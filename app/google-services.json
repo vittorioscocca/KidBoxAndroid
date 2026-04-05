@@ -1,29 +1,47 @@
 {
   "project_info": {
-    "project_number": "000000000000",
-    "project_id": "kidbox-android-placeholder",
-    "storage_bucket": "kidbox-android-placeholder.appspot.com"
+    "project_number": "52613538008",
+    "project_id": "kidbox-42cd7",
+    "storage_bucket": "kidbox-42cd7.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+        "mobilesdk_app_id": "1:52613538008:android:eca84cc36524102e3df7ad",
         "android_client_info": {
           "package_name": "it.vittorioscocca.kidbox"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "52613538008-lpht7873gh01hl8dr1790ag6ost6np06.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "REPLACE_WITH_FIREBASE_CONSOLE_KEY"
+          "current_key": "AIzaSyCdWOL9q1tnYNnPvzpBObJHjVxkHvE06jM"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "52613538008-lpht7873gh01hl8dr1790ag6ost6np06.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "52613538008-v2d99mfnbfkgc4d5hoefabrpaevpdgpl.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "it.vittorioscocca.KidBox"
+              }
+            }
+          ]
         }
       }
     }
   ],
   "configuration_version": "1"
 }
+

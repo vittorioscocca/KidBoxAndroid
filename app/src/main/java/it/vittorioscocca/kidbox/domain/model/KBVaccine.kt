@@ -1,0 +1,26 @@
+package it.vittorioscocca.kidbox.domain.model
+
+/** Vaccino — allineato a [KBVaccine] iOS. */
+data class KBVaccine(
+    val id: String,
+    val familyId: String,
+    val childId: String,
+    val vaccineTypeRaw: String,
+    val statusRaw: String,
+    val commercialName: String?,
+    val doseNumber: Int,
+    val totalDoses: Int,
+    val administeredDateEpochMillis: Long?,
+    val scheduledDateEpochMillis: Long?,
+    val lotNumber: String?,
+    val administeredBy: String?,
+    val administrationSiteRaw: String?,
+    val notes: String?,
+    val isDeleted: Boolean,
+    val createdAtEpochMillis: Long,
+    val updatedAtEpochMillis: Long,
+    val updatedBy: String?,
+    val createdBy: String?,
+    val syncStateRaw: Int,
+    val lastSyncError: String?,
+)
