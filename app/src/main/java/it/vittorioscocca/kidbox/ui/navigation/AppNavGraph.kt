@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.navigation
 
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavType
 import androidx.navigation.NavHostController
@@ -25,13 +26,28 @@ fun AppNavGraph(
         composable(AppDestination.Login.route) {
             LoginScreen(
                 onLoginSuccess = { hasFamily ->
-                    if (hasFamily || onboardingPreferences.hasSeenOnboarding()) {
-                        navController.navigate(AppDestination.Home.route) {
-                            popUpTo(AppDestination.Login.route) { inclusive = true }
+                    val hasSeenOnboarding = onboardingPreferences.hasSeenOnboarding()
+                    Log.d(
+                        "KidBoxDebug",
+                        "onLoginSuccess hasFamily=$hasFamily hasSeenOnboarding=$hasSeenOnboarding",
+                    )
+
+                    when {
+                        hasSeenOnboarding -> {
+                            navController.navigate(AppDestination.Home.route) {
+                                popUpTo(AppDestination.Login.route) { inclusive = true }
+                            }
                         }
-                    } else {
-                        navController.navigate(AppDestination.Onboarding.route) {
-                            popUpTo(AppDestination.Login.route) { inclusive = true }
+                        hasFamily -> {
+                            onboardingPreferences.completeOnboarding()
+                            navController.navigate(AppDestination.Home.route) {
+                                popUpTo(AppDestination.Login.route) { inclusive = true }
+                            }
+                        }
+                        else -> {
+                            navController.navigate(AppDestination.Onboarding.route) {
+                                popUpTo(AppDestination.Login.route) { inclusive = true }
+                            }
                         }
                     }
                 },
@@ -65,7 +81,13 @@ fun AppNavGraph(
         }
 
         composable(AppDestination.Home.route) {
-            HomeScreen()
+            HomeScreen(
+                onLoggedOut = {
+                    navController.navigate(AppDestination.Login.route) {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                    }
+                },
+            )
         }
     }
 }

@@ -18,6 +18,10 @@ class OnboardingPreferences @Inject constructor(
         prefs.edit().putBoolean(KEY_SEEN, true).apply()
     }
 
+    fun reset() {
+        prefs.edit().clear().apply()
+    }
+
     private companion object {
         private const val KEY_SEEN = "has_seen_onboarding"
     }

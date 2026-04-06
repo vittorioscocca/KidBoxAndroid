@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.firestore.FirebaseFirestore
+import android.util.Log
 import dagger.hilt.android.lifecycle.HiltViewModel
-import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
+import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
 import it.vittorioscocca.kidbox.data.remote.auth.AuthError
 import it.vittorioscocca.kidbox.data.remote.auth.AuthFacade
 import it.vittorioscocca.kidbox.data.remote.auth.AuthPresentation
@@ -17,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 @HiltViewModel
@@ -24,7 +27,7 @@ class LoginViewModel @Inject constructor(
     private val auth: AuthFacade,
     private val facebookAuth: FacebookAuthService,
     private val emailAuth: EmailAuthService,
-    private val familyDao: KBFamilyDao,
+    private val onboardingPreferences: OnboardingPreferences,
 ) : ViewModel() {
 
     sealed class AuthCheckState {
@@ -51,12 +54,19 @@ class LoginViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val currentUser = FirebaseAuth.getInstance().currentUser
-            if (currentUser == null) {
-                _authCheckState.value = AuthCheckState.NotAuthenticated
+            val user = FirebaseAuth.getInstance().currentUser
+            val hasFamily = if (user != null) checkHasFamily() else false
+            val hasOnboarding = onboardingPreferences.hasSeenOnboarding()
+
+            Log.d(
+                "KidBoxDebug",
+                "user=${user?.uid} hasFamily=$hasFamily hasOnboarding=$hasOnboarding",
+            )
+
+            _authCheckState.value = if (user == null) {
+                AuthCheckState.NotAuthenticated
             } else {
-                val hasFamily = checkHasFamily()
-                _authCheckState.value = AuthCheckState.Authenticated(hasFamily)
+                AuthCheckState.Authenticated(hasFamily)
             }
         }
     }
@@ -161,8 +171,24 @@ class LoginViewModel @Inject constructor(
     }
 
     private suspend fun checkHasFamily(): Boolean {
-        if (FirebaseAuth.getInstance().currentUser == null) return false
-        return familyDao.hasAnyFamily()
+        return try {
+            val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return false
+            val snapshot = FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(uid)
+                .collection("memberships")
+                .get()
+                .await()
+            val hasFamily = !snapshot.isEmpty
+            Log.d(
+                "KidBoxDebug",
+                "checkHasFamily Firestore result: ${snapshot.size()} memberships → hasFamily=$hasFamily",
+            )
+            hasFamily
+        } catch (e: Exception) {
+            Log.e("KidBoxDebug", "checkHasFamily error: ${e.message}")
+            false
+        }
     }
 
     private fun friendlyError(error: Throwable): String {
