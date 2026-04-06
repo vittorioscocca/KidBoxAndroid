@@ -4,6 +4,6 @@
     <!-- OAuth 2.0 Web client ID da Firebase Console (Impostazioni progetto → Generale). Necessario per Credential Manager + Google Sign-In. -->
     <string name="default_web_client_id" translatable="false">52613538008-v2d99mfnbfkgc4d5hoefabrpaevpdgpl.apps.googleusercontent.com</string>
     <!-- ID app Facebook (Meta Developer Console). Sostituire con l’ID reale. -->
-    <string name="facebook_app_id" translatable="false">1234567890123456</string>
-    <string name="facebook_client_token" translatable="false">REPLACE_WITH_CLIENT_TOKEN</string>
+    <string name="facebook_app_id" translatable="false">2596255223393986</string>
+    <string name="facebook_client_token" translatable="false">5b9865a1b3cafd6f89a71162d5c4094f</string>
 </resources>

@@ -4,9 +4,11 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -72,6 +75,7 @@ fun LoginScreen(
 
     var showEmailSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val uriHandler = LocalUriHandler.current
 
     Box(
         modifier = Modifier
@@ -85,11 +89,11 @@ fun LoginScreen(
                 .padding(horizontal = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Spacer(modifier = Modifier.height(72.dp))
+            Spacer(modifier = Modifier.height(160.dp))
 
             // Logo
             Image(
-                painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                painter = painterResource(id = R.drawable.kidbox_symbol_orange),
                 contentDescription = "KidBox Logo",
                 modifier = Modifier.size(80.dp),
             )
@@ -121,7 +125,6 @@ fun LoginScreen(
 
             // Bottoni neri
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Google
                 Button(
                     onClick = { viewModel.signInGoogle(activity) },
                     enabled = !isBusy,
@@ -143,7 +146,6 @@ fun LoginScreen(
                     )
                 }
 
-                // Facebook
                 Button(
                     onClick = { viewModel.signInFacebook(activity) },
                     enabled = !isBusy,
@@ -239,12 +241,48 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            Text(
-                text = "Continuando, accetti i Termini di Servizio e la Privacy Policy di KidBox.",
-                fontSize = 12.sp,
-                color = Color(0xFF888888),
-                textAlign = TextAlign.Center,
-            )
+            // Footer con link cliccabili
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Continuando, accetti i ",
+                        fontSize = 12.sp,
+                        color = Color(0xFF888888),
+                    )
+                    Text(
+                        "Termini di Servizio",
+                        fontSize = 12.sp,
+                        color = OrangeAccent,
+                        modifier = Modifier.clickable {
+                            uriHandler.openUri("https://vittorioscocca.github.io/KidBox/terms/")
+                        },
+                    )
+                    Text(
+                        " e la ",
+                        fontSize = 12.sp,
+                        color = Color(0xFF888888),
+                    )
+                    Text(
+                        "Privacy Policy",
+                        fontSize = 12.sp,
+                        color = OrangeAccent,
+                        modifier = Modifier.clickable {
+                            uriHandler.openUri("https://vittorioscocca.github.io/KidBox/privacy/")
+                        },
+                    )
+                }
+                Text(
+                    "di KidBox.",
+                    fontSize = 12.sp,
+                    color = Color(0xFF888888),
+                )
+            }
 
             Spacer(modifier = Modifier.height(40.dp))
         }
