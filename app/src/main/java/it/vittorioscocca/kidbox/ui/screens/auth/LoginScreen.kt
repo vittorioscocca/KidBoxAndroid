@@ -36,7 +36,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -64,10 +66,12 @@ private val OrangeAccent = Color(0xFFFF6B00)
 @Composable
 fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel(),
+    onLoginSuccess: (hasFamily: Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
     val activity = context as ComponentActivity
 
+    val authCheckState by viewModel.authCheckState.collectAsStateWithLifecycle()
     val isBusy by viewModel.isBusy.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val resetSent by viewModel.resetPasswordSent.collectAsStateWithLifecycle()
@@ -77,19 +81,31 @@ fun LoginScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val uriHandler = LocalUriHandler.current
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundColor),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Spacer(modifier = Modifier.height(160.dp))
+    LaunchedEffect(authCheckState) {
+        when (val state = authCheckState) {
+            is LoginViewModel.AuthCheckState.Authenticated -> {
+                delay(500)
+                onLoginSuccess(state.hasFamily)
+            }
+            else -> Unit
+        }
+    }
+
+    when (authCheckState) {
+        is LoginViewModel.AuthCheckState.NotAuthenticated -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(BackgroundColor),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Spacer(modifier = Modifier.height(160.dp))
 
             // Logo
             Image(
@@ -285,43 +301,58 @@ fun LoginScreen(
             }
 
             Spacer(modifier = Modifier.height(40.dp))
-        }
+                }
 
-        // Loading overlay
-        if (isBusy) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = OrangeAccent)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        "Accesso in corso…",
-                        color = BlackButton,
-                        style = MaterialTheme.typography.bodyMedium,
+                // Loading overlay
+                if (isBusy) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(color = OrangeAccent)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                "Accesso in corso…",
+                                color = BlackButton,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (showEmailSheet) {
+                ModalBottomSheet(
+                    onDismissRequest = { showEmailSheet = false },
+                    sheetState = sheetState,
+                ) {
+                    EmailAuthSheetContent(
+                        onDismiss = { showEmailSheet = false },
+                        onSignIn = { email, pwd -> viewModel.signInEmail(email, pwd) },
+                        onRegister = { email, pwd -> viewModel.registerEmail(email, pwd) },
+                        onResetPassword = { email -> viewModel.resetPassword(email) },
+                        resetSent = resetSent,
+                        isBusy = isBusy,
+                        errorMessage = errorMessage,
                     )
                 }
             }
         }
-    }
 
-    if (showEmailSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showEmailSheet = false },
-            sheetState = sheetState,
-        ) {
-            EmailAuthSheetContent(
-                onDismiss = { showEmailSheet = false },
-                onSignIn = { email, pwd -> viewModel.signInEmail(email, pwd) },
-                onRegister = { email, pwd -> viewModel.registerEmail(email, pwd) },
-                onResetPassword = { email -> viewModel.resetPassword(email) },
-                resetSent = resetSent,
-                isBusy = isBusy,
-                errorMessage = errorMessage,
-            )
+        is LoginViewModel.AuthCheckState.Checking,
+        is LoginViewModel.AuthCheckState.Authenticated,
+        -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFFF2F0EB)),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(color = Color(0xFFFF6B00))
+            }
         }
     }
 }

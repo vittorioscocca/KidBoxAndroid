@@ -15,6 +15,9 @@ interface KBFamilyDao {
 
     @Query("SELECT * FROM kb_families ORDER BY updatedAtEpochMillis DESC")
     fun observeAll(): Flow<List<KBFamilyEntity>>
+    
+    @Query("SELECT EXISTS(SELECT 1 FROM kb_families LIMIT 1)")
+    suspend fun hasAnyFamily(): Boolean
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBFamilyEntity)

@@ -3,8 +3,10 @@ package it.vittorioscocca.kidbox.ui.screens.auth
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthException
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.remote.auth.AuthError
 import it.vittorioscocca.kidbox.data.remote.auth.AuthFacade
 import it.vittorioscocca.kidbox.data.remote.auth.AuthPresentation
@@ -22,7 +24,17 @@ class LoginViewModel @Inject constructor(
     private val auth: AuthFacade,
     private val facebookAuth: FacebookAuthService,
     private val emailAuth: EmailAuthService,
+    private val familyDao: KBFamilyDao,
 ) : ViewModel() {
+
+    sealed class AuthCheckState {
+        data object Checking : AuthCheckState()
+        data object NotAuthenticated : AuthCheckState()
+        data class Authenticated(val hasFamily: Boolean) : AuthCheckState()
+    }
+
+    private val _authCheckState = MutableStateFlow<AuthCheckState>(AuthCheckState.Checking)
+    val authCheckState: StateFlow<AuthCheckState> = _authCheckState.asStateFlow()
 
     private val _isBusy = MutableStateFlow(false)
     val isBusy: StateFlow<Boolean> = _isBusy.asStateFlow()
@@ -37,6 +49,18 @@ class LoginViewModel @Inject constructor(
     val registrationPendingVerification: StateFlow<Boolean> =
         _registrationPendingVerification.asStateFlow()
 
+    init {
+        viewModelScope.launch {
+            val currentUser = FirebaseAuth.getInstance().currentUser
+            if (currentUser == null) {
+                _authCheckState.value = AuthCheckState.NotAuthenticated
+            } else {
+                val hasFamily = checkHasFamily()
+                _authCheckState.value = AuthCheckState.Authenticated(hasFamily)
+            }
+        }
+    }
+
     fun clearError() {
         _errorMessage.value = null
     }
@@ -50,6 +74,7 @@ class LoginViewModel @Inject constructor(
                     AuthProvider.GOOGLE,
                     AuthPresentation.ActivityContext(activity),
                 )
+                onSignedInSuccessfully()
             } catch (e: Exception) {
                 if (e is AuthError.Cancelled) return@launch
                 _errorMessage.value = friendlyError(e)
@@ -65,6 +90,7 @@ class LoginViewModel @Inject constructor(
             _errorMessage.value = null
             try {
                 facebookAuth.signInWithFacebook(activity)
+                onSignedInSuccessfully()
             } catch (e: Exception) {
                 if (e is AuthError.Cancelled) return@launch
                 _errorMessage.value = friendlyError(e)
@@ -80,6 +106,7 @@ class LoginViewModel @Inject constructor(
             _errorMessage.value = null
             try {
                 emailAuth.signInWithEmail(email, password)
+                onSignedInSuccessfully()
             } catch (e: Exception) {
                 _errorMessage.value = friendlyError(e)
             } finally {
@@ -124,6 +151,18 @@ class LoginViewModel @Inject constructor(
         } catch (e: Exception) {
             // log only — come su iOS non esponiamo errore UI per signOut
         }
+    }
+
+    private suspend fun onSignedInSuccessfully() {
+        if (FirebaseAuth.getInstance().currentUser != null) {
+            _authCheckState.value =
+                AuthCheckState.Authenticated(checkHasFamily())
+        }
+    }
+
+    private suspend fun checkHasFamily(): Boolean {
+        if (FirebaseAuth.getInstance().currentUser == null) return false
+        return familyDao.hasAnyFamily()
     }
 
     private fun friendlyError(error: Throwable): String {

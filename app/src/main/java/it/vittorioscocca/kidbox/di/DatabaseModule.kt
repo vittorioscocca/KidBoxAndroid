@@ -1,0 +1,31 @@
+package it.vittorioscocca.kidbox.di
+
+import android.content.Context
+import androidx.room.Room
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
+import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
+import javax.inject.Singleton
+
+@Module
+@InstallIn(SingletonComponent::class)
+object DatabaseModule {
+
+    @Provides
+    @Singleton
+    fun provideKidBoxDatabase(
+        @ApplicationContext context: Context,
+    ): KidBoxDatabase = Room.databaseBuilder(
+        context,
+        KidBoxDatabase::class.java,
+        "kidbox.db",
+    ).fallbackToDestructiveMigration()
+        .build()
+
+    @Provides
+    fun provideKBFamilyDao(database: KidBoxDatabase): KBFamilyDao = database.familyDao()
+}
