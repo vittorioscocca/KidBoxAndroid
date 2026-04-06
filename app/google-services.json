@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "52613538008-a0ol6881n892kctocsr21pig3j4aekqi.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "it.vittorioscocca.kidbox",
+            "certificate_hash": "7462c4b43a1047fdec238d9683ba7b40e01f9464"
+          }
+        },
+        {
           "client_id": "52613538008-lpht7873gh01hl8dr1790ag6ost6np06.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -44,4 +52,3 @@
   ],
   "configuration_version": "1"
 }
-
