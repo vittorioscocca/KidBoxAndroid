@@ -17,6 +17,7 @@ import it.vittorioscocca.kidbox.ui.screens.home.HomeScreen
 import it.vittorioscocca.kidbox.ui.screens.home.ProfileScreen
 import it.vittorioscocca.kidbox.ui.screens.onboarding.OnboardingScreen
 import it.vittorioscocca.kidbox.ui.screens.onboarding.WikiOnboardingScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.SettingsScreen
 
 @Composable
 fun AppNavGraph(
@@ -100,7 +101,12 @@ fun AppNavGraph(
                 },
             )
         }
-        composable(AppDestination.Settings.route) { PlaceholderScreen("Settings") }
+        composable(AppDestination.Settings.route) {
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onFamilySettings = { navController.navigate(AppDestination.FamilySettings.route) },
+            )
+        }
         composable(
             route = AppDestination.FamilyPhotos.route,
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),

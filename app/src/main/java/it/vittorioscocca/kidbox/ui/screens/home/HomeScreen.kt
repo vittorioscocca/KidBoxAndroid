@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.home
 
 import android.net.Uri
+import android.util.Log
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -20,7 +21,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -66,6 +69,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -101,11 +105,14 @@ fun HomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 16.dp),
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .zIndex(10f),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -130,7 +137,12 @@ fun HomeScreen(
                         Icon(Icons.Filled.Person, contentDescription = null, tint = Color(0xFF666666))
                     }
                 }
-                IconButton(onClick = { onNavigate(AppDestination.Settings.route) }) {
+                IconButton(
+                    onClick = {
+                        Log.d("NAV", "Settings tapped, navigating to: ${AppDestination.Settings.route}")
+                        onNavigate(AppDestination.Settings.route)
+                    },
+                ) {
                     Icon(Icons.Filled.Settings, contentDescription = null, tint = Color(0xFF1A1A1A))
                 }
             }
@@ -200,7 +212,7 @@ fun HomeScreen(
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(20.dp),
+                .padding(16.dp),
         )
 
     }
@@ -320,7 +332,7 @@ private fun HomeFab(
 ) {
     val rotation by animateFloatAsState(if (expanded) 45f else 0f, label = "fab_rotation")
     Column(
-        modifier = modifier,
+        modifier = modifier.wrapContentSize(),
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -344,13 +356,28 @@ private fun HomeFab(
         }
         FloatingActionButton(
             onClick = onToggle,
-            containerColor = Color.Transparent,
-            modifier = Modifier.background(
-                brush = Brush.linearGradient(listOf(Color(0xFFFFBF40), Color(0xFFF26118))),
-                shape = CircleShape,
-            ),
+            containerColor = Color(0xFFFF6B00),
+            shape = CircleShape,
+            modifier = Modifier.size(56.dp),
         ) {
-            Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White, modifier = Modifier.rotate(rotation))
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        brush = Brush.linearGradient(
+                            listOf(Color(0xFFFFBF40), Color(0xFFF26118)),
+                        ),
+                        shape = CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.rotate(rotation),
+                )
+            }
         }
     }
 }
