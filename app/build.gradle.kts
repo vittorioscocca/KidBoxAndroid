@@ -87,4 +87,5 @@ dependencies {
     implementation(libs.androidx.credentials.play.services)
     implementation(libs.googleid)
     implementation(libs.facebook.login)
+    implementation("com.google.zxing:core:3.5.3")
 }

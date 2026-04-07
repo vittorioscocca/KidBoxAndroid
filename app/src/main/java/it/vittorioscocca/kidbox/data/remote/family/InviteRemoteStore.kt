@@ -1,0 +1,51 @@
+package it.vittorioscocca.kidbox.data.remote.family
+
+import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
+import java.util.Date
+import kotlin.random.Random
+
+class InviteRemoteStore(
+    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
+) {
+    suspend fun createInviteCode(familyId: String, ttlDays: Int = 7): String {
+        val uid = auth.currentUser?.uid ?: error("Not authenticated")
+        repeat(10) {
+            val code = generateCode()
+            val ref = db.collection("invites").document(code)
+            try {
+                db.runTransaction { transaction ->
+                    val snap = transaction.get(ref)
+                    if (snap.exists()) {
+                        error("collision")
+                    }
+                    val expiresAt = Date(System.currentTimeMillis() + ttlDays * 24L * 3600L * 1000L)
+                    transaction.set(
+                        ref,
+                        mapOf(
+                            "familyId" to familyId,
+                            "createdBy" to uid,
+                            "revoked" to false,
+                            "createdAt" to Timestamp.now(),
+                            "expiresAt" to Timestamp(expiresAt),
+                        ),
+                    )
+                }.await()
+                return code
+            } catch (_: Exception) {
+                // Retry on collision/transient transaction failures.
+            }
+        }
+        error("Unable to generate unique invite code")
+    }
+
+    private fun generateCode(length: Int = 8): String {
+        val alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+        return buildString(length) {
+            repeat(length) { append(alphabet[Random.nextInt(alphabet.length)]) }
+        }
+    }
+}

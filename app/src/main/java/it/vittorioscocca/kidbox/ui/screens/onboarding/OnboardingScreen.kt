@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -631,10 +632,19 @@ private fun formatBirthLabel(millis: Long): String {
 @Composable
 private fun InvitePartnerPageContent(familyId: String) {
     val context = LocalContext.current
-    val inviteSnippet = if (familyId.isNotEmpty()) {
-        "Unisciti alla mia famiglia su KidBox — codice: $familyId"
-    } else {
-        "Unisciti alla mia famiglia su KidBox"
+    val viewModel: InviteCodeViewModel = hiltViewModel()
+    val isBusy by viewModel.isBusy.collectAsStateWithLifecycle()
+    val qrPayload by viewModel.qrPayload.collectAsStateWithLifecycle()
+    val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
+    val code by viewModel.code.collectAsStateWithLifecycle()
+    var didGenerate by remember { mutableStateOf(false) }
+    var didCopy by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (!didGenerate) {
+            didGenerate = true
+            viewModel.generateInviteCode()
+        }
     }
 
     Column(
@@ -643,8 +653,8 @@ private fun InvitePartnerPageContent(familyId: String) {
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
-        Spacer(modifier = Modifier.height(32.dp))
         Box(
             modifier = Modifier
                 .size(72.dp)
@@ -662,7 +672,7 @@ private fun InvitePartnerPageContent(familyId: String) {
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             "Aggiungi il tuo partner",
-            fontSize = 32.sp,
+            fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
             color = BlackText,
             textAlign = TextAlign.Center,
@@ -678,60 +688,118 @@ private fun InvitePartnerPageContent(familyId: String) {
 
         Box(
             modifier = Modifier
-                .size(240.dp)
-                .shadow(12.dp, RoundedCornerShape(28.dp))
-                .clip(RoundedCornerShape(28.dp))
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
                 .background(Color.White)
-                .padding(20.dp),
+                .shadow(
+                    elevation = 12.dp,
+                    shape = RoundedCornerShape(20.dp),
+                    spotColor = OrangeAccent.copy(alpha = 0.12f),
+                ),
             contentAlignment = Alignment.Center,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(200.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFFE8E8E8)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("QR", color = GrayCaption, fontSize = 14.sp)
+            when {
+                isBusy -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        CircularProgressIndicator(color = OrangeAccent)
+                        Text("Generazione QR…", color = GraySubtitle, fontSize = 14.sp)
+                    }
+                }
+                qrPayload != null -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        QRCodeView(
+                            payload = qrPayload.orEmpty(),
+                            modifier = Modifier.size(156.dp),
+                        )
+                        Text("Valido 24 ore", fontSize = 13.sp, color = GrayCaption)
+                    }
+                }
+                errorMessage != null -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp, horizontal = 20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Warning,
+                            contentDescription = null,
+                            tint = Color(0xFFFF9800),
+                            modifier = Modifier.size(28.dp),
+                        )
+                        Text(
+                            text = errorMessage.orEmpty(),
+                            color = GraySubtitle,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center,
+                        )
+                        TextButton(onClick = viewModel::generateInviteCode) {
+                            Text("Riprova", color = OrangeAccent)
+                        }
+                    }
+                }
+                else -> {
+                    Spacer(modifier = Modifier.height(180.dp))
+                }
             }
         }
-        Text(
-            "Valido 24 ore",
-            fontSize = 13.sp,
-            color = GrayCaption,
-            modifier = Modifier.padding(top = 8.dp),
-        )
 
-        Spacer(modifier = Modifier.height(20.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            OutlinedSoftButton(
-                modifier = Modifier.weight(1f),
-                containerColor = OrangeAccent.copy(alpha = 0.12f),
-                contentColor = OrangeAccent,
-                icon = Icons.Filled.Share,
-                label = "Condividi",
-                onClick = {
-                    val send = Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(Intent.EXTRA_TEXT, inviteSnippet)
-                    }
-                    context.startActivity(Intent.createChooser(send, "Condividi"))
-                },
-            )
-            OutlinedSoftButton(
-                modifier = Modifier.weight(1f),
-                containerColor = Color(0xFFECECEC),
-                contentColor = GraySubtitle,
-                icon = Icons.Filled.ContentCopy,
-                label = "Copia codice",
-                onClick = {
-                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    cm.setPrimaryClip(ClipData.newPlainText("kidbox_invite", familyId.ifEmpty { inviteSnippet }))
-                },
-            )
+        if (qrPayload != null) {
+            Spacer(modifier = Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedSoftButton(
+                    modifier = Modifier.weight(1f),
+                    containerColor = OrangeAccent.copy(alpha = 0.10f),
+                    contentColor = OrangeAccent,
+                    icon = Icons.Filled.Share,
+                    label = "Condividi",
+                    onClick = {
+                        val shareText = "KidBox — codice invito: ${code.orEmpty()}"
+                        val send = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, shareText)
+                        }
+                        context.startActivity(Intent.createChooser(send, "Condividi"))
+                    },
+                )
+                OutlinedSoftButton(
+                    modifier = Modifier.weight(1f),
+                    containerColor = GraySubtitle.copy(alpha = 0.08f),
+                    contentColor = if (didCopy) SuccessGreen else GraySubtitle,
+                    icon = if (didCopy) Icons.Filled.CheckCircle else Icons.Filled.ContentCopy,
+                    label = if (didCopy) "Copiato!" else "Copia codice",
+                    onClick = {
+                        val value = code.orEmpty()
+                        if (value.isNotBlank()) {
+                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            cm.setPrimaryClip(ClipData.newPlainText("kidbox_invite_code", value))
+                            didCopy = true
+                        }
+                    },
+                )
+            }
+            LaunchedEffect(didCopy) {
+                if (didCopy) {
+                    kotlinx.coroutines.delay(2000)
+                    didCopy = false
+                }
+            }
         }
         Text(
             "Puoi farlo anche dopo da Impostazioni → Invita partner",
