@@ -2,6 +2,10 @@ package it.vittorioscocca.kidbox.ui.navigation
 
 import android.util.Log
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
 import androidx.navigation.NavType
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -10,6 +14,7 @@ import androidx.navigation.navArgument
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
 import it.vittorioscocca.kidbox.ui.screens.auth.LoginScreen
 import it.vittorioscocca.kidbox.ui.screens.home.HomeScreen
+import it.vittorioscocca.kidbox.ui.screens.home.ProfileScreen
 import it.vittorioscocca.kidbox.ui.screens.onboarding.OnboardingScreen
 import it.vittorioscocca.kidbox.ui.screens.onboarding.WikiOnboardingScreen
 
@@ -82,6 +87,12 @@ fun AppNavGraph(
 
         composable(AppDestination.Home.route) {
             HomeScreen(
+                onNavigate = { route -> navController.navigate(route) },
+            )
+        }
+
+        composable(AppDestination.Profile.route) {
+            ProfileScreen(
                 onLoggedOut = {
                     navController.navigate(AppDestination.Login.route) {
                         popUpTo(navController.graph.id) { inclusive = true }
@@ -89,5 +100,46 @@ fun AppNavGraph(
                 },
             )
         }
+        composable(AppDestination.Settings.route) { PlaceholderScreen("Settings") }
+        composable(
+            route = AppDestination.FamilyPhotos.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { PlaceholderScreen("Family Photos") }
+        composable(
+            route = AppDestination.NotesHome.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { PlaceholderScreen("Notes") }
+        composable(AppDestination.Todo.route) { PlaceholderScreen("To-Do") }
+        composable(
+            route = AppDestination.ShoppingList.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { PlaceholderScreen("Lista Spesa") }
+        composable(
+            route = AppDestination.Calendar.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { PlaceholderScreen("Calendario") }
+        composable(
+            route = AppDestination.PediatricChildSelector.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { PlaceholderScreen("Salute") }
+        composable(AppDestination.Chat.route) { PlaceholderScreen("Chat") }
+        composable(
+            route = AppDestination.ExpensesHome.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { PlaceholderScreen("Spese") }
+        composable(AppDestination.DocumentsHome.route) { PlaceholderScreen("Documenti") }
+        composable(
+            route = AppDestination.FamilyLocation.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { PlaceholderScreen("Posizione") }
+        composable(AppDestination.AskExpert.route) { PlaceholderScreen("Assistente AI") }
+        composable(AppDestination.FamilySettings.route) { PlaceholderScreen("Family") }
+    }
+}
+
+@Composable
+private fun PlaceholderScreen(label: String) {
+    Box(modifier = androidx.compose.ui.Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(text = label)
     }
 }

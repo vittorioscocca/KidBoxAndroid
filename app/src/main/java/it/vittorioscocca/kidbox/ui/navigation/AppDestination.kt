@@ -8,4 +8,32 @@ sealed class AppDestination(val route: String) {
     }
 
     data object Home : AppDestination("home")
+    data object Profile : AppDestination("profile")
+    data object Settings : AppDestination("settings")
+    data object FamilyPhotos : AppDestination("family_photos/{familyId}") {
+        fun createRoute(familyId: String): String = "family_photos/$familyId"
+    }
+    data object NotesHome : AppDestination("notes_home/{familyId}") {
+        fun createRoute(familyId: String): String = "notes_home/$familyId"
+    }
+    data object Todo : AppDestination("todo")
+    data object ShoppingList : AppDestination("shopping_list/{familyId}") {
+        fun createRoute(familyId: String): String = "shopping_list/$familyId"
+    }
+    data object Calendar : AppDestination("calendar/{familyId}") {
+        fun createRoute(familyId: String): String = "calendar/$familyId"
+    }
+    data object PediatricChildSelector : AppDestination("pediatric_child_selector/{familyId}") {
+        fun createRoute(familyId: String): String = "pediatric_child_selector/$familyId"
+    }
+    data object Chat : AppDestination("chat")
+    data object ExpensesHome : AppDestination("expenses_home/{familyId}") {
+        fun createRoute(familyId: String): String = "expenses_home/$familyId"
+    }
+    data object DocumentsHome : AppDestination("documents_home")
+    data object FamilyLocation : AppDestination("family_location/{familyId}") {
+        fun createRoute(familyId: String): String = "family_location/$familyId"
+    }
+    data object AskExpert : AppDestination("ask_expert")
+    data object FamilySettings : AppDestination("family_settings")
 }

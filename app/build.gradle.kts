@@ -63,6 +63,7 @@ dependencies {
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
+    implementation("io.coil-kt:coil-compose:2.7.0")
     debugImplementation(libs.compose.ui.tooling)
 
     implementation(libs.navigation.compose)
@@ -79,6 +80,7 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.storage)
+    implementation("com.google.firebase:firebase-storage-ktx")
     implementation(libs.firebase.messaging)
 
     implementation(libs.kotlinx.coroutines.android)

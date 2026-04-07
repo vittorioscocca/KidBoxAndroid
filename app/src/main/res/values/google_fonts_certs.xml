@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Placeholder cert array to satisfy R.array reference for GoogleFont provider. -->
+    <array name="com_google_android_gms_fonts_certs">
+        <item>@null</item>
+    </array>
+</resources>

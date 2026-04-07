@@ -7,7 +7,6 @@ import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -19,6 +18,7 @@ import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.navigation.AppNavGraph
 import it.vittorioscocca.kidbox.ui.splash.KidBoxSplashScreen
+import it.vittorioscocca.kidbox.ui.theme.KidBoxTheme
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
         splashScreen.setKeepOnScreenCondition { false }
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            KidBoxTheme {
                 val navController = rememberNavController()
                 var showSplash by remember { mutableStateOf(true) }
 

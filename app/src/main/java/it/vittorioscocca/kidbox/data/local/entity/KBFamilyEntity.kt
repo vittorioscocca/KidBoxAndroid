@@ -12,6 +12,7 @@ data class KBFamilyEntity(
     @PrimaryKey val id: String,
     val name: String,
     val heroPhotoURL: String?,
+    val heroPhotoLocalPath: String? = null,
     val heroPhotoUpdatedAtEpochMillis: Long?,
     val heroPhotoScale: Double?,
     val heroPhotoOffsetX: Double?,
