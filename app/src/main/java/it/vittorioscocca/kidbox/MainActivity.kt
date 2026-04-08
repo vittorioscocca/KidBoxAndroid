@@ -7,6 +7,8 @@ import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -14,7 +16,9 @@ import androidx.compose.runtime.setValue
 import androidx.navigation.compose.rememberNavController
 import com.facebook.CallbackManager
 import dagger.hilt.android.AndroidEntryPoint
+import it.vittorioscocca.kidbox.data.local.AppTheme
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
+import it.vittorioscocca.kidbox.data.local.ThemePreference
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.navigation.AppNavGraph
 import it.vittorioscocca.kidbox.ui.splash.KidBoxSplashScreen
@@ -30,12 +34,21 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var onboardingPreferences: OnboardingPreferences
 
+    @Inject
+    lateinit var themePreference: ThemePreference
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         splashScreen.setKeepOnScreenCondition { false }
         super.onCreate(savedInstanceState)
         setContent {
-            KidBoxTheme {
+            val theme by themePreference.getThemeFlow().collectAsState(AppTheme.SYSTEM)
+            val darkTheme = when (theme) {
+                AppTheme.LIGHT -> false
+                AppTheme.DARK -> true
+                AppTheme.SYSTEM -> isSystemInDarkTheme()
+            }
+            KidBoxTheme(darkTheme = darkTheme) {
                 val navController = rememberNavController()
                 var showSplash by remember { mutableStateOf(true) }
 

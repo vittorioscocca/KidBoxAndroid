@@ -2,6 +2,8 @@ package it.vittorioscocca.kidbox.ui.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -35,8 +37,12 @@ private val KidBoxTypography = Typography(
 )
 
 @Composable
-fun KidBoxTheme(content: @Composable () -> Unit) {
+fun KidBoxTheme(
+    darkTheme: Boolean,
+    content: @Composable () -> Unit,
+) {
     MaterialTheme(
+        colorScheme = if (darkTheme) darkColorScheme() else lightColorScheme(),
         typography = KidBoxTypography,
         content = content,
     )

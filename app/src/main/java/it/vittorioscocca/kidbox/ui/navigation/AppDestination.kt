@@ -10,6 +10,13 @@ sealed class AppDestination(val route: String) {
     data object Home : AppDestination("home")
     data object Profile : AppDestination("profile")
     data object Settings : AppDestination("settings")
+    data object Theme : AppDestination("theme")
+    data object InviteCode : AppDestination("invite_code")
+    data object JoinFamily : AppDestination("join_family")
+    data object EditFamily : AppDestination("edit_family")
+    data object EditChild : AppDestination("edit_child/{childId}") {
+        fun createRoute(childId: String): String = "edit_child/$childId"
+    }
     data object FamilyPhotos : AppDestination("family_photos/{familyId}") {
         fun createRoute(familyId: String): String = "family_photos/$familyId"
     }

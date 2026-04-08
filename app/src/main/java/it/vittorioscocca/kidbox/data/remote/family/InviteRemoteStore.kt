@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox.data.remote.family
 
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import java.util.Date
@@ -40,6 +41,51 @@ class InviteRemoteStore(
             }
         }
         error("Unable to generate unique invite code")
+    }
+
+    suspend fun resolveInvite(code: String): String {
+        auth.currentUser?.uid ?: error("Not authenticated")
+        val snap = db.collection("invites").document(code).get().await()
+        val data = snap.data ?: error("Codice non valido")
+        if (data["revoked"] == true) error("Codice revocato")
+        val expiresAt = data["expiresAt"] as? Timestamp
+        if (expiresAt != null && expiresAt.toDate().before(Date())) error("Codice scaduto")
+        return data["familyId"] as? String ?: error("Invite malformato")
+    }
+
+    suspend fun addMember(familyId: String, role: String = "member") {
+        val uid = auth.currentUser?.uid ?: error("Not authenticated")
+        val memberRef = db.collection("families")
+            .document(familyId)
+            .collection("members")
+            .document(uid)
+        val membershipRef = db.collection("users")
+            .document(uid)
+            .collection("memberships")
+            .document(familyId)
+        val batch = db.batch()
+        batch.set(
+            memberRef,
+            mapOf(
+                "uid" to uid,
+                "role" to role,
+                "isDeleted" to false,
+                "updatedBy" to uid,
+                "updatedAt" to FieldValue.serverTimestamp(),
+                "createdAt" to FieldValue.serverTimestamp(),
+            ),
+            com.google.firebase.firestore.SetOptions.merge(),
+        )
+        batch.set(
+            membershipRef,
+            mapOf(
+                "familyId" to familyId,
+                "role" to role,
+                "createdAt" to FieldValue.serverTimestamp(),
+            ),
+            com.google.firebase.firestore.SetOptions.merge(),
+        )
+        batch.commit().await()
     }
 
     private fun generateCode(length: Int = 8): String {

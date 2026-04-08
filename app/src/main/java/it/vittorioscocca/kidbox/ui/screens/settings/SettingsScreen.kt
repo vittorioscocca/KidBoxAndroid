@@ -29,6 +29,7 @@ import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,6 +37,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.data.local.AppTheme
 
 private data class SettingRowItem(
     val title: String,
@@ -48,17 +52,20 @@ private data class SettingRowItem(
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onTheme: () -> Unit,
     onFamilySettings: () -> Unit,
+    viewModel: ThemeViewModel = hiltViewModel(),
 ) {
     BackHandler { onBack() }
+    val theme by viewModel.theme.collectAsStateWithLifecycle()
 
     val rows = listOf(
         SettingRowItem(
             title = "Tema",
-            subtitle = "Sistema",
+            subtitle = theme.toSubtitle(),
             icon = Icons.Filled.Contrast,
             showChevron = true,
-            onClick = {},
+            onClick = onTheme,
         ),
         SettingRowItem(
             title = "Family settings",
@@ -125,6 +132,12 @@ fun SettingsScreen(
             }
         }
     }
+}
+
+private fun AppTheme.toSubtitle(): String = when (this) {
+    AppTheme.LIGHT -> "Chiaro"
+    AppTheme.DARK -> "Scuro"
+    AppTheme.SYSTEM -> "Sistema"
 }
 
 @Composable

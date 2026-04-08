@@ -17,7 +17,13 @@ import it.vittorioscocca.kidbox.ui.screens.home.HomeScreen
 import it.vittorioscocca.kidbox.ui.screens.home.ProfileScreen
 import it.vittorioscocca.kidbox.ui.screens.onboarding.OnboardingScreen
 import it.vittorioscocca.kidbox.ui.screens.onboarding.WikiOnboardingScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.EditChildScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.EditFamilyScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.FamilySettingsScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.InviteCodeScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.JoinFamilyScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.SettingsScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.ThemeScreen
 
 @Composable
 fun AppNavGraph(
@@ -104,8 +110,38 @@ fun AppNavGraph(
         composable(AppDestination.Settings.route) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
+                onTheme = { navController.navigate(AppDestination.Theme.route) },
                 onFamilySettings = { navController.navigate(AppDestination.FamilySettings.route) },
             )
+        }
+        composable(AppDestination.Theme.route) {
+            ThemeScreen(onBack = { navController.popBackStack() })
+        }
+        composable(AppDestination.InviteCode.route) {
+            InviteCodeScreen(onBack = { navController.popBackStack() })
+        }
+        composable(AppDestination.JoinFamily.route) {
+            JoinFamilyScreen(
+                onBack = { navController.popBackStack() },
+                onJoined = {
+                    navController.navigate(AppDestination.Home.route) {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                    }
+                },
+            )
+        }
+        composable(AppDestination.EditFamily.route) {
+            EditFamilyScreen(
+                onBack = { navController.popBackStack() },
+                onEditChild = { childId -> navController.navigate(AppDestination.EditChild.createRoute(childId)) },
+            )
+        }
+        composable(
+            route = AppDestination.EditChild.route,
+            arguments = listOf(navArgument("childId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            EditChildScreen(childId = childId, onBack = { navController.popBackStack() })
         }
         composable(
             route = AppDestination.FamilyPhotos.route,
@@ -139,7 +175,19 @@ fun AppNavGraph(
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
         ) { PlaceholderScreen("Posizione") }
         composable(AppDestination.AskExpert.route) { PlaceholderScreen("Assistente AI") }
-        composable(AppDestination.FamilySettings.route) { PlaceholderScreen("Family") }
+        composable(AppDestination.FamilySettings.route) {
+            FamilySettingsScreen(
+                onBack = { navController.popBackStack() },
+                onInvite = { navController.navigate(AppDestination.InviteCode.route) },
+                onJoin = { navController.navigate(AppDestination.JoinFamily.route) },
+                onEditFamily = { navController.navigate(AppDestination.EditFamily.route) },
+                onLeaveDone = {
+                    navController.navigate(AppDestination.Login.route) {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                    }
+                },
+            )
+        }
     }
 }
 
