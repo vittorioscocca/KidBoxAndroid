@@ -17,9 +17,9 @@ import it.vittorioscocca.kidbox.ui.screens.home.HomeScreen
 import it.vittorioscocca.kidbox.ui.screens.home.ProfileScreen
 import it.vittorioscocca.kidbox.ui.screens.onboarding.OnboardingScreen
 import it.vittorioscocca.kidbox.ui.screens.onboarding.WikiOnboardingScreen
-import it.vittorioscocca.kidbox.ui.screens.settings.EditChildScreen
-import it.vittorioscocca.kidbox.ui.screens.settings.EditFamilyScreen
-import it.vittorioscocca.kidbox.ui.screens.settings.FamilySettingsScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.family.EditChildScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.family.EditFamilyScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.family.FamilySettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.InviteCodeScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.JoinFamilyScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.SettingsScreen
@@ -133,7 +133,9 @@ fun AppNavGraph(
         composable(AppDestination.EditFamily.route) {
             EditFamilyScreen(
                 onBack = { navController.popBackStack() },
-                onEditChild = { childId -> navController.navigate(AppDestination.EditChild.createRoute(childId)) },
+                onEditChild = { childId ->
+                    navController.navigate(AppDestination.EditChild.createRoute(childId))
+                },
             )
         }
         composable(
@@ -193,7 +195,10 @@ fun AppNavGraph(
 
 @Composable
 private fun PlaceholderScreen(label: String) {
-    Box(modifier = androidx.compose.ui.Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
         Text(text = label)
     }
 }

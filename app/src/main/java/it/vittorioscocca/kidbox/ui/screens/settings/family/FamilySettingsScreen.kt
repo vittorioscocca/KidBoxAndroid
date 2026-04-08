@@ -1,4 +1,4 @@
-package it.vittorioscocca.kidbox.ui.screens.settings
+package it.vittorioscocca.kidbox.ui.screens.settings.family
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -33,11 +33,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +48,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
@@ -64,7 +66,17 @@ fun FamilySettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showLeaveDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) { viewModel.load() }
+    // Lifecycle-aware: calls startObserving() every time the screen resumes
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = object : DefaultLifecycleObserver {
+            override fun onResume(owner: LifecycleOwner) {
+                viewModel.startObserving()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Column(
         modifier = Modifier
@@ -112,12 +124,14 @@ fun FamilySettingsScreen(
                 Spacer(modifier = Modifier.size(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(state.family?.name.orEmpty(), fontWeight = FontWeight.Bold)
-                    Text(
-                        state.children.takeIf { it.isNotEmpty() }?.joinToString(prefix = "Figlio: ") { it.name }
-                            ?: "Nessun figlio configurato.",
-                        color = Color(0xFF666666),
-                        fontSize = 13.sp,
-                    )
+                    val childrenText = if (state.children.isEmpty()) {
+                        "Nessun figlio configurato."
+                    } else if (state.children.size == 1) {
+                        "Figlio: ${state.children[0].name}"
+                    } else {
+                        "Figli: ${state.children.joinToString(", ") { it.name }}"
+                    }
+                    Text(childrenText, color = Color(0xFF666666), fontSize = 13.sp)
                 }
                 IconButton(onClick = onEditFamily) {
                     Icon(Icons.Filled.Edit, null, tint = Color(0xFF2E86FF))
@@ -149,7 +163,10 @@ fun FamilySettingsScreen(
                         Spacer(modifier = Modifier.size(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(member.displayName ?: member.email ?: "Membro")
-                            Text(if (member.role.equals("owner", true)) "Owner" else "Membro", fontSize = 12.sp, color = Color(0xFF666666))
+                            Text(
+                                if (member.role.equals("owner", true)) "Owner" else "Membro",
+                                fontSize = 12.sp, color = Color(0xFF666666),
+                            )
                         }
                         if (state.isOwner && member.userId != state.currentUid) {
                             IconButton(onClick = { viewModel.removeMember(member) }) {
@@ -180,16 +197,18 @@ fun FamilySettingsScreen(
             iconTint = Color(0xFF777777),
             onClick = onJoin,
         )
-        Spacer(modifier = Modifier.height(10.dp))
 
-        SimpleActionCard(
-            title = "Esci dalla famiglia",
-            subtitle = "Non potrai più accedere ai dati condivisi.",
-            icon = Icons.AutoMirrored.Filled.ExitToApp,
-            iconTint = Color(0xFFE53E3E),
-            borderColor = Color(0x66E53E3E),
-            onClick = { showLeaveDialog = true },
-        )
+        if (state.canLeave) {
+            Spacer(modifier = Modifier.height(10.dp))
+            SimpleActionCard(
+                title = "Esci dalla famiglia",
+                subtitle = "Non potrai più accedere ai dati condivisi.",
+                icon = Icons.AutoMirrored.Filled.ExitToApp,
+                iconTint = Color(0xFFE53E3E),
+                borderColor = Color(0x66E53E3E),
+                onClick = { showLeaveDialog = true },
+            )
+        }
     }
 
     if (showLeaveDialog) {
@@ -211,7 +230,7 @@ fun FamilySettingsScreen(
 }
 
 @Composable
-private fun SimpleActionCard(
+fun SimpleActionCard(
     title: String,
     subtitle: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Filled.Groups,
