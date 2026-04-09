@@ -36,6 +36,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -60,6 +61,7 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import java.util.Locale
@@ -89,15 +91,15 @@ fun JoinFamilyScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF2F0EB))
+            .background(MaterialTheme.kidBoxColors.background)
             .statusBarsPadding()
             .padding(16.dp),
     ) {
-        Text("Entra con codice", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF1A1A1A))
+        Text("Entra con codice", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.kidBoxColors.title)
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             "Inserisci il codice invito ricevuto oppure scansiona il QR code.",
-            color = Color(0xFF666666),
+            color = MaterialTheme.kidBoxColors.subtitle,
             fontSize = 14.sp,
         )
         Spacer(modifier = Modifier.height(20.dp))
@@ -118,7 +120,7 @@ fun JoinFamilyScreen(
         // Card con bottone QR + bottone Entra
         Card(
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
         ) {
             // Bottone scanner QR — ora funzionante
             Row(
@@ -149,7 +151,7 @@ fun JoinFamilyScreen(
                 modifier = Modifier
                     .height(1.dp)
                     .fillMaxWidth()
-                    .background(Color(0xFFEAEAEA)),
+                    .background(MaterialTheme.kidBoxColors.divider),
             )
 
             // Bottone Entra con codice testuale
@@ -162,12 +164,15 @@ fun JoinFamilyScreen(
                         if (code.isNotBlank()) viewModel.joinWithCode(code, onJoined)
                     },
                     enabled = !state.isBusy && code.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A1A1A)),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.inverseSurface,
+                        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                    ),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (state.isBusy) {
                         CircularProgressIndicator(
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.inverseOnSurface,
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
                         )

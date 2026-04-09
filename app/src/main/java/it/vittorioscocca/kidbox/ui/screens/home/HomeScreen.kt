@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -50,6 +51,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -75,6 +77,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import java.io.File
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
+import it.vittorioscocca.kidbox.ui.theme.KidBoxDarkColorScheme
+import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
 @Composable
 fun HomeScreen(
@@ -113,7 +117,7 @@ fun HomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF2F0EB)),
+            .background(MaterialTheme.kidBoxColors.background),
     ) {
         if (state.isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -141,8 +145,8 @@ fun HomeScreen(
                         .size(44.dp)
                         .shadow(6.dp, CircleShape)
                         .clip(CircleShape)
-                        .background(Color.White)
-                        .border(2.dp, Color.White, CircleShape)
+                        .background(MaterialTheme.kidBoxColors.card)
+                        .border(2.dp, MaterialTheme.kidBoxColors.card, CircleShape)
                         .clip(CircleShape)
                         .clickable { onNavigate(AppDestination.Profile.route) },
                     contentAlignment = Alignment.Center,
@@ -154,11 +158,11 @@ fun HomeScreen(
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {
-                        Icon(Icons.Filled.Person, contentDescription = null, tint = Color(0xFF666666))
+                        Icon(Icons.Filled.Person, contentDescription = null, tint = MaterialTheme.kidBoxColors.subtitle)
                     }
                 }
                 IconButton(onClick = { onNavigate(AppDestination.Settings.route) }) {
-                    Icon(Icons.Filled.Settings, contentDescription = null, tint = Color(0xFF1A1A1A))
+                    Icon(Icons.Filled.Settings, contentDescription = null, tint = MaterialTheme.kidBoxColors.title)
                 }
             }
 
@@ -168,9 +172,9 @@ fun HomeScreen(
                 fontSize = 34.sp,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = (-0.5).sp,
-                color = Color(0xFF1A1A1A),
+                color = MaterialTheme.kidBoxColors.title,
             )
-            Text(state.todayLabel, color = Color(0xFF666666))
+            Text(state.todayLabel, color = MaterialTheme.kidBoxColors.subtitle)
             Spacer(modifier = Modifier.size(16.dp))
 
             FamilyHeroCard(
@@ -256,6 +260,7 @@ private fun FamilyHeroCard(
             .clickable(onClick = onTap),
         shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             // Immagine con crop applicato tramite graphicsLayer
@@ -280,7 +285,7 @@ private fun FamilyHeroCard(
                         ),
                 )
             } else {
-                Box(modifier = Modifier.fillMaxSize().background(Color(0xFFDDDDDD)))
+                Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.kidBoxColors.divider))
             }
 
             // Gradient overlay
@@ -364,16 +369,19 @@ private data class FeatureItem(
 
 @Composable
 private fun FeatureCard(item: FeatureItem, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val kidBox = MaterialTheme.kidBoxColors
+    val containerColor =
+        if (kidBox === KidBoxDarkColorScheme) kidBox.card else item.cardColor
     Card(
         modifier = modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(containerColor = item.cardColor),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Icon(item.icon, contentDescription = null, tint = item.iconColor, modifier = Modifier.size(28.dp))
-            Text(item.title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color(0xFF1A1A1A))
-            Text(item.subtitle, color = Color(0xFF666666), fontSize = 12.sp)
+            Text(item.title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = MaterialTheme.kidBoxColors.title)
+            Text(item.subtitle, color = MaterialTheme.kidBoxColors.subtitle, fontSize = 12.sp)
         }
     }
 }
@@ -388,15 +396,21 @@ private fun HomeFab(
 ) {
     val rotation by animateFloatAsState(if (expanded) 45f else 0f, label = "fab_rotation")
     Column(
-        modifier = modifier.wrapContentSize(),
+        modifier = modifier
+            .wrapContentSize()
+            .navigationBarsPadding(),
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (expanded) {
             actions.forEach { action ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Surface(shape = RoundedCornerShape(18.dp), color = Color.White) {
-                        Text(action.label, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                    Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.kidBoxColors.card) {
+                        Text(
+                            action.label,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            color = MaterialTheme.kidBoxColors.title,
+                        )
                     }
                     Surface(
                         shape = CircleShape,

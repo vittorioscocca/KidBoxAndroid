@@ -8,5 +8,7 @@
 
     <style name="Theme.KidBox.NoActionBar" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@drawable/splash_background</item>
+        <item name="android:navigationBarColor">#FFCC80</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 </resources>

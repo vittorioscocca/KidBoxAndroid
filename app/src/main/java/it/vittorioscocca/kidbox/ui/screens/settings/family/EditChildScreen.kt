@@ -23,6 +23,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -46,6 +47,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -93,20 +95,20 @@ fun EditChildScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF2F0EB))
+            .background(MaterialTheme.kidBoxColors.background)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
     ) {
-        Text("Figlio", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF1A1A1A))
+        Text("Figlio", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.kidBoxColors.title)
         Spacer(modifier = Modifier.height(16.dp))
 
-        Text("Dati", fontSize = 13.sp, color = Color(0xFF999999))
+        Text("Dati", fontSize = 13.sp, color = MaterialTheme.kidBoxColors.subtitle)
         Spacer(modifier = Modifier.height(8.dp))
 
         Card(
             shape = cardShape,
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
@@ -117,28 +119,28 @@ fun EditChildScreen(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color(0xFF1A1A1A),
-                        unfocusedTextColor = Color(0xFF1A1A1A),
+                        focusedTextColor = MaterialTheme.kidBoxColors.title,
+                        unfocusedTextColor = MaterialTheme.kidBoxColors.title,
                         focusedContainerColor = Color.Transparent,
                         unfocusedContainerColor = Color.Transparent,
                         focusedBorderColor = Color.Transparent,
                         unfocusedBorderColor = Color.Transparent,
                     ),
                 )
-                HorizontalDivider(color = Color(0xFFE5E5EA), modifier = Modifier.padding(start = 16.dp))
+                HorizontalDivider(color = MaterialTheme.kidBoxColors.divider, modifier = Modifier.padding(start = 16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                 ) {
-                    Text("Data di nascita", color = Color(0xFF1A1A1A), modifier = Modifier.weight(1f))
+                    Text("Data di nascita", color = MaterialTheme.kidBoxColors.title, modifier = Modifier.weight(1f))
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFFE5E5EA),
+                        color = MaterialTheme.kidBoxColors.divider,
                         modifier = Modifier.clickable { showDatePicker = true },
                     ) {
                         Text(
                             text = birth?.format(dateFormat) ?: "Aggiungi",
-                            color = if (birth != null) Color(0xFF1A1A1A) else Color(0xFF2E86FF),
+                            color = if (birth != null) MaterialTheme.kidBoxColors.title else Color(0xFF2E86FF),
                             fontSize = 15.sp,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         )
@@ -152,7 +154,7 @@ fun EditChildScreen(
         // ── Salva ────────────────────────────────────────────────────────────
         Card(
             shape = cardShape,
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             modifier = Modifier.fillMaxWidth().clickable {
                 viewModel.saveChild(
@@ -168,13 +170,13 @@ fun EditChildScreen(
         }
 
         Spacer(modifier = Modifier.height(28.dp))
-        Text("Zona Pericolosa", fontSize = 13.sp, color = Color(0xFF999999))
+        Text("Zona Pericolosa", fontSize = 13.sp, color = MaterialTheme.kidBoxColors.subtitle)
         Spacer(modifier = Modifier.height(8.dp))
 
         // ── Elimina figlio ───────────────────────────────────────────────────
         Card(
             shape = cardShape,
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             modifier = Modifier.fillMaxWidth().clickable { showDelete = true },
         ) {
@@ -189,7 +191,7 @@ fun EditChildScreen(
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             "Questa azione non può essere annullata. Il figlio verrà eliminato definitivamente.",
-            fontSize = 13.sp, color = Color(0xFF999999),
+            fontSize = 13.sp, color = MaterialTheme.kidBoxColors.subtitle,
         )
     }
 

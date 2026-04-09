@@ -33,6 +33,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -52,6 +53,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
 @Composable
 fun FamilySettingsScreen(
@@ -81,15 +83,15 @@ fun FamilySettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF2F0EB))
+            .background(MaterialTheme.kidBoxColors.background)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
     ) {
-        Text("Family", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF1A1A1A))
+        Text("Family", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.kidBoxColors.title)
         Spacer(modifier = Modifier.height(8.dp))
-        Text("Famiglia", fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
-        Text("Qui gestisci la famiglia e inviti l'altro genitore.", color = Color(0xFF666666), fontSize = 13.sp)
+        Text("Famiglia", fontWeight = FontWeight.Bold, color = MaterialTheme.kidBoxColors.title)
+        Text("Qui gestisci la famiglia e inviti l'altro genitore.", color = MaterialTheme.kidBoxColors.subtitle, fontSize = 13.sp)
         Spacer(modifier = Modifier.height(12.dp))
 
         if (state.isLoading) {
@@ -100,7 +102,7 @@ fun FamilySettingsScreen(
         }
 
         if (state.family == null) {
-            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Warning, null, tint = Color(0xFFFF6B00))
@@ -116,7 +118,7 @@ fun FamilySettingsScreen(
 
         Card(
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
             border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x552E86FF)),
         ) {
             Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -131,7 +133,7 @@ fun FamilySettingsScreen(
                     } else {
                         "Figli: ${state.children.joinToString(", ") { it.name }}"
                     }
-                    Text(childrenText, color = Color(0xFF666666), fontSize = 13.sp)
+                    Text(childrenText, color = MaterialTheme.kidBoxColors.subtitle, fontSize = 13.sp)
                 }
                 IconButton(onClick = onEditFamily) {
                     Icon(Icons.Filled.Edit, null, tint = Color(0xFF2E86FF))
@@ -140,16 +142,16 @@ fun FamilySettingsScreen(
         }
         Spacer(modifier = Modifier.height(10.dp))
 
-        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Groups, null, tint = Color(0xFF777777))
+                    Icon(Icons.Filled.Groups, null, tint = MaterialTheme.kidBoxColors.subtitle)
                     Spacer(modifier = Modifier.size(8.dp))
                     Text("Membri", fontWeight = FontWeight.SemiBold)
                     Spacer(modifier = Modifier.size(8.dp))
-                    Text("${state.members.size} membri collegati.", color = Color(0xFF777777), fontSize = 13.sp)
+                    Text("${state.members.size} membri collegati.", color = MaterialTheme.kidBoxColors.subtitle, fontSize = 13.sp)
                 }
-                Divider(color = Color(0xFFEAEAEA))
+                Divider(color = MaterialTheme.kidBoxColors.divider)
                 state.members.forEachIndexed { idx, member ->
                     val memberLabel = sequenceOf(member.displayName, member.email)
                         .mapNotNull { it?.trim()?.takeIf { s -> s.isNotEmpty() } }
@@ -162,14 +164,14 @@ fun FamilySettingsScreen(
                         Icon(
                             if (member.role.equals("owner", true)) Icons.Filled.Groups else Icons.Filled.Person,
                             null,
-                            tint = if (member.role.equals("owner", true)) Color(0xFFFF6B00) else Color(0xFF999999),
+                            tint = if (member.role.equals("owner", true)) Color(0xFFFF6B00) else MaterialTheme.kidBoxColors.subtitle,
                         )
                         Spacer(modifier = Modifier.size(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(memberLabel)
                             Text(
                                 if (member.role.equals("owner", true)) "Owner" else "Membro",
-                                fontSize = 12.sp, color = Color(0xFF666666),
+                                fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle,
                             )
                         }
                         if (state.isOwner && member.userId != state.currentUid) {
@@ -178,7 +180,7 @@ fun FamilySettingsScreen(
                             }
                         }
                     }
-                    if (idx != state.members.lastIndex) Divider(color = Color(0xFFF0F0F0))
+                    if (idx != state.members.lastIndex) Divider(color = MaterialTheme.kidBoxColors.divider)
                 }
             }
         }
@@ -198,7 +200,7 @@ fun FamilySettingsScreen(
             title = "Entra con codice",
             subtitle = "Usa un codice se vuoi unirti a un'altra famiglia.",
             icon = Icons.Filled.Key,
-            iconTint = Color(0xFF777777),
+            iconTint = MaterialTheme.kidBoxColors.subtitle,
             onClick = onJoin,
         )
 
@@ -245,15 +247,15 @@ fun SimpleActionCard(
     Card(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
         border = borderColor?.let { androidx.compose.foundation.BorderStroke(1.dp, it) },
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = iconTint)
             Spacer(modifier = Modifier.size(10.dp))
             Column {
-                Text(title, fontWeight = FontWeight.SemiBold)
-                Text(subtitle, fontSize = 13.sp, color = Color(0xFF666666))
+                Text(title, fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.title)
+                Text(subtitle, fontSize = 13.sp, color = MaterialTheme.kidBoxColors.subtitle)
             }
         }
     }

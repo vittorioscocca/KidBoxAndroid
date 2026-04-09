@@ -24,6 +24,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -37,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.AppTheme
+import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
 private data class ThemeRow(
     val title: String,
@@ -61,7 +63,7 @@ fun ThemeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF2F0EB))
+            .background(MaterialTheme.kidBoxColors.background)
             .statusBarsPadding()
             .padding(top = 24.dp, start = 16.dp, end = 16.dp),
     ) {
@@ -69,7 +71,7 @@ fun ThemeScreen(
             text = "Tema",
             fontSize = 34.sp,
             fontWeight = FontWeight.ExtraBold,
-            color = Color(0xFF1A1A1A),
+            color = MaterialTheme.kidBoxColors.title,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(modifier = Modifier.height(16.dp))
@@ -78,7 +80,7 @@ fun ThemeScreen(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
         ) {
             rows.forEachIndexed { index, row ->
                 Row(
@@ -98,7 +100,7 @@ fun ThemeScreen(
                             modifier = Modifier.size(24.dp),
                         )
                         Spacer(modifier = Modifier.size(12.dp))
-                        Text(row.title, fontSize = 16.sp, color = Color(0xFF1A1A1A))
+                        Text(row.title, fontSize = 16.sp, color = MaterialTheme.kidBoxColors.title)
                     }
                     if (row.theme == current) {
                         Icon(Icons.Filled.Check, contentDescription = null, tint = Color(0xFFFF6B00))
@@ -110,7 +112,7 @@ fun ThemeScreen(
                     Divider(
                         modifier = Modifier.padding(horizontal = 16.dp),
                         thickness = 0.5.dp,
-                        color = Color(0xFFE8E8E8),
+                        color = MaterialTheme.kidBoxColors.divider,
                     )
                 }
             }
