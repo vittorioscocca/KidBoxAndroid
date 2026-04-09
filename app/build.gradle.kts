@@ -40,6 +40,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -91,4 +92,21 @@ dependencies {
     implementation(libs.googleid)
     implementation(libs.facebook.login)
     implementation("com.google.zxing:core:3.5.3")
+
+    // CameraX (QR scanner)
+    implementation(libs.camerax.core)
+    implementation(libs.camerax.camera2)
+    implementation(libs.camerax.lifecycle)
+    implementation(libs.camerax.view)
+
+    // ML Kit barcode (legge QR dalla camera)
+    implementation(libs.mlkit.barcode)
+
+    // EncryptedSharedPreferences (FamilyKeyStore)
+    implementation(libs.security.crypto)
+
+    implementation("com.google.guava:guava:32.1.3-android")
+
+    debugImplementation("com.google.firebase:firebase-appcheck-debug")
+    releaseImplementation("com.google.firebase:firebase-appcheck-playintegrity")
 }

@@ -12,9 +12,9 @@ import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.entity.KBChildEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
+import it.vittorioscocca.kidbox.data.local.entity.canonicalMemberDisplayName
 import it.vittorioscocca.kidbox.data.remote.family.FamilyLeaveService
 import it.vittorioscocca.kidbox.data.remote.family.InviteRemoteStore
-import it.vittorioscocca.kidbox.data.local.entity.canonicalMemberDisplayName
 import it.vittorioscocca.kidbox.data.sync.FamilySyncCenter
 import it.vittorioscocca.kidbox.data.sync.firstNonBlankString
 import it.vittorioscocca.kidbox.data.sync.userProfileDisplayName
@@ -57,12 +57,12 @@ class FamilySettingsViewModel @Inject constructor(
     private val familySyncCenter: FamilySyncCenter,
     private val userProfileRepository: UserProfileRepository,
 ) : ViewModel() {
+
     private val db = FirebaseFirestore.getInstance()
     private val inviteRemoteStore = InviteRemoteStore()
     private val _uiState = MutableStateFlow(FamilySettingsUiState())
     val uiState: StateFlow<FamilySettingsUiState> = _uiState.asStateFlow()
 
-    // Reactive observation job — like iOS @Query
     private var observeJob: Job? = null
     private var observingFamilyId: String? = null
 
@@ -76,13 +76,14 @@ class FamilySettingsViewModel @Inject constructor(
     //    → on first snapshot Firestore sends ALL docs as ADDED
     //    → FamilySyncCenter writes them to Room
     //    → Room Flow emits → UI updates automatically
-    // 4. Cross-device sync: when device B adds a child, Firestore listener
-    //    on device A receives ADDED/MODIFIED → writes to Room → UI updates
-    //
-    // NO manual bootstrap after step 2 — FamilySyncCenter handles everything
+    // 4. Cross-device sync: when device B modifies family/child, Firestore listener
+    //    on device A receives MODIFIED → FamilySyncCenter writes to Room → UI updates
     fun startObserving() {
         val currentFamilyId = observingFamilyId
         if (currentFamilyId != null && observeJob?.isActive == true) {
+            // FIX: anche se il job è già attivo, riavviamo sempre i listener Firestore.
+            // Prima questa chiamata era no-op se currentFamilyId == familyId nel SyncCenter,
+            // il che causava listener orfani dopo background/navigazione.
             familySyncCenter.startSync(currentFamilyId)
             return
         }
@@ -102,7 +103,6 @@ class FamilySettingsViewModel @Inject constructor(
                 try {
                     family = bootstrapFromFirebase(uid)
                 } catch (_: Exception) {
-                    // No internet and no local data
                     _uiState.value = FamilySettingsUiState(isLoading = false, currentUid = uid)
                     return@launch
                 }
@@ -116,23 +116,20 @@ class FamilySettingsViewModel @Inject constructor(
             observingFamilyId = fid
 
             // Step 3: start Firestore realtime sync
-            // FamilySyncCenter writes to Room and signals initialSyncDone when first snapshot done
+            // FamilySyncCenter (ora fixato) fa sempre restart dei listener → nessun listener orfano
             familySyncCenter.startSync(fid)
 
             // Step 4: wait for FamilySyncCenter to finish first Firestore snapshot
-            // This ensures Room is fully populated before the Flow starts emitting
             // Timeout 5s — if offline or slow, proceed with whatever Room has
             try {
                 kotlinx.coroutines.withTimeout(5000) {
                     familySyncCenter.initialSyncDone.first { it }
                 }
             } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
-                // Offline or slow network — use Room as-is
+                // Offline o lento — usa Room com'è
             }
 
             // Step 5: observe Room reactively
-            // Now Room is fully populated from Firestore first snapshot
-            // All future changes update automatically via FamilySyncCenter listeners
             combine(
                 familyDao.observeAll(),
                 familyMemberDao.observeActiveByFamilyId(fid),
@@ -155,6 +152,22 @@ class FamilySettingsViewModel @Inject constructor(
 
     // Keep load() for backward compatibility
     fun load() = startObserving()
+
+    /**
+     * Chiama questo metodo dalla Screen su ogni ON_RESUME (vedi DisposableEffect).
+     * Garantisce che i listener Firestore siano sempre attivi anche dopo:
+     * - ritorno da background
+     * - navigazione back/forward
+     * - cambio di rete
+     */
+    private var lastRefreshMs = 0L
+    fun refreshSync() {
+        val fid = observingFamilyId ?: return
+        val now = System.currentTimeMillis()
+        if (now - lastRefreshMs < 10_000L) return
+        lastRefreshMs = now
+        familySyncCenter.startSync(fid)
+    }
 
     // ── Bootstrap from Firestore when Room is empty ───────────────────────────
     private suspend fun bootstrapFromFirebase(requestUid: String): KBFamilyEntity? {
@@ -185,10 +198,12 @@ class FamilySettingsViewModel @Inject constructor(
                 heroPhotoOffsetX = null,
                 heroPhotoOffsetY = null,
                 createdBy = createdBy,
-                updatedBy = uid,
-                createdAtEpochMillis = (familyData["createdAt"] as? com.google.firebase.Timestamp)?.toDate()?.time ?: now,
-                updatedAtEpochMillis = (familyData["updatedAt"] as? com.google.firebase.Timestamp)?.toDate()?.time ?: now,
-                lastSyncAtEpochMillis = now,
+                updatedBy = (familyData["updatedBy"] as? String) ?: uid,
+                createdAtEpochMillis = (familyData["createdAt"] as? com.google.firebase.Timestamp)
+                    ?.toDate()?.time ?: now,
+                updatedAtEpochMillis = (familyData["updatedAt"] as? com.google.firebase.Timestamp)
+                    ?.toDate()?.time ?: now,
+                lastSyncAtEpochMillis = null,
                 lastSyncError = null,
             )
             familyDao.upsert(family)
@@ -199,14 +214,10 @@ class FamilySettingsViewModel @Inject constructor(
             memberDocs.forEach { doc ->
                 val d = doc.data.orEmpty()
                 if (d["isDeleted"] as? Boolean != true) {
-                    val memberCreatedAt =
-                        (d["createdAt"] as? com.google.firebase.Timestamp)?.toDate()?.time ?: now
-                    val memberUpdatedAt =
-                        (d["updatedAt"] as? com.google.firebase.Timestamp)?.toDate()?.time ?: now
                     val memberUid = (d["uid"] as? String) ?: doc.id
-                    val fromProfile =
-                        if (memberUid == uid) userProfileRepository.getByUid(memberUid)?.canonicalMemberDisplayName()
-                        else null
+                    val fromProfile = if (memberUid == uid)
+                        userProfileRepository.getByUid(memberUid)?.canonicalMemberDisplayName()
+                    else null
                     val displayName = fromProfile?.takeIf { it.isNotBlank() }
                         ?: d.firstNonBlankString("displayName", "name", "fullName")
                         ?: d.firstNonBlankString("email")
@@ -214,30 +225,29 @@ class FamilySettingsViewModel @Inject constructor(
                             try {
                                 val userDoc = db.collection("users").document(doc.id).get().await()
                                 if (userDoc.exists()) userDoc.data.orEmpty().userProfileDisplayName() else null
-                            } catch (_: Exception) {
-                                null
-                            }
+                            } catch (_: Exception) { null }
                         }
                         ?: if (memberUid == uid) {
                             val u = FirebaseAuth.getInstance().currentUser
                             u?.displayName?.trim()?.takeIf { it.isNotEmpty() && it != "Utente" }
                                 ?: u?.email?.trim()?.takeIf { it.isNotEmpty() }
-                        } else {
-                            null
-                        }
-                        ?: "Membro"
+                        } else null
+                            ?: "Membro"
                     familyMemberDao.upsert(KBFamilyMemberEntity(
                         id = doc.id,
                         familyId = familyId,
                         userId = memberUid,
                         role = (d["role"] as? String) ?: "member",
                         displayName = displayName,
-                        email = d.firstNonBlankString("email")
-                            ?: FirebaseAuth.getInstance().currentUser?.takeIf { it.uid == memberUid }
+                        email = (d["email"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
+                            ?: FirebaseAuth.getInstance().currentUser
+                                ?.takeIf { it.uid == memberUid }
                                 ?.email?.trim()?.takeIf { it.isNotEmpty() },
                         photoURL = d["photoURL"] as? String,
-                        createdAtEpochMillis = memberCreatedAt,
-                        updatedAtEpochMillis = memberUpdatedAt,
+                        createdAtEpochMillis = (d["createdAt"] as? com.google.firebase.Timestamp)
+                            ?.toDate()?.time ?: now,
+                        updatedAtEpochMillis = (d["updatedAt"] as? com.google.firebase.Timestamp)
+                            ?.toDate()?.time ?: now,
                         updatedBy = (d["updatedBy"] as? String) ?: uid,
                         isDeleted = false,
                     ))
@@ -251,14 +261,19 @@ class FamilySettingsViewModel @Inject constructor(
                 val d = doc.data.orEmpty()
                 if (d["isDeleted"] as? Boolean != true) {
                     childDao.upsert(KBChildEntity(
-                        id = doc.id, familyId = familyId,
+                        id = doc.id,
+                        familyId = familyId,
                         name = (d["name"] as? String)?.takeIf { it.isNotBlank() } ?: "Figlio",
-                        birthDateEpochMillis = (d["birthDate"] as? com.google.firebase.Timestamp)?.toDate()?.time,
-                        weightKg = null, heightCm = null,
+                        birthDateEpochMillis = (d["birthDate"] as? com.google.firebase.Timestamp)
+                            ?.toDate()?.time,
+                        weightKg = null,
+                        heightCm = null,
                         createdBy = (d["createdBy"] as? String) ?: uid,
-                        createdAtEpochMillis = (d["createdAt"] as? com.google.firebase.Timestamp)?.toDate()?.time ?: now,
+                        createdAtEpochMillis = (d["createdAt"] as? com.google.firebase.Timestamp)
+                            ?.toDate()?.time ?: now,
                         updatedBy = (d["updatedBy"] as? String) ?: uid,
-                        updatedAtEpochMillis = (d["updatedAt"] as? com.google.firebase.Timestamp)?.toDate()?.time ?: now,
+                        updatedAtEpochMillis = (d["updatedAt"] as? com.google.firebase.Timestamp)
+                            ?.toDate()?.time ?: now,
                     ))
                 }
             }
@@ -270,7 +285,7 @@ class FamilySettingsViewModel @Inject constructor(
         }
     }
 
-    // ── Write functions (unchanged logic, removed load() calls) ──────────────
+    // ── Write functions ───────────────────────────────────────────────────────
 
     fun removeMember(member: KBFamilyMemberEntity) {
         val familyId = _uiState.value.family?.id ?: return
@@ -278,10 +293,11 @@ class FamilySettingsViewModel @Inject constructor(
             try {
                 db.collection("families").document(familyId)
                     .collection("members").document(member.userId)
-                    .set(mapOf("isDeleted" to true, "updatedAt" to FieldValue.serverTimestamp()),
-                        com.google.firebase.firestore.SetOptions.merge()).await()
+                    .set(
+                        mapOf("isDeleted" to true, "updatedAt" to FieldValue.serverTimestamp()),
+                        com.google.firebase.firestore.SetOptions.merge()
+                    ).await()
                 familyMemberDao.deleteById(member.id)
-                // Room change is picked up automatically by the reactive Flow
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.localizedMessage)
             }
@@ -325,12 +341,22 @@ class FamilySettingsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-                val updated = family.copy(name = name.trim(), updatedAtEpochMillis = System.currentTimeMillis())
+                // FIX: salviamo in Room con updatedAtEpochMillis = now (client time).
+                // Il SyncCenter ora usa serverTimestamp da Firestore per il confronto LWW,
+                // quindi quando riceviamo l'eco della nostra stessa scrittura dal listener,
+                // il check remoteUpdatedAt >= localUpdatedAt funzionerà correttamente.
+                val now = System.currentTimeMillis()
+                val updated = family.copy(name = name.trim(), updatedAtEpochMillis = now)
                 familyDao.upsert(updated)
                 db.collection("families").document(family.id)
-                    .set(mapOf("name" to updated.name, "updatedBy" to uid,
-                        "updatedAt" to FieldValue.serverTimestamp()),
-                        com.google.firebase.firestore.SetOptions.merge()).await()
+                    .set(
+                        mapOf(
+                            "name" to updated.name,
+                            "updatedBy" to uid,
+                            "updatedAt" to FieldValue.serverTimestamp(),
+                        ),
+                        com.google.firebase.firestore.SetOptions.merge()
+                    ).await()
                 onDone()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.localizedMessage)
@@ -350,16 +376,27 @@ class FamilySettingsViewModel @Inject constructor(
                 // Update family in Room + Firestore
                 familyDao.upsert(family.copy(name = trimmedName, updatedAtEpochMillis = now))
                 db.collection("families").document(family.id)
-                    .update("name", trimmedName, "updatedBy", uid, "updatedAt", FieldValue.serverTimestamp()).await()
+                    .update(
+                        "name", trimmedName,
+                        "updatedBy", uid,
+                        "updatedAt", FieldValue.serverTimestamp()
+                    ).await()
 
                 // Upsert children
                 val existingIds = childDao.observeByFamilyId(family.id).first().map { it.id }.toSet()
                 childrenInputs.filter { it.name.isNotBlank() }.forEach { input ->
                     val isExisting = input.id in existingIds
                     val entity = if (isExisting) {
-                        (childDao.getById(input.id) ?: return@forEach).copy(
+                        (childDao.getById(input.id)?.copy(
                             name = input.name.trim(),
                             birthDateEpochMillis = input.birthDateEpochMillis,
+                            updatedBy = uid,
+                            updatedAtEpochMillis = now,
+                        )) ?: KBChildEntity(
+                            id = input.id, familyId = family.id, name = input.name.trim(),
+                            birthDateEpochMillis = input.birthDateEpochMillis,
+                            weightKg = null, heightCm = null,
+                            createdBy = uid, createdAtEpochMillis = now,
                             updatedBy = uid, updatedAtEpochMillis = now,
                         )
                     } else {
@@ -372,22 +409,27 @@ class FamilySettingsViewModel @Inject constructor(
                         )
                     }
                     childDao.upsert(entity)
-                    val firestoreData = mutableMapOf<String, Any?>(
-                        "id" to entity.id, "familyId" to family.id,
-                        "name" to entity.name,
-                        "birthDate" to entity.birthDateEpochMillis?.let {
-                            com.google.firebase.Timestamp(it / 1000, ((it % 1000) * 1_000_000).toInt())
-                        },
-                        "updatedBy" to uid, "updatedAt" to FieldValue.serverTimestamp(),
-                    )
-                    if (!isExisting) {
-                        firestoreData["createdBy"] = uid
-                        firestoreData["createdAt"] = FieldValue.serverTimestamp()
-                        firestoreData["isDeleted"] = false
-                    }
                     db.collection("families").document(family.id)
-                        .collection("children").document(entity.id)
-                        .set(firestoreData, com.google.firebase.firestore.SetOptions.merge()).await()
+                        .collection("children").document(input.id)
+                        .set(
+                            mapOf(
+                                "id" to entity.id,
+                                "familyId" to family.id,
+                                "name" to entity.name,
+                                "birthDate" to entity.birthDateEpochMillis?.let {
+                                    com.google.firebase.Timestamp(
+                                        it / 1000,
+                                        ((it % 1000) * 1_000_000).toInt()
+                                    )
+                                },
+                                "createdBy" to entity.createdBy,
+                                "createdAt" to FieldValue.serverTimestamp(),
+                                "updatedBy" to uid,
+                                "updatedAt" to FieldValue.serverTimestamp(),
+                                "isDeleted" to false,
+                            ),
+                            com.google.firebase.firestore.SetOptions.merge()
+                        ).await()
                 }
                 onDone()
             } catch (e: Exception) {
@@ -404,23 +446,36 @@ class FamilySettingsViewModel @Inject constructor(
             val id = java.util.UUID.randomUUID().toString()
             val now = System.currentTimeMillis()
             val child = KBChildEntity(
-                id = id, familyId = family.id, name = name.trim(),
+                id = id,
+                familyId = family.id,
+                name = name.trim(),
                 birthDateEpochMillis = birthEpochMillis,
-                weightKg = null, heightCm = null,
-                createdBy = uid, createdAtEpochMillis = now,
-                updatedBy = uid, updatedAtEpochMillis = now,
+                weightKg = null,
+                heightCm = null,
+                createdBy = uid,
+                createdAtEpochMillis = now,
+                updatedBy = uid,
+                updatedAtEpochMillis = now,
             )
             childDao.upsert(child)
-            db.collection("families").document(family.id).collection("children").document(id)
-                .set(mapOf(
-                    "id" to child.id, "familyId" to family.id, "name" to child.name,
-                    "birthDate" to child.birthDateEpochMillis?.let {
-                        com.google.firebase.Timestamp(it / 1000, ((it % 1000) * 1_000_000).toInt())
-                    },
-                    "createdBy" to uid, "createdAt" to FieldValue.serverTimestamp(),
-                    "updatedBy" to uid, "isDeleted" to false,
-                    "updatedAt" to FieldValue.serverTimestamp(),
-                ), com.google.firebase.firestore.SetOptions.merge()).await()
+            db.collection("families").document(family.id)
+                .collection("children").document(id)
+                .set(
+                    mapOf(
+                        "id" to child.id,
+                        "familyId" to family.id,
+                        "name" to child.name,
+                        "birthDate" to child.birthDateEpochMillis?.let {
+                            com.google.firebase.Timestamp(it / 1000, ((it % 1000) * 1_000_000).toInt())
+                        },
+                        "createdBy" to uid,
+                        "createdAt" to FieldValue.serverTimestamp(),
+                        "updatedBy" to uid,
+                        "updatedAt" to FieldValue.serverTimestamp(),
+                        "isDeleted" to false,
+                    ),
+                    com.google.firebase.firestore.SetOptions.merge()
+                ).await()
         }
     }
 
@@ -432,27 +487,46 @@ class FamilySettingsViewModel @Inject constructor(
                 val now = System.currentTimeMillis()
                 val existing = childDao.getById(childId)
                 val updated = existing?.copy(
-                    name = name.trim(), birthDateEpochMillis = birthEpochMillis,
-                    updatedBy = uid, updatedAtEpochMillis = now,
-                ) ?: KBChildEntity(
-                    id = childId, familyId = family.id, name = name.trim(),
+                    name = name.trim(),
                     birthDateEpochMillis = birthEpochMillis,
-                    weightKg = null, heightCm = null,
-                    createdBy = uid, createdAtEpochMillis = now,
-                    updatedBy = uid, updatedAtEpochMillis = now,
+                    updatedBy = uid,
+                    updatedAtEpochMillis = now,
+                ) ?: KBChildEntity(
+                    id = childId,
+                    familyId = family.id,
+                    name = name.trim(),
+                    birthDateEpochMillis = birthEpochMillis,
+                    weightKg = null,
+                    heightCm = null,
+                    createdBy = uid,
+                    createdAtEpochMillis = now,
+                    updatedBy = uid,
+                    updatedAtEpochMillis = now,
                 )
                 childDao.upsert(updated)
-                db.collection("families").document(family.id).collection("children").document(childId)
-                    .set(mapOf(
-                        "id" to updated.id, "familyId" to family.id, "name" to updated.name,
-                        "birthDate" to updated.birthDateEpochMillis?.let {
-                            com.google.firebase.Timestamp(it / 1000, ((it % 1000) * 1_000_000).toInt())
-                        },
-                        "updatedBy" to uid, "updatedAt" to FieldValue.serverTimestamp(),
-                    ), com.google.firebase.firestore.SetOptions.merge()).await()
+                db.collection("families").document(family.id)
+                    .collection("children").document(childId)
+                    .set(
+                        mapOf(
+                            "id" to updated.id,
+                            "familyId" to family.id,
+                            "name" to updated.name,
+                            "birthDate" to updated.birthDateEpochMillis?.let {
+                                com.google.firebase.Timestamp(
+                                    it / 1000,
+                                    ((it % 1000) * 1_000_000).toInt()
+                                )
+                            },
+                            "updatedBy" to uid,
+                            "updatedAt" to FieldValue.serverTimestamp(),
+                        ),
+                        com.google.firebase.firestore.SetOptions.merge()
+                    ).await()
                 onDone()
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.localizedMessage ?: "Errore salvataggio figlio")
+                _uiState.value = _uiState.value.copy(
+                    error = e.localizedMessage ?: "Errore salvataggio figlio"
+                )
             }
         }
     }
@@ -460,10 +534,25 @@ class FamilySettingsViewModel @Inject constructor(
     fun deleteChild(childId: String, onDone: () -> Unit) {
         val family = _uiState.value.family ?: return
         viewModelScope.launch {
-            childDao.deleteById(childId)
-            db.collection("families").document(family.id)
-                .collection("children").document(childId).delete().await()
-            onDone()
+            try {
+                childDao.deleteById(childId)
+                db.collection("families").document(family.id)
+                    .collection("children").document(childId)
+                    // FIX: soft-delete con isDeleted=true invece di .delete()
+                    // così gli altri device ricevono il MODIFIED con isDeleted=true
+                    // e possono rimuoverlo dal loro Room. Con .delete() il listener
+                    // riceve REMOVED solo se era già in cache locale — non affidabile.
+                    .set(
+                        mapOf(
+                            "isDeleted" to true,
+                            "updatedAt" to FieldValue.serverTimestamp(),
+                        ),
+                        com.google.firebase.firestore.SetOptions.merge()
+                    ).await()
+                onDone()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = e.localizedMessage)
+            }
         }
     }
 

@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -54,7 +53,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,7 +61,9 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
@@ -82,13 +82,33 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val pendingUri by viewModel.pendingHeroUri.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
     val photoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
     ) { uri: Uri? ->
         uri?.let { viewModel.onHeroPhotoSelected(it, context) }
     }
-    LaunchedEffect(Unit) { viewModel.onScreenVisible() }
+
+    // ── Cropper overlay (come iOS showHeroCropper sheet) ─────────────────────
+    // Se c'è una URI pending, mostriamo il cropper a tutto schermo sopra la Home
+    if (pendingUri != null) {
+        HeroPhotoCropperScreen(
+            imageUri = pendingUri!!,
+            initialCrop = HeroCrop(
+                scale = state.heroPhotoScale,
+                offsetX = state.heroPhotoOffsetX,
+                offsetY = state.heroPhotoOffsetY,
+            ),
+            isSaving = state.isUploadingHero,
+            onCancel = { viewModel.onHeroCropCancelled() },
+            onSave = { crop ->
+                viewModel.onHeroCropSaved(pendingUri!!, crop, context)
+            },
+        )
+        return // non renderizzare la Home sotto
+    }
 
     Box(
         modifier = Modifier
@@ -137,12 +157,7 @@ fun HomeScreen(
                         Icon(Icons.Filled.Person, contentDescription = null, tint = Color(0xFF666666))
                     }
                 }
-                IconButton(
-                    onClick = {
-                        Log.d("NAV", "Settings tapped, navigating to: ${AppDestination.Settings.route}")
-                        onNavigate(AppDestination.Settings.route)
-                    },
-                ) {
+                IconButton(onClick = { onNavigate(AppDestination.Settings.route) }) {
                     Icon(Icons.Filled.Settings, contentDescription = null, tint = Color(0xFF1A1A1A))
                 }
             }
@@ -164,6 +179,9 @@ fun HomeScreen(
                 members = state.memberCount,
                 photoLocalPath = state.heroPhotoLocalPath,
                 photoUrl = state.heroPhotoUrl,
+                heroScale = state.heroPhotoScale,
+                heroOffsetX = state.heroPhotoOffsetX,
+                heroOffsetY = state.heroPhotoOffsetY,
                 onTap = { onNavigate(AppDestination.FamilyPhotos.createRoute(state.familyId)) },
                 onChangePhoto = {
                     photoPicker.launch(
@@ -193,9 +211,7 @@ fun HomeScreen(
                             onClick = { onNavigate(item.route) },
                         )
                     }
-                    if (rowItems.size == 1) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
+                    if (rowItems.size == 1) Spacer(modifier = Modifier.weight(1f))
                 }
                 Spacer(modifier = Modifier.size(12.dp))
             }
@@ -214,18 +230,11 @@ fun HomeScreen(
                 .align(Alignment.BottomEnd)
                 .padding(16.dp),
         )
-
     }
 }
 
-private data class FeatureItem(
-    val title: String,
-    val subtitle: String,
-    val route: String,
-    val icon: ImageVector,
-    val cardColor: Color,
-    val iconColor: Color,
-)
+// ── FamilyHeroCard ─────────────────────────────────────────────────────────────
+// Ora applica scale/offset dal crop — identico alla logica di HomeHeroCard iOS
 
 @Composable
 private fun FamilyHeroCard(
@@ -234,6 +243,9 @@ private fun FamilyHeroCard(
     members: Int,
     photoLocalPath: String?,
     photoUrl: String?,
+    heroScale: Float = 1f,
+    heroOffsetX: Float = 0f,
+    heroOffsetY: Float = 0f,
     onTap: () -> Unit,
     onChangePhoto: () -> Unit,
 ) {
@@ -246,27 +258,50 @@ private fun FamilyHeroCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
+            // Immagine con crop applicato tramite graphicsLayer
             val localModel = photoLocalPath?.let { path ->
                 val f = File(path)
                 if (f.exists()) f else null
             }
             val imageModel = localModel ?: photoUrl
+
             if (imageModel != null) {
-                AsyncImage(model = imageModel, contentDescription = null, modifier = Modifier.fillMaxSize())
+                AsyncImage(
+                    model = imageModel,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(
+                            scaleX = heroScale,
+                            scaleY = heroScale,
+                            translationX = heroOffsetX,
+                            translationY = heroOffsetY,
+                        ),
+                )
             } else {
                 Box(modifier = Modifier.fillMaxSize().background(Color(0xFFDDDDDD)))
             }
+
+            // Gradient overlay
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)))),
+                    .background(
+                        Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)))
+                    ),
             )
+
+            // Top row: data + badge membri
             Row(
                 modifier = Modifier.fillMaxWidth().padding(12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(dateLabel, color = Color.White, fontSize = 12.sp)
-                Surface(color = Color.White.copy(alpha = 0.25f), shape = RoundedCornerShape(20.dp)) {
+                Surface(
+                    color = Color.White.copy(alpha = 0.25f),
+                    shape = RoundedCornerShape(20.dp),
+                ) {
                     Text(
                         "$members membri",
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -275,6 +310,8 @@ private fun FamilyHeroCard(
                     )
                 }
             }
+
+            // Bottom: nome famiglia + bottone cambio foto
             Column(modifier = Modifier.align(Alignment.BottomStart).padding(12.dp)) {
                 Text(
                     familyName,
@@ -285,16 +322,28 @@ private fun FamilyHeroCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(modifier = Modifier.size(4.dp))
-                Surface(color = Color.White.copy(alpha = 0.18f), shape = RoundedCornerShape(16.dp)) {
+                Surface(
+                    color = Color.White.copy(alpha = 0.18f),
+                    shape = RoundedCornerShape(16.dp),
+                ) {
                     Row(
                         modifier = Modifier
                             .clickable(onClick = onChangePhoto)
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Filled.PhotoCamera, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        Icon(
+                            Icons.Filled.PhotoCamera,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp),
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Tocca per cambiare foto", color = Color.White, fontSize = 11.sp)
+                        Text(
+                            if (photoUrl != null) "Cambia foto" else "Aggiungi foto",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                        )
                     }
                 }
             }
@@ -302,12 +351,19 @@ private fun FamilyHeroCard(
     }
 }
 
+// ── FeatureCard, HomeFab, helpers ─────────────────────────────────────────────
+
+private data class FeatureItem(
+    val title: String,
+    val subtitle: String,
+    val route: String,
+    val icon: ImageVector,
+    val cardColor: Color,
+    val iconColor: Color,
+)
+
 @Composable
-private fun FeatureCard(
-    item: FeatureItem,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
+private fun FeatureCard(item: FeatureItem, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Card(
         modifier = modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
@@ -364,19 +420,12 @@ private fun HomeFab(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
-                        brush = Brush.linearGradient(
-                            listOf(Color(0xFFFFBF40), Color(0xFFF26118)),
-                        ),
+                        brush = Brush.linearGradient(listOf(Color(0xFFFFBF40), Color(0xFFF26118))),
                         shape = CircleShape,
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    Icons.Filled.Add,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.rotate(rotation),
-                )
+                Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White, modifier = Modifier.rotate(rotation))
             }
         }
     }

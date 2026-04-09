@@ -16,6 +16,9 @@ coreKtx = "1.15.0"
 credentials = "1.3.0"
 googleid = "1.1.1"
 facebook = "17.0.2"
+camerax = "1.3.4"
+mlkit-barcode = "17.3.0"
+security-crypto = "1.1.0-alpha06"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -54,6 +57,15 @@ androidx-credentials = { group = "androidx.credentials", name = "credentials", v
 androidx-credentials-play-services = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
 googleid = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleid" }
 facebook-login = { group = "com.facebook.android", name = "facebook-login", version.ref = "facebook" }
+camerax-core      = { group = "androidx.camera", name = "camera-core",      version.ref = "camerax" }
+camerax-camera2   = { group = "androidx.camera", name = "camera-camera2",   version.ref = "camerax" }
+camerax-lifecycle = { group = "androidx.camera", name = "camera-lifecycle",  version.ref = "camerax" }
+camerax-view      = { group = "androidx.camera", name = "camera-view",       version.ref = "camerax" }
+mlkit-barcode     = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkit-barcode" }
+security-crypto   = { group = "androidx.security", name = "security-crypto", version.ref = "security-crypto" }
+guava = { group = "com.google.guava", name = "guava", version = "32.1.3-android" }
+firebase-appcheck-debug = { group = "com.google.firebase", name = "firebase-appcheck-debug" }
+firebase-appcheck-playintegrity = { group = "com.google.firebase", name = "firebase-appcheck-playintegrity" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

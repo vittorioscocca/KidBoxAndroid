@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -12,15 +13,20 @@ import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.remote.family.FamilyHeroPhotoService
 import it.vittorioscocca.kidbox.domain.auth.LogoutUseCase
+import it.vittorioscocca.kidbox.ui.screens.home.HeroCrop
 import java.io.ByteArrayOutputStream
 import java.io.File
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
+
+private const val TAG = "HomeViewModel"
 
 data class HomeUiState(
     val isLoading: Boolean = true,
@@ -28,6 +34,9 @@ data class HomeUiState(
     val familyName: String = "",
     val heroPhotoUrl: String? = null,
     val heroPhotoLocalPath: String? = null,
+    val heroPhotoScale: Float = 1f,
+    val heroPhotoOffsetX: Float = 0f,
+    val heroPhotoOffsetY: Float = 0f,
     val isUploadingHero: Boolean = false,
     val errorMessage: String? = null,
     val memberCount: Int = 0,
@@ -37,10 +46,7 @@ data class HomeUiState(
     val topQuickActions: List<HomeQuickAction> = emptyList(),
 )
 
-enum class HomeQuickAction(
-    val key: String,
-    val label: String,
-) {
+enum class HomeQuickAction(val key: String, val label: String) {
     EXPENSE("expense", "Spesa"),
     EVENT("event", "Evento"),
     TODO("todo", "To-Do"),
@@ -59,18 +65,185 @@ class HomeViewModel @Inject constructor(
     private val heroPhotoService: FamilyHeroPhotoService,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
+
     private val prefs = appContext.getSharedPreferences("home_quick_actions", Context.MODE_PRIVATE)
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
-    private var hasLoaded = false
 
-    fun onScreenVisible() {
-        if (hasLoaded) return
-        hasLoaded = true
+    // ── Reactive observation — avviato una volta sola, sempre attivo ──────────
+    // FIX principale: invece di one-shot con hasLoaded, osserviamo Room con un
+    // Flow combine. Ogni volta che FamilySyncCenter aggiorna la famiglia in Room
+    // (es. heroPhotoURL arriva da un altro device via Firestore), la UI si aggiorna.
+    init {
+        observeHomeData()
+    }
+
+    private fun observeHomeData() {
         viewModelScope.launch {
-            loadHomeData()
+            familyDao.observeAll().collectLatest { families ->
+                val family = families.firstOrNull()
+                val familyId = family?.id.orEmpty()
+
+                if (familyId.isBlank()) {
+                    _uiState.value = HomeUiState(isLoading = false)
+                    return@collectLatest
+                }
+
+                combine(
+                    familyDao.observeAll(),
+                    familyMemberDao.observeActiveByFamilyId(familyId),
+                ) { fams, members ->
+                    Pair(fams.firstOrNull(), members.size)
+                }.collect { (fam, memberCount) ->
+                    val remoteUrl = fam?.heroPhotoURL
+
+                    // File locale se esiste già su disco
+                    val localPath = fam?.heroPhotoLocalPath?.takeIf { File(it).exists() }
+
+                    // Se non abbiamo il file locale ma abbiamo l'URL, scarica in background
+                    // Nel frattempo Coil usa l'URL remoto direttamente
+                    if (localPath == null && remoteUrl != null) {
+                        viewModelScope.launch(Dispatchers.IO) {
+                            val path = downloadHeroToCache(fam!!.id, remoteUrl)
+                            if (path != null) {
+                                _uiState.value = _uiState.value.copy(heroPhotoLocalPath = path)
+                            }
+                        }
+                    }
+
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        familyId = familyId,
+                        familyName = fam?.name.orEmpty(),
+                        heroPhotoUrl = remoteUrl,
+                        heroPhotoLocalPath = localPath,
+                        heroPhotoScale = fam?.heroPhotoScale?.toFloat() ?: 1f,
+                        heroPhotoOffsetX = fam?.heroPhotoOffsetX?.toFloat() ?: 0f,
+                        heroPhotoOffsetY = fam?.heroPhotoOffsetY?.toFloat() ?: 0f,
+                        memberCount = memberCount,
+                        todayLabel = todayLabel(),
+                        avatarUrl = com.google.firebase.auth.FirebaseAuth.getInstance()
+                            .currentUser?.photoUrl?.toString(),
+                        topQuickActions = topQuickActions(),
+                    )
+                }
+            }
         }
     }
+
+    // ── Hero photo: upload da picker ──────────────────────────────────────────
+
+
+    // ── Hero photo: flusso a due step identico a iOS ──────────────────────────
+    // Step 1: picker → salva URI + bytes → mostra cropper
+    // Step 2: cropper → onSave(crop) → upload + scrivi su Firestore
+
+    // URI e bytes pending (usati dal cropper)
+    private val _pendingHeroUri = MutableStateFlow<Uri?>(null)
+    val pendingHeroUri: StateFlow<Uri?> = _pendingHeroUri.asStateFlow()
+
+    // Bytes già letti sul main thread — evita problemi MIUI con URI temporanee su IO thread
+    private var pendingHeroBytes: ByteArray? = null
+
+    /** Chiamato quando l'utente seleziona una foto dalla galleria. */
+    fun onHeroPhotoSelected(uri: Uri, context: Context) {
+        // Leggi i bytes subito sul thread corrente (main) prima che l'URI scada
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val bytes = compressJpeg(context, uri)
+                pendingHeroBytes = bytes
+                _pendingHeroUri.value = uri
+            } catch (e: Exception) {
+                Log.e(TAG, "hero read failed: ${e.message}")
+                _uiState.value = _uiState.value.copy(errorMessage = "Impossibile leggere l'immagine")
+            }
+        }
+    }
+
+    fun onHeroCropCancelled() {
+        _pendingHeroUri.value = null
+        pendingHeroBytes = null
+    }
+
+    fun onHeroCropSaved(uri: Uri, crop: HeroCrop, context: Context) {
+        val familyId = _uiState.value.familyId
+        if (familyId.isBlank()) return
+
+        val bytes = pendingHeroBytes ?: run {
+            Log.e(TAG, "onHeroCropSaved: no pending bytes")
+            _uiState.value = _uiState.value.copy(errorMessage = "Immagine non disponibile, riprova")
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.value = _uiState.value.copy(isUploadingHero = true, errorMessage = null)
+            try {
+                Log.d(TAG, "hero upload start familyId=$familyId bytes=${bytes.size}")
+                val remoteUrl = heroPhotoService.setHeroPhoto(familyId, bytes, crop)
+                Log.d(TAG, "hero upload OK familyId=$familyId")
+
+                val cacheFile = saveToLocalCache(familyId, bytes, context)
+
+                familyDao.getById(familyId)?.let { family ->
+                    familyDao.upsert(
+                        family.copy(
+                            heroPhotoURL = remoteUrl,
+                            heroPhotoLocalPath = cacheFile.absolutePath,
+                            heroPhotoUpdatedAtEpochMillis = System.currentTimeMillis(),
+                            heroPhotoScale = crop.scale.toDouble(),
+                            heroPhotoOffsetX = crop.offsetX.toDouble(),
+                            heroPhotoOffsetY = crop.offsetY.toDouble(),
+                        ),
+                    )
+                }
+
+                pendingHeroBytes = null
+                _pendingHeroUri.value = null
+                _uiState.value = _uiState.value.copy(isUploadingHero = false)
+
+            } catch (e: Exception) {
+                Log.e(TAG, "hero upload failed: ${e.message}", e)
+                _uiState.value = _uiState.value.copy(
+                    isUploadingHero = false,
+                    errorMessage = e.localizedMessage ?: "Errore upload foto",
+                )
+            }
+        }
+    }
+
+
+    // ── Download hero da URL remota → cache locale ────────────────────────────
+    // USA Firebase Storage SDK (non URL.readBytes()) così rispetta le auth rules.
+    // L'URL in Firestore è del tipo:
+    //   https://firebasestorage.googleapis.com/v0/b/.../o/families%2F...%2Fhero%2Fhero.jpg?alt=media&token=...
+    // Firebase Storage SDK riconosce il path e aggiunge l'auth header automaticamente.
+
+    private suspend fun downloadHeroToCache(familyId: String, url: String): String? {
+        if (familyId.isBlank() || url.isBlank()) return null
+        return try {
+            // Aspetta che Firebase Auth abbia un utente autenticato
+            val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+            if (uid == null) {
+                Log.w(TAG, "downloadHeroToCache: not authenticated yet, skip")
+                return null
+            }
+            Log.d(TAG, "downloadHeroToCache start familyId=$familyId uid=$uid")
+            val ref = com.google.firebase.storage.FirebaseStorage.getInstance()
+                .reference.child("families/$familyId/hero/hero.jpg")
+            val bytes: ByteArray = ref.getBytes(5 * 1024 * 1024).await()
+            val file = saveToLocalCache(familyId, bytes, appContext)
+            familyDao.getById(familyId)?.let { family ->
+                familyDao.upsert(family.copy(heroPhotoLocalPath = file.absolutePath))
+            }
+            Log.d(TAG, "hero cached OK familyId=$familyId bytes=${bytes.size}")
+            file.absolutePath
+        } catch (e: Exception) {
+            Log.w(TAG, "hero download failed familyId=$familyId: ${e.message}")
+            null
+        }
+    }
+
+    // ── Utils ─────────────────────────────────────────────────────────────────
 
     fun toggleFab() {
         _uiState.value = _uiState.value.copy(isFabExpanded = !_uiState.value.isFabExpanded)
@@ -82,46 +255,8 @@ class HomeViewModel @Inject constructor(
 
     fun recordQuickAction(action: HomeQuickAction) {
         val key = "usage_${action.key}"
-        val current = prefs.getInt(key, 0)
-        prefs.edit().putInt(key, current + 1).apply()
+        prefs.edit().putInt(key, prefs.getInt(key, 0) + 1).apply()
         _uiState.value = _uiState.value.copy(topQuickActions = topQuickActions())
-    }
-
-    fun onHeroPhotoSelected(uri: Uri, context: Context) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val current = _uiState.value
-            if (current.familyId.isBlank()) return@launch
-
-            _uiState.value = current.copy(isUploadingHero = true, errorMessage = null)
-            try {
-                val compressed = compressJpeg(context, uri)
-                val remoteUrl = heroPhotoService.setHeroPhoto(current.familyId, compressed)
-                val cacheFile = saveToLocalCache(current.familyId, compressed, context)
-
-                val family = familyDao.getById(current.familyId)
-                if (family != null) {
-                    familyDao.upsert(
-                        family.copy(
-                            heroPhotoURL = remoteUrl,
-                            heroPhotoLocalPath = cacheFile.absolutePath,
-                            heroPhotoUpdatedAtEpochMillis = System.currentTimeMillis(),
-                        ),
-                    )
-                }
-
-                _uiState.value = _uiState.value.copy(
-                    isUploadingHero = false,
-                    heroPhotoUrl = remoteUrl,
-                    heroPhotoLocalPath = cacheFile.absolutePath,
-                    errorMessage = null,
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isUploadingHero = false,
-                    errorMessage = e.localizedMessage ?: "Errore upload foto",
-                )
-            }
-        }
     }
 
     fun logout(onComplete: () -> Unit) {
@@ -129,29 +264,6 @@ class HomeViewModel @Inject constructor(
             logoutUseCase.logout()
             onComplete()
         }
-    }
-
-    private suspend fun loadHomeData() {
-        val family = familyDao.observeAll().first().firstOrNull()
-        val familyId = family?.id.orEmpty()
-        val membersCount = if (familyId.isNotBlank()) {
-            familyMemberDao.observeActiveByFamilyId(familyId).first().size
-        } else {
-            0
-        }
-
-        _uiState.value = HomeUiState(
-            isLoading = false,
-            familyId = familyId,
-            familyName = family?.name.orEmpty(),
-            heroPhotoUrl = family?.heroPhotoURL,
-            heroPhotoLocalPath = family?.heroPhotoLocalPath,
-            memberCount = membersCount,
-            todayLabel = todayLabel(),
-            avatarUrl = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.photoUrl?.toString(),
-            isFabExpanded = false,
-            topQuickActions = topQuickActions(),
-        )
     }
 
     private fun compressJpeg(context: Context, uri: Uri): ByteArray {
@@ -169,11 +281,10 @@ class HomeViewModel @Inject constructor(
         return file
     }
 
-    private fun topQuickActions(): List<HomeQuickAction> {
-        return HomeQuickAction.entries
+    private fun topQuickActions(): List<HomeQuickAction> =
+        HomeQuickAction.entries
             .sortedByDescending { prefs.getInt("usage_${it.key}", 0) }
             .take(4)
-    }
 
     private fun todayLabel(): String {
         val formatter = java.text.SimpleDateFormat("EEEE, d MMMM", java.util.Locale.getDefault())
