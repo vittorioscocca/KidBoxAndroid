@@ -63,17 +63,24 @@ class InviteRemoteStore(
             .document(uid)
             .collection("memberships")
             .document(familyId)
+        val memberFields = mutableMapOf<String, Any>(
+            "uid" to uid,
+            "role" to role,
+            "isDeleted" to false,
+            "updatedBy" to uid,
+            "updatedAt" to FieldValue.serverTimestamp(),
+            "createdAt" to FieldValue.serverTimestamp(),
+        )
+        auth.currentUser?.displayName?.trim()?.takeIf { it.isNotEmpty() && it != "Utente" }?.let {
+            memberFields["displayName"] = it
+        }
+        auth.currentUser?.email?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            memberFields["email"] = it
+        }
         val batch = db.batch()
         batch.set(
             memberRef,
-            mapOf(
-                "uid" to uid,
-                "role" to role,
-                "isDeleted" to false,
-                "updatedBy" to uid,
-                "updatedAt" to FieldValue.serverTimestamp(),
-                "createdAt" to FieldValue.serverTimestamp(),
-            ),
+            memberFields,
             com.google.firebase.firestore.SetOptions.merge(),
         )
         batch.set(

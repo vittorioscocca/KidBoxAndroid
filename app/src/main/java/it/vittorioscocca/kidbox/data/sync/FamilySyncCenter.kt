@@ -1,15 +1,19 @@
 package it.vittorioscocca.kidbox.data.sync
 
 import android.util.Log
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
+import it.vittorioscocca.kidbox.data.local.dao.KBUserProfileDao
 import it.vittorioscocca.kidbox.data.local.entity.KBChildEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
+import it.vittorioscocca.kidbox.data.local.entity.canonicalMemberDisplayName
+import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,12 +28,14 @@ import kotlinx.coroutines.launch
 private const val TAG = "FamilySyncCenter"
 
 @Singleton
-class FamilySyncCenter constructor(
+class FamilySyncCenter @Inject constructor(
     private val familyDao: KBFamilyDao,
     private val familyMemberDao: KBFamilyMemberDao,
     private val childDao: KBChildDao,
+    private val userProfileDao: KBUserProfileDao,
 ) {
     private val db = FirebaseFirestore.getInstance()
+    private val auth = FirebaseAuth.getInstance()
     private var familyListener: ListenerRegistration? = null
     private var membersListener: ListenerRegistration? = null
     private var childrenListener: ListenerRegistration? = null
@@ -105,7 +111,7 @@ class FamilySyncCenter constructor(
                     val now = System.currentTimeMillis()
                     for (change in snap.documentChanges) {
                         val doc = change.document
-                        val d = doc.data
+                        val d = doc.data.orEmpty()
                         val isDeleted = d["isDeleted"] as? Boolean ?: false
                         if (change.type == DocumentChange.Type.REMOVED || isDeleted) {
                             familyMemberDao.deleteById(doc.id)
@@ -115,7 +121,7 @@ class FamilySyncCenter constructor(
                         var familyExists = familyDao.getById(familyId) != null
                         if (!familyExists) {
                             var retries = 0
-                            while (!familyExists && retries < 10) {
+                            while (!familyExists && retries < 50) {
                                 kotlinx.coroutines.delay(100)
                                 familyExists = familyDao.getById(familyId) != null
                                 retries++
@@ -126,28 +132,62 @@ class FamilySyncCenter constructor(
                             continue
                         }
 
-                        Log.d(TAG, "member raw id=" + doc.id + " displayName=" + d["displayName"] + " role=" + d["role"] + " keys=" + d.keys)
-                        val displayName = (d["displayName"] as? String)?.takeIf { it.isNotBlank() }
-                            ?: (d["email"] as? String)?.takeIf { it.isNotBlank() }
-                            ?: run {
-                                // Fallback: read from users/{uid} like iOS upsertMyMemberProfileIfNeeded
-                                try {
-                                    val userDoc = db.collection("users").document(doc.id).get().await()
-                                    val ud = userDoc.data.orEmpty()
-                                    (ud["displayName"] as? String)?.takeIf { it.isNotBlank() }
-                                        ?: (ud["email"] as? String)?.takeIf { it.isNotBlank() }
-                                        ?: "Membro"
-                                } catch (_: Exception) { "Membro" }
+                        val localMember = familyMemberDao.getById(doc.id)
+                        val memberUid = (d["uid"] as? String) ?: doc.id
+                        val isMe = memberUid == auth.currentUser?.uid
+                        Log.d(
+                            TAG,
+                            "member raw id=${doc.id} displayName=${d["displayName"]} role=${d["role"]} keys=${d.keys}",
+                        )
+                        // Come iOS SyncCenter: per l'utente corrente il nome canonico è KBUserProfile (Room).
+                        var displayName: String? = null
+                        if (isMe) {
+                            displayName = userProfileDao.getByUid(memberUid)?.canonicalMemberDisplayName()
+                        }
+                        if (displayName.isNullOrBlank()) {
+                            displayName = d.firstNonBlankString("displayName", "name", "fullName")
+                                ?: d.firstNonBlankString("email")
+                        }
+                        if (displayName.isNullOrBlank()) {
+                            displayName = try {
+                                val userDoc = db.collection("users").document(doc.id).get().await()
+                                if (userDoc.exists()) userDoc.data.orEmpty().userProfileDisplayName() else null
+                            } catch (e: Exception) {
+                                Log.w(TAG, "users/${doc.id} read failed: ${e.message}")
+                                null
                             }
+                        }
+                        if (displayName.isNullOrBlank() && isMe) {
+                            val u = auth.currentUser
+                            displayName = u?.displayName?.trim()?.takeIf { it.isNotEmpty() && it != "Utente" }
+                                ?: u?.email?.trim()?.takeIf { it.isNotEmpty() }
+                        }
+                        if (displayName.isNullOrBlank()) {
+                            displayName = localMember?.displayName?.trim()?.takeIf { it.isNotEmpty() }
+                        }
+                        if (displayName.isNullOrBlank()) {
+                            displayName = "Membro"
+                        }
+                        val remoteCreatedAt =
+                            (d["createdAt"] as? com.google.firebase.Timestamp)?.toDate()?.time
+                        val remoteUpdatedAt =
+                            (d["updatedAt"] as? com.google.firebase.Timestamp)?.toDate()?.time
                         try {
                             familyMemberDao.upsert(KBFamilyMemberEntity(
                                 id = doc.id, familyId = familyId,
-                                userId = (d["uid"] as? String) ?: doc.id,
+                                userId = memberUid,
                                 role = (d["role"] as? String) ?: "member",
                                 displayName = displayName,
-                                email = d["email"] as? String,
+                                email = d.firstNonBlankString("email")
+                                    ?: auth.currentUser?.takeIf { it.uid == memberUid }?.email?.trim()
+                                        ?.takeIf { it.isNotEmpty() },
                                 photoURL = d["photoURL"] as? String,
-                                createdAtEpochMillis = now, updatedAtEpochMillis = now,
+                                createdAtEpochMillis = remoteCreatedAt
+                                    ?: localMember?.createdAtEpochMillis
+                                    ?: now,
+                                updatedAtEpochMillis = remoteUpdatedAt
+                                    ?: localMember?.updatedAtEpochMillis
+                                    ?: now,
                                 updatedBy = (d["updatedBy"] as? String) ?: doc.id,
                                 isDeleted = false,
                             ))
@@ -172,7 +212,7 @@ class FamilySyncCenter constructor(
                     val now = System.currentTimeMillis()
                     for (change in snap.documentChanges) {
                         val doc = change.document
-                        val d = doc.data
+                        val d = doc.data.orEmpty()
                         Log.d(TAG, "child change=${change.type} id=${doc.id} name=${d["name"]}")
 
                         if (change.type == DocumentChange.Type.REMOVED) {
@@ -198,7 +238,7 @@ class FamilySyncCenter constructor(
                         if (!familyExists) {
                             Log.w(TAG, "family not yet in Room, waiting...")
                             var retries = 0
-                            while (!familyExists && retries < 10) {
+                            while (!familyExists && retries < 50) {
                                 kotlinx.coroutines.delay(100)
                                 familyExists = familyDao.getById(familyId) != null
                                 retries++

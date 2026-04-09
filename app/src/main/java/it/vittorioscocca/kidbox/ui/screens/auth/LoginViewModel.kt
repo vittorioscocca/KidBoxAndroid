@@ -9,6 +9,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import android.util.Log
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
+import it.vittorioscocca.kidbox.data.user.UserProfileRepository
 import it.vittorioscocca.kidbox.data.remote.auth.AuthError
 import it.vittorioscocca.kidbox.data.remote.auth.AuthFacade
 import it.vittorioscocca.kidbox.data.remote.auth.AuthPresentation
@@ -28,6 +29,7 @@ class LoginViewModel @Inject constructor(
     private val facebookAuth: FacebookAuthService,
     private val emailAuth: EmailAuthService,
     private val onboardingPreferences: OnboardingPreferences,
+    private val userProfileRepository: UserProfileRepository,
 ) : ViewModel() {
 
     sealed class AuthCheckState {
@@ -55,6 +57,9 @@ class LoginViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             val user = FirebaseAuth.getInstance().currentUser
+            if (user != null) {
+                userProfileRepository.ensureSeededFromAuth()
+            }
             val hasFamily = if (user != null) checkHasFamily() else false
             val hasOnboarding = onboardingPreferences.hasSeenOnboarding()
 
@@ -165,6 +170,7 @@ class LoginViewModel @Inject constructor(
 
     private suspend fun onSignedInSuccessfully() {
         if (FirebaseAuth.getInstance().currentUser != null) {
+            userProfileRepository.ensureSeededFromAuth()
             _authCheckState.value =
                 AuthCheckState.Authenticated(checkHasFamily())
         }

@@ -151,6 +151,10 @@ fun FamilySettingsScreen(
                 }
                 Divider(color = Color(0xFFEAEAEA))
                 state.members.forEachIndexed { idx, member ->
+                    val memberLabel = sequenceOf(member.displayName, member.email)
+                        .mapNotNull { it?.trim()?.takeIf { s -> s.isNotEmpty() } }
+                        .firstOrNull()
+                        ?: "Membro"
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -162,7 +166,7 @@ fun FamilySettingsScreen(
                         )
                         Spacer(modifier = Modifier.size(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(member.displayName ?: member.email ?: "Membro")
+                            Text(memberLabel)
                             Text(
                                 if (member.role.equals("owner", true)) "Owner" else "Membro",
                                 fontSize = 12.sp, color = Color(0xFF666666),

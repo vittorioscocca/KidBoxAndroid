@@ -10,6 +10,7 @@ import dagger.hilt.components.SingletonComponent
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
+import it.vittorioscocca.kidbox.data.local.dao.KBUserProfileDao
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
 import javax.inject.Singleton
 
@@ -27,6 +28,9 @@ object DatabaseModule {
         "kidbox.db",
     ).fallbackToDestructiveMigration()
         .build()
+
+    @Provides
+    fun provideKBUserProfileDao(database: KidBoxDatabase): KBUserProfileDao = database.userProfileDao()
 
     @Provides
     fun provideKBFamilyDao(database: KidBoxDatabase): KBFamilyDao = database.familyDao()

@@ -14,7 +14,11 @@ import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
 import it.vittorioscocca.kidbox.data.remote.family.FamilyLeaveService
 import it.vittorioscocca.kidbox.data.remote.family.InviteRemoteStore
+import it.vittorioscocca.kidbox.data.local.entity.canonicalMemberDisplayName
 import it.vittorioscocca.kidbox.data.sync.FamilySyncCenter
+import it.vittorioscocca.kidbox.data.sync.firstNonBlankString
+import it.vittorioscocca.kidbox.data.sync.userProfileDisplayName
+import it.vittorioscocca.kidbox.data.user.UserProfileRepository
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,6 +55,7 @@ class FamilySettingsViewModel @Inject constructor(
     private val childDao: KBChildDao,
     private val leaveService: FamilyLeaveService,
     private val familySyncCenter: FamilySyncCenter,
+    private val userProfileRepository: UserProfileRepository,
 ) : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
     private val inviteRemoteStore = InviteRemoteStore()
@@ -194,24 +199,47 @@ class FamilySettingsViewModel @Inject constructor(
             memberDocs.forEach { doc ->
                 val d = doc.data.orEmpty()
                 if (d["isDeleted"] as? Boolean != true) {
-                    val displayName = (d["displayName"] as? String)?.takeIf { it.isNotBlank() }
+                    val memberCreatedAt =
+                        (d["createdAt"] as? com.google.firebase.Timestamp)?.toDate()?.time ?: now
+                    val memberUpdatedAt =
+                        (d["updatedAt"] as? com.google.firebase.Timestamp)?.toDate()?.time ?: now
+                    val memberUid = (d["uid"] as? String) ?: doc.id
+                    val fromProfile =
+                        if (memberUid == uid) userProfileRepository.getByUid(memberUid)?.canonicalMemberDisplayName()
+                        else null
+                    val displayName = fromProfile?.takeIf { it.isNotBlank() }
+                        ?: d.firstNonBlankString("displayName", "name", "fullName")
+                        ?: d.firstNonBlankString("email")
                         ?: run {
                             try {
                                 val userDoc = db.collection("users").document(doc.id).get().await()
-                                val ud = userDoc.data.orEmpty()
-                                (ud["displayName"] as? String)?.takeIf { it.isNotBlank() }
-                                    ?: (ud["email"] as? String)?.takeIf { it.isNotBlank() }
-                                    ?: "Membro"
-                            } catch (_: Exception) { "Membro" }
+                                if (userDoc.exists()) userDoc.data.orEmpty().userProfileDisplayName() else null
+                            } catch (_: Exception) {
+                                null
+                            }
                         }
+                        ?: if (memberUid == uid) {
+                            val u = FirebaseAuth.getInstance().currentUser
+                            u?.displayName?.trim()?.takeIf { it.isNotEmpty() && it != "Utente" }
+                                ?: u?.email?.trim()?.takeIf { it.isNotEmpty() }
+                        } else {
+                            null
+                        }
+                        ?: "Membro"
                     familyMemberDao.upsert(KBFamilyMemberEntity(
-                        id = doc.id, familyId = familyId, userId = doc.id,
+                        id = doc.id,
+                        familyId = familyId,
+                        userId = memberUid,
                         role = (d["role"] as? String) ?: "member",
                         displayName = displayName,
-                        email = d["email"] as? String,
+                        email = d.firstNonBlankString("email")
+                            ?: FirebaseAuth.getInstance().currentUser?.takeIf { it.uid == memberUid }
+                                ?.email?.trim()?.takeIf { it.isNotEmpty() },
                         photoURL = d["photoURL"] as? String,
-                        createdAtEpochMillis = now, updatedAtEpochMillis = now,
-                        updatedBy = uid, isDeleted = false,
+                        createdAtEpochMillis = memberCreatedAt,
+                        updatedAtEpochMillis = memberUpdatedAt,
+                        updatedBy = (d["updatedBy"] as? String) ?: uid,
+                        isDeleted = false,
                     ))
                 }
             }

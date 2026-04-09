@@ -38,13 +38,23 @@ class FamilyFirestoreCreationRepository @Inject constructor(
                 "updatedAt" to FieldValue.serverTimestamp(),
             ),
         )
+        val memberDoc = mutableMapOf<String, Any>(
+            "uid" to uid,
+            "role" to "owner",
+            "createdAt" to FieldValue.serverTimestamp(),
+            "isDeleted" to false,
+            "updatedAt" to FieldValue.serverTimestamp(),
+            "updatedBy" to uid,
+        )
+        auth.currentUser?.displayName?.trim()?.takeIf { it.isNotEmpty() && it != "Utente" }?.let {
+            memberDoc["displayName"] = it
+        }
+        auth.currentUser?.email?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            memberDoc["email"] = it
+        }
         batch1.set(
             familyRef.collection("members").document(uid),
-            mapOf(
-                "uid" to uid,
-                "role" to "owner",
-                "createdAt" to FieldValue.serverTimestamp(),
-            ),
+            memberDoc,
         )
         batch1.set(
             firestore.collection("users").document(uid)
