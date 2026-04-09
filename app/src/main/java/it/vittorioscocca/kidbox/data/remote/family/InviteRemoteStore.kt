@@ -30,6 +30,8 @@ class InviteRemoteStore(
                             "familyId" to familyId,
                             "createdBy" to uid,
                             "revoked" to false,
+                            "usedAt" to null,
+                            "usedBy" to null,
                             "createdAt" to Timestamp.now(),
                             "expiresAt" to Timestamp(expiresAt),
                         ),
@@ -44,13 +46,25 @@ class InviteRemoteStore(
     }
 
     suspend fun resolveInvite(code: String): String {
-        auth.currentUser?.uid ?: error("Not authenticated")
-        val snap = db.collection("invites").document(code).get().await()
-        val data = snap.data ?: error("Codice non valido")
-        if (data["revoked"] == true) error("Codice revocato")
-        val expiresAt = data["expiresAt"] as? Timestamp
-        if (expiresAt != null && expiresAt.toDate().before(Date())) error("Codice scaduto")
-        return data["familyId"] as? String ?: error("Invite malformato")
+        val uid = auth.currentUser?.uid ?: error("Not authenticated")
+        val ref = db.collection("invites").document(code)
+        return db.runTransaction { transaction ->
+            val snap = transaction.get(ref)
+            if (!snap.exists()) error("Codice non valido")
+            val data = snap.data ?: error("Codice non valido")
+            if (data["revoked"] == true) error("Codice revocato")
+            if (data["usedAt"] != null) error("Codice già utilizzato")
+            val expiresAt = data["expiresAt"] as? Timestamp
+            if (expiresAt != null && expiresAt.toDate().before(Date())) error("Codice scaduto")
+            transaction.update(
+                ref,
+                mapOf(
+                    "usedAt" to Timestamp.now(),
+                    "usedBy" to uid,
+                ),
+            )
+            data["familyId"] as? String ?: error("Invite malformato")
+        }.await()
     }
 
     suspend fun addMember(familyId: String, role: String = "member") {

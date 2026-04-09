@@ -43,6 +43,7 @@ class FamilyHeroPhotoService @Inject constructor() {
         Log.d(TAG, "hero upload start familyId=$familyId bytes=${imageData.size}")
 
         val metadata = storageMetadata { contentType = "image/jpeg" }
+        Log.d(TAG, "hero upload attempting path=$path uid=${auth.currentUser?.uid} token=${auth.currentUser?.getIdToken(false)?.result?.token?.take(20)}")
         ref.putBytes(imageData, metadata).await()
         val url = ref.downloadUrl.await().toString()
         Log.d(TAG, "hero upload OK familyId=$familyId url=$url")
