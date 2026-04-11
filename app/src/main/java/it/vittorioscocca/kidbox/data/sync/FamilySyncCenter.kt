@@ -1,10 +1,18 @@
 package it.vittorioscocca.kidbox.data.sync
 
+import android.content.Context
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentChange
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.QuerySnapshot
+import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.data.crypto.FamilyKeyStore
+import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
+import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
@@ -17,9 +25,15 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
@@ -33,6 +47,9 @@ class FamilySyncCenter @Inject constructor(
     private val familyMemberDao: KBFamilyMemberDao,
     private val childDao: KBChildDao,
     private val userProfileDao: KBUserProfileDao,
+    private val database: KidBoxDatabase,
+    private val sessionPrefs: FamilySessionPreferences,
+    @ApplicationContext private val appContext: Context,
 ) {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
@@ -42,9 +59,104 @@ class FamilySyncCenter @Inject constructor(
     private var currentFamilyId: String? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    /** Evita falsi positivi durante switch/join di famiglia (primo snapshot completo). */
+    @Volatile
+    private var isJoining: Boolean = false
+
+    @Volatile
+    private var accessLostEmitted: Boolean = false
+
+    private var lastMembersSnapshot: QuerySnapshot? = null
+
+    private var ownerSyncRecoveryJob: Job? = null
+
     // Signals when the first Firestore snapshot has been fully written to Room
     private val _initialSyncDone = MutableStateFlow(false)
     val initialSyncDone: StateFlow<Boolean> = _initialSyncDone.asStateFlow()
+
+    private val _accessLostEvent = MutableSharedFlow<Unit>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val accessLostEvent: SharedFlow<Unit> = _accessLostEvent.asSharedFlow()
+
+    /**
+     * Revoca accesso remota (es. owner su iOS): stop listener, wipe Room, chiavi, preferenze.
+     *
+     * Spesso Firestore chiude lo stream con **PERMISSION_DENIED** invece di un document change:
+     * va trattato come revoca (vedi [membersListener]).
+     *
+     * Path membri: `families/{familyId}/members/{userId}` (isDeleted o delete doc).
+     */
+    /**
+     * Owner in Room: `createdBy` sulla famiglia **oppure** riga membro locale con role owner (fallback se
+     * `createdBy` è temporaneamente incoerente). Se [currentFamilyId] punta già a un'altra famiglia, false.
+     */
+    private suspend fun isLocalFamilyCreator(familyId: String, uid: String): Boolean {
+        if (uid.isEmpty()) {
+            Log.d(TAG, "Bypass check: familyId=$familyId, isCreator=false (uid empty)")
+            return false
+        }
+        if (currentFamilyId != null && familyId != currentFamilyId) {
+            Log.d(TAG, "Bypass check: familyId=$familyId, isCreator=false (family mismatch currentFamilyId=$currentFamilyId)")
+            return false
+        }
+        val localFamily = familyDao.getById(familyId)
+        val byCreated = localFamily?.createdBy == uid
+        val myMember = familyMemberDao.getById(uid)
+        val byOwnerRole = myMember?.familyId == familyId &&
+            myMember.userId == uid &&
+            myMember.role.equals("owner", ignoreCase = true)
+        val result = byCreated || byOwnerRole
+        Log.d(
+            TAG,
+            "Bypass check: familyId=$familyId, currentFamilyId=$currentFamilyId, isCreator=$result " +
+                "(createdBy=$byCreated ownerRole=$byOwnerRole)",
+        )
+        return result
+    }
+
+    /** Dopo PERMISSION_DENIED transitorio per l'owner: riavvia sync con ritardo. */
+    private fun scheduleOwnerSyncRecovery(syncFamilyId: String) {
+        ownerSyncRecoveryJob?.cancel()
+        ownerSyncRecoveryJob = scope.launch(Dispatchers.IO) {
+            delay(2500)
+            Log.d(TAG, "Tentativo di ripristino sync forzato per Owner familyId=$syncFamilyId")
+            startSync(syncFamilyId)
+        }
+    }
+
+    private fun triggerAccessLostIfEligible(familyId: String, uid: String, reason: String): Boolean {
+        if (uid.isEmpty()) return false
+        synchronized(this) {
+            if (accessLostEmitted) return false
+            accessLostEmitted = true
+        }
+        Log.w(TAG, "Accesso revocato per l'utente corrente ($reason)")
+        stopSync()
+        scope.launch(Dispatchers.IO) {
+            try {
+                // Prima il flag così la Home non rifà bootstrap mentre Room si svuota.
+                sessionPrefs.markSkipHomeBootstrapOnce()
+                database.clearAllTables()
+            } catch (e: Exception) {
+                Log.e(TAG, "access lost clearAllTables failed: ${e.message}", e)
+            }
+            try {
+                FamilyKeyStore.deleteAllFamilyKeysForUser(appContext, uid)
+            } catch (e: Exception) {
+                Log.e(TAG, "access lost deleteAllFamilyKeysForUser failed: ${e.message}", e)
+            }
+            try {
+                // kidbox_prefs + KidBoxPrefs legacy (active_family_id), vedi FamilySessionPreferences
+                sessionPrefs.clearActiveFamilyId()
+            } catch (e: Exception) {
+                Log.e(TAG, "access lost clearActiveFamilyId failed: ${e.message}", e)
+            }
+            _accessLostEvent.emit(Unit)
+        }
+        return true
+    }
 
     /**
      * FIX #1: rimosso il guard `if (currentFamilyId == familyId) return`.
@@ -56,8 +168,14 @@ class FamilySyncCenter @Inject constructor(
      * Il costo è minimo: Firestore re-invia lo snapshot corrente come primo evento.
      */
     fun startSync(familyId: String) {
+        ownerSyncRecoveryJob?.cancel()
+        ownerSyncRecoveryJob = null
+        isJoining = true
+        accessLostEmitted = false
+        lastMembersSnapshot = null
         stopSync()
         currentFamilyId = familyId
+        sessionPrefs.setActiveFamilyId(familyId)
         _initialSyncDone.value = false
         Log.d(TAG, "startSync familyId=$familyId")
 
@@ -66,16 +184,37 @@ class FamilySyncCenter @Inject constructor(
         var childrenFirstDone = false
 
         fun checkAllFirstDone() {
-            if (familyFirstDone && membersFirstDone && childrenFirstDone) {
-                Log.d(TAG, "All first snapshots processed → initialSyncDone")
-                _initialSyncDone.value = true
-            }
+            if (accessLostEmitted) return
+            if (!(familyFirstDone && membersFirstDone && childrenFirstDone)) return
+            Log.d(TAG, "All first snapshots processed → initialSyncDone")
+            _initialSyncDone.value = true
+            isJoining = false
         }
 
         // ── Family listener ───────────────────────────────────────────────────
+        // Nota: routine/todo/event non hanno listener Firestore dedicati in questo modulo Android
+        // (solo family + members + children). Eventuali sync aggiuntive vanno estese qui con lo stesso pattern creator.
         familyListener = db.collection("families").document(familyId)
             .addSnapshotListener { snap, err ->
                 if (err != null) {
+                    val code = (err as? FirebaseFirestoreException)?.code
+                    if (code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                        val uid = auth.currentUser?.uid.orEmpty()
+                        scope.launch {
+                            if (uid.isNotEmpty() && isLocalFamilyCreator(familyId, uid)) {
+                                Log.w(
+                                    TAG,
+                                    "familyListener PERMISSION_DENIED — ignorato (creator locale, glitch revoca)",
+                                )
+                                scheduleOwnerSyncRecovery(familyId)
+                            } else {
+                                Log.e(TAG, "familyListener PERMISSION_DENIED: ${err.message}")
+                            }
+                            familyFirstDone = true
+                            checkAllFirstDone()
+                        }
+                        return@addSnapshotListener
+                    }
                     Log.e(TAG, "familyListener error: ${err.message}")
                     familyFirstDone = true; checkAllFirstDone(); return@addSnapshotListener
                 }
@@ -153,26 +292,136 @@ class FamilySyncCenter @Inject constructor(
             .collection("members")
             .addSnapshotListener { snap, err ->
                 if (err != null) {
+                    val code = (err as? FirebaseFirestoreException)?.code
+                    if (code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                        val uid = auth.currentUser?.uid.orEmpty()
+                        if (uid.isEmpty()) {
+                            membersFirstDone = true
+                            checkAllFirstDone()
+                            return@addSnapshotListener
+                        }
+                        // Il creator che rimuove un membro può vedere PERMISSION_DENIED transitorio:
+                        // non espellere l'owner se in Room risulta creatore di questa famiglia.
+                        scope.launch {
+                            if (isLocalFamilyCreator(familyId, uid)) {
+                                Log.w(
+                                    TAG,
+                                    "membersListener PERMISSION_DENIED — ignorato (creator locale)",
+                                )
+                                scheduleOwnerSyncRecovery(familyId)
+                                membersFirstDone = true
+                                checkAllFirstDone()
+                                return@launch
+                            }
+                            Log.w(TAG, "membersListener PERMISSION_DENIED — trattato come revoca accesso")
+                            triggerAccessLostIfEligible(
+                                familyId,
+                                uid,
+                                "members listener PERMISSION_DENIED",
+                            )
+                        }
+                        return@addSnapshotListener
+                    }
                     Log.e(TAG, "membersListener error: ${err.message}")
                     membersFirstDone = true; checkAllFirstDone(); return@addSnapshotListener
                 }
                 if (snap == null) {
                     membersFirstDone = true; checkAllFirstDone(); return@addSnapshotListener
                 }
+                lastMembersSnapshot = snap
+
                 Log.d(TAG, "membersListener: totalDocs=${snap.documents.size} changes=${snap.documentChanges.size}")
                 scope.launch {
+                    if (accessLostEmitted) return@launch
                     val now = System.currentTimeMillis()
-                    val uid = auth.currentUser?.uid.orEmpty()
+                    val myUid = auth.currentUser?.uid.orEmpty()
+                    val creatorBypass = isLocalFamilyCreator(familyId, myUid)
+                    /** Firestore post-revoca: query vuota ma changelog con REMOVED — non svuotare Room (vale anche dopo startSync recovery). */
+                    val emptyMembersSnap = snap.documents.isEmpty()
+                    val blockMemberDeletesOnEmptyGlitch =
+                        creatorBypass && emptyMembersSnap && snap.documentChanges.isNotEmpty()
+
+                    for (change in snap.documentChanges) {
+                        val doc = change.document
+                        Log.d(
+                            TAG,
+                            "membersListener change: type=${change.type} id=${doc.id} isMe=${doc.id == myUid}",
+                        )
+                        if (myUid.isEmpty() || doc.id != myUid) continue
+                        // Stesso scenario del PERMISSION_DENIED: rimuovendo un altro membro, Firestore può
+                        // emettere REMOVED anche per il doc del creatore con totalDocs=0 (transitorio).
+                        // iOS valuta sulla riga locale; qui non espelliamo il creator da eventi sul proprio uid.
+                        if (creatorBypass) {
+                            Log.w(
+                                TAG,
+                                "membersListener: ignoro revoca sul proprio doc (creator locale, prob. snapshot transitorio)",
+                            )
+                            continue
+                        }
+                        when (change.type) {
+                            DocumentChange.Type.REMOVED -> {
+                                if (triggerAccessLostIfEligible(familyId, myUid, "member REMOVED (my document)")) {
+                                    membersFirstDone = true
+                                    checkAllFirstDone()
+                                    return@launch
+                                }
+                            }
+                            DocumentChange.Type.MODIFIED -> {
+                                if (doc.data?.get("isDeleted") as? Boolean == true) {
+                                    if (triggerAccessLostIfEligible(
+                                            familyId,
+                                            myUid,
+                                            "member isDeleted=true (my document)",
+                                        )
+                                    ) {
+                                        membersFirstDone = true
+                                        checkAllFirstDone()
+                                        return@launch
+                                    }
+                                }
+                            }
+                            else -> { }
+                        }
+                    }
+
                     for (change in snap.documentChanges) {
                         val doc = change.document
                         val d = doc.data.orEmpty()
 
                         if (change.type == DocumentChange.Type.REMOVED) {
+                            if (creatorBypass && doc.id == myUid) {
+                                Log.w(
+                                    TAG,
+                                    "membersListener: skip delete local row per proprio uid (creator, REMOVED spurio)",
+                                )
+                                continue
+                            }
+                            if (blockMemberDeletesOnEmptyGlitch) {
+                                Log.w(
+                                    TAG,
+                                    "membersListener: skip REMOVED (snapshot vuoto + changelog, glitch) id=${doc.id}",
+                                )
+                                continue
+                            }
                             familyMemberDao.deleteById(doc.id)
                             continue
                         }
 
                         if (d["isDeleted"] as? Boolean == true) {
+                            if (creatorBypass && doc.id == myUid) {
+                                Log.w(
+                                    TAG,
+                                    "membersListener: skip delete local row per proprio uid (creator, isDeleted spurio)",
+                                )
+                                continue
+                            }
+                            if (blockMemberDeletesOnEmptyGlitch) {
+                                Log.w(
+                                    TAG,
+                                    "membersListener: skip isDeleted (snapshot vuoto + changelog, glitch) id=${doc.id}",
+                                )
+                                continue
+                            }
                             familyMemberDao.deleteById(doc.id)
                             continue
                         }
@@ -194,7 +443,7 @@ class FamilySyncCenter @Inject constructor(
                             continue
                         }
 
-                        val isMe = memberUid == uid
+                        val isMe = memberUid == myUid
                         var displayName: String? = null
                         if (isMe) {
                             displayName = userProfileDao.getByUid(memberUid)?.canonicalMemberDisplayName()
@@ -249,27 +498,91 @@ class FamilySyncCenter @Inject constructor(
             .collection("children")
             .addSnapshotListener { snap, err ->
                 if (err != null) {
-                    Log.e(TAG, "childrenListener error: ${err.message}")
-                    childrenFirstDone = true; checkAllFirstDone(); return@addSnapshotListener
+                    val uidErr = auth.currentUser?.uid.orEmpty()
+                    scope.launch {
+                        val creatorOnErr =
+                            uidErr.isNotEmpty() && isLocalFamilyCreator(familyId, uidErr)
+                        if (creatorOnErr) {
+                            // Nessuna modifica Room; sblocca solo il gate così isJoining non resta true per sempre.
+                            Log.w(
+                                TAG,
+                                "childrenListener error — Room figli invariato (creator), gate sync: ${err.message}",
+                            )
+                            if ((err as? FirebaseFirestoreException)?.code ==
+                                FirebaseFirestoreException.Code.PERMISSION_DENIED
+                            ) {
+                                scheduleOwnerSyncRecovery(familyId)
+                            }
+                            childrenFirstDone = true
+                            checkAllFirstDone()
+                            return@launch
+                        }
+                        val code = (err as? FirebaseFirestoreException)?.code
+                        if (code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                            Log.e(TAG, "childrenListener PERMISSION_DENIED: ${err.message}")
+                        } else {
+                            Log.e(TAG, "childrenListener error: ${err.message}")
+                        }
+                        childrenFirstDone = true
+                        checkAllFirstDone()
+                    }
+                    return@addSnapshotListener
                 }
                 if (snap == null) {
-                    childrenFirstDone = true; checkAllFirstDone(); return@addSnapshotListener
+                    val uidNull = auth.currentUser?.uid.orEmpty()
+                    scope.launch {
+                        if (uidNull.isNotEmpty() && isLocalFamilyCreator(familyId, uidNull)) {
+                            Log.w(
+                                TAG,
+                                "childrenListener snap null — Room figli invariato (creator), gate sync",
+                            )
+                        } else {
+                            Log.e(TAG, "childrenListener snap null")
+                        }
+                        childrenFirstDone = true
+                        checkAllFirstDone()
+                    }
+                    return@addSnapshotListener
                 }
                 Log.d(TAG, "childrenListener: totalDocs=${snap.documents.size} changes=${snap.documentChanges.size}")
                 scope.launch {
                     val now = System.currentTimeMillis()
+                    val myUid = auth.currentUser?.uid.orEmpty()
+                    val creatorBypass = isLocalFamilyCreator(familyId, myUid)
+                    val emptySnap = snap.documents.isEmpty()
+                    /**
+                     * Glitch post-revoca / recovery: anche con [isJoining]==true dopo [startSync], uno snapshot
+                     * vuoto con REMOVED non deve svuotare Room (prima il blocco si disattivava e cancellava tutti i figli).
+                     */
+                    val blockChildDeletesOnEmptyGlitch =
+                        creatorBypass && emptySnap && snap.documentChanges.isNotEmpty()
+
                     for (change in snap.documentChanges) {
                         val doc = change.document
                         val d = doc.data.orEmpty()
                         Log.d(TAG, "child change=${change.type} id=${doc.id} name=${d["name"]}")
 
                         if (change.type == DocumentChange.Type.REMOVED) {
+                            if (blockChildDeletesOnEmptyGlitch) {
+                                Log.w(
+                                    TAG,
+                                    "childrenListener: skip child REMOVED (glitch vuoto+changelog) id=${doc.id}",
+                                )
+                                continue
+                            }
                             childDao.deleteById(doc.id)
                             continue
                         }
 
                         // FIX #3: gestione isDeleted anche nei children
                         if (d["isDeleted"] as? Boolean == true) {
+                            if (blockChildDeletesOnEmptyGlitch) {
+                                Log.w(
+                                    TAG,
+                                    "childrenListener: skip child isDeleted (glitch vuoto+changelog) id=${doc.id}",
+                                )
+                                continue
+                            }
                             childDao.deleteById(doc.id)
                             Log.d(TAG, "child deleted (isDeleted=true) id=${doc.id}")
                             continue
@@ -338,7 +651,13 @@ class FamilySyncCenter @Inject constructor(
             }
     }
 
+    /**
+     * Rimuove tutte le [ListenerRegistration] Firestore e azzera i riferimenti così non restano
+     * callback attive dopo [remove].
+     */
     fun stopSync() {
+        ownerSyncRecoveryJob?.cancel()
+        ownerSyncRecoveryJob = null
         familyListener?.remove()
         membersListener?.remove()
         childrenListener?.remove()
@@ -346,6 +665,8 @@ class FamilySyncCenter @Inject constructor(
         membersListener = null
         childrenListener = null
         currentFamilyId = null
+        lastMembersSnapshot = null
         _initialSyncDone.value = false
+        sessionPrefs.clearActiveFamilyId()
     }
 }

@@ -1,22 +1,32 @@
 package it.vittorioscocca.kidbox.ui.screens.home
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
+import android.widget.Toast
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
+import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
 import it.vittorioscocca.kidbox.data.remote.family.FamilyHeroPhotoService
+import it.vittorioscocca.kidbox.data.sync.FamilySyncCenter
 import it.vittorioscocca.kidbox.domain.auth.LogoutUseCase
 import it.vittorioscocca.kidbox.ui.screens.home.HeroCrop
 import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -63,6 +73,9 @@ class HomeViewModel @Inject constructor(
     private val familyDao: KBFamilyDao,
     private val familyMemberDao: KBFamilyMemberDao,
     private val heroPhotoService: FamilyHeroPhotoService,
+    private val familySyncCenter: FamilySyncCenter,
+    private val familySessionPreferences: FamilySessionPreferences,
+    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -76,6 +89,26 @@ class HomeViewModel @Inject constructor(
     // (es. heroPhotoURL arriva da un altro device via Firestore), la UI si aggiorna.
     init {
         observeHomeData()
+        viewModelScope.launch {
+            familySyncCenter.accessLostEvent.collect {
+                _uiState.value = HomeUiState(isLoading = false, familyId = "")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        appContext,
+                        "Sei stato rimosso dalla famiglia",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                    val intent = appContext.packageManager
+                        .getLaunchIntentForPackage(appContext.packageName)
+                        ?.apply {
+                            addFlags(
+                                Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK,
+                            )
+                        }
+                    intent?.let { appContext.startActivity(it) }
+                }
+            }
+        }
     }
 
     private fun observeHomeData() {
@@ -85,7 +118,24 @@ class HomeViewModel @Inject constructor(
                 val familyId = family?.id.orEmpty()
 
                 if (familyId.isBlank()) {
-                    _uiState.value = HomeUiState(isLoading = false)
+                    if (familySessionPreferences.consumeSkipHomeBootstrapOnce()) {
+                        Log.i(TAG, "observeHomeData: skip Firestore bootstrap (leave / access revoked)")
+                        _uiState.value = HomeUiState(isLoading = false, familyId = "")
+                        return@collectLatest
+                    }
+                    val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+                    if (uid.isNotEmpty()) {
+                        // Nessun familyId stale (kidbox_prefs / KidBoxPrefs) prima del bootstrap
+                        familySessionPreferences.clearActiveFamilyId()
+                        try {
+                            bootstrapFromFirestore(uid)
+                            // After bootstrap, Room will emit again automatically via the Flow
+                            return@collectLatest
+                        } catch (e: Exception) {
+                            Log.w(TAG, "HomeViewModel bootstrap failed: ${e.message}")
+                        }
+                    }
+                    _uiState.value = HomeUiState(isLoading = false, familyId = "")
                     return@collectLatest
                 }
 
@@ -131,6 +181,130 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private suspend fun bootstrapFromFirestore(uid: String) {
+        try {
+            Log.i(TAG, "bootstrapFromFirestore start uid=$uid")
+            val membershipDocs = db.collection("users")
+                .document(uid)
+                .collection("memberships")
+                .get()
+                .await()
+                .documents
+
+            val familyId = membershipDocs.firstOrNull()?.id.orEmpty()
+            if (familyId.isBlank()) {
+                Log.w(TAG, "bootstrapFromFirestore: memberships empty uid=$uid")
+                _uiState.value = HomeUiState(isLoading = false, familyId = "")
+                return
+            }
+            Log.i(TAG, "bootstrapFromFirestore: found familyId=$familyId")
+
+            try {
+                val myMemberDoc = db.collection("families")
+                    .document(familyId)
+                    .collection("members")
+                    .document(uid)
+                    .get()
+                    .await()
+                if (!myMemberDoc.exists()) {
+                    Log.w(TAG, "bootstrapFromFirestore: member doc assente — probabile revoca familyId=$familyId")
+                    _uiState.value = HomeUiState(isLoading = false, familyId = "")
+                    return
+                }
+                val mData = myMemberDoc.data.orEmpty()
+                if (mData["isDeleted"] as? Boolean == true) {
+                    Log.w(TAG, "bootstrapFromFirestore: member isDeleted=true familyId=$familyId")
+                    _uiState.value = HomeUiState(isLoading = false, familyId = "")
+                    return
+                }
+            } catch (e: FirebaseFirestoreException) {
+                if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                    Log.w(TAG, "bootstrapFromFirestore: lettura member PERMISSION_DENIED — revoca")
+                    _uiState.value = HomeUiState(isLoading = false, familyId = "")
+                    return
+                }
+                throw e
+            }
+
+            val familySnap = db.collection("families").document(familyId).get().await()
+            if (!familySnap.exists()) {
+                Log.w(TAG, "bootstrapFromFirestore: family not found familyId=$familyId")
+                _uiState.value = HomeUiState(isLoading = false, familyId = "")
+                return
+            }
+
+            val familyData = familySnap.data.orEmpty()
+            // Skip famiglie eliminate
+            if (familyData["isDeleted"] as? Boolean == true) {
+                Log.w(TAG, "bootstrapFromFirestore: family isDeleted=true, skipping familyId=$familyId")
+                _uiState.value = HomeUiState(isLoading = false, familyId = "")
+                return
+            }
+            val now = System.currentTimeMillis()
+            val createdBy = familyData["ownerUid"] as? String ?: uid
+            val family = KBFamilyEntity(
+                id = familyId,
+                name = (familyData["name"] as? String).orEmpty(),
+                heroPhotoURL = familyData["heroPhotoURL"] as? String,
+                heroPhotoLocalPath = null,
+                heroPhotoUpdatedAtEpochMillis = null,
+                heroPhotoScale = null,
+                heroPhotoOffsetX = null,
+                heroPhotoOffsetY = null,
+                createdBy = createdBy,
+                updatedBy = (familyData["updatedBy"] as? String) ?: uid,
+                createdAtEpochMillis = (familyData["createdAt"] as? com.google.firebase.Timestamp)?.toDate()?.time ?: now,
+                updatedAtEpochMillis = (familyData["updatedAt"] as? com.google.firebase.Timestamp)?.toDate()?.time ?: now,
+                lastSyncAtEpochMillis = null,
+                lastSyncError = null,
+            )
+            familyDao.upsert(family)
+            Log.i(TAG, "bootstrapFromFirestore: family upserted familyId=$familyId")
+
+            val memberDocs = db.collection("families")
+                .document(familyId)
+                .collection("members")
+                .get()
+                .await()
+                .documents
+
+            memberDocs.forEach { doc ->
+                val d = doc.data.orEmpty()
+                if (d["isDeleted"] as? Boolean != true) {
+                    val memberUid = (d["uid"] as? String) ?: doc.id
+                    val displayName = (d["displayName"] as? String)
+                        ?: (d["name"] as? String)
+                        ?: (d["fullName"] as? String)
+                        ?: (d["email"] as? String)
+                        ?: "Membro"
+                    familyMemberDao.upsert(
+                        KBFamilyMemberEntity(
+                            id = doc.id,
+                            familyId = familyId,
+                            userId = memberUid,
+                            role = (d["role"] as? String) ?: "member",
+                            displayName = displayName,
+                            email = (d["email"] as? String),
+                            photoURL = d["photoURL"] as? String,
+                            createdAtEpochMillis = (d["createdAt"] as? com.google.firebase.Timestamp)?.toDate()?.time ?: now,
+                            updatedAtEpochMillis = (d["updatedAt"] as? com.google.firebase.Timestamp)?.toDate()?.time ?: now,
+                            updatedBy = (d["updatedBy"] as? String) ?: uid,
+                            isDeleted = false,
+                        )
+                    )
+                }
+            }
+            Log.i(TAG, "bootstrapFromFirestore: members upserted count=${memberDocs.size} familyId=$familyId")
+        } catch (e: Exception) {
+            Log.w(TAG, "HomeViewModel bootstrap failed: ${e.message}")
+            _uiState.value = HomeUiState(isLoading = false, familyId = "")
+        } finally {
+            if (_uiState.value.isLoading) {
+                _uiState.value = _uiState.value.copy(isLoading = false)
+            }
+        }
+    }
+
     // ── Hero photo: upload da picker ──────────────────────────────────────────
 
 
@@ -147,6 +321,12 @@ class HomeViewModel @Inject constructor(
 
     /** Chiamato quando l'utente seleziona una foto dalla galleria. */
     fun onHeroPhotoSelected(uri: Uri, context: Context) {
+        if (_uiState.value.familyId.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                errorMessage = "Crea prima una famiglia per caricare una foto",
+            )
+            return
+        }
         // Leggi i bytes subito sul thread corrente (main) prima che l'URI scada
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -289,5 +469,10 @@ class HomeViewModel @Inject constructor(
     private fun todayLabel(): String {
         val formatter = java.text.SimpleDateFormat("EEEE, d MMMM", java.util.Locale.getDefault())
         return formatter.format(java.util.Date())
+    }
+
+    fun reset() {
+        familySessionPreferences.markSkipHomeBootstrapOnce()
+        _uiState.value = HomeUiState(isLoading = false)
     }
 }

@@ -43,7 +43,6 @@ fun AppNavGraph(
                         "KidBoxDebug",
                         "onLoginSuccess hasFamily=$hasFamily hasSeenOnboarding=$hasSeenOnboarding",
                     )
-
                     when {
                         hasSeenOnboarding -> {
                             navController.navigate(AppDestination.Home.route) {
@@ -53,7 +52,7 @@ fun AppNavGraph(
                         hasFamily -> {
                             onboardingPreferences.completeOnboarding()
                             navController.navigate(AppDestination.Home.route) {
-                                popUpTo(AppDestination.Login.route) { inclusive = true }
+                                popUpTo(navController.graph.id) { inclusive = false }
                             }
                         }
                         else -> {
@@ -107,6 +106,7 @@ fun AppNavGraph(
                 },
             )
         }
+
         composable(AppDestination.Settings.route) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
@@ -114,12 +114,15 @@ fun AppNavGraph(
                 onFamilySettings = { navController.navigate(AppDestination.FamilySettings.route) },
             )
         }
+
         composable(AppDestination.Theme.route) {
             ThemeScreen(onBack = { navController.popBackStack() })
         }
+
         composable(AppDestination.InviteCode.route) {
             InviteCodeScreen(onBack = { navController.popBackStack() })
         }
+
         composable(AppDestination.JoinFamily.route) {
             JoinFamilyScreen(
                 onBack = { navController.popBackStack() },
@@ -130,6 +133,7 @@ fun AppNavGraph(
                 },
             )
         }
+
         composable(AppDestination.EditFamily.route) {
             EditFamilyScreen(
                 onBack = { navController.popBackStack() },
@@ -138,6 +142,7 @@ fun AppNavGraph(
                 },
             )
         }
+
         composable(
             route = AppDestination.EditChild.route,
             arguments = listOf(navArgument("childId") { type = NavType.StringType }),
@@ -145,48 +150,68 @@ fun AppNavGraph(
             val childId = backStackEntry.arguments?.getString("childId").orEmpty()
             EditChildScreen(childId = childId, onBack = { navController.popBackStack() })
         }
+
         composable(
             route = AppDestination.FamilyPhotos.route,
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
         ) { PlaceholderScreen("Family Photos") }
+
         composable(
             route = AppDestination.NotesHome.route,
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
         ) { PlaceholderScreen("Notes") }
+
         composable(AppDestination.Todo.route) { PlaceholderScreen("To-Do") }
+
         composable(
             route = AppDestination.ShoppingList.route,
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
         ) { PlaceholderScreen("Lista Spesa") }
+
         composable(
             route = AppDestination.Calendar.route,
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
         ) { PlaceholderScreen("Calendario") }
+
         composable(
             route = AppDestination.PediatricChildSelector.route,
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
         ) { PlaceholderScreen("Salute") }
+
         composable(AppDestination.Chat.route) { PlaceholderScreen("Chat") }
+
         composable(
             route = AppDestination.ExpensesHome.route,
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
         ) { PlaceholderScreen("Spese") }
+
         composable(AppDestination.DocumentsHome.route) { PlaceholderScreen("Documenti") }
+
         composable(
             route = AppDestination.FamilyLocation.route,
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
         ) { PlaceholderScreen("Posizione") }
+
         composable(AppDestination.AskExpert.route) { PlaceholderScreen("Assistente AI") }
+
         composable(AppDestination.FamilySettings.route) {
+            val context = androidx.compose.ui.platform.LocalContext.current
             FamilySettingsScreen(
                 onBack = { navController.popBackStack() },
                 onInvite = { navController.navigate(AppDestination.InviteCode.route) },
                 onJoin = { navController.navigate(AppDestination.JoinFamily.route) },
                 onEditFamily = { navController.navigate(AppDestination.EditFamily.route) },
                 onLeaveDone = {
-                    navController.navigate(AppDestination.Login.route) {
-                        popUpTo(navController.graph.id) { inclusive = true }
-                    }
+                    Log.d("AppNavGraph", "onLeaveDone -> restart app")
+                    val intent = (context as android.app.Activity).packageManager
+                        .getLaunchIntentForPackage(context.packageName)!!
+                        .apply {
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                        }
+                    context.startActivity(intent)
+                    (context as android.app.Activity).finish()
                 },
             )
         }

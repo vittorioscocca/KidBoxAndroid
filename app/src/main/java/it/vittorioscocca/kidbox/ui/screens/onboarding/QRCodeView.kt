@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -18,28 +19,47 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun QRCodeView(payload: String, modifier: Modifier = Modifier) {
-    val bitmap = remember(payload) { QRCodeGenerator.generateQRCodeBitmap(payload) }
-    if (bitmap != null) {
-        Image(
-            bitmap = bitmap.asImageBitmap(),
-            contentDescription = "Codice QR",
-            contentScale = ContentScale.FillBounds,
-            modifier = modifier
-                .size(220.dp)
-                .background(Color.White, RoundedCornerShape(16.dp)),
-        )
-    } else {
-        Box(
-            modifier = modifier
-                .size(220.dp)
-                .background(Color(0x33000000), RoundedCornerShape(16.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = "QR non disponibile",
-                color = Color(0xFF666666),
-                textAlign = TextAlign.Center,
+    val bitmap = remember(payload) {
+        if (payload.isNotBlank()) QRCodeGenerator.generateQRCodeBitmap(payload) else null
+    }
+    when {
+        payload.isBlank() -> {
+            Box(
+                modifier = modifier
+                    .size(220.dp)
+                    .background(Color(0x33000000), RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(36.dp),
+                    color = Color(0xFF666666),
+                    strokeWidth = 3.dp,
+                )
+            }
+        }
+        bitmap != null -> {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = "Codice QR",
+                contentScale = ContentScale.FillBounds,
+                modifier = modifier
+                    .size(220.dp)
+                    .background(Color.White, RoundedCornerShape(16.dp)),
             )
+        }
+        else -> {
+            Box(
+                modifier = modifier
+                    .size(220.dp)
+                    .background(Color(0x33000000), RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "QR non disponibile",
+                    color = Color(0xFF666666),
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }

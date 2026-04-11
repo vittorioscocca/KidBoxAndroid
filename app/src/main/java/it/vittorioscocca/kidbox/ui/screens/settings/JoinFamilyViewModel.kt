@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.remote.family.InviteRemoteStore
+import it.vittorioscocca.kidbox.data.remote.family.JoinPayloadParser
 import it.vittorioscocca.kidbox.data.remote.family.JoinWrapService
 import it.vittorioscocca.kidbox.data.sync.FamilySyncCenter
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,7 +29,7 @@ data class JoinFamilyUiState(
  *
  * Via QR:
  * 1) JoinWrapService.join() — unwrap master key + salva in FamilyKeyStore
- * 2) JoinWrapService.extractCode() — estrae membership code dal payload
+ * 2) JoinPayloadParser.extractInviteCode() — estrae membership code dal payload kidbox://join
  * 3) joinWithCode(code) — resolveInvite + addMember su Firestore
  *
  * Via codice testuale:
@@ -54,12 +55,13 @@ class JoinFamilyViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = JoinFamilyUiState(isBusy = true)
             try {
-                // Step 1: unwrap master key e salva in FamilyKeyStore
-                joinWrapService.join(getApplication(), rawPayload)
+                val raw = rawPayload.trim()
+                // Step 1: unwrap master key (secret Base64URL da kidbox://join) + salva in FamilyKeyStore
+                joinWrapService.join(getApplication(), raw)
                 Log.i(TAG, "QR join: master key saved")
 
-                // Step 2: estrai membership code dal QR payload
-                val code = joinWrapService.extractCode(rawPayload)
+                // Step 2: estrai membership code dal payload (URL kidbox://join o codice plain)
+                val code = JoinPayloadParser.extractInviteCode(raw)
                 if (code.isNullOrBlank()) {
                     _uiState.value = JoinFamilyUiState(
                         error = "QR valido ma senza codice invito."
@@ -89,12 +91,18 @@ class JoinFamilyViewModel @Inject constructor(
 
     private suspend fun joinWithCodeInternal(code: String, onJoined: () -> Unit) {
         try {
+            Log.d(TAG, "resolveInvite start code=$code")
             val familyId = inviteRemote.resolveInvite(code)
+            Log.d(TAG, "resolveInvite OK familyId=$familyId")
+
+            Log.d(TAG, "addMember start familyId=$familyId")
             inviteRemote.addMember(familyId)
+            Log.d(TAG, "addMember OK")
             Log.i(TAG, "join OK familyId=$familyId")
             _uiState.value = JoinFamilyUiState(didJoin = true)
             // Reset FamilySyncCenter così startObserving() fa bootstrap della nuova famiglia
             familySyncCenter.stopSync()
+            familySyncCenter.startSync(familyId)
             onJoined()
         } catch (e: Exception) {
             Log.e(TAG, "joinWithCode failed: ${e.message}")

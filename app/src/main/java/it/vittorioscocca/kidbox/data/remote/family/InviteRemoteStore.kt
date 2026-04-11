@@ -46,25 +46,14 @@ class InviteRemoteStore(
     }
 
     suspend fun resolveInvite(code: String): String {
-        val uid = auth.currentUser?.uid ?: error("Not authenticated")
-        val ref = db.collection("invites").document(code)
-        return db.runTransaction { transaction ->
-            val snap = transaction.get(ref)
-            if (!snap.exists()) error("Codice non valido")
-            val data = snap.data ?: error("Codice non valido")
-            if (data["revoked"] == true) error("Codice revocato")
-            if (data["usedAt"] != null) error("Codice già utilizzato")
-            val expiresAt = data["expiresAt"] as? Timestamp
-            if (expiresAt != null && expiresAt.toDate().before(Date())) error("Codice scaduto")
-            transaction.update(
-                ref,
-                mapOf(
-                    "usedAt" to Timestamp.now(),
-                    "usedBy" to uid,
-                ),
-            )
-            data["familyId"] as? String ?: error("Invite malformato")
-        }.await()
+        auth.currentUser?.uid ?: error("Not authenticated")
+        val snap = db.collection("invites").document(code).get().await()
+        if (!snap.exists()) error("Codice non valido")
+        val data = snap.data ?: error("Codice non valido")
+        if (data["revoked"] == true) error("Codice revocato")
+        val expiresAt = data["expiresAt"] as? Timestamp
+        if (expiresAt != null && expiresAt.toDate().before(Date())) error("Codice scaduto")
+        return data["familyId"] as? String ?: error("Invite malformato")
     }
 
     suspend fun addMember(familyId: String, role: String = "member") {

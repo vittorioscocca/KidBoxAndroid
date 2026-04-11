@@ -15,6 +15,9 @@ interface KBFamilyDao {
 
     @Query("SELECT * FROM kb_families ORDER BY updatedAtEpochMillis DESC")
     fun observeAll(): Flow<List<KBFamilyEntity>>
+
+    @Query("SELECT * FROM kb_families WHERE id = :familyId LIMIT 1")
+    fun observeById(familyId: String): Flow<KBFamilyEntity?>
     
     @Query("SELECT EXISTS(SELECT 1 FROM kb_families LIMIT 1)")
     suspend fun hasAnyFamily(): Boolean
@@ -30,4 +33,10 @@ interface KBFamilyDao {
 
     @Query("DELETE FROM kb_families WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM kb_families WHERE id = :familyId")
+    suspend fun deleteByFamilyId(familyId: String): Int
+
+    @Query("DELETE FROM kb_families")
+    suspend fun deleteAll()
 }

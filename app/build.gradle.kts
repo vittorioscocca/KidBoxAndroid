@@ -58,6 +58,7 @@ dependencies {
     implementation(libs.lifecycle.runtime.compose)
     implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.activity.compose)
+    implementation("androidx.concurrent:concurrent-futures-ktx:1.1.0")
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
@@ -83,6 +84,7 @@ dependencies {
     implementation(libs.firebase.storage)
     implementation("com.google.firebase:firebase-storage-ktx")
     implementation(libs.firebase.messaging)
+    implementation("com.google.firebase:firebase-functions-ktx")
 
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.play.services)

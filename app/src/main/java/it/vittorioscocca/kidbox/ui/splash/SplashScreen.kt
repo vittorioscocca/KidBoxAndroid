@@ -1,5 +1,8 @@
 package it.vittorioscocca.kidbox.ui.splash
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -44,8 +47,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.drawable.toBitmap
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -64,6 +71,11 @@ private val GradientEnd = Color(0xFFF26010)
 fun KidBoxSplashScreen(onFinished: () -> Unit) {
     val density = LocalDensity.current
     val context = LocalContext.current
+    val view = LocalView.current
+    val activity = context as? Activity
+    activity?.window?.attributes?.layoutInDisplayCutoutMode =
+        android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+    val window = activity?.window
     val iconBitmap = remember(context) {
         val drawable = ResourcesCompat.getDrawable(
             context.resources,
@@ -87,6 +99,11 @@ fun KidBoxSplashScreen(onFinished: () -> Unit) {
     var particlesActive by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
+        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
+        controller?.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller?.hide(WindowInsetsCompat.Type.systemBars())
+
         launch {
             delay(100)
             coroutineScope {
@@ -153,6 +170,7 @@ fun KidBoxSplashScreen(onFinished: () -> Unit) {
             iconScale.animateTo(1f, tween(200))
         }
         delay(2600)
+        controller?.show(WindowInsetsCompat.Type.systemBars())
         onFinished()
     }
 
@@ -340,4 +358,10 @@ fun KidBoxSplashScreen(onFinished: () -> Unit) {
             Spacer(modifier = Modifier.weight(1f))
         }
     }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

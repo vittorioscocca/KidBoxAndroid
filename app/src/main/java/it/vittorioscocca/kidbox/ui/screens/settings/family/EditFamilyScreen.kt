@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.SentimentSatisfied
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -258,7 +259,7 @@ fun EditFamilyScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .border(1.5.dp, cardBorder, cardShape)
-                .clickable {
+                .clickable(enabled = !state.isLoading && !state.isSavingFamily) {
                     viewModel.saveFamilyWithChildren(
                         newName = familyName,
                         childrenInputs = children.map { entry ->
@@ -275,11 +276,24 @@ fun EditFamilyScreen(
                 },
         ) {
             Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.CheckCircle, null, tint = Color(0xFF2E86FF), modifier = Modifier.size(22.dp))
+                if (state.isLoading || state.isSavingFamily) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = Color(0xFF2E86FF),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Icon(Icons.Filled.CheckCircle, null, tint = Color(0xFF2E86FF), modifier = Modifier.size(22.dp))
+                }
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text("Salva modifiche", fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
-                    Text("Le modifiche verranno sincronizzate.", color = sectionSubtitle, fontSize = 12.sp)
+                    Text(
+                        state.savingMessage?.takeIf { it.isNotBlank() }
+                            ?: "Le modifiche verranno sincronizzate.",
+                        color = sectionSubtitle,
+                        fontSize = 12.sp,
+                    )
                 }
             }
         }

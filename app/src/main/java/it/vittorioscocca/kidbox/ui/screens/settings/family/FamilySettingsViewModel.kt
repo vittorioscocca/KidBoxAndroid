@@ -1,10 +1,12 @@
 package it.vittorioscocca.kidbox.ui.screens.settings.family
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
@@ -14,6 +16,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
 import it.vittorioscocca.kidbox.data.local.entity.canonicalMemberDisplayName
 import it.vittorioscocca.kidbox.data.remote.family.FamilyLeaveService
+import it.vittorioscocca.kidbox.data.remote.family.FamilyFirestoreCreationRepository
 import it.vittorioscocca.kidbox.data.remote.family.InviteRemoteStore
 import it.vittorioscocca.kidbox.data.sync.FamilySyncCenter
 import it.vittorioscocca.kidbox.data.sync.firstNonBlankString
@@ -26,6 +29,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -37,6 +42,9 @@ data class FamilySettingsUiState(
     val isOwner: Boolean = false,
     val currentUid: String = "",
     val error: String? = null,
+    /** Salvataggio famiglia/figli in corso (non sovrascritto dal flow combine). */
+    val isSavingFamily: Boolean = false,
+    val savingMessage: String? = null,
 ) {
     val canLeave: Boolean
         get() = members.size >= 2 || !isOwner
@@ -48,6 +56,20 @@ data class ChildInput(
     val birthDateEpochMillis: Long?,
 )
 
+sealed interface LeaveScenario {
+    data object MemberOnly : LeaveScenario
+    data object OwnerAlone : LeaveScenario
+    data class OwnerWithMembers(val otherMembers: List<KBFamilyMemberEntity>) : LeaveScenario
+}
+
+sealed interface LeaveDialogState {
+    data object Hidden : LeaveDialogState
+    data object ConfirmLeave : LeaveDialogState
+    data object OwnerAlone : LeaveDialogState
+    data class OwnerWithMembers(val otherMembers: List<KBFamilyMemberEntity>) : LeaveDialogState
+    data object TransferOwnership : LeaveDialogState
+}
+
 @HiltViewModel
 class FamilySettingsViewModel @Inject constructor(
     private val familyDao: KBFamilyDao,
@@ -56,34 +78,68 @@ class FamilySettingsViewModel @Inject constructor(
     private val leaveService: FamilyLeaveService,
     private val familySyncCenter: FamilySyncCenter,
     private val userProfileRepository: UserProfileRepository,
+    private val creationRepository: FamilyFirestoreCreationRepository,
 ) : ViewModel() {
+    companion object {
+        private const val TAG = "FamilySettingsVM"
+    }
 
     private val db = FirebaseFirestore.getInstance()
     private val inviteRemoteStore = InviteRemoteStore()
     private val _uiState = MutableStateFlow(FamilySettingsUiState())
     val uiState: StateFlow<FamilySettingsUiState> = _uiState.asStateFlow()
+    private val _leaveDialogState = MutableStateFlow<LeaveDialogState>(LeaveDialogState.Hidden)
+    val leaveDialogState: StateFlow<LeaveDialogState> = _leaveDialogState.asStateFlow()
+    private val _navigateAwayAfterLeave = MutableStateFlow(false)
+    val navigateAwayAfterLeave: StateFlow<Boolean> = _navigateAwayAfterLeave.asStateFlow()
 
     private var observeJob: Job? = null
     private var observingFamilyId: String? = null
 
-    // ── Public entry point called from screens ────────────────────────────────
-    // Architecture: LOCAL-FIRST exactly like iOS
-    //
-    // FLOW:
-    // 1. Read Room → show UI immediately (works offline, instant)
-    // 2. If Room empty → bootstrap from Firestore once
-    // 3. Start FamilySyncCenter → registers Firestore listeners
-    //    → on first snapshot Firestore sends ALL docs as ADDED
-    //    → FamilySyncCenter writes them to Room
-    //    → Room Flow emits → UI updates automatically
-    // 4. Cross-device sync: when device B modifies family/child, Firestore listener
-    //    on device A receives MODIFIED → FamilySyncCenter writes to Room → UI updates
+    init {
+        viewModelScope.launch {
+            familySyncCenter.accessLostEvent.collect {
+                handleAccessRevokedByRemote()
+            }
+        }
+    }
+
+    /**
+     * Revoca accesso da altro device (listener → PERMISSION_DENIED / wipe).
+     * Reset UI senza mostrare l'errore Firestore: [onLeaveDone] riavvia il flusso verso onboarding.
+     */
+    private fun handleAccessRevokedByRemote() {
+        observeJob?.cancel()
+        observeJob = null
+        observingFamilyId = null
+        dismissLeaveDialog()
+        val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        _uiState.value = FamilySettingsUiState(
+            isLoading = false,
+            family = null,
+            members = emptyList(),
+            children = emptyList(),
+            isOwner = false,
+            currentUid = uid,
+            error = null,
+        )
+        _navigateAwayAfterLeave.value = true
+        Log.i(TAG, "handleAccessRevokedByRemote: stato resettato, navigateAwayAfterLeave=true")
+    }
+
+    private fun isPermissionDenied(t: Throwable): Boolean {
+        var e: Throwable? = t
+        while (e != null) {
+            val fs = e as? FirebaseFirestoreException
+            if (fs?.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) return true
+            e = e.cause
+        }
+        return false
+    }
+
     fun startObserving() {
         val currentFamilyId = observingFamilyId
         if (currentFamilyId != null && observeJob?.isActive == true) {
-            // FIX: anche se il job è già attivo, riavviamo sempre i listener Firestore.
-            // Prima questa chiamata era no-op se currentFamilyId == familyId nel SyncCenter,
-            // il che causava listener orfani dopo background/navigazione.
             familySyncCenter.startSync(currentFamilyId)
             return
         }
@@ -95,10 +151,8 @@ class FamilySettingsViewModel @Inject constructor(
                 return@launch
             }
 
-            // Step 1: read from Room (local-first, instant, works offline)
             var family = familyDao.observeAll().first().firstOrNull()
 
-            // Step 2: Room empty → bootstrap from Firestore (first install only)
             if (family == null) {
                 try {
                     family = bootstrapFromFirebase(uid)
@@ -107,59 +161,59 @@ class FamilySettingsViewModel @Inject constructor(
                     return@launch
                 }
                 if (family == null) {
-                    _uiState.value = FamilySettingsUiState(isLoading = false, currentUid = uid)
-                    return@launch
+                    try {
+                        kotlinx.coroutines.withTimeout(8000) {
+                            familySyncCenter.initialSyncDone.first { it }
+                        }
+                        family = familyDao.observeAll().first().firstOrNull()
+                    } catch (_: Exception) { }
+                    if (family == null) {
+                        _uiState.value = FamilySettingsUiState(isLoading = false, currentUid = uid)
+                        return@launch
+                    }
                 }
             }
 
             val fid = family!!.id
             observingFamilyId = fid
-
-            // Step 3: start Firestore realtime sync
-            // FamilySyncCenter (ora fixato) fa sempre restart dei listener → nessun listener orfano
             familySyncCenter.startSync(fid)
 
-            // Step 4: wait for FamilySyncCenter to finish first Firestore snapshot
-            // Timeout 5s — if offline or slow, proceed with whatever Room has
             try {
                 kotlinx.coroutines.withTimeout(5000) {
                     familySyncCenter.initialSyncDone.first { it }
                 }
-            } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
-                // Offline o lento — usa Room com'è
-            }
+            } catch (_: kotlinx.coroutines.TimeoutCancellationException) { }
 
-            // Step 5: observe Room reactively
             combine(
-                familyDao.observeAll(),
+                familyDao.observeById(fid),
                 familyMemberDao.observeActiveByFamilyId(fid),
                 childDao.observeByFamilyId(fid),
-            ) { families, members, children ->
-                val currentFamily = families.firstOrNull { it.id == fid }
+            ) { family, members, children ->
+                val isOwnerFromMembers =
+                    members.any { it.userId == uid && it.role.equals("owner", true) }
+                val isOwnerFromFamily = family?.createdBy == uid
+                val isOwner = isOwnerFromMembers || isOwnerFromFamily
                 FamilySettingsUiState(
                     isLoading = false,
-                    family = currentFamily,
+                    family = family,
                     members = members,
                     children = children,
-                    isOwner = members.any { it.userId == uid && it.role.equals("owner", true) },
+                    isOwner = isOwner,
                     currentUid = uid,
                 )
             }.collect { newState ->
-                _uiState.value = newState
+                val prev = _uiState.value
+                _uiState.value = newState.copy(
+                    isSavingFamily = prev.isSavingFamily,
+                    savingMessage = prev.savingMessage,
+                    error = prev.error,
+                )
             }
         }
     }
 
-    // Keep load() for backward compatibility
     fun load() = startObserving()
 
-    /**
-     * Chiama questo metodo dalla Screen su ogni ON_RESUME (vedi DisposableEffect).
-     * Garantisce che i listener Firestore siano sempre attivi anche dopo:
-     * - ritorno da background
-     * - navigazione back/forward
-     * - cambio di rete
-     */
     private var lastRefreshMs = 0L
     fun refreshSync() {
         val fid = observingFamilyId ?: return
@@ -169,22 +223,30 @@ class FamilySettingsViewModel @Inject constructor(
         familySyncCenter.startSync(fid)
     }
 
-    // ── Bootstrap from Firestore when Room is empty ───────────────────────────
     private suspend fun bootstrapFromFirebase(requestUid: String): KBFamilyEntity? {
         return try {
             val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty().ifBlank { requestUid }
-            val membershipDocs = db.collection("users")
-                .document(uid)
-                .collection("memberships")
-                .get()
-                .await()
-                .documents
+            var membershipDocs = emptyList<com.google.firebase.firestore.DocumentSnapshot>()
+            repeat(3) { attempt ->
+                membershipDocs = db.collection("users")
+                    .document(uid)
+                    .collection("memberships")
+                    .get()
+                    .await()
+                    .documents
+                if (membershipDocs.isNotEmpty()) return@repeat
+                if (attempt < 2) kotlinx.coroutines.delay(1000)
+            }
 
             val familyId = membershipDocs.firstOrNull()?.id ?: return null
             val familySnap = db.collection("families").document(familyId).get().await()
             if (!familySnap.exists()) return null
 
             val familyData = familySnap.data.orEmpty()
+            if (familyData["isDeleted"] as? Boolean == true) {
+                Log.w(TAG, "bootstrapFromFirebase: family isDeleted=true, skipping familyId=$familyId")
+                return null
+            }
             val now = System.currentTimeMillis()
             val createdBy = familyData["ownerUid"] as? String ?: uid
 
@@ -208,7 +270,6 @@ class FamilySettingsViewModel @Inject constructor(
             )
             familyDao.upsert(family)
 
-            // Bootstrap members
             val memberDocs = db.collection("families")
                 .document(familyId).collection("members").get().await().documents
             memberDocs.forEach { doc ->
@@ -254,7 +315,6 @@ class FamilySettingsViewModel @Inject constructor(
                 }
             }
 
-            // Bootstrap children
             val childDocs = db.collection("families")
                 .document(familyId).collection("children").get().await().documents
             childDocs.forEach { doc ->
@@ -280,14 +340,20 @@ class FamilySettingsViewModel @Inject constructor(
 
             family
         } catch (e: Exception) {
-            _uiState.value = _uiState.value.copy(error = "Errore sync: ${e.localizedMessage}")
+            if (isPermissionDenied(e)) {
+                Log.w(TAG, "bootstrapFromFirebase: PERMISSION_DENIED — revoca accesso, nessun popup errore")
+                val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+                _uiState.value = FamilySettingsUiState(isLoading = false, currentUid = uid, error = null)
+            } else {
+                _uiState.value = _uiState.value.copy(error = "Errore sync: ${e.localizedMessage}")
+            }
             null
         }
     }
 
-    // ── Write functions ───────────────────────────────────────────────────────
-
     fun removeMember(member: KBFamilyMemberEntity) {
+        val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        if (member.userId == currentUid) return
         val familyId = _uiState.value.family?.id ?: return
         viewModelScope.launch {
             try {
@@ -299,24 +365,137 @@ class FamilySettingsViewModel @Inject constructor(
                     ).await()
                 familyMemberDao.deleteById(member.id)
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.localizedMessage)
+                if (!isPermissionDenied(e)) {
+                    _uiState.value = _uiState.value.copy(error = e.localizedMessage)
+                } else {
+                    Log.w(TAG, "removeMember: PERMISSION_DENIED — ignorato (possibile revoca)")
+                }
             }
         }
     }
 
-    fun leaveFamily(onDone: () -> Unit) {
+    fun leaveFamily() {
         val familyId = _uiState.value.family?.id ?: return
         viewModelScope.launch {
             try {
+                Log.i(TAG, "leaveFamily start familyId=$familyId uid=${_uiState.value.currentUid}")
                 leaveService.leaveFamily(familyId)
+                Log.d(TAG, "leaveFamily service completed familyId=$familyId")
                 observeJob?.cancel()
                 observeJob = null
                 observingFamilyId = null
-                onDone()
+                Log.d(TAG, "leaveFamily observers cleared familyId=$familyId")
+                dismissLeaveDialog()
+                _navigateAwayAfterLeave.value = true
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.localizedMessage)
+                Log.e(TAG, "leaveFamily failed familyId=$familyId err=${e.message}", e)
+                if (!isPermissionDenied(e)) {
+                    _uiState.value = _uiState.value.copy(error = e.localizedMessage)
+                }
             }
         }
+    }
+
+    fun checkLeaveScenario(): LeaveScenario {
+        val state = _uiState.value
+        val currentUid = state.currentUid
+        val currentMember = state.members.firstOrNull { it.userId == currentUid }
+        val isOwner = currentMember?.role.equals("owner", ignoreCase = true)
+        if (!isOwner) {
+            Log.d(TAG, "checkLeaveScenario -> MemberOnly uid=$currentUid members=${state.members.size}")
+            return LeaveScenario.MemberOnly
+        }
+        val otherMembers = state.members.filter { it.userId != currentUid }
+        if (otherMembers.isEmpty()) {
+            Log.d(TAG, "checkLeaveScenario -> OwnerAlone uid=$currentUid members=${state.members.size}")
+            return LeaveScenario.OwnerAlone
+        }
+        Log.d(TAG, "checkLeaveScenario -> OwnerWithMembers uid=$currentUid others=${otherMembers.size}")
+        return LeaveScenario.OwnerWithMembers(otherMembers)
+    }
+
+    fun transferOwnershipAndLeave(newOwnerUid: String) {
+        val familyId = _uiState.value.family?.id ?: return
+        viewModelScope.launch {
+            try {
+                Log.i(TAG, "transferOwnershipAndLeave start familyId=$familyId uid=${_uiState.value.currentUid} newOwnerUid=$newOwnerUid")
+                familySyncCenter.stopSync()
+                Log.d(TAG, "transferOwnershipAndLeave sync stopped familyId=$familyId")
+                leaveService.transferOwnershipAndLeave(familyId, newOwnerUid)
+                Log.d(TAG, "transferOwnershipAndLeave service completed familyId=$familyId")
+                observeJob?.cancel()
+                observeJob = null
+                observingFamilyId = null
+                dismissLeaveDialog()
+                _navigateAwayAfterLeave.value = true
+            } catch (e: Exception) {
+                Log.e(TAG, "transferOwnershipAndLeave failed familyId=$familyId newOwnerUid=$newOwnerUid err=${e.message}", e)
+                if (!isPermissionDenied(e)) {
+                    _uiState.value = _uiState.value.copy(error = e.localizedMessage)
+                }
+            }
+        }
+    }
+
+    fun deleteFamily() {
+        val familyId = _uiState.value.family?.id ?: return
+        viewModelScope.launch {
+            try {
+                Log.i(TAG, "deleteFamily start familyId=$familyId uid=${_uiState.value.currentUid}")
+                leaveService.deleteFamily(familyId)
+                familyDao.deleteAll()
+                Log.d(TAG, "deleteFamily service completed familyId=$familyId")
+                observeJob?.cancel()
+                observeJob = null
+                observingFamilyId = null
+                dismissLeaveDialog()
+                _uiState.value = FamilySettingsUiState(
+                    isLoading = false,
+                    currentUid = _uiState.value.currentUid,
+                )
+                _navigateAwayAfterLeave.value = true
+            } catch (e: Exception) {
+                Log.e(TAG, "deleteFamily failed familyId=$familyId err=${e.message}", e)
+                if (!isPermissionDenied(e)) {
+                    _uiState.value = _uiState.value.copy(error = e.localizedMessage)
+                }
+            }
+        }
+    }
+
+    fun onLeaveButtonTapped() {
+        val scenario = checkLeaveScenario()
+        val next = when (scenario) {
+            LeaveScenario.MemberOnly -> LeaveDialogState.ConfirmLeave
+            LeaveScenario.OwnerAlone -> LeaveDialogState.OwnerAlone
+            is LeaveScenario.OwnerWithMembers -> LeaveDialogState.OwnerWithMembers(scenario.otherMembers)
+        }
+        _leaveDialogState.value = next
+        Log.d(TAG, "onLeaveButtonTapped scenario=$scenario dialogState=$next")
+    }
+
+    fun dismissLeaveDialog() {
+        Log.d(TAG, "dismissLeaveDialog from=${_leaveDialogState.value}")
+        _leaveDialogState.value = LeaveDialogState.Hidden
+    }
+
+    fun showTransferOwnershipDialog() {
+        if (_leaveDialogState.value is LeaveDialogState.OwnerWithMembers) {
+            _leaveDialogState.value = LeaveDialogState.TransferOwnership
+            Log.d(TAG, "showTransferOwnershipDialog -> TransferOwnership")
+        } else {
+            Log.w(TAG, "showTransferOwnershipDialog ignored from=${_leaveDialogState.value}")
+        }
+    }
+
+    fun clearError() {
+        Log.d(TAG, "clearError previous=${_uiState.value.error}")
+        _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    fun resetNavigateAway() {
+        Log.d(TAG, "resetNavigateAway")
+        _navigateAwayAfterLeave.value = false
     }
 
     fun joinWithCode(code: String, onDone: () -> Unit) {
@@ -324,13 +503,16 @@ class FamilySettingsViewModel @Inject constructor(
             try {
                 val familyId = inviteRemoteStore.resolveInvite(code.trim())
                 inviteRemoteStore.addMember(familyId)
-                // Reset so startObserving() re-bootstraps the new family
                 observeJob?.cancel()
                 observeJob = null
                 observingFamilyId = null
                 onDone()
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.localizedMessage)
+                if (!isPermissionDenied(e)) {
+                    _uiState.value = _uiState.value.copy(error = e.localizedMessage)
+                } else {
+                    Log.w(TAG, "joinWithCode: PERMISSION_DENIED — ignorato")
+                }
             }
         }
     }
@@ -341,10 +523,6 @@ class FamilySettingsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-                // FIX: salviamo in Room con updatedAtEpochMillis = now (client time).
-                // Il SyncCenter ora usa serverTimestamp da Firestore per il confronto LWW,
-                // quindi quando riceviamo l'eco della nostra stessa scrittura dal listener,
-                // il check remoteUpdatedAt >= localUpdatedAt funzionerà correttamente.
                 val now = System.currentTimeMillis()
                 val updated = family.copy(name = name.trim(), updatedAtEpochMillis = now)
                 familyDao.upsert(updated)
@@ -359,81 +537,162 @@ class FamilySettingsViewModel @Inject constructor(
                     ).await()
                 onDone()
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.localizedMessage)
+                if (!isPermissionDenied(e)) {
+                    _uiState.value = _uiState.value.copy(error = e.localizedMessage)
+                } else {
+                    Log.w(TAG, "saveFamilyName: PERMISSION_DENIED — ignorato")
+                }
             }
         }
     }
 
+    /** Room + Firestore per nome famiglia e figli (chiamare dopo [FamilySyncCenter.stopSync] se serve). */
+    private suspend fun saveFamilyAndChildrenToFirestore(
+        family: KBFamilyEntity,
+        trimmedName: String,
+        childrenInputs: List<ChildInput>,
+        uid: String,
+        now: Long,
+    ) {
+        familyDao.upsert(family.copy(name = trimmedName, updatedAtEpochMillis = now))
+        db.collection("families").document(family.id)
+            .update(
+                "name", trimmedName,
+                "updatedBy", uid,
+                "updatedAt", FieldValue.serverTimestamp(),
+            ).await()
+
+        val existingIds = childDao.getChildrenByFamilyId(family.id).map { it.id }.toSet()
+        childrenInputs.filter { it.name.isNotBlank() }.forEach { input ->
+            val isExisting = input.id in existingIds
+            Log.d(TAG, "saveFamilyWithChildren child id=${input.id} existing=$isExisting name=${input.name.trim()}")
+            val entity = if (isExisting) {
+                (childDao.getById(input.id)?.copy(
+                    name = input.name.trim(),
+                    birthDateEpochMillis = input.birthDateEpochMillis,
+                    updatedBy = uid,
+                    updatedAtEpochMillis = now,
+                )) ?: KBChildEntity(
+                    id = input.id, familyId = family.id, name = input.name.trim(),
+                    birthDateEpochMillis = input.birthDateEpochMillis,
+                    weightKg = null, heightCm = null,
+                    createdBy = uid, createdAtEpochMillis = now,
+                    updatedBy = uid, updatedAtEpochMillis = now,
+                )
+            } else {
+                KBChildEntity(
+                    id = input.id, familyId = family.id, name = input.name.trim(),
+                    birthDateEpochMillis = input.birthDateEpochMillis,
+                    weightKg = null, heightCm = null,
+                    createdBy = uid, createdAtEpochMillis = now,
+                    updatedBy = uid, updatedAtEpochMillis = now,
+                )
+            }
+            childDao.upsert(entity)
+            db.collection("families").document(family.id)
+                .collection("children").document(input.id)
+                .set(
+                    mapOf(
+                        "id" to entity.id,
+                        "familyId" to family.id,
+                        "name" to entity.name,
+                        "birthDate" to entity.birthDateEpochMillis?.let {
+                            com.google.firebase.Timestamp(it / 1000, ((it % 1000) * 1_000_000).toInt())
+                        },
+                        "createdBy" to entity.createdBy,
+                        "createdAt" to FieldValue.serverTimestamp(),
+                        "updatedBy" to uid,
+                        "updatedAt" to FieldValue.serverTimestamp(),
+                        "isDeleted" to false,
+                    ),
+                    com.google.firebase.firestore.SetOptions.merge(),
+                ).await()
+        }
+    }
+
     fun saveFamilyWithChildren(newName: String, childrenInputs: List<ChildInput>, onDone: () -> Unit) {
-        val family = _uiState.value.family ?: return
+        val family = _uiState.value.family
         val trimmedName = newName.trim()
         if (trimmedName.isBlank()) return
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isSavingFamily = true,
+                savingMessage = "Sincronizzazione in corso…",
+                error = null,
+            )
             try {
+                if (family == null) {
+                    Log.i(TAG, "Starting new family creation because state.family was null")
+                    val firstChild = childrenInputs.firstOrNull { it.name.isNotBlank() } ?: childrenInputs.firstOrNull()
+                    val childName = firstChild?.name?.trim().takeUnless { it.isNullOrEmpty() } ?: "Figlio"
+                    val birthDateMillis = firstChild?.birthDateEpochMillis
+                    creationRepository.createFamilyWithInitialChild(
+                        familyName = trimmedName,
+                        childName = childName,
+                        birthDateMillis = birthDateMillis,
+                    )
+                    onDone()
+                    return@launch
+                }
+
                 val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
                 val now = System.currentTimeMillis()
+                Log.i(TAG, "saveFamilyWithChildren start familyId=${family.id} children=${childrenInputs.size}")
 
-                // Update family in Room + Firestore
-                familyDao.upsert(family.copy(name = trimmedName, updatedAtEpochMillis = now))
-                db.collection("families").document(family.id)
-                    .update(
-                        "name", trimmedName,
-                        "updatedBy", uid,
-                        "updatedAt", FieldValue.serverTimestamp()
-                    ).await()
+                // Chiude i listener Firestore che post-revoca possono tenere sessioni/permessi “sporchi”
+                familySyncCenter.stopSync()
+                Log.d(TAG, "saveFamilyWithChildren stopSync done, cooling 1500ms familyId=${family.id}")
+                delay(1500)
 
-                // Upsert children
-                val existingIds = childDao.observeByFamilyId(family.id).first().map { it.id }.toSet()
-                childrenInputs.filter { it.name.isNotBlank() }.forEach { input ->
-                    val isExisting = input.id in existingIds
-                    val entity = if (isExisting) {
-                        (childDao.getById(input.id)?.copy(
-                            name = input.name.trim(),
-                            birthDateEpochMillis = input.birthDateEpochMillis,
-                            updatedBy = uid,
-                            updatedAtEpochMillis = now,
-                        )) ?: KBChildEntity(
-                            id = input.id, familyId = family.id, name = input.name.trim(),
-                            birthDateEpochMillis = input.birthDateEpochMillis,
-                            weightKg = null, heightCm = null,
-                            createdBy = uid, createdAtEpochMillis = now,
-                            updatedBy = uid, updatedAtEpochMillis = now,
-                        )
-                    } else {
-                        KBChildEntity(
-                            id = input.id, familyId = family.id, name = input.name.trim(),
-                            birthDateEpochMillis = input.birthDateEpochMillis,
-                            weightKg = null, heightCm = null,
-                            createdBy = uid, createdAtEpochMillis = now,
-                            updatedBy = uid, updatedAtEpochMillis = now,
-                        )
-                    }
-                    childDao.upsert(entity)
-                    db.collection("families").document(family.id)
-                        .collection("children").document(input.id)
-                        .set(
-                            mapOf(
-                                "id" to entity.id,
-                                "familyId" to family.id,
-                                "name" to entity.name,
-                                "birthDate" to entity.birthDateEpochMillis?.let {
-                                    com.google.firebase.Timestamp(
-                                        it / 1000,
-                                        ((it % 1000) * 1_000_000).toInt()
-                                    )
-                                },
-                                "createdBy" to entity.createdBy,
-                                "createdAt" to FieldValue.serverTimestamp(),
-                                "updatedBy" to uid,
-                                "updatedAt" to FieldValue.serverTimestamp(),
-                                "isDeleted" to false,
-                            ),
-                            com.google.firebase.firestore.SetOptions.merge()
-                        ).await()
+                runCatching {
+                    val fs = FirebaseFirestore.getInstance()
+                    fs.terminate().await()
+                    fs.clearPersistence().await()
+                    Log.i(TAG, "saveFamilyWithChildren: Firestore terminate+clearPersistence OK")
+                }.onFailure { t ->
+                    Log.e(TAG, "saveFamilyWithChildren: terminate/clearPersistence fallito (continuo)", t)
                 }
+
+                for (attempt in 1..5) {
+                    try {
+                        saveFamilyAndChildrenToFirestore(family, trimmedName, childrenInputs, uid, now)
+                        break
+                    } catch (e: Exception) {
+                        if (isPermissionDenied(e) && attempt < 5) {
+                            Log.w(
+                                TAG,
+                                "saveFamilyWithChildren PERMISSION_DENIED attempt=$attempt/5, retry in 2000ms",
+                            )
+                            delay(2000)
+                        } else {
+                            throw e
+                        }
+                    }
+                }
+
+                Log.i(TAG, "saveFamilyWithChildren completed familyId=${family.id}")
+                familySyncCenter.startSync(family.id)
                 onDone()
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.localizedMessage ?: "Errore salvataggio")
+                Log.e(TAG, "saveFamilyWithChildren failed familyId=${family?.id} err=${e.message}", e)
+                val fid = family?.id
+                if (!fid.isNullOrEmpty()) {
+                    runCatching { familySyncCenter.startSync(fid) }
+                        .onFailure { t ->
+                            Log.e(TAG, "saveFamilyWithChildren: startSync dopo errore fallito", t)
+                        }
+                }
+                val msg = when {
+                    isPermissionDenied(e) ->
+                        "Salvataggio non riuscito dopo 5 tentativi. Riprova tra qualche secondo."
+                    else -> e.localizedMessage ?: "Errore salvataggio"
+                }
+                _uiState.value = _uiState.value.copy(error = msg)
+            } finally {
+                _uiState.value = _uiState.value.copy(
+                    isSavingFamily = false,
+                    savingMessage = null,
+                )
             }
         }
     }
@@ -482,9 +741,11 @@ class FamilySettingsViewModel @Inject constructor(
     fun saveChild(childId: String, name: String, birthEpochMillis: Long?, onDone: () -> Unit) {
         val family = _uiState.value.family ?: return
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
                 val now = System.currentTimeMillis()
+                Log.i(TAG, "saveChild start familyId=${family.id} childId=$childId")
                 val existing = childDao.getById(childId)
                 val updated = existing?.copy(
                     name = name.trim(),
@@ -512,21 +773,25 @@ class FamilySettingsViewModel @Inject constructor(
                             "familyId" to family.id,
                             "name" to updated.name,
                             "birthDate" to updated.birthDateEpochMillis?.let {
-                                com.google.firebase.Timestamp(
-                                    it / 1000,
-                                    ((it % 1000) * 1_000_000).toInt()
-                                )
+                                com.google.firebase.Timestamp(it / 1000, ((it % 1000) * 1_000_000).toInt())
                             },
                             "updatedBy" to uid,
                             "updatedAt" to FieldValue.serverTimestamp(),
                         ),
                         com.google.firebase.firestore.SetOptions.merge()
                     ).await()
+                Log.i(TAG, "saveChild completed familyId=${family.id} childId=$childId")
                 onDone()
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    error = e.localizedMessage ?: "Errore salvataggio figlio"
-                )
+                Log.e(TAG, "saveChild failed familyId=${family.id} childId=$childId err=${e.message}", e)
+                if (!isPermissionDenied(e)) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = e.localizedMessage ?: "Errore salvataggio figlio",
+                    )
+                }
+            } finally {
+                _uiState.value = _uiState.value.copy(isLoading = false)
             }
         }
     }
@@ -538,10 +803,6 @@ class FamilySettingsViewModel @Inject constructor(
                 childDao.deleteById(childId)
                 db.collection("families").document(family.id)
                     .collection("children").document(childId)
-                    // FIX: soft-delete con isDeleted=true invece di .delete()
-                    // così gli altri device ricevono il MODIFIED con isDeleted=true
-                    // e possono rimuoverlo dal loro Room. Con .delete() il listener
-                    // riceve REMOVED solo se era già in cache locale — non affidabile.
                     .set(
                         mapOf(
                             "isDeleted" to true,
@@ -551,7 +812,11 @@ class FamilySettingsViewModel @Inject constructor(
                     ).await()
                 onDone()
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.localizedMessage)
+                if (!isPermissionDenied(e)) {
+                    _uiState.value = _uiState.value.copy(error = e.localizedMessage)
+                } else {
+                    Log.w(TAG, "deleteChild: PERMISSION_DENIED — ignorato")
+                }
             }
         }
     }

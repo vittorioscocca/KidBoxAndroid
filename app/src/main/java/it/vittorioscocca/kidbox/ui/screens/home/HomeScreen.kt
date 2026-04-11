@@ -174,7 +174,7 @@ fun HomeScreen(
                 letterSpacing = (-0.5).sp,
                 color = MaterialTheme.kidBoxColors.title,
             )
-            Text(state.todayLabel, color = MaterialTheme.kidBoxColors.subtitle)
+
             Spacer(modifier = Modifier.size(16.dp))
 
             FamilyHeroCard(

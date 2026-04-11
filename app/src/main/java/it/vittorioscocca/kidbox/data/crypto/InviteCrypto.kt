@@ -22,6 +22,9 @@ object InviteCrypto {
 
     private val secureRandom = SecureRandom()
 
+    /** Base64 URL-safe senza padding, allineato a iOS `Data.fromBase64url` / encoding URL-safe. */
+    private const val BASE64URL_FLAGS = Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
+
     // ── Randomness ────────────────────────────────────────────────────────────
 
     fun randomBytes(count: Int): ByteArray {
@@ -110,10 +113,10 @@ object InviteCrypto {
     // ── Helpers base64url ─────────────────────────────────────────────────────
 
     fun toBase64Url(data: ByteArray): String =
-        Base64.encodeToString(data, Base64.NO_WRAP or Base64.URL_SAFE or Base64.NO_PADDING)
+        Base64.encodeToString(data, BASE64URL_FLAGS)
 
     fun fromBase64Url(s: String): ByteArray? = try {
-        Base64.decode(s, Base64.NO_WRAP or Base64.URL_SAFE or Base64.NO_PADDING)
+        Base64.decode(s.trim(), BASE64URL_FLAGS)
     } catch (_: Exception) { null }
 
     fun toBase64(data: ByteArray): String =

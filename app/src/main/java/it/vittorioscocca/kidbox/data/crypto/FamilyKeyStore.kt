@@ -71,6 +71,22 @@ object FamilyKeyStore {
         Log.d(TAG, "deleteFamilyKey familyId=$familyId")
     }
 
+    /** Rimuove tutte le chiavi famiglia associate a questo utente (prefisso `fk_` + suffisso `_userId`). */
+    fun deleteAllFamilyKeysForUser(context: Context, userId: String) {
+        val p = getPrefs(context)
+        val suffix = "_$userId"
+        val editor = p.edit()
+        var n = 0
+        for (key in p.all.keys) {
+            if (key.startsWith("fk_") && key.endsWith(suffix)) {
+                editor.remove(key)
+                n++
+            }
+        }
+        editor.apply()
+        Log.d(TAG, "deleteAllFamilyKeysForUser removed=$n userId=$userId")
+    }
+
     /** Verifica la presenza della chiave senza restituirla (per log/debug). */
     fun hasFamilyKey(context: Context, familyId: String, userId: String): Boolean {
         return getPrefs(context).contains(prefKey(familyId, userId))

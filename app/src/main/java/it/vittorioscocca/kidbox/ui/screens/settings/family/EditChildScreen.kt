@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -156,7 +157,7 @@ fun EditChildScreen(
             shape = cardShape,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-            modifier = Modifier.fillMaxWidth().clickable {
+            modifier = Modifier.fillMaxWidth().clickable(enabled = !state.isLoading) {
                 viewModel.saveChild(
                     childId, name,
                     birth?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli(),
@@ -165,7 +166,15 @@ fun EditChildScreen(
             },
         ) {
             Row(modifier = Modifier.padding(16.dp)) {
-                Text("Salva", color = Color(0xFF2E86FF), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                if (state.isLoading) {
+                    CircularProgressIndicator(
+                        color = Color(0xFF2E86FF),
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.width(18.dp).height(18.dp),
+                    )
+                } else {
+                    Text("Salva", color = Color(0xFF2E86FF), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
         }
 

@@ -16,6 +16,9 @@ interface KBChildDao {
     @Query("SELECT * FROM kb_children WHERE familyId = :familyId ORDER BY name COLLATE NOCASE")
     fun observeByFamilyId(familyId: String): Flow<List<KBChildEntity>>
 
+    @Query("SELECT * FROM kb_children WHERE familyId = :familyId ORDER BY name COLLATE NOCASE")
+    suspend fun getChildrenByFamilyId(familyId: String): List<KBChildEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBChildEntity)
 
@@ -27,4 +30,10 @@ interface KBChildDao {
 
     @Query("DELETE FROM kb_children WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM kb_children WHERE familyId = :familyId")
+    suspend fun deleteByFamilyId(familyId: String): Int
+
+    @Query("DELETE FROM kb_children")
+    suspend fun deleteAll()
 }

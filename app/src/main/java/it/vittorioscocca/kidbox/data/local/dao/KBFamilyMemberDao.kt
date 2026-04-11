@@ -27,4 +27,10 @@ interface KBFamilyMemberDao {
 
     @Query("DELETE FROM kb_family_members WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM kb_family_members WHERE familyId = :familyId")
+    suspend fun deleteByFamilyId(familyId: String): Int
+
+    @Query("DELETE FROM kb_family_members")
+    suspend fun deleteAll()
 }
