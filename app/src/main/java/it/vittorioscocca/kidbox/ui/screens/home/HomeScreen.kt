@@ -79,6 +79,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import java.io.File
+import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.theme.KidBoxDarkColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
@@ -215,7 +216,7 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.size(16.dp))
 
-            val features = featureItems(state.familyId)
+            val features = featureItems(state.familyId, state)
             features.chunked(2).forEach { rowItems ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -225,7 +226,10 @@ fun HomeScreen(
                         FeatureCard(
                             item = item,
                             modifier = Modifier.weight(1f),
-                            onClick = { onNavigate(item.route) },
+                            onClick = {
+                                viewModel.onFeatureOpened(item.counterField)
+                                onNavigate(item.route)
+                            },
                         )
                     }
                     if (rowItems.size == 1) Spacer(modifier = Modifier.weight(1f))
@@ -378,6 +382,8 @@ private data class FeatureItem(
     val icon: ImageVector,
     val cardColor: Color,
     val iconColor: Color,
+    val badgeCount: Int = 0,
+    val counterField: CounterField? = null,
 )
 
 @Composable
@@ -385,16 +391,28 @@ private fun FeatureCard(item: FeatureItem, modifier: Modifier = Modifier, onClic
     val kidBox = MaterialTheme.kidBoxColors
     val containerColor =
         if (kidBox === KidBoxDarkColorScheme) kidBox.card else item.cardColor
-    Card(
-        modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(item.icon, contentDescription = null, tint = item.iconColor, modifier = Modifier.size(28.dp))
-            Text(item.title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = MaterialTheme.kidBoxColors.title)
-            Text(item.subtitle, color = MaterialTheme.kidBoxColors.subtitle, fontSize = 12.sp)
+    Box(modifier = modifier) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            colors = CardDefaults.cardColors(containerColor = containerColor),
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(item.icon, contentDescription = null, tint = item.iconColor, modifier = Modifier.size(28.dp))
+                Text(item.title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = MaterialTheme.kidBoxColors.title)
+                Text(item.subtitle, color = MaterialTheme.kidBoxColors.subtitle, fontSize = 12.sp)
+            }
+        }
+        if (item.badgeCount > 0) {
+            HomeCardBadge(
+                count = item.badgeCount,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 8.dp, end = 8.dp),
+            )
         }
     }
 }
@@ -458,20 +476,48 @@ private fun HomeFab(
     }
 }
 
-private fun featureItems(familyId: String): List<FeatureItem> = listOf(
-    FeatureItem("Note", "Appunti veloci", AppDestination.NotesHome.createRoute(familyId), Icons.AutoMirrored.Filled.Note, Color(0xFFFFF9E6), Color(0xFFF5A623)),
-    FeatureItem("To-Do", "Lista condivisa", AppDestination.Todo.route, Icons.Filled.CheckCircle, Color(0xFFEBF3FF), Color(0xFF2E86FF)),
-    FeatureItem("Lista Spesa", "Lista condivisa", AppDestination.ShoppingList.createRoute(familyId), Icons.Filled.LocalGroceryStore, Color(0xFFEDFAF3), Color(0xFF27AE60)),
-    FeatureItem("Calendario", "Eventi e affidamenti", AppDestination.Calendar.createRoute(familyId), Icons.Filled.CalendarMonth, Color(0xFFF3EEFF), Color(0xFF8B5CF6)),
+private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem> = listOf(
+    FeatureItem("Note", "Appunti veloci", AppDestination.NotesHome.createRoute(familyId), Icons.AutoMirrored.Filled.Note, Color(0xFFFFF9E6), Color(0xFFF5A623), state.badgeNotes, CounterField.NOTES),
+    FeatureItem("To-Do", "Lista condivisa", AppDestination.Todo.route, Icons.Filled.CheckCircle, Color(0xFFEBF3FF), Color(0xFF2E86FF), state.badgeTodos, CounterField.TODOS),
+    FeatureItem("Lista Spesa", "Lista condivisa", AppDestination.ShoppingList.createRoute(familyId), Icons.Filled.LocalGroceryStore, Color(0xFFEDFAF3), Color(0xFF27AE60), state.badgeShopping, CounterField.SHOPPING),
+    FeatureItem("Calendario", "Eventi e affidamenti", AppDestination.Calendar.createRoute(familyId), Icons.Filled.CalendarMonth, Color(0xFFF3EEFF), Color(0xFF8B5CF6), state.badgeCalendar, CounterField.CALENDAR),
     FeatureItem("Salute", "Health tracker", AppDestination.PediatricChildSelector.createRoute(familyId), Icons.Filled.Favorite, Color(0xFFFFEAEA), Color(0xFFE53E3E)),
-    FeatureItem("Chat", "Messaggi famiglia", AppDestination.Chat.route, Icons.AutoMirrored.Filled.Chat, Color(0xFFEDFAF3), Color(0xFF27AE60)),
-    FeatureItem("Spese", "Rette, visite, extra", AppDestination.ExpensesHome.createRoute(familyId), Icons.Filled.Euro, Color(0xFFFFF3E6), Color(0xFFFF6B00)),
-    FeatureItem("Documenti", "Carte importanti", AppDestination.DocumentsHome.route, Icons.Filled.Description, Color(0xFFEBF3FF), Color(0xFF2E86FF)),
-    FeatureItem("Posizione", "Dove sono tutti", AppDestination.FamilyLocation.createRoute(familyId), Icons.Filled.Place, Color(0xFFE6FAF8), Color(0xFF00BFA5)),
+    FeatureItem("Chat", "Messaggi famiglia", AppDestination.Chat.route, Icons.AutoMirrored.Filled.Chat, Color(0xFFEDFAF3), Color(0xFF27AE60), state.badgeChat, CounterField.CHAT),
+    FeatureItem("Spese", "Rette, visite, extra", AppDestination.ExpensesHome.createRoute(familyId), Icons.Filled.Euro, Color(0xFFFFF3E6), Color(0xFFFF6B00), state.badgeExpenses, CounterField.EXPENSES),
+    FeatureItem("Documenti", "Carte importanti", AppDestination.DocumentsHome.route, Icons.Filled.Description, Color(0xFFEBF3FF), Color(0xFF2E86FF), state.badgeDocuments, CounterField.DOCUMENTS),
+    FeatureItem("Posizione", "Dove sono tutti", AppDestination.FamilyLocation.createRoute(familyId), Icons.Filled.Place, Color(0xFFE6FAF8), Color(0xFF00BFA5), state.badgeLocation, CounterField.LOCATION),
     FeatureItem("Foto e Video", "Ricordi famiglia", AppDestination.FamilyPhotos.createRoute(familyId), Icons.Filled.PhotoLibrary, Color(0xFFFFF0F5), Color(0xFFE91E8C)),
     FeatureItem("Assistente AI", "Chiedi aiuto", AppDestination.AskExpert.route, Icons.Filled.Psychology, Color(0xFFEEF0FF), Color(0xFF5C6BC0)),
     FeatureItem("Family", "Gestisci famiglia", AppDestination.FamilySettings.route, Icons.Filled.Person, Color(0xFFFFF3E6), Color(0xFFFF6B00)),
 )
+
+@Composable
+private fun HomeCardBadge(
+    count: Int,
+    modifier: Modifier = Modifier,
+) {
+    val text = if (count > 99) "99+" else count.toString()
+    val isCircle = count < 10
+    Surface(
+        modifier = modifier,
+        shape = if (isCircle) CircleShape else RoundedCornerShape(999.dp),
+        color = Color(0xFFE53935),
+        shadowElevation = 3.dp,
+    ) {
+        Text(
+            text = text,
+            color = Color.White,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            modifier = if (isCircle) {
+                Modifier.size(18.dp).wrapContentSize(Alignment.Center)
+            } else {
+                Modifier.height(18.dp).padding(horizontal = 7.dp).wrapContentSize(Alignment.Center)
+            },
+        )
+    }
+}
 
 private fun actionIcon(action: HomeQuickAction): ImageVector = when (action) {
     HomeQuickAction.EXPENSE -> Icons.Filled.Euro

@@ -19,6 +19,8 @@ import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
+import it.vittorioscocca.kidbox.data.notification.CounterField
+import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
 import it.vittorioscocca.kidbox.data.remote.family.FamilyHeroPhotoService
 import it.vittorioscocca.kidbox.data.sync.FamilySyncCenter
 import it.vittorioscocca.kidbox.domain.auth.LogoutUseCase
@@ -54,6 +56,14 @@ data class HomeUiState(
     val avatarUrl: String? = null,
     val isFabExpanded: Boolean = false,
     val topQuickActions: List<HomeQuickAction> = emptyList(),
+    val badgeChat: Int = 0,
+    val badgeDocuments: Int = 0,
+    val badgeLocation: Int = 0,
+    val badgeTodos: Int = 0,
+    val badgeShopping: Int = 0,
+    val badgeNotes: Int = 0,
+    val badgeCalendar: Int = 0,
+    val badgeExpenses: Int = 0,
 )
 
 enum class HomeQuickAction(val key: String, val label: String) {
@@ -75,6 +85,7 @@ class HomeViewModel @Inject constructor(
     private val heroPhotoService: FamilyHeroPhotoService,
     private val familySyncCenter: FamilySyncCenter,
     private val familySessionPreferences: FamilySessionPreferences,
+    private val homeBadgeManager: HomeBadgeManager,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -89,6 +100,7 @@ class HomeViewModel @Inject constructor(
     // (es. heroPhotoURL arriva da un altro device via Firestore), la UI si aggiorna.
     init {
         observeHomeData()
+        observeBadges()
         viewModelScope.launch { refreshAvatarUrl() }
         viewModelScope.launch {
             familySyncCenter.accessLostEvent.collect {
@@ -119,6 +131,7 @@ class HomeViewModel @Inject constructor(
                 val familyId = family?.id.orEmpty()
 
                 if (familyId.isBlank()) {
+                    homeBadgeManager.stopListening()
                     if (familySessionPreferences.consumeSkipHomeBootstrapOnce()) {
                         Log.i(TAG, "observeHomeData: skip Firestore bootstrap (leave / access revoked)")
                         _uiState.value = HomeUiState(isLoading = false, familyId = "")
@@ -146,6 +159,7 @@ class HomeViewModel @Inject constructor(
                 ) { fams, members ->
                     Pair(fams.firstOrNull(), members.size)
                 }.collect { (fam, memberCount) ->
+                    homeBadgeManager.startListening(familyId)
                     val remoteUrl = fam?.heroPhotoURL
 
                     // File locale se esiste già su disco
@@ -179,6 +193,23 @@ class HomeViewModel @Inject constructor(
                         topQuickActions = topQuickActions(),
                     )
                 }
+            }
+        }
+    }
+
+    private fun observeBadges() {
+        viewModelScope.launch {
+            homeBadgeManager.badges.collectLatest { badges ->
+                _uiState.value = _uiState.value.copy(
+                    badgeChat = badges.chat,
+                    badgeDocuments = badges.documents,
+                    badgeLocation = badges.location,
+                    badgeTodos = badges.todos,
+                    badgeShopping = badges.shopping,
+                    badgeNotes = badges.notes,
+                    badgeCalendar = badges.calendar,
+                    badgeExpenses = badges.expenses,
+                )
             }
         }
     }
@@ -480,6 +511,15 @@ class HomeViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(topQuickActions = topQuickActions())
     }
 
+    fun onFeatureOpened(counterField: CounterField?) {
+        val familyId = _uiState.value.familyId
+        if (counterField == null || familyId.isBlank()) return
+        homeBadgeManager.clearLocal(counterField)
+        viewModelScope.launch {
+            runCatching { homeBadgeManager.resetRemote(familyId, counterField) }
+        }
+    }
+
     fun logout(onComplete: () -> Unit) {
         viewModelScope.launch {
             logoutUseCase.logout()
@@ -515,5 +555,10 @@ class HomeViewModel @Inject constructor(
     fun reset() {
         familySessionPreferences.markSkipHomeBootstrapOnce()
         _uiState.value = HomeUiState(isLoading = false)
+    }
+
+    override fun onCleared() {
+        homeBadgeManager.stopListening()
+        super.onCleared()
     }
 }

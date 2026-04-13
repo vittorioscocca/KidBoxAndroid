@@ -23,6 +23,7 @@ import it.vittorioscocca.kidbox.ui.screens.settings.family.EditFamilyScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.family.FamilySettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.InviteCodeScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.JoinFamilyScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.NotificationSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.SettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.ThemeScreen
 
@@ -116,7 +117,12 @@ fun AppNavGraph(
                 onBack = { navController.popBackStack() },
                 onTheme = { navController.navigate(AppDestination.Theme.route) },
                 onFamilySettings = { navController.navigate(AppDestination.FamilySettings.route) },
+                onNotifications = { navController.navigate(AppDestination.NotificationSettings.route) },
             )
+        }
+
+        composable(AppDestination.NotificationSettings.route) {
+            NotificationSettingsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(AppDestination.Theme.route) {

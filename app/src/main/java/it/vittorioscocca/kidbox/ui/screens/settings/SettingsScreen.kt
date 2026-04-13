@@ -56,6 +56,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onTheme: () -> Unit,
     onFamilySettings: () -> Unit,
+    onNotifications: () -> Unit,
     viewModel: ThemeViewModel = hiltViewModel(),
 ) {
     BackHandler { onBack() }
@@ -91,7 +92,7 @@ fun SettingsScreen(
             title = "Notifiche",
             icon = Icons.Filled.Notifications,
             showChevron = true,
-            onClick = {},
+            onClick = onNotifications,
         ),
         SettingRowItem(
             title = "Utilizzo spazio",

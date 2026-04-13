@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox.ui.screens.grocery
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,11 +19,11 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -304,11 +305,20 @@ private fun GroceryRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onToggle) {
-            Icon(
-                imageVector = if (item.isPurchased) Icons.Default.CheckCircle else Icons.Default.Circle,
-                contentDescription = "Segna acquistato",
-                tint = if (item.isPurchased) Color(0xFF27AE60) else Color(0xFF1C1C1E),
-            )
+            if (item.isPurchased) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = "Segna acquistato",
+                    tint = Color(0xFF27AE60),
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .background(Color.Transparent, CircleShape)
+                        .border(width = 2.dp, color = Color(0xFF1C1C1E), shape = CircleShape),
+                )
+            }
         }
         Column(Modifier.weight(1f)) {
             Text(

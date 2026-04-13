@@ -11,6 +11,7 @@ import androidx.core.view.WindowCompat
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -42,11 +43,14 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var themePreference: ThemePreference
 
+    private var pendingPushDeepLink by mutableStateOf<PushDeepLink?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         splashScreen.setKeepOnScreenCondition { false }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        pendingPushDeepLink = parsePushDeepLink(intent)
         setContent {
             val theme by themePreference.getThemeFlow().collectAsState(AppTheme.SYSTEM)
             val darkTheme = when (theme) {
@@ -81,8 +85,23 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 }
+
+                LaunchedEffect(showSplash, pendingPushDeepLink) {
+                    if (showSplash) return@LaunchedEffect
+                    val deepLink = pendingPushDeepLink ?: return@LaunchedEffect
+                    if (deepLink.type == "new_grocery_item" && deepLink.familyId.isNotBlank()) {
+                        navController.navigate(AppDestination.ShoppingList.createRoute(deepLink.familyId))
+                        pendingPushDeepLink = null
+                    }
+                }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingPushDeepLink = parsePushDeepLink(intent)
     }
 
     @Deprecated("Deprecated in Java")
@@ -90,4 +109,18 @@ class MainActivity : ComponentActivity() {
         facebookCallbackManager.onActivityResult(requestCode, resultCode, data)
         super.onActivityResult(requestCode, resultCode, data)
     }
+
+    private fun parsePushDeepLink(intent: Intent?): PushDeepLink? {
+        val src = intent?.extras ?: return null
+        val type = src.getString("push_type") ?: src.getString("type") ?: return null
+        val familyId = src.getString("push_family_id") ?: src.getString("familyId") ?: ""
+        val itemId = src.getString("push_item_id") ?: src.getString("itemId")
+        return PushDeepLink(type = type, familyId = familyId, itemId = itemId)
+    }
 }
+
+private data class PushDeepLink(
+    val type: String,
+    val familyId: String,
+    val itemId: String?,
+)
