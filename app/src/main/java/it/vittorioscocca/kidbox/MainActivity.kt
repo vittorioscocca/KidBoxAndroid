@@ -89,9 +89,31 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(showSplash, pendingPushDeepLink) {
                     if (showSplash) return@LaunchedEffect
                     val deepLink = pendingPushDeepLink ?: return@LaunchedEffect
-                    if (deepLink.type == "new_grocery_item" && deepLink.familyId.isNotBlank()) {
-                        navController.navigate(AppDestination.ShoppingList.createRoute(deepLink.familyId))
-                        pendingPushDeepLink = null
+                    when (deepLink.type) {
+                        "new_grocery_item" -> {
+                            if (deepLink.familyId.isNotBlank()) {
+                                navController.navigate(AppDestination.ShoppingList.createRoute(deepLink.familyId))
+                            }
+                            pendingPushDeepLink = null
+                        }
+
+                        "todo_assigned", "todo_due_changed" -> {
+                            if (
+                                deepLink.familyId.isNotBlank() &&
+                                !deepLink.childId.isNullOrBlank() &&
+                                !deepLink.listId.isNullOrBlank()
+                            ) {
+                                navController.navigate(
+                                    AppDestination.TodoList.createRoute(
+                                        familyId = deepLink.familyId,
+                                        childId = deepLink.childId!!,
+                                        listId = deepLink.listId!!,
+                                        highlightTodoId = deepLink.todoId,
+                                    ),
+                                )
+                            }
+                            pendingPushDeepLink = null
+                        }
                     }
                 }
             }
@@ -115,7 +137,17 @@ class MainActivity : ComponentActivity() {
         val type = src.getString("push_type") ?: src.getString("type") ?: return null
         val familyId = src.getString("push_family_id") ?: src.getString("familyId") ?: ""
         val itemId = src.getString("push_item_id") ?: src.getString("itemId")
-        return PushDeepLink(type = type, familyId = familyId, itemId = itemId)
+        val childId = src.getString("push_child_id") ?: src.getString("childId")
+        val listId = src.getString("push_list_id") ?: src.getString("listId")
+        val todoId = src.getString("push_todo_id") ?: src.getString("todoId")
+        return PushDeepLink(
+            type = type,
+            familyId = familyId,
+            itemId = itemId,
+            childId = childId,
+            listId = listId,
+            todoId = todoId,
+        )
     }
 }
 
@@ -123,4 +155,7 @@ private data class PushDeepLink(
     val type: String,
     val familyId: String,
     val itemId: String?,
+    val childId: String?,
+    val listId: String?,
+    val todoId: String?,
 )

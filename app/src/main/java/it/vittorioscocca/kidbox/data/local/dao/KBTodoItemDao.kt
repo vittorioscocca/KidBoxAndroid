@@ -16,8 +16,14 @@ interface KBTodoItemDao {
     @Query("SELECT * FROM kb_todo_items WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 ORDER BY dueAtEpochMillis")
     fun observeByFamilyAndChild(familyId: String, childId: String): Flow<List<KBTodoItemEntity>>
 
+    @Query("SELECT * FROM kb_todo_items WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 ORDER BY dueAtEpochMillis")
+    suspend fun getByFamilyAndChild(familyId: String, childId: String): List<KBTodoItemEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBTodoItemEntity)
+
+    @Query("DELETE FROM kb_todo_items WHERE id = :id")
+    suspend fun deleteById(id: String)
 
     @Delete
     suspend fun delete(entity: KBTodoItemEntity)

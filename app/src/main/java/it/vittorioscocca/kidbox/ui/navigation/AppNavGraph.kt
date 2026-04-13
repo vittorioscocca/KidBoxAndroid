@@ -26,6 +26,8 @@ import it.vittorioscocca.kidbox.ui.screens.settings.JoinFamilyScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.NotificationSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.SettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.ThemeScreen
+import it.vittorioscocca.kidbox.ui.screens.todo.TodoHomeScreen
+import it.vittorioscocca.kidbox.ui.screens.todo.TodoListScreen
 
 @Composable
 fun AppNavGraph(
@@ -171,7 +173,39 @@ fun AppNavGraph(
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
         ) { PlaceholderScreen("Notes") }
 
-        composable(AppDestination.Todo.route) { PlaceholderScreen("To-Do") }
+        composable(AppDestination.Todo.route) {
+            TodoHomeScreen(
+                onBack = { navController.popBackStack() },
+                onNavigate = { route -> navController.navigate(route) },
+            )
+        }
+
+        composable(
+            route = AppDestination.TodoList.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+                navArgument("listId") { type = NavType.StringType },
+                navArgument("highlightTodoId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) {
+            TodoListScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(
+            route = AppDestination.TodoSmart.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+                navArgument("kind") { type = NavType.StringType },
+            ),
+        ) {
+            TodoListScreen(onBack = { navController.popBackStack() })
+        }
 
         composable(
             route = AppDestination.ShoppingList.route,

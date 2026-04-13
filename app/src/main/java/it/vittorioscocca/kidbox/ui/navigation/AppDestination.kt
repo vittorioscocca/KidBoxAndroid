@@ -25,6 +25,24 @@ sealed class AppDestination(val route: String) {
         fun createRoute(familyId: String): String = "notes_home/$familyId"
     }
     data object Todo : AppDestination("todo")
+    data object TodoList : AppDestination("todo_list/{familyId}/{childId}/{listId}?highlightTodoId={highlightTodoId}") {
+        fun createRoute(
+            familyId: String,
+            childId: String,
+            listId: String,
+            highlightTodoId: String? = null,
+        ): String {
+            val base = "todo_list/$familyId/$childId/$listId"
+            return if (highlightTodoId.isNullOrBlank()) base else "$base?highlightTodoId=$highlightTodoId"
+        }
+    }
+    data object TodoSmart : AppDestination("todo_smart/{familyId}/{childId}/{kind}") {
+        fun createRoute(
+            familyId: String,
+            childId: String,
+            kind: it.vittorioscocca.kidbox.ui.screens.todo.TodoSmartKind,
+        ): String = "todo_smart/$familyId/$childId/${kind.raw}"
+    }
     data object ShoppingList : AppDestination("shopping_list/{familyId}") {
         fun createRoute(familyId: String): String = "shopping_list/$familyId"
     }

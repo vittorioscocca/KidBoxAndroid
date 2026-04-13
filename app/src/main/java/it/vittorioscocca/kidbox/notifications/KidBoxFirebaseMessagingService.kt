@@ -61,6 +61,9 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
             addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             putExtra("push_type", type)
             putExtra("push_family_id", data["familyId"])
+            putExtra("push_child_id", data["childId"])
+            putExtra("push_list_id", data["listId"])
+            putExtra("push_todo_id", data["todoId"])
             putExtra("push_item_id", data["itemId"])
         }
         val pendingIntent = PendingIntent.getActivity(
