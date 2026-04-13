@@ -75,10 +75,10 @@ class HomeViewModel @Inject constructor(
     private val heroPhotoService: FamilyHeroPhotoService,
     private val familySyncCenter: FamilySyncCenter,
     private val familySessionPreferences: FamilySessionPreferences,
-    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
+    private val db get() = FirebaseFirestore.getInstance()
     private val prefs = appContext.getSharedPreferences("home_quick_actions", Context.MODE_PRIVATE)
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()

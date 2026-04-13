@@ -17,6 +17,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
 import it.vittorioscocca.kidbox.data.local.entity.canonicalMemberDisplayName
 import it.vittorioscocca.kidbox.data.remote.family.FamilyLeaveService
 import it.vittorioscocca.kidbox.data.remote.family.FamilyFirestoreCreationRepository
+import it.vittorioscocca.kidbox.data.remote.family.InitialChild
 import it.vittorioscocca.kidbox.data.remote.family.InviteRemoteStore
 import it.vittorioscocca.kidbox.data.sync.FamilySyncCenter
 import it.vittorioscocca.kidbox.data.sync.firstNonBlankString
@@ -84,7 +85,8 @@ class FamilySettingsViewModel @Inject constructor(
         private const val TAG = "FamilySettingsVM"
     }
 
-    private val db = FirebaseFirestore.getInstance()
+    /** Sempre [FirebaseFirestore.getInstance] — mai un `val` fisso. */
+    private val db get() = FirebaseFirestore.getInstance()
     private val inviteRemoteStore = InviteRemoteStore()
     private val _uiState = MutableStateFlow(FamilySettingsUiState())
     val uiState: StateFlow<FamilySettingsUiState> = _uiState.asStateFlow()
@@ -135,6 +137,34 @@ class FamilySettingsViewModel @Inject constructor(
             e = e.cause
         }
         return false
+    }
+
+    /**
+     * Dopo una scrittura Firestore che cambia i permessi: invalida il token, attende la propagazione
+     * nell'SDK, poi [terminate] e [clearPersistence]. L'ordine è obbligatorio (non pulire con client attivo).
+     * Errori su terminate/clearPersistence vengono loggati ma non bloccano il ripristino del sync.
+     *
+     * @return true se [getIdToken] è riuscito.
+     */
+    private suspend fun refreshTokenThenResetFirestoreCache(): Boolean {
+        var tokenRefreshOk = false
+        try {
+            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.await()
+            tokenRefreshOk = true
+            Log.d(TAG, "refreshTokenThenResetFirestoreCache: token rinfrescato")
+        } catch (e: Exception) {
+            Log.e(TAG, "refreshTokenThenResetFirestoreCache: errore rinfresco token", e)
+        }
+        delay(3000)
+        try {
+            FirebaseFirestore.getInstance().terminate().await()
+            FirebaseFirestore.getInstance().clearPersistence().await()
+            Log.d(TAG, "refreshTokenThenResetFirestoreCache: terminate + clearPersistence OK")
+            delay(1000)
+        } catch (e: Exception) {
+            Log.e(TAG, "refreshTokenThenResetFirestoreCache: terminate/clearPersistence fallito — continuo", e)
+        }
+        return tokenRefreshOk
     }
 
     fun startObserving() {
@@ -351,19 +381,42 @@ class FamilySettingsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Revoca solo il membro indicato: **solo** `families/{familyId}/members/{memberDocId}` con
+     * `isDeleted` + `updatedAt`. Non aggiorna mai `families/{familyId}` (nessun merge sul doc padre).
+     * Operazione atomica lato app: nessuna chiamata a [FamilyLeaveService.leaveFamily] né
+     * [FamilyLeaveService.deleteFamily] — solo sync dopo reset cache.
+     */
     fun removeMember(member: KBFamilyMemberEntity) {
-        val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-        if (member.userId == currentUid) return
+        val myUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        Log.d(
+            "DEBUG_REVOCA",
+            "Operatore (Owner): $myUid, Target (Da rimuovere): ${member.userId}, docId=${member.id}",
+        )
+        if (member.userId == myUid || member.id == myUid) {
+            Log.w(TAG, "removeMember: rifiutato — target coincide con l'operatore")
+            return
+        }
         val familyId = _uiState.value.family?.id ?: return
+        // Path members: id documento = doc.id in sync (mai confondere con l'operatore).
+        val targetMemberDocId = member.id
         viewModelScope.launch {
             try {
                 db.collection("families").document(familyId)
-                    .collection("members").document(member.userId)
-                    .set(
-                        mapOf("isDeleted" to true, "updatedAt" to FieldValue.serverTimestamp()),
-                        com.google.firebase.firestore.SetOptions.merge()
+                    .collection("members").document(targetMemberDocId)
+                    .update(
+                        mapOf(
+                            "isDeleted" to true,
+                            "updatedAt" to FieldValue.serverTimestamp(),
+                        ),
                     ).await()
                 familyMemberDao.deleteById(member.id)
+
+                familySyncCenter.stopSync()
+                Log.d(TAG, "removeMember: stopSync dopo revoca familyId=$familyId")
+                refreshTokenThenResetFirestoreCache()
+                Log.d(TAG, "Reset Firestore completato con nuovo token. Riattivazione Sync.")
+                familySyncCenter.startSync(familyId)
             } catch (e: Exception) {
                 if (!isPermissionDenied(e)) {
                     _uiState.value = _uiState.value.copy(error = e.localizedMessage)
@@ -400,10 +453,27 @@ class FamilySettingsViewModel @Inject constructor(
         val state = _uiState.value
         val currentUid = state.currentUid
         val currentMember = state.members.firstOrNull { it.userId == currentUid }
-        val isOwner = currentMember?.role.equals("owner", ignoreCase = true)
+        val isOwnerFromFamily = state.family?.createdBy == currentUid
+        val isOwner =
+            currentMember?.role.equals("owner", ignoreCase = true) || isOwnerFromFamily
+        Log.d(TAG, "checkLeaveScenario: members=${state.members.size} isOwner=$isOwner")
         if (!isOwner) {
             Log.d(TAG, "checkLeaveScenario -> MemberOnly uid=$currentUid members=${state.members.size}")
             return LeaveScenario.MemberOnly
+        }
+        // Lista vuota (glitch sync post-revoca / permessi): mai OwnerAlone → la UI non deve proporre deleteFamily.
+        if (state.members.isEmpty()) {
+            if (isOwnerFromFamily) {
+                Log.d(
+                    TAG,
+                    "checkLeaveScenario: forzato scenario con membri per evitare eliminazione accidentale durante glitch",
+                )
+            }
+            Log.w(
+                TAG,
+                "checkLeaveScenario -> OwnerWithMembers(empty) uid=$currentUid (lista vuota, mai OwnerAlone)",
+            )
+            return LeaveScenario.OwnerWithMembers(emptyList())
         }
         val otherMembers = state.members.filter { it.userId != currentUid }
         if (otherMembers.isEmpty()) {
@@ -438,24 +508,47 @@ class FamilySettingsViewModel @Inject constructor(
     }
 
     fun deleteFamily() {
-        val familyId = _uiState.value.family?.id ?: return
+        val state = _uiState.value
+        val familyId = state.family?.id ?: return
+
+        if (state.members.filter { !it.isDeleted }.size > 1) {
+            Log.e(
+                TAG,
+                "SABOTAGGIO EVITATO: Tentativo di cancellare famiglia con membri attivi nello stato UI.",
+            )
+            return
+        }
+
         viewModelScope.launch {
+            Log.e(TAG, "!!! INVOCATA PROCEDURA DI ELIMINAZIONE TOTALE FAMIGLIA !!! ID: $familyId")
             try {
-                Log.i(TAG, "deleteFamily start familyId=$familyId uid=${_uiState.value.currentUid}")
-                leaveService.deleteFamily(familyId)
-                familyDao.deleteAll()
-                Log.d(TAG, "deleteFamily service completed familyId=$familyId")
-                observeJob?.cancel()
-                observeJob = null
-                observingFamilyId = null
-                dismissLeaveDialog()
-                _uiState.value = FamilySettingsUiState(
-                    isLoading = false,
-                    currentUid = _uiState.value.currentUid,
-                )
-                _navigateAwayAfterLeave.value = true
+                val activeInDb = familyMemberDao.observeActiveByFamilyId(familyId).first()
+                if (activeInDb.size <= 1) {
+                    Log.i(TAG, "Cancellazione autorizzata: unico membro rimasto nel DB locale.")
+                    Log.i(TAG, "deleteFamily start familyId=$familyId uid=${_uiState.value.currentUid}")
+                    leaveService.deleteFamily(familyId)
+                    familyDao.deleteAll()
+                    Log.d(TAG, "deleteFamily service completed familyId=$familyId")
+                    observeJob?.cancel()
+                    observeJob = null
+                    observingFamilyId = null
+                    dismissLeaveDialog()
+                    _uiState.value = FamilySettingsUiState(
+                        isLoading = false,
+                        currentUid = _uiState.value.currentUid,
+                    )
+                    _navigateAwayAfterLeave.value = true
+                } else {
+                    Log.e(
+                        TAG,
+                        "ERRORE CRITICO: Il database locale dice che ci sono ancora ${activeInDb.size} membri. Cancellazione interrotta.",
+                    )
+                    _uiState.value = _uiState.value.copy(
+                        error = "Impossibile eliminare: sincronizzazione incompleta.",
+                    )
+                }
             } catch (e: Exception) {
-                Log.e(TAG, "deleteFamily failed familyId=$familyId err=${e.message}", e)
+                Log.e(TAG, "Fallimento durante il controllo di sicurezza eliminazione", e)
                 if (!isPermissionDenied(e)) {
                     _uiState.value = _uiState.value.copy(error = e.localizedMessage)
                 }
@@ -464,6 +557,10 @@ class FamilySettingsViewModel @Inject constructor(
     }
 
     fun onLeaveButtonTapped() {
+        if (!familySyncCenter.initialSyncDone.value) {
+            Log.w(TAG, "onLeaveButtonTapped bloccato: sync in corso")
+            return
+        }
         val scenario = checkLeaveScenario()
         val next = when (scenario) {
             LeaveScenario.MemberOnly -> LeaveDialogState.ConfirmLeave
@@ -546,8 +643,9 @@ class FamilySettingsViewModel @Inject constructor(
         }
     }
 
-    /** Room + Firestore per nome famiglia e figli (chiamare dopo [FamilySyncCenter.stopSync] se serve). */
+    /** Room + Firestore per nome famiglia e figli. Usa [fs] dopo clearPersistence/terminate (es. [freshDb]). */
     private suspend fun saveFamilyAndChildrenToFirestore(
+        fs: FirebaseFirestore,
         family: KBFamilyEntity,
         trimmedName: String,
         childrenInputs: List<ChildInput>,
@@ -555,7 +653,7 @@ class FamilySettingsViewModel @Inject constructor(
         now: Long,
     ) {
         familyDao.upsert(family.copy(name = trimmedName, updatedAtEpochMillis = now))
-        db.collection("families").document(family.id)
+        fs.collection("families").document(family.id)
             .update(
                 "name", trimmedName,
                 "updatedBy", uid,
@@ -565,6 +663,7 @@ class FamilySettingsViewModel @Inject constructor(
         val existingIds = childDao.getChildrenByFamilyId(family.id).map { it.id }.toSet()
         childrenInputs.filter { it.name.isNotBlank() }.forEach { input ->
             val isExisting = input.id in existingIds
+            Log.d("DEBUG_SAVE", "Inviando figlio ${input.name.trim()} con ID ${input.id}")
             Log.d(TAG, "saveFamilyWithChildren child id=${input.id} existing=$isExisting name=${input.name.trim()}")
             val entity = if (isExisting) {
                 (childDao.getById(input.id)?.copy(
@@ -589,7 +688,7 @@ class FamilySettingsViewModel @Inject constructor(
                 )
             }
             childDao.upsert(entity)
-            db.collection("families").document(family.id)
+            fs.collection("families").document(family.id)
                 .collection("children").document(input.id)
                 .set(
                     mapOf(
@@ -623,14 +722,26 @@ class FamilySettingsViewModel @Inject constructor(
             try {
                 if (family == null) {
                     Log.i(TAG, "Starting new family creation because state.family was null")
-                    val firstChild = childrenInputs.firstOrNull { it.name.isNotBlank() } ?: childrenInputs.firstOrNull()
-                    val childName = firstChild?.name?.trim().takeUnless { it.isNullOrEmpty() } ?: "Figlio"
-                    val birthDateMillis = firstChild?.birthDateEpochMillis
-                    creationRepository.createFamilyWithInitialChild(
-                        familyName = trimmedName,
-                        childName = childName,
-                        birthDateMillis = birthDateMillis,
+                    val list = childrenInputs
+                        .filter { it.name.isNotBlank() }
+                        .map {
+                            InitialChild(
+                                id = it.id,
+                                name = it.name.trim(),
+                                birthDateMillis = it.birthDateEpochMillis,
+                            )
+                        }
+                    Log.d(
+                        TAG,
+                        "createFamilyWithChildren: ${list.size} figlio/i da salvare: " +
+                            list.joinToString { "${it.name}(${it.id.take(8)}…)" },
                     )
+                    if (list.isEmpty()) {
+                        _uiState.value = _uiState.value.copy(error = "Aggiungi almeno un figlio con nome.")
+                        return@launch
+                    }
+                    val newFamilyId = creationRepository.createFamilyWithChildren(trimmedName, list)
+                    familySyncCenter.startSync(newFamilyId)
                     onDone()
                     return@launch
                 }
@@ -639,23 +750,13 @@ class FamilySettingsViewModel @Inject constructor(
                 val now = System.currentTimeMillis()
                 Log.i(TAG, "saveFamilyWithChildren start familyId=${family.id} children=${childrenInputs.size}")
 
-                // Chiude i listener Firestore che post-revoca possono tenere sessioni/permessi “sporchi”
                 familySyncCenter.stopSync()
-                Log.d(TAG, "saveFamilyWithChildren stopSync done, cooling 1500ms familyId=${family.id}")
-                delay(1500)
+                Log.d(TAG, "saveFamilyWithChildren stopSync done familyId=${family.id}")
 
-                runCatching {
-                    val fs = FirebaseFirestore.getInstance()
-                    fs.terminate().await()
-                    fs.clearPersistence().await()
-                    Log.i(TAG, "saveFamilyWithChildren: Firestore terminate+clearPersistence OK")
-                }.onFailure { t ->
-                    Log.e(TAG, "saveFamilyWithChildren: terminate/clearPersistence fallito (continuo)", t)
-                }
-
+                val fs = FirebaseFirestore.getInstance()
                 for (attempt in 1..5) {
                     try {
-                        saveFamilyAndChildrenToFirestore(family, trimmedName, childrenInputs, uid, now)
+                        saveFamilyAndChildrenToFirestore(fs, family, trimmedName, childrenInputs, uid, now)
                         break
                     } catch (e: Exception) {
                         if (isPermissionDenied(e) && attempt < 5) {
@@ -670,7 +771,9 @@ class FamilySettingsViewModel @Inject constructor(
                     }
                 }
 
-                Log.i(TAG, "saveFamilyWithChildren completed familyId=${family.id}")
+                Log.i(TAG, "saveFamilyWithChildren write OK familyId=${family.id}")
+                refreshTokenThenResetFirestoreCache()
+                Log.d(TAG, "Reset Firestore completato con nuovo token. Riattivazione Sync.")
                 familySyncCenter.startSync(family.id)
                 onDone()
             } catch (e: Exception) {

@@ -9,9 +9,9 @@ import java.util.Date
 import kotlin.random.Random
 
 class InviteRemoteStore(
-    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
 ) {
+    private val db get() = FirebaseFirestore.getInstance()
     suspend fun createInviteCode(familyId: String, ttlDays: Int = 7): String {
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
         repeat(10) {

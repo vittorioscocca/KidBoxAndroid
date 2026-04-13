@@ -21,7 +21,7 @@ private const val TAG = "FamilyHeroPhotoService"
 @Singleton
 class FamilyHeroPhotoService @Inject constructor() {
 
-    private val db = FirebaseFirestore.getInstance()
+    private val db get() = FirebaseFirestore.getInstance()
     private val storage = FirebaseStorage.getInstance()
     private val auth = FirebaseAuth.getInstance()
 

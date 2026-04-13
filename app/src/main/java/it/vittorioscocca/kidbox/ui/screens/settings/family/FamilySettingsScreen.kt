@@ -163,15 +163,45 @@ fun FamilySettingsScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
+                val showMembersLoading =
+                    state.isOwner && state.family != null && state.members.isEmpty()
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Groups, null, tint = MaterialTheme.kidBoxColors.subtitle)
                         Spacer(modifier = Modifier.size(8.dp))
                         Text("Membri", fontWeight = FontWeight.SemiBold)
                         Spacer(modifier = Modifier.size(8.dp))
-                        Text("${state.members.size} membri collegati.", color = MaterialTheme.kidBoxColors.subtitle, fontSize = 13.sp)
+                        Text(
+                            if (showMembersLoading) {
+                                "Caricamento membri…"
+                            } else {
+                                "${state.members.size} membri collegati."
+                            },
+                            color = MaterialTheme.kidBoxColors.subtitle,
+                            fontSize = 13.sp,
+                        )
                     }
                     Divider(color = MaterialTheme.kidBoxColors.divider)
+                    if (showMembersLoading) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = Color(0xFF2E86FF),
+                            )
+                            Spacer(modifier = Modifier.size(10.dp))
+                            Text(
+                                "Caricamento membri…",
+                                fontSize = 14.sp,
+                                color = MaterialTheme.kidBoxColors.subtitle,
+                            )
+                        }
+                    }
                     state.members.forEachIndexed { idx, member ->
                         val memberLabel = sequenceOf(member.displayName, member.email)
                             .mapNotNull { it?.trim()?.takeIf { s -> s.isNotEmpty() } }

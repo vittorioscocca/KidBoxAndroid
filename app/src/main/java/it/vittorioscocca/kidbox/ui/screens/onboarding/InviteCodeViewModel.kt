@@ -28,7 +28,7 @@ class InviteCodeViewModel @Inject constructor(
 
     private val remote = InviteRemoteStore()
     private val wrapService = InviteWrapService()
-    private val db = FirebaseFirestore.getInstance()
+    private val db get() = FirebaseFirestore.getInstance()
 
     private val _isBusy = MutableStateFlow(false)
     val isBusy: StateFlow<Boolean> = _isBusy.asStateFlow()

@@ -51,7 +51,8 @@ class FamilySyncCenter @Inject constructor(
     private val sessionPrefs: FamilySessionPreferences,
     @ApplicationContext private val appContext: Context,
 ) {
-    private val db = FirebaseFirestore.getInstance()
+    /** Sempre [FirebaseFirestore.getInstance] — mai un `val` fisso (dopo terminate il singleton si rinnova). */
+    private val db get() = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private var familyListener: ListenerRegistration? = null
     private var membersListener: ListenerRegistration? = null
@@ -104,28 +105,37 @@ class FamilySyncCenter @Inject constructor(
         val localFamily = familyDao.getById(familyId)
         val byCreated = localFamily?.createdBy == uid
         val myMember = familyMemberDao.getById(uid)
-        val byOwnerRole = myMember?.familyId == familyId &&
+        val byOwnerRoleFromMember = myMember?.familyId == familyId &&
             myMember.userId == uid &&
             myMember.role.equals("owner", ignoreCase = true)
-        val result = byCreated || byOwnerRole
+        // Creatore da Room: sempre owner per il bypass, anche se la riga membro / Firestore è incoerente
+        val ownerRoleEffective = byCreated || byOwnerRoleFromMember
+        val result = ownerRoleEffective
         Log.d(
             TAG,
             "Bypass check: familyId=$familyId, currentFamilyId=$currentFamilyId, isCreator=$result " +
-                "(createdBy=$byCreated ownerRole=$byOwnerRole)",
+                "(createdBy=$byCreated ownerRoleFromMember=$byOwnerRoleFromMember ownerRoleEffective=$ownerRoleEffective)",
         )
         return result
     }
 
-    /** Dopo PERMISSION_DENIED transitorio per l'owner: riavvia sync con ritardo. */
-    private fun scheduleOwnerSyncRecovery(syncFamilyId: String) {
+    /**
+     * Dopo PERMISSION_DENIED per il creator: attende [delayMs] così Firestore/Auth possono aggiornare il token
+     * e la cache possa stabilizzarsi, poi riavvia i listener.
+     */
+    private fun restartSyncAfterDelay(syncFamilyId: String, delayMs: Long) {
         ownerSyncRecoveryJob?.cancel()
         ownerSyncRecoveryJob = scope.launch(Dispatchers.IO) {
-            delay(2500)
-            Log.d(TAG, "Tentativo di ripristino sync forzato per Owner familyId=$syncFamilyId")
+            delay(delayMs)
+            Log.d(TAG, "restartSyncAfterDelay delayMs=$delayMs → startSync familyId=$syncFamilyId")
             startSync(syncFamilyId)
         }
     }
 
+    /**
+     * Solo wipe **locale** (Room, chiavi, prefs) + evento UI. Non chiama [FamilyLeaveService] e non tocca
+     * `users/{uid}/memberships` su Firestore.
+     */
     private fun triggerAccessLostIfEligible(familyId: String, uid: String, reason: String): Boolean {
         if (uid.isEmpty()) return false
         synchronized(this) {
@@ -204,9 +214,11 @@ class FamilySyncCenter @Inject constructor(
                             if (uid.isNotEmpty() && isLocalFamilyCreator(familyId, uid)) {
                                 Log.w(
                                     TAG,
-                                    "familyListener PERMISSION_DENIED — ignorato (creator locale, glitch revoca)",
+                                    "Permessi in aggiornamento, riprovo tra 8s (family listener, creator)",
                                 )
-                                scheduleOwnerSyncRecovery(familyId)
+                                restartSyncAfterDelay(familyId, 8000L)
+                                _initialSyncDone.value = true
+                                isJoining = false
                             } else {
                                 Log.e(TAG, "familyListener PERMISSION_DENIED: ${err.message}")
                             }
@@ -306,9 +318,11 @@ class FamilySyncCenter @Inject constructor(
                             if (isLocalFamilyCreator(familyId, uid)) {
                                 Log.w(
                                     TAG,
-                                    "membersListener PERMISSION_DENIED — ignorato (creator locale)",
+                                    "Permessi in aggiornamento, riprovo tra 8s (members listener, creator)",
                                 )
-                                scheduleOwnerSyncRecovery(familyId)
+                                restartSyncAfterDelay(familyId, 8000L)
+                                _initialSyncDone.value = true
+                                isJoining = false
                                 membersFirstDone = true
                                 checkAllFirstDone()
                                 return@launch
@@ -336,10 +350,17 @@ class FamilySyncCenter @Inject constructor(
                     val now = System.currentTimeMillis()
                     val myUid = auth.currentUser?.uid.orEmpty()
                     val creatorBypass = isLocalFamilyCreator(familyId, myUid)
-                    /** Firestore post-revoca: query vuota ma changelog con REMOVED — non svuotare Room (vale anche dopo startSync recovery). */
-                    val emptyMembersSnap = snap.documents.isEmpty()
-                    val blockMemberDeletesOnEmptyGlitch =
-                        creatorBypass && emptyMembersSnap && snap.documentChanges.isNotEmpty()
+                    // Solo se non ci sono né documenti né changelog: altrimenti con totalDocs=0 e
+                    // documentChanges>0 (es. REMOVED per altri membri) dobbiamo applicare le modifiche.
+                    if (snap.documents.isEmpty() && snap.documentChanges.isEmpty() && creatorBypass) {
+                        Log.w(
+                            TAG,
+                            "Snapshot vuoto senza cambiamenti (creator) — niente da applicare.",
+                        )
+                        membersFirstDone = true
+                        checkAllFirstDone()
+                        return@launch
+                    }
 
                     for (change in snap.documentChanges) {
                         val doc = change.document
@@ -396,13 +417,6 @@ class FamilySyncCenter @Inject constructor(
                                 )
                                 continue
                             }
-                            if (blockMemberDeletesOnEmptyGlitch) {
-                                Log.w(
-                                    TAG,
-                                    "membersListener: skip REMOVED (snapshot vuoto + changelog, glitch) id=${doc.id}",
-                                )
-                                continue
-                            }
                             familyMemberDao.deleteById(doc.id)
                             continue
                         }
@@ -412,13 +426,6 @@ class FamilySyncCenter @Inject constructor(
                                 Log.w(
                                     TAG,
                                     "membersListener: skip delete local row per proprio uid (creator, isDeleted spurio)",
-                                )
-                                continue
-                            }
-                            if (blockMemberDeletesOnEmptyGlitch) {
-                                Log.w(
-                                    TAG,
-                                    "membersListener: skip isDeleted (snapshot vuoto + changelog, glitch) id=${doc.id}",
                                 )
                                 continue
                             }
@@ -503,15 +510,21 @@ class FamilySyncCenter @Inject constructor(
                         val creatorOnErr =
                             uidErr.isNotEmpty() && isLocalFamilyCreator(familyId, uidErr)
                         if (creatorOnErr) {
-                            // Nessuna modifica Room; sblocca solo il gate così isJoining non resta true per sempre.
-                            Log.w(
-                                TAG,
-                                "childrenListener error — Room figli invariato (creator), gate sync: ${err.message}",
-                            )
-                            if ((err as? FirebaseFirestoreException)?.code ==
+                            val permDenied = (err as? FirebaseFirestoreException)?.code ==
                                 FirebaseFirestoreException.Code.PERMISSION_DENIED
-                            ) {
-                                scheduleOwnerSyncRecovery(familyId)
+                            if (permDenied) {
+                                Log.w(
+                                    TAG,
+                                    "Permessi in aggiornamento, riprovo tra 8s (children listener, creator)",
+                                )
+                                restartSyncAfterDelay(familyId, 8000L)
+                                _initialSyncDone.value = true
+                                isJoining = false
+                            } else {
+                                Log.w(
+                                    TAG,
+                                    "childrenListener error — Room figli invariato (creator), gate sync: ${err.message}",
+                                )
                             }
                             childrenFirstDone = true
                             checkAllFirstDone()
@@ -549,13 +562,20 @@ class FamilySyncCenter @Inject constructor(
                     val now = System.currentTimeMillis()
                     val myUid = auth.currentUser?.uid.orEmpty()
                     val creatorBypass = isLocalFamilyCreator(familyId, myUid)
-                    val emptySnap = snap.documents.isEmpty()
-                    /**
-                     * Glitch post-revoca / recovery: anche con [isJoining]==true dopo [startSync], uno snapshot
-                     * vuoto con REMOVED non deve svuotare Room (prima il blocco si disattivava e cancellava tutti i figli).
-                     */
-                    val blockChildDeletesOnEmptyGlitch =
-                        creatorBypass && emptySnap && snap.documentChanges.isNotEmpty()
+                    if (snap.documents.isEmpty() && snap.documentChanges.isEmpty() && creatorBypass) {
+                        Log.w(
+                            TAG,
+                            "Snapshot vuoto senza cambiamenti (creator) — niente da applicare.",
+                        )
+                        childrenFirstDone = true
+                        checkAllFirstDone()
+                        return@launch
+                    }
+
+                    val skipChildDeletesOnEmptySnapshotGlitch =
+                        creatorBypass &&
+                            snap.documents.isEmpty() &&
+                            snap.documentChanges.isNotEmpty()
 
                     for (change in snap.documentChanges) {
                         val doc = change.document
@@ -563,10 +583,10 @@ class FamilySyncCenter @Inject constructor(
                         Log.d(TAG, "child change=${change.type} id=${doc.id} name=${d["name"]}")
 
                         if (change.type == DocumentChange.Type.REMOVED) {
-                            if (blockChildDeletesOnEmptyGlitch) {
+                            if (skipChildDeletesOnEmptySnapshotGlitch) {
                                 Log.w(
                                     TAG,
-                                    "childrenListener: skip child REMOVED (glitch vuoto+changelog) id=${doc.id}",
+                                    "skip child REMOVED (vuoto+changelog, prob. glitch permessi) id=${doc.id}",
                                 )
                                 continue
                             }
@@ -576,10 +596,10 @@ class FamilySyncCenter @Inject constructor(
 
                         // FIX #3: gestione isDeleted anche nei children
                         if (d["isDeleted"] as? Boolean == true) {
-                            if (blockChildDeletesOnEmptyGlitch) {
+                            if (skipChildDeletesOnEmptySnapshotGlitch) {
                                 Log.w(
                                     TAG,
-                                    "childrenListener: skip child isDeleted (glitch vuoto+changelog) id=${doc.id}",
+                                    "skip child isDeleted (vuoto+changelog, prob. glitch permessi) id=${doc.id}",
                                 )
                                 continue
                             }

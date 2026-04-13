@@ -14,9 +14,9 @@ import kotlinx.coroutines.tasks.await
  */
 @Singleton
 class FamilyMemberProfileRemoteStore @Inject constructor(
-    private val db: FirebaseFirestore,
     private val auth: FirebaseAuth,
 ) {
+    private val db get() = FirebaseFirestore.getInstance()
     suspend fun upsertMyMemberProfileIfNeeded(familyId: String, displayName: String? = null) {
         val user = auth.currentUser ?: return
         val uid = user.uid

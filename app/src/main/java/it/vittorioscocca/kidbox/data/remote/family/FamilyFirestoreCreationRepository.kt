@@ -1,34 +1,50 @@
 package it.vittorioscocca.kidbox.data.remote.family
 
+import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.Timestamp
+import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
+import it.vittorioscocca.kidbox.data.local.entity.KBChildEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
+private const val TAG = "FamilyFirestoreCreation"
+
+/** Figlio da creare insieme alla famiglia (Firestore + Room). */
+data class InitialChild(
+    val id: String,
+    val name: String,
+    val birthDateMillis: Long?,
+)
+
 @Singleton
 class FamilyFirestoreCreationRepository @Inject constructor(
-    private val firestore: FirebaseFirestore,
     private val auth: FirebaseAuth,
     private val familyDao: KBFamilyDao,
+    private val childDao: KBChildDao,
 ) {
 
-    suspend fun createFamilyWithInitialChild(
+    private val db get() = FirebaseFirestore.getInstance()
+
+    /**
+     * Crea famiglia + membership + tutti i figli (uno `.set().await()` dopo l’altro).
+     * Se un figlio fallisce, l’eccezione interrompe il flusso (nessun commit parziale oltre i precedenti await).
+     */
+    suspend fun createFamilyWithChildren(
         familyName: String,
-        childName: String,
-        birthDateMillis: Long?,
+        children: List<InitialChild>,
     ): String {
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
         val familyId = UUID.randomUUID().toString()
-        val childId = UUID.randomUUID().toString()
-        val familyRef = firestore.collection("families").document(familyId)
+        val familyRef = db.collection("families").document(familyId)
 
-        val batch1 = firestore.batch()
+        val batch1 = db.batch()
         batch1.set(
             familyRef,
             mapOf(
@@ -57,7 +73,7 @@ class FamilyFirestoreCreationRepository @Inject constructor(
             memberDoc,
         )
         batch1.set(
-            firestore.collection("users").document(uid)
+            db.collection("users").document(uid)
                 .collection("memberships").document(familyId),
             mapOf(
                 "familyId" to familyId,
@@ -66,21 +82,6 @@ class FamilyFirestoreCreationRepository @Inject constructor(
             ),
         )
         batch1.commit().await()
-
-        val childData = mutableMapOf<String, Any>(
-            "name" to childName,
-            "isDeleted" to false,
-            "createdAt" to FieldValue.serverTimestamp(),
-            "updatedBy" to uid,
-            "updatedAt" to FieldValue.serverTimestamp(),
-        )
-        if (birthDateMillis != null) {
-            childData["birthDate"] = Timestamp(
-                birthDateMillis / 1000,
-                ((birthDateMillis % 1000) * 1_000_000).toInt(),
-            )
-        }
-        familyRef.collection("children").document(childId).set(childData).await()
 
         val now = System.currentTimeMillis()
         familyDao.upsert(
@@ -100,6 +101,55 @@ class FamilyFirestoreCreationRepository @Inject constructor(
                 lastSyncError = null,
             ),
         )
+
+        val toSave = children.map { it.copy(name = it.name.trim()) }.filter { it.name.isNotEmpty() }
+        for (child in toSave) {
+            Log.d("DEBUG_SAVE", "Inviando figlio ${child.name} con ID ${child.id}")
+            val childData = mutableMapOf<String, Any>(
+                "name" to child.name,
+                "isDeleted" to false,
+                "createdBy" to uid,
+                "createdAt" to FieldValue.serverTimestamp(),
+                "updatedBy" to uid,
+                "updatedAt" to FieldValue.serverTimestamp(),
+            )
+            if (child.birthDateMillis != null) {
+                childData["birthDate"] = Timestamp(
+                    child.birthDateMillis / 1000,
+                    ((child.birthDateMillis % 1000) * 1_000_000).toInt(),
+                )
+            }
+            familyRef.collection("children").document(child.id).set(childData).await()
+            childDao.upsert(
+                KBChildEntity(
+                    id = child.id,
+                    familyId = familyId,
+                    name = child.name,
+                    birthDateEpochMillis = child.birthDateMillis,
+                    weightKg = null,
+                    heightCm = null,
+                    createdBy = uid,
+                    createdAtEpochMillis = now,
+                    updatedBy = uid,
+                    updatedAtEpochMillis = now,
+                ),
+            )
+        }
+
+        Log.i(TAG, "createFamilyWithChildren OK familyId=$familyId childrenWritten=${toSave.size}")
         return familyId
+    }
+
+    /** Compatibilità onboarding: un solo figlio. */
+    suspend fun createFamilyWithInitialChild(
+        familyName: String,
+        childName: String,
+        birthDateMillis: Long?,
+    ): String {
+        val childId = UUID.randomUUID().toString()
+        return createFamilyWithChildren(
+            familyName,
+            listOf(InitialChild(id = childId, name = childName, birthDateMillis = birthDateMillis)),
+        )
     }
 }

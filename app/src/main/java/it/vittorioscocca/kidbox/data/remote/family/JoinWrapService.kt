@@ -20,9 +20,9 @@ sealed class JoinInviteError(message: String) : Exception(message) {
 }
 
 class JoinWrapService(
-    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
 ) {
+    private val db get() = FirebaseFirestore.getInstance()
     data class ParsedPayload(
         val familyId: String,
         val inviteId: String,

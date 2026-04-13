@@ -31,9 +31,9 @@ private const val TAG = "InviteWrapService"
  * 5) Costruisce il QR payload con secret URL-safe base64
  */
 class InviteWrapService(
-    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
 ) {
+    private val db get() = FirebaseFirestore.getInstance()
     data class Result(
         val inviteId: String,
         val secretBase64url: String,

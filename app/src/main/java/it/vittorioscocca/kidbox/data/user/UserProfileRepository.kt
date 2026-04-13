@@ -21,10 +21,10 @@ class UserProfileRepository @Inject constructor(
     private val userProfileDao: KBUserProfileDao,
     private val familyDao: KBFamilyDao,
     private val familyMemberDao: KBFamilyMemberDao,
-    private val firestore: FirebaseFirestore,
     private val auth: FirebaseAuth,
     private val memberProfileRemoteStore: FamilyMemberProfileRemoteStore,
 ) {
+    private val db get() = FirebaseFirestore.getInstance()
     fun observe(uid: String): Flow<KBUserProfileEntity?> = userProfileDao.observeByUid(uid)
 
     suspend fun getByUid(uid: String): KBUserProfileEntity? = userProfileDao.getByUid(uid)
@@ -94,7 +94,7 @@ class UserProfileRepository @Inject constructor(
         )
         userProfileDao.upsert(entity)
 
-        firestore.collection("users").document(uid).set(
+        db.collection("users").document(uid).set(
             mapOf(
                 "firstName" to fn,
                 "lastName" to ln,
@@ -128,7 +128,7 @@ class UserProfileRepository @Inject constructor(
     suspend fun fetchRemoteProfileFields(uid: String): RemoteUserProfileFields? {
         if (auth.currentUser?.uid != uid) return null
         val snap = try {
-            firestore.collection("users").document(uid).get().await()
+            db.collection("users").document(uid).get().await()
         } catch (_: Exception) {
             return null
         }

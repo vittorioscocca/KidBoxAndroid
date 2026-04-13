@@ -72,7 +72,8 @@ fun EditFamilyScreen(
     BackHandler { onBack() }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var familyName by remember { mutableStateOf("") }
-    var children by remember { mutableStateOf(listOf<ChildEntry>()) }
+    // Una riga vuota di default: per nuova famiglia l’utente compila; con famiglia esistente LaunchedEffect sostituisce dalla Room.
+    var children by remember { mutableStateOf(listOf(ChildEntry(id = ""))) }
     val dateFormat = remember { DateTimeFormatter.ofPattern("d/M/yyyy") }
     val cardShape = RoundedCornerShape(16.dp)
     val cardBorder = Color(0x552E86FF)
@@ -260,17 +261,22 @@ fun EditFamilyScreen(
                 .fillMaxWidth()
                 .border(1.5.dp, cardBorder, cardShape)
                 .clickable(enabled = !state.isLoading && !state.isSavingFamily) {
+                    val inputs = children.map { entry ->
+                        ChildInput(
+                            id = if (entry.id.isBlank()) UUID.randomUUID().toString() else entry.id,
+                            name = entry.name,
+                            birthDateEpochMillis = entry.birthDate
+                                ?.atStartOfDay(ZoneId.systemDefault())
+                                ?.toInstant()?.toEpochMilli(),
+                        )
+                    }
+                    android.util.Log.d(
+                        "EditFamilyScreen",
+                        "Salva: ${inputs.count { it.name.isNotBlank() }} figlio/i con nome su ${inputs.size} righe",
+                    )
                     viewModel.saveFamilyWithChildren(
                         newName = familyName,
-                        childrenInputs = children.map { entry ->
-                            ChildInput(
-                                id = if (entry.id.isBlank()) UUID.randomUUID().toString() else entry.id,
-                                name = entry.name,
-                                birthDateEpochMillis = entry.birthDate
-                                    ?.atStartOfDay(ZoneId.systemDefault())
-                                    ?.toInstant()?.toEpochMilli(),
-                            )
-                        },
+                        childrenInputs = inputs,
                         onDone = onBack,
                     )
                 },
