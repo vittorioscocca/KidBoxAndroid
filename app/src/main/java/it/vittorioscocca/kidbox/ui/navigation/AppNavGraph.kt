@@ -13,6 +13,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
 import it.vittorioscocca.kidbox.ui.screens.auth.LoginScreen
+import it.vittorioscocca.kidbox.ui.screens.grocery.GroceryListScreen
 import it.vittorioscocca.kidbox.ui.screens.home.HomeScreen
 import it.vittorioscocca.kidbox.ui.screens.home.ProfileScreen
 import it.vittorioscocca.kidbox.ui.screens.onboarding.OnboardingScreen
@@ -44,20 +45,22 @@ fun AppNavGraph(
                         "onLoginSuccess hasFamily=$hasFamily hasSeenOnboarding=$hasSeenOnboarding",
                     )
                     when {
+                        // Se non ho più una famiglia (es. revoca), devo rientrare nel wizard.
+                        // hasSeenOnboarding non deve bypassare questo stato.
+                        !hasFamily -> {
+                            navController.navigate(AppDestination.Onboarding.route) {
+                                popUpTo(AppDestination.Login.route) { inclusive = true }
+                            }
+                        }
                         hasSeenOnboarding -> {
                             navController.navigate(AppDestination.Home.route) {
                                 popUpTo(AppDestination.Login.route) { inclusive = true }
                             }
                         }
-                        hasFamily -> {
+                        else -> {
                             onboardingPreferences.completeOnboarding()
                             navController.navigate(AppDestination.Home.route) {
                                 popUpTo(navController.graph.id) { inclusive = false }
-                            }
-                        }
-                        else -> {
-                            navController.navigate(AppDestination.Onboarding.route) {
-                                popUpTo(AppDestination.Login.route) { inclusive = true }
                             }
                         }
                     }
@@ -67,8 +70,9 @@ fun AppNavGraph(
 
         composable(AppDestination.Onboarding.route) {
             OnboardingScreen(
-                onFamilyCreated = { familyId ->
-                    navController.navigate(AppDestination.WikiOnboarding.createRoute(familyId)) {
+                onFamilyCreated = {
+                    onboardingPreferences.completeOnboarding()
+                    navController.navigate(AppDestination.Home.route) {
                         popUpTo(AppDestination.Onboarding.route) { inclusive = true }
                     }
                 },
@@ -166,7 +170,9 @@ fun AppNavGraph(
         composable(
             route = AppDestination.ShoppingList.route,
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
-        ) { PlaceholderScreen("Lista Spesa") }
+        ) {
+            GroceryListScreen(onBack = { navController.popBackStack() })
+        }
 
         composable(
             route = AppDestination.Calendar.route,

@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.Source
 import android.util.Log
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
@@ -19,6 +21,7 @@ import it.vittorioscocca.kidbox.data.remote.auth.FacebookAuthService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -59,6 +62,7 @@ class LoginViewModel @Inject constructor(
             val user = FirebaseAuth.getInstance().currentUser
             if (user != null) {
                 userProfileRepository.ensureSeededFromAuth()
+                resetFirestoreClientAfterAuthChange()
             }
             val hasFamily = if (user != null) checkHasFamily() else false
             val hasOnboarding = onboardingPreferences.hasSeenOnboarding()
@@ -171,30 +175,106 @@ class LoginViewModel @Inject constructor(
     private suspend fun onSignedInSuccessfully() {
         if (FirebaseAuth.getInstance().currentUser != null) {
             userProfileRepository.ensureSeededFromAuth()
+            resetFirestoreClientAfterAuthChange()
             _authCheckState.value =
                 AuthCheckState.Authenticated(checkHasFamily())
         }
     }
 
+    /**
+     * Dopo login/logout con wipe locale, forza nuovo token e resetta il client Firestore
+     * per evitare PERMISSION_DENIED transitori dovuti a credenziali/cache stale.
+     */
+    private suspend fun resetFirestoreClientAfterAuthChange() {
+        try {
+            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.await()
+            delay(400)
+            FirebaseFirestore.getInstance().terminate().await()
+            FirebaseFirestore.getInstance().clearPersistence().await()
+            delay(250)
+            Log.d("KidBoxDebug", "resetFirestoreClientAfterAuthChange: OK")
+        } catch (e: Exception) {
+            Log.w("KidBoxDebug", "resetFirestoreClientAfterAuthChange: ${e.message}")
+        }
+    }
+
     private suspend fun checkHasFamily(): Boolean {
         return try {
-            val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return false
-            val snapshot = FirebaseFirestore.getInstance()
-                .collection("users")
-                .document(uid)
-                .collection("memberships")
-                .get()
-                .await()
-            val hasFamily = !snapshot.isEmpty
-            Log.d(
-                "KidBoxDebug",
-                "checkHasFamily Firestore result: ${snapshot.size()} memberships → hasFamily=$hasFamily",
-            )
-            hasFamily
+            checkHasFamilyOnce()
+        } catch (e: FirebaseFirestoreException) {
+            if (e.code != FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                Log.e("KidBoxDebug", "checkHasFamily firestore error: ${e.message}")
+                return false
+            }
+            Log.w("KidBoxDebug", "checkHasFamily: PERMISSION_DENIED, reset+retry")
+            resetFirestoreClientAfterAuthChange()
+            runCatching { checkHasFamilyOnce() }
+                .onFailure { t -> Log.e("KidBoxDebug", "checkHasFamily retry failed: ${t.message}") }
+                .getOrDefault(false)
         } catch (e: Exception) {
             Log.e("KidBoxDebug", "checkHasFamily error: ${e.message}")
             false
         }
+    }
+
+    private suspend fun checkHasFamilyOnce(): Boolean {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return false
+        val membershipsSnap = FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(uid)
+            .collection("memberships")
+            .get(Source.SERVER)
+            .await()
+        val candidateFamilyIds = buildList {
+            membershipsSnap.documents.forEach { doc ->
+                if (doc.id.isNotBlank()) add(doc.id)
+                (doc.data?.get("familyId") as? String)
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { add(it) }
+            }
+        }.distinct()
+
+        // Fallback robusto: se memberships è vuota/incoerente, ricava famiglie da members collectionGroup.
+        val resolvedFamilyIds = if (candidateFamilyIds.isNotEmpty()) {
+            candidateFamilyIds
+        } else {
+            Log.w("KidBoxDebug", "checkHasFamily: memberships vuote, fallback collectionGroup(members)")
+            val memberDocs = FirebaseFirestore.getInstance()
+                .collectionGroup("members")
+                .whereEqualTo("uid", uid)
+                .get(Source.SERVER)
+                .await()
+                .documents
+            memberDocs
+                .filter { it.data?.get("isDeleted") as? Boolean != true }
+                .mapNotNull { it.reference.parent.parent?.id }
+                .distinct()
+        }
+
+        if (resolvedFamilyIds.isEmpty()) {
+            Log.d("KidBoxDebug", "checkHasFamily: no family ids on server -> false")
+            return false
+        }
+
+        // Verifica definitiva: devo avere almeno un member doc valido nella family.
+        val hasValidMembership = resolvedFamilyIds.any { familyId ->
+            if (familyId.isBlank()) return@any false
+            val memberSnap = FirebaseFirestore.getInstance()
+                .collection("families")
+                .document(familyId)
+                .collection("members")
+                .document(uid)
+                .get(Source.SERVER)
+                .await()
+            memberSnap.exists() && (memberSnap.data?.get("isDeleted") as? Boolean != true)
+        }
+
+        Log.d(
+            "KidBoxDebug",
+            "checkHasFamily server candidates=${resolvedFamilyIds.size} hasValidMembership=$hasValidMembership",
+        )
+        return hasValidMembership
     }
 
     private fun friendlyError(error: Throwable): String {

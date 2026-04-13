@@ -89,7 +89,7 @@ class InviteCodeViewModel @Inject constructor(
         _errorMessage.value = null
     }
 
-    fun generateInviteCode() {
+    fun generateInviteCode(preferredFamilyId: String? = null) {
         _isBusy.value = true
         _errorMessage.value = null
         _qrPayload.value = null
@@ -98,10 +98,11 @@ class InviteCodeViewModel @Inject constructor(
         _currentInviteId.value = null
         viewModelScope.launch {
             try {
-                val firstFamily = familyDao.observeAll().first().firstOrNull()
+                val familyId = preferredFamilyId
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: familyDao.observeAll().first().firstOrNull()?.id
                     ?: error("Nessuna family trovata.")
-
-                val familyId = firstFamily.id
 
                 // 1) Membership invite code (classico)
                 val newCode = remote.createInviteCode(familyId = familyId)

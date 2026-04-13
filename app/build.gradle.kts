@@ -103,6 +103,7 @@ dependencies {
 
     // ML Kit barcode (legge QR dalla camera)
     implementation(libs.mlkit.barcode)
+    implementation(libs.play.services.location)
 
     // EncryptedSharedPreferences (FamilyKeyStore)
     implementation(libs.security.crypto)

@@ -89,6 +89,7 @@ class HomeViewModel @Inject constructor(
     // (es. heroPhotoURL arriva da un altro device via Firestore), la UI si aggiorna.
     init {
         observeHomeData()
+        viewModelScope.launch { refreshAvatarUrl() }
         viewModelScope.launch {
             familySyncCenter.accessLostEvent.collect {
                 _uiState.value = HomeUiState(isLoading = false, familyId = "")
@@ -172,13 +173,28 @@ class HomeViewModel @Inject constructor(
                         heroPhotoOffsetY = fam?.heroPhotoOffsetY?.toFloat() ?: 0f,
                         memberCount = memberCount,
                         todayLabel = todayLabel(),
-                        avatarUrl = com.google.firebase.auth.FirebaseAuth.getInstance()
-                            .currentUser?.photoUrl?.toString(),
+                        avatarUrl = _uiState.value.avatarUrl
+                            ?: com.google.firebase.auth.FirebaseAuth.getInstance()
+                                .currentUser?.photoUrl?.toString(),
                         topQuickActions = topQuickActions(),
                     )
                 }
             }
         }
+    }
+
+    fun onScreenVisible() {
+        viewModelScope.launch { refreshAvatarUrl() }
+    }
+
+    private suspend fun refreshAvatarUrl() {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val remote = runCatching {
+            db.collection("users").document(uid).get().await()
+        }.getOrNull()
+        val url = (remote?.data?.get("avatarURL") as? String)?.trim().takeIf { !it.isNullOrEmpty() }
+            ?: FirebaseAuth.getInstance().currentUser?.photoUrl?.toString()
+        _uiState.value = _uiState.value.copy(avatarUrl = url)
     }
 
     private suspend fun bootstrapFromFirestore(uid: String) {
@@ -191,55 +207,80 @@ class HomeViewModel @Inject constructor(
                 .await()
                 .documents
 
-            val familyId = membershipDocs.firstOrNull()?.id.orEmpty()
-            if (familyId.isBlank()) {
+            val candidateFamilyIds = mutableListOf<String>()
+            membershipDocs
+                .asSequence()
+                .mapNotNull { doc ->
+                    doc.id.takeIf { it.isNotBlank() }?.also { candidateFamilyIds.add(it) }
+                    (doc.data?.get("familyId") as? String)?.trim()?.takeIf { it.isNotEmpty() }
+                }
+                .forEach { candidateFamilyIds.add(it) }
+
+            if (candidateFamilyIds.isEmpty()) {
+                Log.w(TAG, "bootstrapFromFirestore: memberships empty/incoerenti, fallback members collectionGroup")
+                val memberDocs = db.collectionGroup("members")
+                    .whereEqualTo("uid", uid)
+                    .get()
+                    .await()
+                    .documents
+                memberDocs
+                    .filter { it.data?.get("isDeleted") as? Boolean != true }
+                    .mapNotNull { it.reference.parent.parent?.id }
+                    .forEach { candidateFamilyIds.add(it) }
+            }
+            val distinctCandidates = candidateFamilyIds
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+
+            if (distinctCandidates.isEmpty()) {
                 Log.w(TAG, "bootstrapFromFirestore: memberships empty uid=$uid")
                 _uiState.value = HomeUiState(isLoading = false, familyId = "")
                 return
             }
-            Log.i(TAG, "bootstrapFromFirestore: found familyId=$familyId")
 
-            try {
-                val myMemberDoc = db.collection("families")
-                    .document(familyId)
-                    .collection("members")
-                    .document(uid)
-                    .get()
-                    .await()
-                if (!myMemberDoc.exists()) {
-                    Log.w(TAG, "bootstrapFromFirestore: member doc assente — probabile revoca familyId=$familyId")
-                    _uiState.value = HomeUiState(isLoading = false, familyId = "")
-                    return
+            var selectedFamilyId: String? = null
+            var selectedFamilyData: Map<String, Any> = emptyMap()
+            for (candidateId in distinctCandidates) {
+                try {
+                    val myMemberDoc = db.collection("families")
+                        .document(candidateId)
+                        .collection("members")
+                        .document(uid)
+                        .get()
+                        .await()
+                    if (!myMemberDoc.exists() || myMemberDoc.data?.get("isDeleted") as? Boolean == true) {
+                        Log.w(TAG, "bootstrapFromFirestore: skip familyId=$candidateId (member missing/deleted)")
+                        continue
+                    }
+                    val familySnap = db.collection("families").document(candidateId).get().await()
+                    if (!familySnap.exists()) {
+                        Log.w(TAG, "bootstrapFromFirestore: skip familyId=$candidateId (family missing)")
+                        continue
+                    }
+                    val familyData = familySnap.data.orEmpty()
+                    if (familyData["isDeleted"] as? Boolean == true) {
+                        Log.w(TAG, "bootstrapFromFirestore: skip familyId=$candidateId (family deleted)")
+                        continue
+                    }
+                    selectedFamilyId = candidateId
+                    selectedFamilyData = familyData
+                    break
+                } catch (e: FirebaseFirestoreException) {
+                    if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                        Log.w(TAG, "bootstrapFromFirestore: skip familyId=$candidateId (PERMISSION_DENIED)")
+                        continue
+                    }
+                    throw e
                 }
-                val mData = myMemberDoc.data.orEmpty()
-                if (mData["isDeleted"] as? Boolean == true) {
-                    Log.w(TAG, "bootstrapFromFirestore: member isDeleted=true familyId=$familyId")
-                    _uiState.value = HomeUiState(isLoading = false, familyId = "")
-                    return
-                }
-            } catch (e: FirebaseFirestoreException) {
-                if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
-                    Log.w(TAG, "bootstrapFromFirestore: lettura member PERMISSION_DENIED — revoca")
-                    _uiState.value = HomeUiState(isLoading = false, familyId = "")
-                    return
-                }
-                throw e
             }
-
-            val familySnap = db.collection("families").document(familyId).get().await()
-            if (!familySnap.exists()) {
-                Log.w(TAG, "bootstrapFromFirestore: family not found familyId=$familyId")
+            val familyId = selectedFamilyId
+            if (familyId.isNullOrBlank()) {
                 _uiState.value = HomeUiState(isLoading = false, familyId = "")
                 return
             }
-
-            val familyData = familySnap.data.orEmpty()
-            // Skip famiglie eliminate
-            if (familyData["isDeleted"] as? Boolean == true) {
-                Log.w(TAG, "bootstrapFromFirestore: family isDeleted=true, skipping familyId=$familyId")
-                _uiState.value = HomeUiState(isLoading = false, familyId = "")
-                return
-            }
+            Log.i(TAG, "bootstrapFromFirestore: selected familyId=$familyId from candidates=${distinctCandidates.size}")
+            val familyData = selectedFamilyData
             val now = System.currentTimeMillis()
             val createdBy = familyData["ownerUid"] as? String ?: uid
             val family = KBFamilyEntity(

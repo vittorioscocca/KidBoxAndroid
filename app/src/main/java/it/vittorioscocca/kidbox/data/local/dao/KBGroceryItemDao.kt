@@ -19,6 +19,9 @@ interface KBGroceryItemDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBGroceryItemEntity)
 
+    @Query("DELETE FROM kb_grocery_items WHERE id = :id")
+    suspend fun deleteById(id: String)
+
     @Delete
     suspend fun delete(entity: KBGroceryItemEntity)
 }

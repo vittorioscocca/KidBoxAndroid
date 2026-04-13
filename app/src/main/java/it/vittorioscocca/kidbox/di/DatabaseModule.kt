@@ -10,6 +10,7 @@ import dagger.hilt.components.SingletonComponent
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
+import it.vittorioscocca.kidbox.data.local.dao.KBGroceryItemDao
 import it.vittorioscocca.kidbox.data.local.dao.KBUserProfileDao
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
 import javax.inject.Singleton
@@ -40,4 +41,7 @@ object DatabaseModule {
 
     @Provides
     fun provideKBChildDao(database: KidBoxDatabase): KBChildDao = database.childDao()
+
+    @Provides
+    fun provideKBGroceryItemDao(database: KidBoxDatabase): KBGroceryItemDao = database.groceryItemDao()
 }

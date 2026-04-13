@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -222,7 +223,8 @@ fun OnboardingScreen(
                 },
                 modifier = Modifier
                     .padding(horizontal = 28.dp)
-                    .padding(bottom = 40.dp),
+                    .navigationBarsPadding()
+                    .padding(bottom = 12.dp),
             )
         }
     }
@@ -637,13 +639,11 @@ private fun InvitePartnerPageContent(familyId: String) {
     val qrPayload by viewModel.qrPayload.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val code by viewModel.code.collectAsStateWithLifecycle()
-    var didGenerate by remember { mutableStateOf(false) }
     var didCopy by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        if (!didGenerate) {
-            didGenerate = true
-            viewModel.generateInviteCode()
+    LaunchedEffect(familyId) {
+        if (familyId.isNotBlank()) {
+            viewModel.generateInviteCode(preferredFamilyId = familyId)
         }
     }
 

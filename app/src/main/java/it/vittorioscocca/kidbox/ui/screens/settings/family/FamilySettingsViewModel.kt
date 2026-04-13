@@ -253,7 +253,10 @@ class FamilySettingsViewModel @Inject constructor(
         familySyncCenter.startSync(fid)
     }
 
-    private suspend fun bootstrapFromFirebase(requestUid: String): KBFamilyEntity? {
+    private suspend fun bootstrapFromFirebase(
+        requestUid: String,
+        allowRecoveryOnPermissionDenied: Boolean = true,
+    ): KBFamilyEntity? {
         return try {
             val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty().ifBlank { requestUid }
             var membershipDocs = emptyList<com.google.firebase.firestore.DocumentSnapshot>()
@@ -268,15 +271,67 @@ class FamilySettingsViewModel @Inject constructor(
                 if (attempt < 2) kotlinx.coroutines.delay(1000)
             }
 
-            val familyId = membershipDocs.firstOrNull()?.id ?: return null
-            val familySnap = db.collection("families").document(familyId).get().await()
-            if (!familySnap.exists()) return null
+            val candidateFamilyIds = mutableListOf<String>()
+            membershipDocs
+                .asSequence()
+                .mapNotNull { doc ->
+                    doc.id.takeIf { it.isNotBlank() }?.also { candidateFamilyIds.add(it) }
+                    (doc.data?.get("familyId") as? String)?.trim()?.takeIf { it.isNotEmpty() }
+                }
+                .forEach { candidateFamilyIds.add(it) }
 
-            val familyData = familySnap.data.orEmpty()
-            if (familyData["isDeleted"] as? Boolean == true) {
-                Log.w(TAG, "bootstrapFromFirebase: family isDeleted=true, skipping familyId=$familyId")
-                return null
+            if (candidateFamilyIds.isEmpty()) {
+                Log.w(TAG, "bootstrapFromFirebase: memberships vuote/incoerenti, fallback members collectionGroup")
+                val memberDocs = db.collectionGroup("members")
+                    .whereEqualTo("uid", uid)
+                    .get()
+                    .await()
+                    .documents
+                memberDocs
+                    .filter { it.data?.get("isDeleted") as? Boolean != true }
+                    .mapNotNull { it.reference.parent.parent?.id }
+                    .forEach { candidateFamilyIds.add(it) }
             }
+            val distinctCandidates = candidateFamilyIds
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+            if (distinctCandidates.isEmpty()) return null
+
+            var selectedFamilyId: String? = null
+            var selectedFamilySnap: com.google.firebase.firestore.DocumentSnapshot? = null
+            for (candidateId in distinctCandidates) {
+                try {
+                    val myMemberSnap = db.collection("families")
+                        .document(candidateId)
+                        .collection("members")
+                        .document(uid)
+                        .get()
+                        .await()
+                    if (!myMemberSnap.exists() || myMemberSnap.data?.get("isDeleted") as? Boolean == true) {
+                        Log.w(TAG, "bootstrapFromFirebase: skip familyId=$candidateId (member missing/deleted)")
+                        continue
+                    }
+                    val familySnap = db.collection("families").document(candidateId).get().await()
+                    if (!familySnap.exists()) continue
+                    val familyData = familySnap.data.orEmpty()
+                    if (familyData["isDeleted"] as? Boolean == true) {
+                        Log.w(TAG, "bootstrapFromFirebase: skip familyId=$candidateId (family deleted)")
+                        continue
+                    }
+                    selectedFamilyId = candidateId
+                    selectedFamilySnap = familySnap
+                    break
+                } catch (e: FirebaseFirestoreException) {
+                    if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                        Log.w(TAG, "bootstrapFromFirebase: skip familyId=$candidateId (PERMISSION_DENIED)")
+                        continue
+                    }
+                    throw e
+                }
+            }
+            val familyId = selectedFamilyId ?: return null
+            val familyData = selectedFamilySnap?.data.orEmpty()
             val now = System.currentTimeMillis()
             val createdBy = familyData["ownerUid"] as? String ?: uid
 
@@ -372,6 +427,14 @@ class FamilySettingsViewModel @Inject constructor(
         } catch (e: Exception) {
             if (isPermissionDenied(e)) {
                 Log.w(TAG, "bootstrapFromFirebase: PERMISSION_DENIED — revoca accesso, nessun popup errore")
+                if (allowRecoveryOnPermissionDenied) {
+                    Log.w(TAG, "bootstrapFromFirebase: tentativo recovery token/cache e retry")
+                    refreshTokenThenResetFirestoreCache()
+                    return bootstrapFromFirebase(
+                        requestUid = requestUid,
+                        allowRecoveryOnPermissionDenied = false,
+                    )
+                }
                 val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
                 _uiState.value = FamilySettingsUiState(isLoading = false, currentUid = uid, error = null)
             } else {
