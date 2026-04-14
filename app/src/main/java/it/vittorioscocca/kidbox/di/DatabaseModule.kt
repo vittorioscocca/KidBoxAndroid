@@ -12,6 +12,8 @@ import it.vittorioscocca.kidbox.data.local.dao.KBCalendarEventDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.dao.KBGroceryItemDao
+import it.vittorioscocca.kidbox.data.local.dao.KBDocumentDao
+import it.vittorioscocca.kidbox.data.local.dao.KBDocumentCategoryDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoItemDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoListDao
 import it.vittorioscocca.kidbox.data.local.dao.KBUserProfileDao
@@ -56,4 +58,10 @@ object DatabaseModule {
 
     @Provides
     fun provideKBCalendarEventDao(database: KidBoxDatabase): KBCalendarEventDao = database.calendarEventDao()
+
+    @Provides
+    fun provideKBDocumentDao(database: KidBoxDatabase): KBDocumentDao = database.documentDao()
+
+    @Provides
+    fun provideKBDocumentCategoryDao(database: KidBoxDatabase): KBDocumentCategoryDao = database.documentCategoryDao()
 }

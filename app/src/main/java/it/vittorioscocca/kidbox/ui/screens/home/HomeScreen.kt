@@ -635,7 +635,7 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
     FeatureItem("health", "Salute", "Health tracker", AppDestination.PediatricChildSelector.createRoute(familyId), Icons.Filled.Favorite, Color(0xFFFFEAEA), Color(0xFFE53E3E)),
     FeatureItem("chat", "Chat", "Messaggi famiglia", AppDestination.Chat.route, Icons.AutoMirrored.Filled.Chat, Color(0xFFEDFAF3), Color(0xFF27AE60), state.badgeChat, CounterField.CHAT),
     FeatureItem("expenses", "Spese", "Rette, visite, extra", AppDestination.ExpensesHome.createRoute(familyId), Icons.Filled.Euro, Color(0xFFFFF3E6), Color(0xFFFF6B00), state.badgeExpenses, CounterField.EXPENSES),
-    FeatureItem("documents", "Documenti", "Carte importanti", AppDestination.DocumentsHome.route, Icons.Filled.Description, Color(0xFFEBF3FF), Color(0xFF2E86FF), state.badgeDocuments, CounterField.DOCUMENTS),
+    FeatureItem("documents", "Documenti", "Carte importanti", AppDestination.DocumentsHome.createRoute(familyId), Icons.Filled.Description, Color(0xFFEBF3FF), Color(0xFF2E86FF), state.badgeDocuments, CounterField.DOCUMENTS),
     FeatureItem("location", "Posizione", "Dove sono tutti", AppDestination.FamilyLocation.createRoute(familyId), Icons.Filled.Place, Color(0xFFE6FAF8), Color(0xFF00BFA5), state.badgeLocation, CounterField.LOCATION),
     FeatureItem("photos", "Foto e Video", "Ricordi famiglia", AppDestination.FamilyPhotos.createRoute(familyId), Icons.Filled.PhotoLibrary, Color(0xFFFFF0F5), Color(0xFFE91E8C)),
     FeatureItem("ai", "Assistente AI", "Chiedi aiuto", AppDestination.AskExpert.route, Icons.Filled.Psychology, Color(0xFFEEF0FF), Color(0xFF5C6BC0)),
@@ -689,5 +689,5 @@ private fun quickActionRoute(action: HomeQuickAction, familyId: String): String 
     HomeQuickAction.SHOPPING_LIST -> AppDestination.ShoppingList.createRoute(familyId)
     HomeQuickAction.MESSAGE -> AppDestination.Chat.route
     HomeQuickAction.HEALTH -> AppDestination.PediatricChildSelector.createRoute(familyId)
-    HomeQuickAction.DOCUMENTS -> AppDestination.DocumentsHome.route
+    HomeQuickAction.DOCUMENTS -> AppDestination.DocumentsHome.createRoute(familyId)
 }

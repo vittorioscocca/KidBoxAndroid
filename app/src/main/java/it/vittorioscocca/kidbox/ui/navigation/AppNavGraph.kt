@@ -18,6 +18,7 @@ import it.vittorioscocca.kidbox.ui.screens.home.HomeScreen
 import it.vittorioscocca.kidbox.ui.screens.home.ProfileScreen
 import it.vittorioscocca.kidbox.ui.screens.onboarding.OnboardingScreen
 import it.vittorioscocca.kidbox.ui.screens.onboarding.WikiOnboardingScreen
+import it.vittorioscocca.kidbox.ui.screens.documents.DocumentBrowserScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.family.EditChildScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.family.EditFamilyScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.family.FamilySettingsScreen
@@ -238,7 +239,17 @@ fun AppNavGraph(
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
         ) { PlaceholderScreen("Spese") }
 
-        composable(AppDestination.DocumentsHome.route) { PlaceholderScreen("Documenti") }
+        composable(
+            route = AppDestination.DocumentsHome.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            DocumentBrowserScreen(
+                familyId = familyId,
+                onBack = { navController.popBackStack() },
+                onNavigate = { route -> navController.navigate(route) },
+            )
+        }
 
         composable(
             route = AppDestination.FamilyLocation.route,

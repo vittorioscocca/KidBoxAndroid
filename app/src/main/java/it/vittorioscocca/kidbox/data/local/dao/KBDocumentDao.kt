@@ -1,7 +1,6 @@
 package it.vittorioscocca.kidbox.data.local.dao
 
 import androidx.room.Dao
-import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -19,6 +18,15 @@ interface KBDocumentDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBDocumentEntity)
 
-    @Delete
-    suspend fun delete(entity: KBDocumentEntity)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(entities: List<KBDocumentEntity>)
+
+    @Query("SELECT * FROM kb_documents WHERE familyId = :familyId AND syncStateRaw = :syncStateRaw")
+    suspend fun getBySyncState(
+        familyId: String,
+        syncStateRaw: Int,
+    ): List<KBDocumentEntity>
+
+    @Query("DELETE FROM kb_documents WHERE id = :id")
+    suspend fun deleteById(id: String)
 }
