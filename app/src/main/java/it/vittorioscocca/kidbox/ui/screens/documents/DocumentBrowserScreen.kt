@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -125,6 +126,8 @@ fun DocumentBrowserScreen(
     familyId: String,
     onBack: () -> Unit,
     onNavigate: (String) -> Unit = {},
+    initialHighlightDocumentId: String? = null,
+    initialFolderId: String = "root",
     viewModel: DocumentsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -147,7 +150,15 @@ fun DocumentBrowserScreen(
     var singleCopyTarget by remember { mutableStateOf<ContextMenuTarget?>(null) }
     var uploadTargetFolderId by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(familyId) { viewModel.bindFamily(familyId) }
+    LaunchedEffect(familyId, initialHighlightDocumentId, initialFolderId) {
+        viewModel.bindFamily(familyId)
+        if (!initialHighlightDocumentId.isNullOrBlank()) {
+            viewModel.focusDocument(initialHighlightDocumentId)
+        }
+        if (initialFolderId.isBlank()) {
+            // Keep a safe non-null navigation default for folder route param.
+        }
+    }
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let { msg ->
             Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
@@ -334,11 +345,13 @@ fun DocumentBrowserScreen(
                         DocumentGridItem(
                             document = doc,
                             isSelected = doc.id in state.selectedDocumentIds,
+                            isHighlighted = doc.id == state.highlightedDocumentId,
                             selecting = state.isSelecting,
                             onClick = {
                                 if (state.isSelecting) {
                                     viewModel.toggleDocumentSelection(doc.id)
                                 } else {
+                                    viewModel.clearHighlightedDocument()
                                     Log.i(
                                         TAG_DOC_OPEN,
                                         "tap document id=${doc.id} mime=${doc.mimeType} hasLocal=${!doc.localPath.isNullOrBlank()} hasRemote=${!doc.storagePath.isBlank()}",
@@ -361,6 +374,7 @@ fun DocumentBrowserScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 20.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(sortedFolders, key = { "folder_${it.id}" }) { folder ->
@@ -380,10 +394,12 @@ fun DocumentBrowserScreen(
                             document = doc,
                             selecting = state.isSelecting,
                             isSelected = doc.id in state.selectedDocumentIds,
+                            isHighlighted = doc.id == state.highlightedDocumentId,
                             onClick = {
                                 if (state.isSelecting) {
                                     viewModel.toggleDocumentSelection(doc.id)
                                 } else {
+                                    viewModel.clearHighlightedDocument()
                                     Log.i(
                                         TAG_DOC_OPEN,
                                         "tap document id=${doc.id} mime=${doc.mimeType} hasLocal=${!doc.localPath.isNullOrBlank()} hasRemote=${!doc.storagePath.isBlank()}",
@@ -783,6 +799,7 @@ private fun SheetAction(
             Text(
                 text = title,
                 fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.kidBoxColors.title,
             )
         }
     }
@@ -826,7 +843,13 @@ private fun FolderGridItem(
                 Icon(Icons.Default.Folder, contentDescription = null, tint = Color(0xFFFF941A), modifier = Modifier.size(54.dp))
             }
             Spacer(Modifier.height(10.dp))
-            Text(folder.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                folder.title,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.kidBoxColors.title,
+            )
             Text(formatRelativeTime(folder.updatedAtEpochMillis), color = Color(0xFF8B8B8B), fontSize = 12.sp)
         }
     }
@@ -836,10 +859,16 @@ private fun FolderGridItem(
 private fun DocumentGridItem(
     document: KBDocumentEntity,
     isSelected: Boolean,
+    isHighlighted: Boolean,
     selecting: Boolean,
     onClick: () -> Unit,
     onLongPress: () -> Unit,
 ) {
+    val itemBackground = when {
+        isSelected -> Color(0xFFEAF4FF)
+        isHighlighted -> Color(0xFFFFF6D9)
+        else -> Color.Transparent
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -849,7 +878,7 @@ private fun DocumentGridItem(
                     onLongPress = { onLongPress() },
                 )
             }
-            .background(if (isSelected) Color(0xFFEAF4FF) else Color.Transparent, RoundedCornerShape(10.dp))
+            .background(itemBackground, RoundedCornerShape(10.dp))
             .padding(6.dp),
     ) {
         Column(
@@ -880,7 +909,13 @@ private fun DocumentGridItem(
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Text(document.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                document.title,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.kidBoxColors.title,
+            )
             Text(document.fileName, color = Color(0xFF8B8B8B), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(formatRelativeTime(document.updatedAtEpochMillis), color = Color(0xFF8B8B8B), fontSize = 12.sp)
         }
@@ -918,7 +953,7 @@ private fun FolderListItem(
         }
         Icon(Icons.Default.Folder, contentDescription = null, tint = Color(0xFFFF941A), modifier = Modifier.size(32.dp))
         Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
-            Text(folder.title, fontWeight = FontWeight.SemiBold)
+            Text(folder.title, fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.title)
             Text(formatRelativeTime(folder.updatedAtEpochMillis), color = Color(0xFF8B8B8B), fontSize = 12.sp)
         }
     }
@@ -929,9 +964,15 @@ private fun DocumentListItem(
     document: KBDocumentEntity,
     selecting: Boolean,
     isSelected: Boolean,
+    isHighlighted: Boolean,
     onClick: () -> Unit,
     onLongPress: () -> Unit,
 ) {
+    val itemBackground = when {
+        isSelected -> Color(0xFFEAF4FF)
+        isHighlighted -> Color(0xFFFFF6D9)
+        else -> Color.Transparent
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -941,7 +982,7 @@ private fun DocumentListItem(
                     onLongPress = { onLongPress() },
                 )
             }
-            .background(if (isSelected) Color(0xFFEAF4FF) else Color.Transparent, RoundedCornerShape(8.dp))
+            .background(itemBackground, RoundedCornerShape(8.dp))
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -965,7 +1006,13 @@ private fun DocumentListItem(
             Icon(iconForMime(document.mimeType), contentDescription = null, tint = Color(0xFF5F6B7A), modifier = Modifier.size(30.dp))
         }
         Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
-            Text(document.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                document.title,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.kidBoxColors.title,
+            )
             Text(
                 "${document.fileName} • ${formatRelativeTime(document.updatedAtEpochMillis)}",
                 fontSize = 12.sp,

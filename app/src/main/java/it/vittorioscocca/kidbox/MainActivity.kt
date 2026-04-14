@@ -132,6 +132,30 @@ class MainActivity : ComponentActivity() {
                                 }
                                 pendingPushDeepLink = null
                             }
+
+                            "expense", "expenses", "new_expense", "expense_created" -> {
+                                if (deepLink.familyId.isNotBlank()) {
+                                    navController.navigate(
+                                        AppDestination.ExpensesHome.createRoute(
+                                            familyId = deepLink.familyId,
+                                            highlightExpenseId = deepLink.expenseId ?: deepLink.itemId,
+                                        ),
+                                    )
+                                }
+                                pendingPushDeepLink = null
+                            }
+
+                            "document", "documents", "new_document", "document_shared", "shared_document" -> {
+                                if (deepLink.familyId.isNotBlank()) {
+                                    navController.navigate(
+                                        AppDestination.DocumentsHome.createRoute(
+                                            familyId = deepLink.familyId,
+                                            highlightDocumentId = deepLink.docId ?: deepLink.itemId,
+                                        ),
+                                    )
+                                }
+                                pendingPushDeepLink = null
+                            }
                         }
                     }
                 }
@@ -152,26 +176,30 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun parsePushDeepLink(intent: Intent?): PushDeepLink? {
-        val src = intent?.extras ?: return null
-        val deepLink = src.getString("deep_link")
-            ?: src.getString("push_deep_link")
-            ?: src.getString("route")
-        val type = src.getString("push_type")
-            ?: src.getString("type")
+        val src = intent?.extras
+        val deepLink = src.safeGetString("deep_link")
+            ?: src.safeGetString("push_deep_link")
+            ?: src.safeGetString("route")
+        val type = src.safeGetString("push_type")
+            ?: src.safeGetString("type")
             ?: deepLink
             ?: return null
-        val familyId = src.getString("push_family_id") ?: src.getString("familyId") ?: ""
-        val itemId = src.getString("push_item_id") ?: src.getString("itemId")
-        val childId = src.getString("push_child_id") ?: src.getString("childId")
-        val listId = src.getString("push_list_id") ?: src.getString("listId")
-        val todoId = src.getString("push_todo_id") ?: src.getString("todoId")
+        val familyId = src.safeGetString("push_family_id") ?: src.safeGetString("familyId") ?: ""
+        val itemId = src.safeGetString("push_item_id") ?: src.safeGetString("itemId")
+        val docId = src.safeGetString("push_doc_id") ?: src.safeGetString("docId")
+        val expenseId = src.safeGetString("push_expense_id") ?: src.safeGetString("expenseId")
+        val childId = src.safeGetString("push_child_id") ?: src.safeGetString("childId")
+        val listId = src.safeGetString("push_list_id") ?: src.safeGetString("listId")
+        val todoId = src.safeGetString("push_todo_id") ?: src.safeGetString("todoId")
         return PushDeepLink(
             type = type,
             familyId = familyId,
-            itemId = itemId,
+            itemId = itemId ?: expenseId ?: docId,
             childId = childId,
             listId = listId,
             todoId = todoId,
+            expenseId = expenseId,
+            docId = docId,
         )
     }
 }
@@ -183,4 +211,8 @@ private data class PushDeepLink(
     val childId: String?,
     val listId: String?,
     val todoId: String?,
+    val expenseId: String?,
+    val docId: String?,
 )
+
+private fun Bundle?.safeGetString(key: String): String? = this?.getString(key)

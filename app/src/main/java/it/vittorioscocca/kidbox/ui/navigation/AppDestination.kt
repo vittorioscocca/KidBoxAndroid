@@ -53,11 +53,25 @@ sealed class AppDestination(val route: String) {
         fun createRoute(familyId: String): String = "pediatric_child_selector/$familyId"
     }
     data object Chat : AppDestination("chat")
-    data object ExpensesHome : AppDestination("expenses_home/{familyId}") {
-        fun createRoute(familyId: String): String = "expenses_home/$familyId"
+    data object ExpensesHome : AppDestination("expenses_home/{familyId}?highlightExpenseId={highlightExpenseId}") {
+        fun createRoute(
+            familyId: String,
+            highlightExpenseId: String? = null,
+        ): String {
+            val base = "expenses_home/$familyId"
+            return if (highlightExpenseId.isNullOrBlank()) base else "$base?highlightExpenseId=$highlightExpenseId"
+        }
     }
-    data object DocumentsHome : AppDestination("documents_home/{familyId}") {
-        fun createRoute(familyId: String): String = "documents_home/$familyId"
+    data object DocumentsHome : AppDestination("documents_home/{familyId}?highlightDocumentId={highlightDocumentId}&folderId={folderId}") {
+        fun createRoute(
+            familyId: String,
+            highlightDocumentId: String? = null,
+            folderId: String = "root",
+        ): String {
+            val base = "documents_home/$familyId"
+            val highlightPart = if (highlightDocumentId.isNullOrBlank()) "" else "highlightDocumentId=$highlightDocumentId&"
+            return "$base?${highlightPart}folderId=${folderId.ifBlank { "root" }}"
+        }
     }
     data object FamilyLocation : AppDestination("family_location/{familyId}") {
         fun createRoute(familyId: String): String = "family_location/$familyId"

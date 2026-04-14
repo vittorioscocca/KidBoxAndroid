@@ -27,6 +27,24 @@ interface KBDocumentCategoryDao {
         syncStateRaw: Int,
     ): List<KBDocumentCategoryEntity>
 
+    @Query("SELECT * FROM kb_document_categories WHERE familyId = :familyId")
+    suspend fun getAllByFamilyId(familyId: String): List<KBDocumentCategoryEntity>
+
+    @Query(
+        """
+        SELECT c.* FROM kb_document_categories c
+        LEFT JOIN kb_document_categories p
+            ON c.parentId = p.id
+            AND p.familyId = :familyId
+            AND p.isDeleted = 0
+        WHERE c.familyId = :familyId
+          AND c.isDeleted = 0
+          AND c.id LIKE 'exp-cat-%'
+          AND (c.parentId IS NULL OR p.id IS NULL)
+        """,
+    )
+    suspend fun getOrphanedExpenseCategories(familyId: String): List<KBDocumentCategoryEntity>
+
     @Query("DELETE FROM kb_document_categories WHERE id = :id")
     suspend fun deleteById(id: String)
 }

@@ -127,7 +127,11 @@ fun FamilySettingsScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Filled.Warning, null, tint = Color(0xFFFF6B00))
                             Spacer(modifier = Modifier.size(8.dp))
-                            Text("Nessuna famiglia configurata", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Nessuna famiglia configurata",
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.kidBoxColors.title,
+                            )
                         }
                         SimpleActionCard("Crea una famiglia", "Configura la tua famiglia", onClick = onEditFamily)
                         SimpleActionCard("Entra con codice", "Usa un invito", onClick = onJoin)
@@ -145,7 +149,11 @@ fun FamilySettingsScreen(
                     Icon(Icons.Filled.Groups, null, tint = Color(0xFF2E86FF))
                     Spacer(modifier = Modifier.size(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(state.family?.name.orEmpty(), fontWeight = FontWeight.Bold)
+                        Text(
+                            state.family?.name.orEmpty(),
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.kidBoxColors.title,
+                        )
                         val childrenText = if (state.children.isEmpty()) {
                             "Nessun figlio configurato."
                         } else if (state.children.size == 1) {
@@ -169,7 +177,7 @@ fun FamilySettingsScreen(
                     Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Groups, null, tint = MaterialTheme.kidBoxColors.subtitle)
                         Spacer(modifier = Modifier.size(8.dp))
-                        Text("Membri", fontWeight = FontWeight.SemiBold)
+                        Text("Membri", fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.title)
                         Spacer(modifier = Modifier.size(8.dp))
                         Text(
                             if (showMembersLoading) {
@@ -217,7 +225,7 @@ fun FamilySettingsScreen(
                             )
                             Spacer(modifier = Modifier.size(8.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(memberLabel)
+                                Text(memberLabel, color = MaterialTheme.kidBoxColors.title)
                                 Text(
                                     if (member.role.equals("owner", true)) "Owner" else "Membro",
                                     fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle,

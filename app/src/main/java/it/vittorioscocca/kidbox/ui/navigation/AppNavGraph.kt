@@ -28,6 +28,7 @@ import it.vittorioscocca.kidbox.ui.screens.settings.NotificationSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.SettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.ThemeScreen
 import it.vittorioscocca.kidbox.ui.screens.calendar.CalendarScreen
+import it.vittorioscocca.kidbox.ui.screens.expenses.ExpensesHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoListScreen
 
@@ -236,18 +237,51 @@ fun AppNavGraph(
 
         composable(
             route = AppDestination.ExpensesHome.route,
-            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
-        ) { PlaceholderScreen("Spese") }
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("highlightExpenseId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val highlightExpenseId = backStackEntry.arguments?.getString("highlightExpenseId")
+            ExpensesHomeScreen(
+                familyId = familyId,
+                highlightExpenseId = highlightExpenseId,
+                onBack = { navController.popBackStack() },
+                onNavigate = { route -> navController.navigate(route) },
+            )
+        }
 
         composable(
             route = AppDestination.DocumentsHome.route,
-            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("highlightDocumentId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("folderId") {
+                    type = NavType.StringType
+                    nullable = false
+                    defaultValue = "root"
+                },
+            ),
         ) { backStackEntry ->
-            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val args = backStackEntry.arguments
+            val familyId = args?.getString("familyId").orEmpty()
+            val highlightDocumentId = args?.getString("highlightDocumentId")
+            val initialFolderId = args?.getString("folderId") ?: "root"
             DocumentBrowserScreen(
                 familyId = familyId,
                 onBack = { navController.popBackStack() },
                 onNavigate = { route -> navController.navigate(route) },
+                initialHighlightDocumentId = highlightDocumentId,
+                initialFolderId = initialFolderId,
             )
         }
 

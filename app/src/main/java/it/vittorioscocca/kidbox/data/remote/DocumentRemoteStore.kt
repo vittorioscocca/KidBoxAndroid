@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.data.remote
 
+import android.util.Log
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentChange
@@ -15,6 +16,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
+private const val TAG_DOC_SYNC = "KB_Doc_Sync"
 
 data class RemoteDocumentDto(
     val id: String,
@@ -47,10 +49,22 @@ data class RemoteDocumentCategoryDto(
 )
 
 sealed interface DocumentRemoteChange {
-    data class UpsertDocument(val dto: RemoteDocumentDto) : DocumentRemoteChange
-    data class RemoveDocument(val id: String) : DocumentRemoteChange
-    data class UpsertCategory(val dto: RemoteDocumentCategoryDto) : DocumentRemoteChange
-    data class RemoveCategory(val id: String) : DocumentRemoteChange
+    data class UpsertDocument(
+        val dto: RemoteDocumentDto,
+        val isFromCache: Boolean,
+    ) : DocumentRemoteChange
+    data class RemoveDocument(
+        val id: String,
+        val isFromCache: Boolean,
+    ) : DocumentRemoteChange
+    data class UpsertCategory(
+        val dto: RemoteDocumentCategoryDto,
+        val isFromCache: Boolean,
+    ) : DocumentRemoteChange
+    data class RemoveCategory(
+        val id: String,
+        val isFromCache: Boolean,
+    ) : DocumentRemoteChange
 }
 
 @Singleton
@@ -62,7 +76,7 @@ class DocumentRemoteStore @Inject constructor(
 
     fun listenDocuments(
         familyId: String,
-        onChange: (List<DocumentRemoteChange>) -> Unit,
+        onChange: (DocumentRemoteChange) -> Unit,
         onError: (Exception) -> Unit,
     ): ListenerRegistration = db.collection("families")
         .document(familyId)
@@ -74,7 +88,10 @@ class DocumentRemoteStore @Inject constructor(
                     onError(err)
                     return@EventListener
                 }
-                val changes = snap?.documentChanges?.mapNotNull { diff ->
+                val isFromCache = snap?.metadata?.isFromCache == true
+                var upsertCount = 0
+                var removedCount = 0
+                snap?.documentChanges?.forEach { diff ->
                     val doc = diff.document
                     val d = doc.data
                     val resolvedCategoryId = (d["categoryId"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
@@ -84,6 +101,13 @@ class DocumentRemoteStore @Inject constructor(
                         DocumentChange.Type.ADDED,
                         DocumentChange.Type.MODIFIED,
                         -> {
+                            if (isFromCache && doc.id.startsWith("exp-") && resolvedCategoryId.isNullOrBlank()) {
+                                Log.d(
+                                    TAG_DOC_SYNC,
+                                    "cache-guard skip document id=${doc.id} reason=fromCache_null_category",
+                                )
+                                return@forEach
+                            }
                             val dto = RemoteDocumentDto(
                                 id = doc.id,
                                 familyId = familyId,
@@ -101,19 +125,32 @@ class DocumentRemoteStore @Inject constructor(
                                 updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
                                 updatedBy = (d["updatedBy"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
                             )
-                            DocumentRemoteChange.UpsertDocument(dto)
+                            onChange(DocumentRemoteChange.UpsertDocument(dto, isFromCache = isFromCache))
+                            upsertCount += 1
                         }
 
-                        DocumentChange.Type.REMOVED -> DocumentRemoteChange.RemoveDocument(doc.id)
+                        DocumentChange.Type.REMOVED -> {
+                            if (isFromCache) {
+                                Log.d(TAG_DOC_SYNC, "cache-guard skip document removed id=${doc.id}")
+                                return@forEach
+                            }
+                            onChange(DocumentRemoteChange.RemoveDocument(doc.id, isFromCache = false))
+                            removedCount += 1
+                        }
                     }
-                }.orEmpty()
-                if (changes.isNotEmpty()) onChange(changes)
+                }
+                if (upsertCount + removedCount > 0) {
+                    Log.d(
+                        TAG_DOC_SYNC,
+                        "Snapshot processed. Changes: $upsertCount added/modified, $removedCount removed. collection=documents isFromCache=$isFromCache",
+                    )
+                }
             },
         )
 
     fun listenCategories(
         familyId: String,
-        onChange: (List<DocumentRemoteChange>) -> Unit,
+        onChange: (DocumentRemoteChange) -> Unit,
         onError: (Exception) -> Unit,
     ): ListenerRegistration = db.collection("families")
         .document(familyId)
@@ -125,36 +162,81 @@ class DocumentRemoteStore @Inject constructor(
                     onError(err)
                     return@EventListener
                 }
-                val changes = snap?.documentChanges?.mapNotNull { diff ->
+                val isFromCache = snap?.metadata?.isFromCache == true
+                var upsertCount = 0
+                var removedCount = 0
+                snap?.documentChanges?.forEach { diff ->
                     val doc = diff.document
                     val d = doc.data
                     when (diff.type) {
                         DocumentChange.Type.ADDED,
                         DocumentChange.Type.MODIFIED,
                         -> {
+                            val resolvedParentId = (d["parentId"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
+                            if (
+                                isFromCache &&
+                                doc.id.startsWith("exp-") &&
+                                !doc.id.startsWith("exp-root-") &&
+                                resolvedParentId.isNullOrBlank()
+                            ) {
+                                Log.d(
+                                    TAG_DOC_SYNC,
+                                    "cache-guard skip category id=${doc.id} reason=fromCache_null_parent",
+                                )
+                                return@forEach
+                            }
                             val dto = RemoteDocumentCategoryDto(
                                 id = doc.id,
                                 familyId = familyId,
                                 title = (d["title"] as? String)?.trim().orEmpty(),
                                 sortOrder = (d["sortOrder"] as? Number)?.toInt() ?: 0,
-                                parentId = (d["parentId"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                                parentId = resolvedParentId,
                                 isDeleted = d["isDeleted"] as? Boolean ?: false,
                                 createdAtEpochMillis = (d["createdAt"] as? Timestamp)?.toDate()?.time,
                                 updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
                                 updatedBy = (d["updatedBy"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
                             )
-                            DocumentRemoteChange.UpsertCategory(dto)
+                            onChange(DocumentRemoteChange.UpsertCategory(dto, isFromCache = isFromCache))
+                            upsertCount += 1
                         }
 
-                        DocumentChange.Type.REMOVED -> DocumentRemoteChange.RemoveCategory(doc.id)
+                        DocumentChange.Type.REMOVED -> {
+                            if (isFromCache) {
+                                Log.d(TAG_DOC_SYNC, "cache-guard skip category removed id=${doc.id}")
+                                return@forEach
+                            }
+                            onChange(DocumentRemoteChange.RemoveCategory(doc.id, isFromCache = false))
+                            removedCount += 1
+                        }
                     }
-                }.orEmpty()
-                if (changes.isNotEmpty()) onChange(changes)
+                }
+                if (upsertCount + removedCount > 0) {
+                    Log.d(
+                        TAG_DOC_SYNC,
+                        "Snapshot processed. Changes: $upsertCount added/modified, $removedCount removed. collection=documentCategories isFromCache=$isFromCache",
+                    )
+                }
             },
         )
 
     suspend fun upsertDocument(entity: KBDocumentEntity) {
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
+        val inferredExpenseCategoryId = entity.notes
+            ?.takeIf { it.startsWith("expense:") }
+            ?.substringAfter("expense:")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { expenseId -> "exp-cat-$expenseId" }
+        val normalizedCategoryId = entity.categoryId
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: inferredExpenseCategoryId
+        if (entity.categoryId.isNullOrBlank() && !inferredExpenseCategoryId.isNullOrBlank()) {
+            Log.d(
+                TAG_DOC_SYNC,
+                "outbound document guard id=${entity.id} forcingCategory=$inferredExpenseCategoryId fromNotes=${entity.notes}",
+            )
+        }
         db.collection("families")
             .document(entity.familyId)
             .collection("documents")
@@ -169,10 +251,10 @@ class DocumentRemoteStore @Inject constructor(
                     "downloadURL" to entity.downloadURL,
                     "notes" to entity.notes,
                     "childId" to entity.childId,
-                    "categoryId" to entity.categoryId,
+                    "categoryId" to normalizedCategoryId,
                     // compatibilità cross-client: alcuni path storici leggono parentId/folderId
-                    "parentId" to entity.categoryId,
-                    "folderId" to entity.categoryId,
+                    "parentId" to normalizedCategoryId,
+                    "folderId" to normalizedCategoryId,
                     "isDeleted" to entity.isDeleted,
                     "updatedBy" to uid,
                     "updatedAt" to FieldValue.serverTimestamp(),
@@ -185,6 +267,16 @@ class DocumentRemoteStore @Inject constructor(
 
     suspend fun upsertCategory(entity: KBDocumentCategoryEntity) {
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
+        val enforcedParentId = when {
+            entity.id.startsWith("exp-cat-") && entity.parentId.isNullOrBlank() -> "exp-root-${entity.familyId}"
+            else -> entity.parentId
+        }
+        if (enforcedParentId != entity.parentId) {
+            Log.d(
+                TAG_DOC_SYNC,
+                "outbound category guard id=${entity.id} forcingParent=$enforcedParentId originalParent=${entity.parentId}",
+            )
+        }
         db.collection("families")
             .document(entity.familyId)
             .collection("documentCategories")
@@ -193,7 +285,7 @@ class DocumentRemoteStore @Inject constructor(
                 mapOf(
                     "title" to entity.title,
                     "sortOrder" to entity.sortOrder,
-                    "parentId" to entity.parentId,
+                    "parentId" to enforcedParentId,
                     "isDeleted" to entity.isDeleted,
                     "updatedBy" to uid,
                     "updatedAt" to FieldValue.serverTimestamp(),

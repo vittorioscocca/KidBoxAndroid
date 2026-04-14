@@ -44,6 +44,7 @@ data class DocumentsUiState(
     val selectedDocumentIds: Set<String> = emptySet(),
     val folders: List<KBDocumentCategoryEntity> = emptyList(),
     val documents: List<KBDocumentEntity> = emptyList(),
+    val highlightedDocumentId: String? = null,
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
 )
@@ -74,8 +75,15 @@ class DocumentsViewModel @Inject constructor(
             },
         )
         clearBadge(familyId)
-        observeCurrentFolder()
-        viewModelScope.launch { runCatching { repository.flushPending(familyId) } }
+        viewModelScope.launch {
+            runCatching {
+                repository.healHierarchy(familyId)
+                repository.flushPending(familyId)
+            }.onFailure {
+                _uiState.value = _uiState.value.copy(errorMessage = it.localizedMessage ?: "Errore consolidamento gerarchia")
+            }
+            observeCurrentFolder()
+        }
     }
 
     fun setMode(mode: DocumentsViewMode) {
@@ -268,6 +276,7 @@ class DocumentsViewModel @Inject constructor(
     fun navigateToFolder(folder: KBDocumentCategoryEntity) {
         _uiState.value = _uiState.value.copy(
             breadcrumbs = _uiState.value.breadcrumbs + FolderCrumb(id = folder.id, title = folder.title),
+            highlightedDocumentId = null,
             isSelecting = false,
             selectedFolderIds = emptySet(),
             selectedDocumentIds = emptySet(),
@@ -280,12 +289,52 @@ class DocumentsViewModel @Inject constructor(
         if (crumbs.size <= 1) return false
         _uiState.value = _uiState.value.copy(
             breadcrumbs = crumbs.dropLast(1),
+            highlightedDocumentId = null,
             isSelecting = false,
             selectedFolderIds = emptySet(),
             selectedDocumentIds = emptySet(),
         )
         observeCurrentFolder()
         return true
+    }
+
+    fun focusDocument(documentId: String) {
+        val familyId = _uiState.value.familyId
+        if (familyId.isBlank() || documentId.isBlank()) return
+        viewModelScope.launch {
+            runCatching {
+                val document = repository.getDocumentById(documentId) ?: return@runCatching
+                if (document.familyId != familyId || document.isDeleted) return@runCatching
+                val pathFolders = mutableListOf<KBDocumentCategoryEntity>()
+                var currentFolderId = document.categoryId
+                while (!currentFolderId.isNullOrBlank()) {
+                    val folder = repository.getFolderById(currentFolderId) ?: break
+                    pathFolders.add(folder)
+                    currentFolderId = folder.parentId
+                }
+                val breadcrumbs = buildList {
+                    add(FolderCrumb(id = null, title = "Documenti"))
+                    pathFolders.asReversed().forEach { folder ->
+                        add(FolderCrumb(id = folder.id, title = folder.title))
+                    }
+                }
+                _uiState.value = _uiState.value.copy(
+                    breadcrumbs = breadcrumbs,
+                    highlightedDocumentId = document.id,
+                    isSelecting = false,
+                    selectedFolderIds = emptySet(),
+                    selectedDocumentIds = emptySet(),
+                )
+                observeCurrentFolder()
+            }.onFailure {
+                _uiState.value = _uiState.value.copy(errorMessage = it.localizedMessage ?: "Errore apertura documento condiviso")
+            }
+        }
+    }
+
+    fun clearHighlightedDocument() {
+        if (_uiState.value.highlightedDocumentId == null) return
+        _uiState.value = _uiState.value.copy(highlightedDocumentId = null)
     }
 
     fun createFolder(name: String) {

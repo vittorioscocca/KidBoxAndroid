@@ -67,7 +67,9 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
             putExtra("push_child_id", data["childId"])
             putExtra("push_list_id", data["listId"])
             putExtra("push_todo_id", data["todoId"])
-            putExtra("push_item_id", data["itemId"])
+            putExtra("push_item_id", data["itemId"] ?: data["docId"] ?: data["expenseId"])
+            putExtra("push_doc_id", data["docId"])
+            putExtra("push_expense_id", data["expenseId"])
             putExtra("push_deep_link", data["deep_link"] ?: data["route"])
         }
         val pendingIntent = PendingIntent.getActivity(
