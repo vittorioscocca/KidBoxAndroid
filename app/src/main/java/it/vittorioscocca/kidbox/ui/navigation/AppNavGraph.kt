@@ -26,6 +26,7 @@ import it.vittorioscocca.kidbox.ui.screens.settings.JoinFamilyScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.NotificationSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.SettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.ThemeScreen
+import it.vittorioscocca.kidbox.ui.screens.calendar.CalendarScreen
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoListScreen
 
@@ -217,7 +218,13 @@ fun AppNavGraph(
         composable(
             route = AppDestination.Calendar.route,
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
-        ) { PlaceholderScreen("Calendario") }
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            CalendarScreen(
+                familyId = familyId,
+                onBack = { navController.popBackStack() },
+            )
+        }
 
         composable(
             route = AppDestination.PediatricChildSelector.route,

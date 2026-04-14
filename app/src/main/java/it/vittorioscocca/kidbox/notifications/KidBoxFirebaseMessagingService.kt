@@ -44,7 +44,10 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         super.onMessageReceived(remoteMessage)
-        val type = remoteMessage.data["type"].orEmpty()
+        val type = remoteMessage.data["type"]
+            ?: remoteMessage.data["deep_link"]
+            ?: remoteMessage.data["route"]
+            ?: ""
         val title = remoteMessage.notification?.title ?: "KidBox"
         val body = remoteMessage.notification?.body ?: "Nuova notifica"
         showNotification(title, body, remoteMessage.data, type)
@@ -65,6 +68,7 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
             putExtra("push_list_id", data["listId"])
             putExtra("push_todo_id", data["todoId"])
             putExtra("push_item_id", data["itemId"])
+            putExtra("push_deep_link", data["deep_link"] ?: data["route"])
         }
         val pendingIntent = PendingIntent.getActivity(
             this,

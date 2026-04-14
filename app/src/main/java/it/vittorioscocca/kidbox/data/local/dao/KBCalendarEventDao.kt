@@ -19,6 +19,25 @@ interface KBCalendarEventDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBCalendarEventEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(entities: List<KBCalendarEventEntity>)
+
+    @Query(
+        """
+        SELECT * FROM kb_calendar_events
+        WHERE familyId = :familyId
+          AND syncStateRaw = :syncStateRaw
+        ORDER BY updatedAtEpochMillis ASC
+        """
+    )
+    suspend fun getBySyncState(
+        familyId: String,
+        syncStateRaw: Int,
+    ): List<KBCalendarEventEntity>
+
+    @Query("DELETE FROM kb_calendar_events WHERE id = :id")
+    suspend fun deleteById(id: String)
+
     @Delete
     suspend fun delete(entity: KBCalendarEventEntity)
 }

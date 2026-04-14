@@ -8,6 +8,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
+import it.vittorioscocca.kidbox.data.local.dao.KBCalendarEventDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.dao.KBGroceryItemDao
@@ -52,4 +53,7 @@ object DatabaseModule {
 
     @Provides
     fun provideKBTodoItemDao(database: KidBoxDatabase): KBTodoItemDao = database.todoItemDao()
+
+    @Provides
+    fun provideKBCalendarEventDao(database: KidBoxDatabase): KBCalendarEventDao = database.calendarEventDao()
 }

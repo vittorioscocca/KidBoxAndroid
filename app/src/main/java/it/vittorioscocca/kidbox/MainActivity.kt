@@ -101,6 +101,13 @@ class MainActivity : ComponentActivity() {
                         if (showSplash) return@LaunchedEffect
                         val deepLink = pendingPushDeepLink ?: return@LaunchedEffect
                         when (deepLink.type) {
+                            "calendar", "open_calendar", "calendar_event" -> {
+                                if (deepLink.familyId.isNotBlank()) {
+                                    navController.navigate(AppDestination.Calendar.createRoute(deepLink.familyId))
+                                }
+                                pendingPushDeepLink = null
+                            }
+
                             "new_grocery_item" -> {
                                 if (deepLink.familyId.isNotBlank()) {
                                     navController.navigate(AppDestination.ShoppingList.createRoute(deepLink.familyId))
@@ -146,7 +153,13 @@ class MainActivity : ComponentActivity() {
 
     private fun parsePushDeepLink(intent: Intent?): PushDeepLink? {
         val src = intent?.extras ?: return null
-        val type = src.getString("push_type") ?: src.getString("type") ?: return null
+        val deepLink = src.getString("deep_link")
+            ?: src.getString("push_deep_link")
+            ?: src.getString("route")
+        val type = src.getString("push_type")
+            ?: src.getString("type")
+            ?: deepLink
+            ?: return null
         val familyId = src.getString("push_family_id") ?: src.getString("familyId") ?: ""
         val itemId = src.getString("push_item_id") ?: src.getString("itemId")
         val childId = src.getString("push_child_id") ?: src.getString("childId")
