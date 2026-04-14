@@ -748,6 +748,7 @@ private fun AddEditExpenseSheet(
                     fontSize = 24.sp,
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center,
+                    color = MaterialTheme.kidBoxColors.title,
                 )
                 CapsuleActionButton(
                     label = if (editing == null) "Aggiungi" else "Salva",
@@ -764,9 +765,9 @@ private fun AddEditExpenseSheet(
                 )
             }
             Spacer(Modifier.height(12.dp))
-            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Text("Importo", color = Color(0xFF9A9A9A))
+                    Text("Importo", color = MaterialTheme.kidBoxColors.subtitle)
                     OutlinedTextField(
                         value = amountText,
                         onValueChange = { amountText = it.filter { ch -> ch.isDigit() || ch == ',' || ch == '.' } },
@@ -778,7 +779,7 @@ private fun AddEditExpenseSheet(
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     OutlinedTextField(
                         value = title,
@@ -792,11 +793,11 @@ private fun AddEditExpenseSheet(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Data", fontWeight = FontWeight.SemiBold)
+                        Text("Data", fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.title)
                         Spacer(Modifier.weight(1f))
                         Surface(
                             shape = RoundedCornerShape(999.dp),
-                            color = Color(0xFFF1F1F1),
+                            color = MaterialTheme.kidBoxColors.rowBackground,
                             onClick = {
                                 val cal = Calendar.getInstance().apply { timeInMillis = dateEpochMillis }
                                 DatePickerDialog(
@@ -814,15 +815,16 @@ private fun AddEditExpenseSheet(
                             Text(
                                 text = date.format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ITALIAN)),
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                color = MaterialTheme.kidBoxColors.title,
                             )
                         }
                     }
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Text("Categoria", color = Color(0xFF7E7E7E), fontWeight = FontWeight.SemiBold)
+                    Text("Categoria", color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(10.dp))
                     Row(
                         modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -848,9 +850,9 @@ private fun AddEditExpenseSheet(
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Text("Note", color = Color(0xFF7E7E7E), fontWeight = FontWeight.SemiBold)
+                    Text("Note", color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
                     OutlinedTextField(
                         value = notes,
                         onValueChange = { notes = it },
@@ -860,7 +862,7 @@ private fun AddEditExpenseSheet(
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text("Ricevute e allegati", color = Color(0xFF1E88E5), fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(6.dp))
@@ -868,7 +870,7 @@ private fun AddEditExpenseSheet(
                         text = pendingAttachment?.fileName
                             ?: selectedKidBoxDocument?.fileName
                             ?: "Aggiungi foto, PDF o documenti alla spesa",
-                        color = Color(0xFF7E7E7E),
+                        color = MaterialTheme.kidBoxColors.subtitle,
                         fontSize = 12.sp,
                     )
                     Spacer(Modifier.height(10.dp))
@@ -958,6 +960,7 @@ private fun KidBoxDocumentPickerSheet(
                     fontSize = 20.sp,
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center,
+                    color = MaterialTheme.kidBoxColors.title,
                 )
                 Spacer(modifier = Modifier.width(68.dp))
             }
@@ -969,14 +972,14 @@ private fun KidBoxDocumentPickerSheet(
                         .horizontalScroll(rememberScrollState())
                         .padding(bottom = 8.dp),
                 ) {
-                    Text("Documenti", color = Color(0xFF7E7E7E), fontSize = 12.sp)
+                    Text("Documenti", color = MaterialTheme.kidBoxColors.subtitle, fontSize = 12.sp)
                     breadcrumbs.forEach { crumb ->
-                        Text(" / ${crumb.title}", color = Color(0xFF7E7E7E), fontSize = 12.sp)
+                        Text(" / ${crumb.title}", color = MaterialTheme.kidBoxColors.subtitle, fontSize = 12.sp)
                     }
                 }
             }
             if (visibleFolders.isEmpty() && visibleDocuments.isEmpty()) {
-                Text("Nessun elemento in questa cartella", color = Color(0xFF8E8E8E))
+                Text("Nessun elemento in questa cartella", color = MaterialTheme.kidBoxColors.subtitle)
             } else {
                 LazyColumn(
                     modifier = Modifier
@@ -988,7 +991,7 @@ private fun KidBoxDocumentPickerSheet(
                         Surface(
                             onClick = { currentFolderId = folder.id },
                             shape = RoundedCornerShape(12.dp),
-                            color = Color.White,
+                            color = MaterialTheme.kidBoxColors.card,
                         ) {
                             Row(
                                 modifier = Modifier
@@ -1003,6 +1006,7 @@ private fun KidBoxDocumentPickerSheet(
                                     modifier = Modifier.weight(1f).padding(start = 8.dp),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.kidBoxColors.title,
                                 )
                             }
                         }
@@ -1011,7 +1015,7 @@ private fun KidBoxDocumentPickerSheet(
                         Surface(
                             onClick = { onSelect(doc) },
                             shape = RoundedCornerShape(12.dp),
-                            color = Color.White,
+                            color = MaterialTheme.kidBoxColors.card,
                         ) {
                             Row(
                                 modifier = Modifier
@@ -1021,8 +1025,14 @@ private fun KidBoxDocumentPickerSheet(
                             ) {
                                 Icon(Icons.Default.AttachFile, contentDescription = null, tint = Color(0xFF1E88E5))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(doc.title.ifBlank { doc.fileName }, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(doc.fileName, color = Color(0xFF8E8E8E), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(
+                                        doc.title.ifBlank { doc.fileName },
+                                        color = MaterialTheme.kidBoxColors.title,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(doc.fileName, color = MaterialTheme.kidBoxColors.subtitle, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
                             }
                         }
@@ -1075,11 +1085,12 @@ private fun ExpenseDetailSheet(
                     fontSize = 24.sp,
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center,
+                    color = MaterialTheme.kidBoxColors.title,
                 )
                 HeaderCircleButton(icon = Icons.Default.Edit, onClick = onEdit)
             }
             Spacer(Modifier.height(12.dp))
-            Card(shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Card(shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1100,7 +1111,7 @@ private fun ExpenseDetailSheet(
                         )
                     }
                     Spacer(Modifier.height(12.dp))
-                    Text(formatEuro(expense.amount), fontWeight = FontWeight.ExtraBold, fontSize = 30.sp)
+                    Text(formatEuro(expense.amount), fontWeight = FontWeight.ExtraBold, fontSize = 30.sp, color = MaterialTheme.kidBoxColors.title)
                     Spacer(Modifier.height(8.dp))
                     Surface(
                         shape = RoundedCornerShape(999.dp),
@@ -1116,7 +1127,7 @@ private fun ExpenseDetailSheet(
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                     DetailRow(icon = Icons.Default.Description, label = "Descrizione", value = expense.title)
                     DividerLine()
@@ -1126,7 +1137,7 @@ private fun ExpenseDetailSheet(
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.AttachFile, contentDescription = null, tint = Color(0xFF1E88E5))
@@ -1139,7 +1150,7 @@ private fun ExpenseDetailSheet(
                                 if (!isOpeningAttachment) onOpenAttachment()
                             },
                             shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFFF3F3F8),
+                            color = MaterialTheme.kidBoxColors.rowBackground,
                         ) {
                             Row(
                                 modifier = Modifier
@@ -1187,14 +1198,14 @@ private fun ExpenseDetailSheet(
                             }
                         }
                     } else {
-                        Text("Nessun allegato", color = Color(0xFF8E8E8E), fontSize = 12.sp)
+                        Text("Nessun allegato", color = MaterialTheme.kidBoxColors.subtitle, fontSize = 12.sp)
                     }
                     Spacer(Modifier.height(6.dp))
-                    Text("Visibili anche in Documenti › Spese", color = Color(0xFFB3B3B3), fontSize = 11.sp)
+                    Text("Visibili anche in Documenti › Spese", color = MaterialTheme.kidBoxColors.subtitle, fontSize = 11.sp)
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                     DetailMetaRow(label = "Aggiunta il", value = formatDateTime(expense.createdAtEpochMillis))
                     DividerLine()
@@ -1247,8 +1258,8 @@ private fun DetailRow(
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, tint = Color(0xFF8E8E8E), modifier = Modifier.size(18.dp))
-        Text("  $label", color = Color(0xFF8E8E8E), modifier = Modifier.weight(1f))
+        Icon(icon, contentDescription = null, tint = MaterialTheme.kidBoxColors.subtitle, modifier = Modifier.size(18.dp))
+        Text("  $label", color = MaterialTheme.kidBoxColors.subtitle, modifier = Modifier.weight(1f))
         Text(value, color = MaterialTheme.kidBoxColors.title, fontWeight = FontWeight.SemiBold)
     }
 }
@@ -1264,7 +1275,7 @@ private fun DetailMetaRow(
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, color = Color(0xFF8E8E8E), modifier = Modifier.weight(1f))
+        Text(label, color = MaterialTheme.kidBoxColors.subtitle, modifier = Modifier.weight(1f))
         Text(value, color = MaterialTheme.kidBoxColors.title, fontWeight = FontWeight.SemiBold)
     }
 }
@@ -1275,7 +1286,7 @@ private fun DividerLine() {
         modifier = Modifier
             .fillMaxWidth()
             .height(1.dp)
-            .background(Color(0xFFEDEDED)),
+            .background(MaterialTheme.kidBoxColors.divider),
     )
 }
 
@@ -1385,7 +1396,7 @@ private fun CapsuleActionButton(
         onClick = onClick,
         enabled = enabled,
         shape = RoundedCornerShape(999.dp),
-        color = if (enabled) Color.White else Color(0xFFF0F0F0),
+        color = if (enabled) MaterialTheme.kidBoxColors.card else MaterialTheme.kidBoxColors.divider,
         modifier = modifier.height(42.dp),
     ) {
         Box(contentAlignment = Alignment.Center) {

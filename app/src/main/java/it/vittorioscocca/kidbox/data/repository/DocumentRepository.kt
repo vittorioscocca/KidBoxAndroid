@@ -56,7 +56,7 @@ class DocumentRepository @Inject constructor(
     private var docsListener: ListenerRegistration? = null
     private var categoriesListener: ListenerRegistration? = null
     private var listeningFamilyId: String? = null
-    private val lastRootOrphanSignatureByFamily = mutableMapOf<String, String>()
+    private val healedFamiliesInSession = mutableSetOf<String>()
     private val lastRootSystemHiddenSignatureByFamily = mutableMapOf<String, String>()
 
     fun observeBrowser(
@@ -68,18 +68,8 @@ class DocumentRepository @Inject constructor(
             combine(
                 categoriesFlow,
                 documentDao.observeRootVisibleByFamilyId(familyId),
-                documentDao.observeRootHiddenExpenseOrphansByFamilyId(familyId),
                 documentDao.observeRootHiddenSystemEncodedByFamilyId(familyId),
-            ) { categories, rootVisibleDocuments, hiddenExpenseOrphans, hiddenSystemEncoded ->
-                val hiddenIds = hiddenExpenseOrphans.map { it.id }.sorted()
-                val signature = hiddenIds.joinToString("|")
-                val previous = lastRootOrphanSignatureByFamily[familyId]
-                if (signature != previous) {
-                    lastRootOrphanSignatureByFamily[familyId] = signature
-                    hiddenIds.forEach { orphanId ->
-                        Log.d(TAG_DOC_SYNC, "Hiding orphaned expense file from Root view: $orphanId")
-                    }
-                }
+            ) { categories, rootVisibleDocuments, hiddenSystemEncoded ->
                 val hiddenSystemNames = hiddenSystemEncoded.map { it.fileName.ifBlank { it.title } }.sorted()
                 val hiddenSystemSignature = hiddenSystemNames.joinToString("|")
                 val previousSystem = lastRootSystemHiddenSignatureByFamily[familyId]
@@ -134,10 +124,17 @@ class DocumentRepository @Inject constructor(
 
     suspend fun getFolderById(folderId: String): KBDocumentCategoryEntity? = categoryDao.getById(folderId)
 
-    suspend fun healHierarchy(familyId: String): Int {
+    suspend fun healHierarchy(
+        familyId: String,
+        force: Boolean = false,
+    ): Int {
+        if (!force && healedFamiliesInSession.contains(familyId)) {
+            Log.d(TAG_DOC_SYNC, "healHierarchy skipped for familyId=$familyId (already healed this session)")
+            return 0
+        }
         val now = System.currentTimeMillis()
         val uid = auth.currentUser?.uid ?: "local"
-        return database.withTransaction {
+        val restored = database.withTransaction {
             var restoredCount = 0
             var restoredDocs = 0
             var restoredCats = 0
@@ -158,7 +155,7 @@ class DocumentRepository @Inject constructor(
                         updatedBy = uid,
                         isDeleted = false,
                         parentId = null,
-                        syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                        syncStateRaw = KBSyncState.SYNCED.rawValue,
                         lastSyncError = null,
                     )
                 }
@@ -170,7 +167,7 @@ class DocumentRepository @Inject constructor(
                         parentId = null,
                         updatedAtEpochMillis = now,
                         updatedBy = uid,
-                        syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                        syncStateRaw = KBSyncState.SYNCED.rawValue,
                         lastSyncError = null,
                     )
                 }
@@ -180,6 +177,7 @@ class DocumentRepository @Inject constructor(
 
             val orphanCats = categoryDao.getOrphanedExpenseCategories(familyId)
             orphanCats.forEach { category ->
+                if (KBSyncState.fromRaw(category.syncStateRaw) == KBSyncState.PENDING_UPSERT) return@forEach
                 restoredCount += 1
                 restoredCats += 1
                 categoryDao.upsert(
@@ -187,7 +185,7 @@ class DocumentRepository @Inject constructor(
                         parentId = rootId,
                         updatedAtEpochMillis = now,
                         updatedBy = uid,
-                        syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                        syncStateRaw = KBSyncState.SYNCED.rawValue,
                         lastSyncError = null,
                     ),
                 )
@@ -198,6 +196,7 @@ class DocumentRepository @Inject constructor(
             allCategoriesForRevive
                 .filter { it.id.startsWith("exp-cat-") }
                 .forEach { category ->
+                    if (KBSyncState.fromRaw(category.syncStateRaw) == KBSyncState.PENDING_UPSERT) return@forEach
                     val expenseId = parseExpenseIdFromCategoryId(category.id)
                     val linkedExpense = expenseId?.let { expenseDao.getById(it) }
                     if (linkedExpense != null && !linkedExpense.isDeleted && linkedExpense.familyId == familyId) {
@@ -212,7 +211,7 @@ class DocumentRepository @Inject constructor(
                                     isDeleted = false,
                                     updatedAtEpochMillis = now,
                                     updatedBy = uid,
-                                    syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                                    syncStateRaw = KBSyncState.SYNCED.rawValue,
                                     lastSyncError = null,
                                 ),
                             )
@@ -223,6 +222,7 @@ class DocumentRepository @Inject constructor(
             val orphanDocs = documentDao.getOrphanedExpenseDocuments(familyId)
             val allCategories = categoryDao.getAllByFamilyId(familyId).associateBy { it.id }
             orphanDocs.forEach { doc ->
+                if (KBSyncState.fromRaw(doc.syncStateRaw) == KBSyncState.PENDING_UPSERT) return@forEach
                 val categoryId = doc.categoryId
                 val existingCategoryDeleted = categoryId != null && allCategories[categoryId]?.isDeleted == true
                 val expenseIdFromNotes = parseExpenseIdFromNotes(doc.notes)
@@ -236,7 +236,7 @@ class DocumentRepository @Inject constructor(
                             isDeleted = false,
                             updatedAtEpochMillis = now,
                             updatedBy = uid,
-                            syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                            syncStateRaw = KBSyncState.SYNCED.rawValue,
                             lastSyncError = null,
                         ) ?: KBDocumentCategoryEntity(
                             id = targetExpenseFolderId,
@@ -248,7 +248,7 @@ class DocumentRepository @Inject constructor(
                             updatedBy = uid,
                             isDeleted = false,
                             parentId = rootId,
-                            syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                            syncStateRaw = KBSyncState.SYNCED.rawValue,
                             lastSyncError = null,
                         )
                         categoryDao.upsert(expenseFolder)
@@ -259,7 +259,7 @@ class DocumentRepository @Inject constructor(
                                 categoryId = targetExpenseFolderId,
                                 updatedAtEpochMillis = now,
                                 updatedBy = uid,
-                                syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                                syncStateRaw = KBSyncState.SYNCED.rawValue,
                                 lastSyncError = null,
                             ),
                         )
@@ -274,7 +274,7 @@ class DocumentRepository @Inject constructor(
                             categoryId = rootId,
                             updatedAtEpochMillis = now,
                             updatedBy = uid,
-                            syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                            syncStateRaw = KBSyncState.SYNCED.rawValue,
                             lastSyncError = null,
                         ),
                     )
@@ -287,7 +287,7 @@ class DocumentRepository @Inject constructor(
                         categoryId = rootId,
                         updatedAtEpochMillis = now,
                         updatedBy = uid,
-                        syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                        syncStateRaw = KBSyncState.SYNCED.rawValue,
                         lastSyncError = null,
                     ),
                 )
@@ -296,6 +296,7 @@ class DocumentRepository @Inject constructor(
             val expenseLinkedDocs = documentDao.getAllByFamilyId(familyId)
                 .filter { isExpenseLinkedDocument(it.id, it.notes) }
             expenseLinkedDocs.forEach { doc ->
+                if (KBSyncState.fromRaw(doc.syncStateRaw) == KBSyncState.PENDING_UPSERT) return@forEach
                 val expenseId = parseExpenseIdFromNotes(doc.notes) ?: return@forEach
                 val expense = expenseDao.getById(expenseId)
                 val targetCategoryId = expenseCategoryFolderId(expenseId)
@@ -330,7 +331,7 @@ class DocumentRepository @Inject constructor(
                                 parentId = rootId,
                                 updatedAtEpochMillis = now,
                                 updatedBy = uid,
-                                syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                                syncStateRaw = KBSyncState.SYNCED.rawValue,
                                 lastSyncError = null,
                             ),
                         )
@@ -344,7 +345,7 @@ class DocumentRepository @Inject constructor(
                                 isDeleted = false,
                                 updatedAtEpochMillis = now,
                                 updatedBy = uid,
-                                syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                                syncStateRaw = KBSyncState.SYNCED.rawValue,
                                 lastSyncError = null,
                             ),
                         )
@@ -361,7 +362,7 @@ class DocumentRepository @Inject constructor(
                             categoryId = rootId,
                             updatedAtEpochMillis = now,
                             updatedBy = uid,
-                            syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                            syncStateRaw = KBSyncState.SYNCED.rawValue,
                             lastSyncError = null,
                         ),
                     )
@@ -380,7 +381,7 @@ class DocumentRepository @Inject constructor(
                                     updatedBy = uid,
                                     isDeleted = false,
                                     parentId = rootId,
-                                    syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                                    syncStateRaw = KBSyncState.SYNCED.rawValue,
                                     lastSyncError = null,
                                 ),
                             )
@@ -395,7 +396,7 @@ class DocumentRepository @Inject constructor(
                                 isDeleted = false,
                                 updatedAtEpochMillis = now,
                                 updatedBy = uid,
-                                syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                                syncStateRaw = KBSyncState.SYNCED.rawValue,
                                 lastSyncError = null,
                             ),
                         )
@@ -417,7 +418,7 @@ class DocumentRepository @Inject constructor(
                         isDeleted = true,
                         updatedAtEpochMillis = now,
                         updatedBy = uid,
-                        syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                        syncStateRaw = KBSyncState.SYNCED.rawValue,
                         lastSyncError = null,
                     ),
                 )
@@ -437,6 +438,26 @@ class DocumentRepository @Inject constructor(
             )
             Log.d(TAG_DOC_SYNC, "Hierarchy Healing executed. Restored $restoredCount orphaned expense items.")
             restoredCount
+        }
+        healedFamiliesInSession += familyId
+        return restored
+    }
+
+    suspend fun hasCriticalExpenseHierarchyInstability(familyId: String): Boolean {
+        val rootId = expensesRootFolderId(familyId)
+        val root = categoryDao.getById(rootId)
+        if (root == null || root.isDeleted || root.parentId != null) return true
+
+        val activeCategories = categoryDao.getAllByFamilyId(familyId).filter { !it.isDeleted }
+        val activeCategoryIds = activeCategories.map { it.id }.toHashSet()
+        if (activeCategories.any { it.id.startsWith("exp-cat-") && it.parentId != rootId }) return true
+
+        val activeExpenseDocs = documentDao.getAllByFamilyId(familyId)
+            .filter { !it.isDeleted && isExpenseLinkedDocument(it.id, it.notes) }
+
+        return activeExpenseDocs.any { doc ->
+            val categoryId = doc.categoryId?.trim()?.takeIf { it.isNotEmpty() } ?: return@any true
+            categoryId !in activeCategoryIds
         }
     }
 
@@ -698,15 +719,57 @@ class DocumentRepository @Inject constructor(
     }
 
     suspend fun deleteFolderLocal(folder: KBDocumentCategoryEntity) {
-        categoryDao.upsert(
-            folder.copy(
-                isDeleted = true,
-                syncStateRaw = KBSyncState.PENDING_DELETE.rawValue,
-                updatedAtEpochMillis = System.currentTimeMillis(),
-                updatedBy = auth.currentUser?.uid ?: folder.updatedBy,
-                lastSyncError = null,
-            ),
-        )
+        if (folder.id.startsWith("exp-root-")) {
+            Log.d(TAG_DOC_SYNC, "Blocked delete on expense root folder id=${folder.id}")
+            return
+        }
+        val now = System.currentTimeMillis()
+        val uid = auth.currentUser?.uid ?: folder.updatedBy
+        database.withTransaction {
+            val allFolders = categoryDao.getAllByFamilyId(folder.familyId)
+            val descendantsByParent = allFolders.groupBy { it.parentId }
+            val folderIdsToDelete = linkedSetOf<String>()
+            val queue = ArrayDeque<String>()
+            queue.add(folder.id)
+            while (queue.isNotEmpty()) {
+                val currentId = queue.removeFirst()
+                if (!folderIdsToDelete.add(currentId)) continue
+                descendantsByParent[currentId].orEmpty().forEach { child ->
+                    queue.add(child.id)
+                }
+            }
+
+            val allDocs = documentDao.getAllByFamilyId(folder.familyId)
+            allDocs
+                .filter { it.categoryId != null && folderIdsToDelete.contains(it.categoryId) }
+                .forEach { doc ->
+                    if (KBSyncState.fromRaw(doc.syncStateRaw) == KBSyncState.PENDING_DELETE) return@forEach
+                    documentDao.upsert(
+                        doc.copy(
+                            isDeleted = true,
+                            syncStateRaw = KBSyncState.PENDING_DELETE.rawValue,
+                            updatedAtEpochMillis = now,
+                            updatedBy = uid,
+                            lastSyncError = null,
+                        ),
+                    )
+                }
+
+            allFolders
+                .filter { folderIdsToDelete.contains(it.id) }
+                .forEach { current ->
+                    if (KBSyncState.fromRaw(current.syncStateRaw) == KBSyncState.PENDING_DELETE) return@forEach
+                    categoryDao.upsert(
+                        current.copy(
+                            isDeleted = true,
+                            syncStateRaw = KBSyncState.PENDING_DELETE.rawValue,
+                            updatedAtEpochMillis = now,
+                            updatedBy = uid,
+                            lastSyncError = null,
+                        ),
+                    )
+                }
+        }
     }
 
     suspend fun moveDocumentLocal(
@@ -1095,21 +1158,32 @@ class DocumentRepository @Inject constructor(
             )
         }
 
-        categoryDao.upsert(
-            KBDocumentCategoryEntity(
-                id = dto.id,
-                familyId = familyId,
-                title = dto.title.ifBlank { local?.title.orEmpty() },
-                sortOrder = dto.sortOrder,
-                createdAtEpochMillis = local?.createdAtEpochMillis ?: dto.createdAtEpochMillis ?: now,
-                updatedAtEpochMillis = remoteUpdatedAt.takeIf { it > 0L } ?: now,
-                updatedBy = dto.updatedBy ?: local?.updatedBy ?: "",
-                isDeleted = false,
-                parentId = resolvedParentId,
-                syncStateRaw = KBSyncState.SYNCED.rawValue,
-                lastSyncError = null,
-            ),
+        val targetCategory = KBDocumentCategoryEntity(
+            id = dto.id,
+            familyId = familyId,
+            title = dto.title.ifBlank { local?.title.orEmpty() },
+            sortOrder = dto.sortOrder,
+            createdAtEpochMillis = local?.createdAtEpochMillis ?: dto.createdAtEpochMillis ?: now,
+            updatedAtEpochMillis = remoteUpdatedAt.takeIf { it > 0L } ?: now,
+            updatedBy = dto.updatedBy ?: local?.updatedBy ?: "",
+            isDeleted = false,
+            parentId = resolvedParentId,
+            syncStateRaw = KBSyncState.SYNCED.rawValue,
+            lastSyncError = null,
         )
+        val unchangedCategory = local != null &&
+            local.title == targetCategory.title &&
+            local.sortOrder == targetCategory.sortOrder &&
+            local.parentId == targetCategory.parentId &&
+            local.isDeleted == targetCategory.isDeleted &&
+            local.updatedAtEpochMillis == targetCategory.updatedAtEpochMillis &&
+            local.updatedBy == targetCategory.updatedBy &&
+            KBSyncState.fromRaw(local.syncStateRaw) == KBSyncState.SYNCED
+        if (unchangedCategory) {
+            Log.d(TAG_DOC_SYNC, "Skipped category upsert id=${dto.id} reason=unchanged")
+            return
+        }
+        categoryDao.upsert(targetCategory)
         Log.d(TAG_DOC_SYNC, "Applied category id=${dto.id} parentResolved=$resolvedParentId")
     }
 
@@ -1174,12 +1248,14 @@ class DocumentRepository @Inject constructor(
         val linkedExpenseId = parseExpenseIdFromNotes(dto.notes ?: local?.notes)
         if (!linkedExpenseId.isNullOrBlank()) {
             val expense = expenseDao.getById(linkedExpenseId)
-            resolvedCategoryId = expenseCategoryFolderId(linkedExpenseId)
+            val deterministicExpenseFolderId = expenseCategoryFolderId(linkedExpenseId)
+            resolvedCategoryId = resolvedCategoryId ?: deterministicExpenseFolderId
             if (expense == null) {
                 Log.d(
                     TAG_DOC_SYNC,
-                    "expense not local yet for document id=${dto.id} expenseId=$linkedExpenseId; using deterministic category=$resolvedCategoryId",
+                    "expense not local yet for document id=${dto.id} expenseId=$linkedExpenseId; fallback to expenses root",
                 )
+                resolvedCategoryId = expensesRootFolderId(familyId)
             } else if (expense.isDeleted || expense.familyId != familyId) {
                 val fallbackRootId = expensesRootFolderId(familyId)
                 Log.d(
@@ -1187,6 +1263,8 @@ class DocumentRepository @Inject constructor(
                     "guard document id=${dto.id} reason=linked_expense_missing_or_deleted expenseId=$linkedExpenseId forcingRoot=$fallbackRootId",
                 )
                 resolvedCategoryId = fallbackRootId
+            } else if (categoryDao.getById(deterministicExpenseFolderId)?.isDeleted == true) {
+                resolvedCategoryId = expensesRootFolderId(familyId)
             }
         }
         if (isFromCache && local != null && dto.categoryId == null && !local.categoryId.isNullOrBlank()) {
@@ -1216,15 +1294,22 @@ class DocumentRepository @Inject constructor(
             Log.d(TAG_DOC_SYNC, "Overriding LWW to preserve hierarchy for ID: ${dto.id}")
         }
         if (!resolvedCategoryId.isNullOrBlank()) {
-            val existingCategory = categoryDao.getById(resolvedCategoryId)
+            val isExpenseDocument = isExpenseLinkedDocument(dto.id, dto.notes ?: local?.notes)
+            var existingCategory = categoryDao.getById(resolvedCategoryId)
             if (existingCategory == null || existingCategory.isDeleted) {
+                if (isExpenseDocument) {
+                    resolvedCategoryId = expensesRootFolderId(familyId)
+                    existingCategory = categoryDao.getById(resolvedCategoryId)
+                }
                 Log.d(TAG_DOC_SYNC, "create/restore placeholder category id=$resolvedCategoryId for document=${dto.id}")
                 val expenseIdFromCategory = parseExpenseIdFromCategoryId(resolvedCategoryId)
                 val linkedExpense = expenseIdFromCategory?.let { expenseDao.getById(it) }
                 val placeholderTitle = when {
+                    resolvedCategoryId.startsWith("exp-root-") -> "Spese"
                     !existingCategory?.title.isNullOrBlank() -> existingCategory?.title.orEmpty()
                     linkedExpense != null && !linkedExpense.isDeleted && linkedExpense.familyId == familyId ->
                         linkedExpense.title.trim().ifBlank { "Spesa" }
+                    isExpenseDocument -> "Allegato Spesa"
                     else -> "Cartella"
                 }
                 categoryDao.upsert(
@@ -1246,33 +1331,49 @@ class DocumentRepository @Inject constructor(
             }
         }
 
-        val isInsert = local == null
-        documentDao.upsert(
-            KBDocumentEntity(
-                id = dto.id,
-                familyId = familyId,
-                childId = dto.childId,
-                categoryId = resolvedCategoryId,
-                localPath = local?.localPath,
-                title = dto.title.ifBlank { titleFromFileName(dto.fileName) },
-                fileName = dto.fileName,
-                mimeType = dto.mimeType,
-                fileSize = dto.fileSize,
-                storagePath = dto.storagePath,
-                downloadURL = dto.downloadURL,
-                notes = dto.notes,
-                extractedText = local?.extractedText,
-                extractedTextUpdatedAtEpochMillis = local?.extractedTextUpdatedAtEpochMillis,
-                extractionStatusRaw = local?.extractionStatusRaw ?: 0,
-                extractionError = local?.extractionError,
-                createdAtEpochMillis = local?.createdAtEpochMillis ?: dto.createdAtEpochMillis ?: now,
-                updatedAtEpochMillis = remoteUpdatedAt.takeIf { it > 0L } ?: now,
-                updatedBy = dto.updatedBy ?: local?.updatedBy ?: "",
-                isDeleted = false,
-                syncStateRaw = KBSyncState.SYNCED.rawValue,
-                lastSyncError = null,
-            ),
+        val targetDocument = KBDocumentEntity(
+            id = dto.id,
+            familyId = familyId,
+            childId = dto.childId,
+            categoryId = resolvedCategoryId,
+            localPath = local?.localPath,
+            title = dto.title.ifBlank { titleFromFileName(dto.fileName) },
+            fileName = dto.fileName,
+            mimeType = dto.mimeType,
+            fileSize = dto.fileSize,
+            storagePath = dto.storagePath,
+            downloadURL = dto.downloadURL,
+            notes = dto.notes,
+            extractedText = local?.extractedText,
+            extractedTextUpdatedAtEpochMillis = local?.extractedTextUpdatedAtEpochMillis,
+            extractionStatusRaw = local?.extractionStatusRaw ?: 0,
+            extractionError = local?.extractionError,
+            createdAtEpochMillis = local?.createdAtEpochMillis ?: dto.createdAtEpochMillis ?: now,
+            updatedAtEpochMillis = remoteUpdatedAt.takeIf { it > 0L } ?: now,
+            updatedBy = dto.updatedBy ?: local?.updatedBy ?: "",
+            isDeleted = false,
+            syncStateRaw = KBSyncState.SYNCED.rawValue,
+            lastSyncError = null,
         )
+        val unchangedDocument = local != null &&
+            local.categoryId == targetDocument.categoryId &&
+            local.title == targetDocument.title &&
+            local.fileName == targetDocument.fileName &&
+            local.mimeType == targetDocument.mimeType &&
+            local.fileSize == targetDocument.fileSize &&
+            local.storagePath == targetDocument.storagePath &&
+            local.downloadURL == targetDocument.downloadURL &&
+            local.notes == targetDocument.notes &&
+            local.updatedAtEpochMillis == targetDocument.updatedAtEpochMillis &&
+            local.updatedBy == targetDocument.updatedBy &&
+            !local.isDeleted &&
+            KBSyncState.fromRaw(local.syncStateRaw) == KBSyncState.SYNCED
+        if (unchangedDocument) {
+            Log.d(TAG_DOC_SYNC, "Skipped document upsert id=${dto.id} reason=unchanged")
+            return
+        }
+        val isInsert = local == null
+        documentDao.upsert(targetDocument)
         if (isInsert) {
             recalculateDocumentHierarchy(
                 familyId = familyId,
@@ -1404,11 +1505,20 @@ class DocumentRepository @Inject constructor(
             ?: expectedCategoryForDocument(documentId = doc.id, notes = doc.notes)
         if (!categoryId.isNullOrBlank() && categoryDao.getById(categoryId) == null) {
             Log.d(TAG_DOC_SYNC, "refresh insert create placeholder category id=$categoryId document=$documentId")
+            val expenseIdFromCategory = parseExpenseIdFromCategoryId(categoryId)
+            val linkedExpense = expenseIdFromCategory?.let { expenseDao.getById(it) }
+            val placeholderTitle = when {
+                categoryId.startsWith("exp-root-") -> "Spese"
+                linkedExpense != null && !linkedExpense.isDeleted && linkedExpense.familyId == familyId ->
+                    linkedExpense.title.trim().ifBlank { "Spesa" }
+                doc.notes?.startsWith("expense:") == true -> "Allegato Spesa"
+                else -> "Cartella"
+            }
             categoryDao.upsert(
                 KBDocumentCategoryEntity(
                     id = categoryId,
                     familyId = familyId,
-                    title = "Cartella",
+                    title = placeholderTitle,
                     sortOrder = 0,
                     createdAtEpochMillis = now,
                     updatedAtEpochMillis = now,

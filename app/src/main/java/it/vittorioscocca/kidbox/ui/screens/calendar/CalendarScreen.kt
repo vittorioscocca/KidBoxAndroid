@@ -28,8 +28,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.NotificationsNone
@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.entity.KBCalendarEventEntity
+import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -105,7 +106,7 @@ fun CalendarScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     HeaderCircleButton(
-                        icon = Icons.Default.ArrowBack,
+                        icon = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Indietro",
                         onClick = onBack,
                     )
@@ -848,15 +849,13 @@ private fun HeaderCircleButton(
     contentDescription: String,
     onClick: () -> Unit,
 ) {
-    Surface(
-        onClick = onClick,
+    Card(
+        modifier = Modifier.size(44.dp).clickable(onClick = onClick),
         shape = CircleShape,
-        color = Color.White,
-        shadowElevation = 6.dp,
-        modifier = Modifier.size(44.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = contentDescription, tint = Color.Black)
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = contentDescription, tint = MaterialTheme.kidBoxColors.title)
         }
     }
 }

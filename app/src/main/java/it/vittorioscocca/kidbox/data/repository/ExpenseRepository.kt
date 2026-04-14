@@ -76,9 +76,6 @@ class ExpenseRepository @Inject constructor(
                 stopRealtimeLocked()
                 listeningFamilyId = familyId
                 seedDefaultCategories(familyId)
-                // Pre-create "Spese" root folder for attachment parity.
-                runCatching { documentRepository.ensureExpenseFolders(familyId, "", "") }
-                runCatching { documentRepository.flushPending(familyId) }
                 expensesListener = remoteStore.listenExpenses(
                     familyId = familyId,
                     onChange = { changes -> scope.launch { applyInbound(familyId, changes) } },

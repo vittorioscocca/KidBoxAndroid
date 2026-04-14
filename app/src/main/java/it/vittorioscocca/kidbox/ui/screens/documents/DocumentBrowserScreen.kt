@@ -495,6 +495,37 @@ fun DocumentBrowserScreen(
                 }
             }
         }
+
+        if (state.isStabilizingHierarchy) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.kidBoxColors.card,
+                    shadowElevation = 10.dp,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        Text(
+                            text = "Aggiorno struttura cartelle...",
+                            modifier = Modifier.padding(start = 12.dp),
+                            color = MaterialTheme.kidBoxColors.title,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
+        }
     }
 
     if (showMoveSheet) {

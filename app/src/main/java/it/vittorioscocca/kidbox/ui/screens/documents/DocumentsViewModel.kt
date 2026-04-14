@@ -16,6 +16,7 @@ import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,6 +46,7 @@ data class DocumentsUiState(
     val folders: List<KBDocumentCategoryEntity> = emptyList(),
     val documents: List<KBDocumentEntity> = emptyList(),
     val highlightedDocumentId: String? = null,
+    val isStabilizingHierarchy: Boolean = false,
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
 )
@@ -59,6 +61,8 @@ class DocumentsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(DocumentsUiState())
     val uiState: StateFlow<DocumentsUiState> = _uiState.asStateFlow()
     private var folderObservationJob: Job? = null
+    private var debounceHealJob: Job? = null
+    private var rootGateStartedAtMillis: Long = 0L
 
     fun bindFamily(familyId: String) {
         if (familyId.isBlank() || _uiState.value.familyId == familyId) return
@@ -68,6 +72,7 @@ class DocumentsViewModel @Inject constructor(
             sort = uiPreferences.getSort().toUiSort(),
             sortAscending = uiPreferences.getSortAscending(),
         )
+        rootGateStartedAtMillis = System.currentTimeMillis()
         repository.startRealtime(
             familyId = familyId,
             onPermissionDenied = {
@@ -442,12 +447,49 @@ class DocumentsViewModel @Inject constructor(
         folderObservationJob?.cancel()
         folderObservationJob = viewModelScope.launch {
             repository.observeBrowser(familyId, parentId).collectLatest { data ->
+                if (parentId == null) {
+                    val expenseRootId = repository.expensesRootFolderId(familyId)
+                    val hasExpenseRoot = data.folders.any { it.id == expenseRootId && !it.isDeleted }
+                    val hasCriticalInstability = runCatching {
+                        repository.hasCriticalExpenseHierarchyInstability(familyId)
+                    }.getOrDefault(false)
+                    val withinAntiFlashWindow = (System.currentTimeMillis() - rootGateStartedAtMillis) <= 1_200L
+                    if ((!hasExpenseRoot || hasCriticalInstability) && withinAntiFlashWindow) {
+                        scheduleDebouncedHeal(familyId)
+                        _uiState.value = _uiState.value.copy(
+                            isStabilizingHierarchy = true,
+                            isLoading = true,
+                        )
+                        return@collectLatest
+                    }
+                    if (hasCriticalInstability) {
+                        scheduleDebouncedHeal(familyId)
+                    }
+                }
                 _uiState.value = _uiState.value.copy(
                     folders = data.folders,
                     documents = data.documents,
+                    isStabilizingHierarchy = false,
                     isLoading = false,
                     errorMessage = null,
                 )
+            }
+        }
+    }
+
+    private fun scheduleDebouncedHeal(familyId: String) {
+        debounceHealJob?.cancel()
+        debounceHealJob = viewModelScope.launch {
+            delay(800L)
+            val stillUnstable = runCatching {
+                repository.hasCriticalExpenseHierarchyInstability(familyId)
+            }.getOrDefault(false)
+            if (!stillUnstable) return@launch
+            runCatching {
+                repository.healHierarchy(familyId, force = true)
+                repository.flushPending(familyId)
+            }.onFailure {
+                _uiState.value = _uiState.value.copy(errorMessage = it.localizedMessage ?: "Errore consolidamento gerarchia")
             }
         }
     }
