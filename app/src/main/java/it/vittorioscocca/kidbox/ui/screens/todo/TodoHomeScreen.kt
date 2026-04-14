@@ -53,9 +53,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
-
-private val TodoBg = Color(0xFFF4F4F8)
-private val TodoCard = Color(0xFFFFFFFF)
+import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
 @Composable
 fun TodoHomeScreen(
@@ -63,6 +61,7 @@ fun TodoHomeScreen(
     onNavigate: (String) -> Unit,
     viewModel: TodoHomeViewModel = hiltViewModel(),
 ) {
+    val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showNewList by remember { mutableStateOf(false) }
     var listNameDraft by remember { mutableStateOf("") }
@@ -75,7 +74,7 @@ fun TodoHomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(TodoBg),
+            .background(kb.background),
     ) {
         Column(
             modifier = Modifier
@@ -101,9 +100,9 @@ fun TodoHomeScreen(
                 )
             }
             Spacer(Modifier.height(12.dp))
-            Text("To-Do", fontSize = 40.sp, fontWeight = FontWeight.ExtraBold)
+            Text("To-Do", fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, color = kb.title)
             Spacer(Modifier.height(18.dp))
-            Text("Panoramica", fontWeight = FontWeight.SemiBold, fontSize = 24.sp)
+            Text("Panoramica", fontWeight = FontWeight.SemiBold, fontSize = 24.sp, color = kb.title)
             Spacer(Modifier.height(12.dp))
 
             val cards = listOf(
@@ -131,7 +130,7 @@ fun TodoHomeScreen(
                                     )
                                 },
                             shape = RoundedCornerShape(18.dp),
-                            colors = CardDefaults.cardColors(containerColor = TodoCard),
+                            colors = CardDefaults.cardColors(containerColor = kb.card),
                             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                         ) {
                             Box(
@@ -149,7 +148,7 @@ fun TodoHomeScreen(
                                         tint = card.iconColor,
                                         modifier = Modifier.size(18.dp),
                                     )
-                                    Text(card.title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                                    Text(card.title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = kb.title)
                                 }
                                 if (card.count > 0) {
                                     Box(
@@ -176,7 +175,7 @@ fun TodoHomeScreen(
             }
 
             Spacer(Modifier.height(8.dp))
-            Text("Le mie liste", fontWeight = FontWeight.SemiBold, fontSize = 24.sp)
+            Text("Le mie liste", fontWeight = FontWeight.SemiBold, fontSize = 24.sp, color = kb.title)
             Spacer(Modifier.height(12.dp))
             if (state.lists.isEmpty()) {
                 EmptyCard("Nessuna lista")
@@ -202,7 +201,7 @@ fun TodoHomeScreen(
                                 },
                             ),
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = TodoCard),
+                        colors = CardDefaults.cardColors(containerColor = kb.card),
                     ) {
                         Row(
                             modifier = Modifier
@@ -210,8 +209,8 @@ fun TodoHomeScreen(
                                 .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(list.name, fontSize = 16.sp, modifier = Modifier.weight(1f))
-                            Text("Pressione lunga per azioni", fontSize = 11.sp, color = Color(0xFF9AA0AA))
+                            Text(list.name, fontSize = 16.sp, color = kb.title, modifier = Modifier.weight(1f))
+                            Text("Pressione lunga per azioni", fontSize = 11.sp, color = kb.subtitle)
                         }
                     }
                 }
@@ -313,10 +312,10 @@ private fun HeaderCircleButton(
     Card(
         modifier = Modifier.size(44.dp).clickable(onClick = onClick),
         shape = CircleShape,
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
+            Icon(icon, contentDescription = null, tint = MaterialTheme.kidBoxColors.title)
         }
     }
 }
@@ -326,12 +325,12 @@ private fun EmptyCard(text: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = TodoCard),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
     ) {
         Text(
             text = text,
             modifier = Modifier.padding(16.dp),
-            color = Color(0xFF6B7280),
+            color = MaterialTheme.kidBoxColors.subtitle,
         )
     }
 }

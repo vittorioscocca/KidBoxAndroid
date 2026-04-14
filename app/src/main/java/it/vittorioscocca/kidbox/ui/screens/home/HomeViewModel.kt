@@ -56,6 +56,7 @@ data class HomeUiState(
     val avatarUrl: String? = null,
     val isFabExpanded: Boolean = false,
     val topQuickActions: List<HomeQuickAction> = emptyList(),
+    val featureOrder: List<String> = emptyList(),
     val badgeChat: Int = 0,
     val badgeDocuments: Int = 0,
     val badgeLocation: Int = 0,
@@ -91,6 +92,7 @@ class HomeViewModel @Inject constructor(
 
     private val db get() = FirebaseFirestore.getInstance()
     private val prefs = appContext.getSharedPreferences("home_quick_actions", Context.MODE_PRIVATE)
+    private val featureOrderKey = "feature_order_v1"
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
@@ -191,6 +193,7 @@ class HomeViewModel @Inject constructor(
                             ?: com.google.firebase.auth.FirebaseAuth.getInstance()
                                 .currentUser?.photoUrl?.toString(),
                         topQuickActions = topQuickActions(),
+                        featureOrder = loadFeatureOrder(),
                     )
                 }
             }
@@ -511,6 +514,16 @@ class HomeViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(topQuickActions = topQuickActions())
     }
 
+    fun saveFeatureOrder(order: List<String>) {
+        val normalized = order
+            .filter { it in defaultFeatureOrder() }
+            .distinct()
+            .toMutableList()
+        defaultFeatureOrder().forEach { if (it !in normalized) normalized.add(it) }
+        prefs.edit().putString(featureOrderKey, normalized.joinToString(",")).apply()
+        _uiState.value = _uiState.value.copy(featureOrder = normalized)
+    }
+
     fun onFeatureOpened(counterField: CounterField?) {
         val familyId = _uiState.value.familyId
         if (counterField == null || familyId.isBlank()) return
@@ -546,6 +559,33 @@ class HomeViewModel @Inject constructor(
         HomeQuickAction.entries
             .sortedByDescending { prefs.getInt("usage_${it.key}", 0) }
             .take(4)
+
+    private fun loadFeatureOrder(): List<String> {
+        val raw = prefs.getString(featureOrderKey, null).orEmpty()
+        if (raw.isBlank()) return defaultFeatureOrder()
+        val parsed = raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        val normalized = parsed
+            .filter { it in defaultFeatureOrder() }
+            .distinct()
+            .toMutableList()
+        defaultFeatureOrder().forEach { if (it !in normalized) normalized.add(it) }
+        return normalized
+    }
+
+    private fun defaultFeatureOrder(): List<String> = listOf(
+        "notes",
+        "todo",
+        "shopping",
+        "calendar",
+        "health",
+        "chat",
+        "expenses",
+        "documents",
+        "location",
+        "photos",
+        "ai",
+        "family",
+    )
 
     private fun todayLabel(): String {
         val formatter = java.text.SimpleDateFormat("EEEE, d MMMM", java.util.Locale.getDefault())

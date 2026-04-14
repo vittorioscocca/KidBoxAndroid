@@ -57,17 +57,12 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.entity.KBGroceryItemEntity
+import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import kotlinx.coroutines.launch
-
-private val GroceryBg = Color(0xFFF5F4F1)
-private val GroceryCard = Color.White
-private val GrocerySection = Color(0xFF6F6F73)
-private val GroceryTextMuted = Color(0xFF8E8E93)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,6 +70,11 @@ fun GroceryListScreen(
     onBack: () -> Unit,
     viewModel: GroceryListViewModel = hiltViewModel(),
 ) {
+    val kb = MaterialTheme.kidBoxColors
+    val groceryBg = kb.background
+    val groceryCard = kb.card
+    val grocerySection = kb.subtitle
+    val groceryTextMuted = kb.subtitle
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -89,7 +89,7 @@ fun GroceryListScreen(
     }
 
     Scaffold(
-        containerColor = GroceryBg,
+        containerColor = groceryBg,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column(
@@ -100,14 +100,22 @@ fun GroceryListScreen(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     HeaderCircleButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Indietro",
+                            tint = kb.title,
+                        )
                     }
                     Spacer(Modifier.weight(1f))
                     HeaderCircleButton(onClick = {
                         editingItem = null
                         showAddDialog = true
                     }) {
-                        Icon(Icons.Default.Add, contentDescription = "Aggiungi prodotto")
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Aggiungi prodotto",
+                            tint = kb.title,
+                        )
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -117,6 +125,7 @@ fun GroceryListScreen(
                         fontWeight = FontWeight.Bold,
                         fontSize = 40.sp,
                     ),
+                    color = kb.title,
                 )
             }
         },
@@ -134,7 +143,7 @@ fun GroceryListScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(GroceryBg)
+                    .background(groceryBg)
                     .padding(padding)
                     .navigationBarsPadding()
                     .padding(horizontal = 20.dp),
@@ -144,14 +153,14 @@ fun GroceryListScreen(
                     item {
                         Card(
                             shape = RoundedCornerShape(24.dp),
-                            colors = CardDefaults.cardColors(containerColor = GroceryCard),
+                            colors = CardDefaults.cardColors(containerColor = groceryCard),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 2.dp),
                         ) {
                             Text(
                                 text = "Lista vuota",
-                                color = GroceryTextMuted,
+                                color = groceryTextMuted,
                                 style = MaterialTheme.typography.titleLarge,
                                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
                             )
@@ -164,7 +173,7 @@ fun GroceryListScreen(
                         Text(
                             text = category,
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                            color = GrocerySection,
+                            color = kb.title,
                             modifier = Modifier.padding(top = 10.dp, bottom = 6.dp),
                         )
                     }
@@ -193,11 +202,11 @@ fun GroceryListScreen(
                                 text = "Acquistati (${state.purchased.size})",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = GrocerySection,
+                                color = kb.title,
                             )
                             Spacer(Modifier.weight(1f))
                             TextButton(onClick = { showDeletePurchasedAlert = true }) {
-                                Text("Elimina tutti", color = Color.Red)
+                                Text("Elimina tutti", color = Color(0xFFE35156))
                             }
                         }
                     }
@@ -263,9 +272,10 @@ private fun GroceryGroupCard(
     onClick: (KBGroceryItemEntity) -> Unit,
     onDelete: (KBGroceryItemEntity) -> Unit,
 ) {
+    val kb = MaterialTheme.kidBoxColors
     Card(
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = GroceryCard),
+        colors = CardDefaults.cardColors(containerColor = kb.card),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column {
@@ -282,7 +292,7 @@ private fun GroceryGroupCard(
                             .fillMaxWidth()
                             .height(1.dp)
                             .padding(horizontal = 20.dp)
-                            .background(Color(0xFFE7E7EA)),
+                            .background(kb.divider),
                     )
                 }
             }
@@ -297,6 +307,7 @@ private fun GroceryRow(
     onClick: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val kb = MaterialTheme.kidBoxColors
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -316,7 +327,7 @@ private fun GroceryRow(
                     modifier = Modifier
                         .size(22.dp)
                         .background(Color.Transparent, CircleShape)
-                        .border(width = 2.dp, color = Color(0xFF1C1C1E), shape = CircleShape),
+                        .border(width = 2.dp, color = kb.title, shape = CircleShape),
                 )
             }
         }
@@ -324,18 +335,18 @@ private fun GroceryRow(
             Text(
                 text = item.name,
                 style = MaterialTheme.typography.bodyLarge,
-                color = if (item.isPurchased) GroceryTextMuted else Color(0xFF1C1C1E),
+                color = if (item.isPurchased) kb.subtitle else kb.title,
             )
             if (!item.notes.isNullOrBlank()) {
                 Text(
                     text = item.notes,
                     style = MaterialTheme.typography.bodySmall,
-                    color = GroceryTextMuted,
+                    color = kb.subtitle,
                     maxLines = 1,
                 )
             }
         }
-        TextButton(onClick = onDelete) { Text("Elimina", color = Color.Red) }
+        TextButton(onClick = onDelete) { Text("Elimina", color = Color(0xFFE35156)) }
     }
 }
 
@@ -346,6 +357,7 @@ private fun GroceryEditDialog(
     onDismiss: () -> Unit,
     onSave: (name: String, category: String?, notes: String?) -> Unit,
 ) {
+    val kb = MaterialTheme.kidBoxColors
     var name by remember(initialItem?.id) { mutableStateOf(initialItem?.name.orEmpty()) }
     var category by remember(initialItem?.id) { mutableStateOf(initialItem?.category.orEmpty()) }
     var notes by remember(initialItem?.id) { mutableStateOf(initialItem?.notes.orEmpty()) }
@@ -364,7 +376,7 @@ private fun GroceryEditDialog(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = Color(0xFFEFEFF3),
+        containerColor = kb.background,
         dragHandle = null,
     ) {
         Column(
@@ -397,16 +409,16 @@ private fun GroceryEditDialog(
                 )
             }
             Spacer(Modifier.height(18.dp))
-            Text("Prodotto", style = MaterialTheme.typography.titleMedium.copy(color = GrocerySection, fontWeight = FontWeight.Bold))
+            Text("Prodotto", style = MaterialTheme.typography.titleMedium.copy(color = kb.subtitle, fontWeight = FontWeight.Bold))
             Spacer(Modifier.height(8.dp))
             AppleTextField(value = name, onValueChange = { name = it }, placeholder = "Nome prodotto")
 
             Spacer(Modifier.height(16.dp))
-            Text("Categoria", style = MaterialTheme.typography.titleMedium.copy(color = GrocerySection, fontWeight = FontWeight.Bold))
+            Text("Categoria", style = MaterialTheme.typography.titleMedium.copy(color = kb.subtitle, fontWeight = FontWeight.Bold))
             Spacer(Modifier.height(8.dp))
             Card(
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = GroceryCard),
+                colors = CardDefaults.cardColors(containerColor = kb.card),
             ) {
                 AppleTextField(
                     value = category,
@@ -419,7 +431,7 @@ private fun GroceryEditDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(1.dp)
-                        .background(Color(0xFFE0E0E3)),
+                        .background(kb.divider),
                 )
                 LazyRow(
                     modifier = Modifier
@@ -430,12 +442,12 @@ private fun GroceryEditDialog(
                     items(categories) { cat ->
                         Surface(
                             shape = RoundedCornerShape(999.dp),
-                            color = if (category == cat) Color(0xFF111111) else Color(0xFFF1F1F3),
+                            color = if (category == cat) kb.title else kb.background,
                             modifier = Modifier.clickable { category = cat },
                         ) {
                             Text(
                                 text = cat,
-                                color = if (category == cat) Color.White else Color(0xFF2A2A2A),
+                                color = if (category == cat) kb.card else kb.title,
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                             )
@@ -445,7 +457,7 @@ private fun GroceryEditDialog(
             }
 
             Spacer(Modifier.height(16.dp))
-            Text("Note (opzionale)", style = MaterialTheme.typography.titleMedium.copy(color = GrocerySection, fontWeight = FontWeight.Bold))
+            Text("Note (opzionale)", style = MaterialTheme.typography.titleMedium.copy(color = kb.subtitle, fontWeight = FontWeight.Bold))
             Spacer(Modifier.height(8.dp))
             AppleTextField(
                 value = notes,
@@ -466,7 +478,7 @@ private fun HeaderCircleButton(
     Surface(
         onClick = onClick,
         shape = CircleShape,
-        color = Color.White,
+        color = MaterialTheme.kidBoxColors.card,
         shadowElevation = 6.dp,
         modifier = Modifier.size(44.dp),
     ) {
@@ -480,16 +492,17 @@ private fun PillButton(
     onClick: () -> Unit,
     enabled: Boolean = true,
 ) {
+    val kb = MaterialTheme.kidBoxColors
     Surface(
         onClick = onClick,
         enabled = enabled,
         shape = RoundedCornerShape(999.dp),
-        color = if (enabled) Color(0xFFF4F4F6) else Color(0xFFE5E5E8),
+        color = if (enabled) kb.background else kb.divider,
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = if (enabled) Color(0xFF1C1C1E) else Color(0xFFB0B0B5),
+            color = if (enabled) kb.title else kb.subtitle,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
         )
     }
@@ -504,24 +517,25 @@ private fun AppleTextField(
     minLines: Int = 1,
     shape: Shape = RoundedCornerShape(22.dp),
 ) {
+    val kb = MaterialTheme.kidBoxColors
     TextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text(placeholder, color = Color(0xFFB0B0B5)) },
+        placeholder = { Text(placeholder, color = kb.subtitle) },
         modifier = modifier,
         minLines = minLines,
         shape = shape,
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color.White,
-            unfocusedContainerColor = Color.White,
-            disabledContainerColor = Color.White,
+            focusedContainerColor = kb.card,
+            unfocusedContainerColor = kb.card,
+            disabledContainerColor = kb.card,
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
             disabledIndicatorColor = Color.Transparent,
-            focusedTextColor = Color(0xFF1C1C1E),
-            unfocusedTextColor = Color(0xFF1C1C1E),
-            focusedPlaceholderColor = Color(0xFFB0B0B5),
-            unfocusedPlaceholderColor = Color(0xFFB0B0B5),
+            focusedTextColor = kb.title,
+            unfocusedTextColor = kb.title,
+            focusedPlaceholderColor = kb.subtitle,
+            unfocusedPlaceholderColor = kb.subtitle,
         ),
     )
 }

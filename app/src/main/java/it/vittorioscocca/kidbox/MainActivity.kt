@@ -10,7 +10,10 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
@@ -18,6 +21,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.platform.LocalView
 import androidx.navigation.compose.rememberNavController
 import com.facebook.CallbackManager
@@ -29,6 +34,7 @@ import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.navigation.AppNavGraph
 import it.vittorioscocca.kidbox.ui.splash.KidBoxSplashScreen
 import it.vittorioscocca.kidbox.ui.theme.KidBoxTheme
+import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -67,52 +73,58 @@ class MainActivity : ComponentActivity() {
                 }
             }
             KidBoxTheme(darkTheme = darkTheme) {
-                val navController = rememberNavController()
-                var showSplash by remember { mutableStateOf(true) }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.kidBoxColors.background),
+                ) {
+                    val navController = rememberNavController()
+                    var showSplash by remember { mutableStateOf(true) }
 
-                Crossfade(
-                    targetState = showSplash,
-                    animationSpec = tween(500),
-                    label = "splash_crossfade",
-                ) { splash ->
-                    if (splash) {
-                        KidBoxSplashScreen(onFinished = { showSplash = false })
-                    } else {
-                        AppNavGraph(
-                            navController = navController,
-                            startDestination = AppDestination.Login.route,
-                            onboardingPreferences = onboardingPreferences,
-                        )
-                    }
-                }
-
-                LaunchedEffect(showSplash, pendingPushDeepLink) {
-                    if (showSplash) return@LaunchedEffect
-                    val deepLink = pendingPushDeepLink ?: return@LaunchedEffect
-                    when (deepLink.type) {
-                        "new_grocery_item" -> {
-                            if (deepLink.familyId.isNotBlank()) {
-                                navController.navigate(AppDestination.ShoppingList.createRoute(deepLink.familyId))
-                            }
-                            pendingPushDeepLink = null
+                    Crossfade(
+                        targetState = showSplash,
+                        animationSpec = tween(500),
+                        label = "splash_crossfade",
+                    ) { splash ->
+                        if (splash) {
+                            KidBoxSplashScreen(onFinished = { showSplash = false })
+                        } else {
+                            AppNavGraph(
+                                navController = navController,
+                                startDestination = AppDestination.Login.route,
+                                onboardingPreferences = onboardingPreferences,
+                            )
                         }
+                    }
 
-                        "todo_assigned", "todo_due_changed" -> {
-                            if (
-                                deepLink.familyId.isNotBlank() &&
-                                !deepLink.childId.isNullOrBlank() &&
-                                !deepLink.listId.isNullOrBlank()
-                            ) {
-                                navController.navigate(
-                                    AppDestination.TodoList.createRoute(
-                                        familyId = deepLink.familyId,
-                                        childId = deepLink.childId!!,
-                                        listId = deepLink.listId!!,
-                                        highlightTodoId = deepLink.todoId,
-                                    ),
-                                )
+                    LaunchedEffect(showSplash, pendingPushDeepLink) {
+                        if (showSplash) return@LaunchedEffect
+                        val deepLink = pendingPushDeepLink ?: return@LaunchedEffect
+                        when (deepLink.type) {
+                            "new_grocery_item" -> {
+                                if (deepLink.familyId.isNotBlank()) {
+                                    navController.navigate(AppDestination.ShoppingList.createRoute(deepLink.familyId))
+                                }
+                                pendingPushDeepLink = null
                             }
-                            pendingPushDeepLink = null
+
+                            "todo_assigned", "todo_due_changed" -> {
+                                if (
+                                    deepLink.familyId.isNotBlank() &&
+                                    !deepLink.childId.isNullOrBlank() &&
+                                    !deepLink.listId.isNullOrBlank()
+                                ) {
+                                    navController.navigate(
+                                        AppDestination.TodoList.createRoute(
+                                            familyId = deepLink.familyId,
+                                            childId = deepLink.childId!!,
+                                            listId = deepLink.listId!!,
+                                            highlightTodoId = deepLink.todoId,
+                                        ),
+                                    )
+                                }
+                                pendingPushDeepLink = null
+                            }
                         }
                     }
                 }

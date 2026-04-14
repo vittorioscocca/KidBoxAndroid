@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
 private val BackgroundColor = Color(0xFFF2F0EB)
 private val BlackButton = Color(0xFF1A1A1A)
@@ -345,13 +346,17 @@ fun LoginScreen(
         is LoginViewModel.AuthCheckState.Checking,
         is LoginViewModel.AuthCheckState.Authenticated,
         -> {
+            val kb = MaterialTheme.kidBoxColors
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFFF2F0EB)),
+                    .background(kb.background),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator(color = Color(0xFFFF6B00))
+                CircularProgressIndicator(
+                    color = OrangeAccent,
+                    trackColor = kb.divider,
+                )
             }
         }
     }

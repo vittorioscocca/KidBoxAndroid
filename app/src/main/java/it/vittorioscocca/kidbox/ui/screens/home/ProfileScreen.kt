@@ -79,10 +79,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
-private val ProfileBg = Color(0xFFF5F4F1)
-private val ProfileCard = Color.White
-private val SoftGray = Color(0xFFF4F4F6)
 private val AccentOrange = Color(0xFFF2611A)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -100,6 +98,7 @@ fun ProfileScreen(
     var deleteConfirmText by remember { mutableStateOf("") }
     val deleteSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = androidx.compose.ui.platform.LocalContext.current
+    val kb = MaterialTheme.kidBoxColors
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
@@ -144,10 +143,15 @@ fun ProfileScreen(
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("Elimina account", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                Text(
+                    "Elimina account",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    color = MaterialTheme.kidBoxColors.title,
+                )
                 Text(
                     "Per confermare scrivi ELIMINA. Questa azione elimina account e dati.",
-                    color = Color(0xFF666666),
+                    color = kb.subtitle,
                 )
                 OutlinedTextField(
                     value = deleteConfirmText,
@@ -155,6 +159,14 @@ fun ProfileScreen(
                     label = { Text("Digita ELIMINA") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = kb.card,
+                        unfocusedContainerColor = kb.card,
+                        focusedTextColor = kb.title,
+                        unfocusedTextColor = kb.title,
+                        focusedLabelColor = kb.subtitle,
+                        unfocusedLabelColor = kb.subtitle,
+                    ),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     TextButton(onClick = { showDeleteSheet = false }) { Text("Annulla") }
@@ -194,7 +206,7 @@ fun ProfileScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(ProfileBg)
+            .background(kb.background)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -212,7 +224,7 @@ fun ProfileScreen(
                         .size(46.dp)
                         .shadow(6.dp, CircleShape)
                         .clip(CircleShape)
-                        .background(Color.White)
+                        .background(kb.card)
                         .clickable { onBack.invoke() },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -220,7 +232,7 @@ fun ProfileScreen(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = null,
                         modifier = Modifier.size(21.dp),
-                        tint = Color(0xFF222222),
+                        tint = kb.title,
                     )
                 }
             }
@@ -231,18 +243,19 @@ fun ProfileScreen(
             "Profilo",
             style = MaterialTheme.typography.headlineLarge.copy(fontSize = 44.sp, lineHeight = 46.sp),
             fontWeight = FontWeight.ExtraBold,
+            color = kb.title,
         )
 
         if (state.isLoading) {
             Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(color = AccentOrange)
             }
             return@Column
         }
 
         ElevatedCard(
             modifier = Modifier.fillMaxWidth(),
-            colors = androidx.compose.material3.CardDefaults.elevatedCardColors(containerColor = ProfileCard),
+            colors = androidx.compose.material3.CardDefaults.elevatedCardColors(containerColor = kb.card),
             shape = RoundedCornerShape(20.dp),
             elevation = androidx.compose.material3.CardDefaults.elevatedCardElevation(defaultElevation = 1.5.dp),
         ) {
@@ -259,7 +272,7 @@ fun ProfileScreen(
                                 )
                                 .padding(2.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xFFFFF2E8))
+                                .background(kb.rowBackground)
                                 .shadow(8.dp, CircleShape),
                         ) {
                             when {
@@ -319,7 +332,7 @@ fun ProfileScreen(
                     }
                 }
 
-                HorizontalDivider(color = Color(0xFFEDEDED))
+                HorizontalDivider(color = kb.divider)
                 ProfileInput("Nome", state.firstName, viewModel::setFirstName)
                 ProfileInput("Cognome", state.lastName, viewModel::setLastName)
 
@@ -353,18 +366,22 @@ fun ProfileScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = SoftGray,
-                    unfocusedContainerColor = SoftGray,
+                    focusedContainerColor = kb.rowBackground,
+                    unfocusedContainerColor = kb.rowBackground,
                     focusedBorderColor = Color.Transparent,
                     unfocusedBorderColor = Color.Transparent,
+                    focusedTextColor = kb.title,
+                    unfocusedTextColor = kb.title,
+                    focusedPlaceholderColor = kb.subtitle,
+                    unfocusedPlaceholderColor = kb.subtitle,
                 ),
                 shape = RoundedCornerShape(12.dp),
             )
-            HorizontalDivider(color = Color(0xFFECECEC))
+            HorizontalDivider(color = kb.divider)
 
             if (state.addressSuggestions.isNotEmpty()) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(SoftGray),
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(kb.rowBackground),
                 ) {
                     state.addressSuggestions.forEachIndexed { index, item ->
                         Row(
@@ -376,11 +393,16 @@ fun ProfileScreen(
                             Icon(Icons.Default.LocationOn, contentDescription = null, tint = AccentOrange, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(8.dp))
                             Column {
-                                Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(item.subtitle, color = Color(0xFF888888), fontSize = 12.sp)
+                                Text(
+                                    item.title,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = kb.title,
+                                )
+                                Text(item.subtitle, color = kb.subtitle, fontSize = 12.sp)
                             }
                         }
-                        if (index < state.addressSuggestions.lastIndex) HorizontalDivider(color = Color(0xFFE7E7E7))
+                        if (index < state.addressSuggestions.lastIndex) HorizontalDivider(color = kb.divider)
                     }
                 }
             }
@@ -395,7 +417,7 @@ fun ProfileScreen(
 
         SectionCard(icon = Icons.Default.Email, iconColor = Color(0xFF2F80ED), title = "ACCOUNT") {
             InfoRow(Icons.Default.Email, Color(0xFF5EA8E2), "Email", state.email.ifBlank { "—" })
-            HorizontalDivider(color = Color(0xFFECECEC))
+            HorizontalDivider(color = kb.divider)
             InfoRow(Icons.Default.Update, Color(0xFF67B96D), "Ultimo accesso", "13 Apr 2026 at 9:17")
         }
 
@@ -405,18 +427,18 @@ fun ProfileScreen(
                     modifier = Modifier
                         .size(38.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFF1F1F4)),
+                        .background(kb.rowBackground),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Default.ManageAccounts, contentDescription = null, tint = Color(0xFF8C8C8C), modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.ManageAccounts, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(18.dp))
                 }
                 Spacer(Modifier.width(10.dp))
-                Text(state.planLabel, fontWeight = FontWeight.SemiBold)
+                Text(state.planLabel, fontWeight = FontWeight.SemiBold, color = kb.title)
                 Spacer(Modifier.weight(1f))
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFFE9EEF8))
+                        .background(MaterialTheme.kidBoxColors.rowBackground)
                         .padding(horizontal = 10.dp, vertical = 4.dp),
                 ) {
                     Text("Upgrade", color = Color(0xFF2F80ED), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
@@ -427,10 +449,14 @@ fun ProfileScreen(
                 progress = { progress },
                 modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(6.dp)),
                 color = Color(0xFF2F80ED),
-                trackColor = Color(0xFFE8EDF5),
+                trackColor = kb.divider,
             )
-            Text("${state.storageUsedBytes / 1_000_000} MB di ${state.storageTotalBytes / 1_000_000} MB", fontSize = 12.sp, color = Color(0xFF7A7A7A))
-            HorizontalDivider(color = Color(0xFFECECEC), modifier = Modifier.padding(top = 2.dp))
+            Text(
+                "${state.storageUsedBytes / 1_000_000} MB di ${state.storageTotalBytes / 1_000_000} MB",
+                fontSize = 12.sp,
+                color = kb.subtitle,
+            )
+            HorizontalDivider(color = kb.divider, modifier = Modifier.padding(top = 2.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -438,17 +464,17 @@ fun ProfileScreen(
                     .clickable { },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Default.Home, contentDescription = null, tint = Color(0xFF9A9A9A), modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Home, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(10.dp))
-                Text("Gestisci spazio e piani")
+                Text("Gestisci spazio e piani", color = kb.title)
                 Spacer(Modifier.weight(1f))
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = Color(0xFFB2B2B2))
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = kb.subtitle)
             }
         }
 
         ElevatedCard(
             modifier = Modifier.fillMaxWidth(),
-            colors = androidx.compose.material3.CardDefaults.elevatedCardColors(containerColor = ProfileCard),
+            colors = androidx.compose.material3.CardDefaults.elevatedCardColors(containerColor = kb.card),
             shape = RoundedCornerShape(20.dp),
         ) {
             ActionRow(
@@ -457,7 +483,7 @@ fun ProfileScreen(
                 label = "Esci",
                 onClick = { showLogoutConfirm = true },
             )
-            HorizontalDivider(color = Color(0xFFECECEC), modifier = Modifier.padding(start = 56.dp))
+            HorizontalDivider(color = kb.divider, modifier = Modifier.padding(start = 56.dp))
             ActionRow(
                 icon = Icons.Default.Delete,
                 tint = Color(0xFFD32F2F),
@@ -481,19 +507,22 @@ fun ProfileScreen(
 
 @Composable
 private fun ProfileInput(label: String, value: String, onChange: (String) -> Unit) {
+    val kb = MaterialTheme.kidBoxColors
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         singleLine = true,
-        placeholder = { Text(label) },
-        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFF9A9A9A)) },
+        placeholder = { Text(label, color = kb.subtitle) },
+        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = kb.subtitle) },
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = SoftGray,
-            unfocusedContainerColor = SoftGray,
+            focusedContainerColor = kb.rowBackground,
+            unfocusedContainerColor = kb.rowBackground,
             focusedBorderColor = Color.Transparent,
             unfocusedBorderColor = Color.Transparent,
+            focusedTextColor = kb.title,
+            unfocusedTextColor = kb.title,
         ),
     )
 }
@@ -505,16 +534,17 @@ private fun SectionCard(
     title: String,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val kb = MaterialTheme.kidBoxColors
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = androidx.compose.material3.CardDefaults.elevatedCardColors(containerColor = ProfileCard),
+        colors = androidx.compose.material3.CardDefaults.elevatedCardColors(containerColor = kb.card),
         shape = RoundedCornerShape(20.dp),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF8A8A8A))
+                Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = kb.subtitle)
             }
             content()
         }
@@ -523,12 +553,13 @@ private fun SectionCard(
 
 @Composable
 private fun InfoRow(icon: ImageVector, tint: Color, label: String, value: String) {
+    val kb = MaterialTheme.kidBoxColors
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, fontSize = 12.sp, color = Color(0xFF8A8A8A))
-            Text(value, fontSize = 14.sp)
+            Text(label, fontSize = 12.sp, color = kb.subtitle)
+            Text(value, fontSize = 14.sp, color = kb.title)
         }
     }
 }
@@ -540,6 +571,7 @@ private fun ActionRow(
     label: String,
     onClick: () -> Unit,
 ) {
+    val kb = MaterialTheme.kidBoxColors
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -549,7 +581,11 @@ private fun ActionRow(
     ) {
         Icon(icon, contentDescription = null, tint = tint)
         Spacer(Modifier.width(12.dp))
-        Text(label, color = if (tint == Color(0xFFD32F2F)) tint else Color.Unspecified, modifier = Modifier.weight(1f))
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = Color(0xFFB2B2B2))
+        Text(
+            label,
+            color = if (tint == Color(0xFFD32F2F)) tint else kb.title,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = kb.subtitle)
     }
 }

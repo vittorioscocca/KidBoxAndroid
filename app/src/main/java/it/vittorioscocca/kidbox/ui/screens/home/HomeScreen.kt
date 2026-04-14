@@ -2,11 +2,15 @@ package it.vittorioscocca.kidbox.ui.screens.home
 
 import android.net.Uri
 import android.util.Log
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +31,9 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -56,6 +63,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,13 +78,21 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -79,11 +100,13 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import java.io.File
+import kotlin.math.sqrt
 import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.theme.KidBoxDarkColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     onNavigate: (String) -> Unit,
@@ -93,6 +116,8 @@ fun HomeScreen(
     val pendingUri by viewModel.pendingHeroUri.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val haptic = LocalHapticFeedback.current
+    val density = LocalDensity.current
 
     androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -134,7 +159,7 @@ fun HomeScreen(
     ) {
         if (state.isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(color = Color(0xFFFF6B00))
             }
             return@Box
         }
@@ -216,25 +241,149 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.size(16.dp))
 
-            val features = featureItems(state.familyId, state)
-            features.chunked(2).forEach { rowItems ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    rowItems.forEach { item ->
-                        FeatureCard(
-                            item = item,
-                            modifier = Modifier.weight(1f),
-                            onClick = {
+            val allFeatures = featureItems(state.familyId, state)
+            val featureById = remember(allFeatures) { allFeatures.associateBy { it.id } }
+            val orderIds = remember { mutableStateListOf<String>() }
+            LaunchedEffect(state.featureOrder, allFeatures.map { it.id }) {
+                val preferred = if (state.featureOrder.isEmpty()) allFeatures.map { it.id } else state.featureOrder
+                val normalized = preferred.filter { it in featureById.keys }.toMutableList()
+                allFeatures.map { it.id }.forEach { if (it !in normalized) normalized.add(it) }
+                orderIds.clear()
+                orderIds.addAll(normalized)
+            }
+            val itemBounds = remember { mutableStateMapOf<String, Rect>() }
+            var draggingId by remember { mutableStateOf<String?>(null) }
+            var dragOffset by remember { mutableStateOf(Offset.Zero) }
+            /** Centro card (root) al long-press: ghost = anchor + dragOffset, stabile durante gli swap. */
+            var dragAnchorCenter by remember { mutableStateOf(Offset.Zero) }
+            val swapSlopPx = with(density) { 22.dp.toPx() }
+
+            val placementSpring = remember {
+                spring<Float>(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessLow,
+                )
+            }
+            val featureGridCellMinHeight = 128.dp
+            val featureGridRowSpacing = 12.dp
+            val featureGridRows = (orderIds.size + 1) / 2
+            val featureGridHeight =
+                if (orderIds.isEmpty()) 0.dp
+                else (featureGridRows * 128 + (featureGridRows - 1) * 12).dp
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(featureGridHeight),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(featureGridRowSpacing),
+                userScrollEnabled = false,
+            ) {
+                items(
+                    count = orderIds.size,
+                    key = { orderIds[it] },
+                ) { index ->
+                    val item = featureById[orderIds[index]] ?: return@items
+                    val isDragging = draggingId == item.id
+                    val scale by animateFloatAsState(
+                        targetValue = if (isDragging) 1.05f else 1f,
+                        animationSpec = placementSpring,
+                        label = "home_feature_scale",
+                    )
+                    FeatureCard(
+                        item = item,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(featureGridCellMinHeight)
+                            .zIndex(if (isDragging) 20f else 0f)
+                            .onGloballyPositioned { coordinates ->
+                                itemBounds[item.id] = coordinates.boundsInRoot()
+                            }
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                                if (isDragging) {
+                                    translationX = dragOffset.x
+                                    translationY = dragOffset.y
+                                }
+                            }
+                            .then(
+                                if (isDragging) {
+                                    Modifier.shadow(
+                                        elevation = 14.dp,
+                                        shape = RoundedCornerShape(16.dp),
+                                        ambientColor = Color.Black.copy(alpha = 0.12f),
+                                        spotColor = Color.Black.copy(alpha = 0.18f),
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            )
+                            .pointerInput(item.id) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        dragAnchorCenter = itemBounds[item.id]?.center ?: Offset.Zero
+                                        draggingId = item.id
+                                        dragOffset = Offset.Zero
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    },
+                                    onDrag = { change, amount ->
+                                        change.consume()
+                                        if (draggingId != item.id) return@detectDragGesturesAfterLongPress
+                                        dragOffset += amount
+                                        val currentId = draggingId ?: return@detectDragGesturesAfterLongPress
+                                        val fromIdx = orderIds.indexOf(currentId)
+                                        if (fromIdx < 0) return@detectDragGesturesAfterLongPress
+                                        val ghostCenter = dragAnchorCenter + dragOffset
+                                        var nearestIdx = fromIdx
+                                        var nearestDist = Float.POSITIVE_INFINITY
+                                        for (i in orderIds.indices) {
+                                            val oid = orderIds[i]
+                                            val r = itemBounds[oid] ?: continue
+                                            val dx = r.center.x - ghostCenter.x
+                                            val dy = r.center.y - ghostCenter.y
+                                            val d = dx * dx + dy * dy
+                                            if (d < nearestDist) {
+                                                nearestDist = d
+                                                nearestIdx = i
+                                            }
+                                        }
+                                        val occupiedCenter = itemBounds[currentId]?.center ?: dragAnchorCenter
+                                        val distOccupiedSq = run {
+                                            val ox = ghostCenter.x - occupiedCenter.x
+                                            val oy = ghostCenter.y - occupiedCenter.y
+                                            ox * ox + oy * oy
+                                        }
+                                        val distOcc = sqrt(distOccupiedSq)
+                                        val distNear = sqrt(nearestDist)
+                                        if (nearestIdx != fromIdx && distNear + swapSlopPx < distOcc) {
+                                            orderIds.removeAt(fromIdx)
+                                            orderIds.add(nearestIdx, currentId)
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        draggingId = null
+                                        dragOffset = Offset.Zero
+                                        dragAnchorCenter = Offset.Zero
+                                        viewModel.saveFeatureOrder(orderIds.toList())
+                                    },
+                                    onDragCancel = {
+                                        draggingId = null
+                                        dragOffset = Offset.Zero
+                                        dragAnchorCenter = Offset.Zero
+                                    },
+                                )
+                            },
+                        onClick = {
+                            if (draggingId == null) {
                                 viewModel.onFeatureOpened(item.counterField)
                                 onNavigate(item.route)
-                            },
-                        )
-                    }
-                    if (rowItems.size == 1) Spacer(modifier = Modifier.weight(1f))
+                            }
+                        },
+                    )
                 }
-                Spacer(modifier = Modifier.size(12.dp))
             }
         }
 
@@ -376,6 +525,7 @@ private fun FamilyHeroCard(
 // ── FeatureCard, HomeFab, helpers ─────────────────────────────────────────────
 
 private data class FeatureItem(
+    val id: String,
     val title: String,
     val subtitle: String,
     val route: String,
@@ -391,11 +541,12 @@ private fun FeatureCard(item: FeatureItem, modifier: Modifier = Modifier, onClic
     val kidBox = MaterialTheme.kidBoxColors
     val containerColor =
         if (kidBox === KidBoxDarkColorScheme) kidBox.card else item.cardColor
-    Box(modifier = modifier) {
+    Box {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick),
+                .clickable(onClick = onClick)
+                .then(modifier),
             shape = RoundedCornerShape(16.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             colors = CardDefaults.cardColors(containerColor = containerColor),
@@ -477,18 +628,18 @@ private fun HomeFab(
 }
 
 private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem> = listOf(
-    FeatureItem("Note", "Appunti veloci", AppDestination.NotesHome.createRoute(familyId), Icons.AutoMirrored.Filled.Note, Color(0xFFFFF9E6), Color(0xFFF5A623), state.badgeNotes, CounterField.NOTES),
-    FeatureItem("To-Do", "Lista condivisa", AppDestination.Todo.route, Icons.Filled.CheckCircle, Color(0xFFEBF3FF), Color(0xFF2E86FF), state.badgeTodos, CounterField.TODOS),
-    FeatureItem("Lista Spesa", "Lista condivisa", AppDestination.ShoppingList.createRoute(familyId), Icons.Filled.LocalGroceryStore, Color(0xFFEDFAF3), Color(0xFF27AE60), state.badgeShopping, CounterField.SHOPPING),
-    FeatureItem("Calendario", "Eventi e affidamenti", AppDestination.Calendar.createRoute(familyId), Icons.Filled.CalendarMonth, Color(0xFFF3EEFF), Color(0xFF8B5CF6), state.badgeCalendar, CounterField.CALENDAR),
-    FeatureItem("Salute", "Health tracker", AppDestination.PediatricChildSelector.createRoute(familyId), Icons.Filled.Favorite, Color(0xFFFFEAEA), Color(0xFFE53E3E)),
-    FeatureItem("Chat", "Messaggi famiglia", AppDestination.Chat.route, Icons.AutoMirrored.Filled.Chat, Color(0xFFEDFAF3), Color(0xFF27AE60), state.badgeChat, CounterField.CHAT),
-    FeatureItem("Spese", "Rette, visite, extra", AppDestination.ExpensesHome.createRoute(familyId), Icons.Filled.Euro, Color(0xFFFFF3E6), Color(0xFFFF6B00), state.badgeExpenses, CounterField.EXPENSES),
-    FeatureItem("Documenti", "Carte importanti", AppDestination.DocumentsHome.route, Icons.Filled.Description, Color(0xFFEBF3FF), Color(0xFF2E86FF), state.badgeDocuments, CounterField.DOCUMENTS),
-    FeatureItem("Posizione", "Dove sono tutti", AppDestination.FamilyLocation.createRoute(familyId), Icons.Filled.Place, Color(0xFFE6FAF8), Color(0xFF00BFA5), state.badgeLocation, CounterField.LOCATION),
-    FeatureItem("Foto e Video", "Ricordi famiglia", AppDestination.FamilyPhotos.createRoute(familyId), Icons.Filled.PhotoLibrary, Color(0xFFFFF0F5), Color(0xFFE91E8C)),
-    FeatureItem("Assistente AI", "Chiedi aiuto", AppDestination.AskExpert.route, Icons.Filled.Psychology, Color(0xFFEEF0FF), Color(0xFF5C6BC0)),
-    FeatureItem("Family", "Gestisci famiglia", AppDestination.FamilySettings.route, Icons.Filled.Person, Color(0xFFFFF3E6), Color(0xFFFF6B00)),
+    FeatureItem("notes", "Note", "Appunti veloci", AppDestination.NotesHome.createRoute(familyId), Icons.AutoMirrored.Filled.Note, Color(0xFFFFF9E6), Color(0xFFF5A623), state.badgeNotes, CounterField.NOTES),
+    FeatureItem("todo", "To-Do", "Lista condivisa", AppDestination.Todo.route, Icons.Filled.CheckCircle, Color(0xFFEBF3FF), Color(0xFF2E86FF), state.badgeTodos, CounterField.TODOS),
+    FeatureItem("shopping", "Lista Spesa", "Lista condivisa", AppDestination.ShoppingList.createRoute(familyId), Icons.Filled.LocalGroceryStore, Color(0xFFEDFAF3), Color(0xFF27AE60), state.badgeShopping, CounterField.SHOPPING),
+    FeatureItem("calendar", "Calendario", "Eventi e affidamenti", AppDestination.Calendar.createRoute(familyId), Icons.Filled.CalendarMonth, Color(0xFFF3EEFF), Color(0xFF8B5CF6), state.badgeCalendar, CounterField.CALENDAR),
+    FeatureItem("health", "Salute", "Health tracker", AppDestination.PediatricChildSelector.createRoute(familyId), Icons.Filled.Favorite, Color(0xFFFFEAEA), Color(0xFFE53E3E)),
+    FeatureItem("chat", "Chat", "Messaggi famiglia", AppDestination.Chat.route, Icons.AutoMirrored.Filled.Chat, Color(0xFFEDFAF3), Color(0xFF27AE60), state.badgeChat, CounterField.CHAT),
+    FeatureItem("expenses", "Spese", "Rette, visite, extra", AppDestination.ExpensesHome.createRoute(familyId), Icons.Filled.Euro, Color(0xFFFFF3E6), Color(0xFFFF6B00), state.badgeExpenses, CounterField.EXPENSES),
+    FeatureItem("documents", "Documenti", "Carte importanti", AppDestination.DocumentsHome.route, Icons.Filled.Description, Color(0xFFEBF3FF), Color(0xFF2E86FF), state.badgeDocuments, CounterField.DOCUMENTS),
+    FeatureItem("location", "Posizione", "Dove sono tutti", AppDestination.FamilyLocation.createRoute(familyId), Icons.Filled.Place, Color(0xFFE6FAF8), Color(0xFF00BFA5), state.badgeLocation, CounterField.LOCATION),
+    FeatureItem("photos", "Foto e Video", "Ricordi famiglia", AppDestination.FamilyPhotos.createRoute(familyId), Icons.Filled.PhotoLibrary, Color(0xFFFFF0F5), Color(0xFFE91E8C)),
+    FeatureItem("ai", "Assistente AI", "Chiedi aiuto", AppDestination.AskExpert.route, Icons.Filled.Psychology, Color(0xFFEEF0FF), Color(0xFF5C6BC0)),
+    FeatureItem("family", "Family", "Gestisci famiglia", AppDestination.FamilySettings.route, Icons.Filled.Person, Color(0xFFFFF3E6), Color(0xFFFF6B00)),
 )
 
 @Composable

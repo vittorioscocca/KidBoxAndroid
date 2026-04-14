@@ -36,11 +36,14 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoItemEntity
+import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -67,11 +71,20 @@ fun TodoListScreen(
     onBack: () -> Unit,
     viewModel: TodoListViewModel = hiltViewModel(),
 ) {
+    val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
     var showEditor by remember { mutableStateOf(false) }
     var editingTodo by remember { mutableStateOf<KBTodoItemEntity?>(null) }
     var pendingSaveAfterPermission by remember { mutableStateOf<TodoEditForm?>(null) }
+    var pendingSnackbarMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(pendingSnackbarMessage) {
+        val message = pendingSnackbarMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        pendingSnackbarMessage = null
+    }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -100,13 +113,16 @@ fun TodoListScreen(
                 reminderEnabled = effective.reminderEnabled,
             )
         }
+        if (effective.reminderEnabled && effective.dueAt != null) {
+            pendingSnackbarMessage = "Promemoria programmato per ${formatDate(effective.dueAt)}"
+        }
         showEditor = false
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF4F4F8)),
+            .background(kb.background),
     ) {
         Column(
             modifier = Modifier
@@ -134,7 +150,7 @@ fun TodoListScreen(
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Text(state.listName, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold)
+            Text(state.listName, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold, color = kb.title)
             Spacer(Modifier.height(16.dp))
 
             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
@@ -143,12 +159,12 @@ fun TodoListScreen(
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            colors = CardDefaults.cardColors(containerColor = kb.card),
                         ) {
                             Text(
                                 "Nessun elemento",
                                 modifier = Modifier.padding(16.dp),
-                                color = Color(0xFF9397A0),
+                                color = kb.subtitle,
                             )
                         }
                     }
@@ -170,6 +186,13 @@ fun TodoListScreen(
                 item { Spacer(Modifier.height(24.dp)) }
             }
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 20.dp),
+        )
     }
 
     if (showEditor) {
@@ -206,6 +229,9 @@ fun TodoListScreen(
                             reminderEnabled = form.reminderEnabled,
                         )
                     }
+                    if (form.reminderEnabled && form.dueAt != null) {
+                        pendingSnackbarMessage = "Promemoria programmato per ${formatDate(form.dueAt)}"
+                    }
                     showEditor = false
                 }
             },
@@ -229,7 +255,7 @@ private fun TodoRow(
             .alpha(if (todo.isDone) 0.8f else 1f)
             .clickable(onClick = onEdit),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = if (highlighted) Color(0xFFFFF8D8) else Color.White),
+        colors = CardDefaults.cardColors(containerColor = if (highlighted) Color(0xFFFFF8D8) else MaterialTheme.kidBoxColors.card),
     ) {
         Row(
             modifier = Modifier
@@ -242,7 +268,7 @@ private fun TodoRow(
                 Icon(
                     imageVector = if (todo.isDone) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
                     contentDescription = null,
-                    tint = if (todo.isDone) Color(0xFF111111) else Color(0xFFB9BDC6),
+                    tint = if (todo.isDone) MaterialTheme.kidBoxColors.title else Color(0xFFB9BDC6),
                     modifier = Modifier.size(20.dp),
                 )
             }
@@ -255,7 +281,7 @@ private fun TodoRow(
                         text = todo.title,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Medium,
-                        color = if (todo.isDone) Color(0xFF595F69) else Color(0xFF111111),
+                    color = if (todo.isDone) MaterialTheme.kidBoxColors.subtitle else MaterialTheme.kidBoxColors.title,
                         modifier = Modifier.weight(1f, fill = false),
                     )
                     if (todo.reminderEnabled) {
@@ -275,7 +301,7 @@ private fun TodoRow(
                     }
                 }
                 if (info.isNotBlank()) {
-                    Text(info, color = Color(0xFF6F7784), fontSize = 13.sp)
+                    Text(info, color = MaterialTheme.kidBoxColors.subtitle, fontSize = 13.sp)
                 }
                 if (isUrgent) {
                     Text(
@@ -381,7 +407,7 @@ private fun TodoEditDialog(
                                 .weight(1f)
                                 .clickable { pickDate() },
                             shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFF2F3F7)),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.rowBackground),
                         ) {
                             Text(
                                 text = formatDateOnly(dueAt),
@@ -393,7 +419,7 @@ private fun TodoEditDialog(
                             modifier = Modifier
                                 .clickable { pickTime() },
                             shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFF2F3F7)),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.rowBackground),
                         ) {
                             Text(
                                 text = formatTimeOnly(dueAt),
@@ -427,7 +453,7 @@ private fun TodoEditDialog(
                         .fillMaxWidth()
                         .clickable { showAssigneePicker = true },
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF2F3F7)),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.rowBackground),
                 ) {
                     Row(
                         modifier = Modifier
@@ -436,11 +462,11 @@ private fun TodoEditDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text("Assegnato a", fontSize = 13.sp, color = Color(0xFF6F7784))
+                        Text("Assegnato a", fontSize = 13.sp, color = MaterialTheme.kidBoxColors.subtitle)
                         Text(
                             members.firstOrNull { it.uid == assignedTo }?.displayName ?: "Nessuno",
                             fontSize = 15.sp,
-                            color = Color(0xFF111111),
+                            color = MaterialTheme.kidBoxColors.title,
                         )
                     }
                 }
@@ -546,7 +572,7 @@ private fun HeaderCircleButton(
     Card(
         modifier = Modifier.size(44.dp).clickable(onClick = onClick),
         shape = CircleShape,
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)

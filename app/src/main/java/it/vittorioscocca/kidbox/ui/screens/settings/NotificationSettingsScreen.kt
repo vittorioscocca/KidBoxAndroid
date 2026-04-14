@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.notification.PushNotificationManager.PreferenceKeys
+import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
 @Composable
 fun NotificationSettingsScreen(
@@ -50,6 +51,7 @@ fun NotificationSettingsScreen(
     viewModel: NotificationSettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var pendingEnableKey by remember { mutableStateOf<String?>(null) }
@@ -80,7 +82,7 @@ fun NotificationSettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F4F1))
+            .background(kb.background)
             .statusBarsPadding()
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
@@ -89,17 +91,22 @@ fun NotificationSettingsScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Indietro",
+                    tint = kb.title,
+                )
             }
             Text(
                 text = "Notifiche",
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                color = kb.title,
             )
         }
         Spacer(Modifier.height(12.dp))
         Card(
             shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = kb.card),
         ) {
             NotificationToggleRow(
                 title = "Notifica nuovi documenti",
@@ -275,6 +282,7 @@ private fun NotificationToggleRow(
     enabled: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
+    val kb = MaterialTheme.kidBoxColors
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -295,12 +303,12 @@ private fun NotificationToggleRow(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color(0xFF1C1C1E),
+                    color = kb.title,
                 )
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF8E8E93),
+                    color = kb.subtitle,
                 )
             }
         }
