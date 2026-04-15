@@ -156,6 +156,22 @@ class MainActivity : ComponentActivity() {
                                 }
                                 pendingPushDeepLink = null
                             }
+
+                            "location", "open_location", "location_sharing_started", "location_sharing_stopped" -> {
+                                if (deepLink.familyId.isNotBlank()) {
+                                    navController.navigate(AppDestination.FamilyLocation.createRoute(deepLink.familyId))
+                                }
+                                pendingPushDeepLink = null
+                            }
+
+                            "location", "family_location", "location_sharing_started", "location_sharing_stopped" -> {
+                                if (deepLink.familyId.isNotBlank()) {
+                                    navController.navigate(
+                                        AppDestination.FamilyLocation.createRoute(deepLink.familyId),
+                                    )
+                                }
+                                pendingPushDeepLink = null
+                            }
                         }
                     }
                 }

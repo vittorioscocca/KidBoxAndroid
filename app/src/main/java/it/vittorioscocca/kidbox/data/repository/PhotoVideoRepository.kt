@@ -7,13 +7,16 @@ import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.util.Log
 import android.util.Base64
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
 import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyPhotoDao
 import it.vittorioscocca.kidbox.data.local.dao.KBPhotoAlbumDao
+import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyPhotoEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBPhotoAlbumEntity
 import it.vittorioscocca.kidbox.data.remote.PhotoAlbumRemoteChange
@@ -38,8 +41,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+private const val PHOTO_INTEGRITY_TAG = "KidBoxPhotoIntegrity"
+
 @Singleton
 class PhotoVideoRepository @Inject constructor(
+    private val familyDao: KBFamilyDao,
     private val photoDao: KBFamilyPhotoDao,
     private val albumDao: KBPhotoAlbumDao,
     private val remoteStore: PhotoVideoRemoteStore,
@@ -152,6 +158,7 @@ class PhotoVideoRepository @Inject constructor(
         albumId: String? = null,
         caption: String? = null,
     ): KBFamilyPhotoEntity {
+        ensureFamilyExists(familyId = familyId, updatedAtEpochMillis = System.currentTimeMillis(), updatedBy = auth.currentUser?.uid)
         val now = System.currentTimeMillis()
         val uid = auth.currentUser?.uid ?: "local"
         val id = UUID.randomUUID().toString()
@@ -432,6 +439,11 @@ class PhotoVideoRepository @Inject constructor(
         familyId: String,
         dto: RemoteFamilyPhotoDto,
     ) {
+        ensureFamilyExists(
+            familyId = familyId,
+            updatedAtEpochMillis = dto.updatedAtEpochMillis,
+            updatedBy = dto.updatedBy,
+        )
         val local = photoDao.getById(dto.id)
         val localSync = local?.let { KBSyncState.fromRaw(it.syncStateRaw) }
         if (localSync == KBSyncState.PENDING_UPSERT || localSync == KBSyncState.PENDING_DELETE) return
@@ -472,6 +484,11 @@ class PhotoVideoRepository @Inject constructor(
         familyId: String,
         dto: RemotePhotoAlbumDto,
     ) {
+        ensureFamilyExists(
+            familyId = familyId,
+            updatedAtEpochMillis = dto.updatedAtEpochMillis,
+            updatedBy = dto.updatedBy,
+        )
         val local = albumDao.getById(dto.id)
         val localSync = local?.let { KBSyncState.fromRaw(it.syncStateRaw) }
         if (localSync == KBSyncState.PENDING_UPSERT || localSync == KBSyncState.PENDING_DELETE) return
@@ -482,12 +499,21 @@ class PhotoVideoRepository @Inject constructor(
         }
         if (local != null && remoteUpdatedAt < local.updatedAtEpochMillis) return
         val now = System.currentTimeMillis()
+        // The album can arrive from cache before its cover photo snapshot; avoid FK crash.
+        val resolvedCoverPhotoId = dto.coverPhotoId
+            ?.takeIf { coverId -> photoDao.getById(coverId) != null }
+        if (!dto.coverPhotoId.isNullOrBlank() && resolvedCoverPhotoId == null) {
+            Log.w(
+                PHOTO_INTEGRITY_TAG,
+                "Album ${dto.id}: coverPhotoId=${dto.coverPhotoId} not found locally, fallback to null",
+            )
+        }
         albumDao.upsert(
             KBPhotoAlbumEntity(
                 id = dto.id,
                 familyId = familyId,
                 title = dto.title.ifBlank { local?.title.orEmpty() },
-                coverPhotoId = dto.coverPhotoId,
+                coverPhotoId = resolvedCoverPhotoId,
                 sortOrder = dto.sortOrder,
                 createdAtEpochMillis = local?.createdAtEpochMillis ?: dto.createdAtEpochMillis ?: now,
                 updatedAtEpochMillis = if (remoteUpdatedAt > 0L) remoteUpdatedAt else now,
@@ -495,6 +521,39 @@ class PhotoVideoRepository @Inject constructor(
                 updatedBy = dto.updatedBy ?: local?.updatedBy.orEmpty(),
                 isDeleted = false,
                 syncStateRaw = KBSyncState.SYNCED.rawValue,
+                lastSyncError = null,
+            ),
+        )
+    }
+
+    private suspend fun ensureFamilyExists(
+        familyId: String,
+        updatedAtEpochMillis: Long?,
+        updatedBy: String?,
+    ) {
+        if (familyId.isBlank()) return
+        if (familyDao.getById(familyId) != null) return
+        val now = System.currentTimeMillis()
+        val actor = updatedBy?.takeIf { it.isNotBlank() } ?: auth.currentUser?.uid ?: "remote"
+        Log.w(
+            PHOTO_INTEGRITY_TAG,
+            "Missing family row for familyId=$familyId, creating placeholder before photo/album upsert",
+        )
+        familyDao.upsert(
+            KBFamilyEntity(
+                id = familyId,
+                name = "",
+                heroPhotoURL = null,
+                heroPhotoLocalPath = null,
+                heroPhotoUpdatedAtEpochMillis = null,
+                heroPhotoScale = null,
+                heroPhotoOffsetX = null,
+                heroPhotoOffsetY = null,
+                createdBy = actor,
+                updatedBy = actor,
+                createdAtEpochMillis = updatedAtEpochMillis ?: now,
+                updatedAtEpochMillis = updatedAtEpochMillis ?: now,
+                lastSyncAtEpochMillis = null,
                 lastSyncError = null,
             ),
         )

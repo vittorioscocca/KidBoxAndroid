@@ -6,4 +6,6 @@
     <!-- ID app Facebook (Meta Developer Console). Sostituire con l’ID reale. -->
     <string name="facebook_app_id" translatable="false">2596255223393986</string>
     <string name="facebook_client_token" translatable="false">5b9865a1b3cafd6f89a71162d5c4094f</string>
+    <!-- Maps key is injected from local.properties (MAPS_API_KEY). -->
+    <string name="google_maps_key" translatable="false"></string>
 </resources>

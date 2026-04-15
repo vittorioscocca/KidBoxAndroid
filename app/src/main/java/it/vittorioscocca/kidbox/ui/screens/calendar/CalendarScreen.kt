@@ -140,7 +140,7 @@ fun CalendarScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
                     .clip(RoundedCornerShape(999.dp))
-                    .background(Color(0xFFF0F0F0))
+                    .background(MaterialTheme.kidBoxColors.card)
                     .padding(3.dp),
             ) {
                 TogglePill(
@@ -244,7 +244,7 @@ private fun CalendarMonthView(
                 Text(
                     text = d,
                     modifier = Modifier.weight(1f),
-                    color = Color.Gray,
+                    color = MaterialTheme.kidBoxColors.subtitle,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     fontSize = 13.sp,
                 )
@@ -283,7 +283,7 @@ private fun CalendarMonthView(
                             ) {
                                 Text(
                                     text = day.dayOfMonth.toString(),
-                                    color = if (isSelected) Color.White else Color.Black,
+                                    color = if (isSelected) Color.White else MaterialTheme.kidBoxColors.title,
                                     fontWeight = if (isToday || isSelected) FontWeight.SemiBold else FontWeight.Normal,
                                 )
                             }
@@ -307,10 +307,10 @@ private fun CalendarMonthView(
                     Icon(
                         Icons.Default.NotificationsNone,
                         contentDescription = null,
-                        tint = Color(0xFFCFCFCF),
+                        tint = MaterialTheme.kidBoxColors.subtitle,
                         modifier = Modifier.size(42.dp),
                     )
-                    Text("Nessun evento", color = Color.Gray, modifier = Modifier.padding(top = 6.dp))
+                    Text("Nessun evento", color = MaterialTheme.kidBoxColors.subtitle, modifier = Modifier.padding(top = 6.dp))
                 }
             }
         } else {
@@ -428,7 +428,7 @@ private fun MiniMonthCard(
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
             Text(monthTitle, fontWeight = FontWeight.Bold)
@@ -437,7 +437,7 @@ private fun MiniMonthCard(
                     Text(
                         text = it,
                         modifier = Modifier.weight(1f),
-                        color = Color(0xFF9E9E9E),
+                        color = MaterialTheme.kidBoxColors.subtitle,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         fontSize = 9.sp,
                     )
@@ -460,7 +460,7 @@ private fun MiniMonthCard(
                             ) {
                                 Text(
                                     day.dayOfMonth.toString(),
-                                    color = if (isSelected) Color(0xFF1E88E5) else Color.Black,
+                                    color = if (isSelected) Color(0xFF1E88E5) else MaterialTheme.kidBoxColors.title,
                                     fontSize = 10.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                 )
@@ -504,12 +504,12 @@ private fun CalendarEventCard(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
             .clickable(onClick = onEdit),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
         shape = RoundedCornerShape(14.dp),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(event.title, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            Text(timeLabel, color = Color.Gray, fontSize = 12.sp)
+            Text(timeLabel, color = MaterialTheme.kidBoxColors.subtitle, fontSize = 12.sp)
             Text(categoryLabel(event.categoryRaw), color = categoryColor(event.categoryRaw), fontSize = 12.sp)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onDelete) {
@@ -579,7 +579,7 @@ private fun CalendarEventDialog(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = Color(0xFFF6F6F6),
+        containerColor = MaterialTheme.kidBoxColors.background,
         dragHandle = null,
     ) {
         Column(
@@ -599,9 +599,9 @@ private fun CalendarEventDialog(
                 Spacer(modifier = Modifier.size(74.dp))
             }
 
-            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("TITOLO", fontSize = 12.sp, color = Color(0xFF9E9E9E), fontWeight = FontWeight.SemiBold)
+                    Text("TITOLO", fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
                     TextField(
                         value = title,
                         onValueChange = { title = it },
@@ -611,7 +611,7 @@ private fun CalendarEventDialog(
                         colors = textFieldColors(),
                     )
                     Divider()
-                    Text("CATEGORIA", fontSize = 12.sp, color = Color(0xFF9E9E9E), fontWeight = FontWeight.SemiBold)
+                    Text("CATEGORIA", fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("children", "school", "health", "family").forEach { raw ->
                             CategoryPill(
@@ -624,7 +624,7 @@ private fun CalendarEventDialog(
                 }
             }
 
-            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Tutto il giorno", modifier = Modifier.weight(1f), fontSize = 16.sp)
@@ -649,7 +649,7 @@ private fun CalendarEventDialog(
                         onPickTime = { pickTime(endTime) { endTime = it } },
                     )
                     Divider()
-                    Text("RICORRENZA", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Color(0xFF9E9E9E))
+                    Text("RICORRENZA", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         listOf(
                             "none" to "Nessuna",
@@ -664,7 +664,7 @@ private fun CalendarEventDialog(
                 }
             }
 
-            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Row(
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -674,9 +674,9 @@ private fun CalendarEventDialog(
                 }
             }
 
-            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("LUOGO", fontSize = 12.sp, color = Color(0xFF9E9E9E), fontWeight = FontWeight.SemiBold)
+                    Text("LUOGO", fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
                     TextField(
                         value = location,
                         onValueChange = { location = it },
@@ -686,7 +686,7 @@ private fun CalendarEventDialog(
                         colors = textFieldColors(),
                     )
                     Divider()
-                    Text("NOTE", fontSize = 12.sp, color = Color(0xFF9E9E9E), fontWeight = FontWeight.SemiBold)
+                    Text("NOTE", fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
                     TextField(
                         value = notes,
                         onValueChange = { notes = it },
@@ -767,7 +767,7 @@ private fun PickerPill(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(Color(0xFFF2F2F5))
+            .background(MaterialTheme.kidBoxColors.card)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
@@ -791,8 +791,8 @@ private fun CategoryPill(
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(if (selected) color.copy(alpha = 0.2f) else Color.White)
-            .border(1.dp, if (selected) color else Color(0xFFE0E0E0), RoundedCornerShape(999.dp))
+            .background(if (selected) color.copy(alpha = 0.2f) else MaterialTheme.kidBoxColors.card)
+            .border(1.dp, if (selected) color else MaterialTheme.kidBoxColors.divider, RoundedCornerShape(999.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -815,8 +815,8 @@ private fun SmallChip(
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(if (selected) Color(0xFFE9F2FF) else Color.White)
-            .border(1.dp, if (selected) Color(0xFF64B5F6) else Color(0xFFE0E0E0), RoundedCornerShape(999.dp))
+            .background(if (selected) Color(0xFFE9F2FF) else MaterialTheme.kidBoxColors.card)
+            .border(1.dp, if (selected) Color(0xFF64B5F6) else MaterialTheme.kidBoxColors.divider, RoundedCornerShape(999.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 5.dp),
     ) {
@@ -834,12 +834,12 @@ private fun TogglePill(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(if (selected) Color.White else Color.Transparent)
+            .background(if (selected) MaterialTheme.kidBoxColors.card else Color.Transparent)
             .clickable(onClick = onClick)
             .padding(vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, fontWeight = FontWeight.SemiBold, color = Color.Black)
+        Text(text, fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.title)
     }
 }
 
@@ -868,7 +868,7 @@ private fun PillButton(
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(999.dp),
-        color = Color(0xFFEFEFEF),
+        color = MaterialTheme.kidBoxColors.card,
     ) {
         Text(
             text = text,

@@ -2,9 +2,14 @@ package it.vittorioscocca.kidbox.ui.screens.home
 
 import android.net.Uri
 import android.util.Log
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -232,6 +237,37 @@ fun HomeScreen(
                     )
                 },
             )
+            if (state.isMembersSyncing) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp),
+                        strokeWidth = 2.dp,
+                        color = Color(0xFFFF6B00),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Sincronizzazione membri...",
+                        color = MaterialTheme.kidBoxColors.subtitle,
+                        fontSize = 12.sp,
+                    )
+                }
+            }
+            state.membersSyncWarning?.let { warning ->
+                Text(
+                    text = warning,
+                    color = Color(0xFFD9822B),
+                    fontSize = 12.sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                )
+            }
             if (state.isUploadingHero) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
             }
@@ -534,6 +570,7 @@ private data class FeatureItem(
     val iconColor: Color,
     val badgeCount: Int = 0,
     val counterField: CounterField? = null,
+    val isPulsing: Boolean = false,
 )
 
 @Composable
@@ -563,6 +600,13 @@ private fun FeatureCard(item: FeatureItem, modifier: Modifier = Modifier, onClic
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 8.dp, end = 8.dp),
+            )
+        }
+        if (item.isPulsing) {
+            LocationPulseIndicator(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 10.dp, bottom = 10.dp),
             )
         }
     }
@@ -636,7 +680,18 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
     FeatureItem("chat", "Chat", "Messaggi famiglia", AppDestination.Chat.route, Icons.AutoMirrored.Filled.Chat, Color(0xFFEDFAF3), Color(0xFF27AE60), state.badgeChat, CounterField.CHAT),
     FeatureItem("expenses", "Spese", "Rette, visite, extra", AppDestination.ExpensesHome.createRoute(familyId), Icons.Filled.Euro, Color(0xFFFFF3E6), Color(0xFFFF6B00), state.badgeExpenses, CounterField.EXPENSES),
     FeatureItem("documents", "Documenti", "Carte importanti", AppDestination.DocumentsHome.createRoute(familyId), Icons.Filled.Description, Color(0xFFEBF3FF), Color(0xFF2E86FF), state.badgeDocuments, CounterField.DOCUMENTS),
-    FeatureItem("location", "Posizione", "Dove sono tutti", AppDestination.FamilyLocation.createRoute(familyId), Icons.Filled.Place, Color(0xFFE6FAF8), Color(0xFF00BFA5), state.badgeLocation, CounterField.LOCATION),
+    FeatureItem(
+        "location",
+        "Posizione",
+        "Dove sono tutti",
+        AppDestination.FamilyLocation.createRoute(familyId),
+        Icons.Filled.Place,
+        Color(0xFFE6FAF8),
+        Color(0xFF00BFA5),
+        state.badgeLocation,
+        CounterField.LOCATION,
+        isPulsing = state.isLocationSharing,
+    ),
     FeatureItem(
         "photos",
         "Foto e Video",
@@ -651,6 +706,48 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
     FeatureItem("ai", "Assistente AI", "Chiedi aiuto", AppDestination.AskExpert.route, Icons.Filled.Psychology, Color(0xFFEEF0FF), Color(0xFF5C6BC0)),
     FeatureItem("family", "Family", "Gestisci famiglia", AppDestination.FamilySettings.route, Icons.Filled.Person, Color(0xFFFFF3E6), Color(0xFFFF6B00)),
 )
+
+@Composable
+private fun LocationPulseIndicator(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "home_location_pulse")
+    val pulseScale by transition.animateFloat(
+        initialValue = 0.85f,
+        targetValue = 1.65f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "home_location_pulse_scale",
+    )
+    val pulseAlpha by transition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "home_location_pulse_alpha",
+    )
+
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .size(16.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF34C759).copy(alpha = pulseAlpha))
+                .graphicsLayer {
+                    scaleX = pulseScale
+                    scaleY = pulseScale
+                },
+        )
+        Box(
+            modifier = Modifier
+                .size(9.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF30C659)),
+        )
+    }
+}
 
 @Composable
 private fun HomeCardBadge(

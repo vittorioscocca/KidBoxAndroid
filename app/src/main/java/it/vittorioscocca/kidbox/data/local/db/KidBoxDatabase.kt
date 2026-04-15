@@ -26,6 +26,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBRoutineCheckDao
 import it.vittorioscocca.kidbox.data.local.dao.KBRoutineDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoItemDao
 import it.vittorioscocca.kidbox.data.local.dao.KBUserProfileDao
+import it.vittorioscocca.kidbox.data.local.dao.KBSharedLocationDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoListDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTreatmentDao
 import it.vittorioscocca.kidbox.data.local.dao.KBVaccineDao
@@ -53,12 +54,13 @@ import it.vittorioscocca.kidbox.data.local.entity.KBRoutineCheckEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBRoutineEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoItemEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBUserProfileEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBSharedLocationEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoListEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTreatmentEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBVaccineEntity
 
 @Database(
-    version = 3,
+    version = 4,
     exportSchema = false,
     entities = [
         KBUserProfileEntity::class,
@@ -88,6 +90,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBVaccineEntity
         KBTreatmentEntity::class,
         KBCustomDrugEntity::class,
         KBDoseLogEntity::class,
+        KBSharedLocationEntity::class,
     ],
 )
 abstract class KidBoxDatabase : RoomDatabase() {
@@ -118,4 +121,5 @@ abstract class KidBoxDatabase : RoomDatabase() {
     abstract fun treatmentDao(): KBTreatmentDao
     abstract fun customDrugDao(): KBCustomDrugDao
     abstract fun doseLogDao(): KBDoseLogDao
+    abstract fun sharedLocationDao(): KBSharedLocationDao
 }

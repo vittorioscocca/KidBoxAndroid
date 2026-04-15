@@ -17,6 +17,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
+import it.vittorioscocca.kidbox.data.local.dao.KBSharedLocationDao
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
 import it.vittorioscocca.kidbox.data.notification.CounterField
@@ -28,6 +29,8 @@ import it.vittorioscocca.kidbox.ui.screens.home.HeroCrop
 import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,6 +42,8 @@ import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 private const val TAG = "HomeViewModel"
+private const val MEMBERS_SYNC_TAG = "HomeMembersSync"
+private const val MEMBERS_SYNC_TIMEOUT_MS = 10_000L
 
 data class HomeUiState(
     val isLoading: Boolean = true,
@@ -52,6 +57,9 @@ data class HomeUiState(
     val isUploadingHero: Boolean = false,
     val errorMessage: String? = null,
     val memberCount: Int = 0,
+    val isLocationSharing: Boolean = false,
+    val isMembersSyncing: Boolean = false,
+    val membersSyncWarning: String? = null,
     val todayLabel: String = "",
     val avatarUrl: String? = null,
     val isFabExpanded: Boolean = false,
@@ -84,6 +92,7 @@ class HomeViewModel @Inject constructor(
     private val logoutUseCase: LogoutUseCase,
     private val familyDao: KBFamilyDao,
     private val familyMemberDao: KBFamilyMemberDao,
+    private val sharedLocationDao: KBSharedLocationDao,
     private val heroPhotoService: FamilyHeroPhotoService,
     private val familySyncCenter: FamilySyncCenter,
     private val familySessionPreferences: FamilySessionPreferences,
@@ -94,6 +103,10 @@ class HomeViewModel @Inject constructor(
     private val db get() = FirebaseFirestore.getInstance()
     private val prefs = appContext.getSharedPreferences("home_quick_actions", Context.MODE_PRIVATE)
     private val featureOrderKey = "feature_order_v1"
+    private var syncedFamilyId: String? = null
+    @Volatile
+    private var initialSyncCompleted: Boolean = false
+    private var membersSyncTimeoutJob: Job? = null
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
@@ -104,6 +117,7 @@ class HomeViewModel @Inject constructor(
     init {
         observeHomeData()
         observeBadges()
+        observeInitialSyncState()
         viewModelScope.launch { refreshAvatarUrl() }
         viewModelScope.launch {
             familySyncCenter.accessLostEvent.collect {
@@ -135,6 +149,13 @@ class HomeViewModel @Inject constructor(
 
                 if (familyId.isBlank()) {
                     homeBadgeManager.stopListening()
+                    syncedFamilyId = null
+                    initialSyncCompleted = false
+                    cancelMembersSyncTimeout()
+                    _uiState.value = _uiState.value.copy(
+                        isMembersSyncing = false,
+                        membersSyncWarning = null,
+                    )
                     if (familySessionPreferences.consumeSkipHomeBootstrapOnce()) {
                         Log.i(TAG, "observeHomeData: skip Firestore bootstrap (leave / access revoked)")
                         _uiState.value = HomeUiState(isLoading = false, familyId = "")
@@ -155,14 +176,42 @@ class HomeViewModel @Inject constructor(
                     _uiState.value = HomeUiState(isLoading = false, familyId = "")
                     return@collectLatest
                 }
+                if (syncedFamilyId != familyId) {
+                    syncedFamilyId = familyId
+                    initialSyncCompleted = false
+                    Log.i(MEMBERS_SYNC_TAG, "startSync familyId=$familyId")
+                    _uiState.value = _uiState.value.copy(
+                        isMembersSyncing = true,
+                        membersSyncWarning = null,
+                    )
+                    scheduleMembersSyncTimeout(familyId)
+                    familySyncCenter.startSync(familyId)
+                }
 
                 combine(
                     familyDao.observeAll(),
                     familyMemberDao.observeActiveByFamilyId(familyId),
-                ) { fams, members ->
-                    Pair(fams.firstOrNull(), members.size)
-                }.collect { (fam, memberCount) ->
+                    sharedLocationDao.observeActiveByFamilyId(familyId),
+                ) { fams, members, sharedUsers ->
+                    Triple(
+                        fams.firstOrNull(),
+                        members.size,
+                        sharedUsers,
+                    )
+                }.collect { (fam, memberCount, sharedUsers) ->
                     homeBadgeManager.startListening(familyId)
+                    val shouldSyncMembers = !initialSyncCompleted || memberCount <= 0
+                    val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+                    val isLocationSharing = if (currentUid.isBlank()) {
+                        // Avoid flicker when auth is briefly unavailable during resume/navigation.
+                        _uiState.value.isLocationSharing
+                    } else {
+                        sharedUsers.any { it.id == currentUid }
+                    }
+                    Log.d(
+                        MEMBERS_SYNC_TAG,
+                        "members update familyId=$familyId count=$memberCount initialDone=$initialSyncCompleted syncing=$shouldSyncMembers locationSharing=$isLocationSharing",
+                    )
                     val remoteUrl = fam?.heroPhotoURL
 
                     // File locale se esiste già su disco
@@ -189,6 +238,9 @@ class HomeViewModel @Inject constructor(
                         heroPhotoOffsetX = fam?.heroPhotoOffsetX?.toFloat() ?: 0f,
                         heroPhotoOffsetY = fam?.heroPhotoOffsetY?.toFloat() ?: 0f,
                         memberCount = memberCount,
+                        isLocationSharing = isLocationSharing,
+                        isMembersSyncing = shouldSyncMembers,
+                        membersSyncWarning = if (memberCount > 0) null else _uiState.value.membersSyncWarning,
                         todayLabel = todayLabel(),
                         avatarUrl = _uiState.value.avatarUrl
                             ?: com.google.firebase.auth.FirebaseAuth.getInstance()
@@ -196,9 +248,65 @@ class HomeViewModel @Inject constructor(
                         topQuickActions = topQuickActions(),
                         featureOrder = loadFeatureOrder(),
                     )
+                    if (!shouldSyncMembers || memberCount > 0) {
+                        cancelMembersSyncTimeout()
+                    }
                 }
             }
         }
+    }
+
+    private fun observeInitialSyncState() {
+        viewModelScope.launch {
+            familySyncCenter.initialSyncDone.collectLatest { done ->
+                val current = _uiState.value
+                if (current.familyId.isBlank()) return@collectLatest
+                initialSyncCompleted = done
+                val isSyncing = !done || current.memberCount <= 0
+                if (current.isMembersSyncing != isSyncing) {
+                    Log.i(
+                        MEMBERS_SYNC_TAG,
+                        if (isSyncing) {
+                            "initial sync pending familyId=${current.familyId} count=${current.memberCount}"
+                        } else {
+                            "initial sync completed familyId=${current.familyId} count=${current.memberCount}"
+                        },
+                    )
+                    _uiState.value = current.copy(
+                        isMembersSyncing = isSyncing,
+                        membersSyncWarning = if (current.memberCount > 0) null else current.membersSyncWarning,
+                    )
+                }
+                if (!isSyncing || current.memberCount > 0) {
+                    cancelMembersSyncTimeout()
+                } else {
+                    scheduleMembersSyncTimeout(current.familyId)
+                }
+            }
+        }
+    }
+
+    private fun scheduleMembersSyncTimeout(familyId: String) {
+        if (familyId.isBlank()) return
+        membersSyncTimeoutJob?.cancel()
+        membersSyncTimeoutJob = viewModelScope.launch {
+            delay(MEMBERS_SYNC_TIMEOUT_MS)
+            val current = _uiState.value
+            if (current.familyId != familyId || current.memberCount > 0 || !current.isMembersSyncing) return@launch
+            Log.w(
+                MEMBERS_SYNC_TAG,
+                "timeout familyId=$familyId after=${MEMBERS_SYNC_TIMEOUT_MS}ms, release loading with warning",
+            )
+            _uiState.value = current.copy(
+                isMembersSyncing = false,
+                membersSyncWarning = "Sincronizzazione membri lenta. Aggiorno appena disponibili.",
+            )
+        }
+    }
+
+    private fun cancelMembersSyncTimeout() {
+        membersSyncTimeoutJob?.cancel()
+        membersSyncTimeoutJob = null
     }
 
     private fun observeBadges() {
@@ -600,6 +708,7 @@ class HomeViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        cancelMembersSyncTimeout()
         homeBadgeManager.stopListening()
         super.onCleared()
     }

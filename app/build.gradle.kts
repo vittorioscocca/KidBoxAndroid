@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +7,20 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.services)
+}
+
+val localProperties = Properties().apply {
+    val localFile = rootProject.file("local.properties")
+    if (localFile.exists()) {
+        localFile.inputStream().use { load(it) }
+    }
+}
+val mapsApiKey = localProperties.getProperty("MAPS_API_KEY", "")
+
+if (mapsApiKey.isBlank() || mapsApiKey == "YOUR_GOOGLE_MAPS_API_KEY") {
+    throw GradleException(
+        "Missing MAPS_API_KEY in local.properties. Add MAPS_API_KEY=<your_key> before building.",
+    )
 }
 
 android {
@@ -17,6 +33,7 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
+        manifestPlaceholders["googleMapsApiKey"] = mapsApiKey
     }
 
     buildTypes {
@@ -47,6 +64,15 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+}
+
+configurations.configureEach {
+    resolutionStrategy {
+        force(
+            "androidx.core:core:1.15.0",
+            "androidx.core:core-ktx:1.15.0",
+        )
     }
 }
 
@@ -104,6 +130,8 @@ dependencies {
     // ML Kit barcode (legge QR dalla camera)
     implementation(libs.mlkit.barcode)
     implementation(libs.play.services.location)
+    implementation(libs.play.services.maps)
+    implementation(libs.maps.compose)
 
     // EncryptedSharedPreferences (FamilyKeyStore)
     implementation(libs.security.crypto)
