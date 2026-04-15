@@ -29,6 +29,7 @@ import it.vittorioscocca.kidbox.ui.screens.settings.SettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.ThemeScreen
 import it.vittorioscocca.kidbox.ui.screens.calendar.CalendarScreen
 import it.vittorioscocca.kidbox.ui.screens.expenses.ExpensesHomeScreen
+import it.vittorioscocca.kidbox.ui.screens.photos.FamilyPhotosScreen
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoListScreen
 
@@ -169,7 +170,11 @@ fun AppNavGraph(
         composable(
             route = AppDestination.FamilyPhotos.route,
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
-        ) { PlaceholderScreen("Family Photos") }
+        ) {
+            FamilyPhotosScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
 
         composable(
             route = AppDestination.NotesHome.route,

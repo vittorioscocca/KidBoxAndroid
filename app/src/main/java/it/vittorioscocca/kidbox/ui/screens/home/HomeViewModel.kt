@@ -59,6 +59,7 @@ data class HomeUiState(
     val featureOrder: List<String> = emptyList(),
     val badgeChat: Int = 0,
     val badgeDocuments: Int = 0,
+    val badgePhotos: Int = 0,
     val badgeLocation: Int = 0,
     val badgeTodos: Int = 0,
     val badgeShopping: Int = 0,
@@ -206,6 +207,7 @@ class HomeViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     badgeChat = badges.chat,
                     badgeDocuments = badges.documents,
+                    badgePhotos = badges.photos,
                     badgeLocation = badges.location,
                     badgeTodos = badges.todos,
                     badgeShopping = badges.shopping,

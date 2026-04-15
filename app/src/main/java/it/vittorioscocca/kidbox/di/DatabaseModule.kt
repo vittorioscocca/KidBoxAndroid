@@ -11,11 +11,13 @@ import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBCalendarEventDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyPhotoDao
 import it.vittorioscocca.kidbox.data.local.dao.KBGroceryItemDao
 import it.vittorioscocca.kidbox.data.local.dao.KBExpenseDao
 import it.vittorioscocca.kidbox.data.local.dao.KBExpenseCategoryDao
 import it.vittorioscocca.kidbox.data.local.dao.KBDocumentDao
 import it.vittorioscocca.kidbox.data.local.dao.KBDocumentCategoryDao
+import it.vittorioscocca.kidbox.data.local.dao.KBPhotoAlbumDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoItemDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoListDao
 import it.vittorioscocca.kidbox.data.local.dao.KBUserProfileDao
@@ -72,4 +74,10 @@ object DatabaseModule {
 
     @Provides
     fun provideKBExpenseCategoryDao(database: KidBoxDatabase): KBExpenseCategoryDao = database.expenseCategoryDao()
+
+    @Provides
+    fun provideKBFamilyPhotoDao(database: KidBoxDatabase): KBFamilyPhotoDao = database.familyPhotoDao()
+
+    @Provides
+    fun provideKBPhotoAlbumDao(database: KidBoxDatabase): KBPhotoAlbumDao = database.photoAlbumDao()
 }

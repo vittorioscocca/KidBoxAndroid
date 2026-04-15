@@ -14,6 +14,7 @@ import kotlinx.coroutines.tasks.await
 data class HomeBadges(
     val chat: Int = 0,
     val documents: Int = 0,
+    val photos: Int = 0,
     val location: Int = 0,
     val todos: Int = 0,
     val shopping: Int = 0,
@@ -25,6 +26,7 @@ data class HomeBadges(
 enum class CounterField(val raw: String) {
     CHAT("chat"),
     DOCUMENTS("documents"),
+    PHOTOS("photos"),
     LOCATION("location"),
     TODOS("todos"),
     SHOPPING("shopping"),
@@ -62,6 +64,7 @@ class HomeBadgeManager @Inject constructor(
                 _badges.value = HomeBadges(
                     chat = d.intValue("chat"),
                     documents = d.intValue("documents"),
+                    photos = d.intValue("photos"),
                     location = d.intValue("location"),
                     todos = d.intValue("todos"),
                     shopping = d.intValue("shopping"),
@@ -84,6 +87,7 @@ class HomeBadgeManager @Inject constructor(
         _badges.value = when (field) {
             CounterField.CHAT -> curr.copy(chat = 0)
             CounterField.DOCUMENTS -> curr.copy(documents = 0)
+            CounterField.PHOTOS -> curr.copy(photos = 0)
             CounterField.LOCATION -> curr.copy(location = 0)
             CounterField.TODOS -> curr.copy(todos = 0)
             CounterField.SHOPPING -> curr.copy(shopping = 0)

@@ -637,7 +637,17 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
     FeatureItem("expenses", "Spese", "Rette, visite, extra", AppDestination.ExpensesHome.createRoute(familyId), Icons.Filled.Euro, Color(0xFFFFF3E6), Color(0xFFFF6B00), state.badgeExpenses, CounterField.EXPENSES),
     FeatureItem("documents", "Documenti", "Carte importanti", AppDestination.DocumentsHome.createRoute(familyId), Icons.Filled.Description, Color(0xFFEBF3FF), Color(0xFF2E86FF), state.badgeDocuments, CounterField.DOCUMENTS),
     FeatureItem("location", "Posizione", "Dove sono tutti", AppDestination.FamilyLocation.createRoute(familyId), Icons.Filled.Place, Color(0xFFE6FAF8), Color(0xFF00BFA5), state.badgeLocation, CounterField.LOCATION),
-    FeatureItem("photos", "Foto e Video", "Ricordi famiglia", AppDestination.FamilyPhotos.createRoute(familyId), Icons.Filled.PhotoLibrary, Color(0xFFFFF0F5), Color(0xFFE91E8C)),
+    FeatureItem(
+        "photos",
+        "Foto e Video",
+        "Ricordi famiglia",
+        AppDestination.FamilyPhotos.createRoute(familyId),
+        Icons.Filled.PhotoLibrary,
+        Color(0xFFFFF0F5),
+        Color(0xFFE91E8C),
+        state.badgePhotos,
+        CounterField.PHOTOS,
+    ),
     FeatureItem("ai", "Assistente AI", "Chiedi aiuto", AppDestination.AskExpert.route, Icons.Filled.Psychology, Color(0xFFEEF0FF), Color(0xFF5C6BC0)),
     FeatureItem("family", "Family", "Gestisci famiglia", AppDestination.FamilySettings.route, Icons.Filled.Person, Color(0xFFFFF3E6), Color(0xFFFF6B00)),
 )
