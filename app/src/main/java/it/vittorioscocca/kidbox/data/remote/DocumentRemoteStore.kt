@@ -219,6 +219,37 @@ class DocumentRemoteStore @Inject constructor(
             },
         )
 
+    /**
+     * Esegue una `get()` one-shot dalla collezione `documentCategories` e ritorna i DTO
+     * con la **stessa normalizzazione** usata dal listener realtime (filtro cache-guard escluso,
+     * perché il get esplicito serve proprio a pre-caricare la gerarchia prima dei documenti).
+     *
+     * Usato all'avvio dell'app per garantire che, quando i documenti arrivano dal listener,
+     * tutte le categorie siano già presenti in DB locale con il `parentId` corretto.
+     * In questo modo l'UI non vede mai categorie "placeholder" agganciate al root per pochi ms.
+     */
+    suspend fun fetchCategoriesOnce(familyId: String): List<RemoteDocumentCategoryDto> {
+        val snap = db.collection("families")
+            .document(familyId)
+            .collection("documentCategories")
+            .get()
+            .await()
+        return snap.documents.mapNotNull { doc ->
+            val d = doc.data ?: return@mapNotNull null
+            RemoteDocumentCategoryDto(
+                id = doc.id,
+                familyId = familyId,
+                title = (d["title"] as? String)?.trim().orEmpty(),
+                sortOrder = (d["sortOrder"] as? Number)?.toInt() ?: 0,
+                parentId = (d["parentId"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                isDeleted = d["isDeleted"] as? Boolean ?: false,
+                createdAtEpochMillis = (d["createdAt"] as? Timestamp)?.toDate()?.time,
+                updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
+                updatedBy = (d["updatedBy"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+            )
+        }
+    }
+
     suspend fun upsertDocument(entity: KBDocumentEntity) {
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
         val inferredExpenseCategoryId = entity.notes

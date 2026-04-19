@@ -34,6 +34,14 @@ import kotlinx.coroutines.sync.withLock
 private const val TAG_DOC_REPO = "KB_Doc_Repo"
 private const val TAG_DOC_SYNC = "KB_Doc_Sync"
 
+/** Titoli usati per i placeholder di categoria creati al volo da applyInboundDocument. */
+private val PLACEHOLDER_CATEGORY_TITLES = setOf(
+    "Cartella",
+    "Spese",
+    "Spesa",
+    "Allegato Spesa",
+)
+
 data class DocumentBrowserData(
     val folders: List<KBDocumentCategoryEntity>,
     val documents: List<KBDocumentEntity>,
@@ -470,7 +478,37 @@ class DocumentRepository @Inject constructor(
                 if (listeningFamilyId == familyId && docsListener != null && categoriesListener != null) return@withLock
                 stopRealtimeLocked()
                 listeningFamilyId = familyId
-                docsListener = remoteStore.listenDocuments(
+
+                // 1) Pre-carica tutte le categorie con un get() one-shot e applicale in DB
+                //    PRIMA di avviare il listener documenti.
+                //    In questo modo, quando i documenti arrivano dal listener, l'albero delle
+                //    cartelle è già completo con i parentId corretti: niente più placeholder
+                //    agganciati al root per pochi ms (esperienza utente "file esplosi").
+                runCatching {
+                    val categories = remoteStore.fetchCategoriesOnce(familyId)
+                    Log.d(
+                        TAG_DOC_SYNC,
+                        "prefetch categories familyId=$familyId count=${categories.size}",
+                    )
+                    categories.forEach { dto ->
+                        applyInboundChange(
+                            familyId,
+                            DocumentRemoteChange.UpsertCategory(dto, isFromCache = false),
+                        )
+                    }
+                }.onFailure { err ->
+                    Log.w(TAG_DOC_SYNC, "prefetch categories failed familyId=$familyId: ${err.message}")
+                    if (err is FirebaseFirestoreException && err.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                        onPermissionDenied?.invoke()
+                        return@withLock
+                    }
+                    // Se il prefetch fallisce per motivi diversi (es. offline), si prosegue
+                    // comunque coi listener: la cache persistita di Firestore farà fallback,
+                    // e il comportamento legacy (placeholder) resta come safety net.
+                }
+
+                // 2) Avvia il listener categorie (per gli aggiornamenti incrementali)
+                categoriesListener = remoteStore.listenCategories(
                     familyId = familyId,
                     onChange = { change ->
                         scope.launch(Dispatchers.IO) { applyInboundChange(familyId, change) }
@@ -481,7 +519,9 @@ class DocumentRepository @Inject constructor(
                         }
                     },
                 )
-                categoriesListener = remoteStore.listenCategories(
+
+                // 3) Solo ora avvia il listener documenti
+                docsListener = remoteStore.listenDocuments(
                     familyId = familyId,
                     onChange = { change ->
                         scope.launch(Dispatchers.IO) { applyInboundChange(familyId, change) }
@@ -1106,11 +1146,17 @@ class DocumentRepository @Inject constructor(
             )
             resolvedParentId = expectedParentId
         }
+        // Se il record locale è un placeholder appena creato (titolo generico),
+        // accettiamo comunque l'inbound remoto anche se più "vecchio" — il remoto
+        // contiene il titolo autoritativo che dobbiamo adottare.
+        val isLocalPlaceholderTitle = local != null && local.title in PLACEHOLDER_CATEGORY_TITLES
+        val remoteHasRealTitle = dto.title.isNotBlank() && dto.title !in PLACEHOLDER_CATEGORY_TITLES
         val shouldOverrideLwwForHierarchy = local != null &&
             remoteUpdatedAt <= local.updatedAtEpochMillis &&
             (
                 (local.parentId.isNullOrBlank() && !resolvedParentId.isNullOrBlank()) ||
-                    (local.parentId != resolvedParentId && dto.id.startsWith("exp-cat-"))
+                    (local.parentId != resolvedParentId && dto.id.startsWith("exp-cat-")) ||
+                    (isLocalPlaceholderTitle && remoteHasRealTitle)
                 )
         val preserveLocalHierarchy = local != null &&
             local.parentId != null &&
@@ -1249,22 +1295,43 @@ class DocumentRepository @Inject constructor(
         if (!linkedExpenseId.isNullOrBlank()) {
             val expense = expenseDao.getById(linkedExpenseId)
             val deterministicExpenseFolderId = expenseCategoryFolderId(linkedExpenseId)
-            resolvedCategoryId = resolvedCategoryId ?: deterministicExpenseFolderId
-            if (expense == null) {
-                Log.d(
-                    TAG_DOC_SYNC,
-                    "expense not local yet for document id=${dto.id} expenseId=$linkedExpenseId; fallback to expenses root",
-                )
-                resolvedCategoryId = expensesRootFolderId(familyId)
-            } else if (expense.isDeleted || expense.familyId != familyId) {
-                val fallbackRootId = expensesRootFolderId(familyId)
-                Log.d(
-                    TAG_DOC_SYNC,
-                    "guard document id=${dto.id} reason=linked_expense_missing_or_deleted expenseId=$linkedExpenseId forcingRoot=$fallbackRootId",
-                )
-                resolvedCategoryId = fallbackRootId
-            } else if (categoryDao.getById(deterministicExpenseFolderId)?.isDeleted == true) {
-                resolvedCategoryId = expensesRootFolderId(familyId)
+            // Preferisci sempre la sottocartella deterministica (exp-cat-<expenseId>):
+            // - se la spesa non è ancora in locale (race di startup tra listeners) NON
+            //   ricablare a root, altrimenti i documenti finiscono "esplosi" sopra la
+            //   loro sottocartella;
+            // - la creazione del placeholder per la cartella mancante avviene poco più
+            //   sotto, così entrando nella subfolder l'utente vede comunque il file.
+            val preferredExpenseCategoryId = when {
+                !resolvedCategoryId.isNullOrBlank() &&
+                    resolvedCategoryId.startsWith("exp-cat-") -> resolvedCategoryId
+                !local?.categoryId.isNullOrBlank() &&
+                    local!!.categoryId!!.startsWith("exp-cat-") -> local.categoryId
+                else -> deterministicExpenseFolderId
+            }
+            resolvedCategoryId = preferredExpenseCategoryId
+            when {
+                expense == null -> {
+                    Log.d(
+                        TAG_DOC_SYNC,
+                        "expense not local yet for document id=${dto.id} expenseId=$linkedExpenseId; keeping deterministic folder=$preferredExpenseCategoryId",
+                    )
+                }
+                expense.isDeleted || expense.familyId != familyId -> {
+                    val fallbackRootId = expensesRootFolderId(familyId)
+                    Log.d(
+                        TAG_DOC_SYNC,
+                        "guard document id=${dto.id} reason=linked_expense_missing_or_deleted expenseId=$linkedExpenseId forcingRoot=$fallbackRootId",
+                    )
+                    resolvedCategoryId = fallbackRootId
+                }
+                categoryDao.getById(deterministicExpenseFolderId)?.isDeleted == true -> {
+                    // La sottocartella era stata soft-deleted: la riviviamo nel blocco
+                    // "create/restore placeholder" più sotto, così non perdiamo gerarchia.
+                    Log.d(
+                        TAG_DOC_SYNC,
+                        "expense subfolder soft-deleted for document id=${dto.id} expenseId=$linkedExpenseId; will revive placeholder=$preferredExpenseCategoryId",
+                    )
+                }
             }
         }
         if (isFromCache && local != null && dto.categoryId == null && !local.categoryId.isNullOrBlank()) {
@@ -1297,11 +1364,11 @@ class DocumentRepository @Inject constructor(
             val isExpenseDocument = isExpenseLinkedDocument(dto.id, dto.notes ?: local?.notes)
             var existingCategory = categoryDao.getById(resolvedCategoryId)
             if (existingCategory == null || existingCategory.isDeleted) {
-                if (isExpenseDocument) {
-                    resolvedCategoryId = expensesRootFolderId(familyId)
-                    existingCategory = categoryDao.getById(resolvedCategoryId)
-                }
-                Log.d(TAG_DOC_SYNC, "create/restore placeholder category id=$resolvedCategoryId for document=${dto.id}")
+                // Fix: NON ricablare a root quando manca la subfolder. Lasciamo
+                // resolvedCategoryId puntare alla cartella deterministica (es.
+                // exp-cat-<expenseId>) e creiamo/ripristiniamo qui sotto il
+                // placeholder, così la gerarchia non viene "schiacciata" sulla root.
+                Log.d(TAG_DOC_SYNC, "create/restore placeholder category id=$resolvedCategoryId for document=${dto.id} isExpense=$isExpenseDocument")
                 val expenseIdFromCategory = parseExpenseIdFromCategoryId(resolvedCategoryId)
                 val linkedExpense = expenseIdFromCategory?.let { expenseDao.getById(it) }
                 val placeholderTitle = when {
