@@ -157,6 +157,23 @@ class MainActivity : ComponentActivity() {
                                 pendingPushDeepLink = null
                             }
 
+                            "note", "notes", "new_note" -> {
+                                if (deepLink.familyId.isNotBlank()) {
+                                    val targetNoteId = deepLink.noteId ?: deepLink.itemId
+                                    if (!targetNoteId.isNullOrBlank()) {
+                                        navController.navigate(
+                                            AppDestination.NoteDetail.createRoute(
+                                                familyId = deepLink.familyId,
+                                                noteId = targetNoteId,
+                                            ),
+                                        )
+                                    } else {
+                                        navController.navigate(AppDestination.NotesHome.createRoute(deepLink.familyId))
+                                    }
+                                }
+                                pendingPushDeepLink = null
+                            }
+
                             "location", "open_location", "location_sharing_started", "location_sharing_stopped" -> {
                                 if (deepLink.familyId.isNotBlank()) {
                                     navController.navigate(AppDestination.FamilyLocation.createRoute(deepLink.familyId))
@@ -203,6 +220,7 @@ class MainActivity : ComponentActivity() {
         val familyId = src.safeGetString("push_family_id") ?: src.safeGetString("familyId") ?: ""
         val itemId = src.safeGetString("push_item_id") ?: src.safeGetString("itemId")
         val docId = src.safeGetString("push_doc_id") ?: src.safeGetString("docId")
+        val noteId = src.safeGetString("push_note_id") ?: src.safeGetString("noteId")
         val expenseId = src.safeGetString("push_expense_id") ?: src.safeGetString("expenseId")
         val childId = src.safeGetString("push_child_id") ?: src.safeGetString("childId")
         val listId = src.safeGetString("push_list_id") ?: src.safeGetString("listId")
@@ -210,12 +228,13 @@ class MainActivity : ComponentActivity() {
         return PushDeepLink(
             type = type,
             familyId = familyId,
-            itemId = itemId ?: expenseId ?: docId,
+            itemId = itemId ?: expenseId ?: docId ?: noteId,
             childId = childId,
             listId = listId,
             todoId = todoId,
             expenseId = expenseId,
             docId = docId,
+            noteId = noteId,
         )
     }
 }
@@ -229,6 +248,7 @@ private data class PushDeepLink(
     val todoId: String?,
     val expenseId: String?,
     val docId: String?,
+    val noteId: String?,
 )
 
 private fun Bundle?.safeGetString(key: String): String? = this?.getString(key)

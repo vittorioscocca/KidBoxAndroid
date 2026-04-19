@@ -30,6 +30,8 @@ import it.vittorioscocca.kidbox.ui.screens.settings.ThemeScreen
 import it.vittorioscocca.kidbox.ui.screens.calendar.CalendarScreen
 import it.vittorioscocca.kidbox.ui.screens.expenses.ExpensesHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.location.FamilyLocationScreen
+import it.vittorioscocca.kidbox.ui.screens.notes.NoteDetailScreen
+import it.vittorioscocca.kidbox.ui.screens.notes.NotesHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.photos.FamilyPhotosScreen
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoListScreen
@@ -180,7 +182,30 @@ fun AppNavGraph(
         composable(
             route = AppDestination.NotesHome.route,
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
-        ) { PlaceholderScreen("Notes") }
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            NotesHomeScreen(
+                familyId = familyId,
+                onBack = { navController.popBackStack() },
+                onNavigate = { route -> navController.navigate(route) },
+            )
+        }
+
+        composable(
+            route = AppDestination.NoteDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("noteId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val noteId = backStackEntry.arguments?.getString("noteId").orEmpty()
+            NoteDetailScreen(
+                familyId = familyId,
+                noteId = noteId,
+                onBack = { navController.popBackStack() },
+            )
+        }
 
         composable(AppDestination.Todo.route) {
             TodoHomeScreen(

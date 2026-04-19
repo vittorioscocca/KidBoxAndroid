@@ -230,7 +230,6 @@ fun HomeScreen(
                 heroScale = state.heroPhotoScale,
                 heroOffsetX = state.heroPhotoOffsetX,
                 heroOffsetY = state.heroPhotoOffsetY,
-                onTap = { onNavigate(AppDestination.FamilyPhotos.createRoute(state.familyId)) },
                 onChangePhoto = {
                     photoPicker.launch(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
@@ -452,14 +451,12 @@ private fun FamilyHeroCard(
     heroScale: Float = 1f,
     heroOffsetX: Float = 0f,
     heroOffsetY: Float = 0f,
-    onTap: () -> Unit,
     onChangePhoto: () -> Unit,
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(220.dp)
-            .clickable(onClick = onTap),
+            .height(220.dp),
         shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),

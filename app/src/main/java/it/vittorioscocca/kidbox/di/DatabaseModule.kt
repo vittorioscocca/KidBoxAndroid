@@ -13,6 +13,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyPhotoDao
 import it.vittorioscocca.kidbox.data.local.dao.KBGroceryItemDao
+import it.vittorioscocca.kidbox.data.local.dao.KBNoteDao
 import it.vittorioscocca.kidbox.data.local.dao.KBExpenseDao
 import it.vittorioscocca.kidbox.data.local.dao.KBExpenseCategoryDao
 import it.vittorioscocca.kidbox.data.local.dao.KBDocumentDao
@@ -54,6 +55,9 @@ object DatabaseModule {
 
     @Provides
     fun provideKBGroceryItemDao(database: KidBoxDatabase): KBGroceryItemDao = database.groceryItemDao()
+
+    @Provides
+    fun provideKBNoteDao(database: KidBoxDatabase): KBNoteDao = database.noteDao()
 
     @Provides
     fun provideKBTodoListDao(database: KidBoxDatabase): KBTodoListDao = database.todoListDao()

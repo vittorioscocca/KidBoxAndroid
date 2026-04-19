@@ -137,6 +137,7 @@ dependencies {
     implementation(libs.security.crypto)
 
     implementation("com.google.guava:guava:32.1.3-android")
+    implementation("com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava")
 
     debugImplementation("com.google.firebase:firebase-appcheck-debug")
     releaseImplementation("com.google.firebase:firebase-appcheck-playintegrity")
