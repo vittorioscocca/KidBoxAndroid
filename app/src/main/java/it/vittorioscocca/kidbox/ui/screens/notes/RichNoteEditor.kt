@@ -61,6 +61,9 @@ import it.vittorioscocca.kidbox.data.remote.notes.normalizeChecklistGlyphsToIos
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import kotlin.math.abs
 
+/** Cerchi checklist ○/◉ leggermente più grandi del corpo testo (1.2f è usato per sottotitoli). */
+private const val CHECKLIST_CIRCLE_RELATIVE_SIZE = 1.25f
+
 /**
  * La tastiera software inserisce `\n` via [InputConnection.commitText], non come [KeyEvent.KEYCODE_ENTER]
  * su [setOnKeyListener]. Intercettiamo commitText e sendKeyEvent(ENTER) con debounce per non duplicare.
@@ -615,19 +618,28 @@ private fun buildToolbarState(
     editText: EditText,
 ): RichToolbarState {
     val editable = editText.text ?: return RichToolbarState()
-    val start = editText.selectionStart.coerceAtLeast(0)
-    val end = editText.selectionEnd.coerceAtLeast(start)
-    val safeEnd = if (end == start) (start + 1).coerceAtMost(editable.length) else end
-    val lineStart = editable.toString().lastIndexOf('\n', (start - 1).coerceAtLeast(0)).let { if (it == -1) 0 else it + 1 }
-    val lineEnd = editable.toString().indexOf('\n', start).let { if (it == -1) editable.length else it }
-    val line = editable.substring(lineStart, lineEnd)
+    val length = editable.length
+    // Lavoriamo SEMPRE sulla snapshot `ns` (String) per evitare che le sub-sequence
+    // su `Editable` (SpannableBuilder di emoji2) vadano in StringIndexOutOfBoundsException
+    // in stati transitori (es. subito dopo aver svuotato una riga con backspace).
+    val ns = editable.toString()
+    val start = editText.selectionStart.coerceAtLeast(0).coerceAtMost(length)
+    val end = editText.selectionEnd.coerceAtLeast(start).coerceAtMost(length)
+    val safeEnd = if (end == start) (start + 1).coerceAtMost(length) else end
+    val lineStart = ns.lastIndexOf('\n', (start - 1).coerceAtLeast(0)).let { if (it == -1) 0 else it + 1 }
+    val lineEnd = ns.indexOf('\n', start.coerceAtMost(ns.length))
+        .let { if (it == -1) ns.length else it }
+        .coerceAtLeast(lineStart)
+    val line = ns.substring(lineStart.coerceAtMost(ns.length), lineEnd.coerceAtMost(ns.length))
+    val isChecklistLine = line.startsWith("○ ") || line.startsWith("◉ ")
+    // Riga checklist: il cerchio usa RelativeSizeSpan (1.25f); non confonderlo con H2.
     return RichToolbarState(
         isBold = editable.getSpans(start, safeEnd, StyleSpan::class.java).any { it.style == Typeface.BOLD },
         isItalic = editable.getSpans(start, safeEnd, StyleSpan::class.java).any { it.style == Typeface.ITALIC },
         isUnderline = editable.getSpans(start, safeEnd, UnderlineSpan::class.java).isNotEmpty(),
         isStrike = editable.getSpans(start, safeEnd, StrikethroughSpan::class.java).isNotEmpty(),
-        isHeading = editable.getSpans(start, safeEnd, RelativeSizeSpan::class.java).any { it.sizeChange >= 1.35f },
-        isSubheading = editable.getSpans(start, safeEnd, RelativeSizeSpan::class.java).any { it.sizeChange in 1.15f..1.34f },
+        isHeading = !isChecklistLine && editable.getSpans(start, safeEnd, RelativeSizeSpan::class.java).any { it.sizeChange >= 1.35f },
+        isSubheading = !isChecklistLine && editable.getSpans(start, safeEnd, RelativeSizeSpan::class.java).any { it.sizeChange in 1.15f..1.34f },
         isBullet = editable.getSpans(lineStart, lineEnd, BulletSpan::class.java).isNotEmpty() || line.startsWith("• "),
         isNumber = Regex("^[0-9]+\\. ").containsMatchIn(line),
         isChecklist = line.startsWith("○ ") || line.startsWith("◉ "),
@@ -704,7 +716,8 @@ private fun EditText.handleChecklistTap(
     tapX: Int,
     onBodyChange: (String) -> Unit,
 ) : Boolean {
-    if (tapX > 48) return false
+    val maxTapX = (56f * resources.displayMetrics.density).toInt()
+    if (tapX > maxTapX) return false
     val editable = text ?: return false
     val cursor = selectionStart.coerceAtLeast(0)
     val lineStart = editable.toString().lastIndexOf('\n', (cursor - 1).coerceAtLeast(0)).let { if (it == -1) 0 else it + 1 }
@@ -738,9 +751,16 @@ private fun styleChecklistCircle(
     val circleEnd = (lineStart + 1).coerceAtMost(len)
     if (lineStart < circleEnd) {
         editable.getSpans(lineStart, circleEnd, ForegroundColorSpan::class.java).forEach { editable.removeSpan(it) }
+        editable.getSpans(lineStart, circleEnd, RelativeSizeSpan::class.java).forEach { editable.removeSpan(it) }
         val color = if (checked) 0xFF34C759.toInt() else 0xFF8A8A8A.toInt()
         editable.setSpan(
             ForegroundColorSpan(color),
+            lineStart,
+            circleEnd,
+            Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+        )
+        editable.setSpan(
+            RelativeSizeSpan(CHECKLIST_CIRCLE_RELATIVE_SIZE),
             lineStart,
             circleEnd,
             Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
@@ -785,15 +805,40 @@ private fun bodyHtmlToSpanned(
     if (normalized.isEmpty()) {
         return SpannableStringBuilder("")
     }
-    return HtmlCompat.fromHtml(normalized, HtmlCompat.FROM_HTML_MODE_LEGACY)
+    val builder = SpannableStringBuilder(
+        HtmlCompat.fromHtml(normalized, HtmlCompat.FROM_HTML_MODE_LEGACY),
+    )
+    applyChecklistStylesToAllLines(builder)
+    return builder
+}
+
+/** Applica colore e ingrandimento ai cerchi dopo il parse HTML da remoto. */
+private fun applyChecklistStylesToAllLines(editable: Editable) {
+    val s = editable.toString()
+    var lineStart = 0
+    while (lineStart < s.length) {
+        val lineEnd = s.indexOf('\n', lineStart).let { if (it == -1) s.length else it }
+        val line = s.substring(lineStart, lineEnd)
+        if (line.startsWith("○ ") || line.startsWith("◉ ")) {
+            styleChecklistCircle(editable, lineStart, lineEnd, checked = line.startsWith("◉ "))
+        }
+        lineStart = lineEnd + 1
+    }
 }
 
 private fun spannedToHtml(
     text: CharSequence,
 ): String {
     if (text.isEmpty()) return ""
+    val builder = SpannableStringBuilder(text)
+    // Non serializzare l'ingrandimento del cerchio nell'HTML (parità iOS / storage pulito).
+    builder.getSpans(0, builder.length, RelativeSizeSpan::class.java).forEach { span ->
+        if (kotlin.math.abs(span.sizeChange - CHECKLIST_CIRCLE_RELATIVE_SIZE) < 0.02f) {
+            builder.removeSpan(span)
+        }
+    }
     return HtmlCompat.toHtml(
-        SpannableStringBuilder(text),
+        builder,
         HtmlCompat.TO_HTML_PARAGRAPH_LINES_CONSECUTIVE,
     )
 }

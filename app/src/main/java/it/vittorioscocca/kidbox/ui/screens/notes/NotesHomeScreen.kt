@@ -251,7 +251,7 @@ fun NotesHomeScreen(
             else -> {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     if (sectioned.isEmpty()) {
                         item {
@@ -272,7 +272,7 @@ fun NotesHomeScreen(
                                     color = kb.subtitle,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
+                                    modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
                                 )
                             }
                             items(notes, key = { it.id }) { note ->
@@ -305,7 +305,7 @@ fun NotesHomeScreen(
                                     colors = CardDefaults.cardColors(containerColor = cardColor),
                                     elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
                                 ) {
-                                    Column(modifier = Modifier.padding(14.dp)) {
+                                    Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             verticalAlignment = Alignment.CenterVertically,
@@ -372,14 +372,14 @@ fun NotesHomeScreen(
                                                 }
                                             }
                                         }
-                                        Spacer(Modifier.height(4.dp))
+                                        Spacer(Modifier.height(6.dp))
                                         Text(
                                             text = previewFor(note.body),
                                             color = kb.subtitle,
                                             maxLines = 2,
                                             fontSize = 14.sp,
                                         )
-                                        Spacer(Modifier.height(6.dp))
+                                        Spacer(Modifier.height(8.dp))
                                         Text(
                                             text = formatDate(note.updatedAtEpochMillis),
                                             color = kb.subtitle,
