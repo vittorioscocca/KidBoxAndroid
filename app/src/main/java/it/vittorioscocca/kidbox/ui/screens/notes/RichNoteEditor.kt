@@ -28,10 +28,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
@@ -52,17 +54,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.text.HtmlCompat
 import it.vittorioscocca.kidbox.data.remote.notes.normalizeChecklistGlyphsToIos
+import it.vittorioscocca.kidbox.data.remote.notes.sanitizeCrossPlatformHtml
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import kotlin.math.abs
 
-/** Cerchi checklist ○/◉ leggermente più grandi del corpo testo (1.2f è usato per sottotitoli). */
-private const val CHECKLIST_CIRCLE_RELATIVE_SIZE = 1.25f
+/** Cerchi checklist ○/◉ ben visibili, ~32sp su corpo 16sp (2×). Allineato a iOS (UIFont 32pt). */
+private const val CHECKLIST_CIRCLE_RELATIVE_SIZE = 2.0f
 
 /**
  * La tastiera software inserisce `\n` via [InputConnection.commitText], non come [KeyEvent.KEYCODE_ENTER]
@@ -142,6 +146,9 @@ fun RichNoteEditor(
     val editTextRef = remember { arrayOfNulls<EditText>(1) }
     var toolbarState by remember { mutableStateOf(RichToolbarState()) }
     var isAaExpanded by remember { mutableStateOf(false) }
+    var isBodyFocused by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
+    val isKeyboardVisible = WindowInsets.ime.getBottom(density) > 0
 
     DisposableEffect(Unit) {
         onDispose {
@@ -282,6 +289,9 @@ fun RichNoteEditor(
                             selectionChanged = {
                                 toolbarState = buildToolbarState(this)
                             }
+                            onFocusChangeListener = android.view.View.OnFocusChangeListener { _, hasFocus ->
+                                isBodyFocused = hasFocus
+                            }
                             editTextRef[0] = this
                         }
                     },
@@ -300,19 +310,21 @@ fun RichNoteEditor(
                 )
             }
         }
-        Spacer(Modifier.height(10.dp))
-        RichToolbarBar(
-            modifier = Modifier
-                .fillMaxWidth()
-                .imePadding(),
-            state = toolbarState,
-            isAaExpanded = isAaExpanded,
-            onAction = { command ->
-                editTextRef[0]?.applyCommand(command, onBodyChange)
-                editTextRef[0]?.let { toolbarState = buildToolbarState(it) }
-            },
-            onToggleAa = { isAaExpanded = !isAaExpanded },
-        )
+        if (isKeyboardVisible && isBodyFocused) {
+            Spacer(Modifier.height(10.dp))
+            RichToolbarBar(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .imePadding(),
+                state = toolbarState,
+                isAaExpanded = isAaExpanded,
+                onAction = { command ->
+                    editTextRef[0]?.applyCommand(command, onBodyChange)
+                    editTextRef[0]?.let { toolbarState = buildToolbarState(it) }
+                },
+                onToggleAa = { isAaExpanded = !isAaExpanded },
+            )
+        }
     }
 }
 
@@ -681,6 +693,20 @@ private fun EditText.handleEnterKey(
         else -> "\n"
     }
     editable.insert(cursor, continuation)
+    // Se la continuation è una nuova riga checklist, applica subito lo
+    // stile al cerchio (RelativeSizeSpan + colore), altrimenti il nuovo
+    // ○ resterebbe a dimensione normale mentre il primo era grande.
+    if (continuation.startsWith("\n○ ") || continuation.startsWith("\n◉ ")) {
+        val newCircleStart = cursor + 1 // salta il '\n'
+        val ns = editable.toString()
+        val newLineEnd = ns.indexOf('\n', newCircleStart).let { if (it == -1) ns.length else it }
+        styleChecklistCircle(
+            editable = editable,
+            lineStart = newCircleStart,
+            lineEnd = newLineEnd,
+            checked = continuation.startsWith("\n◉ "),
+        )
+    }
     setSelection((cursor + continuation.length).coerceAtMost(editable.length))
     onBodyChange(spannedToHtml(editable))
 }
@@ -801,7 +827,12 @@ private inline fun forEachSelectedLine(
 private fun bodyHtmlToSpanned(
     html: String,
 ): Spanned {
-    val normalized = html.trim().normalizeChecklistGlyphsToIos()
+    // Sanifica il payload per eliminare <head>, <style> e class="..." tipici
+    // degli HTML prodotti da NSAttributedString su iOS: senza questo passaggio
+    // il CSS ("p.p1 { margin: ... }") finirebbe visibile come testo.
+    val normalized = html.trim()
+        .sanitizeCrossPlatformHtml()
+        .normalizeChecklistGlyphsToIos()
     if (normalized.isEmpty()) {
         return SpannableStringBuilder("")
     }

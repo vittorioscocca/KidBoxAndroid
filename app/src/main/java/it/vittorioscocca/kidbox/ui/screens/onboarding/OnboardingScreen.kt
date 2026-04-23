@@ -1,9 +1,12 @@
 package it.vittorioscocca.kidbox.ui.screens.onboarding
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -38,6 +41,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
@@ -46,8 +50,10 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -55,12 +61,16 @@ import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -83,6 +93,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.ui.screens.settings.CornerBrackets
+import it.vittorioscocca.kidbox.ui.screens.settings.JoinFamilyViewModel
+import it.vittorioscocca.kidbox.ui.screens.settings.QRScannerView
+import java.util.Locale
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
@@ -133,13 +147,19 @@ private val introSlides = listOf(
     ),
 )
 
+private enum class FamilyPath { Create, Join }
+
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingScreen(
     onFamilyCreated: (familyId: String) -> Unit,
     viewModel: OnboardingViewModel = hiltViewModel(),
 ) {
-    val pagerState = rememberPagerState(pageCount = { 5 })
+    var familyPath by remember { mutableStateOf<FamilyPath?>(null) }
+
+    val pagerState = rememberPagerState(
+        pageCount = { if (familyPath == FamilyPath.Join) 5 else 6 },
+    )
     val scope = rememberCoroutineScope()
 
     val createdFamilyId by viewModel.createdFamilyId.collectAsStateWithLifecycle()
@@ -147,8 +167,8 @@ fun OnboardingScreen(
     val createFamilyError by viewModel.createFamilyError.collectAsStateWithLifecycle()
 
     val currentPage = pagerState.currentPage
-    val accent = pageAccent(currentPage)
-    val iconTint = pageIconTint(currentPage)
+    val accent = pageAccent(currentPage, familyPath)
+    val iconTint = pageIconTint(currentPage, familyPath)
 
     Box(
         modifier = Modifier
@@ -167,9 +187,13 @@ fun OnboardingScreen(
                     .fillMaxWidth(),
                 userScrollEnabled = false,
             ) { page ->
-                when (page) {
-                    in 0..2 -> IntroPageContent(slide = introSlides[page])
-                    3 -> CreateFamilyPageContent(
+                when {
+                    page in 0..2 -> IntroPageContent(slide = introSlides[page])
+                    page == 3 -> FamilyPathPickerPageContent(
+                        selected = familyPath,
+                        onSelect = { familyPath = it },
+                    )
+                    page == 4 && familyPath == FamilyPath.Create -> CreateFamilyPageContent(
                         isCreating = isCreatingFamily,
                         errorText = createFamilyError,
                         familyCreated = createdFamilyId != null,
@@ -178,11 +202,21 @@ fun OnboardingScreen(
                             viewModel.createFamily(fam, child, birth)
                         },
                     )
+                    page == 4 && familyPath == FamilyPath.Join -> JoinFamilyPageContent(
+                        onJoined = { familyId -> onFamilyCreated(familyId) },
+                    )
+                    // Fallback: familyPath == null (non dovrebbe succedere, il CTA pag.3 è disabled)
+                    page == 4 -> FamilyPathPickerPageContent(
+                        selected = familyPath,
+                        onSelect = { familyPath = it },
+                    )
                     else -> InvitePartnerPageContent(
                         familyId = createdFamilyId.orEmpty(),
                     )
                 }
             }
+
+            val totalPages = if (familyPath == FamilyPath.Join) 5 else 6
 
             Row(
                 modifier = Modifier
@@ -191,54 +225,79 @@ fun OnboardingScreen(
                 horizontalArrangement = Arrangement.Center,
             ) {
                 PageIndicators(
-                    pageCount = 5,
+                    pageCount = totalPages,
                     currentPage = currentPage,
                     accent = accent,
                 )
             }
 
+            val isJoinPage = currentPage == 4 && familyPath == FamilyPath.Join
             val ctaEnabled = when (currentPage) {
-                3 -> createdFamilyId != null
-                4 -> createdFamilyId != null
+                3 -> familyPath != null
+                4 -> when (familyPath) {
+                    FamilyPath.Create -> createdFamilyId != null
+                    FamilyPath.Join -> false
+                    null -> false
+                }
+                5 -> createdFamilyId != null
                 else -> true
             }
+            val ctaLabel = if (currentPage == totalPages - 1) "Inizia" else "Continua"
 
-            MainCtaButton(
-                currentPage = currentPage,
-                accent = accent,
-                iconTint = iconTint,
-                enabled = ctaEnabled,
-                onClick = {
-                    when (currentPage) {
-                        3 -> {
-                            if (createdFamilyId != null) {
+            if (isJoinPage) {
+                Spacer(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .padding(horizontal = 28.dp)
+                        .navigationBarsPadding()
+                        .padding(bottom = 12.dp),
+                )
+            } else {
+                MainCtaButton(
+                    label = ctaLabel,
+                    accent = accent,
+                    iconTint = iconTint,
+                    enabled = ctaEnabled,
+                    onClick = {
+                        when (currentPage) {
+                            3 -> if (familyPath != null) {
                                 scope.launch { pagerState.animateScrollToPage(4) }
                             }
+                            4 -> when (familyPath) {
+                                FamilyPath.Create -> if (createdFamilyId != null) {
+                                    scope.launch { pagerState.animateScrollToPage(5) }
+                                }
+                                FamilyPath.Join -> Unit
+                                null -> Unit
+                            }
+                            5 -> createdFamilyId?.let { onFamilyCreated(it) }
+                            else -> scope.launch {
+                                pagerState.animateScrollToPage(currentPage + 1)
+                            }
                         }
-                        4 -> createdFamilyId?.let { onFamilyCreated(it) }
-                        else -> scope.launch {
-                            pagerState.animateScrollToPage(currentPage + 1)
-                        }
-                    }
-                },
-                modifier = Modifier
-                    .padding(horizontal = 28.dp)
-                    .navigationBarsPadding()
-                    .padding(bottom = 12.dp),
-            )
+                    },
+                    modifier = Modifier
+                        .padding(horizontal = 28.dp)
+                        .navigationBarsPadding()
+                        .padding(bottom = 12.dp),
+                )
+            }
         }
     }
 }
 
-private fun pageAccent(page: Int): Color = when (page) {
+private fun pageAccent(page: Int, familyPath: FamilyPath?): Color = when (page) {
     1 -> PurpleAccent
     2 -> GreenAccent
+    4 -> if (familyPath == FamilyPath.Join) PurpleAccent else OrangeAccent
     else -> OrangeAccent
 }
 
-private fun pageIconTint(page: Int): Color = when (page) {
+private fun pageIconTint(page: Int, familyPath: FamilyPath?): Color = when (page) {
     1 -> Color(0xFF9B7BC9)
     2 -> Color(0xFF4CAF74)
+    4 -> if (familyPath == FamilyPath.Join) Color(0xFF9B7BC9) else Color(0xFFFFBF40)
     else -> Color(0xFFFFBF40)
 }
 
@@ -862,14 +921,13 @@ private fun PageIndicators(
 
 @Composable
 private fun MainCtaButton(
-    currentPage: Int,
+    label: String,
     accent: Color,
     iconTint: Color,
     enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val label = if (currentPage == 4) "Inizia" else "Continua"
     val brush = if (enabled) {
         Brush.horizontalGradient(colors = listOf(iconTint, accent))
     } else {
@@ -900,5 +958,347 @@ private fun MainCtaButton(
             fontWeight = FontWeight.SemiBold,
             color = Color.White,
         )
+    }
+}
+
+// MARK: - Pagina 3: scelta fra "Crea" / "Entra con QR"
+
+@Composable
+private fun FamilyPathPickerPageContent(
+    selected: FamilyPath?,
+    onSelect: (FamilyPath) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 24.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            "Come vuoi iniziare?",
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Bold,
+            color = BlackText,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            "Scegli se creare una nuova famiglia o unirti a una esistente.",
+            fontSize = 15.sp,
+            color = GraySubtitle,
+            textAlign = TextAlign.Center,
+            lineHeight = 22.sp,
+            modifier = Modifier.padding(horizontal = 8.dp),
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+
+        PathOptionCard(
+            path = FamilyPath.Create,
+            isSelected = selected == FamilyPath.Create,
+            icon = Icons.Filled.Home,
+            accent = OrangeAccent,
+            title = "Crea la tua famiglia",
+            subtitle = "Sarai il creatore e potrai invitare il tuo partner.",
+            onSelect = onSelect,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        PathOptionCard(
+            path = FamilyPath.Join,
+            isSelected = selected == FamilyPath.Join,
+            icon = Icons.Filled.QrCodeScanner,
+            accent = PurpleAccent,
+            title = "Entra in una famiglia",
+            subtitle = "Hai un codice QR o un codice testuale? Usalo per unirti.",
+            onSelect = onSelect,
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun PathOptionCard(
+    path: FamilyPath,
+    isSelected: Boolean,
+    icon: ImageVector,
+    accent: Color,
+    title: String,
+    subtitle: String,
+    onSelect: (FamilyPath) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (isSelected) accent.copy(alpha = 0.08f) else Color.White)
+            .border(
+                width = if (isSelected) 1.5.dp else 1.dp,
+                color = if (isSelected) accent else GrayFieldBorder,
+                shape = RoundedCornerShape(16.dp),
+            )
+            .clickable { onSelect(path) }
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(accent.copy(alpha = if (isSelected) 0.20f else 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = BlackText)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(subtitle, fontSize = 13.sp, color = GraySubtitle, lineHeight = 18.sp)
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Icon(
+            imageVector = if (isSelected) Icons.Filled.CheckCircle else Icons.Filled.KeyboardArrowDown,
+            contentDescription = null,
+            tint = if (isSelected) accent else GrayCaption.copy(alpha = 0.6f),
+            modifier = Modifier.size(22.dp),
+        )
+    }
+}
+
+// MARK: - Pagina 4 (percorso Join): codice + scansiona QR
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun JoinFamilyPageContent(
+    onJoined: (familyId: String) -> Unit,
+) {
+    val viewModel: JoinFamilyViewModel = hiltViewModel()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var code by remember { mutableStateOf("") }
+    var showScanner by remember { mutableStateOf(false) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) showScanner = true
+    }
+
+    // Quando il join riesce, completa l'onboarding passando il familyId raggiunto.
+    LaunchedEffect(state.didJoin, state.joinedFamilyId) {
+        val joinedId = state.joinedFamilyId
+        if (state.didJoin && joinedId != null) {
+            onJoined(joinedId)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 24.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(PurpleAccent.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.QrCodeScanner,
+                contentDescription = null,
+                tint = PurpleAccent,
+                modifier = Modifier.size(32.dp),
+            )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            "Entra nella famiglia",
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Bold,
+            color = BlackText,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            "Inserisci il codice invito ricevuto oppure scansiona il QR code.",
+            fontSize = 15.sp,
+            color = GraySubtitle,
+            textAlign = TextAlign.Center,
+            lineHeight = 22.sp,
+            modifier = Modifier.padding(horizontal = 8.dp),
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+
+        FormFieldLabel("Codice invito")
+        OutlinedTextField(
+            value = code,
+            onValueChange = { code = it.uppercase(Locale.ROOT) },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !state.didJoin,
+            singleLine = true,
+            placeholder = { Text("Es. K7P4D2", color = GrayCaption) },
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = PurpleAccent,
+                unfocusedBorderColor = GrayFieldBorder,
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+            ),
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(PurpleAccent.copy(alpha = 0.10f))
+                .clickable(enabled = !state.didJoin) {
+                    permissionLauncher.launch(Manifest.permission.CAMERA)
+                }
+                .padding(vertical = 14.dp, horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Icon(
+                Icons.Filled.QrCodeScanner,
+                contentDescription = null,
+                tint = PurpleAccent,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                "Scansiona QR code",
+                color = PurpleAccent,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(
+            onClick = {
+                if (code.isNotBlank()) {
+                    viewModel.joinWithCode(code) {
+                        // Il LaunchedEffect sopra osserva didJoin + joinedFamilyId.
+                    }
+                }
+            },
+            enabled = !state.isBusy && !state.didJoin && code.isNotBlank(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = PurpleAccent,
+                disabledContainerColor = GrayDisabled.copy(alpha = 0.4f),
+                contentColor = Color.White,
+                disabledContentColor = Color.White.copy(alpha = 0.7f),
+            ),
+        ) {
+            if (state.isBusy) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Text("Entra", fontWeight = FontWeight.SemiBold)
+            }
+        }
+
+        state.error?.takeIf { it.isNotBlank() }?.let { err ->
+            Text(
+                err,
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+
+        if (state.didJoin) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(
+                    Icons.Filled.CheckCircle,
+                    contentDescription = null,
+                    tint = SuccessGreen,
+                    modifier = Modifier.size(22.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "Sei entrato nella famiglia!",
+                    color = SuccessGreen,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+
+    if (showScanner) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { showScanner = false },
+            sheetState = sheetState,
+            containerColor = Color.Black,
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(480.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                QRScannerView(
+                    onQRDetected = { payload ->
+                        showScanner = false
+                        viewModel.onQRScanned(payload) { /* stato osservato dal LaunchedEffect */ }
+                    },
+                )
+                Box(
+                    modifier = Modifier
+                        .size(240.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.Transparent),
+                ) {
+                    CornerBrackets()
+                }
+                IconButton(
+                    onClick = { showScanner = false },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp),
+                ) {
+                    Icon(Icons.Filled.Close, contentDescription = "Chiudi", tint = Color.White)
+                }
+                Text(
+                    "Inquadra il QR code",
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 32.dp),
+                    fontSize = 14.sp,
+                )
+            }
+        }
     }
 }

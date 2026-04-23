@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.notes
 
 import androidx.core.text.HtmlCompat
+import it.vittorioscocca.kidbox.data.remote.notes.sanitizeCrossPlatformHtml
 
 internal fun String.htmlToPlainText(
     trimEdges: Boolean = true,
@@ -14,6 +15,9 @@ internal fun String.htmlToPlainText(
         value.contains("&gt;") ||
         value.contains("&amp;")
     ) {
+        // Rimuove <head>/<style>/class=... (HTML "pesante" di iOS) prima del parse,
+        // altrimenti il CSS finisce come testo nell'anteprima.
+        value = value.sanitizeCrossPlatformHtml()
         value = HtmlCompat.fromHtml(value, HtmlCompat.FROM_HTML_MODE_LEGACY).toString()
         if (value.contains('<') && value.contains('>')) {
             value = HtmlCompat.fromHtml(value, HtmlCompat.FROM_HTML_MODE_LEGACY).toString()

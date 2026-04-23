@@ -21,6 +21,9 @@ data class JoinFamilyUiState(
     val isBusy: Boolean = false,
     val didJoin: Boolean = false,
     val error: String? = null,
+    /** Popolato solo dopo un join riuscito (QR o codice): serve all'onboarding
+     *  per chiamare `onFamilyCreated(familyId)` e lasciare l'onboarding. */
+    val joinedFamilyId: String? = null,
 )
 
 /**
@@ -99,7 +102,7 @@ class JoinFamilyViewModel @Inject constructor(
             inviteRemote.addMember(familyId)
             Log.d(TAG, "addMember OK")
             Log.i(TAG, "join OK familyId=$familyId")
-            _uiState.value = JoinFamilyUiState(didJoin = true)
+            _uiState.value = JoinFamilyUiState(didJoin = true, joinedFamilyId = familyId)
             // Reset FamilySyncCenter così startObserving() fa bootstrap della nuova famiglia
             familySyncCenter.stopSync()
             familySyncCenter.startSync(familyId)

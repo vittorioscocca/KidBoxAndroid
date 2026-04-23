@@ -254,7 +254,7 @@ fun JoinFamilyScreen(
 
 @androidx.annotation.OptIn(ExperimentalGetImage::class)
 @Composable
-private fun QRScannerView(onQRDetected: (String) -> Unit) {
+internal fun QRScannerView(onQRDetected: (String) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var detected by remember { mutableStateOf(false) }
@@ -318,7 +318,7 @@ private fun QRScannerView(onQRDetected: (String) -> Unit) {
 }
 
 @Composable
-private fun CornerBrackets() {
+internal fun CornerBrackets() {
     // Disegna i 4 angoli del mirino con Canvas
     androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
         val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = 4f)

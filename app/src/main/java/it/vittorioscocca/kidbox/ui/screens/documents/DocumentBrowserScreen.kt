@@ -324,7 +324,7 @@ fun DocumentBrowserScreen(
             Spacer(Modifier.height(10.dp))
             if (state.mode == DocumentsViewMode.GRID) {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
+                    columns = GridCells.Fixed(3),
                     modifier = Modifier.fillMaxSize(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -982,7 +982,7 @@ private fun FolderListItem(
             )
             Spacer(modifier = Modifier.width(8.dp))
         }
-        Icon(Icons.Default.Folder, contentDescription = null, tint = Color(0xFFFF941A), modifier = Modifier.size(32.dp))
+        Icon(Icons.Default.Folder, contentDescription = null, tint = Color(0xFFFF941A), modifier = Modifier.size(36.dp))
         Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
             Text(folder.title, fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.title)
             Text(formatRelativeTime(folder.updatedAtEpochMillis), color = Color(0xFF8B8B8B), fontSize = 12.sp)
@@ -1030,11 +1030,11 @@ private fun DocumentListItem(
                 model = File(document.localPath),
                 contentDescription = null,
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(36.dp)
                     .background(Color(0xFFF0F0F0), RoundedCornerShape(8.dp)),
             )
         } else {
-            Icon(iconForMime(document.mimeType), contentDescription = null, tint = Color(0xFF5F6B7A), modifier = Modifier.size(30.dp))
+            Icon(iconForMime(document.mimeType), contentDescription = null, tint = Color(0xFF5F6B7A), modifier = Modifier.size(34.dp))
         }
         Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
             Text(

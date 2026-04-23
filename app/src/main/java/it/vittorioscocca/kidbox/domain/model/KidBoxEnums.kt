@@ -71,6 +71,7 @@ enum class KBChatMessageType(val rawValue: String) {
     DOCUMENT("document"),
     LOCATION("location"),
     MEDIA_GROUP("mediaGroup"),
+    CONTACT("contact"),
 }
 
 enum class KBTranscriptStatus(val rawValue: String) {
