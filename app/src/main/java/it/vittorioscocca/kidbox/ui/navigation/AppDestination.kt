@@ -10,6 +10,7 @@ sealed class AppDestination(val route: String) {
     data object Home : AppDestination("home")
     data object Profile : AppDestination("profile")
     data object Settings : AppDestination("settings")
+    data object MessageSettings : AppDestination("message_settings")
     data object NotificationSettings : AppDestination("notification_settings")
     data object Theme : AppDestination("theme")
     data object InviteCode : AppDestination("invite_code")

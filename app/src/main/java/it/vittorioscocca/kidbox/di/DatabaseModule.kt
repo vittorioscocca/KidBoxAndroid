@@ -2,6 +2,8 @@ package it.vittorioscocca.kidbox.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -9,6 +11,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBCalendarEventDao
+import it.vittorioscocca.kidbox.data.local.dao.KBChatMessageDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyPhotoDao
@@ -30,6 +33,16 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
+    private val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Chat schema parity with iOS:
+            // - contactPayloadJSON (for shared contact card)
+            // - deletedForJSON    (per-user local hidden state mirror)
+            db.execSQL("ALTER TABLE kb_chat_messages ADD COLUMN contactPayloadJSON TEXT")
+            db.execSQL("ALTER TABLE kb_chat_messages ADD COLUMN deletedForJSON TEXT")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideKidBoxDatabase(
@@ -38,7 +51,8 @@ object DatabaseModule {
         context,
         KidBoxDatabase::class.java,
         "kidbox.db",
-    ).fallbackToDestructiveMigration()
+    ).addMigrations(MIGRATION_4_5)
+        .fallbackToDestructiveMigration()
         .build()
 
     @Provides
@@ -79,6 +93,9 @@ object DatabaseModule {
 
     @Provides
     fun provideKBExpenseCategoryDao(database: KidBoxDatabase): KBExpenseCategoryDao = database.expenseCategoryDao()
+
+    @Provides
+    fun provideKBChatMessageDao(database: KidBoxDatabase): KBChatMessageDao = database.chatMessageDao()
 
     @Provides
     fun provideKBFamilyPhotoDao(database: KidBoxDatabase): KBFamilyPhotoDao = database.familyPhotoDao()

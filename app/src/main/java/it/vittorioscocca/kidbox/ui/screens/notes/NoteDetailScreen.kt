@@ -30,6 +30,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,6 +48,8 @@ fun NoteDetailScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val kb = MaterialTheme.kidBoxColors
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
 
     LaunchedEffect(familyId, noteId) {
         viewModel.bind(familyId, noteId)
@@ -82,7 +86,11 @@ fun NoteDetailScreen(
                 fontSize = 22.sp,
             )
             IconButton(
-                onClick = { viewModel.save(onDone = onBack) },
+                onClick = {
+                    viewModel.save(onDone = {})
+                    focusManager.clearFocus(force = true)
+                    keyboardController?.hide()
+                },
                 enabled = !state.isSaving,
             ) {
                 Icon(Icons.Default.Check, contentDescription = "Salva", tint = kb.title)

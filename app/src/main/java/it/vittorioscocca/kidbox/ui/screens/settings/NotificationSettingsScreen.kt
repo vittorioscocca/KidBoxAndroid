@@ -1,11 +1,15 @@
 package it.vittorioscocca.kidbox.ui.screens.settings
 
 import android.Manifest
+import android.app.NotificationManager
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.notification.PushNotificationManager.PreferenceKeys
+import it.vittorioscocca.kidbox.notifications.KidBoxFirebaseMessagingService
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
 @Composable
@@ -55,6 +60,7 @@ fun NotificationSettingsScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var pendingEnableKey by remember { mutableStateOf<String?>(null) }
+    var isNotificationChannelSilent by remember { mutableStateOf(false) }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -77,6 +83,13 @@ fun NotificationSettingsScreen(
         val msg = state.message ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(msg)
         viewModel.clearMessage()
+    }
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = context.getSystemService(NotificationManager::class.java)
+            val channel = manager?.getNotificationChannel(KidBoxFirebaseMessagingService.CHANNEL_ID_FAMILY_UPDATES)
+            isNotificationChannelSilent = channel != null && channel.importance < NotificationManager.IMPORTANCE_DEFAULT
+        }
     }
 
     Column(
@@ -108,6 +121,43 @@ fun NotificationSettingsScreen(
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = kb.card),
         ) {
+            if (isNotificationChannelSilent) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                val intent = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                    putExtra(Settings.EXTRA_CHANNEL_ID, KidBoxFirebaseMessagingService.CHANNEL_ID_FAMILY_UPDATES)
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(intent)
+                            }
+                        }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Canale notifiche silenzioso",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = kb.title,
+                        )
+                        Text(
+                            text = "Tocca qui per attivare alert visibili (popup/suono).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = kb.subtitle,
+                        )
+                    }
+                    Text(
+                        text = "Apri",
+                        color = Color(0xFFFF6B00),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                }
+            }
             NotificationToggleRow(
                 title = "Notifica nuovi documenti",
                 subtitle = "Quando viene caricato un documento condiviso",

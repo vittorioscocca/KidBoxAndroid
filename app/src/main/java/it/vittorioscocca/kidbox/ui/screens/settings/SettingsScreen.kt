@@ -56,6 +56,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onTheme: () -> Unit,
     onFamilySettings: () -> Unit,
+    onMessageSettings: () -> Unit,
     onNotifications: () -> Unit,
     viewModel: ThemeViewModel = hiltViewModel(),
 ) {
@@ -80,7 +81,7 @@ fun SettingsScreen(
             title = "Messaggi",
             icon = Icons.AutoMirrored.Filled.Chat,
             showChevron = true,
-            onClick = {},
+            onClick = onMessageSettings,
         ),
         SettingRowItem(
             title = "Assistente AI",

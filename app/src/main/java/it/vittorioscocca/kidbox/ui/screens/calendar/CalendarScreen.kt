@@ -205,11 +205,7 @@ private fun CalendarMonthView(
     onDeleteEvent: (KBCalendarEventEntity) -> Unit,
 ) {
     val eventsByDate = remember(events) {
-        events.groupBy {
-            Instant.ofEpochMilli(it.startDateEpochMillis)
-                .atZone(ZoneId.systemDefault())
-                .toLocalDate()
-        }
+        buildEventsByDay(events)
     }
 
     val days = remember(displayedMonth) { monthGridDays(displayedMonth.withDayOfMonth(1)) }
@@ -339,11 +335,7 @@ private fun CalendarYearView(
         initialFirstVisibleItemIndex = years.indexOf(currentYear).coerceAtLeast(0),
     )
     val eventDates = remember(events) {
-        events.map {
-            Instant.ofEpochMilli(it.startDateEpochMillis)
-                .atZone(ZoneId.systemDefault())
-                .toLocalDate()
-        }.toSet()
+        buildEventDatesSet(events)
     }
 
     LazyColumn(
@@ -919,5 +911,39 @@ private fun categoryColor(raw: String): Color = when (raw) {
     "admin" -> Color(0xFF7F8C8D)
     "leisure" -> Color(0xFF9B59B6)
     else -> Color(0xFF9E9E9E)
+}
+
+private fun buildEventsByDay(events: List<KBCalendarEventEntity>): Map<LocalDate, List<KBCalendarEventEntity>> {
+    val grouped = linkedMapOf<LocalDate, MutableList<KBCalendarEventEntity>>()
+    events.forEach { event ->
+        eventCoveredDates(event).forEach { day ->
+            grouped.getOrPut(day) { mutableListOf() }.add(event)
+        }
+    }
+    return grouped.mapValues { (_, list) -> list.sortedBy { it.startDateEpochMillis } }
+}
+
+private fun buildEventDatesSet(events: List<KBCalendarEventEntity>): Set<LocalDate> =
+    buildSet {
+        events.forEach { addAll(eventCoveredDates(it)) }
+    }
+
+private fun eventCoveredDates(event: KBCalendarEventEntity): List<LocalDate> {
+    val zone = ZoneId.systemDefault()
+    var start = Instant.ofEpochMilli(event.startDateEpochMillis).atZone(zone).toLocalDate()
+    var end = Instant.ofEpochMilli(event.endDateEpochMillis).atZone(zone).toLocalDate()
+    if (end.isBefore(start)) {
+        val temp = start
+        start = end
+        end = temp
+    }
+
+    val result = mutableListOf<LocalDate>()
+    var cursor = start
+    while (!cursor.isAfter(end)) {
+        result += cursor
+        cursor = cursor.plusDays(1)
+    }
+    return result
 }
 

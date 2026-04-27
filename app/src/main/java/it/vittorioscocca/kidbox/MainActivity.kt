@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -32,6 +33,7 @@ import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
 import it.vittorioscocca.kidbox.data.local.ThemePreference
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.navigation.AppNavGraph
+import it.vittorioscocca.kidbox.notifications.NotificationBadgeStore
 import it.vittorioscocca.kidbox.ui.splash.KidBoxSplashScreen
 import it.vittorioscocca.kidbox.ui.theme.KidBoxTheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
@@ -55,6 +57,7 @@ class MainActivity : ComponentActivity() {
         val splashScreen = installSplashScreen()
         splashScreen.setKeepOnScreenCondition { false }
         super.onCreate(savedInstanceState)
+        clearAppBadgeAndNotifications()
         enableEdgeToEdge()
         pendingPushDeepLink = parsePushDeepLink(intent)
         setContent {
@@ -189,6 +192,11 @@ class MainActivity : ComponentActivity() {
                                 }
                                 pendingPushDeepLink = null
                             }
+
+                            "chat", "new_message", "new_chat_message", "message_received", "open_chat" -> {
+                                navController.navigate(AppDestination.Chat.route)
+                                pendingPushDeepLink = null
+                            }
                         }
                     }
                 }
@@ -200,6 +208,12 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingPushDeepLink = parsePushDeepLink(intent)
+        clearAppBadgeAndNotifications()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        clearAppBadgeAndNotifications()
     }
 
     @Deprecated("Deprecated in Java")
@@ -236,6 +250,11 @@ class MainActivity : ComponentActivity() {
             docId = docId,
             noteId = noteId,
         )
+    }
+
+    private fun clearAppBadgeAndNotifications() {
+        NotificationBadgeStore.reset(this)
+        NotificationManagerCompat.from(this).cancelAll()
     }
 }
 

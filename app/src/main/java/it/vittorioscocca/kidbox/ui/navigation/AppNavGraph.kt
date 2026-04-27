@@ -24,6 +24,7 @@ import it.vittorioscocca.kidbox.ui.screens.settings.family.EditFamilyScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.family.FamilySettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.InviteCodeScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.JoinFamilyScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.MessageSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.NotificationSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.SettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.ThemeScreen
@@ -33,6 +34,7 @@ import it.vittorioscocca.kidbox.ui.screens.location.FamilyLocationScreen
 import it.vittorioscocca.kidbox.ui.screens.notes.NoteDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.notes.NotesHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.photos.FamilyPhotosScreen
+import it.vittorioscocca.kidbox.ui.screens.chat.ChatScreen
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoListScreen
 
@@ -126,8 +128,13 @@ fun AppNavGraph(
                 onBack = { navController.popBackStack() },
                 onTheme = { navController.navigate(AppDestination.Theme.route) },
                 onFamilySettings = { navController.navigate(AppDestination.FamilySettings.route) },
+                onMessageSettings = { navController.navigate(AppDestination.MessageSettings.route) },
                 onNotifications = { navController.navigate(AppDestination.NotificationSettings.route) },
             )
+        }
+
+        composable(AppDestination.MessageSettings.route) {
+            MessageSettingsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(AppDestination.NotificationSettings.route) {
@@ -264,7 +271,11 @@ fun AppNavGraph(
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
         ) { PlaceholderScreen("Salute") }
 
-        composable(AppDestination.Chat.route) { PlaceholderScreen("Chat") }
+        composable(AppDestination.Chat.route) {
+            ChatScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
 
         composable(
             route = AppDestination.ExpensesHome.route,
