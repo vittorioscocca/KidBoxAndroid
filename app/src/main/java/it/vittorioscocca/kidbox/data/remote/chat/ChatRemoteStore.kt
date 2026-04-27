@@ -405,11 +405,11 @@ class ChatRemoteStore @Inject constructor(
             Log.w(tag, "skip incoming: already transcribed id=${dto.id}")
             return
         }
-        if (local.transcriptStatusRaw == "processing" || local.transcriptStatusRaw == "completed") {
-            Log.w(
-                tag,
-                "skip incoming: status=${local.transcriptStatusRaw} id=${dto.id}",
-            )
+        // Allow a retry when the remote status is "completed" but the text is blank — this
+        // happens when iOS transcription ran but returned nothing (silence, failed recognizer).
+        // We skip only "processing" (another device is actively transcribing) to avoid races.
+        if (local.transcriptStatusRaw == "processing") {
+            Log.w(tag, "skip incoming: status=processing id=${dto.id}")
             return
         }
         val localPath = local.mediaLocalPath

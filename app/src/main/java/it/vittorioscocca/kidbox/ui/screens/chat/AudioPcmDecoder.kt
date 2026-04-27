@@ -44,8 +44,13 @@ internal object AudioPcmDecoder {
             extractor.selectTrack(trackIndex)
             val format = extractor.getTrackFormat(trackIndex)
             val mime = format.getString(MediaFormat.KEY_MIME) ?: "audio/mp4a-latm"
-            val sourceSampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-            val sourceChannels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT).coerceAtLeast(1)
+            // KEY_SAMPLE_RATE / KEY_CHANNEL_COUNT may be absent in some iOS-produced M4A files
+            // (the codec info lives inside the CSD box, not the track header). getInteger() throws
+            // NullPointerException when the key is missing, so we guard with containsKey().
+            val sourceSampleRate = if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE))
+                format.getInteger(MediaFormat.KEY_SAMPLE_RATE) else 44100
+            val sourceChannels = if (format.containsKey(MediaFormat.KEY_CHANNEL_COUNT))
+                format.getInteger(MediaFormat.KEY_CHANNEL_COUNT).coerceAtLeast(1) else 1
             Log.w(TAG, "decoder: input mime=$mime sr=$sourceSampleRate ch=$sourceChannels")
 
             codec = MediaCodec.createDecoderByType(mime)
