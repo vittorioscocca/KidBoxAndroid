@@ -71,7 +71,7 @@ fun ChatInputBar(
         modifier = modifier
             .fillMaxWidth()
             .background(MaterialTheme.kidBoxColors.card)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 5.dp),
     ) {
         if (recordingState.isRecording) {
             Row(
@@ -126,7 +126,7 @@ fun ChatInputBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Card(
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(36.dp),
                 shape = CircleShape,
                 colors = CardDefaults.cardColors(containerColor = Color(0x1AFF6B00)),
             ) {
@@ -135,24 +135,24 @@ fun ChatInputBar(
                 }
             }
 
-            Spacer(Modifier.size(8.dp))
+            Spacer(Modifier.size(6.dp))
 
             OutlinedTextField(
                 value = text,
                 onValueChange = onTextChange,
                 modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = 52.dp, max = 140.dp),
-                shape = RoundedCornerShape(24.dp),
+                    .heightIn(min = 40.dp, max = 120.dp),
+                shape = RoundedCornerShape(20.dp),
                 placeholder = { Text("Messaggio...") },
-                maxLines = 6,
+                maxLines = 5,
                 enabled = !recordingState.isRecording,
             )
 
-            Spacer(Modifier.size(8.dp))
+            Spacer(Modifier.size(6.dp))
 
             Card(
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(36.dp),
                 shape = CircleShape,
                 colors = CardDefaults.cardColors(
                     containerColor = if (isTyping) Color(0xFFFF6B00) else Color(0x1AFF6B00),

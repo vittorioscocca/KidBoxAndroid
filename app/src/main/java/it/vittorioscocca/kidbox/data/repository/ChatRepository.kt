@@ -18,9 +18,13 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 
 @Singleton
@@ -187,6 +191,84 @@ class ChatRepository @Inject constructor(
         }
     }
 
+    /**
+     * Uploads [items] (photo/video byte arrays) concurrently to Firebase Storage, then
+     * creates a single MEDIA_GROUP message in Room and Firestore.
+     *
+     * Each item is a pair of (bytes, isVideo). Max 10 items enforced here as a safety net.
+     */
+    suspend fun sendMediaGroupMessage(
+        familyId: String,
+        items: List<Pair<ByteArray, Boolean>>,  // Boolean = isVideo
+        replyToId: String? = null,
+    ): String {
+        require(items.isNotEmpty()) { "sendMediaGroupMessage requires at least one item" }
+        val uid = auth.currentUser?.uid ?: error("Not authenticated")
+        val senderName = auth.currentUser?.displayName.orEmpty()
+        val now = System.currentTimeMillis()
+        val messageId = UUID.randomUUID().toString()
+        val capped = items.take(10)
+
+        // Upload all files concurrently — each gets its own sub-path under the message id.
+        val uploadedUrls: List<String>
+        val uploadedTypes: List<String>
+        withContext(Dispatchers.IO) {
+            val results = coroutineScope {
+                capped.mapIndexed { i, (bytes, isVideo) ->
+                    async {
+                        val type = if (isVideo) ChatMessageType.VIDEO else ChatMessageType.PHOTO
+                        val (fileName, mimeType) = ChatStorageService.defaultFileInfo(type)
+                        storageService.upload(
+                            familyId = familyId,
+                            messageId = "$messageId-$i",
+                            fileName = fileName,
+                            mimeType = mimeType,
+                            bytes = bytes,
+                        )
+                    }
+                }.awaitAll()
+            }
+            uploadedUrls = results.map { it.downloadUrl }
+            uploadedTypes = capped.map { (_, isVideo) -> if (isVideo) "video" else "photo" }
+        }
+
+        val urlsJson   = JSONArray(uploadedUrls).toString()
+        val typesJson  = JSONArray(uploadedTypes).toString()
+
+        val local = KBChatMessageEntity(
+            id = messageId,
+            familyId = familyId,
+            senderId = uid,
+            senderName = senderName,
+            typeRaw = ChatMessageType.MEDIA_GROUP.rawValue,
+            text = null, latitude = null, longitude = null,
+            mediaStoragePath = null, mediaURL = null,
+            mediaDurationSeconds = null, mediaThumbnailURL = null,
+            replyToId = replyToId, mediaLocalPath = null, mediaFileSize = null,
+            mediaGroupURLsJSON = urlsJson, mediaGroupTypesJSON = typesJson,
+            contactPayloadJSON = null, reactionsJSON = null,
+            readByJSON = null, deletedForJSON = null,
+            transcriptText = null, transcriptStatusRaw = "none",
+            transcriptSourceRaw = null, transcriptLocaleIdentifier = null,
+            transcriptIsFinal = false, transcriptUpdatedAtEpochMillis = null,
+            transcriptErrorMessage = null,
+            createdAtEpochMillis = now, editedAtEpochMillis = null,
+            isDeleted = false, isDeletedForEveryone = false,
+            syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+            lastSyncError = null,
+        )
+        chatDao.upsert(local)
+
+        return runCatching {
+            remoteStore.upsert(local)
+            chatDao.upsert(local.copy(syncStateRaw = KBSyncState.SYNCED.rawValue, lastSyncError = null))
+            messageId
+        }.getOrElse { err ->
+            chatDao.upsert(local.copy(syncStateRaw = KBSyncState.ERROR.rawValue, lastSyncError = err.message))
+            throw err
+        }
+    }
+
     suspend fun fetchOlderMessages(
         familyId: String,
         cursor: DocumentSnapshot?,
@@ -315,20 +397,46 @@ class ChatRepository @Inject constructor(
         }
     }
 
+    /**
+     * Clears every message in the chat for [familyId]:
+     * - Soft-deletes each message remotely (so other devices stop seeing them).
+     * - Deletes the original media payload from Firebase Storage.
+     * - Wipes every local row from Room so the UI updates immediately.
+     *
+     * Failures on individual messages are swallowed: clearing the chat must always
+     * leave the user with an empty thread locally, even if some remote ops fail.
+     */
+    suspend fun clearAllMessages(familyId: String) {
+        if (familyId.isBlank()) return
+        val all = chatDao.getAllByFamilyId(familyId)
+        chatDao.deleteAllByFamilyId(familyId)
+        all.forEach { msg ->
+            runCatching {
+                msg.mediaStoragePath?.takeIf { it.isNotBlank() }?.let { storageService.delete(it) }
+            }
+            runCatching { remoteStore.softDelete(familyId, msg.id) }
+        }
+    }
+
     suspend fun softDelete(
         familyId: String,
         messageId: String,
     ) {
         val local = chatDao.getById(messageId) ?: return
-        val pending = local.copy(
-            isDeleted = true,
-            syncStateRaw = KBSyncState.PENDING_DELETE.rawValue,
-            lastSyncError = null,
+        // Optimistic local update: show placeholder immediately without waiting for
+        // the Firestore round-trip (mirrors iOS behaviour).
+        chatDao.upsert(
+            local.copy(
+                isDeleted = true,
+                isDeletedForEveryone = true,
+                syncStateRaw = KBSyncState.SYNCED.rawValue,
+                lastSyncError = null,
+            ),
         )
-        chatDao.upsert(pending)
         runCatching {
             remoteStore.softDelete(familyId, messageId)
-            chatDao.deleteById(messageId)
+            // Best-effort media cleanup.
+            local.mediaStoragePath?.takeIf { it.isNotBlank() }?.let { storageService.delete(it) }
         }.onFailure { err ->
             chatDao.upsert(
                 local.copy(

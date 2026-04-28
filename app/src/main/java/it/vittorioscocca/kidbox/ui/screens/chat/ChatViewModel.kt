@@ -14,13 +14,16 @@ import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
 import it.vittorioscocca.kidbox.data.repository.ChatRepository
 import org.json.JSONObject
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class ChatUiState(
     val isLoading: Boolean = true,
@@ -36,6 +39,8 @@ data class ChatUiState(
     val isSending: Boolean = false,
     val isAudioTranscriptionEnabled: Boolean = true,
     val errorText: String? = null,
+    val isSearchActive: Boolean = false,
+    val searchQuery: String = "",
 )
 
 @HiltViewModel
@@ -66,6 +71,44 @@ class ChatViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             isAudioTranscriptionEnabled = messageSettingsPreferences.isAudioTranscriptionEnabled(),
         )
+    }
+
+    fun loadScrollAnchor(): Pair<String, Int>? {
+        val familyId = _uiState.value.familyId
+        return messageSettingsPreferences.getChatScrollAnchor(familyId)
+    }
+
+    fun saveScrollAnchor(messageId: String?, offset: Int) {
+        val familyId = _uiState.value.familyId
+        messageSettingsPreferences.setChatScrollAnchor(familyId, messageId, offset)
+    }
+
+    fun saveScrollAnchorFor(familyId: String, messageId: String?, offset: Int) {
+        messageSettingsPreferences.setChatScrollAnchor(familyId, messageId, offset)
+    }
+
+    fun setSearchActive(active: Boolean) {
+        _uiState.value = _uiState.value.copy(
+            isSearchActive = active,
+            searchQuery = if (active) _uiState.value.searchQuery else "",
+        )
+    }
+
+    fun onSearchQueryChange(query: String) {
+        _uiState.value = _uiState.value.copy(searchQuery = query)
+    }
+
+    fun clearChat() {
+        val familyId = _uiState.value.familyId
+        if (familyId.isBlank()) return
+        viewModelScope.launch {
+            runCatching { chatRepository.clearAllMessages(familyId) }
+                .onFailure { err ->
+                    _uiState.value = _uiState.value.copy(
+                        errorText = err.message ?: "Impossibile svuotare la chat",
+                    )
+                }
+        }
     }
 
     private fun observeFamily() {
@@ -120,15 +163,27 @@ class ChatViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            chatRepository.observeMessages(familyId).collectLatest { messages ->
-                chatRepository.scheduleLocalMediaCacheCleanup(familyId)
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    messages = messages
-                        .map { it.toUi() }
-                        .filterNot { it.isDeleted && it.type != ChatMessageType.TEXT },
-                )
-            }
+            chatRepository.observeMessages(familyId)
+                // Mapping KBChatMessage → UiChatMessage is CPU-only (JSON parsing, string ops)
+                // but for 50+ messages it's measurable on the main thread. Run it on Default
+                // so the UI thread stays free for rendering while the list is being prepared.
+                .map { messages ->
+                    withContext(Dispatchers.Default) {
+                        messages
+                            .map { it.toUi() }
+                            // Hide messages deleted only for me (isDeleted=true, isDeletedForEveryone=false).
+                            // Messages deleted for everyone (isDeletedForEveryone=true) are kept in the list
+                            // so the bubble can render the "Messaggio eliminato" placeholder.
+                            .filterNot { it.isDeleted && !it.isDeletedForEveryone }
+                    }
+                }
+                .collectLatest { mappedMessages ->
+                    chatRepository.scheduleLocalMediaCacheCleanup(familyId)
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        messages = mappedMessages,
+                    )
+                }
         }
     }
 
@@ -187,6 +242,29 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /** Sends multiple photos/videos as a single MEDIA_GROUP message. Max 10 items. */
+    fun sendMediaGroup(items: List<Pair<ByteArray, Boolean>>) {
+        val state = _uiState.value
+        val familyId = state.familyId
+        if (familyId.isBlank() || items.isEmpty()) return
+        val replyToId = state.replyingToId
+        _uiState.value = state.copy(replyingToId = null)
+        viewModelScope.launch {
+            setSending(true)
+            runCatching {
+                chatRepository.sendMediaGroupMessage(
+                    familyId = familyId,
+                    items = items,
+                    replyToId = replyToId,
+                )
+            }.onFailure { err ->
+                _uiState.value = _uiState.value.copy(errorText = err.message ?: "Invio allegati non riuscito")
+            }.also {
+                setSending(false)
+            }
+        }
+    }
+
     fun sendDocumentAttachment(fileName: String, mimeType: String, bytes: ByteArray) {
         val state = _uiState.value
         val familyId = state.familyId
@@ -213,7 +291,13 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun sendAudioAttachment(fileName: String, mimeType: String, bytes: ByteArray, transcriptText: String? = null) {
+    fun sendAudioAttachment(
+        fileName: String,
+        mimeType: String,
+        bytes: ByteArray,
+        durationSeconds: Int? = null,
+        transcriptText: String? = null,
+    ) {
         val state = _uiState.value
         val familyId = state.familyId
         if (familyId.isBlank() || bytes.isEmpty()) return
@@ -229,6 +313,7 @@ class ChatViewModel @Inject constructor(
                     mediaBytes = bytes,
                     fileName = fileName,
                     mimeType = mimeType,
+                    mediaDurationSeconds = durationSeconds?.takeIf { it > 0 },
                     replyToId = replyToId,
                 )
             }.onFailure { err ->

@@ -335,7 +335,7 @@ private fun GroceryRow(
             Text(
                 text = item.name,
                 style = MaterialTheme.typography.bodyLarge,
-                color = if (item.isPurchased) kb.subtitle else kb.title,
+                color = if (item.isPurchased) kb.subtitle else MaterialTheme.colorScheme.onSurface,
             )
             if (!item.notes.isNullOrBlank()) {
                 Text(

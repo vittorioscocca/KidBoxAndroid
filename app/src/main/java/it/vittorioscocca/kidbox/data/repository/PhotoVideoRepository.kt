@@ -18,6 +18,8 @@ import it.vittorioscocca.kidbox.data.local.dao.KBFamilyPhotoDao
 import it.vittorioscocca.kidbox.data.local.dao.KBPhotoAlbumDao
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyPhotoEntity
+import it.vittorioscocca.kidbox.util.fixBitmapOrientationFromBytes
+import it.vittorioscocca.kidbox.util.fixVideoFrameOrientation
 import it.vittorioscocca.kidbox.data.local.entity.KBPhotoAlbumEntity
 import it.vittorioscocca.kidbox.data.remote.PhotoAlbumRemoteChange
 import it.vittorioscocca.kidbox.data.remote.PhotoRemoteChange
@@ -617,10 +619,12 @@ class PhotoVideoRepository @Inject constructor(
                 val retriever = MediaMetadataRetriever()
                 retriever.setDataSource(context, uri)
                 val frame = retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    ?.let { fixVideoFrameOrientation(it, retriever) }
                 retriever.release()
                 frame
             } else {
                 decodeSampledBitmap(bytes, 320, 320)
+                    .let { fixBitmapOrientationFromBytes(it, bytes) }
             }
         }.getOrNull() ?: return null
         return bitmapToBase64(thumbBitmap)
@@ -631,7 +635,9 @@ class PhotoVideoRepository @Inject constructor(
         mimeType: String,
     ): String? {
         val thumbBitmap = runCatching {
-            if (mimeType.startsWith("video/")) null else decodeSampledBitmap(bytes, 320, 320)
+            if (mimeType.startsWith("video/")) null
+            else decodeSampledBitmap(bytes, 320, 320)
+                .let { fixBitmapOrientationFromBytes(it, bytes) }
         }.getOrNull() ?: return null
         return bitmapToBase64(thumbBitmap)
     }

@@ -38,32 +38,40 @@ class ChatStorageService @Inject constructor(
         require(bytes.isNotEmpty()) { "Empty media payload" }
 
         val safeName = fileName.ifBlank { "file.bin" }
-        val path = "families/$familyId/chat/$messageId/$safeName.kbenc"
-        val ref = storage.reference.child(path)
-        val encrypted = cryptoManager.encrypt(bytes, familyId)
-        val metadata = StorageMetadata.Builder()
-            .setContentType("application/octet-stream")
-            .setCustomMetadata("kb_encrypted", "1")
-            .setCustomMetadata("kb_alg", "AES-GCM")
-            .setCustomMetadata("kb_orig_name", safeName)
-            .setCustomMetadata("kb_orig_mime", mimeType)
-            .build()
 
-        ref.putBytes(encrypted, metadata).await()
+        // All chat media (audio, photo, video, documents) is uploaded plain, matching
+        // iOS which relies on Firebase Storage Rules for access control rather than
+        // AES-GCM encryption. This enables cross-platform streaming and file opening
+        // without a custom decrypt step.
+        val path = "families/$familyId/chat/$messageId/$safeName"
+        val ref = storage.reference.child(path)
+        val metadata = StorageMetadata.Builder()
+            .setContentType(mimeType)
+            .build()
+        ref.putBytes(bytes, metadata).await()
         val downloadUrl = ref.downloadUrl.await().toString()
         return ChatMediaUploadResult(
             storagePath = path,
             downloadUrl = downloadUrl,
-            bytes = bytes.size.toLong(), // logical/original size for UI
+            bytes = bytes.size.toLong(),
         )
     }
 
+    /**
+     * Downloads chat media bytes, transparently handling both legacy AES-GCM
+     * encrypted blobs (path ending in `.kbenc`) and plain payloads (used for
+     * iOS interop, e.g. `audio.m4a`).
+     */
     suspend fun downloadDecrypted(
         storagePath: String,
         familyId: String,
     ): ByteArray {
-        val encrypted = storage.reference.child(storagePath).getBytes(250L * 1024L * 1024L).await()
-        return cryptoManager.decrypt(encrypted, familyId)
+        val bytes = storage.reference.child(storagePath).getBytes(250L * 1024L * 1024L).await()
+        return if (storagePath.endsWith(".kbenc", ignoreCase = true)) {
+            cryptoManager.decrypt(bytes, familyId)
+        } else {
+            bytes
+        }
     }
 
     fun cachePlainMediaLocally(

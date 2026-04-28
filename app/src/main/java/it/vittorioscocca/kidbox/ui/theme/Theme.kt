@@ -21,6 +21,14 @@ data class KidBoxColorScheme(
     val subtitle: Color,
     val divider: Color,
     val rowBackground: Color,
+    /** Background of incoming (other-person) chat bubbles. */
+    val incomingBubble: Color,
+    /**
+     * A subtle surface overlay used for inner cards/containers that sit on top of
+     * a bubble or card background.  Light = ~6 % black, Dark = ~10 % white so the
+     * element is always slightly contrasted against its parent regardless of theme.
+     */
+    val surfaceOverlay: Color,
 )
 
 val KidBoxLightColorScheme = KidBoxColorScheme(
@@ -30,6 +38,8 @@ val KidBoxLightColorScheme = KidBoxColorScheme(
     subtitle = Color(0xFF666666),
     divider = Color(0xFFE8E8E8),
     rowBackground = Color(0xFFFFFFFF),
+    incomingBubble = Color(0xFFFFFFFF),
+    surfaceOverlay = Color(0x0F000000),
 )
 
 val KidBoxDarkColorScheme = KidBoxColorScheme(
@@ -39,6 +49,8 @@ val KidBoxDarkColorScheme = KidBoxColorScheme(
     subtitle = Color(0xFFAAAAAA),
     divider = Color(0xFF3A3A3C),
     rowBackground = Color(0xFF2C2C2E),
+    incomingBubble = Color(0xFF3A3A3C),
+    surfaceOverlay = Color(0x1AFFFFFF),
 )
 
 val LocalKidBoxColors = staticCompositionLocalOf { KidBoxLightColorScheme }

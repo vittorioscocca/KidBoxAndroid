@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.data.remote.chat
 
+import android.os.Build
 import android.util.Log
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
@@ -171,9 +172,13 @@ class ChatRemoteStore @Inject constructor(
             .document(familyId)
             .collection("chatMessages")
             .document(messageId)
+        // Mirror iOS: isDeleted=true signals "deleted for everyone" to all listeners.
+        // isDeletedForEveryone is written explicitly so Android listeners can map
+        // it directly without relying on the isDeleted→isDeletedForEveryone convention.
         ref.set(
             mapOf(
                 "isDeleted" to true,
+                "isDeletedForEveryone" to true,
                 "updatedBy" to uid,
                 "updatedAt" to FieldValue.serverTimestamp(),
             ),
@@ -237,14 +242,19 @@ class ChatRemoteStore @Inject constructor(
 
         // Update local Room cache and trigger media hydration / transcription for each
         // page of older messages, exactly the same as for live updates.
+        val currentUid = auth.currentUser?.uid.orEmpty()
         dtos.forEach { dto ->
-            if (dto.isDeleted) {
+            if (currentUid.isNotBlank() && dto.deletedFor.contains(currentUid)) {
+                // Deleted for me only → remove locally, don't show.
                 chatDao.deleteById(dto.id)
             } else {
                 val existing = chatDao.getById(dto.id)
                 val merged = dto.toLocalEntity(local = existing)
                 chatDao.upsert(merged)
-                maybeHydrateEncryptedMedia(familyId = familyId, dto = dto, local = merged)
+                // Don't hydrate media for messages deleted for everyone (just the placeholder).
+                if (!dto.isDeleted) {
+                    maybeHydrateEncryptedMedia(familyId = familyId, dto = dto, local = merged)
+                }
             }
         }
 
@@ -292,11 +302,18 @@ class ChatRemoteStore @Inject constructor(
 
     private suspend fun applyRemoteUpsert(familyId: String, doc: DocumentSnapshot) {
         val dto = doc.toRemoteDto(familyId)
-        if (dto.isDeleted) {
+        val currentUid = auth.currentUser?.uid.orEmpty()
+
+        // Message was deleted only for the current user → wipe from local DB and stop.
+        if (currentUid.isNotBlank() && dto.deletedFor.contains(currentUid)) {
             chatDao.deleteById(dto.id)
             return
         }
 
+        // Message deleted for everyone: keep in DB so the UI can show the "deleted"
+        // placeholder (isDeletedForEveryone = true). toLocalEntity maps dto.isDeleted
+        // → isDeletedForEveryone, so we fall through to the normal upsert path and
+        // skip media hydration.
         val local = chatDao.getById(dto.id)
         val localSync = local?.let { KBSyncState.fromRaw(it.syncStateRaw) }
         if (localSync == KBSyncState.PENDING_DELETE) return
@@ -307,7 +324,9 @@ class ChatRemoteStore @Inject constructor(
 
         val merged = dto.toLocalEntity(local = local)
         chatDao.upsert(merged)
-        maybeHydrateEncryptedMedia(familyId = familyId, dto = dto, local = merged)
+        if (!dto.isDeleted) {
+            maybeHydrateEncryptedMedia(familyId = familyId, dto = dto, local = merged)
+        }
     }
 
     /**
@@ -376,8 +395,12 @@ class ChatRemoteStore @Inject constructor(
     /**
      * Run on-device speech recognition for incoming audio messages.
      *
-     * Each guard logs the reason it skipped so the pipeline is debuggable from
-     * Logcat with the `KB_Transcription` filter.
+     * Guard order (each logged with KB_Transcription tag):
+     *  1. Basic sanity (uid, type, setting, own message, already done, in progress)
+     *  2. Device capability check BEFORE setting "processing" → avoids the retry loop
+     *     that would otherwise fire on every Firestore update for unsupported devices
+     *  3. Audio file presence
+     *  4. Actual recognition
      */
     private suspend fun maybeTranscribeIncomingAudio(
         familyId: String,
@@ -386,50 +409,71 @@ class ChatRemoteStore @Inject constructor(
     ) {
         val tag = transcriptionLogTag
         val currentUid = auth.currentUser?.uid.orEmpty()
+
+        // ── Basic guards ─────────────────────────────────────────────────────
         if (currentUid.isBlank()) {
-            Log.w(tag, "skip incoming: no current user id=${dto.id}")
+            Log.w(tag, "skip: no current user id=${dto.id}")
             return
         }
-        if (ChatMessageType.fromRaw(dto.typeRaw) != ChatMessageType.AUDIO) {
-            return
-        }
+        if (ChatMessageType.fromRaw(dto.typeRaw) != ChatMessageType.AUDIO) return
         if (!messageSettingsPreferences.isAudioTranscriptionEnabled()) {
-            Log.w(tag, "skip incoming: transcription disabled in settings id=${dto.id}")
+            Log.w(tag, "skip: transcription disabled in settings id=${dto.id}")
             return
         }
         if (dto.senderId == currentUid) {
-            Log.w(tag, "skip incoming: own message id=${dto.id}")
+            Log.w(tag, "skip: own message id=${dto.id}")
             return
         }
+        // Already has a successful transcript → done.
         if (!local.transcriptText.isNullOrBlank()) {
-            Log.w(tag, "skip incoming: already transcribed id=${dto.id}")
+            Log.w(tag, "skip: already transcribed id=${dto.id}")
             return
         }
-        // Allow a retry when the remote status is "completed" but the text is blank — this
-        // happens when iOS transcription ran but returned nothing (silence, failed recognizer).
-        // We skip only "processing" (another device is actively transcribing) to avoid races.
+        // Another device is transcribing → don't race.
         if (local.transcriptStatusRaw == "processing") {
-            Log.w(tag, "skip incoming: status=processing id=${dto.id}")
+            Log.w(tag, "skip: status=processing id=${dto.id}")
             return
         }
+
+        // ── Device capability check (BEFORE touching the DB) ─────────────────
+        // EXTRA_AUDIO_SOURCE (file-based recognition) requires API 33+.
+        // On older devices we immediately mark the message as failed so the UI
+        // shows "Trascrizione non disponibile" and we never retry.
+        if (!transcriptionService.isRecognitionAvailable()) {
+            if (local.transcriptStatusRaw != "failed") {
+                Log.w(tag, "device_unsupported: api=${Build.VERSION.SDK_INT} id=${dto.id}")
+                chatDao.upsert(
+                    local.copy(
+                        transcriptStatusRaw = "failed",
+                        transcriptErrorMessage = "Trascrizione non supportata (richiede Android 13+)",
+                        transcriptUpdatedAtEpochMillis = System.currentTimeMillis(),
+                    ),
+                )
+            }
+            return
+        }
+
+        // Already permanently failed → don't retry (avoids loop on transient failures).
+        // The only exception: if iOS set status="completed" with blank text, we do try once.
+        if (local.transcriptStatusRaw == "failed") {
+            Log.w(tag, "skip: already failed id=${dto.id}")
+            return
+        }
+
+        // ── Audio file check ──────────────────────────────────────────────────
         val localPath = local.mediaLocalPath
         if (localPath.isNullOrBlank()) {
-            Log.w(tag, "skip incoming: missing local media path id=${dto.id}")
+            Log.w(tag, "skip: missing local path id=${dto.id}")
             return
         }
         val audioFile = java.io.File(localPath)
         if (!audioFile.exists() || audioFile.length() == 0L) {
-            Log.w(
-                tag,
-                "skip incoming: file missing/empty id=${dto.id} path=$localPath",
-            )
+            Log.w(tag, "skip: file missing/empty id=${dto.id} path=$localPath")
             return
         }
 
-        Log.w(
-            tag,
-            "start incoming: family=$familyId id=${dto.id} sender=${dto.senderId} file=${audioFile.name} size=${audioFile.length()}",
-        )
+        // ── Start recognition ─────────────────────────────────────────────────
+        Log.w(tag, "start: family=$familyId id=${dto.id} file=${audioFile.name} size=${audioFile.length()}")
 
         chatDao.upsert(
             local.copy(
@@ -442,15 +486,13 @@ class ChatRemoteStore @Inject constructor(
         val transcript = runCatching {
             transcriptionService.transcribeAudioBestEffort(audioFile)
         }.onFailure {
-            Log.e(tag, "incoming threw ${it.javaClass.simpleName}: ${it.message}", it)
+            Log.e(tag, "threw ${it.javaClass.simpleName}: ${it.message}", it)
         }.getOrNull()?.trim().orEmpty()
 
         val refreshed = chatDao.getById(dto.id) ?: return
+
         if (transcript.isNotBlank()) {
-            Log.w(
-                tag,
-                "complete incoming: id=${dto.id} chars=${transcript.length}",
-            )
+            Log.w(tag, "complete: id=${dto.id} chars=${transcript.length}")
             chatDao.upsert(
                 refreshed.copy(
                     transcriptText = transcript,
@@ -463,12 +505,12 @@ class ChatRemoteStore @Inject constructor(
                 ),
             )
         } else {
-            Log.w(tag, "fail incoming: id=${dto.id} blank result")
+            Log.w(tag, "fail: blank result id=${dto.id}")
             chatDao.upsert(
                 refreshed.copy(
                     transcriptStatusRaw = "failed",
                     transcriptUpdatedAtEpochMillis = System.currentTimeMillis(),
-                    transcriptErrorMessage = "Trascrizione non disponibile sul dispositivo",
+                    transcriptErrorMessage = "Trascrizione non disponibile",
                 ),
             )
         }
@@ -554,8 +596,10 @@ class ChatRemoteStore @Inject constructor(
             transcriptErrorMessage = transcriptErrorMessage ?: local?.transcriptErrorMessage,
             createdAtEpochMillis = createdAtEpochMillis ?: now,
             editedAtEpochMillis = editedAtEpochMillis,
-            isDeleted = false,
-            isDeletedForEveryone = isDeletedForEveryone,
+            // isDeleted (remote) signals "deleted for everyone" — same convention as iOS.
+            // We keep the row with the flag set so the UI can render the placeholder.
+            isDeleted = isDeleted,
+            isDeletedForEveryone = isDeletedForEveryone || isDeleted,
             syncStateRaw = KBSyncState.SYNCED.rawValue,
             lastSyncError = null,
         )

@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -68,9 +69,11 @@ import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.entity.KBSharedLocationEntity
 import it.vittorioscocca.kidbox.data.repository.LocationShareMode
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.runtime.rememberCoroutineScope
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 @Composable
 fun FamilyLocationScreen(
@@ -91,6 +94,7 @@ fun FamilyLocationScreen(
         }
     }
     val myUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+    val scope = rememberCoroutineScope()
     var showShareOptions by remember { mutableStateOf(false) }
     var showTemporaryDialog by remember { mutableStateOf(false) }
     var temporaryHours by remember { mutableIntStateOf(2) }
@@ -296,6 +300,17 @@ fun FamilyLocationScreen(
                     viewModel.stopSharing()
                 }
             },
+            onMyLocationTap = {
+                val lat = state.deviceLatitude ?: return@LocationBottomCard
+                val lon = state.deviceLongitude ?: return@LocationBottomCard
+                followingUserId = null
+                scope.launch {
+                    cameraPositionState.animate(
+                        update = CameraUpdateFactory.newLatLngZoom(LatLng(lat, lon), 16f),
+                        durationMs = 500,
+                    )
+                }
+            },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
@@ -385,6 +400,7 @@ private fun LocationBottomCard(
     state: FamilyLocationUiState,
     isDarkTheme: Boolean,
     onToggle: (Boolean) -> Unit,
+    onMyLocationTap: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val containerColor = if (isDarkTheme) Color(0xD11C2733) else Color(0xE6EFF6E5)
@@ -457,7 +473,12 @@ private fun LocationBottomCard(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(
+                                    enabled = state.deviceLatitude != null,
+                                    onClick = onMyLocationTap,
+                                ),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Surface(
@@ -482,7 +503,12 @@ private fun LocationBottomCard(
                                 fontSize = 19.sp,
                                 modifier = Modifier.weight(1f),
                             )
-                            Text(">", color = chevronColor, fontSize = 14.sp)
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = if (state.deviceLatitude != null) Color(0xFF2E86FF) else chevronColor,
+                                modifier = Modifier.size(20.dp),
+                            )
                         }
 
                         Row(

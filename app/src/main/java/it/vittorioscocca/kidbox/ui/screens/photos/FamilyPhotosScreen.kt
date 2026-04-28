@@ -53,6 +53,7 @@ import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.DoneAll
@@ -107,6 +108,8 @@ import it.vittorioscocca.kidbox.data.local.entity.KBFamilyPhotoEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBPhotoAlbumEntity
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import it.vittorioscocca.kidbox.util.fixBitmapOrientationFromFile
+import it.vittorioscocca.kidbox.util.fixVideoFrameOrientation
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -362,10 +365,14 @@ fun FamilyPhotosScreen(
                     selectedPhotoIds = emptySet()
                     isSelectionMode = false
                 },
+                onDeselect = {
+                    selectedPhotoIds = emptySet()
+                    isSelectionMode = false
+                },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                    .fillMaxWidth()
+                    .navigationBarsPadding(),
             )
         }
     }
@@ -683,47 +690,55 @@ private fun SelectionActionBar(
     onRemove: () -> Unit,
     onSetCover: () -> Unit,
     onDelete: () -> Unit,
+    onDeselect: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
         color = MaterialTheme.kidBoxColors.card,
-        shadowElevation = 8.dp,
+        shadowElevation = 12.dp,
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = 8.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            ActionRow(
-                label = "Aggiungi",
+            ActionIconButton(
+                icon = Icons.Default.Close,
+                label = "Annulla",
+                enabled = true,
+                onClick = onDeselect,
+            )
+            ActionIconButton(
                 icon = Icons.AutoMirrored.Filled.PlaylistAdd,
+                label = "Aggiungi",
                 enabled = selectedCount > 0,
                 onClick = onAdd,
             )
-            ActionRow(
-                label = "Sposta",
+            ActionIconButton(
                 icon = Icons.AutoMirrored.Filled.DriveFileMove,
+                label = "Sposta",
                 enabled = selectedCount > 0,
                 onClick = onMove,
             )
-            ActionRow(
-                label = "Rimuovi",
+            ActionIconButton(
                 icon = Icons.Default.RemoveCircleOutline,
+                label = "Rimuovi",
                 enabled = canRemoveFromAlbum,
                 onClick = onRemove,
             )
-            ActionRow(
-                label = "Copertina",
+            ActionIconButton(
                 icon = Icons.Default.Image,
+                label = "Copertina",
                 enabled = canSetCover,
                 onClick = onSetCover,
             )
-            ActionRow(
-                label = "Elimina",
+            ActionIconButton(
                 icon = Icons.Default.Delete,
+                label = "Elimina",
                 enabled = selectedCount > 0,
                 destructive = true,
                 onClick = onDelete,
@@ -1109,50 +1124,40 @@ private fun PhotoLongPressMenuDialog(
 }
 
 @Composable
-private fun ActionRow(
-    label: String,
+private fun ActionIconButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
     enabled: Boolean,
     destructive: Boolean = false,
     onClick: () -> Unit,
 ) {
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
-        color = when {
-            !enabled -> MaterialTheme.kidBoxColors.divider
-            destructive -> Color(0xFFFFEBEE)
-            else -> MaterialTheme.kidBoxColors.rowBackground
-        },
-        modifier = Modifier.fillMaxWidth(),
+    val tint = when {
+        !enabled -> MaterialTheme.kidBoxColors.subtitle
+        destructive -> Color(0xFFE35156)
+        else -> MaterialTheme.kidBoxColors.title
+    }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        IconButton(
+            onClick = onClick,
+            enabled = enabled,
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = null,
-                tint = when {
-                    !enabled -> MaterialTheme.kidBoxColors.subtitle
-                    destructive -> Color(0xFFE35156)
-                    else -> MaterialTheme.kidBoxColors.title
-                },
-                modifier = Modifier.size(16.dp),
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text = label,
-                color = when {
-                    !enabled -> MaterialTheme.kidBoxColors.subtitle
-                    destructive -> Color(0xFFE35156)
-                    else -> MaterialTheme.kidBoxColors.title
-                },
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
+                contentDescription = label,
+                tint = tint,
+                modifier = Modifier.size(24.dp),
             )
         }
+        Text(
+            text = label,
+            color = tint,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+        )
     }
 }
 
@@ -1414,6 +1419,7 @@ private fun FullscreenMediaViewer(
                                     runCatching {
                                         val file = withContext(Dispatchers.IO) { prepareFile(photo) }
                                         val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+                                            ?.let { fixBitmapOrientationFromFile(it, file.absolutePath) }
                                             ?: error("Anteprima non disponibile")
                                         editorBitmap = bitmap
                                         showEditorForPhoto = photo
@@ -2009,6 +2015,7 @@ private fun extractVideoFrameBitmap(file: File): Bitmap? {
         val retriever = MediaMetadataRetriever()
         retriever.setDataSource(file.absolutePath)
         val frame = retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+            ?.let { fixVideoFrameOrientation(it, retriever) }
         retriever.release()
         frame
     }.getOrNull()

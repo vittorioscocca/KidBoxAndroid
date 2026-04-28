@@ -210,7 +210,6 @@ fun TodoHomeScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(list.name, fontSize = 16.sp, color = kb.title, modifier = Modifier.weight(1f))
-                            Text("Pressione lunga per azioni", fontSize = 11.sp, color = kb.subtitle)
                         }
                     }
                 }

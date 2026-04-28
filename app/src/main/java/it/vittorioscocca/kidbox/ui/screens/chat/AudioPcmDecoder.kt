@@ -21,10 +21,23 @@ internal object AudioPcmDecoder {
     private const val TIMEOUT_US = 10_000L
 
     /**
+     * Decode [input] to mono 16 kHz PCM and write raw 16-bit little-endian samples
+     * at [output] (no RIFF/WAV header). Returns true on success.
+     *
+     * SpeechRecognizer's EXTRA_AUDIO_SOURCE expects raw PCM that matches the PCM
+     * encoding/channel/sample-rate extras: any container header (e.g. WAV's 44-byte
+     * RIFF prefix) is interpreted as PCM samples and triggers early NO_MATCH on
+     * several OEM engines (MIUI/Xiaomi in particular).
+     */
+    fun decodeToMono16kPcm(input: File, output: File): Boolean = decode(input, output, writeWavHeader = false)
+
+    /**
      * Decode [input] to mono 16 kHz PCM and write a minimal WAV container at [outputWav].
      * Returns true on success.
      */
-    fun decodeToMono16kWav(input: File, outputWav: File): Boolean {
+    fun decodeToMono16kWav(input: File, outputWav: File): Boolean = decode(input, outputWav, writeWavHeader = true)
+
+    private fun decode(input: File, output: File, writeWavHeader: Boolean): Boolean {
         if (!input.exists() || input.length() == 0L) {
             Log.w(TAG, "decoder: skip missing/empty input ${input.absolutePath}")
             return false
@@ -105,14 +118,19 @@ internal object AudioPcmDecoder {
             Log.w(TAG, "decoder: raw pcm bytes=${rawPcm.size}")
 
             val mono16k = downmixAndResample(rawPcm, sourceSampleRate, sourceChannels, 16_000)
-            writeWav(
-                target = outputWav,
-                pcm = mono16k,
-                sampleRate = 16_000,
-                channels = 1,
-                bitsPerSample = 16,
-            )
-            Log.w(TAG, "decoder: wrote wav=${outputWav.absolutePath} size=${outputWav.length()}")
+            if (writeWavHeader) {
+                writeWav(
+                    target = output,
+                    pcm = mono16k,
+                    sampleRate = 16_000,
+                    channels = 1,
+                    bitsPerSample = 16,
+                )
+                Log.w(TAG, "decoder: wrote wav=${output.absolutePath} size=${output.length()}")
+            } else {
+                FileOutputStream(output).use { fos -> fos.write(mono16k) }
+                Log.w(TAG, "decoder: wrote pcm=${output.absolutePath} size=${output.length()}")
+            }
             return true
         } catch (t: Throwable) {
             Log.e(TAG, "decoder: failed ${t.javaClass.simpleName}: ${t.message}", t)

@@ -1,8 +1,11 @@
 package it.vittorioscocca.kidbox.ui.screens.chat
 
 import android.text.format.DateUtils
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import it.vittorioscocca.kidbox.data.chat.model.ChatMessageType
+import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import it.vittorioscocca.kidbox.data.chat.model.ContactPayload
 import it.vittorioscocca.kidbox.data.chat.model.LabeledStringValue
 import it.vittorioscocca.kidbox.domain.model.KBChatMessage
@@ -12,6 +15,11 @@ import java.util.Locale
 import org.json.JSONArray
 import org.json.JSONObject
 
+// @Immutable tells the Compose compiler that instances of this class are completely
+// immutable: equality is structural (data class) and no fields can change after creation.
+// This allows Compose to skip recomposing any ChatBubble whose UiChatMessage hasn't
+// changed, eliminating unnecessary redraws when unrelated state updates arrive.
+@Immutable
 data class UiChatMessage(
     val id: String,
     val familyId: String,
@@ -104,8 +112,9 @@ internal fun UiChatMessage.previewText(): String =
         else -> text.orEmpty().ifBlank { "Messaggio" }
     }
 
+@Composable
 internal fun messageBubbleColor(isOwn: Boolean): Color =
-    if (isOwn) Color(0xFFFF6B00) else Color(0xFFFFFFFF)
+    if (isOwn) Color(0xFFFF6B00) else androidx.compose.material3.MaterialTheme.kidBoxColors.incomingBubble
 
 private fun String?.toJsonStringList(): List<String> {
     if (this.isNullOrBlank()) return emptyList()

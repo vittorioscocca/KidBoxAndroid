@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox.ui.screens.home
 
 import android.Manifest
 import android.graphics.BitmapFactory
+import it.vittorioscocca.kidbox.util.fixBitmapOrientationFromBytes
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -282,7 +283,7 @@ fun ProfileScreen(
                                         rawBytes,
                                         0,
                                         rawBytes.size,
-                                    )
+                                    )?.let { fixBitmapOrientationFromBytes(it, rawBytes) }
                                     if (bitmap != null) {
                                         Image(
                                             bitmap = bitmap.asImageBitmap(),

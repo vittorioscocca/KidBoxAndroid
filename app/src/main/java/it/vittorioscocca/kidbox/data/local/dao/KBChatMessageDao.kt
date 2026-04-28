@@ -25,6 +25,12 @@ interface KBChatMessageDao {
     @Query("DELETE FROM kb_chat_messages WHERE id = :id")
     suspend fun deleteById(id: String)
 
+    @Query("DELETE FROM kb_chat_messages WHERE familyId = :familyId")
+    suspend fun deleteAllByFamilyId(familyId: String)
+
+    @Query("SELECT * FROM kb_chat_messages WHERE familyId = :familyId")
+    suspend fun getAllByFamilyId(familyId: String): List<KBChatMessageEntity>
+
     @Query("SELECT * FROM kb_chat_messages WHERE familyId = :familyId AND syncStateRaw = :syncStateRaw")
     suspend fun getBySyncState(familyId: String, syncStateRaw: Int): List<KBChatMessageEntity>
 
