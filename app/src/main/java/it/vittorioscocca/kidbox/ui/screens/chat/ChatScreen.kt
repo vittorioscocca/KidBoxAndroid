@@ -63,6 +63,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.ModeEdit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PermMedia
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -192,6 +193,7 @@ fun ChatScreen(
     var pendingOlderAnchorIndex by remember { mutableStateOf<Int?>(null) }
     var pendingOlderAnchorOffset by remember { mutableStateOf<Int?>(null) }
     var showClearConfirm by remember { mutableStateOf(false) }
+    var showGallery by remember { mutableStateOf(false) }
     // derivedStateOf reads LazyListState snapshot state internally — no outer remember keys
     // needed. Adding message size / index as remember keys would recreate the derivedState
     // object on every list change instead of letting it evolve naturally, causing extra work.
@@ -511,6 +513,7 @@ fun ChatScreen(
                 onBack = onBack,
                 onSearchToggle = { viewModel.setSearchActive(!state.isSearchActive) },
                 onClearChat = { showClearConfirm = true },
+                onShowGallery = { showGallery = true },
                 isSearchActive = state.isSearchActive,
                 searchQuery = state.searchQuery,
                 onSearchQueryChange = viewModel::onSearchQueryChange,
@@ -877,6 +880,16 @@ fun ChatScreen(
             },
         )
     }
+    if (showGallery) {
+        ChatMediaGallerySheet(
+            messages = state.messages,
+            onDismiss = { showGallery = false },
+            onGoToMessage = { msgId ->
+                showGallery = false
+                viewModel.highlightMessage(msgId)
+            },
+        )
+    }
 }
 
 @Composable
@@ -884,6 +897,7 @@ private fun Header(
     onBack: () -> Unit,
     onSearchToggle: () -> Unit,
     onClearChat: () -> Unit,
+    onShowGallery: () -> Unit,
     isSearchActive: Boolean,
     searchQuery: String = "",
     onSearchQueryChange: (String) -> Unit = {},
@@ -1020,6 +1034,16 @@ private fun Header(
                         },
                     )
                     DropdownMenuItem(
+                        text = { Text("Media, link e documenti") },
+                        leadingIcon = {
+                            Icon(Icons.Default.PermMedia, contentDescription = null)
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onShowGallery()
+                        },
+                    )
+                    DropdownMenuItem(
                         text = { Text("Svuota chat") },
                         leadingIcon = {
                             Icon(
@@ -1078,6 +1102,7 @@ private fun ReplyComposerBar(
     onResumeRecording: () -> Unit,
     replyPreview: UiChatMessage?,
 ) {
+    val context = LocalContext.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1149,7 +1174,7 @@ private fun ReplyComposerBar(
                             if (url != null) {
                                 var videoBitmap by remember(url) { mutableStateOf<android.graphics.Bitmap?>(null) }
                                 LaunchedEffect(url) {
-                                    videoBitmap = VideoThumbnailLoader.load(url, "reply_${replyPreview.id}")
+                                    videoBitmap = VideoThumbnailLoader.load(url, context, "reply_${replyPreview.id}")
                                 }
                                 val bmp = videoBitmap
                                 if (bmp != null) {
@@ -1551,6 +1576,7 @@ private fun MediaGroupGalleryDialog(
     initialIndex: Int,
     onDismiss: () -> Unit,
 ) {
+    val context = LocalContext.current
     val pagerState = rememberPagerState(
         initialPage = initialIndex.coerceIn(0, (urls.size - 1).coerceAtLeast(0)),
         pageCount = { urls.size },
@@ -1622,7 +1648,7 @@ private fun MediaGroupGalleryDialog(
                                 initialValue = null,
                                 key1 = url,
                             ) {
-                                value = VideoThumbnailLoader.load(url, cacheKey = "gallery_vid_$page")
+                                value = VideoThumbnailLoader.load(url, context, cacheKey = "gallery_vid_$page")
                             }
                             if (thumbnail != null) {
                                 Image(

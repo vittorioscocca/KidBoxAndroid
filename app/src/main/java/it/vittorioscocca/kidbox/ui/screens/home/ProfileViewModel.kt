@@ -62,6 +62,7 @@ private data class SavedSnapshot(
     val lastName: String,
     val familyAddress: String,
     val avatarFingerprint: Int,
+    val avatarUrl: String?,
 )
 
 @HiltViewModel
@@ -87,7 +88,7 @@ class ProfileViewModel @Inject constructor(
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
     private var addressAutocompleteJob: Job? = null
 
-    private var savedSnapshot = SavedSnapshot("", "", "", 0)
+    private var savedSnapshot = SavedSnapshot("", "", "", -1, null)
 
     fun onScreenVisible() {
         viewModelScope.launch {
@@ -112,7 +113,7 @@ class ProfileViewModel @Inject constructor(
             }.getOrNull()?.data?.let { d ->
                 avatarUrl = (d["avatarURL"] as? String)?.takeIf { it.isNotBlank() }
             }
-            savedSnapshot = SavedSnapshot(first.trim(), last.trim(), addr.trim(), 0)
+            savedSnapshot = SavedSnapshot(first.trim(), last.trim(), addr.trim(), -1, avatarUrl)
             _uiState.update {
                 it.copy(
                     firstName = first,
@@ -286,7 +287,10 @@ class ProfileViewModel @Inject constructor(
                     firstName = _uiState.value.firstName.trim(),
                     lastName = _uiState.value.lastName.trim(),
                     familyAddress = _uiState.value.familyAddress.trim(),
-                    avatarFingerprint = _uiState.value.pickedAvatar?.contentHashCode() ?: 0,
+                    // pickedAvatar has already been cleared to null at this point,
+                    // so use -1 (the "nothing picked" sentinel) to match recomputeDirty().
+                    avatarFingerprint = -1,
+                    avatarUrl = _uiState.value.avatarUrl,
                 )
                 _uiState.update { it.copy(isSaving = false, saveSucceeded = true) }
                 recomputeDirty()
@@ -328,7 +332,9 @@ class ProfileViewModel @Inject constructor(
 
     private fun recomputeDirty() {
         val s = _uiState.value
-        val currentAvatarFingerprint = s.pickedAvatar?.contentHashCode() ?: 0
+        // Use -1 as the "nothing picked" sentinel so that a real ByteArray
+        // whose contentHashCode() happens to be 0 still marks the form as dirty.
+        val currentAvatarFingerprint = s.pickedAvatar?.contentHashCode() ?: -1
         val dirty = s.firstName.trim() != savedSnapshot.firstName ||
             s.lastName.trim() != savedSnapshot.lastName ||
             s.familyAddress.trim() != savedSnapshot.familyAddress ||

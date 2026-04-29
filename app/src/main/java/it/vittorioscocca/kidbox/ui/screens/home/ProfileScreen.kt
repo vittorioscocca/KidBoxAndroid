@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox.ui.screens.home
 
 import android.Manifest
 import android.graphics.BitmapFactory
+import android.net.Uri
 import it.vittorioscocca.kidbox.util.fixBitmapOrientationFromBytes
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -101,14 +102,13 @@ fun ProfileScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val kb = MaterialTheme.kidBoxColors
 
+    // URI of the image the user picked from the gallery — drives the crop overlay
+    var avatarCropUri by remember { mutableStateOf<Uri?>(null) }
+
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-        if (bytes != null && bytes.isNotEmpty()) {
-            viewModel.onAvatarPicked(bytes)
-        }
+        if (uri != null) avatarCropUri = uri
     }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -204,6 +204,7 @@ fun ProfileScreen(
         )
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -504,6 +505,23 @@ fun ProfileScreen(
         }
         Spacer(modifier = Modifier.height(12.dp))
     }
+
+    // ── Avatar cropper overlay ────────────────────────────────────────────────
+    // Shown on top of the profile screen whenever the user picks a new photo.
+    // It covers the entire screen (dark background + fillMaxSize), so no
+    // additional scrim is needed.
+    avatarCropUri?.let { uri ->
+        AvatarCropperScreen(
+            imageUri = uri,
+            onCancel = { avatarCropUri = null },
+            onSave = { croppedBytes ->
+                viewModel.onAvatarPicked(croppedBytes)
+                avatarCropUri = null
+            },
+        )
+    }
+
+    } // end Box
 }
 
 @Composable

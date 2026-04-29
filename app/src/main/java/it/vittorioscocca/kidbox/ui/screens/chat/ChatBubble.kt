@@ -91,6 +91,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
 import coil.request.ImageRequest
 import it.vittorioscocca.kidbox.data.chat.model.ChatMessageType
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
@@ -564,6 +565,10 @@ private fun LinkPreviewCard(
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(data.imageUrl)
+                    .memoryCacheKey(data.imageUrl)
+                    .diskCacheKey(data.imageUrl)
+                    .memoryCachePolicy(CachePolicy.ENABLED)
+                    .diskCachePolicy(CachePolicy.ENABLED)
                     .crossfade(true)
                     .build(),
                 contentDescription = null,
@@ -584,6 +589,7 @@ private fun MediaContent(
     onLongPress: () -> Unit = {},
 ) {
     val mediaUrl = message.mediaUrl
+    val context = LocalContext.current
     Box(
         modifier = Modifier
             // Fill the surrounding bubble width and use a fixed 4:3 aspect so the
@@ -601,7 +607,7 @@ private fun MediaContent(
             val cacheKey = "msg_${message.id}"
             if (isVideo) {
                 val bmp by produceState<android.graphics.Bitmap?>(initialValue = null, key1 = message.id) {
-                    value = VideoThumbnailLoader.load(mediaUrl, cacheKey = "vid_${message.id}")
+                    value = VideoThumbnailLoader.load(mediaUrl, context, cacheKey = "vid_${message.id}")
                 }
                 if (bmp != null) {
                     androidx.compose.foundation.Image(
@@ -613,10 +619,12 @@ private fun MediaContent(
                 } else {
                     // Fallback while thumbnail is loading — Coil handles images natively
                     AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
+                        model = ImageRequest.Builder(context)
                             .data(mediaUrl)
                             .memoryCacheKey(cacheKey)
                             .diskCacheKey(cacheKey)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
+                            .diskCachePolicy(CachePolicy.ENABLED)
                             .build(),
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
@@ -631,10 +639,12 @@ private fun MediaContent(
                 )
             } else {
                 AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
+                    model = ImageRequest.Builder(context)
                         .data(mediaUrl)
                         .memoryCacheKey(cacheKey)
                         .diskCacheKey(cacheKey)
+                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .diskCachePolicy(CachePolicy.ENABLED)
                         .crossfade(true)
                         .build(),
                     contentDescription = null,
@@ -664,34 +674,39 @@ private fun MediaGroupContent(
     onLongPress: () -> Unit = {},
 ) {
     val totalCount = message.mediaGroupUrls.size
-    // Show at most 6 tiles (2 rows × 3 columns), like iOS
+    // At most 6 tiles; the 6th shows the actual image behind a "+N" overlay
     val displayCount = minOf(6, totalCount)
-    // Items truly outside the grid (not shown as full thumbnails).
-    // The 6th tile shows the 6th image under the overlay, so overflowCount
-    // represents the hidden items: totalCount - 6 (not totalCount - 5).
+    // Items hidden behind the "+N" overlay: everything after the 6th
     val overflowCount = (totalCount - 6).coerceAtLeast(0)
 
-    Column(
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        (0 until displayCount).chunked(3).forEach { rowIndices ->
+    // Row structure — each Int is the number of cells in that row:
+    //   2 → [2]        4 → [2,2]
+    //   3 → [3]        5 → [2,3]
+    //   6+ → [3,3]
+    val rowLayout = mediaGridLayout(displayCount)
+    val context = LocalContext.current
+
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        var tileIndex = 0
+        rowLayout.forEach { cellsInRow ->
             Row(
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                rowIndices.forEach { absoluteIndex ->
-                    val url = message.mediaGroupUrls[absoluteIndex]
-                    val isVideo = message.mediaGroupTypes.getOrNull(absoluteIndex) == "video"
-                    val isLastTile = absoluteIndex == 5 && overflowCount > 0
-                    val tileKey = "msg_${message.id}_$absoluteIndex"
+                repeat(cellsInRow) {
+                    val idx = tileIndex++
+                    val url = message.mediaGroupUrls[idx]
+                    val isVideo = message.mediaGroupTypes.getOrNull(idx) == "video"
+                    // The last tile (index 5) gets the "+N" scrim when there are more items
+                    val isOverflowTile = idx == 5 && overflowCount > 0
+                    val tileKey = "msg_${message.id}_$idx"
 
-                    // Load video thumbnail asynchronously; photo uses Coil directly
+                    // Load video thumbnail asynchronously; photos are handled by Coil
                     val videoBmp by if (isVideo) {
                         produceState<android.graphics.Bitmap?>(initialValue = null, key1 = tileKey) {
-                            value = VideoThumbnailLoader.load(url, cacheKey = tileKey)
+                            value = VideoThumbnailLoader.load(url, context, cacheKey = tileKey)
                         }
                     } else {
-                        // Static producer that always emits null — Coil handles photos
                         produceState<android.graphics.Bitmap?>(initialValue = null) {}
                     }
 
@@ -703,7 +718,7 @@ private fun MediaGroupContent(
                             .background(MaterialTheme.kidBoxColors.surfaceOverlay),
                         contentAlignment = Alignment.Center,
                     ) {
-                        // ── Thumbnail ─────────────────────────────────────
+                        // ── Thumbnail ─────────────────────────────────────────
                         if (isVideo && videoBmp != null) {
                             androidx.compose.foundation.Image(
                                 bitmap = videoBmp!!.asImageBitmap(),
@@ -713,10 +728,12 @@ private fun MediaGroupContent(
                             )
                         } else {
                             AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
+                                model = ImageRequest.Builder(context)
                                     .data(url)
                                     .memoryCacheKey(tileKey)
                                     .diskCacheKey(tileKey)
+                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                    .diskCachePolicy(CachePolicy.ENABLED)
                                     .crossfade(true)
                                     .build(),
                                 contentDescription = null,
@@ -725,8 +742,8 @@ private fun MediaGroupContent(
                             )
                         }
 
-                        // ── "+N" overflow overlay on the 6th tile ─────────
-                        if (isLastTile) {
+                        // ── "+N" overflow overlay on the 6th tile ─────────────
+                        if (isOverflowTile) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -743,8 +760,8 @@ private fun MediaGroupContent(
                             }
                         }
 
-                        // ── Play icon for video tiles (not on overflow cell) ─
-                        if (isVideo && !isLastTile) {
+                        // ── Play icon for video tiles (skip the overflow cell) ─
+                        if (isVideo && !isOverflowTile) {
                             Icon(
                                 imageVector = Icons.Default.PlayArrow,
                                 contentDescription = null,
@@ -756,17 +773,16 @@ private fun MediaGroupContent(
                             )
                         }
 
-                        // ── Transparent tap / long-press overlay ──────────
+                        // ── Transparent tap / long-press overlay ──────────────
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .combinedClickable(
                                     onClick = {
-                                        // Open the full-group gallery starting at this item.
                                         onMediaGroupTap(
                                             message.mediaGroupUrls,
                                             message.mediaGroupTypes,
-                                            absoluteIndex,
+                                            idx,
                                         )
                                     },
                                     onLongClick = onLongPress,
@@ -774,14 +790,25 @@ private fun MediaGroupContent(
                         )
                     }
                 }
-                // Pad row to always have 3 columns so tiles stay the same size
-                val emptyCells = 3 - rowIndices.size
-                repeat(emptyCells) {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
             }
         }
     }
+}
+
+/**
+ * Returns the grid row structure for [count] displayed tiles (1–6).
+ * Each element is the number of cells in that row.
+ *
+ *   1 → [1]      3 → [3]      5 → [2, 3]
+ *   2 → [2]      4 → [2, 2]   6+ → [3, 3]
+ */
+private fun mediaGridLayout(count: Int): List<Int> = when (count) {
+    1    -> listOf(1)
+    2    -> listOf(2)
+    3    -> listOf(3)
+    4    -> listOf(2, 2)
+    5    -> listOf(2, 3)
+    else -> listOf(3, 3)   // 6 tiles shown; extras hidden behind the "+N" overlay
 }
 
 @Composable
