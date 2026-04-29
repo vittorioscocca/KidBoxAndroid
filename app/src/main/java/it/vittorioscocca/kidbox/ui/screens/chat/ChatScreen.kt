@@ -112,7 +112,11 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
+import android.app.Activity
+import android.content.ContextWrapper
 import android.view.WindowManager
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -138,8 +142,11 @@ import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import androidx.compose.ui.text.style.TextOverflow
+import coil.Coil
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import coil.size.Scale
+import coil.size.Size
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -153,6 +160,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import android.media.MediaMetadataRetriever
 import it.vittorioscocca.kidbox.util.VideoCompressor
 import it.vittorioscocca.kidbox.util.fixVideoFrameOrientation
@@ -161,6 +169,7 @@ import java.io.ByteArrayOutputStream
 @Composable
 fun ChatScreen(
     onBack: () -> Unit,
+    onNavigateToGallery: (familyId: String) -> Unit = {},
     viewModel: ChatViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -169,10 +178,8 @@ fun ChatScreen(
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     var actionTarget by remember { mutableStateOf<UiChatMessage?>(null) }
-    var fullScreenMediaUrl by remember { mutableStateOf<String?>(null) }
-    var fullScreenIsVideo by remember { mutableStateOf(false) }
-    // Media-group gallery: triple of (urls, types, startIndex)
-    var mediaGroupGallery by remember { mutableStateOf<Triple<List<String>, List<String>, Int>?>(null) }
+    // Unified gallery request: (urls, types, startIndex). Single-media taps produce a 1-item list.
+    var galleryRequest by remember { mutableStateOf<Triple<List<String>, List<String>, Int>?>(null) }
     var showAttachmentSheet by remember { mutableStateOf(false) }
     // (Uri, isVideo) items staged for review before sending
     var pendingMedia by remember { mutableStateOf<List<Pair<Uri, Boolean>>>(emptyList()) }
@@ -190,20 +197,17 @@ fun ChatScreen(
     val inputBarState by inputBarViewModel.uiState.collectAsStateWithLifecycle()
     var previousMessagesCount by remember { mutableStateOf(0) }
     var didInitialBottomScroll by remember { mutableStateOf(false) }
-    var pendingOlderAnchorIndex by remember { mutableStateOf<Int?>(null) }
-    var pendingOlderAnchorOffset by remember { mutableStateOf<Int?>(null) }
     var showClearConfirm by remember { mutableStateOf(false) }
-    var showGallery by remember { mutableStateOf(false) }
     // derivedStateOf reads LazyListState snapshot state internally — no outer remember keys
     // needed. Adding message size / index as remember keys would recreate the derivedState
     // object on every list change instead of letting it evolve naturally, causing extra work.
     val showScrollToBottomButton by remember {
         derivedStateOf {
-            val totalItems = listState.layoutInfo.totalItemsCount
-            if (totalItems <= 1) return@derivedStateOf false
-            // Show when user is not near the bottom (accounts for day separators too).
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            lastVisible < (totalItems - 3).coerceAtLeast(0)
+            val total = listState.layoutInfo.totalItemsCount
+            if (total <= 1) return@derivedStateOf false
+            // With reverseLayout index 0 is visually the bottom (newest message).
+            // Show FAB whenever the user has scrolled up more than 2 items.
+            listState.firstVisibleItemIndex > 2
         }
     }
     val shouldShowScrollToBottomFab by remember {
@@ -238,10 +242,40 @@ fun ChatScreen(
             }
         }
     }
+    // Reverse so newest is at index 0 — lets us use LazyColumn(reverseLayout = true)
+    // which renders the bottom automatically and makes new-message append a no-op for scroll.
+    val reversedFlatItems = remember(flatItems) { flatItems.asReversed() }
     // O(1) reply-context lookup. Without this every ChatBubble that has a replyToId does a
     // linear scan through all messages — O(n) per bubble, O(n²) total per frame on large histories.
     val messagesById = remember(state.messages) {
         state.messages.associateBy { it.id }
+    }
+
+    // Step 3 — Eager prefetch: warm Coil's memory cache for every PHOTO and MEDIA_GROUP thumb
+    // as soon as the message list changes so bubbles render without a loading placeholder.
+    // We enqueue (non-blocking) rather than await so the composable is never suspended here.
+    LaunchedEffect(state.messages.size, state.familyId) {
+        if (state.messages.isEmpty()) return@LaunchedEffect
+        val loader = Coil.imageLoader(context)
+        state.messages.forEach { msg ->
+            val cacheKey = "msg_${msg.id}"
+            val source: Any? = when (msg.type) {
+                ChatMessageType.PHOTO -> {
+                    msg.mediaLocalPath?.let { java.io.File(it) }?.takeIf { it.exists() }
+                        ?: msg.mediaUrl
+                }
+                ChatMessageType.MEDIA_GROUP -> msg.mediaGroupUrls.firstOrNull()
+                else -> null
+            } ?: return@forEach
+            val request = ImageRequest.Builder(context)
+                .data(source)
+                .memoryCacheKey(cacheKey)
+                .diskCacheKey(cacheKey)
+                .size(Size(400, 400))
+                .scale(Scale.FILL)
+                .build()
+            loader.enqueue(request)
+        }
     }
 
     @SuppressLint("MissingPermission")
@@ -265,23 +299,19 @@ fun ChatScreen(
         }
     }
 
-    val flatItemsState = rememberUpdatedState(flatItems)
+    val reversedFlatItemsState = rememberUpdatedState(reversedFlatItems)
     val familyIdForAnchor = state.familyId
     DisposableEffect(familyIdForAnchor) {
         onDispose {
-            // Persist the topmost visible message id so the next reopen restores
-            // the same reading position. When the user is near the bottom we clear
-            // the anchor — reopen falls back to bottom (the desired default).
-            // We capture the familyId locally so a family switch saves under the
-            // family the user was actually viewing, not the one we just switched to.
-            val items = flatItemsState.value
+            // Persist the visible message id so the next reopen restores the reading position.
+            // With reverseLayout, index 0 = bottom (newest). Being "at bottom" means
+            // firstVisibleItemIndex <= 1 — clear the anchor so reopen defaults to bottom.
+            val items = reversedFlatItemsState.value
             if (familyIdForAnchor.isBlank() || items.isEmpty()) {
                 viewModel.saveScrollAnchorFor(familyIdForAnchor, null, 0)
                 return@onDispose
             }
-            val totalItems = listState.layoutInfo.totalItemsCount
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            val isNearBottom = totalItems > 0 && lastVisible >= (totalItems - 3).coerceAtLeast(0)
+            val isNearBottom = listState.firstVisibleItemIndex <= 1
             if (isNearBottom) {
                 viewModel.saveScrollAnchorFor(familyIdForAnchor, null, 0)
                 return@onDispose
@@ -401,7 +431,13 @@ fun ChatScreen(
         startRecordingSafely()
     }
 
-    LaunchedEffect(state.messages.size, state.isLoadingOlder, state.familyId) {
+    // Reset per-family scroll state so we always re-anchor to bottom on family switch.
+    LaunchedEffect(state.familyId) {
+        didInitialBottomScroll = false
+        previousMessagesCount = 0
+    }
+
+    LaunchedEffect(state.messages.size, state.isLoadingOlder) {
         val currentCount = state.messages.size
         if (currentCount <= 0) {
             previousMessagesCount = 0
@@ -409,10 +445,8 @@ fun ChatScreen(
         }
 
         if (!didInitialBottomScroll) {
-            // Always open at the bottom — the most recent messages are what the user expects
-            // to see first. The LazyColumn is invisible (alpha 0) until this jump completes,
-            // so there is no visual flash.
-            listState.scrollToItem(flatItems.lastIndex.coerceAtLeast(0))
+            // With reverseLayout index 0 IS the bottom (newest message) — no flatItems math.
+            listState.scrollToItem(0)
             didInitialBottomScroll = true
             previousMessagesCount = currentCount
             viewModel.markVisibleAsRead(state.messages.takeLast(20).map { it.id })
@@ -421,69 +455,48 @@ fun ChatScreen(
 
         val countDelta = currentCount - previousMessagesCount
         if (countDelta > 0 && !state.isLoadingOlder) {
-            val pendingIndex = pendingOlderAnchorIndex
-            val pendingOffset = pendingOlderAnchorOffset
-            if (pendingIndex != null && pendingOffset != null) {
-                // Older messages loaded: restore position shifted by the new count.
-                val target = (pendingIndex + countDelta)
-                    .coerceAtMost(listState.layoutInfo.totalItemsCount.coerceAtLeast(1) - 1)
-                listState.scrollToItem(target, pendingOffset)
-                pendingOlderAnchorIndex = null
-                pendingOlderAnchorOffset = null
-            } else {
-                // New message arrived (sent or received).
-                // Use flatItems.lastIndex — the correct absolute index in the LazyColumn
-                // (which includes day-separator items), not messages.lastIndex.
-                val lastFlatIndex = flatItems.lastIndex.coerceAtLeast(0)
-
-                // Always scroll to bottom for own messages (user just sent, they're already
-                // at the bottom). For incoming messages scroll only when near the bottom.
-                val isOwnMessage = state.messages.lastOrNull()?.senderId == state.currentUid
-                if (isOwnMessage) {
-                    // Instant jump — no animation lag between tap and seeing the sent bubble.
-                    listState.scrollToItem(lastFlatIndex)
-                } else {
-                    // Incoming: scroll only when the user was already near the bottom so we
-                    // don't yank them away from an older message they're reading.
-                    val totalItems = listState.layoutInfo.totalItemsCount
-                    val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-                    // Use the *previous* totalItems - countDelta as reference because the
-                    // layout may not have updated yet after the state change.
-                    val wasNearBottom = totalItems <= 0 ||
-                        lastVisible >= (totalItems - countDelta - 2).coerceAtLeast(0)
-                    if (wasNearBottom) {
-                        listState.scrollToItem(lastFlatIndex)
-                    }
-                }
+            // New message arrived. With reverseLayout the new item lands at index 0 and the
+            // LazyColumn automatically preserves the user's visual offset — we only need to
+            // pull to bottom when the user is already there or the message is their own.
+            val isOwnMessage = state.messages.lastOrNull()?.senderId == state.currentUid
+            val wasAtBottom = listState.firstVisibleItemIndex <= 1
+            if (isOwnMessage || wasAtBottom) {
+                listState.scrollToItem(0)
             }
-            viewModel.markVisibleAsRead(state.messages.takeLast(20).map { it.id })
+            // If the user is reading older messages, do nothing — reverseLayout keeps their
+            // view stable while the new bubble slides in at the bottom.
         }
+
         previousMessagesCount = currentCount
+        viewModel.markVisibleAsRead(state.messages.takeLast(20).map { it.id })
     }
-    // Use snapshotFlow instead of a LaunchedEffect with scroll-index as a key.
-    // LaunchedEffect(listState.firstVisibleItemIndex, ...) would cancel+relaunch the
-    // coroutine on every scroll step, which is wasteful. snapshotFlow coalesces rapid
-    // scroll updates and only emits when the observed state has actually changed.
+
+    // Pagination — triggers when the user scrolls toward the visual top (oldest messages),
+    // which with reverseLayout means lastVisible approaches reversedFlatItems.lastIndex.
     LaunchedEffect(Unit) {
         snapshotFlow {
-            Triple(
-                listState.firstVisibleItemIndex,
-                state.isLoadingOlder,
-                state.messages.size,
-            )
-        }.collect { (firstIndex, isLoadingOlder, msgCount) ->
-            if (firstIndex <= 3 && msgCount > 0) {
-                if (!isLoadingOlder) {
-                    pendingOlderAnchorIndex = listState.firstVisibleItemIndex
-                    pendingOlderAnchorOffset = listState.firstVisibleItemScrollOffset
-                }
-                viewModel.loadOlderMessages()
-            }
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val total = info.totalItemsCount
+            Triple(lastVisible, total, state.isLoadingOlder)
         }
+            .distinctUntilChanged()
+            .collect { (lastVisible, total, isLoadingOlder) ->
+                if (total > 0 &&
+                    lastVisible >= total - 5 &&
+                    !isLoadingOlder &&
+                    state.hasMoreOlder
+                ) {
+                    viewModel.loadOlderMessages()
+                }
+            }
     }
     LaunchedEffect(state.highlightedMessageId) {
         val targetId = state.highlightedMessageId ?: return@LaunchedEffect
-        val idx = state.messages.indexOfFirst { it.id == targetId }
+        // Index must be looked up in reversedFlatItems because that's what the LazyColumn renders.
+        val idx = reversedFlatItems.indexOfFirst {
+            it is ChatListItem.Message && it.message.id == targetId
+        }
         if (idx >= 0) listState.animateScrollToItem(idx)
     }
     LaunchedEffect(Unit) {
@@ -513,7 +526,7 @@ fun ChatScreen(
                 onBack = onBack,
                 onSearchToggle = { viewModel.setSearchActive(!state.isSearchActive) },
                 onClearChat = { showClearConfirm = true },
-                onShowGallery = { showGallery = true },
+                onShowGallery = { onNavigateToGallery(state.familyId) },
                 isSearchActive = state.isSearchActive,
                 searchQuery = state.searchQuery,
                 onSearchQueryChange = viewModel::onSearchQueryChange,
@@ -541,22 +554,18 @@ fun ChatScreen(
                         }
                         LazyColumn(
                             state = listState,
+                            reverseLayout = true,   // index 0 = newest (visual bottom); oldest at visual top
                             // Stay invisible until the initial scroll position has been applied so
                             // the user doesn't see a brief flash at the top of the history before
-                            // we jump to the saved anchor (or the bottom).
+                            // we settle at the bottom.
                             modifier = Modifier
                                 .weight(1f)
                                 .alpha(if (didInitialBottomScroll) 1f else 0f),
                             contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
                             verticalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
-                            if (state.isLoadingOlder) {
-                                item {
-                                    LoadingOlderShimmer()
-                                }
-                            }
                             itemsIndexed(
-                                items = flatItems,
+                                items = reversedFlatItems,
                                 key = { index, item ->
                                     when (item) {
                                         is ChatListItem.Separator -> "sep_${item.label}_$index"
@@ -578,11 +587,14 @@ fun ChatScreen(
                                             onReactionTap = { msg, emoji -> viewModel.toggleReaction(msg, emoji) },
                                             onReplyContextTap = { msgId -> viewModel.highlightMessage(msgId) },
                                             onMediaTap = { url, isVideo ->
-                                                fullScreenMediaUrl = url
-                                                fullScreenIsVideo = isVideo
+                                                galleryRequest = Triple(
+                                                    listOf(url),
+                                                    listOf(if (isVideo) "video" else "photo"),
+                                                    0,
+                                                )
                                             },
                                             onMediaGroupTap = { urls, types, startIndex ->
-                                                mediaGroupGallery = Triple(urls, types, startIndex)
+                                                galleryRequest = Triple(urls, types, startIndex)
                                             },
                                             onAudioPlaybackStateChange = { active ->
                                                 proximityManager.setPlaybackActive(active)
@@ -592,6 +604,11 @@ fun ChatScreen(
                                         )
                                     }
                                 }
+                            }
+
+                            // Shimmer at the END of reversedFlatItems = visual top (oldest side).
+                            if (state.isLoadingOlder) {
+                                item(key = "loading_older_shimmer") { LoadingOlderShimmer() }
                             }
                         }
                     }
@@ -605,10 +622,7 @@ fun ChatScreen(
                     visible = shouldShowScrollToBottomFab,
                     isDarkTheme = isDarkTheme,
                     onClick = {
-                        scope.launch {
-                            val target = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                            if (target > 0) listState.scrollToItem(target)
-                        }
+                        scope.launch { listState.animateScrollToItem(0) }
                     },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
@@ -855,19 +869,12 @@ fun ChatScreen(
             },
         )
     }
-    if (fullScreenMediaUrl != null) {
-        MediaFullscreenDialog(
-            url = fullScreenMediaUrl ?: "",
-            isVideo = fullScreenIsVideo,
-            onDismiss = { fullScreenMediaUrl = null },
-        )
-    }
-    mediaGroupGallery?.let { (urls, types, startIndex) ->
+    galleryRequest?.let { (urls, types, idx) ->
         MediaGroupGalleryDialog(
             urls = urls,
             types = types,
-            initialIndex = startIndex,
-            onDismiss = { mediaGroupGallery = null },
+            initialIndex = idx,
+            onDismiss = { galleryRequest = null },
         )
     }
     if (showLocationPicker && locationPickerLatLng != null) {
@@ -877,16 +884,6 @@ fun ChatScreen(
             onConfirm = { lat, lon ->
                 showLocationPicker = false
                 viewModel.sendLocationAttachment(lat, lon)
-            },
-        )
-    }
-    if (showGallery) {
-        ChatMediaGallerySheet(
-            messages = state.messages,
-            onDismiss = { showGallery = false },
-            onGoToMessage = { msgId ->
-                showGallery = false
-                viewModel.highlightMessage(msgId)
             },
         )
     }
@@ -1602,6 +1599,23 @@ private fun MediaGroupGalleryDialog(
             )
         }
 
+        // Hide status + navigation bars while the gallery is open, restore on dismiss.
+        // Uses the activity's window (not the dialog's) so the inset change is global.
+        val activityContext = LocalContext.current
+        DisposableEffect(activityContext, dialogView) {
+            val activity = activityContext.findActivity()
+            if (activity == null) return@DisposableEffect onDispose { }
+            val controller = WindowInsetsControllerCompat(activity.window, dialogView)
+            val previousBehavior = controller.systemBarsBehavior
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            onDispose {
+                controller.show(WindowInsetsCompat.Type.systemBars())
+                controller.systemBarsBehavior = previousBehavior
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -1715,75 +1729,6 @@ private fun MediaGroupGalleryDialog(
                 Icon(
                     imageVector = Icons.Default.Close,
                     contentDescription = "Chiudi",
-                    tint = Color.White,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun MediaFullscreenDialog(
-    url: String,
-    isVideo: Boolean,
-    onDismiss: () -> Unit,
-) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false,
-        ),
-    ) {
-        val dialogView = LocalView.current
-        SideEffect {
-            (dialogView.parent as? DialogWindowProvider)?.window?.setLayout(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT,
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black),
-        ) {
-            if (isVideo) {
-                AndroidView(
-                    factory = { ctx ->
-                        VideoView(ctx)
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                    update = { view ->
-                        if (view.tag != url) {
-                            view.tag = url
-                            view.setVideoURI(Uri.parse(url))
-                            view.setOnPreparedListener {
-                                it.isLooping = true
-                                view.start()
-                            }
-                        }
-                    },
-                )
-            } else {
-                AsyncImage(
-                    model = url,
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(20.dp)
-                    .background(Color.Black.copy(alpha = 0.45f), CircleShape),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = null,
                     tint = Color.White,
                 )
             }
@@ -2190,4 +2135,11 @@ private suspend fun saveMediaToDevice(
 private sealed class ChatListItem {
     data class Separator(val label: String) : ChatListItem()
     data class Message(val message: UiChatMessage) : ChatListItem()
+}
+
+/** Walks up the Context chain to find the host Activity (mirrors FamilyPhotosScreen). */
+private tailrec fun android.content.Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

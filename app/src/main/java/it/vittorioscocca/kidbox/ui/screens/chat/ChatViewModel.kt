@@ -157,6 +157,13 @@ class ChatViewModel @Inject constructor(
             },
         )
 
+        // Background hydration: download and cache media for messages that have a Firebase
+        // Storage path but no local file yet. Errors are swallowed per-message inside the
+        // repository so this never surfaces to the user.
+        viewModelScope.launch {
+            chatRepository.hydrateMissingMedia(familyId)
+        }
+
         typingRegistration?.remove()
         typingRegistration = chatRepository.listenTyping(familyId) { names ->
             _uiState.value = _uiState.value.copy(typingUsers = names)

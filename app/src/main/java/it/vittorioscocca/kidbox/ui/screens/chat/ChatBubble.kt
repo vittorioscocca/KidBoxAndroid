@@ -80,8 +80,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberCameraPositionState
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -588,7 +597,14 @@ private fun MediaContent(
     onMediaTap: (url: String, isVideo: Boolean) -> Unit,
     onLongPress: () -> Unit = {},
 ) {
-    val mediaUrl = message.mediaUrl
+    // Prefer the locally cached file over the Firebase Storage HTTPS URL —
+    // reading from disk bypasses any network round-trip and is dramatically faster
+    // than waiting for Coil's HTTP cache lookup.
+    val localFile = remember(message.mediaLocalPath) {
+        message.mediaLocalPath?.let { java.io.File(it) }?.takeIf { it.exists() }
+    }
+    val imageSource: Any? = localFile ?: message.mediaUrl
+    val mediaUrl = message.mediaUrl   // kept for the fullscreen tap callback
     val context = LocalContext.current
     Box(
         modifier = Modifier
@@ -600,14 +616,14 @@ private fun MediaContent(
             .background(MaterialTheme.kidBoxColors.surfaceOverlay),
         contentAlignment = Alignment.Center,
     ) {
-        if (mediaUrl != null) {
+        if (imageSource != null) {
             // Stable cache key tied to the message id so Coil keeps hitting its memory
-            // / disk cache even when mediaUrl flips from the Firebase Storage https URL
-            // to the local file:// URI once the asset finishes hydrating in Room.
+            // / disk cache even when the source flips from local file to remote URL.
             val cacheKey = "msg_${message.id}"
             if (isVideo) {
+                val videoSource = localFile?.absolutePath ?: (mediaUrl ?: "")
                 val bmp by produceState<android.graphics.Bitmap?>(initialValue = null, key1 = message.id) {
-                    value = VideoThumbnailLoader.load(mediaUrl, context, cacheKey = "vid_${message.id}")
+                    value = VideoThumbnailLoader.load(videoSource, context, cacheKey = "vid_${message.id}")
                 }
                 if (bmp != null) {
                     androidx.compose.foundation.Image(
@@ -617,10 +633,10 @@ private fun MediaContent(
                         contentScale = ContentScale.Crop,
                     )
                 } else {
-                    // Fallback while thumbnail is loading — Coil handles images natively
+                    // Fallback while thumbnail is loading
                     AsyncImage(
                         model = ImageRequest.Builder(context)
-                            .data(mediaUrl)
+                            .data(imageSource)
                             .memoryCacheKey(cacheKey)
                             .diskCacheKey(cacheKey)
                             .memoryCachePolicy(CachePolicy.ENABLED)
@@ -640,7 +656,7 @@ private fun MediaContent(
             } else {
                 AsyncImage(
                     model = ImageRequest.Builder(context)
-                        .data(mediaUrl)
+                        .data(imageSource)
                         .memoryCacheKey(cacheKey)
                         .diskCacheKey(cacheKey)
                         .memoryCachePolicy(CachePolicy.ENABLED)
@@ -659,7 +675,7 @@ private fun MediaContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .combinedClickable(
-                        onClick = { onMediaTap(mediaUrl, isVideo) },
+                        onClick = { onMediaTap(mediaUrl ?: "", isVideo) },
                         onLongClick = onLongPress,
                     ),
             )
@@ -812,58 +828,66 @@ private fun mediaGridLayout(count: Int): List<Int> = when (count) {
 }
 
 @Composable
-private fun LocationContent(message: UiChatMessage) {
-    val context = LocalContext.current
+private fun LocationContent(
+    message: UiChatMessage,
+    onLongPress: () -> Unit = {},
+) {
     val lat = message.latitude ?: return
     val lon = message.longitude ?: return
+    val context = LocalContext.current
 
-    // A full GoogleMap inside a LazyColumn is extremely expensive — each instance
-    // allocates a WebView-backed surface, starts the Maps SDK renderer, and issues
-    // tile network requests. With several location messages visible at once this
-    // tanks scroll performance and causes the initial "a scatti" jank.
-    //
-    // Instead we render a lightweight static preview that opens the system Maps app
-    // on tap. The user gets the same geo-context at a fraction of the cost.
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(LatLng(lat, lon), 15f)
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(4f / 3f)
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF78909C)) // blue-grey placeholder
+            .height(160.dp)
             .combinedClickable(
                 onClick = {
-                    val intent = Intent(
-                        Intent.ACTION_VIEW,
-                        Uri.parse("geo:$lat,$lon?q=$lat,$lon(Posizione)"),
-                    )
-                    context.startActivity(intent)
+                    val uri = Uri.parse("geo:$lat,$lon?q=$lat,$lon(Posizione condivisa)")
+                    context.startActivity(Intent(Intent.ACTION_VIEW, uri))
                 },
-                onLongClick = {},
+                onLongClick = onLongPress,
             ),
-        contentAlignment = Alignment.Center,
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+        GoogleMap(
+            modifier = Modifier.fillMaxSize(),
+            cameraPositionState = cameraPositionState,
+            uiSettings = MapUiSettings(
+                scrollGesturesEnabled = false,
+                zoomGesturesEnabled = false,
+                rotationGesturesEnabled = false,
+                tiltGesturesEnabled = false,
+                zoomControlsEnabled = false,
+                mapToolbarEnabled = false,
+                compassEnabled = false,
+                myLocationButtonEnabled = false,
+            ),
+            properties = MapProperties(isMyLocationEnabled = false),
         ) {
-            Icon(
-                imageVector = Icons.Default.Place,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(40.dp),
-            )
-            Text(
-                text = "Apri in Maps",
-                color = Color.White,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                text = "%.5f, %.5f".format(lat, lon),
-                color = Color.White.copy(alpha = 0.75f),
-                fontSize = 10.sp,
+            Marker(
+                state = MarkerState(position = LatLng(lat, lon)),
+                title = "Posizione",
             )
         }
+
+        // Transparent overlay that consumes all touch events on the map surface,
+        // leaving only the outer combinedClickable to handle tap/long-press —
+        // identical to iOS allowsHitTesting(false).
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            awaitPointerEvent(pass = PointerEventPass.Initial)
+                                .changes.forEach { it.consume() }
+                        }
+                    }
+                },
+        )
     }
 }
 

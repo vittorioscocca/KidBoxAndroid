@@ -60,6 +60,9 @@ sealed class AppDestination(val route: String) {
         fun createRoute(familyId: String): String = "pediatric_child_selector/$familyId"
     }
     data object Chat : AppDestination("chat")
+    data object ChatMediaGallery : AppDestination("chat_media_gallery/{familyId}") {
+        fun createRoute(familyId: String): String = "chat_media_gallery/$familyId"
+    }
     data object ExpensesHome : AppDestination("expenses_home/{familyId}?highlightExpenseId={highlightExpenseId}") {
         fun createRoute(
             familyId: String,

@@ -2,10 +2,14 @@ package it.vittorioscocca.kidbox.ui.navigation
 
 import android.util.Log
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -34,7 +38,9 @@ import it.vittorioscocca.kidbox.ui.screens.location.FamilyLocationScreen
 import it.vittorioscocca.kidbox.ui.screens.notes.NoteDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.notes.NotesHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.photos.FamilyPhotosScreen
+import it.vittorioscocca.kidbox.ui.screens.chat.ChatMediaGalleryScreen
 import it.vittorioscocca.kidbox.ui.screens.chat.ChatScreen
+import it.vittorioscocca.kidbox.ui.screens.chat.ChatViewModel
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoListScreen
 
@@ -274,6 +280,30 @@ fun AppNavGraph(
         composable(AppDestination.Chat.route) {
             ChatScreen(
                 onBack = { navController.popBackStack() },
+                onNavigateToGallery = { familyId ->
+                    navController.navigate(AppDestination.ChatMediaGallery.createRoute(familyId))
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.ChatMediaGallery.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            // Share the ChatViewModel instance that is already alive for the Chat destination
+            // so highlightMessage() takes effect as soon as we pop back.
+            val parentEntry = remember(backStackEntry) {
+                navController.getBackStackEntry(AppDestination.Chat.route)
+            }
+            val viewModel: ChatViewModel = hiltViewModel(parentEntry)
+            val state by viewModel.uiState.collectAsStateWithLifecycle()
+            ChatMediaGalleryScreen(
+                messages = state.messages,
+                onDismiss = { navController.popBackStack() },
+                onGoToMessage = { msgId ->
+                    viewModel.highlightMessage(msgId)
+                    navController.popBackStack()
+                },
             )
         }
 

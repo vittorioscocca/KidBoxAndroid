@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -38,6 +37,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
@@ -48,15 +48,16 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -224,14 +225,13 @@ private fun Long.formatFileSize(): String {
 // Entry point
 // ─────────────────────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ChatMediaGallerySheet(
+internal fun ChatMediaGalleryScreen(
     messages: List<UiChatMessage>,
     onDismiss: () -> Unit,
     onGoToMessage: (messageId: String) -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
     // Pre-compute items once per messages snapshot
     val mediaItems = remember(messages) { buildMediaItems(messages) }
     val linkItems  = remember(messages) { buildLinkItems(messages) }
@@ -243,7 +243,6 @@ internal fun ChatMediaGallerySheet(
     // Fullscreen viewer: null = hidden, non-null = start index within filteredMedia
     var fullscreenStartIndex by remember { mutableStateOf<Int?>(null) }
 
-    // Recompute search filter whenever tab or query changes
     val filteredMedia = remember(mediaItems, searchQuery) {
         if (searchQuery.isBlank()) mediaItems
         else mediaItems.filter {
@@ -266,140 +265,138 @@ internal fun ChatMediaGallerySheet(
         }
     }
 
-    // Reset search when switching tabs
     LaunchedEffect(selectedTab) { searchQuery = "" }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
+    Scaffold(
         containerColor = MaterialTheme.kidBoxColors.background,
-        dragHandle = null,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.92f),   // occupies ~92 % of the screen height
-        ) {
-            // ── Handle + title ────────────────────────────────────────────────
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp, bottom = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(width = 36.dp, height = 4.dp)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(MaterialTheme.kidBoxColors.divider),
-                )
-            }
-            Text(
-                text = "Media, link e documenti",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.kidBoxColors.title,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-
-            // ── Tab chips ─────────────────────────────────────────────────────
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                GalleryTab.entries.forEach { tab ->
-                    val isActive = tab == selectedTab
+        topBar = {
+            TopAppBar(
+                title = {
                     Text(
-                        text = tab.label,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(
-                                if (isActive) AccentOrange.copy(alpha = 0.13f)
-                                else MaterialTheme.kidBoxColors.card,
-                            )
-                            .clickable { selectedTab = tab }
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                        color = if (isActive) AccentOrange else MaterialTheme.kidBoxColors.subtitle,
-                        fontSize = 13.sp,
-                        fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                        text = "Media, link e documenti",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.kidBoxColors.title,
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Indietro",
+                            tint = MaterialTheme.kidBoxColors.title,
+                        )
+                    }
+                },
+                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.kidBoxColors.background,
+                ),
+            )
+        },
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize(),
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // ── Tab chips ─────────────────────────────────────────────────
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    GalleryTab.entries.forEach { tab ->
+                        val isActive = tab == selectedTab
+                        Text(
+                            text = tab.label,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(
+                                    if (isActive) AccentOrange.copy(alpha = 0.13f)
+                                    else MaterialTheme.kidBoxColors.card,
+                                )
+                                .clickable { selectedTab = tab }
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                            color = if (isActive) AccentOrange else MaterialTheme.kidBoxColors.subtitle,
+                            fontSize = 13.sp,
+                            fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                        )
+                    }
+                }
+
+                // ── Search bar ────────────────────────────────────────────────
+                val placeholder = when (selectedTab) {
+                    GalleryTab.MEDIA -> "Cerca media o mittente"
+                    GalleryTab.LINKS -> "Cerca link o sito"
+                    GalleryTab.DOCS  -> "Cerca documento o mittente"
+                }
+                val kb = MaterialTheme.kidBoxColors
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    placeholder = { Text(placeholder, fontSize = 13.sp, color = kb.subtitle) },
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(18.dp))
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(36.dp)) {
+                                Icon(Icons.Default.Close, contentDescription = "Cancella", tint = kb.subtitle, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = kb.card,
+                        unfocusedContainerColor = kb.card,
+                        focusedBorderColor = AccentOrange.copy(alpha = 0.5f),
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedTextColor = kb.title,
+                        unfocusedTextColor = kb.title,
+                    ),
+                )
+
+                HorizontalDivider(color = MaterialTheme.kidBoxColors.divider, modifier = Modifier.padding(top = 4.dp))
+
+                // ── Tab content ───────────────────────────────────────────────
+                when (selectedTab) {
+                    GalleryTab.MEDIA -> MediaTab(
+                        items = filteredMedia,
+                        onThumbTap = { idx -> fullscreenStartIndex = idx },
+                        onGoToMessage = onGoToMessage,
+                    )
+                    GalleryTab.LINKS -> LinksTab(
+                        items = filteredLinks,
+                        onGoToMessage = onGoToMessage,
+                        onDismiss = onDismiss,
+                    )
+                    GalleryTab.DOCS  -> DocsTab(
+                        items = filteredDocs,
+                        onGoToMessage = onGoToMessage,
+                        onDismiss = onDismiss,
                     )
                 }
             }
 
-            // ── Search bar ────────────────────────────────────────────────────
-            val placeholder = when (selectedTab) {
-                GalleryTab.MEDIA -> "Cerca media o mittente"
-                GalleryTab.LINKS -> "Cerca link o sito"
-                GalleryTab.DOCS  -> "Cerca documento o mittente"
-            }
-            val kb = MaterialTheme.kidBoxColors
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                placeholder = { Text(placeholder, fontSize = 13.sp, color = kb.subtitle) },
-                leadingIcon = {
-                    Icon(Icons.Default.Search, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(18.dp))
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Default.Close, contentDescription = "Cancella", tint = kb.subtitle, modifier = Modifier.size(16.dp))
-                        }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = kb.card,
-                    unfocusedContainerColor = kb.card,
-                    focusedBorderColor = AccentOrange.copy(alpha = 0.5f),
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = kb.title,
-                    unfocusedTextColor = kb.title,
-                ),
-            )
-
-            HorizontalDivider(color = kb.divider, modifier = Modifier.padding(top = 4.dp))
-
-            // ── Tab content ───────────────────────────────────────────────────
-            when (selectedTab) {
-                GalleryTab.MEDIA -> MediaTab(
+            // ── Fullscreen viewer — covers the entire screen via zIndex(10f) ──
+            val startIdx = fullscreenStartIndex
+            if (startIdx != null) {
+                GalleryFullscreenViewer(
                     items = filteredMedia,
-                    onThumbTap = { idx -> fullscreenStartIndex = idx },
-                    onGoToMessage = onGoToMessage,
-                )
-                GalleryTab.LINKS -> LinksTab(
-                    items = filteredLinks,
-                    onGoToMessage = onGoToMessage,
-                    onDismiss = onDismiss,
-                )
-                GalleryTab.DOCS  -> DocsTab(
-                    items = filteredDocs,
-                    onGoToMessage = onGoToMessage,
-                    onDismiss = onDismiss,
+                    startIndex = startIdx,
+                    onClose = { fullscreenStartIndex = null },
+                    onGoToMessage = { msgId ->
+                        fullscreenStartIndex = null
+                        onGoToMessage(msgId)
+                    },
                 )
             }
         }
-    }
-
-    // ── Fullscreen viewer — rendered above the sheet ─────────────────────────
-    val startIdx = fullscreenStartIndex
-    if (startIdx != null) {
-        GalleryFullscreenViewer(
-            items = filteredMedia,
-            startIndex = startIdx,
-            onClose = { fullscreenStartIndex = null },
-            onGoToMessage = { msgId ->
-                fullscreenStartIndex = null
-                onDismiss()
-                onGoToMessage(msgId)
-            },
-        )
     }
 }
 

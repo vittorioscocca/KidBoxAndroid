@@ -34,6 +34,7 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         manifestPlaceholders["googleMapsApiKey"] = mapsApiKey
+        buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
     }
 
     buildTypes {

@@ -462,6 +462,56 @@ class ChatRepository @Inject constructor(
         }
     }
 
+    /**
+     * Background pass that downloads and caches media for messages whose
+     * [KBChatMessageEntity.mediaStoragePath] is set but [KBChatMessageEntity.mediaLocalPath]
+     * is missing or points to a file that no longer exists on disk.
+     *
+     * Only PHOTO, VIDEO, AUDIO, and DOCUMENT messages are hydrated; MEDIA_GROUP items
+     * reference URLs directly and do not use [mediaStoragePath].
+     *
+     * Runs concurrently (one coroutine per message) but is not cancellation-safe mid-download
+     * — it is fire-and-forget from [scope] so it survives ViewModel cancellation.
+     */
+    suspend fun hydrateMissingMedia(familyId: String) {
+        if (familyId.isBlank()) return
+        val singleMediaTypes = setOf(
+            ChatMessageType.PHOTO.rawValue,
+            ChatMessageType.VIDEO.rawValue,
+            ChatMessageType.AUDIO.rawValue,
+            ChatMessageType.DOCUMENT.rawValue,
+        )
+        val needsHydration = chatDao.getAllByFamilyId(familyId).filter { entity ->
+            entity.typeRaw in singleMediaTypes &&
+                !entity.mediaStoragePath.isNullOrBlank() &&
+                (entity.mediaLocalPath.isNullOrBlank() || !File(entity.mediaLocalPath).exists())
+        }
+        if (needsHydration.isEmpty()) return
+
+        withContext(Dispatchers.IO) {
+            coroutineScope {
+                needsHydration.map { entity ->
+                    async {
+                        runCatching {
+                            val storagePath = entity.mediaStoragePath!!
+                            val bytes = storageService.downloadDecrypted(storagePath, familyId)
+                            val fileName = storagePath.substringAfterLast('/')
+                            val localPath = storageService.cachePlainMediaLocally(
+                                familyId = familyId,
+                                messageId = entity.id,
+                                fileName = fileName,
+                                bytes = bytes,
+                            )
+                            chatDao.upsert(entity.copy(mediaLocalPath = localPath))
+                        }
+                        // Failures are swallowed per-message so one bad download
+                        // does not abort the rest of the batch.
+                    }
+                }.awaitAll()
+            }
+        }
+    }
+
     fun flushPending(familyId: String) {
         scope.launch {
             chatDao.getBySyncState(familyId, KBSyncState.PENDING_UPSERT.rawValue).forEach { msg ->

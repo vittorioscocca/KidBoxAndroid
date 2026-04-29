@@ -30,6 +30,7 @@ data class UiChatMessage(
     val latitude: Double?,
     val longitude: Double?,
     val mediaUrl: String?,
+    val mediaLocalPath: String?,   // absolute on-device path when media is hydrated; null otherwise
     val mediaDurationSeconds: Int?,
     val mediaFileSize: Long?,
     val transcriptText: String?,
@@ -64,6 +65,7 @@ internal fun KBChatMessage.toUi(): UiChatMessage =
         latitude = latitude,
         longitude = longitude,
         mediaUrl = mediaURL,
+        mediaLocalPath = mediaLocalPath,
         mediaDurationSeconds = mediaDurationSeconds,
         mediaFileSize = mediaFileSize,
         transcriptText = transcriptText,

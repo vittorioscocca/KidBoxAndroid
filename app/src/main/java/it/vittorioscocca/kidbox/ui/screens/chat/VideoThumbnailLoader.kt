@@ -12,21 +12,22 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Two-level (memory + disk) cache for video thumbnails.
+ * Three-level (memory + disk + decode) cache for video thumbnails.
  *
  * Level 1 — in-process [LruCache] capped at 80 bitmaps.
  * Level 2 — JPEG files under `<cacheDir>/video_thumbs/`. Thumbnails survive
  *            app restarts; the OS evicts them when storage is low.
+ * Level 3 — [MediaMetadataRetriever] decode from [source].
  *
- * The [cacheKey] parameter lets callers supply a stable identifier
- * (e.g. `"vid_<messageId>"`) that stays constant even if the Firebase
- * Storage signed URL rotates.
+ * [source] may be an absolute file path, a `file://` URI, or an `https://` URL.
+ * [cacheKey] should be a stable identifier (e.g. `"vid_<messageId>"`) so the same
+ * bitmap is reused even if [source] rotates (signed URL refresh, local→remote switch).
  */
 internal object VideoThumbnailLoader {
 
     private val memCache = LruCache<String, Bitmap>(80)
 
-    suspend fun load(url: String, context: Context, cacheKey: String = url): Bitmap? =
+    suspend fun load(source: String, context: Context, cacheKey: String = source): Bitmap? =
         withContext(Dispatchers.IO) {
             // ── Level 1: memory cache ─────────────────────────────────────────
             memCache.get(cacheKey)?.let { return@withContext it }
@@ -47,14 +48,14 @@ internal object VideoThumbnailLoader {
             // ── Level 3: decode from source ───────────────────────────────────
             val bmp = runCatching {
                 val retriever = MediaMetadataRetriever()
-                // setDataSource(url, headers) works for HTTP/HTTPS but throws on
-                // file:// URIs — detect the scheme and pick the right overload.
-                val scheme = Uri.parse(url).scheme?.lowercase()
-                if (scheme == "file" || scheme == null || url.startsWith("/")) {
-                    val path = if (url.startsWith("file://")) Uri.parse(url).path!! else url
+                // setDataSource(String, headers) works for HTTP/HTTPS but throws on
+                // plain file paths — detect the scheme and pick the right overload.
+                val scheme = Uri.parse(source).scheme?.lowercase()
+                if (scheme == "file" || scheme == null || source.startsWith("/")) {
+                    val path = if (source.startsWith("file://")) Uri.parse(source).path!! else source
                     retriever.setDataSource(path)
                 } else {
-                    retriever.setDataSource(url, hashMapOf())
+                    retriever.setDataSource(source, hashMapOf())
                 }
                 val frame = retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
                     ?.let { fixVideoFrameOrientation(it, retriever) }
