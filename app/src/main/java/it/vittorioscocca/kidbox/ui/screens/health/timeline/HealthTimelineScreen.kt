@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+
 // TODO: Period filters (all/year/month) from iOS are not implemented in this phase.
 //       Add a filter bar above the LazyColumn in a future iteration.
 package it.vittorioscocca.kidbox.ui.screens.health.timeline

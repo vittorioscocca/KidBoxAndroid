@@ -119,6 +119,9 @@ sealed class AppDestination(val route: String) {
     data object HealthTimeline : AppDestination("health/{familyId}/{childId}/timeline") {
         fun route(familyId: String, childId: String) = "health/$familyId/$childId/timeline"
     }
+    data object HealthAIChat : AppDestination("health/{familyId}/{childId}/ai-chat") {
+        fun route(familyId: String, childId: String) = "health/$familyId/$childId/ai-chat"
+    }
     data object Chat : AppDestination("chat")
     data object ChatMediaGallery : AppDestination("chat_media_gallery/{familyId}") {
         fun createRoute(familyId: String): String = "chat_media_gallery/$familyId"

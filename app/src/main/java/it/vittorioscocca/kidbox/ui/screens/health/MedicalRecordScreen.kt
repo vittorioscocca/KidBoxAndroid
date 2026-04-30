@@ -93,6 +93,8 @@ fun MedicalRecordScreen(
         state.saveError?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
     }
 
+    val primaryDoctorLabel = if (state.isChild) "Pediatra di riferimento" else "Medico di base"
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -184,8 +186,8 @@ fun MedicalRecordScreen(
             )
             Spacer(Modifier.height(16.dp))
 
-            // ── Pediatra ───────────────────────────────────────────────────────
-            SectionLabel("Pediatra di riferimento")
+            // ── Medico di riferimento ─────────────────────────────────────────────
+            SectionLabel(primaryDoctorLabel)
             OutlinedTextField(
                 value = state.doctorName,
                 onValueChange = viewModel::setDoctorName,

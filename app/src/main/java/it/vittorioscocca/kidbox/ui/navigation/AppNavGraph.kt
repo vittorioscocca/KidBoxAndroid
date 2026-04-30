@@ -59,6 +59,7 @@ import it.vittorioscocca.kidbox.ui.screens.health.vaccines.MedicalVaccinesScreen
 import it.vittorioscocca.kidbox.ui.screens.health.vaccines.MedicalVaccineFormScreen
 import it.vittorioscocca.kidbox.ui.screens.health.vaccines.MedicalVaccineDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.health.timeline.HealthTimelineScreen
+import it.vittorioscocca.kidbox.ui.screens.health.ai.HealthAIChatScreen
 
 @Composable
 fun AppNavGraph(
@@ -636,6 +637,22 @@ fun AppNavGraph(
                 onOpenTreatment = { treatmentId ->
                     navController.navigate(AppDestination.TreatmentDetail.route(familyId, childId, treatmentId))
                 },
+            )
+        }
+
+        composable(
+            route = AppDestination.HealthAIChat.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            HealthAIChatScreen(
+                familyId = familyId,
+                childId = childId,
+                onBack = { navController.popBackStack() },
             )
         }
 

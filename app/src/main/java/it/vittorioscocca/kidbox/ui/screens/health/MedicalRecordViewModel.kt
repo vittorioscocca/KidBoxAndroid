@@ -3,6 +3,7 @@ package it.vittorioscocca.kidbox.ui.screens.health
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.repository.PediatricProfileRepository
 import it.vittorioscocca.kidbox.data.sync.PediatricProfileSyncCenter
 import it.vittorioscocca.kidbox.domain.model.KBEmergencyContact
@@ -15,6 +16,7 @@ import kotlinx.coroutines.launch
 data class MedicalRecordState(
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
+    val isChild: Boolean = true,
     val bloodGroup: String = "Non specificato",
     val allergies: String = "",
     val medicalNotes: String = "",
@@ -29,6 +31,7 @@ data class MedicalRecordState(
 class MedicalRecordViewModel @Inject constructor(
     private val repository: PediatricProfileRepository,
     private val syncCenter: PediatricProfileSyncCenter,
+    private val childDao: KBChildDao,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MedicalRecordState())
@@ -43,13 +46,15 @@ class MedicalRecordViewModel @Inject constructor(
         this.childId = childId
         syncCenter.start(familyId, childId)
         viewModelScope.launch {
+            val isChild = childDao.getById(childId) != null
             val profile = repository.loadOnce(childId)
             if (profile == null) {
-                _uiState.value = _uiState.value.copy(isLoading = false)
+                _uiState.value = _uiState.value.copy(isLoading = false, isChild = isChild)
                 return@launch
             }
             _uiState.value = MedicalRecordState(
                 isLoading = false,
+                isChild = isChild,
                 bloodGroup = profile.bloodGroup ?: "Non specificato",
                 allergies = profile.allergies.orEmpty(),
                 medicalNotes = profile.medicalNotes.orEmpty(),

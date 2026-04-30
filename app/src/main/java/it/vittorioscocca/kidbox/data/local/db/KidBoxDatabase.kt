@@ -2,6 +2,8 @@ package it.vittorioscocca.kidbox.data.local.db
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import it.vittorioscocca.kidbox.data.local.dao.KBAIConversationDao
+import it.vittorioscocca.kidbox.data.local.dao.KBAIMessageDao
 import it.vittorioscocca.kidbox.data.local.dao.KBCalendarEventDao
 import it.vittorioscocca.kidbox.data.local.dao.KBChatMessageDao
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
@@ -30,6 +32,8 @@ import it.vittorioscocca.kidbox.data.local.dao.KBSharedLocationDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoListDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTreatmentDao
 import it.vittorioscocca.kidbox.data.local.dao.KBVaccineDao
+import it.vittorioscocca.kidbox.data.local.entity.KBAIConversationEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBAIMessageEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBCalendarEventEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBChatMessageEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBChildEntity
@@ -60,7 +64,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBTreatmentEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBVaccineEntity
 
 @Database(
-    version = 7,
+    version = 8,
     exportSchema = false,
     entities = [
         KBUserProfileEntity::class,
@@ -91,6 +95,8 @@ import it.vittorioscocca.kidbox.data.local.entity.KBVaccineEntity
         KBCustomDrugEntity::class,
         KBDoseLogEntity::class,
         KBSharedLocationEntity::class,
+        KBAIConversationEntity::class,
+        KBAIMessageEntity::class,
     ],
 )
 abstract class KidBoxDatabase : RoomDatabase() {
@@ -122,4 +128,6 @@ abstract class KidBoxDatabase : RoomDatabase() {
     abstract fun customDrugDao(): KBCustomDrugDao
     abstract fun doseLogDao(): KBDoseLogDao
     abstract fun sharedLocationDao(): KBSharedLocationDao
+    abstract fun aiConversationDao(): KBAIConversationDao
+    abstract fun aiMessageDao(): KBAIMessageDao
 }

@@ -1,5 +1,8 @@
 package it.vittorioscocca.kidbox.ui.screens.health
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,22 +24,28 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.Vaccines
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +59,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
+private val ORANGE_FAB = Color(0xFFFF6B00)
+
 @Composable
 fun HealthHomeScreen(
     familyId: String,
@@ -60,10 +71,10 @@ fun HealthHomeScreen(
 ) {
     val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var showConsentDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(familyId, childId) { viewModel.load(familyId, childId) }
 
-    // Build the 6 module cards. Lambdas are recreated only when subjectName changes.
     val cards = remember(state.subjectName, state.activeTreatmentCount) {
         listOf(
             HealthCard(
@@ -135,13 +146,12 @@ fun HealthHomeScreen(
             }
             Spacer(Modifier.height(8.dp))
 
-            // Hero header: avatar + name
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
                         .size(52.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFFF6B00).copy(alpha = 0.15f)),
+                        .background(ORANGE_FAB.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text("🧑", fontSize = 24.sp)
@@ -168,7 +178,75 @@ fun HealthHomeScreen(
                 items(cards) { card -> HealthModuleCard(card) }
             }
         }
+
+        // ── Floating AI button ────────────────────────────────────────────────
+        AnimatedVisibility(
+            visible = state.hasAnyHealthData,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 20.dp, bottom = 80.dp),
+        ) {
+            FloatingActionButton(
+                onClick = {
+                    if (state.hasAiConsent) {
+                        onNavigate(AppDestination.HealthAIChat.route(familyId, childId))
+                    } else {
+                        showConsentDialog = true
+                    }
+                },
+                containerColor = ORANGE_FAB,
+                contentColor = Color.White,
+                shape = CircleShape,
+            ) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = "Assistente AI salute")
+            }
+        }
     }
+
+    // ── AI Consent dialog ─────────────────────────────────────────────────────
+    if (showConsentDialog) {
+        AiConsentDialog(
+            subjectName = state.subjectName,
+            onAccept = {
+                viewModel.grantAiConsent()
+                showConsentDialog = false
+                onNavigate(AppDestination.HealthAIChat.route(familyId, childId))
+            },
+            onDismiss = { showConsentDialog = false },
+        )
+    }
+}
+
+@Composable
+private fun AiConsentDialog(
+    subjectName: String,
+    onAccept: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val name = subjectName.ifBlank { "questo profilo" }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Assistente AI medico", fontWeight = FontWeight.Bold) },
+        text = {
+            Text(
+                "Le tue domande e il contesto sanitario di $name (visite, cure, esami, vaccini) " +
+                    "verranno inviati ad Anthropic per generare la risposta.\n\n" +
+                    "L'AI fornisce informazioni generali — non sostituisce il tuo medico.\n\n" +
+                    "I tuoi dati vengono trattati secondo la Privacy Policy di Anthropic.",
+                fontSize = 14.sp,
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onAccept) {
+                Text("Accetta", color = ORANGE_FAB, fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Annulla") }
+        },
+    )
 }
 
 private data class HealthCard(

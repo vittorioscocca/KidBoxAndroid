@@ -9,6 +9,8 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import it.vittorioscocca.kidbox.data.local.dao.KBAIConversationDao
+import it.vittorioscocca.kidbox.data.local.dao.KBAIMessageDao
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBCalendarEventDao
 import it.vittorioscocca.kidbox.data.local.dao.KBChatMessageDao
@@ -62,6 +64,42 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_7_8 = object : Migration(7, 8) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS kb_ai_conversations (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    childId TEXT NOT NULL,
+                    scopeId TEXT NOT NULL,
+                    summary TEXT,
+                    summarizedMessageCount INTEGER NOT NULL DEFAULT 0,
+                    createdAtEpochMillis INTEGER NOT NULL,
+                    updatedAtEpochMillis INTEGER NOT NULL
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_kb_ai_conversations_scopeId ON kb_ai_conversations(scopeId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_ai_conversations_familyId ON kb_ai_conversations(familyId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_ai_conversations_childId ON kb_ai_conversations(childId)")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS kb_ai_messages (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    conversationId TEXT NOT NULL,
+                    roleRaw TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    createdAtEpochMillis INTEGER NOT NULL
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_ai_messages_conversationId ON kb_ai_messages(conversationId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_ai_messages_createdAtEpochMillis ON kb_ai_messages(createdAtEpochMillis)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideKidBoxDatabase(
@@ -70,7 +108,7 @@ object DatabaseModule {
         context,
         KidBoxDatabase::class.java,
         "kidbox.db",
-    ).addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+    ).addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
         .fallbackToDestructiveMigration()
         .build()
 
@@ -148,4 +186,12 @@ object DatabaseModule {
     @Provides
     fun provideKBDoseLogDao(database: KidBoxDatabase): KBDoseLogDao =
         database.doseLogDao()
+
+    @Provides
+    fun provideKBAIConversationDao(database: KidBoxDatabase): KBAIConversationDao =
+        database.aiConversationDao()
+
+    @Provides
+    fun provideKBAIMessageDao(database: KidBoxDatabase): KBAIMessageDao =
+        database.aiMessageDao()
 }
