@@ -43,6 +43,22 @@ import it.vittorioscocca.kidbox.ui.screens.chat.ChatScreen
 import it.vittorioscocca.kidbox.ui.screens.chat.ChatViewModel
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoListScreen
+import it.vittorioscocca.kidbox.ui.screens.health.HealthSubjectSelectorScreen
+import it.vittorioscocca.kidbox.ui.screens.health.HealthHomeScreen
+import it.vittorioscocca.kidbox.ui.screens.health.MedicalRecordScreen
+import it.vittorioscocca.kidbox.ui.screens.health.visits.MedicalVisitsScreen
+import it.vittorioscocca.kidbox.ui.screens.health.visits.MedicalVisitFormScreen
+import it.vittorioscocca.kidbox.ui.screens.health.visits.MedicalVisitDetailScreen
+import it.vittorioscocca.kidbox.ui.screens.health.exams.MedicalExamsScreen
+import it.vittorioscocca.kidbox.ui.screens.health.exams.MedicalExamFormScreen
+import it.vittorioscocca.kidbox.ui.screens.health.exams.MedicalExamDetailScreen
+import it.vittorioscocca.kidbox.ui.screens.health.treatments.MedicalTreatmentsScreen
+import it.vittorioscocca.kidbox.ui.screens.health.treatments.MedicalTreatmentFormScreen
+import it.vittorioscocca.kidbox.ui.screens.health.treatments.MedicalTreatmentDetailScreen
+import it.vittorioscocca.kidbox.ui.screens.health.vaccines.MedicalVaccinesScreen
+import it.vittorioscocca.kidbox.ui.screens.health.vaccines.MedicalVaccineFormScreen
+import it.vittorioscocca.kidbox.ui.screens.health.vaccines.MedicalVaccineDetailScreen
+import it.vittorioscocca.kidbox.ui.screens.health.timeline.HealthTimelineScreen
 
 @Composable
 fun AppNavGraph(
@@ -275,7 +291,353 @@ fun AppNavGraph(
         composable(
             route = AppDestination.PediatricChildSelector.route,
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
-        ) { PlaceholderScreen("Salute") }
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            HealthSubjectSelectorScreen(
+                familyId = familyId,
+                onBack = { navController.popBackStack() },
+                onSelect = { childId ->
+                    navController.navigate(AppDestination.HealthHome.route(familyId, childId))
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.HealthHome.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            HealthHomeScreen(
+                familyId = familyId,
+                childId = childId,
+                onBack = { navController.popBackStack() },
+                onNavigate = { route -> navController.navigate(route) },
+            )
+        }
+
+        composable(
+            route = AppDestination.MedicalRecord.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            MedicalRecordScreen(
+                familyId = familyId,
+                childId = childId,
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.MedicalVisits.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            MedicalVisitsScreen(
+                familyId = familyId,
+                childId = childId,
+                onBack = { navController.popBackStack() },
+                onAdd = {
+                    navController.navigate(AppDestination.MedicalVisitForm.route(familyId, childId))
+                },
+                onOpen = { visitId ->
+                    navController.navigate(AppDestination.MedicalVisitDetail.route(familyId, childId, visitId))
+                },
+            )
+        }
+
+        // MedicalVisitForm must be registered BEFORE MedicalVisitDetail so that the literal
+        // "form" path segment takes precedence over the parameterized {visitId} segment.
+        composable(
+            route = AppDestination.MedicalVisitForm.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+                navArgument("visitId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            val visitId = backStackEntry.arguments?.getString("visitId")
+            MedicalVisitFormScreen(
+                familyId = familyId,
+                childId = childId,
+                visitId = visitId,
+                onBack = { navController.popBackStack() },
+                onSaved = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.MedicalVisitDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+                navArgument("visitId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            val visitId = backStackEntry.arguments?.getString("visitId").orEmpty()
+            MedicalVisitDetailScreen(
+                familyId = familyId,
+                childId = childId,
+                visitId = visitId,
+                onBack = { navController.popBackStack() },
+                onEdit = {
+                    navController.navigate(
+                        AppDestination.MedicalVisitForm.route(familyId, childId, visitId)
+                    )
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.Vaccines.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            MedicalVaccinesScreen(
+                familyId = familyId,
+                childId = childId,
+                onBack = { navController.popBackStack() },
+                onAdd = {
+                    navController.navigate(AppDestination.VaccineForm.routeNew(familyId, childId))
+                },
+                onOpen = { vaccineId ->
+                    navController.navigate(AppDestination.VaccineDetail.route(familyId, childId, vaccineId))
+                },
+            )
+        }
+
+        // VaccineForm must be registered BEFORE VaccineDetail to avoid route conflicts.
+        composable(
+            route = AppDestination.VaccineForm.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+                navArgument("vaccineId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            val vaccineId = backStackEntry.arguments?.getString("vaccineId")
+            MedicalVaccineFormScreen(
+                familyId = familyId,
+                childId = childId,
+                vaccineId = vaccineId,
+                onBack = { navController.popBackStack() },
+                onSaved = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.VaccineDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+                navArgument("vaccineId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            val vaccineId = backStackEntry.arguments?.getString("vaccineId").orEmpty()
+            MedicalVaccineDetailScreen(
+                familyId = familyId,
+                childId = childId,
+                vaccineId = vaccineId,
+                onBack = { navController.popBackStack() },
+                onEdit = {
+                    navController.navigate(AppDestination.VaccineForm.routeEdit(familyId, childId, vaccineId))
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.MedicalExams.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            MedicalExamsScreen(
+                familyId = familyId,
+                childId = childId,
+                onBack = { navController.popBackStack() },
+                onAdd = {
+                    navController.navigate(AppDestination.MedicalExamForm.routeNew(familyId, childId))
+                },
+                onOpen = { examId ->
+                    navController.navigate(AppDestination.MedicalExamDetail.route(familyId, childId, examId))
+                },
+            )
+        }
+
+        // MedicalExamForm must be registered BEFORE MedicalExamDetail to avoid route conflicts.
+        composable(
+            route = AppDestination.MedicalExamForm.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+                navArgument("examId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            val examId = backStackEntry.arguments?.getString("examId")
+            MedicalExamFormScreen(
+                familyId = familyId,
+                childId = childId,
+                examId = examId,
+                onBack = { navController.popBackStack() },
+                onSaved = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.MedicalExamDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+                navArgument("examId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            val examId = backStackEntry.arguments?.getString("examId").orEmpty()
+            MedicalExamDetailScreen(
+                familyId = familyId,
+                childId = childId,
+                examId = examId,
+                onBack = { navController.popBackStack() },
+                onEdit = {
+                    navController.navigate(AppDestination.MedicalExamForm.routeEdit(familyId, childId, examId))
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.Treatments.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            MedicalTreatmentsScreen(
+                familyId = familyId,
+                childId = childId,
+                onBack = { navController.popBackStack() },
+                onAdd = {
+                    navController.navigate(AppDestination.TreatmentForm.routeNew(familyId, childId))
+                },
+                onOpen = { treatmentId ->
+                    navController.navigate(AppDestination.TreatmentDetail.route(familyId, childId, treatmentId))
+                },
+            )
+        }
+
+        // TreatmentForm must be registered BEFORE TreatmentDetail to avoid route conflicts.
+        composable(
+            route = AppDestination.TreatmentForm.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+                navArgument("treatmentId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            val treatmentId = backStackEntry.arguments?.getString("treatmentId")
+            MedicalTreatmentFormScreen(
+                familyId = familyId,
+                childId = childId,
+                treatmentId = treatmentId,
+                onBack = { navController.popBackStack() },
+                onSaved = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.TreatmentDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+                navArgument("treatmentId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            val treatmentId = backStackEntry.arguments?.getString("treatmentId").orEmpty()
+            MedicalTreatmentDetailScreen(
+                familyId = familyId,
+                childId = childId,
+                treatmentId = treatmentId,
+                onBack = { navController.popBackStack() },
+                onEdit = {
+                    navController.navigate(AppDestination.TreatmentForm.routeEdit(familyId, childId, treatmentId))
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.HealthTimeline.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            HealthTimelineScreen(
+                familyId = familyId,
+                childId = childId,
+                onBack = { navController.popBackStack() },
+                onOpenVisit = { visitId ->
+                    navController.navigate(AppDestination.MedicalVisitDetail.route(familyId, childId, visitId))
+                },
+                onOpenExam = { examId ->
+                    navController.navigate(AppDestination.MedicalExamDetail.route(familyId, childId, examId))
+                },
+                onOpenTreatment = { treatmentId ->
+                    navController.navigate(AppDestination.TreatmentDetail.route(familyId, childId, treatmentId))
+                },
+            )
+        }
 
         composable(AppDestination.Chat.route) {
             ChatScreen(

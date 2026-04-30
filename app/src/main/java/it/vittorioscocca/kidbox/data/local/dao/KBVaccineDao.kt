@@ -13,8 +13,17 @@ interface KBVaccineDao {
     @Query("SELECT * FROM kb_vaccines WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): KBVaccineEntity?
 
-    @Query("SELECT * FROM kb_vaccines WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 ORDER BY administeredDateEpochMillis DESC")
+    @Query(
+        "SELECT * FROM kb_vaccines WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 " +
+            "ORDER BY scheduledDateEpochMillis ASC",
+    )
     fun observeByFamilyAndChild(familyId: String, childId: String): Flow<List<KBVaccineEntity>>
+
+    @Query(
+        "SELECT * FROM kb_vaccines WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 " +
+            "ORDER BY scheduledDateEpochMillis ASC",
+    )
+    suspend fun listByFamilyAndChild(familyId: String, childId: String): List<KBVaccineEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBVaccineEntity)

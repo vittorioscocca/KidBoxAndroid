@@ -60,7 +60,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBTreatmentEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBVaccineEntity
 
 @Database(
-    version = 5,
+    version = 7,
     exportSchema = false,
     entities = [
         KBUserProfileEntity::class,

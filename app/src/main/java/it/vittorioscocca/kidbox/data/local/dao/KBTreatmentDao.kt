@@ -16,6 +16,12 @@ interface KBTreatmentDao {
     @Query("SELECT * FROM kb_treatments WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 ORDER BY startDateEpochMillis DESC")
     fun observeByFamilyAndChild(familyId: String, childId: String): Flow<List<KBTreatmentEntity>>
 
+    @Query("SELECT * FROM kb_treatments WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 ORDER BY startDateEpochMillis DESC")
+    suspend fun listByFamilyAndChild(familyId: String, childId: String): List<KBTreatmentEntity>
+
+    @Query("SELECT * FROM kb_treatments WHERE familyId = :familyId AND isDeleted = 0 AND isActive = 1 AND reminderEnabled = 1")
+    suspend fun listActiveWithReminders(familyId: String): List<KBTreatmentEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBTreatmentEntity)
 

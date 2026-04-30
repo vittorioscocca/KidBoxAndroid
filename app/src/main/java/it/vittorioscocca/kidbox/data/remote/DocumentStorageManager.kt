@@ -59,6 +59,31 @@ class DocumentStorageManager @Inject constructor(
         return plain
     }
 
+    /** Upload already-encrypted bytes (or plain bytes that will be encrypted) to an explicit [storagePath].
+     *  Returns the download URL. Useful when the caller needs a non-standard storage path. */
+    suspend fun uploadEncryptedToPath(
+        storagePath: String,
+        familyId: String,
+        mimeType: String,
+        fileName: String,
+        plainBytes: ByteArray,
+    ): String {
+        Log.i(TAG_DOC_STORAGE, "uploadEncryptedToPath start path=$storagePath bytes=${plainBytes.size}")
+        val encrypted = cryptoManager.encrypt(plainBytes, familyId)
+        val ref = storage.reference.child(storagePath)
+        val metadata = StorageMetadata.Builder()
+            .setContentType("application/octet-stream")
+            .setCustomMetadata("kb_encrypted", "1")
+            .setCustomMetadata("kb_alg", "AES-GCM")
+            .setCustomMetadata("kb_orig_mime", mimeType)
+            .setCustomMetadata("kb_orig_name", fileName)
+            .build()
+        ref.putBytes(encrypted, metadata).await()
+        val downloadUrl = ref.downloadUrl.await().toString()
+        Log.i(TAG_DOC_STORAGE, "uploadEncryptedToPath ok path=$storagePath")
+        return downloadUrl
+    }
+
     suspend fun delete(storagePath: String) {
         if (storagePath.isBlank()) return
         Log.i(TAG_DOC_STORAGE, "delete start path=$storagePath")

@@ -59,6 +59,66 @@ sealed class AppDestination(val route: String) {
     data object PediatricChildSelector : AppDestination("pediatric_child_selector/{familyId}") {
         fun createRoute(familyId: String): String = "pediatric_child_selector/$familyId"
     }
+    data object HealthHome : AppDestination("health/{familyId}/{childId}") {
+        fun route(familyId: String, childId: String) = "health/$familyId/$childId"
+    }
+    data object MedicalRecord : AppDestination("health/{familyId}/{childId}/medical-record") {
+        fun route(familyId: String, childId: String) =
+            "health/$familyId/$childId/medical-record"
+    }
+    data object MedicalVisits : AppDestination("health/{familyId}/{childId}/visits") {
+        fun route(familyId: String, childId: String) =
+            "health/$familyId/$childId/visits"
+    }
+    data object MedicalVisitDetail : AppDestination("health/{familyId}/{childId}/visits/{visitId}") {
+        fun route(familyId: String, childId: String, visitId: String) =
+            "health/$familyId/$childId/visits/$visitId"
+    }
+    data object MedicalVisitForm : AppDestination("health/{familyId}/{childId}/visits/form?visitId={visitId}") {
+        fun route(familyId: String, childId: String, visitId: String? = null): String {
+            val base = "health/$familyId/$childId/visits/form"
+            return if (visitId != null) "$base?visitId=$visitId" else base
+        }
+    }
+    data object MedicalExams : AppDestination("health/{familyId}/{childId}/exams") {
+        fun route(familyId: String, childId: String) = "health/$familyId/$childId/exams"
+    }
+    data object MedicalExamDetail : AppDestination("health/{familyId}/{childId}/exams/{examId}") {
+        fun route(familyId: String, childId: String, examId: String) =
+            "health/$familyId/$childId/exams/$examId"
+    }
+    data object MedicalExamForm : AppDestination("health/{familyId}/{childId}/exams/form?examId={examId}") {
+        fun routeNew(familyId: String, childId: String) = "health/$familyId/$childId/exams/form"
+        fun routeEdit(familyId: String, childId: String, examId: String) =
+            "health/$familyId/$childId/exams/form?examId=$examId"
+    }
+    data object Vaccines : AppDestination("health/{familyId}/{childId}/vaccines") {
+        fun route(familyId: String, childId: String) = "health/$familyId/$childId/vaccines"
+    }
+    data object VaccineDetail : AppDestination("health/{familyId}/{childId}/vaccines/{vaccineId}") {
+        fun route(familyId: String, childId: String, vaccineId: String) =
+            "health/$familyId/$childId/vaccines/$vaccineId"
+    }
+    data object VaccineForm : AppDestination("health/{familyId}/{childId}/vaccines/form?vaccineId={vaccineId}") {
+        fun routeNew(familyId: String, childId: String) = "health/$familyId/$childId/vaccines/form"
+        fun routeEdit(familyId: String, childId: String, vaccineId: String) =
+            "health/$familyId/$childId/vaccines/form?vaccineId=$vaccineId"
+    }
+    data object Treatments : AppDestination("health/{familyId}/{childId}/treatments") {
+        fun route(familyId: String, childId: String) = "health/$familyId/$childId/treatments"
+    }
+    data object TreatmentDetail : AppDestination("health/{familyId}/{childId}/treatments/{treatmentId}") {
+        fun route(familyId: String, childId: String, treatmentId: String) =
+            "health/$familyId/$childId/treatments/$treatmentId"
+    }
+    data object TreatmentForm : AppDestination("health/{familyId}/{childId}/treatments/form?treatmentId={treatmentId}") {
+        fun routeNew(familyId: String, childId: String) = "health/$familyId/$childId/treatments/form"
+        fun routeEdit(familyId: String, childId: String, treatmentId: String) =
+            "health/$familyId/$childId/treatments/form?treatmentId=$treatmentId"
+    }
+    data object HealthTimeline : AppDestination("health/{familyId}/{childId}/timeline") {
+        fun route(familyId: String, childId: String) = "health/$familyId/$childId/timeline"
+    }
     data object Chat : AppDestination("chat")
     data object ChatMediaGallery : AppDestination("chat_media_gallery/{familyId}") {
         fun createRoute(familyId: String): String = "chat_media_gallery/$familyId"

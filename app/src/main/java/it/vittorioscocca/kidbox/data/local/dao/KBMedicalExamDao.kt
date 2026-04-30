@@ -16,6 +16,9 @@ interface KBMedicalExamDao {
     @Query("SELECT * FROM kb_medical_exams WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 ORDER BY deadlineEpochMillis")
     fun observeByFamilyAndChild(familyId: String, childId: String): Flow<List<KBMedicalExamEntity>>
 
+    @Query("SELECT * FROM kb_medical_exams WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 ORDER BY deadlineEpochMillis")
+    suspend fun listByFamilyAndChild(familyId: String, childId: String): List<KBMedicalExamEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBMedicalExamEntity)
 

@@ -16,6 +16,12 @@ interface KBDoseLogDao {
     @Query("SELECT * FROM kb_dose_logs WHERE treatmentId = :treatmentId AND isDeleted = 0 ORDER BY dayNumber, slotIndex")
     fun observeByTreatment(treatmentId: String): Flow<List<KBDoseLogEntity>>
 
+    @Query("SELECT * FROM kb_dose_logs WHERE treatmentId = :treatmentId AND isDeleted = 0 ORDER BY dayNumber, slotIndex")
+    suspend fun listByTreatment(treatmentId: String): List<KBDoseLogEntity>
+
+    @Query("SELECT * FROM kb_dose_logs WHERE treatmentId = :treatmentId AND dayNumber = :dayNumber AND slotIndex = :slotIndex AND isDeleted = 0 LIMIT 1")
+    suspend fun getByTreatmentDaySlot(treatmentId: String, dayNumber: Int, slotIndex: Int): KBDoseLogEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBDoseLogEntity)
 

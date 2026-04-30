@@ -23,6 +23,12 @@ import it.vittorioscocca.kidbox.data.local.dao.KBDocumentDao
 import it.vittorioscocca.kidbox.data.local.dao.KBDocumentCategoryDao
 import it.vittorioscocca.kidbox.data.local.dao.KBPhotoAlbumDao
 import it.vittorioscocca.kidbox.data.local.dao.KBSharedLocationDao
+import it.vittorioscocca.kidbox.data.local.dao.KBMedicalVisitDao
+import it.vittorioscocca.kidbox.data.local.dao.KBMedicalExamDao
+import it.vittorioscocca.kidbox.data.local.dao.KBPediatricProfileDao
+import it.vittorioscocca.kidbox.data.local.dao.KBVaccineDao
+import it.vittorioscocca.kidbox.data.local.dao.KBTreatmentDao
+import it.vittorioscocca.kidbox.data.local.dao.KBDoseLogDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoItemDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoListDao
 import it.vittorioscocca.kidbox.data.local.dao.KBUserProfileDao
@@ -35,11 +41,24 @@ object DatabaseModule {
 
     private val MIGRATION_4_5 = object : Migration(4, 5) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            // Chat schema parity with iOS:
-            // - contactPayloadJSON (for shared contact card)
-            // - deletedForJSON    (per-user local hidden state mirror)
             db.execSQL("ALTER TABLE kb_chat_messages ADD COLUMN contactPayloadJSON TEXT")
             db.execSQL("ALTER TABLE kb_chat_messages ADD COLUMN deletedForJSON TEXT")
+        }
+    }
+
+    private val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE kb_medical_exams ADD COLUMN reminderOn INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
+    private val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE kb_vaccines ADD COLUMN name TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE kb_vaccines ADD COLUMN doctorName TEXT")
+            db.execSQL("ALTER TABLE kb_vaccines ADD COLUMN location TEXT")
+            db.execSQL("ALTER TABLE kb_vaccines ADD COLUMN reminderOn INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE kb_vaccines ADD COLUMN nextDoseDateEpochMillis INTEGER")
         }
     }
 
@@ -51,7 +70,7 @@ object DatabaseModule {
         context,
         KidBoxDatabase::class.java,
         "kidbox.db",
-    ).addMigrations(MIGRATION_4_5)
+    ).addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
         .fallbackToDestructiveMigration()
         .build()
 
@@ -105,4 +124,28 @@ object DatabaseModule {
 
     @Provides
     fun provideKBSharedLocationDao(database: KidBoxDatabase): KBSharedLocationDao = database.sharedLocationDao()
+
+    @Provides
+    fun provideKBMedicalVisitDao(database: KidBoxDatabase): KBMedicalVisitDao =
+        database.medicalVisitDao()
+
+    @Provides
+    fun provideKBMedicalExamDao(database: KidBoxDatabase): KBMedicalExamDao =
+        database.medicalExamDao()
+
+    @Provides
+    fun provideKBPediatricProfileDao(database: KidBoxDatabase): KBPediatricProfileDao =
+        database.pediatricProfileDao()
+
+    @Provides
+    fun provideKBVaccineDao(database: KidBoxDatabase): KBVaccineDao =
+        database.vaccineDao()
+
+    @Provides
+    fun provideKBTreatmentDao(database: KidBoxDatabase): KBTreatmentDao =
+        database.treatmentDao()
+
+    @Provides
+    fun provideKBDoseLogDao(database: KidBoxDatabase): KBDoseLogDao =
+        database.doseLogDao()
 }

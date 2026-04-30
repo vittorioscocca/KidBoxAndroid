@@ -43,6 +43,7 @@ data class KBMedicalExamEntity(
     val resultText: String?,
     val resultDateEpochMillis: Long?,
     val prescribingVisitId: String?,
+    val reminderOn: Boolean = false,
     val isDeleted: Boolean,
     val syncStateRaw: Int,
     val lastSyncError: String?,

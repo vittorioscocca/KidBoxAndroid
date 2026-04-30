@@ -1,5 +1,10 @@
 package it.vittorioscocca.kidbox.domain.model
 
+private val SLOT_LABELS = listOf("Mattina", "Pranzo", "Sera", "Notte")
+
+fun slotLabelFor(index: Int): String =
+    if (index < SLOT_LABELS.size) SLOT_LABELS[index] else "Dose ${index + 1}"
+
 /** Terapia farmacologica — allineato a [KBTreatment] iOS. */
 data class KBTreatment(
     val id: String,
