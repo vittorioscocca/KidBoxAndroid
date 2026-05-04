@@ -5,11 +5,12 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
-import it.vittorioscocca.kidbox.data.local.mapper.KBVaccineStatus
 import it.vittorioscocca.kidbox.data.local.mapper.KBVaccineType
+import it.vittorioscocca.kidbox.data.local.mapper.displayTitle
 import it.vittorioscocca.kidbox.data.repository.VaccineRepository
 import it.vittorioscocca.kidbox.domain.model.KBVaccine
 import it.vittorioscocca.kidbox.notifications.VaccineReminderScheduler
+import java.util.Calendar
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,28 +18,39 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/** Allineato a iOS `VaccineStatus` per il form. */
+enum class VaccineFormStatus {
+    ADMINISTERED,
+    SCHEDULED,
+    PLANNED,
+}
+
 data class MedicalVaccineFormState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val vaccineId: String = UUID.randomUUID().toString(),
+    /** In modifica: conserva createdAt / createdBy dal record. */
+    val createdAtEpochMillis: Long? = null,
+    val createdBy: String? = null,
     val childName: String = "",
-    val name: String = "",
-    val vaccineType: KBVaccineType = KBVaccineType.MANDATORY,
-    val hasScheduledDate: Boolean = false,
-    val scheduledDateEpochMillis: Long = System.currentTimeMillis(),
-    val isAdministered: Boolean = false,
+    val formStatus: VaccineFormStatus = VaccineFormStatus.ADMINISTERED,
+    val vaccineType: KBVaccineType = KBVaccineType.ESAVALENTE,
+    val commercialName: String = "",
+    val doseNumber: Int = 1,
+    val totalDoses: Int = 1,
     val administeredDateEpochMillis: Long = System.currentTimeMillis(),
-    val doctorName: String = "",
-    val location: String = "",
+    val scheduledDateEpochMillis: Long = System.currentTimeMillis(),
     val lotNumber: String = "",
+    val administeredBy: String = "",
+    val administrationSite: String = "",
     val notes: String = "",
-    val hasNextDose: Boolean = false,
-    val nextDoseDateEpochMillis: Long = System.currentTimeMillis(),
+    /** Promemoria locale solo per stato «Da programmare». */
     val reminderOn: Boolean = false,
+    val nextDoseDateEpochMillis: Long? = null,
     val saved: Boolean = false,
     val saveError: String? = null,
 ) {
-    val canSave: Boolean get() = name.isNotBlank()
+    val canSave: Boolean get() = true
 }
 
 @HiltViewModel
@@ -54,18 +66,52 @@ class MedicalVaccineFormViewModel @Inject constructor(
 
     private var familyId: String = ""
     private var childId: String = ""
+    private var boundKey: String? = null
 
     fun bind(familyId: String, childId: String, vaccineId: String?) {
-        if (this.familyId == familyId && this.childId == childId) return
+        val key = "$familyId|$childId|${vaccineId ?: "new"}"
+        if (boundKey == key) return
+        boundKey = key
         this.familyId = familyId
         this.childId = childId
 
         viewModelScope.launch {
             val name = resolveChildName(childId)
-            _uiState.value = _uiState.value.copy(childName = name)
+            if (vaccineId != null) {
+                val vaccine = repository.getById(vaccineId)
+                if (vaccine != null) {
+                    val formStatus = when (vaccine.statusRaw) {
+                        "scheduled" -> VaccineFormStatus.SCHEDULED
+                        "planned" -> VaccineFormStatus.PLANNED
+                        else -> VaccineFormStatus.ADMINISTERED
+                    }
+                    _uiState.value = MedicalVaccineFormState(
+                        isLoading = false,
+                        vaccineId = vaccine.id,
+                        createdAtEpochMillis = vaccine.createdAtEpochMillis,
+                        createdBy = vaccine.createdBy,
+                        childName = name,
+                        formStatus = formStatus,
+                        vaccineType = KBVaccineType.fromRaw(vaccine.vaccineTypeRaw),
+                        commercialName = vaccine.commercialName.orEmpty(),
+                        doseNumber = vaccine.doseNumber.coerceIn(1, 10),
+                        totalDoses = vaccine.totalDoses.coerceIn(1, 10),
+                        administeredDateEpochMillis = vaccine.administeredDateEpochMillis ?: System.currentTimeMillis(),
+                        scheduledDateEpochMillis = vaccine.scheduledDateEpochMillis ?: System.currentTimeMillis(),
+                        lotNumber = vaccine.lotNumber.orEmpty(),
+                        administeredBy = vaccine.administeredBy.orEmpty(),
+                        administrationSite = vaccine.administrationSiteRaw.orEmpty(),
+                        notes = vaccine.notes.orEmpty(),
+                        reminderOn = vaccine.reminderOn && formStatus == VaccineFormStatus.PLANNED,
+                        nextDoseDateEpochMillis = vaccine.nextDoseDateEpochMillis,
+                    )
+                } else {
+                    _uiState.value = MedicalVaccineFormState(childName = name, isLoading = false)
+                }
+            } else {
+                _uiState.value = MedicalVaccineFormState(childName = name)
+            }
         }
-
-        if (vaccineId != null) loadVaccine(vaccineId)
     }
 
     private suspend fun resolveChildName(id: String): String {
@@ -74,57 +120,78 @@ class MedicalVaccineFormViewModel @Inject constructor(
         return "Profilo"
     }
 
-    private fun loadVaccine(vaccineId: String) {
-        _uiState.value = _uiState.value.copy(isLoading = true)
-        viewModelScope.launch {
-            val vaccine = repository.getById(vaccineId)
-            if (vaccine != null) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    vaccineId = vaccine.id,
-                    name = vaccine.name,
-                    vaccineType = KBVaccineType.fromRaw(vaccine.vaccineTypeRaw) ?: KBVaccineType.MANDATORY,
-                    hasScheduledDate = vaccine.scheduledDateEpochMillis != null,
-                    scheduledDateEpochMillis = vaccine.scheduledDateEpochMillis ?: System.currentTimeMillis(),
-                    isAdministered = vaccine.administeredDateEpochMillis != null,
-                    administeredDateEpochMillis = vaccine.administeredDateEpochMillis ?: System.currentTimeMillis(),
-                    doctorName = vaccine.doctorName.orEmpty(),
-                    location = vaccine.location.orEmpty(),
-                    lotNumber = vaccine.lotNumber.orEmpty(),
-                    notes = vaccine.notes.orEmpty(),
-                    hasNextDose = vaccine.nextDoseDateEpochMillis != null,
-                    nextDoseDateEpochMillis = vaccine.nextDoseDateEpochMillis ?: System.currentTimeMillis(),
-                    reminderOn = vaccine.reminderOn,
-                )
-            } else {
-                _uiState.value = _uiState.value.copy(isLoading = false)
-            }
-        }
+    fun setFormStatus(v: VaccineFormStatus) {
+        val cur = _uiState.value
+        _uiState.value = cur.copy(
+            formStatus = v,
+            reminderOn = if (v == VaccineFormStatus.PLANNED) cur.reminderOn else false,
+            nextDoseDateEpochMillis = if (v == VaccineFormStatus.PLANNED) cur.nextDoseDateEpochMillis else null,
+        )
     }
 
-    fun setName(v: String) { _uiState.value = _uiState.value.copy(name = v) }
-    fun setVaccineType(v: KBVaccineType) { _uiState.value = _uiState.value.copy(vaccineType = v) }
-    fun setHasScheduledDate(v: Boolean) {
-        _uiState.value = _uiState.value.copy(
-            hasScheduledDate = v,
-            reminderOn = if (!v) false else _uiState.value.reminderOn,
+    fun setReminderOn(v: Boolean) {
+        val cur = _uiState.value
+        val defaultNext = Calendar.getInstance().apply { add(Calendar.MONTH, 1) }.timeInMillis
+        _uiState.value = cur.copy(
+            reminderOn = v,
+            nextDoseDateEpochMillis = when {
+                !v -> null
+                cur.nextDoseDateEpochMillis != null -> cur.nextDoseDateEpochMillis
+                else -> defaultNext
+            },
         )
     }
-    fun setScheduledDateEpochMillis(v: Long) { _uiState.value = _uiState.value.copy(scheduledDateEpochMillis = v) }
-    fun setIsAdministered(v: Boolean) {
+
+    fun setNextDoseDateEpochMillis(v: Long) {
+        _uiState.value = _uiState.value.copy(nextDoseDateEpochMillis = v)
+    }
+
+    fun setVaccineType(v: KBVaccineType) {
+        _uiState.value = _uiState.value.copy(vaccineType = v)
+    }
+
+    fun setCommercialName(v: String) {
+        _uiState.value = _uiState.value.copy(commercialName = v)
+    }
+
+    fun setDoseNumber(v: Int) {
+        _uiState.value = _uiState.value.copy(doseNumber = v.coerceIn(1, 10))
+    }
+
+    fun setTotalDoses(v: Int) {
+        _uiState.value = _uiState.value.copy(totalDoses = v.coerceIn(1, 10))
+    }
+
+    fun setAdministeredDateEpochMillis(v: Long) {
+        _uiState.value = _uiState.value.copy(administeredDateEpochMillis = v)
+    }
+
+    fun setScheduledDateEpochMillis(v: Long) {
+        _uiState.value = _uiState.value.copy(scheduledDateEpochMillis = v)
+    }
+
+    fun setLotNumber(v: String) {
+        _uiState.value = _uiState.value.copy(lotNumber = v)
+    }
+
+    fun setAdministeredBy(v: String) {
+        _uiState.value = _uiState.value.copy(administeredBy = v)
+    }
+
+    fun setAdministrationSite(v: String) {
+        _uiState.value = _uiState.value.copy(administrationSite = v)
+    }
+
+    fun toggleAdministrationSite(site: String) {
+        val cur = _uiState.value.administrationSite
         _uiState.value = _uiState.value.copy(
-            isAdministered = v,
-            reminderOn = if (v) false else _uiState.value.reminderOn,
+            administrationSite = if (cur == site) "" else site,
         )
     }
-    fun setAdministeredDateEpochMillis(v: Long) { _uiState.value = _uiState.value.copy(administeredDateEpochMillis = v) }
-    fun setDoctorName(v: String) { _uiState.value = _uiState.value.copy(doctorName = v) }
-    fun setLocation(v: String) { _uiState.value = _uiState.value.copy(location = v) }
-    fun setLotNumber(v: String) { _uiState.value = _uiState.value.copy(lotNumber = v) }
-    fun setNotes(v: String) { _uiState.value = _uiState.value.copy(notes = v) }
-    fun setHasNextDose(v: Boolean) { _uiState.value = _uiState.value.copy(hasNextDose = v) }
-    fun setNextDoseDateEpochMillis(v: Long) { _uiState.value = _uiState.value.copy(nextDoseDateEpochMillis = v) }
-    fun setReminderOn(v: Boolean) { _uiState.value = _uiState.value.copy(reminderOn = v) }
+
+    fun setNotes(v: String) {
+        _uiState.value = _uiState.value.copy(notes = v)
+    }
 
     fun save() {
         val s = _uiState.value
@@ -132,50 +199,66 @@ class MedicalVaccineFormViewModel @Inject constructor(
         _uiState.value = s.copy(isSaving = true, saveError = null)
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            val scheduledMs = if (s.hasScheduledDate) s.scheduledDateEpochMillis else null
-            val administeredMs = if (s.isAdministered) s.administeredDateEpochMillis else null
-            val nextDoseMs = if (s.hasNextDose) s.nextDoseDateEpochMillis else null
-
-            val statusRaw = when {
-                s.isAdministered -> KBVaccineStatus.ADMINISTERED.rawValue
-                scheduledMs != null && scheduledMs < now -> KBVaccineStatus.OVERDUE.rawValue
-                else -> KBVaccineStatus.SCHEDULED.rawValue
+            val createdAt = s.createdAtEpochMillis ?: now
+            val statusRaw = when (s.formStatus) {
+                VaccineFormStatus.ADMINISTERED -> "administered"
+                VaccineFormStatus.SCHEDULED -> "scheduled"
+                VaccineFormStatus.PLANNED -> "planned"
             }
+            val administeredMs = if (s.formStatus == VaccineFormStatus.ADMINISTERED) {
+                s.administeredDateEpochMillis
+            } else {
+                null
+            }
+            val scheduledMs = if (s.formStatus == VaccineFormStatus.SCHEDULED) {
+                s.scheduledDateEpochMillis
+            } else {
+                null
+            }
+            val plannedReminder = s.formStatus == VaccineFormStatus.PLANNED &&
+                s.reminderOn &&
+                s.nextDoseDateEpochMillis != null &&
+                s.nextDoseDateEpochMillis > now
+            val reminderOn = plannedReminder
+            val nextDoseMs = if (plannedReminder) s.nextDoseDateEpochMillis else null
 
-            val vaccine = KBVaccine(
+            val vaccineDraft = KBVaccine(
                 id = s.vaccineId,
                 familyId = familyId,
                 childId = childId,
-                name = s.name.trim(),
+                name = "",
                 vaccineTypeRaw = s.vaccineType.rawValue,
                 statusRaw = statusRaw,
-                commercialName = null,
-                doseNumber = 0,
-                totalDoses = 0,
+                commercialName = s.commercialName.trim().takeIf { it.isNotEmpty() },
+                doseNumber = s.doseNumber,
+                totalDoses = s.totalDoses,
                 administeredDateEpochMillis = administeredMs,
                 scheduledDateEpochMillis = scheduledMs,
-                lotNumber = s.lotNumber.takeIf { it.isNotBlank() },
-                doctorName = s.doctorName.takeIf { it.isNotBlank() },
-                location = s.location.takeIf { it.isNotBlank() },
-                administeredBy = null,
-                administrationSiteRaw = null,
-                notes = s.notes.takeIf { it.isNotBlank() },
-                reminderOn = s.reminderOn && scheduledMs != null && !s.isAdministered,
+                lotNumber = s.lotNumber.trim().takeIf { it.isNotEmpty() },
+                doctorName = null,
+                location = null,
+                administeredBy = s.administeredBy.trim().takeIf { it.isNotEmpty() },
+                administrationSiteRaw = s.administrationSite.trim().takeIf { it.isNotEmpty() },
+                notes = s.notes.trim().takeIf { it.isNotEmpty() },
+                reminderOn = reminderOn,
                 nextDoseDateEpochMillis = nextDoseMs,
                 isDeleted = false,
-                createdAtEpochMillis = now,
+                createdAtEpochMillis = createdAt,
                 updatedAtEpochMillis = now,
                 updatedBy = null,
-                createdBy = null,
+                createdBy = s.createdBy,
                 syncStateRaw = 0,
                 lastSyncError = null,
             )
+            val displayName = vaccineDraft.displayTitle()
+            val vaccine = vaccineDraft.copy(name = displayName)
 
             runCatching { repository.upsert(vaccine) }
                 .fold(
                     onSuccess = { saved ->
-                        if (saved.reminderOn && saved.scheduledDateEpochMillis != null &&
-                            saved.scheduledDateEpochMillis > System.currentTimeMillis()
+                        if (saved.reminderOn && saved.statusRaw == "planned" &&
+                            saved.nextDoseDateEpochMillis != null &&
+                            saved.nextDoseDateEpochMillis > System.currentTimeMillis()
                         ) {
                             reminderScheduler.scheduleVaccineReminder(saved, s.childName)
                         } else {

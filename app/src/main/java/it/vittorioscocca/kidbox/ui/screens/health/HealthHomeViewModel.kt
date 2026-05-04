@@ -10,6 +10,8 @@ import it.vittorioscocca.kidbox.data.local.dao.KBMedicalExamDao
 import it.vittorioscocca.kidbox.data.local.dao.KBMedicalVisitDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTreatmentDao
 import it.vittorioscocca.kidbox.data.local.dao.KBVaccineDao
+import it.vittorioscocca.kidbox.data.sync.TreatmentSyncCenter
+import it.vittorioscocca.kidbox.domain.model.KBExamStatus
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +26,12 @@ import kotlinx.coroutines.launch
 data class HealthHomeState(
     val subjectName: String = "",
     val activeTreatmentCount: Int = 0,
+    val vaccineCount: Int = 0,
+    val visitCount: Int = 0,
+    val examCount: Int = 0,
+    val pendingExamCount: Int = 0,
+    /** Allineato a iOS [PediatricHomeView.timelineEvents]: visite + esami + vaccini + cure attive (non eliminate). */
+    val timelineEventCount: Int = 0,
     val hasAnyHealthData: Boolean = false,
     val hasAiConsent: Boolean = false,
 )
@@ -37,6 +45,7 @@ class HealthHomeViewModel @Inject constructor(
     private val examDao: KBMedicalExamDao,
     private val vaccineDao: KBVaccineDao,
     private val aiConsentStore: AiConsentStore,
+    private val treatmentSyncCenter: TreatmentSyncCenter,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HealthHomeState())
@@ -49,6 +58,10 @@ class HealthHomeViewModel @Inject constructor(
         if (loadedFamilyId == familyId && loadedChildId == childId) return
         loadedFamilyId = familyId
         loadedChildId = childId
+
+        if (familyId.isNotBlank()) {
+            treatmentSyncCenter.start(familyId)
+        }
 
         _uiState.value = _uiState.value.copy(hasAiConsent = aiConsentStore.hasHealthAiConsent())
 
@@ -69,24 +82,34 @@ class HealthHomeViewModel @Inject constructor(
 
         val now = System.currentTimeMillis()
 
-        treatmentDao.observeByFamilyAndChild(familyId, childId)
-            .map { treatments ->
-                treatments.count { t ->
-                    t.isActive && !t.isDeleted && (t.isLongTerm || t.endDateEpochMillis == null || t.endDateEpochMillis >= now)
-                }
-            }
-            .onEach { count -> _uiState.value = _uiState.value.copy(activeTreatmentCount = count) }
-            .launchIn(viewModelScope)
-
         combine(
+            treatmentDao.observeByFamilyAndChild(familyId, childId),
             visitDao.observeByFamilyAndChild(familyId, childId),
             examDao.observeByFamilyAndChild(familyId, childId),
-            treatmentDao.observeByFamilyAndChild(familyId, childId),
             vaccineDao.observeByFamilyAndChild(familyId, childId),
-        ) { visits, exams, treatments, vaccines ->
-            visits.isNotEmpty() || exams.isNotEmpty() || treatments.isNotEmpty() || vaccines.isNotEmpty()
+        ) { treatments, visits, exams, vaccines ->
+            val activeForCureCard = treatments.count { t ->
+                t.isActive && !t.isDeleted && (t.isLongTerm || t.endDateEpochMillis == null || t.endDateEpochMillis >= now)
+            }
+            val activeForTimeline = treatments.count { it.isActive && !it.isDeleted }
+            val pendingExams = exams.count { e ->
+                when (KBExamStatus.entries.firstOrNull { it.rawValue == e.statusRaw } ?: KBExamStatus.PENDING) {
+                    KBExamStatus.PENDING, KBExamStatus.BOOKED -> true
+                    else -> false
+                }
+            }
+            val timelineTotal = visits.size + exams.size + vaccines.size + activeForTimeline
+            val hasAny = visits.isNotEmpty() || exams.isNotEmpty() || treatments.isNotEmpty() || vaccines.isNotEmpty()
+            _uiState.value = _uiState.value.copy(
+                activeTreatmentCount = activeForCureCard,
+                vaccineCount = vaccines.size,
+                visitCount = visits.size,
+                examCount = exams.size,
+                pendingExamCount = pendingExams,
+                timelineEventCount = timelineTotal,
+                hasAnyHealthData = hasAny,
+            )
         }
-            .onEach { hasAny -> _uiState.value = _uiState.value.copy(hasAnyHealthData = hasAny) }
             .launchIn(viewModelScope)
     }
 

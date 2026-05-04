@@ -174,7 +174,6 @@ class HealthTimelineViewModel @Inject constructor(
         if (boundFamilyId.isNotBlank()) {
             visitSyncCenter.stop(boundFamilyId)
             examSyncCenter.stop(boundFamilyId)
-            treatmentSyncCenter.stop(boundFamilyId)
             vaccineSyncCenter.stop(boundFamilyId)
         }
     }

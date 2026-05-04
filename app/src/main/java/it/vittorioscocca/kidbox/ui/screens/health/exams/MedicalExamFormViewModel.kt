@@ -1,20 +1,29 @@
 package it.vittorioscocca.kidbox.ui.screens.health.exams
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.vittorioscocca.kidbox.data.health.ExamAttachmentTag
+import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
+import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import it.vittorioscocca.kidbox.data.local.mapper.examStatusFromRaw
+import it.vittorioscocca.kidbox.data.repository.DocumentRepository
 import it.vittorioscocca.kidbox.data.repository.MedicalExamRepository
 import it.vittorioscocca.kidbox.domain.model.KBExamStatus
 import it.vittorioscocca.kidbox.domain.model.KBMedicalExam
 import it.vittorioscocca.kidbox.notifications.ExamReminderScheduler
+import java.io.File
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 data class MedicalExamFormState(
@@ -34,6 +43,10 @@ data class MedicalExamFormState(
     val hasResult: Boolean = false,
     val resultText: String = "",
     val resultDateEpochMillis: Long = System.currentTimeMillis(),
+    val attachments: List<KBDocumentEntity> = emptyList(),
+    val isUploading: Boolean = false,
+    val openFileEvent: Pair<String, File>? = null,
+    val uploadError: String? = null,
     val saved: Boolean = false,
     val saveError: String? = null,
 ) {
@@ -46,6 +59,8 @@ class MedicalExamFormViewModel @Inject constructor(
     private val reminderScheduler: ExamReminderScheduler,
     private val childDao: KBChildDao,
     private val memberDao: KBFamilyMemberDao,
+    private val attachmentService: HealthAttachmentService,
+    private val documentRepository: DocumentRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MedicalExamFormState())
@@ -63,6 +78,12 @@ class MedicalExamFormViewModel @Inject constructor(
             val name = resolveChildName(childId)
             _uiState.value = _uiState.value.copy(childName = name)
         }
+
+        documentRepository.startRealtime(familyId)
+        documentRepository.observeAllDocuments(familyId)
+            .map { docs -> docs.filter { ExamAttachmentTag.matches(it.notes, _uiState.value.examId) } }
+            .onEach { docs -> _uiState.value = _uiState.value.copy(attachments = docs) }
+            .launchIn(viewModelScope)
 
         if (examId != null) loadExam(examId)
     }
@@ -117,6 +138,34 @@ class MedicalExamFormViewModel @Inject constructor(
     fun setHasResult(v: Boolean) { _uiState.value = _uiState.value.copy(hasResult = v) }
     fun setResultText(v: String) { _uiState.value = _uiState.value.copy(resultText = v) }
     fun setResultDateEpochMillis(v: Long) { _uiState.value = _uiState.value.copy(resultDateEpochMillis = v) }
+    fun consumeOpenFileEvent() { _uiState.value = _uiState.value.copy(openFileEvent = null) }
+    fun consumeUploadError() { _uiState.value = _uiState.value.copy(uploadError = null) }
+
+    fun uploadAttachment(uri: Uri) {
+        _uiState.value = _uiState.value.copy(isUploading = true, uploadError = null)
+        viewModelScope.launch {
+            attachmentService.uploadExamAttachment(uri, _uiState.value.examId, familyId, childId)
+                .onSuccess { _uiState.value = _uiState.value.copy(isUploading = false) }
+                .onFailure { err ->
+                    _uiState.value = _uiState.value.copy(
+                        isUploading = false,
+                        uploadError = err.message ?: "Errore durante l'upload",
+                    )
+                }
+        }
+    }
+
+    fun deleteAttachment(doc: KBDocumentEntity) {
+        viewModelScope.launch { attachmentService.deleteAttachment(doc) }
+    }
+
+    fun openAttachment(doc: KBDocumentEntity) {
+        viewModelScope.launch {
+            attachmentService.downloadAttachment(doc)
+                .onSuccess { file -> _uiState.value = _uiState.value.copy(openFileEvent = doc.mimeType to file) }
+                .onFailure { err -> _uiState.value = _uiState.value.copy(uploadError = err.message ?: "Errore apertura file") }
+        }
+    }
 
     fun save() {
         val s = _uiState.value

@@ -38,7 +38,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -72,6 +72,7 @@ fun HealthTimelineScreen(
     onOpenVisit: (visitId: String) -> Unit,
     onOpenExam: (examId: String) -> Unit,
     onOpenTreatment: (treatmentId: String) -> Unit,
+    onOpenVaccine: (vaccineId: String) -> Unit,
     viewModel: HealthTimelineViewModel = hiltViewModel(),
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -93,15 +94,15 @@ fun HealthTimelineScreen(
             // Top bar
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
             ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Indietro",
-                        tint = kb.title,
-                    )
-                }
+                KidBoxHeaderCircleButton(
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Indietro",
+                    onClick = onBack,
+                )
             }
 
             // Title + subject name
@@ -178,7 +179,7 @@ fun HealthTimelineScreen(
                                             HealthTimelineEventKind.VISIT -> onOpenVisit(event.sourceId)
                                             HealthTimelineEventKind.EXAM -> onOpenExam(event.sourceId)
                                             HealthTimelineEventKind.TREATMENT -> onOpenTreatment(event.sourceId)
-                                            HealthTimelineEventKind.VACCINE -> Unit
+                                            HealthTimelineEventKind.VACCINE -> onOpenVaccine(event.sourceId)
                                         }
                                     },
                                 )
@@ -228,7 +229,7 @@ private fun TimelineEventCard(
 ) {
     val kb = MaterialTheme.kidBoxColors
     val tintColor = Color(event.kind.tintColorArgb)
-    val isNavigable = event.kind != HealthTimelineEventKind.VACCINE
+    val isNavigable = true
     val dateText = remember(event.dateEpochMillis) {
         SimpleDateFormat("dd MMM yyyy", Locale.ITALIAN).format(Date(event.dateEpochMillis))
     }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,20 +24,23 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.HealthAndSafety
-import androidx.compose.material.icons.filled.MedicalServices
+import androidx.compose.material.icons.filled.Biotech
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Medication
-import androidx.compose.material.icons.filled.Science
-import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.Vaccines
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -52,6 +56,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -60,6 +65,8 @@ import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
 private val ORANGE_FAB = Color(0xFFFF6B00)
+/** Stesso family del viola cure / tema iOS (avatar cerchio sotto nome). */
+private val HEALTH_HEADER_TINT = Color(0xFF9573D9)
 
 @Composable
 fun HealthHomeScreen(
@@ -75,47 +82,69 @@ fun HealthHomeScreen(
 
     LaunchedEffect(familyId, childId) { viewModel.load(familyId, childId) }
 
-    val cards = remember(state.subjectName, state.activeTreatmentCount) {
+    val cards = remember(
+        state.subjectName,
+        state.activeTreatmentCount,
+        state.vaccineCount,
+        state.visitCount,
+        state.examCount,
+        state.pendingExamCount,
+        state.timelineEventCount,
+    ) {
+        val cureSubtitle = when {
+            state.activeTreatmentCount == 1 -> "1 attiva"
+            state.activeTreatmentCount > 1 -> "${state.activeTreatmentCount} attive"
+            else -> "Farmaci attivi"
+        }
+        val examSubtitle = when {
+            state.pendingExamCount > 0 -> "${state.pendingExamCount} in attesa"
+            else -> "${state.examCount} registrati"
+        }
         listOf(
             HealthCard(
                 title = "Cure",
-                subtitle = if (state.activeTreatmentCount > 0) "${state.activeTreatmentCount} attive" else "Farmaci attivi",
+                subtitle = cureSubtitle,
                 icon = Icons.Default.Medication,
                 tint = Color(0xFF9573D9),
+                badgeCount = state.activeTreatmentCount.takeIf { it > 0 },
                 onClick = { onNavigate(AppDestination.Treatments.route(familyId, childId)) },
             ),
             HealthCard(
                 title = "Vaccini",
-                subtitle = "Calendario vaccinale",
+                subtitle = "${state.vaccineCount} registrati",
                 icon = Icons.Default.Vaccines,
                 tint = Color(0xFFF38D73),
                 onClick = { onNavigate(AppDestination.Vaccines.route(familyId, childId)) },
             ),
             HealthCard(
                 title = "Visite",
-                subtitle = "Storico visite",
-                icon = Icons.Default.MedicalServices,
+                subtitle = "${state.visitCount} registrate",
+                icon = Icons.Default.MonitorHeart,
                 tint = Color(0xFF5996D9),
                 onClick = { onNavigate(AppDestination.MedicalVisits.route(familyId, childId)) },
             ),
             HealthCard(
                 title = "Analisi & Esami",
-                subtitle = "Referti",
-                icon = Icons.Default.Science,
+                subtitle = examSubtitle,
+                icon = Icons.Default.Biotech,
                 tint = Color(0xFF40A6BF),
+                badgeCount = state.pendingExamCount.takeIf { it > 0 },
                 onClick = { onNavigate(AppDestination.MedicalExams.route(familyId, childId)) },
             ),
             HealthCard(
                 title = "Scheda Medica",
                 subtitle = "Allergie, pediatra",
-                icon = Icons.Default.HealthAndSafety,
+                icon = Icons.Default.Description,
                 tint = Color(0xFF66BFA6),
                 onClick = { onNavigate(AppDestination.MedicalRecord.route(familyId, childId)) },
             ),
             HealthCard(
                 title = "Storico Salute",
-                subtitle = "Timeline",
-                icon = Icons.Default.Timeline,
+                subtitle = when (state.timelineEventCount) {
+                    1 -> "1 evento"
+                    else -> "${state.timelineEventCount} eventi"
+                },
+                icon = Icons.Default.Folder,
                 tint = Color(0xFFD98C59),
                 onClick = { onNavigate(AppDestination.HealthTimeline.route(familyId, childId)) },
             ),
@@ -135,15 +164,24 @@ fun HealthHomeScreen(
                 .padding(horizontal = 18.dp),
         ) {
             Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Indietro",
-                        tint = kb.title,
-                    )
-                }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                KidBoxHeaderCircleButton(
+                    icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    contentDescription = "Indietro",
+                    onClick = onBack,
+                )
             }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Salute",
+                fontWeight = FontWeight.Bold,
+                fontSize = 34.sp,
+                color = kb.title,
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(8.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -151,7 +189,7 @@ fun HealthHomeScreen(
                     modifier = Modifier
                         .size(52.dp)
                         .clip(CircleShape)
-                        .background(ORANGE_FAB.copy(alpha = 0.15f)),
+                        .background(HEALTH_HEADER_TINT.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text("🧑", fontSize = 24.sp)
@@ -160,22 +198,31 @@ fun HealthHomeScreen(
                 Column {
                     Text(
                         state.subjectName.ifBlank { "Profilo" },
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
                         color = kb.title,
                     )
-                    Text("Diario di salute", fontSize = 13.sp, color = kb.subtitle)
+                    Text("Diario di salute", fontSize = 14.sp, color = kb.subtitle)
                 }
             }
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
 
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth(),
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
             ) {
-                items(cards) { card -> HealthModuleCard(card) }
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        bottom = if (state.hasAnyHealthData) 108.dp else 32.dp,
+                    ),
+                ) {
+                    items(cards) { card -> HealthModuleCard(card) }
+                }
             }
         }
 
@@ -199,6 +246,10 @@ fun HealthHomeScreen(
                 containerColor = ORANGE_FAB,
                 contentColor = Color.White,
                 shape = CircleShape,
+                elevation = FloatingActionButtonDefaults.elevation(
+                    defaultElevation = 6.dp,
+                    pressedElevation = 8.dp,
+                ),
             ) {
                 Icon(Icons.Default.AutoAwesome, contentDescription = "Assistente AI salute")
             }
@@ -254,6 +305,7 @@ private data class HealthCard(
     val subtitle: String,
     val icon: ImageVector,
     val tint: Color,
+    val badgeCount: Int? = null,
     val onClick: () -> Unit,
 )
 
@@ -263,35 +315,67 @@ private fun HealthModuleCard(card: HealthCard) {
     Card(
         onClick = card.onClick,
         colors = CardDefaults.cardColors(containerColor = kb.card),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 3.dp,
+            pressedElevation = 5.dp,
+            hoveredElevation = 4.dp,
+            focusedElevation = 4.dp,
+        ),
         modifier = Modifier
             .fillMaxWidth()
-            .height(130.dp),
+            .height(152.dp),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
+                .padding(horizontal = 12.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(card.tint.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center,
+            BadgedBox(
+                badge = {
+                    val n = card.badgeCount ?: 0
+                    if (n > 0) {
+                        Badge(containerColor = card.tint) {
+                            Text(
+                                n.toString(),
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+                },
             ) {
-                Icon(card.icon, contentDescription = null, tint = card.tint)
+                Box(
+                    modifier = Modifier
+                        .size(60.dp)
+                        .clip(CircleShape)
+                        .background(card.tint.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(card.icon, contentDescription = null, tint = card.tint, modifier = Modifier.size(28.dp))
+                }
             }
-            Column {
-                Text(
-                    card.title,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = kb.title,
-                )
-                Text(card.subtitle, fontSize = 12.sp, color = kb.subtitle)
-            }
+            Spacer(Modifier.height(14.dp))
+            Text(
+                card.title,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = kb.title,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                card.subtitle,
+                fontSize = 12.sp,
+                color = kb.subtitle,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

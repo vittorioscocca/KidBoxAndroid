@@ -1,9 +1,11 @@
 package it.vittorioscocca.kidbox.data.remote.health
 
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.SetOptions
 import it.vittorioscocca.kidbox.data.local.entity.KBDoseLogEntity
 import javax.inject.Inject
@@ -36,23 +38,38 @@ class DoseLogRemoteStore @Inject constructor() {
 
     private val db get() = FirebaseFirestore.getInstance()
 
+    /**
+     * Solo documenti modificati (come iOS) + [MetadataChanges.INCLUDE] così quando si risolve
+     * `serverTimestamp` / cache non si perdono aggiornamenti; evita di riscrivere tutta la tabella a ogni snapshot.
+     */
     fun listenAll(
         familyId: String,
-        onChange: (List<RemoteDoseLogDto>) -> Unit,
+        onChange: (List<RemoteDoseLogDto>, removedIds: List<String>) -> Unit,
     ): ListenerRegistration =
         db.collection("families")
             .document(familyId)
-            .collection("treatmentDoseLogs")
-            .addSnapshotListener { snap, _ ->
+            .collection("doseLogs")
+            .addSnapshotListener(MetadataChanges.INCLUDE) { snap, _ ->
                 if (snap == null) return@addSnapshotListener
-                val dtos = snap.documents.mapNotNull { decode(it, familyId) }
-                onChange(dtos)
+                val removed = mutableListOf<String>()
+                val dtos = buildList {
+                    for (change in snap.documentChanges) {
+                        when (change.type) {
+                            DocumentChange.Type.REMOVED -> removed.add(change.document.id)
+                            DocumentChange.Type.ADDED, DocumentChange.Type.MODIFIED ->
+                                decode(change.document, familyId)?.let(::add)
+                        }
+                    }
+                }
+                if (dtos.isNotEmpty() || removed.isNotEmpty()) {
+                    onChange(dtos, removed)
+                }
             }
 
     suspend fun upsert(dto: RemoteDoseLogDto) {
         val ref = db.collection("families")
             .document(dto.familyId)
-            .collection("treatmentDoseLogs")
+            .collection("doseLogs")
             .document(dto.id)
 
         fun Long.toTs() = Timestamp(this / 1000, ((this % 1000) * 1_000_000).toInt())
@@ -79,7 +96,7 @@ class DoseLogRemoteStore @Inject constructor() {
     suspend fun softDelete(familyId: String, doseLogId: String, updatedBy: String) {
         db.collection("families")
             .document(familyId)
-            .collection("treatmentDoseLogs")
+            .collection("doseLogs")
             .document(doseLogId)
             .update(
                 mapOf(

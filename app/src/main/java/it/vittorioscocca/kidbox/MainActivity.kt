@@ -218,7 +218,8 @@ class MainActivity : ComponentActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        facebookCallbackManager.onActivityResult(requestCode, resultCode, data)
+        // Facebook SDK can NPE when Intent/extras are null (e.g. after document picker on some OEMs).
+        runCatching { facebookCallbackManager.onActivityResult(requestCode, resultCode, data) }
         super.onActivityResult(requestCode, resultCode, data)
     }
 

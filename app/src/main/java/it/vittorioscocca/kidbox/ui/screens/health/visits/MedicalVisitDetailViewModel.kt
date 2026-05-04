@@ -9,8 +9,11 @@ import it.vittorioscocca.kidbox.data.health.VisitAttachmentTag
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
 import it.vittorioscocca.kidbox.data.repository.DocumentRepository
+import it.vittorioscocca.kidbox.data.repository.MedicalExamRepository
 import it.vittorioscocca.kidbox.data.repository.MedicalVisitRepository
+import it.vittorioscocca.kidbox.data.repository.TreatmentRepository
 import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
 import it.vittorioscocca.kidbox.notifications.VisitReminderScheduler
 import java.io.File
@@ -23,10 +26,18 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
+data class LinkedPrescriptionRow(
+    val id: String,
+    val title: String,
+    val subtitle: String? = null,
+)
+
 data class MedicalVisitDetailState(
     val isLoading: Boolean = true,
     val visit: KBMedicalVisit? = null,
     val childName: String = "",
+    val linkedTreatments: List<LinkedPrescriptionRow> = emptyList(),
+    val linkedExams: List<LinkedPrescriptionRow> = emptyList(),
     val error: String? = null,
     val confirmDelete: Boolean = false,
     val deleted: Boolean = false,
@@ -39,6 +50,8 @@ data class MedicalVisitDetailState(
 @HiltViewModel
 class MedicalVisitDetailViewModel @Inject constructor(
     private val repository: MedicalVisitRepository,
+    private val treatmentRepository: TreatmentRepository,
+    private val examRepository: MedicalExamRepository,
     private val reminderScheduler: VisitReminderScheduler,
     private val childDao: KBChildDao,
     private val memberDao: KBFamilyMemberDao,
@@ -62,10 +75,39 @@ class MedicalVisitDetailViewModel @Inject constructor(
         viewModelScope.launch {
             val childName = resolveChildName(childId)
             val visit = repository.loadOnce(visitId)
+            val treatmentRows = if (visit != null) {
+                decodeStringList(visit.linkedTreatmentIdsJson).mapNotNull { tid ->
+                    treatmentRepository.getById(tid)?.let { t ->
+                        val dosage = if (t.dosageValue % 1.0 == 0.0) "%.0f".format(t.dosageValue) else "%.1f".format(t.dosageValue)
+                        LinkedPrescriptionRow(
+                            id = t.id,
+                            title = t.drugName,
+                            subtitle = "$dosage ${t.dosageUnit} · ${t.dailyFrequency}x/die",
+                        )
+                    }
+                }
+            } else {
+                emptyList()
+            }
+            val examRows = if (visit != null) {
+                decodeStringList(visit.linkedExamIdsJson).mapNotNull { eid ->
+                    examRepository.getById(eid)?.let { e ->
+                        LinkedPrescriptionRow(
+                            id = e.id,
+                            title = e.name,
+                            subtitle = if (e.isUrgent) "Urgente" else null,
+                        )
+                    }
+                }
+            } else {
+                emptyList()
+            }
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 visit = visit,
                 childName = childName,
+                linkedTreatments = treatmentRows,
+                linkedExams = examRows,
                 error = if (visit == null) "Visita non trovata" else null,
             )
         }

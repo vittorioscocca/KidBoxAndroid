@@ -35,7 +35,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -89,13 +89,17 @@ fun MedicalVisitsScreen(
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro", tint = kb.title)
-            }
+            KidBoxHeaderCircleButton(
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Indietro",
+                onClick = onBack,
+            )
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = onAdd) {
-                Icon(Icons.Default.Add, contentDescription = "Nuova visita", tint = kb.title)
-            }
+            KidBoxHeaderCircleButton(
+                icon = Icons.Default.Add,
+                contentDescription = "Nuova visita",
+                onClick = onAdd,
+            )
         }
 
         // ── Title ──────────────────────────────────────────────────────────────

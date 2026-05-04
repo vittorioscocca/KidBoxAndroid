@@ -1,11 +1,20 @@
 package it.vittorioscocca.kidbox.ui.screens.health.treatments
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.repository.TreatmentRepository
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.launchIn
+import java.io.File
+import it.vittorioscocca.kidbox.data.repository.DocumentRepository
+import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
+import it.vittorioscocca.kidbox.data.health.TreatmentAttachmentTag
+import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import it.vittorioscocca.kidbox.notifications.TreatmentNotificationManager
 import java.util.UUID
@@ -39,6 +48,10 @@ data class MedicalTreatmentFormState(
     val scheduleTimes: List<String> = listOf("08:00"),
     val notes: String = "",
     val reminderEnabled: Boolean = false,
+    val attachments: List<KBDocumentEntity> = emptyList(),
+    val isUploading: Boolean = false,
+    val openFileEvent: Pair<String, File>? = null,
+    val uploadError: String? = null,
     val saved: Boolean = false,
     val saveError: String? = null,
 ) {
@@ -54,6 +67,8 @@ class MedicalTreatmentFormViewModel @Inject constructor(
     private val notifManager: TreatmentNotificationManager,
     private val childDao: KBChildDao,
     private val memberDao: KBFamilyMemberDao,
+    private val attachmentService: HealthAttachmentService,
+    private val documentRepository: DocumentRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MedicalTreatmentFormState())
@@ -71,6 +86,12 @@ class MedicalTreatmentFormViewModel @Inject constructor(
             val name = resolveChildName(childId)
             _uiState.value = _uiState.value.copy(childName = name)
         }
+
+        documentRepository.startRealtime(familyId)
+        documentRepository.observeAllDocuments(familyId)
+            .map { docs -> docs.filter { TreatmentAttachmentTag.matches(it.notes, _uiState.value.treatmentId) } }
+            .onEach { docs -> _uiState.value = _uiState.value.copy(attachments = docs) }
+            .launchIn(viewModelScope)
 
         if (treatmentId != null) loadTreatment(treatmentId)
     }
@@ -132,6 +153,41 @@ class MedicalTreatmentFormViewModel @Inject constructor(
         if (index < updated.size) updated[index] = time
         _uiState.value = _uiState.value.copy(scheduleTimes = updated)
     }
+
+    fun uploadAttachment(uri: Uri) {
+        val s = _uiState.value
+        _uiState.value = s.copy(isUploading = true, uploadError = null)
+        viewModelScope.launch {
+            attachmentService.uploadTreatmentAttachment(
+                uri = uri,
+                treatmentId = _uiState.value.treatmentId,
+                familyId = familyId,
+                childId = childId,
+            ).onSuccess {
+                _uiState.value = _uiState.value.copy(isUploading = false)
+            }.onFailure { err ->
+                _uiState.value = _uiState.value.copy(
+                    isUploading = false,
+                    uploadError = err.message ?: "Errore upload allegato",
+                )
+            }
+        }
+    }
+
+    fun deleteAttachment(doc: KBDocumentEntity) {
+        viewModelScope.launch { attachmentService.deleteAttachment(doc) }
+    }
+
+    fun openAttachment(doc: KBDocumentEntity) {
+        viewModelScope.launch {
+            attachmentService.downloadAttachment(doc)
+                .onSuccess { file -> _uiState.value = _uiState.value.copy(openFileEvent = doc.mimeType to file) }
+                .onFailure { err -> _uiState.value = _uiState.value.copy(uploadError = err.message ?: "Errore apertura allegato") }
+        }
+    }
+
+    fun consumeOpenFileEvent() { _uiState.value = _uiState.value.copy(openFileEvent = null) }
+    fun consumeUploadError() { _uiState.value = _uiState.value.copy(uploadError = null) }
 
     fun save() {
         val s = _uiState.value

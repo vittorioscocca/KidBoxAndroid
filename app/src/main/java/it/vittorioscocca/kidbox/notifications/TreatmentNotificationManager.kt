@@ -9,7 +9,7 @@ import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.mapper.scheduleTimesList
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
-import it.vittorioscocca.kidbox.domain.model.slotLabelFor
+import it.vittorioscocca.kidbox.domain.model.schedulePeriodLabel
 import java.time.temporal.ChronoUnit
 import java.util.Calendar
 import javax.inject.Inject
@@ -106,7 +106,7 @@ class TreatmentNotificationManager @Inject constructor(
                 val fireMillis = buildFireMillis(currentDay, timeStr) ?: continue
                 if (fireMillis <= now) continue
 
-                val slotLabel = slotLabelFor(slotIndex)
+                val slotLabel = schedulePeriodLabel(timeStr, slotIndex)
                 val dosageStr = treatment.dosageValue.formatted()
                 val body = "$slotLabel · $dosageStr ${treatment.dosageUnit} per $childName"
                 scheduleAlarm(treatment, dayOffset, slotIndex, timeStr, fireMillis, body)

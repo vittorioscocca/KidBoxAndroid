@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
+import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTreatmentDao
 import it.vittorioscocca.kidbox.data.local.mapper.toDomain
 import it.vittorioscocca.kidbox.data.local.mapper.toEntity
@@ -19,6 +20,7 @@ import kotlinx.coroutines.withContext
 class TreatmentRepository @Inject constructor(
     private val dao: KBTreatmentDao,
     private val remote: TreatmentRemoteStore,
+    private val childDao: KBChildDao,
 ) {
     private val auth = FirebaseAuth.getInstance()
 
@@ -27,6 +29,10 @@ class TreatmentRepository @Inject constructor(
 
     suspend fun getById(id: String): KBTreatment? = withContext(Dispatchers.IO) {
         dao.getById(id)?.toDomain()
+    }
+
+    suspend fun listByFamilyAndChild(familyId: String, childId: String): List<KBTreatment> = withContext(Dispatchers.IO) {
+        dao.listByFamilyAndChild(familyId, childId).map { it.toDomain() }
     }
 
     suspend fun upsert(treatment: KBTreatment): KBTreatment = withContext(Dispatchers.IO) {
@@ -41,7 +47,8 @@ class TreatmentRepository @Inject constructor(
         dao.upsert(pending.toEntity())
 
         runCatching {
-            remote.upsert(pending.toRemoteDto())
+            val syncReminder = isPediatricHealthSubject(pending.familyId, pending.childId)
+            remote.upsert(pending.toRemoteDto(), syncReminder)
             dao.upsert(pending.copy(syncStateRaw = 0).toEntity())
         }.onFailure { err ->
             dao.upsert(pending.copy(lastSyncError = err.message).toEntity())
@@ -60,6 +67,11 @@ class TreatmentRepository @Inject constructor(
         )
         dao.upsert(deleted.toEntity())
         runCatching { remote.softDelete(treatment.familyId, treatment.id, uid) }
+    }
+
+    private suspend fun isPediatricHealthSubject(familyId: String, childId: String): Boolean {
+        val row = childDao.getById(childId) ?: return false
+        return row.familyId == familyId
     }
 }
 

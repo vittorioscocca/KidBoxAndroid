@@ -57,7 +57,8 @@ class TreatmentRemoteStore @Inject constructor() {
                 onChange(dtos)
             }
 
-    suspend fun upsert(dto: RemoteTreatmentDto) {
+    /** Promemoria in remoto solo per cure del bambino ([syncReminderEnabledToRemote] = true). Per adulti il campo viene rimosso da Firestore. */
+    suspend fun upsert(dto: RemoteTreatmentDto, syncReminderEnabledToRemote: Boolean) {
         val ref = db.collection("families")
             .document(dto.familyId)
             .collection("treatments")
@@ -65,28 +66,32 @@ class TreatmentRemoteStore @Inject constructor() {
 
         fun Long.toTs() = Timestamp(this / 1000, ((this % 1000) * 1_000_000).toInt())
 
-        val payload = mapOf(
+        val payload = mutableMapOf<String, Any>(
             "familyId" to dto.familyId,
             "childId" to dto.childId,
             "drugName" to dto.drugName,
-            "activeIngredient" to dto.activeIngredient,
             "dosageValue" to dto.dosageValue,
             "dosageUnit" to dto.dosageUnit,
             "isLongTerm" to dto.isLongTerm,
             "durationDays" to dto.durationDays,
             "startDate" to dto.startDateEpochMillis.toTs(),
-            "endDate" to dto.endDateEpochMillis?.toTs(),
             "dailyFrequency" to dto.dailyFrequency,
             "scheduleTimes" to dto.scheduleTimes,
             "isActive" to dto.isActive,
-            "notes" to dto.notes,
-            "reminderEnabled" to dto.reminderEnabled,
             "isDeleted" to dto.isDeleted,
             "updatedAt" to Timestamp.now(),
-            "updatedBy" to dto.updatedBy,
+            "updatedBy" to (dto.updatedBy ?: "local"),
             "createdAt" to dto.createdAtEpochMillis.toTs(),
-            "createdBy" to dto.createdBy,
         )
+        dto.activeIngredient?.let { payload["activeIngredient"] = it }
+        dto.endDateEpochMillis?.let { payload["endDate"] = it.toTs() }
+        dto.notes?.let { payload["notes"] = it }
+        dto.createdBy?.let { payload["createdBy"] = it }
+        if (syncReminderEnabledToRemote) {
+            payload["reminderEnabled"] = dto.reminderEnabled
+        } else {
+            payload["reminderEnabled"] = FieldValue.delete()
+        }
         ref.set(payload, SetOptions.merge()).await()
     }
 

@@ -57,7 +57,6 @@ import it.vittorioscocca.kidbox.ui.screens.health.treatments.MedicalTreatmentFor
 import it.vittorioscocca.kidbox.ui.screens.health.treatments.MedicalTreatmentDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.health.vaccines.MedicalVaccinesScreen
 import it.vittorioscocca.kidbox.ui.screens.health.vaccines.MedicalVaccineFormScreen
-import it.vittorioscocca.kidbox.ui.screens.health.vaccines.MedicalVaccineDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.health.timeline.HealthTimelineScreen
 import it.vittorioscocca.kidbox.ui.screens.health.ai.HealthAIChatScreen
 
@@ -405,6 +404,12 @@ fun AppNavGraph(
                         AppDestination.MedicalVisitForm.route(familyId, childId, visitId)
                     )
                 },
+                onOpenTreatment = { treatmentId ->
+                    navController.navigate(AppDestination.TreatmentDetail.route(familyId, childId, treatmentId))
+                },
+                onOpenExam = { examId ->
+                    navController.navigate(AppDestination.MedicalExamDetail.route(familyId, childId, examId))
+                },
             )
         }
 
@@ -425,12 +430,11 @@ fun AppNavGraph(
                     navController.navigate(AppDestination.VaccineForm.routeNew(familyId, childId))
                 },
                 onOpen = { vaccineId ->
-                    navController.navigate(AppDestination.VaccineDetail.route(familyId, childId, vaccineId))
+                    navController.navigate(AppDestination.VaccineForm.routeEdit(familyId, childId, vaccineId))
                 },
             )
         }
 
-        // VaccineForm must be registered BEFORE VaccineDetail to avoid route conflicts.
         composable(
             route = AppDestination.VaccineForm.route,
             arguments = listOf(
@@ -452,28 +456,6 @@ fun AppNavGraph(
                 vaccineId = vaccineId,
                 onBack = { navController.popBackStack() },
                 onSaved = { navController.popBackStack() },
-            )
-        }
-
-        composable(
-            route = AppDestination.VaccineDetail.route,
-            arguments = listOf(
-                navArgument("familyId") { type = NavType.StringType },
-                navArgument("childId") { type = NavType.StringType },
-                navArgument("vaccineId") { type = NavType.StringType },
-            ),
-        ) { backStackEntry ->
-            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
-            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
-            val vaccineId = backStackEntry.arguments?.getString("vaccineId").orEmpty()
-            MedicalVaccineDetailScreen(
-                familyId = familyId,
-                childId = childId,
-                vaccineId = vaccineId,
-                onBack = { navController.popBackStack() },
-                onEdit = {
-                    navController.navigate(AppDestination.VaccineForm.routeEdit(familyId, childId, vaccineId))
-                },
             )
         }
 
@@ -636,6 +618,9 @@ fun AppNavGraph(
                 },
                 onOpenTreatment = { treatmentId ->
                     navController.navigate(AppDestination.TreatmentDetail.route(familyId, childId, treatmentId))
+                },
+                onOpenVaccine = { vaccineId ->
+                    navController.navigate(AppDestination.VaccineForm.routeEdit(familyId, childId, vaccineId))
                 },
             )
         }

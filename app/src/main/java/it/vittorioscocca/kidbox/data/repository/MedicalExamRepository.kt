@@ -28,6 +28,10 @@ class MedicalExamRepository @Inject constructor(
         dao.getById(id)?.toDomain()
     }
 
+    suspend fun listByFamilyAndChild(familyId: String, childId: String): List<KBMedicalExam> = withContext(Dispatchers.IO) {
+        dao.listByFamilyAndChild(familyId, childId).map { it.toDomain() }
+    }
+
     suspend fun upsert(exam: KBMedicalExam): KBMedicalExam = withContext(Dispatchers.IO) {
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()

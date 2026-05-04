@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
+import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -137,16 +138,20 @@ fun HealthAIChatScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro", tint = kb.title)
-                    }
+                    KidBoxHeaderCircleButton(
+                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Indietro",
+                        onClick = onBack,
+                    )
                 },
                 actions = {
                     if (state.messages.isNotEmpty()) {
                         Box {
-                            IconButton(onClick = { showMenu = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = kb.title)
-                            }
+                            KidBoxHeaderCircleButton(
+                                icon = Icons.Default.MoreVert,
+                                contentDescription = "Menu",
+                                onClick = { showMenu = true },
+                            )
                             DropdownMenu(
                                 expanded = showMenu,
                                 onDismissRequest = { showMenu = false },

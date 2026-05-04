@@ -676,8 +676,8 @@ class FamilySyncCenter @Inject constructor(
                                 familyId = familyId,
                                 name = remoteName.ifBlank { local?.name ?: "Figlio" },
                                 birthDateEpochMillis = remoteBirthDate ?: local?.birthDateEpochMillis,
-                                weightKg = null,
-                                heightCm = null,
+                                weightKg = firestoreChildWeightKg(d) ?: local?.weightKg,
+                                heightCm = firestoreChildHeightCm(d) ?: local?.heightCm,
                                 createdBy = remoteCreatedBy ?: local?.createdBy ?: "remote",
                                 createdAtEpochMillis = remoteCreatedAt ?: local?.createdAtEpochMillis ?: now,
                                 updatedBy = remoteUpdatedBy ?: local?.updatedBy,
@@ -845,8 +845,8 @@ class FamilySyncCenter @Inject constructor(
                             familyId = familyId,
                             name = remoteName.ifBlank { local?.name ?: "Figlio" },
                             birthDateEpochMillis = remoteBirthDate ?: local?.birthDateEpochMillis,
-                            weightKg = null,
-                            heightCm = null,
+                            weightKg = firestoreChildWeightKg(d) ?: local?.weightKg,
+                            heightCm = firestoreChildHeightCm(d) ?: local?.heightCm,
                             createdBy = remoteCreatedBy ?: local?.createdBy ?: "remote",
                             createdAtEpochMillis = remoteCreatedAt ?: local?.createdAtEpochMillis ?: now,
                             updatedBy = remoteUpdatedBy ?: local?.updatedBy,
@@ -888,3 +888,9 @@ class FamilySyncCenter @Inject constructor(
         sessionPrefs.clearActiveFamilyId()
     }
 }
+
+private fun firestoreChildWeightKg(d: Map<String, Any?>): Double? =
+    (d["weightKg"] as? Number)?.toDouble()
+
+private fun firestoreChildHeightCm(d: Map<String, Any?>): Double? =
+    (d["heightCm"] as? Number)?.toDouble()

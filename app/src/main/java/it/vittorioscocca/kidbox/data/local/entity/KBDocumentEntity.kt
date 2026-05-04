@@ -15,12 +15,6 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE,
         ),
         ForeignKey(
-            entity = KBChildEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["childId"],
-            onDelete = ForeignKey.SET_NULL,
-        ),
-        ForeignKey(
             entity = KBDocumentCategoryEntity::class,
             parentColumns = ["id"],
             childColumns = ["categoryId"],

@@ -2,7 +2,13 @@
 
 package it.vittorioscocca.kidbox.ui.screens.health.exams
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,6 +39,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -55,8 +62,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import it.vittorioscocca.kidbox.domain.model.KBExamStatus
+import it.vittorioscocca.kidbox.ui.screens.health.attachments.HealthAttachmentsCard
+import it.vittorioscocca.kidbox.ui.screens.health.attachments.KidBoxDocumentPickerSheet
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -88,10 +100,65 @@ fun MedicalExamFormScreen(
     LaunchedEffect(state.saveError) {
         state.saveError?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
     }
+    LaunchedEffect(state.uploadError) {
+        state.uploadError?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            viewModel.consumeUploadError()
+        }
+    }
+    LaunchedEffect(state.openFileEvent) {
+        state.openFileEvent?.let { (mime, file) ->
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, mime)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            runCatching { context.startActivity(intent) }
+            viewModel.consumeOpenFileEvent()
+        }
+    }
 
     var showDeadlinePicker by remember { mutableStateOf(false) }
     var showResultDatePicker by remember { mutableStateOf(false) }
     var statusMenuOpen by remember { mutableStateOf(false) }
+    val cameraFile = remember { File(File(context.cacheDir, "health-camera").apply { mkdirs() }, "exam_form_camera_tmp.jpg") }
+    val cameraUri = remember(cameraFile) { FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", cameraFile) }
+    val takePictureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        if (success) viewModel.uploadAttachment(cameraUri)
+    }
+    val cameraPermLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            takePictureLauncher.launch(cameraUri)
+        } else {
+            Toast.makeText(context, "Permesso fotocamera negato", Toast.LENGTH_SHORT).show()
+        }
+    }
+    val pickPhotoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { viewModel.uploadAttachment(it) }
+    }
+    val pickFileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { viewModel.uploadAttachment(it) }
+    }
+    var showKidBoxDocPicker by remember { mutableStateOf(false) }
+
+    var currentStep by remember { mutableStateOf(0) }
+    val totalSteps = 4
+    val stepTitle = when (currentStep) {
+        0 -> "Dettagli esame"
+        1 -> "Stato e promemoria"
+        2 -> "Referto"
+        else -> "Riepilogo"
+    }
+    val stepSubtitle = when (currentStep) {
+        0 -> "Nome, urgenza, scadenza e luogo"
+        1 -> "Stato, alert e note preparazione"
+        2 -> "Inserisci risultato se disponibile"
+        else -> "Controlla tutto prima di salvare"
+    }
+    val canAdvance = when (currentStep) {
+        0 -> state.name.isNotBlank()
+        else -> true
+    }
 
     Box(
         modifier = Modifier
@@ -108,10 +175,14 @@ fun MedicalExamFormScreen(
         ) {
             // ── Top bar ───────────────────────────────────────────────────────
             Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro", tint = kb.title)
-                }
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                KidBoxHeaderCircleButton(
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Indietro",
+                    onClick = onBack,
+                )
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onBack) { Text("Annulla", color = kb.title) }
             }
             Text(
                 if (examId == null) "Nuovo esame" else "Modifica esame",
@@ -122,8 +193,26 @@ fun MedicalExamFormScreen(
             if (state.childName.isNotBlank()) {
                 Text(state.childName, fontSize = 14.sp, color = kb.subtitle)
             }
+            Spacer(Modifier.height(10.dp))
+            Text("Step ${currentStep + 1} di $totalSteps · $stepTitle", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = kb.subtitle)
+            Text(stepSubtitle, fontSize = 12.sp, color = kb.subtitle)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                repeat(totalSteps) { index ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(4.dp)
+                            .background(
+                                if (index <= currentStep) ORANGE_EXAM_FORM else kb.subtitle.copy(alpha = 0.25f),
+                                RoundedCornerShape(100.dp),
+                            ),
+                    )
+                }
+            }
             Spacer(Modifier.height(20.dp))
 
+            if (currentStep == 0) {
             // ── 1. Nome esame ─────────────────────────────────────────────────
             ExamSectionLabel("Nome esame")
             OutlinedTextField(
@@ -161,6 +250,9 @@ fun MedicalExamFormScreen(
             }
             Spacer(Modifier.height(16.dp))
 
+            }
+
+            if (currentStep == 1) {
             // ── 4. Stato ──────────────────────────────────────────────────────
             ExamSectionLabel("Stato")
             ExposedDropdownMenuBox(
@@ -243,6 +335,9 @@ fun MedicalExamFormScreen(
             )
             Spacer(Modifier.height(16.dp))
 
+            }
+
+            if (currentStep == 2) {
             // ── 9. Risultato ──────────────────────────────────────────────────
             ExamSectionLabel("Risultato")
             ExamSwitchRow(
@@ -275,26 +370,117 @@ fun MedicalExamFormScreen(
                     },
                 )
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(12.dp))
+            ExamSectionLabel("Referto allegato")
+            Text(
+                "Aggiungi qui PDF/foto del referto.",
+                fontSize = 12.sp,
+                color = kb.subtitle,
+            )
+            Spacer(Modifier.height(8.dp))
+            HealthAttachmentsCard(
+                attachments = state.attachments,
+                tintColor = ORANGE_EXAM_FORM,
+                isUploading = state.isUploading,
+                onPickFile = { pickFileLauncher.launch(arrayOf("*/*")) },
+                onPickPhoto = { pickPhotoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
+                onTakePhoto = {
+                    when {
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                            PackageManager.PERMISSION_GRANTED -> takePictureLauncher.launch(cameraUri)
+                        else -> cameraPermLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                },
+                onOpenAttachment = { viewModel.openAttachment(it) },
+                onDeleteAttachment = { viewModel.deleteAttachment(it) },
+                onPickFromKidBoxDocuments = { showKidBoxDocPicker = true },
+            )
+            }
 
-            // ── Save button ───────────────────────────────────────────────────
-            Button(
-                onClick = { viewModel.save() },
-                enabled = !state.isSaving && state.canSave,
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = ORANGE_EXAM_FORM),
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-            ) {
-                if (state.isSaving) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Salvataggio...", color = Color.White, fontWeight = FontWeight.SemiBold)
+            if (currentStep == 3) {
+                ExamSectionLabel("Riepilogo")
+                OutlinedTextField(value = state.name, onValueChange = {}, readOnly = true, label = { Text("Nome esame") }, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(value = state.status.rawValue, onValueChange = {}, readOnly = true, label = { Text("Stato") }, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+                if (state.hasDeadline) {
+                    OutlinedTextField(value = DATE_FMT_EXAM_FORM.format(Date(state.deadlineEpochMillis)), onValueChange = {}, readOnly = true, label = { Text("Scadenza") }, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(8.dp))
+                }
+                if (state.hasResult) {
+                    OutlinedTextField(value = state.resultText, onValueChange = {}, readOnly = true, label = { Text("Risultato") }, modifier = Modifier.fillMaxWidth(), minLines = 3)
+                }
+                Spacer(Modifier.height(12.dp))
+                ExamSectionLabel("Referto allegato")
+                OutlinedTextField(
+                    value = if (state.attachments.isEmpty()) "Nessun allegato" else "${state.attachments.size} allegato/i",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Totale allegati") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (state.attachments.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    state.attachments.forEach { doc ->
+                        OutlinedTextField(
+                            value = doc.title.ifBlank { doc.fileName },
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Allegato") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (currentStep > 0) {
+                    Button(
+                        onClick = { currentStep -= 1 },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = kb.card),
+                    ) { Text("Indietro", color = kb.title) }
+                }
+                if (currentStep < totalSteps - 1) {
+                    Button(
+                        onClick = { currentStep += 1 },
+                        enabled = canAdvance,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ORANGE_EXAM_FORM),
+                    ) { Text("Avanti", color = Color.White, fontWeight = FontWeight.SemiBold) }
                 } else {
-                    Text("Salva esame", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Button(
+                        onClick = { viewModel.save() },
+                        enabled = !state.isSaving && state.canSave,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ORANGE_EXAM_FORM),
+                        modifier = Modifier.weight(1f).height(52.dp),
+                    ) {
+                        if (state.isSaving) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Salvataggio...", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        } else {
+                            Text("Salva esame", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
                 }
             }
             Spacer(Modifier.height(60.dp))
         }
+    }
+
+    if (showKidBoxDocPicker) {
+        KidBoxDocumentPickerSheet(
+            familyId = familyId,
+            onDismiss = { showKidBoxDocPicker = false },
+            onPickedUri = { viewModel.uploadAttachment(it) },
+        )
     }
 
     if (showDeadlinePicker) {

@@ -1,11 +1,14 @@
 package it.vittorioscocca.kidbox.ui.screens.health.visits
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,9 +28,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MedicalServices
+import androidx.compose.material.icons.filled.Medication
+import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -36,14 +42,16 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +60,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -59,6 +68,7 @@ import it.vittorioscocca.kidbox.data.local.mapper.KBDoctorSpecialization
 import it.vittorioscocca.kidbox.data.local.mapper.KBVisitStatus
 import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
 import it.vittorioscocca.kidbox.ui.screens.health.attachments.HealthAttachmentsCard
+import it.vittorioscocca.kidbox.ui.screens.health.attachments.KidBoxDocumentPickerSheet
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.io.File
 import java.text.SimpleDateFormat
@@ -76,6 +86,8 @@ fun MedicalVisitDetailScreen(
     visitId: String,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onOpenTreatment: (treatmentId: String) -> Unit = {},
+    onOpenExam: (examId: String) -> Unit = {},
     viewModel: MedicalVisitDetailViewModel = hiltViewModel(),
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -105,18 +117,23 @@ fun MedicalVisitDetailScreen(
     val cameraFile = remember { File(File(context.cacheDir, "health-camera").apply { mkdirs() }, "visit_camera_tmp.jpg") }
     val cameraUri = remember(cameraFile) { FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", cameraFile) }
 
-    val cameraPermLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (!granted) Toast.makeText(context, "Permesso fotocamera negato", Toast.LENGTH_SHORT).show()
-    }
     val takePictureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         if (success) viewModel.uploadAttachment(cameraUri)
+    }
+    val cameraPermLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            takePictureLauncher.launch(cameraUri)
+        } else {
+            Toast.makeText(context, "Permesso fotocamera negato", Toast.LENGTH_SHORT).show()
+        }
     }
     val pickPhotoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri?.let { viewModel.uploadAttachment(it) }
     }
-    val pickFileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val pickFileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.uploadAttachment(it) }
     }
+    var showKidBoxDocPicker by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -134,9 +151,11 @@ fun MedicalVisitDetailScreen(
                         .statusBarsPadding()
                         .padding(18.dp),
                 ) {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro", tint = kb.title)
-                    }
+                    KidBoxHeaderCircleButton(
+                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Indietro",
+                        onClick = onBack,
+                    )
                     Spacer(Modifier.height(40.dp))
                     Text(state.error ?: "Visita non trovata.", color = kb.subtitle, fontSize = 16.sp)
                 }
@@ -160,16 +179,25 @@ fun MedicalVisitDetailScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro", tint = kb.title)
-                        }
+                        KidBoxHeaderCircleButton(
+                            icon = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Indietro",
+                            onClick = onBack,
+                        )
                         Spacer(Modifier.weight(1f))
-                        IconButton(onClick = onEdit) {
-                            Icon(Icons.Default.Edit, contentDescription = "Modifica", tint = ORANGE_DETAIL)
-                        }
-                        IconButton(onClick = { viewModel.requestDelete() }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Elimina", tint = kb.subtitle)
-                        }
+                        KidBoxHeaderCircleButton(
+                            icon = Icons.Default.Edit,
+                            contentDescription = "Modifica",
+                            onClick = onEdit,
+                            iconTint = ORANGE_DETAIL,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        KidBoxHeaderCircleButton(
+                            icon = Icons.Default.Delete,
+                            contentDescription = "Elimina",
+                            onClick = { viewModel.requestDelete() },
+                            iconTint = Color(0xFFE53935),
+                        )
                     }
                     Spacer(Modifier.height(8.dp))
 
@@ -291,19 +319,56 @@ fun MedicalVisitDetailScreen(
                         Spacer(Modifier.height(12.dp))
                     }
 
+                    if (state.linkedTreatments.isNotEmpty() || state.linkedExams.isNotEmpty()) {
+                        DetailSectionCard(title = "Prescritto in questa visita") {
+                            if (state.linkedTreatments.isNotEmpty()) {
+                                Text("Cure", fontSize = 12.sp, color = kb.subtitle, fontWeight = FontWeight.SemiBold)
+                                Spacer(Modifier.height(6.dp))
+                                state.linkedTreatments.forEach { row ->
+                                    LinkedRow(
+                                        title = row.title,
+                                        subtitle = row.subtitle,
+                                        leadingIcon = { Icon(Icons.Default.Medication, contentDescription = null, tint = ORANGE_DETAIL, modifier = Modifier.size(22.dp)) },
+                                        onClick = { onOpenTreatment(row.id) },
+                                    )
+                                    Spacer(Modifier.height(6.dp))
+                                }
+                            }
+                            if (state.linkedExams.isNotEmpty()) {
+                                if (state.linkedTreatments.isNotEmpty()) Spacer(Modifier.height(8.dp))
+                                Text("Analisi / esami", fontSize = 12.sp, color = kb.subtitle, fontWeight = FontWeight.SemiBold)
+                                Spacer(Modifier.height(6.dp))
+                                state.linkedExams.forEach { row ->
+                                    LinkedRow(
+                                        title = row.title,
+                                        subtitle = row.subtitle,
+                                        leadingIcon = { Icon(Icons.Default.Science, contentDescription = null, tint = Color(0xFF40A6BF), modifier = Modifier.size(22.dp)) },
+                                        onClick = { onOpenExam(row.id) },
+                                    )
+                                    Spacer(Modifier.height(6.dp))
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
+
                     // ── Allegati card ──────────────────────────────────────────
                     HealthAttachmentsCard(
                         attachments = state.attachments,
                         tintColor = ORANGE_DETAIL,
                         isUploading = state.isUploading,
-                        onPickFile = { pickFileLauncher.launch("*/*") },
+                        onPickFile = { pickFileLauncher.launch(arrayOf("*/*")) },
                         onPickPhoto = { pickPhotoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
                         onTakePhoto = {
-                            cameraPermLauncher.launch(android.Manifest.permission.CAMERA)
-                            takePictureLauncher.launch(cameraUri)
+                            when {
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                                    PackageManager.PERMISSION_GRANTED -> takePictureLauncher.launch(cameraUri)
+                                else -> cameraPermLauncher.launch(Manifest.permission.CAMERA)
+                            }
                         },
                         onOpenAttachment = { viewModel.openAttachment(it) },
                         onDeleteAttachment = { viewModel.deleteAttachment(it) },
+                        onPickFromKidBoxDocuments = { showKidBoxDocPicker = true },
                     )
                     Spacer(Modifier.height(24.dp))
                 }
@@ -336,6 +401,14 @@ fun MedicalVisitDetailScreen(
                 }
             }
         }
+    }
+
+    if (showKidBoxDocPicker) {
+        KidBoxDocumentPickerSheet(
+            familyId = familyId,
+            onDismiss = { showKidBoxDocPicker = false },
+            onPickedUri = { viewModel.uploadAttachment(it) },
+        )
     }
 
     // ── Delete confirmation dialog ─────────────────────────────────────────────
@@ -372,6 +445,36 @@ private fun DetailSectionCard(title: String, content: @Composable () -> Unit) {
             Spacer(Modifier.height(8.dp))
             content()
         }
+    }
+}
+
+@Composable
+private fun LinkedRow(
+    title: String,
+    subtitle: String?,
+    leadingIcon: @Composable () -> Unit,
+    onClick: () -> Unit,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(kb.subtitle.copy(alpha = 0.08f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        leadingIcon()
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = kb.title)
+            if (!subtitle.isNullOrBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(subtitle, fontSize = 12.sp, color = kb.subtitle)
+            }
+        }
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = kb.subtitle.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
     }
 }
 

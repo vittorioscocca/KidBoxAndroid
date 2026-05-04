@@ -7,8 +7,8 @@ import android.content.Intent
 import android.os.Build
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.mapper.KBVaccineStatus
-import it.vittorioscocca.kidbox.data.local.mapper.KBVaccineType
 import it.vittorioscocca.kidbox.data.local.mapper.computedStatus
+import it.vittorioscocca.kidbox.data.local.mapper.displayTitle
 import it.vittorioscocca.kidbox.domain.model.KBVaccine
 import java.util.Calendar
 import javax.inject.Inject
@@ -21,17 +21,14 @@ class VaccineReminderScheduler @Inject constructor(
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
     fun scheduleVaccineReminder(vaccine: KBVaccine, childName: String) {
-        val scheduled = vaccine.scheduledDateEpochMillis ?: return
+        if (!vaccine.reminderOn) return
+        if (vaccine.statusRaw != "planned") return
+        val target = vaccine.nextDoseDateEpochMillis ?: return
         if (vaccine.computedStatus() == KBVaccineStatus.ADMINISTERED) return
-        val fireAt = dayBeforeAt9(scheduled)
+        val fireAt = dayBeforeAt9(target)
         if (fireAt <= System.currentTimeMillis()) return
 
-        val typeLabel = when (KBVaccineType.fromRaw(vaccine.vaccineTypeRaw)) {
-            KBVaccineType.MANDATORY -> "(obbligatorio)"
-            KBVaccineType.RECOMMENDED -> "(raccomandato)"
-            null -> ""
-        }
-        val body = "Vaccino per $childName: ${vaccine.name} $typeLabel".trim()
+        val body = "Vaccino per $childName: ${vaccine.displayTitle()}"
         val pi = buildPendingIntent(vaccine.id, body, vaccine.familyId, vaccine.childId)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

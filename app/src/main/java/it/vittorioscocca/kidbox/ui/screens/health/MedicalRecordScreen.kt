@@ -38,7 +38,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -109,14 +109,15 @@ fun MedicalRecordScreen(
                 .verticalScroll(rememberScrollState()),
         ) {
             Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Indietro",
-                        tint = kb.title,
-                    )
-                }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                KidBoxHeaderCircleButton(
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Indietro",
+                    onClick = onBack,
+                )
             }
             Spacer(Modifier.height(8.dp))
             Text(
@@ -217,13 +218,12 @@ fun MedicalRecordScreen(
                     color = kb.title,
                 )
                 Spacer(Modifier.weight(1f))
-                IconButton(onClick = { showAddContact = true }) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = "Aggiungi contatto",
-                        tint = Color(0xFFFF6B00),
-                    )
-                }
+                KidBoxHeaderCircleButton(
+                    icon = Icons.Default.Add,
+                    contentDescription = "Aggiungi contatto",
+                    onClick = { showAddContact = true },
+                    iconTint = Color(0xFFFF6B00),
+                )
             }
             if (state.emergencyContacts.isEmpty()) {
                 Text(
@@ -361,13 +361,12 @@ private fun EmergencyContactRow(
                     }
                 }
             }
-            IconButton(onClick = onDelete) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Elimina",
-                    tint = kb.subtitle,
-                )
-            }
+            KidBoxHeaderCircleButton(
+                icon = Icons.Default.Delete,
+                contentDescription = "Elimina",
+                onClick = onDelete,
+                iconTint = Color(0xFFE53935),
+            )
         }
     }
 }

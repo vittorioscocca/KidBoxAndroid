@@ -16,11 +16,21 @@ interface KBDoseLogDao {
     @Query("SELECT * FROM kb_dose_logs WHERE treatmentId = :treatmentId AND isDeleted = 0 ORDER BY dayNumber, slotIndex")
     fun observeByTreatment(treatmentId: String): Flow<List<KBDoseLogEntity>>
 
+    @Query(
+        "SELECT * FROM kb_dose_logs WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 " +
+            "ORDER BY treatmentId, dayNumber, slotIndex",
+    )
+    fun observeByFamilyAndChild(familyId: String, childId: String): Flow<List<KBDoseLogEntity>>
+
     @Query("SELECT * FROM kb_dose_logs WHERE treatmentId = :treatmentId AND isDeleted = 0 ORDER BY dayNumber, slotIndex")
     suspend fun listByTreatment(treatmentId: String): List<KBDoseLogEntity>
 
     @Query("SELECT * FROM kb_dose_logs WHERE treatmentId = :treatmentId AND dayNumber = :dayNumber AND slotIndex = :slotIndex AND isDeleted = 0 LIMIT 1")
     suspend fun getByTreatmentDaySlot(treatmentId: String, dayNumber: Int, slotIndex: Int): KBDoseLogEntity?
+
+    /** Stesso slot terapia: un solo documento Firestore per tutti i dispositivi (id deterministico). */
+    @Query("DELETE FROM kb_dose_logs WHERE treatmentId = :treatmentId AND dayNumber = :dayNumber AND slotIndex = :slotIndex")
+    suspend fun deleteAllForTreatmentDaySlot(treatmentId: String, dayNumber: Int, slotIndex: Int)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBDoseLogEntity)

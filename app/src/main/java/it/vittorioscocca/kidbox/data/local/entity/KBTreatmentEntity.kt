@@ -14,12 +14,6 @@ import androidx.room.PrimaryKey
             childColumns = ["familyId"],
             onDelete = ForeignKey.CASCADE,
         ),
-        ForeignKey(
-            entity = KBChildEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["childId"],
-            onDelete = ForeignKey.CASCADE,
-        ),
     ],
     indices = [Index("familyId"), Index("childId")],
 )

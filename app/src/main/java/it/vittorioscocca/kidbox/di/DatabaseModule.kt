@@ -100,6 +100,345 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_8_9 = object : Migration(8, 9) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS kb_treatments_new (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    childId TEXT NOT NULL,
+                    drugName TEXT NOT NULL,
+                    activeIngredient TEXT,
+                    dosageValue REAL NOT NULL,
+                    dosageUnit TEXT NOT NULL,
+                    isLongTerm INTEGER NOT NULL,
+                    durationDays INTEGER NOT NULL,
+                    startDateEpochMillis INTEGER NOT NULL,
+                    endDateEpochMillis INTEGER,
+                    dailyFrequency INTEGER NOT NULL,
+                    scheduleTimesData TEXT NOT NULL,
+                    isActive INTEGER NOT NULL,
+                    notes TEXT,
+                    reminderEnabled INTEGER NOT NULL,
+                    isDeleted INTEGER NOT NULL,
+                    createdAtEpochMillis INTEGER NOT NULL,
+                    updatedAtEpochMillis INTEGER NOT NULL,
+                    updatedBy TEXT,
+                    createdBy TEXT,
+                    syncStatus INTEGER NOT NULL,
+                    lastSyncError TEXT,
+                    syncStateRaw INTEGER NOT NULL,
+                    FOREIGN KEY(familyId) REFERENCES kb_families(id) ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_treatments_new_familyId ON kb_treatments_new(familyId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_treatments_new_childId ON kb_treatments_new(childId)")
+            db.execSQL(
+                """
+                INSERT INTO kb_treatments_new (
+                    id, familyId, childId, drugName, activeIngredient, dosageValue, dosageUnit,
+                    isLongTerm, durationDays, startDateEpochMillis, endDateEpochMillis,
+                    dailyFrequency, scheduleTimesData, isActive, notes, reminderEnabled,
+                    isDeleted, createdAtEpochMillis, updatedAtEpochMillis, updatedBy, createdBy,
+                    syncStatus, lastSyncError, syncStateRaw
+                )
+                SELECT
+                    id, familyId, childId, drugName, activeIngredient, dosageValue, dosageUnit,
+                    isLongTerm, durationDays, startDateEpochMillis, endDateEpochMillis,
+                    dailyFrequency, scheduleTimesData, isActive, notes, reminderEnabled,
+                    isDeleted, createdAtEpochMillis, updatedAtEpochMillis, updatedBy, createdBy,
+                    syncStatus, lastSyncError, syncStateRaw
+                FROM kb_treatments
+                """.trimIndent(),
+            )
+            db.execSQL("DROP TABLE kb_treatments")
+            db.execSQL("ALTER TABLE kb_treatments_new RENAME TO kb_treatments")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS kb_dose_logs_new (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    childId TEXT NOT NULL,
+                    treatmentId TEXT NOT NULL,
+                    dayNumber INTEGER NOT NULL,
+                    slotIndex INTEGER NOT NULL,
+                    scheduledTime TEXT NOT NULL,
+                    takenAtEpochMillis INTEGER,
+                    taken INTEGER NOT NULL,
+                    isDeleted INTEGER NOT NULL,
+                    createdAtEpochMillis INTEGER NOT NULL,
+                    updatedAtEpochMillis INTEGER NOT NULL,
+                    updatedBy TEXT,
+                    syncStatus INTEGER NOT NULL,
+                    lastSyncError TEXT,
+                    FOREIGN KEY(familyId) REFERENCES kb_families(id) ON DELETE CASCADE,
+                    FOREIGN KEY(treatmentId) REFERENCES kb_treatments(id) ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_dose_logs_new_familyId ON kb_dose_logs_new(familyId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_dose_logs_new_childId ON kb_dose_logs_new(childId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_dose_logs_new_treatmentId ON kb_dose_logs_new(treatmentId)")
+            db.execSQL(
+                """
+                INSERT INTO kb_dose_logs_new (
+                    id, familyId, childId, treatmentId, dayNumber, slotIndex, scheduledTime,
+                    takenAtEpochMillis, taken, isDeleted, createdAtEpochMillis, updatedAtEpochMillis,
+                    updatedBy, syncStatus, lastSyncError
+                )
+                SELECT
+                    id, familyId, childId, treatmentId, dayNumber, slotIndex, scheduledTime,
+                    takenAtEpochMillis, taken, isDeleted, createdAtEpochMillis, updatedAtEpochMillis,
+                    updatedBy, syncStatus, lastSyncError
+                FROM kb_dose_logs
+                """.trimIndent(),
+            )
+            db.execSQL("DROP TABLE kb_dose_logs")
+            db.execSQL("ALTER TABLE kb_dose_logs_new RENAME TO kb_dose_logs")
+        }
+    }
+
+    private val MIGRATION_9_10 = object : Migration(9, 10) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("PRAGMA foreign_keys=OFF")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS kb_medical_visits_new (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    childId TEXT NOT NULL,
+                    dateEpochMillis INTEGER NOT NULL,
+                    doctorName TEXT,
+                    doctorSpecializationRaw TEXT,
+                    travelDetailsJson TEXT,
+                    reason TEXT NOT NULL,
+                    diagnosis TEXT,
+                    recommendations TEXT,
+                    linkedTreatmentIdsJson TEXT NOT NULL,
+                    linkedExamIdsJson TEXT NOT NULL,
+                    asNeededDrugsJson TEXT,
+                    therapyTypesJson TEXT NOT NULL,
+                    prescribedExamsJson TEXT,
+                    photoUrlsJson TEXT NOT NULL,
+                    notes TEXT,
+                    nextVisitDateEpochMillis INTEGER,
+                    nextVisitReason TEXT,
+                    visitStatusRaw TEXT,
+                    reminderOn INTEGER NOT NULL,
+                    nextVisitReminderOn INTEGER NOT NULL,
+                    isDeleted INTEGER NOT NULL,
+                    createdAtEpochMillis INTEGER NOT NULL,
+                    updatedAtEpochMillis INTEGER NOT NULL,
+                    updatedBy TEXT,
+                    createdBy TEXT,
+                    syncStateRaw INTEGER NOT NULL,
+                    lastSyncError TEXT,
+                    FOREIGN KEY(familyId) REFERENCES kb_families(id) ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_medical_visits_new_familyId ON kb_medical_visits_new(familyId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_medical_visits_new_childId ON kb_medical_visits_new(childId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_medical_visits_new_dateEpochMillis ON kb_medical_visits_new(dateEpochMillis)")
+            db.execSQL(
+                """
+                INSERT INTO kb_medical_visits_new (
+                    id, familyId, childId, dateEpochMillis, doctorName, doctorSpecializationRaw,
+                    travelDetailsJson, reason, diagnosis, recommendations, linkedTreatmentIdsJson,
+                    linkedExamIdsJson, asNeededDrugsJson, therapyTypesJson, prescribedExamsJson,
+                    photoUrlsJson, notes, nextVisitDateEpochMillis, nextVisitReason, visitStatusRaw,
+                    reminderOn, nextVisitReminderOn, isDeleted, createdAtEpochMillis, updatedAtEpochMillis,
+                    updatedBy, createdBy, syncStateRaw, lastSyncError
+                )
+                SELECT
+                    id, familyId, childId, dateEpochMillis, doctorName, doctorSpecializationRaw,
+                    travelDetailsJson, reason, diagnosis, recommendations, linkedTreatmentIdsJson,
+                    linkedExamIdsJson, asNeededDrugsJson, therapyTypesJson, prescribedExamsJson,
+                    photoUrlsJson, notes, nextVisitDateEpochMillis, nextVisitReason, visitStatusRaw,
+                    reminderOn, nextVisitReminderOn, isDeleted, createdAtEpochMillis, updatedAtEpochMillis,
+                    updatedBy, createdBy, syncStateRaw, lastSyncError
+                FROM kb_medical_visits
+                """.trimIndent(),
+            )
+            db.execSQL("DROP TABLE kb_medical_visits")
+            db.execSQL("ALTER TABLE kb_medical_visits_new RENAME TO kb_medical_visits")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS kb_medical_exams_new (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    childId TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    isUrgent INTEGER NOT NULL,
+                    deadlineEpochMillis INTEGER,
+                    preparation TEXT,
+                    notes TEXT,
+                    location TEXT,
+                    statusRaw TEXT NOT NULL,
+                    resultText TEXT,
+                    resultDateEpochMillis INTEGER,
+                    prescribingVisitId TEXT,
+                    reminderOn INTEGER NOT NULL DEFAULT 0,
+                    isDeleted INTEGER NOT NULL,
+                    syncStateRaw INTEGER NOT NULL,
+                    lastSyncError TEXT,
+                    createdAtEpochMillis INTEGER NOT NULL,
+                    updatedAtEpochMillis INTEGER NOT NULL,
+                    updatedBy TEXT NOT NULL,
+                    createdBy TEXT NOT NULL,
+                    FOREIGN KEY(familyId) REFERENCES kb_families(id) ON DELETE CASCADE,
+                    FOREIGN KEY(prescribingVisitId) REFERENCES kb_medical_visits(id) ON DELETE SET NULL
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_medical_exams_new_familyId ON kb_medical_exams_new(familyId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_medical_exams_new_childId ON kb_medical_exams_new(childId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_medical_exams_new_prescribingVisitId ON kb_medical_exams_new(prescribingVisitId)")
+            db.execSQL(
+                """
+                INSERT INTO kb_medical_exams_new (
+                    id, familyId, childId, name, isUrgent, deadlineEpochMillis, preparation, notes,
+                    location, statusRaw, resultText, resultDateEpochMillis, prescribingVisitId, reminderOn,
+                    isDeleted, syncStateRaw, lastSyncError, createdAtEpochMillis, updatedAtEpochMillis, updatedBy, createdBy
+                )
+                SELECT
+                    id, familyId, childId, name, isUrgent, deadlineEpochMillis, preparation, notes,
+                    location, statusRaw, resultText, resultDateEpochMillis, prescribingVisitId, reminderOn,
+                    isDeleted, syncStateRaw, lastSyncError, createdAtEpochMillis, updatedAtEpochMillis, updatedBy, createdBy
+                FROM kb_medical_exams
+                """.trimIndent(),
+            )
+            db.execSQL("DROP TABLE kb_medical_exams")
+            db.execSQL("ALTER TABLE kb_medical_exams_new RENAME TO kb_medical_exams")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS kb_vaccines_new (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    childId TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    vaccineTypeRaw TEXT NOT NULL,
+                    statusRaw TEXT NOT NULL,
+                    commercialName TEXT,
+                    doseNumber INTEGER NOT NULL,
+                    totalDoses INTEGER NOT NULL,
+                    administeredDateEpochMillis INTEGER,
+                    scheduledDateEpochMillis INTEGER,
+                    lotNumber TEXT,
+                    doctorName TEXT,
+                    location TEXT,
+                    administeredBy TEXT,
+                    administrationSiteRaw TEXT,
+                    notes TEXT,
+                    reminderOn INTEGER NOT NULL,
+                    nextDoseDateEpochMillis INTEGER,
+                    isDeleted INTEGER NOT NULL,
+                    createdAtEpochMillis INTEGER NOT NULL,
+                    updatedAtEpochMillis INTEGER NOT NULL,
+                    updatedBy TEXT,
+                    createdBy TEXT,
+                    syncStateRaw INTEGER NOT NULL,
+                    lastSyncError TEXT,
+                    FOREIGN KEY(familyId) REFERENCES kb_families(id) ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_vaccines_new_familyId ON kb_vaccines_new(familyId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_vaccines_new_childId ON kb_vaccines_new(childId)")
+            db.execSQL(
+                """
+                INSERT INTO kb_vaccines_new (
+                    id, familyId, childId, name, vaccineTypeRaw, statusRaw, commercialName, doseNumber,
+                    totalDoses, administeredDateEpochMillis, scheduledDateEpochMillis, lotNumber, doctorName,
+                    location, administeredBy, administrationSiteRaw, notes, reminderOn, nextDoseDateEpochMillis,
+                    isDeleted, createdAtEpochMillis, updatedAtEpochMillis, updatedBy, createdBy, syncStateRaw, lastSyncError
+                )
+                SELECT
+                    id, familyId, childId, name, vaccineTypeRaw, statusRaw, commercialName, doseNumber,
+                    totalDoses, administeredDateEpochMillis, scheduledDateEpochMillis, lotNumber, doctorName,
+                    location, administeredBy, administrationSiteRaw, notes, reminderOn, nextDoseDateEpochMillis,
+                    isDeleted, createdAtEpochMillis, updatedAtEpochMillis, updatedBy, createdBy, syncStateRaw, lastSyncError
+                FROM kb_vaccines
+                """.trimIndent(),
+            )
+            db.execSQL("DROP TABLE kb_vaccines")
+            db.execSQL("ALTER TABLE kb_vaccines_new RENAME TO kb_vaccines")
+
+            db.execSQL("PRAGMA foreign_keys=ON")
+        }
+    }
+
+    /**
+     * Documents can reference a health [childId] that is not in [kb_children] (e.g. adult profile).
+     * Drop FK(childId → kb_children) so treatment/visit/exam attachments insert cleanly.
+     */
+    private val MIGRATION_10_11 = object : Migration(10, 11) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("PRAGMA foreign_keys=OFF")
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS kb_documents_new (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    childId TEXT,
+                    categoryId TEXT,
+                    localPath TEXT,
+                    title TEXT NOT NULL,
+                    fileName TEXT NOT NULL,
+                    mimeType TEXT NOT NULL,
+                    fileSize INTEGER NOT NULL,
+                    storagePath TEXT NOT NULL,
+                    downloadURL TEXT,
+                    notes TEXT,
+                    extractedText TEXT,
+                    extractedTextUpdatedAtEpochMillis INTEGER,
+                    extractionStatusRaw INTEGER NOT NULL,
+                    extractionError TEXT,
+                    createdAtEpochMillis INTEGER NOT NULL,
+                    updatedAtEpochMillis INTEGER NOT NULL,
+                    updatedBy TEXT NOT NULL,
+                    isDeleted INTEGER NOT NULL,
+                    syncStateRaw INTEGER NOT NULL,
+                    lastSyncError TEXT,
+                    FOREIGN KEY(familyId) REFERENCES kb_families(id) ON DELETE CASCADE,
+                    FOREIGN KEY(categoryId) REFERENCES kb_document_categories(id) ON DELETE SET NULL
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_documents_new_familyId ON kb_documents_new(familyId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_documents_new_childId ON kb_documents_new(childId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_documents_new_categoryId ON kb_documents_new(categoryId)")
+            db.execSQL(
+                """
+                INSERT INTO kb_documents_new (
+                    id, familyId, childId, categoryId, localPath, title, fileName, mimeType, fileSize,
+                    storagePath, downloadURL, notes, extractedText, extractedTextUpdatedAtEpochMillis,
+                    extractionStatusRaw, extractionError, createdAtEpochMillis, updatedAtEpochMillis,
+                    updatedBy, isDeleted, syncStateRaw, lastSyncError
+                )
+                SELECT
+                    id, familyId, childId, categoryId, localPath, title, fileName, mimeType, fileSize,
+                    storagePath, downloadURL, notes, extractedText, extractedTextUpdatedAtEpochMillis,
+                    extractionStatusRaw, extractionError, createdAtEpochMillis, updatedAtEpochMillis,
+                    updatedBy, isDeleted, syncStateRaw, lastSyncError
+                FROM kb_documents
+                """.trimIndent(),
+            )
+            db.execSQL("DROP TABLE kb_documents")
+            db.execSQL("ALTER TABLE kb_documents_new RENAME TO kb_documents")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_documents_familyId ON kb_documents(familyId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_documents_childId ON kb_documents(childId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_documents_categoryId ON kb_documents(categoryId)")
+            db.execSQL("PRAGMA foreign_keys=ON")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideKidBoxDatabase(
@@ -108,7 +447,15 @@ object DatabaseModule {
         context,
         KidBoxDatabase::class.java,
         "kidbox.db",
-    ).addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+    ).addMigrations(
+        MIGRATION_4_5,
+        MIGRATION_5_6,
+        MIGRATION_6_7,
+        MIGRATION_7_8,
+        MIGRATION_8_9,
+        MIGRATION_9_10,
+        MIGRATION_10_11,
+    )
         .fallbackToDestructiveMigration()
         .build()
 

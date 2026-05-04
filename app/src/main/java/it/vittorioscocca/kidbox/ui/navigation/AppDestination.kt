@@ -95,10 +95,6 @@ sealed class AppDestination(val route: String) {
     data object Vaccines : AppDestination("health/{familyId}/{childId}/vaccines") {
         fun route(familyId: String, childId: String) = "health/$familyId/$childId/vaccines"
     }
-    data object VaccineDetail : AppDestination("health/{familyId}/{childId}/vaccines/{vaccineId}") {
-        fun route(familyId: String, childId: String, vaccineId: String) =
-            "health/$familyId/$childId/vaccines/$vaccineId"
-    }
     data object VaccineForm : AppDestination("health/{familyId}/{childId}/vaccines/form?vaccineId={vaccineId}") {
         fun routeNew(familyId: String, childId: String) = "health/$familyId/$childId/vaccines/form"
         fun routeEdit(familyId: String, childId: String, vaccineId: String) =
