@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.automirrored.filled.Help
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.Groups
@@ -58,6 +58,7 @@ fun SettingsScreen(
     onFamilySettings: () -> Unit,
     onMessageSettings: () -> Unit,
     onNotifications: () -> Unit,
+    onAiSettings: () -> Unit,
     viewModel: ThemeViewModel = hiltViewModel(),
 ) {
     BackHandler { onBack() }
@@ -85,9 +86,9 @@ fun SettingsScreen(
         ),
         SettingRowItem(
             title = "Assistente AI",
-            icon = Icons.AutoMirrored.Filled.Help,
+            icon = Icons.Filled.AutoAwesome,
             showChevron = true,
-            onClick = {},
+            onClick = onAiSettings,
         ),
         SettingRowItem(
             title = "Notifiche",

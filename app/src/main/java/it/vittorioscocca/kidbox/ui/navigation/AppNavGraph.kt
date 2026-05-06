@@ -30,11 +30,15 @@ import it.vittorioscocca.kidbox.ui.screens.settings.InviteCodeScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.JoinFamilyScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.MessageSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.NotificationSettingsScreen
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.AIChatScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.AiSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.SettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.ThemeScreen
 import it.vittorioscocca.kidbox.ui.screens.calendar.CalendarScreen
 import it.vittorioscocca.kidbox.ui.screens.expenses.ExpensesHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.location.FamilyLocationScreen
+import it.vittorioscocca.kidbox.ui.screens.wallet.WalletHomeScreen
+import it.vittorioscocca.kidbox.ui.screens.wallet.WalletTicketDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.notes.NoteDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.notes.NotesHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.photos.FamilyPhotosScreen
@@ -48,9 +52,12 @@ import it.vittorioscocca.kidbox.ui.screens.health.HealthHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.health.MedicalRecordScreen
 import it.vittorioscocca.kidbox.ui.screens.health.visits.MedicalVisitsScreen
 import it.vittorioscocca.kidbox.ui.screens.health.visits.MedicalVisitFormScreen
+import it.vittorioscocca.kidbox.health.visits.ai.VisitAiChatScreen
 import it.vittorioscocca.kidbox.ui.screens.health.visits.MedicalVisitDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.health.exams.MedicalExamsScreen
 import it.vittorioscocca.kidbox.ui.screens.health.exams.MedicalExamFormScreen
+import it.vittorioscocca.kidbox.health.exams.ai.ExamAiChatScreen
+import it.vittorioscocca.kidbox.health.exams.ai.ExamsListAiChatScreen
 import it.vittorioscocca.kidbox.ui.screens.health.exams.MedicalExamDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.health.treatments.MedicalTreatmentsScreen
 import it.vittorioscocca.kidbox.ui.screens.health.treatments.MedicalTreatmentFormScreen
@@ -152,7 +159,12 @@ fun AppNavGraph(
                 onFamilySettings = { navController.navigate(AppDestination.FamilySettings.route) },
                 onMessageSettings = { navController.navigate(AppDestination.MessageSettings.route) },
                 onNotifications = { navController.navigate(AppDestination.NotificationSettings.route) },
+                onAiSettings = { navController.navigate(AppDestination.AiSettings.route) },
             )
+        }
+
+        composable(AppDestination.AiSettings.route) {
+            AiSettingsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(AppDestination.MessageSettings.route) {
@@ -354,6 +366,17 @@ fun AppNavGraph(
                 onOpen = { visitId ->
                     navController.navigate(AppDestination.MedicalVisitDetail.route(familyId, childId, visitId))
                 },
+                onOpenVisitsListAiChat = { subjectName, visitIdsJson ->
+                    navController.navigate(
+                        AppDestination.VisitsListAiChat.route(
+                            familyId = familyId,
+                            childId = childId,
+                            subjectName = subjectName,
+                            visitIdsJson = visitIdsJson,
+                            isListMode = true,
+                        ),
+                    )
+                },
             )
         }
 
@@ -384,6 +407,70 @@ fun AppNavGraph(
         }
 
         composable(
+            route = AppDestination.VisitAiChat.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+                navArgument("visitId") { type = NavType.StringType },
+                navArgument("subjectName") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("visitTitle") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("visitDate") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("diagnosis") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("notes") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+            ),
+        ) { backStackEntry ->
+            val visitIdArg = backStackEntry.arguments?.getString("visitId").orEmpty()
+            val subjectNameArg = backStackEntry.arguments?.getString("subjectName").orEmpty()
+            VisitAiChatScreen(
+                visitId = visitIdArg,
+                subjectName = subjectNameArg,
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.VisitsListAiChat.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+                navArgument("subjectName") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("visitIdsJson") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("isListMode") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                },
+            ),
+        ) { backStackEntry ->
+            val subjectNameArg = backStackEntry.arguments?.getString("subjectName").orEmpty()
+            VisitAiChatScreen(
+                visitId = "",
+                subjectName = subjectNameArg,
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
             route = AppDestination.MedicalVisitDetail.route,
             arguments = listOf(
                 navArgument("familyId") { type = NavType.StringType },
@@ -409,6 +496,20 @@ fun AppNavGraph(
                 },
                 onOpenExam = { examId ->
                     navController.navigate(AppDestination.MedicalExamDetail.route(familyId, childId, examId))
+                },
+                onOpenVisitAiChat = { subjectName, visitTitle, visitDate, diagnosis, notes ->
+                    navController.navigate(
+                        AppDestination.VisitAiChat.route(
+                            familyId = familyId,
+                            childId = childId,
+                            visitId = visitId,
+                            subjectName = subjectName,
+                            visitTitle = visitTitle,
+                            visitDate = visitDate,
+                            diagnosis = diagnosis,
+                            notes = notes,
+                        ),
+                    )
                 },
             )
         }
@@ -478,6 +579,17 @@ fun AppNavGraph(
                 onOpen = { examId ->
                     navController.navigate(AppDestination.MedicalExamDetail.route(familyId, childId, examId))
                 },
+                onOpenExamsListAiChat = { subjectName, examIdsJson ->
+                    navController.navigate(
+                        AppDestination.ExamsListAiChat.route(
+                            familyId = familyId,
+                            childId = childId,
+                            subjectName = subjectName,
+                            examIdsJson = examIdsJson,
+                            isListMode = true,
+                        ),
+                    )
+                },
             )
         }
 
@@ -502,7 +614,84 @@ fun AppNavGraph(
                 childId = childId,
                 examId = examId,
                 onBack = { navController.popBackStack() },
-                onSaved = { navController.popBackStack() },
+                onSaved = { _: String -> navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.ExamsListAiChat.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+                navArgument("subjectName") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("examIdsJson") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("isListMode") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                },
+            ),
+        ) { backStackEntry ->
+            val subjectNameArg = backStackEntry.arguments?.getString("subjectName").orEmpty()
+            ExamsListAiChatScreen(
+                subjectName = subjectNameArg,
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.ExamAiChat.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+                navArgument("examId") { type = NavType.StringType },
+                navArgument("subjectName") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("examName") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("examStatus") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("deadline") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("preparation") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("resultText") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("notes") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("attachmentsSummary") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+            ),
+        ) { backStackEntry ->
+            val examIdArg = backStackEntry.arguments?.getString("examId").orEmpty()
+            val examNameArg = backStackEntry.arguments?.getString("examName").orEmpty()
+            val subjectNameArg = backStackEntry.arguments?.getString("subjectName").orEmpty()
+            ExamAiChatScreen(
+                examId = examIdArg,
+                examName = examNameArg,
+                subjectName = subjectNameArg,
+                onBack = { navController.popBackStack() },
             )
         }
 
@@ -524,6 +713,26 @@ fun AppNavGraph(
                 onBack = { navController.popBackStack() },
                 onEdit = {
                     navController.navigate(AppDestination.MedicalExamForm.routeEdit(familyId, childId, examId))
+                },
+                onOpenVisit = { visitId ->
+                    navController.navigate(AppDestination.MedicalVisitDetail.route(familyId, childId, visitId))
+                },
+                onOpenExamAiChat = { subjectName, examName, examStatus, deadline, preparation, resultText, notes, attachmentsSummary ->
+                    navController.navigate(
+                        AppDestination.ExamAiChat.route(
+                            familyId = familyId,
+                            childId = childId,
+                            examId = examId,
+                            subjectName = subjectName,
+                            examName = examName,
+                            examStatus = examStatus,
+                            deadline = deadline,
+                            preparation = preparation,
+                            resultText = resultText,
+                            notes = notes,
+                            attachmentsSummary = attachmentsSummary,
+                        ),
+                    )
                 },
             )
         }
@@ -571,7 +780,7 @@ fun AppNavGraph(
                 childId = childId,
                 treatmentId = treatmentId,
                 onBack = { navController.popBackStack() },
-                onSaved = { navController.popBackStack() },
+                onSaved = { _: String -> navController.popBackStack() },
             )
         }
 
@@ -593,6 +802,9 @@ fun AppNavGraph(
                 onBack = { navController.popBackStack() },
                 onEdit = {
                     navController.navigate(AppDestination.TreatmentForm.routeEdit(familyId, childId, treatmentId))
+                },
+                onOpenVisit = { visitId ->
+                    navController.navigate(AppDestination.MedicalVisitDetail.route(familyId, childId, visitId))
                 },
             )
         }
@@ -630,6 +842,26 @@ fun AppNavGraph(
             arguments = listOf(
                 navArgument("familyId") { type = NavType.StringType },
                 navArgument("childId") { type = NavType.StringType },
+                navArgument("subjectName") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("visitIdsJson") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("examIdsJson") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("treatmentIdsJson") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("vaccineIdsJson") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
             ),
         ) { backStackEntry ->
             val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
@@ -732,7 +964,53 @@ fun AppNavGraph(
             )
         }
 
+        composable(
+            route = AppDestination.WalletHome.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            WalletHomeScreen(
+                familyId = familyId,
+                onBack = { navController.popBackStack() },
+                onTicketClick = { ticketId ->
+                    navController.navigate(AppDestination.WalletDetail.createRoute(familyId, ticketId))
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.WalletDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("ticketId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val ticketId = backStackEntry.arguments?.getString("ticketId").orEmpty()
+            WalletTicketDetailScreen(
+                familyId = familyId,
+                ticketId = ticketId,
+                onBack = { navController.popBackStack() },
+            )
+        }
+
         composable(AppDestination.AskExpert.route) { PlaceholderScreen("Assistente AI") }
+
+        composable(
+            route = AppDestination.PlanningAiChat.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("familyName") { type = NavType.StringType; defaultValue = "" },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val familyName = backStackEntry.arguments?.getString("familyName").orEmpty()
+            AIChatScreen(
+                familyId = familyId,
+                familyName = familyName,
+                onBack = { navController.popBackStack() },
+            )
+        }
 
         composable(AppDestination.FamilySettings.route) {
             val context = androidx.compose.ui.platform.LocalContext.current

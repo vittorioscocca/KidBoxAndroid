@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.PaddingValues
@@ -22,18 +23,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.FileCopy
-import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -46,9 +44,9 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -71,7 +69,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
-import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
+import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListAddBottomButton
+import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListTopToolbar
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.DateFormat
 import java.util.Locale
@@ -164,91 +163,48 @@ fun MedicalTreatmentsScreen(
         )
     }
 
-    Box(
+    Scaffold(
         modifier = Modifier
             .fillMaxSize()
             .background(kb.background)
-            .statusBarsPadding()
-            .navigationBarsPadding(),
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                KidBoxHeaderCircleButton(
-                    icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Indietro",
-                    onClick = onBack,
-                )
-                Spacer(Modifier.weight(1f))
+            .statusBarsPadding(),
+        containerColor = kb.background,
+        bottomBar = {
+            Column(Modifier.navigationBarsPadding()) {
                 if (state.isSelecting) {
-                    Surface(
-                        shape = RoundedCornerShape(22.dp),
-                        color = kb.card,
-                        shadowElevation = 0.dp,
-                    ) {
-                        Row(
-                            modifier = Modifier.height(44.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            IconButton(
-                                onClick = { showFilterSheet = true },
-                                modifier = Modifier.size(44.dp),
-                            ) {
-                                Icon(
-                                    imageVector = if (state.timeFilter == TreatmentTimeFilter.ALL) {
-                                        Icons.Outlined.FilterList
-                                    } else {
-                                        Icons.Filled.FilterList
-                                    },
-                                    contentDescription = "Filtra per periodo",
-                                    tint = if (state.timeFilter == TreatmentTimeFilter.ALL) kb.title else PURPLE,
-                                )
-                            }
-                            TextButton(
-                                onClick = { viewModel.setSelecting(false) },
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                            ) {
-                                Text(
-                                    "Fine",
-                                    color = kb.title,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Medium,
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    KidBoxHeaderCircleButton(
-                        icon = if (state.timeFilter == TreatmentTimeFilter.ALL) {
-                            Icons.Outlined.FilterList
-                        } else {
-                            Icons.Filled.FilterList
-                        },
-                        contentDescription = "Filtra per periodo",
-                        onClick = { showFilterSheet = true },
-                        iconTint = if (state.timeFilter == TreatmentTimeFilter.ALL) null else PURPLE,
+                    SelectionBottomBar(
+                        allSelected = state.selectedIds.size == state.allFiltered.size && state.allFiltered.isNotEmpty(),
+                        hasSelection = state.selectedIds.isNotEmpty(),
+                        onToggleSelectAll = { viewModel.toggleSelectAllFiltered() },
+                        onDuplicate = { viewModel.duplicateSelected() },
+                        onDelete = { showDeleteConfirm = true },
                     )
-                    Spacer(Modifier.width(4.dp))
-                    TextButton(onClick = { viewModel.setSelecting(true) }) {
-                        Text(
-                            "Seleziona",
-                            color = kb.title,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
-                    Spacer(Modifier.width(2.dp))
-                    KidBoxHeaderCircleButton(
-                        icon = Icons.Default.Add,
-                        contentDescription = "Nuova cura",
+                } else {
+                    HealthListAddBottomButton(
+                        tint = PURPLE,
+                        label = "Nuova Cura",
                         onClick = onAdd,
                     )
                 }
             }
+        },
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+        ) {
+            HealthListTopToolbar(
+                tint = PURPLE,
+                filterActive = state.timeFilter != TreatmentTimeFilter.ALL,
+                isSelecting = state.isSelecting,
+                onBack = onBack,
+                onFilterClick = { showFilterSheet = true },
+                onToggleSelectClick = {
+                    if (state.isSelecting) viewModel.setSelecting(false) else viewModel.setSelecting(true)
+                },
+                onAddClick = onAdd,
+            )
 
             Text(
                 "Cure",
@@ -316,36 +272,10 @@ fun MedicalTreatmentsScreen(
                                 if (state.isSelecting) viewModel.toggleSelection(t.id) else onOpen(t.id)
                             },
                         )
-                        item { Spacer(Modifier.height(if (state.isSelecting) 120.dp else 84.dp)) }
+                        item { Spacer(Modifier.height(24.dp)) }
                     }
                 }
             }
-        }
-
-        if (!state.isSelecting) {
-            Button(
-                onClick = onAdd,
-                colors = ButtonDefaults.buttonColors(containerColor = PURPLE),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(horizontal = 20.dp, vertical = 20.dp)
-                    .fillMaxWidth()
-                    .height(54.dp),
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
-                Spacer(Modifier.width(8.dp))
-                Text("Nuova Cura", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-            }
-        } else {
-            SelectionBottomBar(
-                allSelected = state.selectedIds.size == state.allFiltered.size && state.allFiltered.isNotEmpty(),
-                hasSelection = state.selectedIds.isNotEmpty(),
-                onToggleSelectAll = { viewModel.toggleSelectAllFiltered() },
-                onDuplicate = { viewModel.duplicateSelected() },
-                onDelete = { showDeleteConfirm = true },
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
         }
     }
 }
@@ -571,77 +501,76 @@ private fun SelectionBottomBar(
     modifier: Modifier = Modifier,
 ) {
     val kb = MaterialTheme.kidBoxColors
-    Column(modifier = modifier.fillMaxWidth()) {
-        HorizontalDivider(color = kb.subtitle.copy(alpha = 0.15f))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(kb.background)
-                .padding(top = 6.dp, bottom = 10.dp),
+    val deleteTint = Color(0xFFD32F2F)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .background(kb.background),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextButton(
+            onClick = onToggleSelectAll,
+            modifier = Modifier.weight(1f),
         ) {
-            TextButton(
-                onClick = onToggleSelectAll,
-                modifier = Modifier.weight(1f),
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = if (allSelected) Icons.Filled.CheckCircle else Icons.Outlined.Apps,
-                        contentDescription = null,
-                        tint = PURPLE,
-                        modifier = Modifier.size(24.dp),
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        if (allSelected) "Deseleziona" else "Tutte",
-                        fontSize = 12.sp,
-                        color = PURPLE,
-                        fontWeight = FontWeight.Medium,
-                    )
-                }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = if (allSelected) Icons.Filled.CheckCircle else Icons.Default.GridView,
+                    contentDescription = null,
+                    tint = PURPLE,
+                    modifier = Modifier.size(22.dp),
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    if (allSelected) "Deseleziona" else "Tutte",
+                    fontSize = 11.sp,
+                    color = PURPLE,
+                    fontWeight = FontWeight.Medium,
+                )
             }
-            VerticalBarDivider()
-            TextButton(
-                onClick = onDuplicate,
-                enabled = hasSelection,
-                modifier = Modifier.weight(1f),
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Outlined.FileCopy,
-                        contentDescription = null,
-                        tint = if (hasSelection) PURPLE else kb.subtitle,
-                        modifier = Modifier.size(24.dp),
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Duplica",
-                        fontSize = 12.sp,
-                        color = if (hasSelection) PURPLE else kb.subtitle,
-                        fontWeight = FontWeight.Medium,
-                    )
-                }
+        }
+        VerticalBarDivider()
+        TextButton(
+            onClick = onDuplicate,
+            enabled = hasSelection,
+            modifier = Modifier.weight(1f),
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    Icons.Outlined.FileCopy,
+                    contentDescription = null,
+                    tint = if (hasSelection) PURPLE else kb.subtitle,
+                    modifier = Modifier.size(22.dp),
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Duplica",
+                    fontSize = 11.sp,
+                    color = if (hasSelection) PURPLE else kb.subtitle,
+                    fontWeight = FontWeight.Medium,
+                )
             }
-            VerticalBarDivider()
-            TextButton(
-                onClick = onDelete,
-                enabled = hasSelection,
-                modifier = Modifier.weight(1f),
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = null,
-                        tint = if (hasSelection) Color(0xFFB3261E) else kb.subtitle,
-                        modifier = Modifier.size(24.dp),
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Elimina",
-                        fontSize = 12.sp,
-                        color = if (hasSelection) Color(0xFFB3261E) else kb.subtitle,
-                        fontWeight = FontWeight.Medium,
-                    )
-                }
+        }
+        VerticalBarDivider()
+        TextButton(
+            onClick = onDelete,
+            enabled = hasSelection,
+            modifier = Modifier.weight(1f),
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = null,
+                    tint = if (hasSelection) deleteTint else kb.subtitle,
+                    modifier = Modifier.size(22.dp),
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Elimina",
+                    fontSize = 11.sp,
+                    color = if (hasSelection) deleteTint else kb.subtitle,
+                    fontWeight = FontWeight.Medium,
+                )
             }
         }
     }
@@ -653,7 +582,7 @@ private fun VerticalBarDivider() {
     Box(
         modifier = Modifier
             .width(1.dp)
-            .height(40.dp)
+            .fillMaxHeight()
             .background(kb.subtitle.copy(alpha = 0.2f)),
     )
 }

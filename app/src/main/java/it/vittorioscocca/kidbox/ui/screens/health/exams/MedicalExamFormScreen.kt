@@ -82,19 +82,25 @@ fun MedicalExamFormScreen(
     childId: String,
     examId: String?,
     onBack: () -> Unit,
-    onSaved: () -> Unit = onBack,
+    prescribingVisitId: String? = null,
+    bindNonce: Int = 0,
+    onSaved: (examId: String) -> Unit = { _ -> onBack() },
     viewModel: MedicalExamFormViewModel = hiltViewModel(),
 ) {
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(familyId, childId, examId) { viewModel.bind(familyId, childId, examId) }
+    LaunchedEffect(familyId, childId, examId, prescribingVisitId, bindNonce) {
+        viewModel.bind(familyId, childId, examId, prescribingVisitId, bindNonce)
+    }
 
-    LaunchedEffect(state.saved) {
+    LaunchedEffect(state.saved, state.examId) {
         if (state.saved) {
             Toast.makeText(context, "Esame salvato", Toast.LENGTH_SHORT).show()
-            onSaved()
+            val id = state.examId
+            viewModel.consumeSaved()
+            onSaved(id)
         }
     }
     LaunchedEffect(state.saveError) {

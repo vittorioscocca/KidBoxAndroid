@@ -5,6 +5,9 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.notification.PushNotificationManager
 import it.vittorioscocca.kidbox.data.notification.PushNotificationManager.PreferenceKeys
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
+import it.vittorioscocca.kidbox.data.wallet.WalletReminderPrefs
+import it.vittorioscocca.kidbox.notifications.WalletReminderScheduler
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,12 +24,16 @@ data class NotificationSettingsUiState(
     val notifyOnNewNote: Boolean = true,
     val notifyOnNewCalendarEvent: Boolean = true,
     val notifyOnNewExpense: Boolean = true,
+    val notifyOnWalletReminder: Boolean = true,
     val message: String? = null,
 )
 
 @HiltViewModel
 class NotificationSettingsViewModel @Inject constructor(
     private val pushNotificationManager: PushNotificationManager,
+    private val walletReminderPrefs: WalletReminderPrefs,
+    private val familyDao: KBFamilyDao,
+    private val walletReminderScheduler: WalletReminderScheduler,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(NotificationSettingsUiState())
     val uiState: StateFlow<NotificationSettingsUiState> = _uiState.asStateFlow()
@@ -45,6 +52,7 @@ class NotificationSettingsViewModel @Inject constructor(
                         notifyOnNewNote = prefs[PreferenceKeys.NOTIFY_ON_NEW_NOTE] ?: true,
                         notifyOnNewCalendarEvent = prefs[PreferenceKeys.NOTIFY_ON_NEW_CALENDAR_EVENT] ?: true,
                         notifyOnNewExpense = prefs[PreferenceKeys.NOTIFY_ON_NEW_EXPENSE] ?: true,
+                        notifyOnWalletReminder = walletReminderPrefs.isReminderEnabled(),
                         message = null,
                     )
                 }
@@ -84,5 +92,14 @@ class NotificationSettingsViewModel @Inject constructor(
 
     fun clearMessage() {
         _uiState.value = _uiState.value.copy(message = null)
+    }
+
+    fun setWalletReminderLocal(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(notifyOnWalletReminder = enabled)
+        walletReminderPrefs.setReminderEnabled(enabled)
+        viewModelScope.launch {
+            val familyId = familyDao.peekAnyFamilyId() ?: return@launch
+            walletReminderScheduler.rescheduleForFamily(familyId)
+        }
     }
 }

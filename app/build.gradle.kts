@@ -35,6 +35,7 @@ android {
         versionName = "1.0.0"
         manifestPlaceholders["googleMapsApiKey"] = mapsApiKey
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
+        buildConfigField("Boolean", "AI_ENABLED", "true")
     }
 
     buildTypes {
@@ -139,6 +140,18 @@ dependencies {
 
     implementation("com.google.guava:guava:32.1.3-android")
     implementation("com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava")
+
+    // PDF text extraction
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+
+    // Barcode rendering in Wallet detail screen
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0") { isTransitive = false }
+
+    // ML Kit barcode scanning (used by WalletPdfParser to scan barcodes from rendered PDF pages)
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
+
+    // WorkManager (wallet reminders)
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
 
     debugImplementation("com.google.firebase:firebase-appcheck-debug")
     releaseImplementation("com.google.firebase:firebase-appcheck-playintegrity")

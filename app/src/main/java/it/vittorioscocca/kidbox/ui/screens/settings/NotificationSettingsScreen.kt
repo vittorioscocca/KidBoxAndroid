@@ -67,6 +67,11 @@ fun NotificationSettingsScreen(
     ) { granted ->
         val key = pendingEnableKey
         if (key == null) return@rememberLauncherForActivityResult
+        if (key == LOCAL_WALLET_REMINDER_KEY) {
+            viewModel.setWalletReminderLocal(granted)
+            pendingEnableKey = null
+            return@rememberLauncherForActivityResult
+        }
         if (granted) {
             viewModel.setPreference(key = key, enabled = true, registerToken = true)
         } else {
@@ -318,6 +323,30 @@ fun NotificationSettingsScreen(
                     )
                 },
             )
+            NotificationToggleRow(
+                title = "Promemoria Wallet",
+                subtitle = "Un’ora prima dell’evento del biglietto (solo su questo dispositivo)",
+                checked = state.notifyOnWalletReminder,
+                enabled = !state.isLoading && pendingEnableKey == null,
+                onCheckedChange = { enabled ->
+                    if (!enabled) {
+                        viewModel.setWalletReminderLocal(false)
+                        return@NotificationToggleRow
+                    }
+                    updatePreferenceWithPermission(
+                        key = LOCAL_WALLET_REMINDER_KEY,
+                        enabled = true,
+                        context = context,
+                        setPendingKey = { pendingEnableKey = it },
+                        requestPermission = {
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        },
+                        onSet = { _, value, _ ->
+                            if (value) viewModel.setWalletReminderLocal(true)
+                        },
+                    )
+                },
+            )
         }
         Spacer(Modifier.height(12.dp))
         SnackbarHost(hostState = snackbarHostState)
@@ -369,6 +398,8 @@ private fun NotificationToggleRow(
         )
     }
 }
+
+private const val LOCAL_WALLET_REMINDER_KEY = "__local_wallet_reminder__"
 
 private fun updatePreferenceWithPermission(
     key: String,

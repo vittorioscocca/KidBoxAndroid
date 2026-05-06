@@ -59,6 +59,102 @@ import it.vittorioscocca.kidbox.ui.theme.KidBoxColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.io.File
 
+/**
+ * Bottom sheet «Aggiungi allegato»: stesso contenuto di [HealthAttachmentsCard] (cure / analisi / visita).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HealthAttachmentSourcePickerSheet(
+    onDismiss: () -> Unit,
+    tintColor: Color,
+    onTakePhoto: () -> Unit,
+    onPickPhoto: () -> Unit,
+    onPickFile: () -> Unit,
+    onPickFromKidBoxDocuments: (() -> Unit)?,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = kb.background,
+        dragHandle = {
+            val hKb = MaterialTheme.kidBoxColors
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 40.dp, height = 4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(hKb.subtitle.copy(alpha = 0.35f)),
+                )
+            }
+        },
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
+            Text(
+                "Aggiungi allegato",
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                color = tintColor,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+            HorizontalDivider(color = kb.subtitle.copy(alpha = 0.15f))
+            AttachmentSourceRow(
+                label = "Scatta foto",
+                icon = Icons.Default.PhotoCamera,
+                tintColor = tintColor,
+                kb = kb,
+                showLeadingDivider = false,
+                onClick = {
+                    onDismiss()
+                    onTakePhoto()
+                },
+            )
+            AttachmentSourceRow(
+                label = "Scegli dalla libreria",
+                icon = Icons.Default.PhotoLibrary,
+                tintColor = tintColor,
+                kb = kb,
+                showLeadingDivider = true,
+                onClick = {
+                    onDismiss()
+                    onPickPhoto()
+                },
+            )
+            AttachmentSourceRow(
+                label = "File del telefono",
+                icon = Icons.Default.InsertDriveFile,
+                tintColor = tintColor,
+                kb = kb,
+                showLeadingDivider = true,
+                onClick = {
+                    onDismiss()
+                    onPickFile()
+                },
+            )
+            if (onPickFromKidBoxDocuments != null) {
+                AttachmentSourceRow(
+                    label = "Da KidBox Documenti",
+                    icon = Icons.Default.Folder,
+                    tintColor = tintColor,
+                    kb = kb,
+                    showLeadingDivider = true,
+                    onClick = {
+                        onDismiss()
+                        onPickFromKidBoxDocuments()
+                    },
+                )
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HealthAttachmentsCard(
@@ -76,7 +172,6 @@ fun HealthAttachmentsCard(
     val kb = MaterialTheme.kidBoxColors
     var showSheet by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<KBDocumentEntity?>(null) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     Card(
         colors = CardDefaults.cardColors(containerColor = kb.card),
@@ -148,78 +243,15 @@ fun HealthAttachmentsCard(
         }
     }
 
-    // Add-attachment bottom sheet
     if (showSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showSheet = false },
-            sheetState = sheetState,
-            containerColor = kb.background,
-            dragHandle = {
-                val hKb = MaterialTheme.kidBoxColors
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(width = 40.dp, height = 4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(hKb.subtitle.copy(alpha = 0.35f)),
-                    )
-                }
-            },
-        ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
-                Text(
-                    "Aggiungi allegato",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = tintColor,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                )
-                HorizontalDivider(color = kb.subtitle.copy(alpha = 0.15f))
-                AttachmentSourceRow(
-                    label = "Scatta foto",
-                    icon = Icons.Default.PhotoCamera,
-                    tintColor = tintColor,
-                    kb = kb,
-                    showLeadingDivider = false,
-                    onClick = { showSheet = false; onTakePhoto() },
-                )
-                AttachmentSourceRow(
-                    label = "Scegli dalla libreria",
-                    icon = Icons.Default.PhotoLibrary,
-                    tintColor = tintColor,
-                    kb = kb,
-                    showLeadingDivider = true,
-                    onClick = { showSheet = false; onPickPhoto() },
-                )
-                AttachmentSourceRow(
-                    label = "File del telefono",
-                    icon = Icons.Default.InsertDriveFile,
-                    tintColor = tintColor,
-                    kb = kb,
-                    showLeadingDivider = true,
-                    onClick = { showSheet = false; onPickFile() },
-                )
-                if (onPickFromKidBoxDocuments != null) {
-                    AttachmentSourceRow(
-                        label = "Da KidBox Documenti",
-                        icon = Icons.Default.Folder,
-                        tintColor = tintColor,
-                        kb = kb,
-                        showLeadingDivider = true,
-                        onClick = {
-                            showSheet = false
-                            onPickFromKidBoxDocuments()
-                        },
-                    )
-                }
-            }
-        }
+        HealthAttachmentSourcePickerSheet(
+            onDismiss = { showSheet = false },
+            tintColor = tintColor,
+            onTakePhoto = onTakePhoto,
+            onPickPhoto = onPickPhoto,
+            onPickFile = onPickFile,
+            onPickFromKidBoxDocuments = onPickFromKidBoxDocuments,
+        )
     }
 
     // Delete confirmation dialog

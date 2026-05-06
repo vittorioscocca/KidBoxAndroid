@@ -21,6 +21,7 @@ data class HomeBadges(
     val notes: Int = 0,
     val calendar: Int = 0,
     val expenses: Int = 0,
+    val wallet: Int = 0,
 )
 
 enum class CounterField(val raw: String) {
@@ -33,6 +34,7 @@ enum class CounterField(val raw: String) {
     NOTES("notes"),
     CALENDAR("calendar"),
     EXPENSES("expenses"),
+    WALLET("wallet"),
 }
 
 @Singleton
@@ -71,6 +73,7 @@ class HomeBadgeManager @Inject constructor(
                     notes = d.intValue("notes"),
                     calendar = d.intValue("calendar"),
                     expenses = d.intValue("expenses"),
+                    wallet = d.intValue("wallet"),
                 )
             }
     }
@@ -94,6 +97,7 @@ class HomeBadgeManager @Inject constructor(
             CounterField.NOTES -> curr.copy(notes = 0)
             CounterField.CALENDAR -> curr.copy(calendar = 0)
             CounterField.EXPENSES -> curr.copy(expenses = 0)
+            CounterField.WALLET -> curr.copy(wallet = 0)
         }
     }
 

@@ -48,6 +48,8 @@ data class MedicalTreatmentFormState(
     val scheduleTimes: List<String> = listOf("08:00"),
     val notes: String = "",
     val reminderEnabled: Boolean = false,
+    /** Impostato quando la cura è collegata da una visita. */
+    val prescribingVisitId: String? = null,
     val attachments: List<KBDocumentEntity> = emptyList(),
     val isUploading: Boolean = false,
     val openFileEvent: Pair<String, File>? = null,
@@ -123,6 +125,7 @@ class MedicalTreatmentFormViewModel @Inject constructor(
                     scheduleTimes = times.ifEmpty { listOf("08:00") },
                     notes = t.notes.orEmpty(),
                     reminderEnabled = t.reminderEnabled,
+                    prescribingVisitId = t.prescribingVisitId,
                 )
             } else {
                 _uiState.value = _uiState.value.copy(isLoading = false)
@@ -188,6 +191,7 @@ class MedicalTreatmentFormViewModel @Inject constructor(
 
     fun consumeOpenFileEvent() { _uiState.value = _uiState.value.copy(openFileEvent = null) }
     fun consumeUploadError() { _uiState.value = _uiState.value.copy(uploadError = null) }
+    fun consumeSaved() { _uiState.value = _uiState.value.copy(saved = false) }
 
     fun save() {
         val s = _uiState.value
@@ -202,6 +206,7 @@ class MedicalTreatmentFormViewModel @Inject constructor(
                 id = s.treatmentId,
                 familyId = familyId,
                 childId = childId,
+                prescribingVisitId = s.prescribingVisitId,
                 drugName = s.drugName.trim(),
                 activeIngredient = s.activeIngredient.takeIf { it.isNotBlank() },
                 dosageValue = dosage,

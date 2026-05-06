@@ -3,6 +3,7 @@ package it.vittorioscocca.kidbox.ui.screens.health
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.vittorioscocca.kidbox.ai.AiSettings
 import it.vittorioscocca.kidbox.data.local.AiConsentStore
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
@@ -10,21 +11,27 @@ import it.vittorioscocca.kidbox.data.local.dao.KBMedicalExamDao
 import it.vittorioscocca.kidbox.data.local.dao.KBMedicalVisitDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTreatmentDao
 import it.vittorioscocca.kidbox.data.local.dao.KBVaccineDao
+import it.vittorioscocca.kidbox.data.sync.MedicalExamSyncCenter
+import it.vittorioscocca.kidbox.data.sync.MedicalVisitSyncCenter
 import it.vittorioscocca.kidbox.data.sync.TreatmentSyncCenter
+import it.vittorioscocca.kidbox.data.sync.VaccineSyncCenter
 import it.vittorioscocca.kidbox.domain.model.KBExamStatus
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 data class HealthHomeState(
     val subjectName: String = "",
+    val visitIds: List<String> = emptyList(),
+    val examIds: List<String> = emptyList(),
+    val treatmentIds: List<String> = emptyList(),
+    val vaccineIds: List<String> = emptyList(),
     val activeTreatmentCount: Int = 0,
     val vaccineCount: Int = 0,
     val visitCount: Int = 0,
@@ -46,21 +53,32 @@ class HealthHomeViewModel @Inject constructor(
     private val vaccineDao: KBVaccineDao,
     private val aiConsentStore: AiConsentStore,
     private val treatmentSyncCenter: TreatmentSyncCenter,
+    private val visitSyncCenter: MedicalVisitSyncCenter,
+    private val examSyncCenter: MedicalExamSyncCenter,
+    private val vaccineSyncCenter: VaccineSyncCenter,
+    private val aiSettings: AiSettings,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HealthHomeState())
     val uiState: StateFlow<HealthHomeState> = _uiState.asStateFlow()
 
+    val isAiGloballyEnabled: StateFlow<Boolean> get() = aiSettings.isEnabled
+
     private var loadedFamilyId = ""
     private var loadedChildId = ""
+    private var observeJob: Job? = null
 
     fun load(familyId: String, childId: String) {
         if (loadedFamilyId == familyId && loadedChildId == childId) return
+        observeJob?.cancel()
         loadedFamilyId = familyId
         loadedChildId = childId
 
         if (familyId.isNotBlank()) {
             treatmentSyncCenter.start(familyId)
+            visitSyncCenter.start(familyId)
+            examSyncCenter.start(familyId)
+            vaccineSyncCenter.start(familyId)
         }
 
         _uiState.value = _uiState.value.copy(hasAiConsent = aiConsentStore.hasHealthAiConsent())
@@ -82,7 +100,7 @@ class HealthHomeViewModel @Inject constructor(
 
         val now = System.currentTimeMillis()
 
-        combine(
+        observeJob = combine(
             treatmentDao.observeByFamilyAndChild(familyId, childId),
             visitDao.observeByFamilyAndChild(familyId, childId),
             examDao.observeByFamilyAndChild(familyId, childId),
@@ -100,7 +118,8 @@ class HealthHomeViewModel @Inject constructor(
             }
             val timelineTotal = visits.size + exams.size + vaccines.size + activeForTimeline
             val hasAny = visits.isNotEmpty() || exams.isNotEmpty() || treatments.isNotEmpty() || vaccines.isNotEmpty()
-            _uiState.value = _uiState.value.copy(
+            val st = _uiState.value
+            _uiState.value = st.copy(
                 activeTreatmentCount = activeForCureCard,
                 vaccineCount = vaccines.size,
                 visitCount = visits.size,
@@ -108,6 +127,12 @@ class HealthHomeViewModel @Inject constructor(
                 pendingExamCount = pendingExams,
                 timelineEventCount = timelineTotal,
                 hasAnyHealthData = hasAny,
+                subjectName = st.subjectName,
+                hasAiConsent = st.hasAiConsent,
+                visitIds = visits.filter { !it.isDeleted }.map { it.id },
+                examIds = exams.filter { !it.isDeleted }.map { it.id },
+                treatmentIds = treatments.filter { !it.isDeleted }.map { it.id },
+                vaccineIds = vaccines.filter { !it.isDeleted }.map { it.id },
             )
         }
             .launchIn(viewModelScope)

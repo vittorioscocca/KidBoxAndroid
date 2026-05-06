@@ -52,6 +52,11 @@ class MedicalExamRepository @Inject constructor(
         pending
     }
 
+    suspend fun softDeleteById(examId: String) {
+        val exam = getById(examId) ?: return
+        softDelete(exam)
+    }
+
     suspend fun softDelete(exam: KBMedicalExam) = withContext(Dispatchers.IO) {
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()

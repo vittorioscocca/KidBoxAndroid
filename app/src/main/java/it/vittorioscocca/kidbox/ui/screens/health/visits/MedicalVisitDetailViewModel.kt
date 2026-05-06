@@ -9,11 +9,16 @@ import it.vittorioscocca.kidbox.data.health.VisitAttachmentTag
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
+import it.vittorioscocca.kidbox.data.local.mapper.decodeAsNeededDrugs
 import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
+import it.vittorioscocca.kidbox.data.local.mapper.decodeTherapyTypes
 import it.vittorioscocca.kidbox.data.repository.DocumentRepository
 import it.vittorioscocca.kidbox.data.repository.MedicalExamRepository
 import it.vittorioscocca.kidbox.data.repository.MedicalVisitRepository
 import it.vittorioscocca.kidbox.data.repository.TreatmentRepository
+import it.vittorioscocca.kidbox.ai.AiSettings
+import it.vittorioscocca.kidbox.domain.model.KBExamStatus
+import it.vittorioscocca.kidbox.domain.model.KBMedicalExam
 import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
 import it.vittorioscocca.kidbox.notifications.VisitReminderScheduler
 import java.io.File
@@ -25,11 +30,18 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+private val EXAM_DEADLINE_FMT = SimpleDateFormat("d MMM yyyy", Locale.ITALIAN)
 
 data class LinkedPrescriptionRow(
     val id: String,
     val title: String,
     val subtitle: String? = null,
+    /** Solo esami: colore icona (urgente = rosso). */
+    val examUrgent: Boolean = false,
 )
 
 data class MedicalVisitDetailState(
@@ -38,6 +50,8 @@ data class MedicalVisitDetailState(
     val childName: String = "",
     val linkedTreatments: List<LinkedPrescriptionRow> = emptyList(),
     val linkedExams: List<LinkedPrescriptionRow> = emptyList(),
+    val asNeededDrugRows: List<LinkedPrescriptionRow> = emptyList(),
+    val therapyTypeLabels: List<String> = emptyList(),
     val error: String? = null,
     val confirmDelete: Boolean = false,
     val deleted: Boolean = false,
@@ -57,10 +71,13 @@ class MedicalVisitDetailViewModel @Inject constructor(
     private val memberDao: KBFamilyMemberDao,
     private val attachmentService: HealthAttachmentService,
     private val documentRepository: DocumentRepository,
+    private val aiSettings: AiSettings,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MedicalVisitDetailState())
     val uiState: StateFlow<MedicalVisitDetailState> = _uiState.asStateFlow()
+
+    val isAiGloballyEnabled: StateFlow<Boolean> get() = aiSettings.isEnabled
 
     private var familyId: String = ""
     private var childId: String = ""
@@ -79,10 +96,11 @@ class MedicalVisitDetailViewModel @Inject constructor(
                 decodeStringList(visit.linkedTreatmentIdsJson).mapNotNull { tid ->
                     treatmentRepository.getById(tid)?.let { t ->
                         val dosage = if (t.dosageValue % 1.0 == 0.0) "%.0f".format(t.dosageValue) else "%.1f".format(t.dosageValue)
+                        val tail = if (t.isLongTerm) "lungo termine" else "${t.durationDays}gg"
                         LinkedPrescriptionRow(
                             id = t.id,
                             title = t.drugName,
-                            subtitle = "$dosage ${t.dosageUnit} · ${t.dailyFrequency}x/die",
+                            subtitle = "$dosage ${t.dosageUnit} · ${t.dailyFrequency}x/die · $tail",
                         )
                     }
                 }
@@ -91,23 +109,31 @@ class MedicalVisitDetailViewModel @Inject constructor(
             }
             val examRows = if (visit != null) {
                 decodeStringList(visit.linkedExamIdsJson).mapNotNull { eid ->
-                    examRepository.getById(eid)?.let { e ->
-                        LinkedPrescriptionRow(
-                            id = e.id,
-                            title = e.name,
-                            subtitle = if (e.isUrgent) "Urgente" else null,
-                        )
-                    }
+                    examRepository.getById(eid)?.let { e -> buildExamLinkedRow(e) }
                 }
             } else {
                 emptyList()
             }
+            val asNeededRows = visit?.let { v ->
+                decodeAsNeededDrugs(v.asNeededDrugsJson).map { d ->
+                    val dosage = if (d.dosageValue % 1.0 == 0.0) "%.0f".format(d.dosageValue) else "%.1f".format(d.dosageValue)
+                    val instr = d.instructions?.trim().orEmpty()
+                    val sub = buildString {
+                        append("$dosage ${d.dosageUnit}")
+                        if (instr.isNotEmpty()) append(" · ").append(instr)
+                    }
+                    LinkedPrescriptionRow(id = d.id, title = d.drugName, subtitle = sub)
+                }
+            } ?: emptyList()
+            val therapyLabels = visit?.let { decodeTherapyTypes(it.therapyTypesJson).map { it.rawValue } } ?: emptyList()
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 visit = visit,
                 childName = childName,
                 linkedTreatments = treatmentRows,
                 linkedExams = examRows,
+                asNeededDrugRows = asNeededRows,
+                therapyTypeLabels = therapyLabels,
                 error = if (visit == null) "Visita non trovata" else null,
             )
         }
@@ -172,6 +198,19 @@ class MedicalVisitDetailViewModel @Inject constructor(
 
     fun consumeUploadError() {
         _uiState.value = _uiState.value.copy(uploadError = null)
+    }
+
+    private fun buildExamLinkedRow(e: KBMedicalExam): LinkedPrescriptionRow {
+        val statusLabel = KBExamStatus.entries.firstOrNull { it.rawValue == e.statusRaw }?.rawValue ?: e.statusRaw
+        val entro = e.deadlineEpochMillis?.let { EXAM_DEADLINE_FMT.format(Date(it)) }
+        val subtitle = buildString {
+            if (entro != null) append("Entro: ").append(entro)
+            if (statusLabel.isNotBlank()) {
+                if (isNotEmpty()) append(" · ")
+                append(statusLabel)
+            }
+        }
+        return LinkedPrescriptionRow(id = e.id, title = e.name, subtitle = subtitle, examUrgent = e.isUrgent)
     }
 
     private suspend fun resolveChildName(id: String): String {

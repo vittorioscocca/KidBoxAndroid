@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox
 
 import android.app.Activity
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -29,7 +30,9 @@ import androidx.navigation.compose.rememberNavController
 import com.facebook.CallbackManager
 import dagger.hilt.android.AndroidEntryPoint
 import it.vittorioscocca.kidbox.data.local.AppTheme
+import android.net.Uri
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
+import it.vittorioscocca.kidbox.data.wallet.PendingWalletImport
 import it.vittorioscocca.kidbox.data.local.ThemePreference
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.navigation.AppNavGraph
@@ -60,6 +63,7 @@ class MainActivity : ComponentActivity() {
         clearAppBadgeAndNotifications()
         enableEdgeToEdge()
         pendingPushDeepLink = parsePushDeepLink(intent)
+        captureWalletShareIntent(intent)
         setContent {
             val theme by themePreference.getThemeFlow().collectAsState(AppTheme.SYSTEM)
             val darkTheme = when (theme) {
@@ -197,6 +201,20 @@ class MainActivity : ComponentActivity() {
                                 navController.navigate(AppDestination.Chat.route)
                                 pendingPushDeepLink = null
                             }
+
+                            "new_wallet_ticket" -> {
+                                if (deepLink.familyId.isNotBlank()) {
+                                    navController.navigate(AppDestination.WalletHome.createRoute(deepLink.familyId))
+                                }
+                                pendingPushDeepLink = null
+                            }
+
+                            "wallet_ticket_reminder" -> {
+                                if (deepLink.familyId.isNotBlank()) {
+                                    navController.navigate(AppDestination.WalletHome.createRoute(deepLink.familyId))
+                                }
+                                pendingPushDeepLink = null
+                            }
                         }
                     }
                 }
@@ -208,6 +226,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingPushDeepLink = parsePushDeepLink(intent)
+        captureWalletShareIntent(intent)
         clearAppBadgeAndNotifications()
     }
 
@@ -240,17 +259,32 @@ class MainActivity : ComponentActivity() {
         val childId = src.safeGetString("push_child_id") ?: src.safeGetString("childId")
         val listId = src.safeGetString("push_list_id") ?: src.safeGetString("listId")
         val todoId = src.safeGetString("push_todo_id") ?: src.safeGetString("todoId")
+        val ticketId = src.safeGetString("ticketId")
         return PushDeepLink(
             type = type,
             familyId = familyId,
-            itemId = itemId ?: expenseId ?: docId ?: noteId,
+            itemId = itemId ?: expenseId ?: docId ?: noteId ?: ticketId,
             childId = childId,
             listId = listId,
             todoId = todoId,
             expenseId = expenseId,
             docId = docId,
             noteId = noteId,
+            ticketId = ticketId,
         )
+    }
+
+    private fun captureWalletShareIntent(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_SEND) return
+        val stream = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra(Intent.EXTRA_STREAM)
+        } ?: return
+        val type = intent.type.orEmpty()
+        if (type != "application/pdf" && !type.endsWith("/pdf")) return
+        PendingWalletImport.set(stream)
     }
 
     private fun clearAppBadgeAndNotifications() {
@@ -269,6 +303,7 @@ private data class PushDeepLink(
     val expenseId: String?,
     val docId: String?,
     val noteId: String?,
+    val ticketId: String?,
 )
 
 private fun Bundle?.safeGetString(key: String): String? = this?.getString(key)

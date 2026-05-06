@@ -32,6 +32,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBSharedLocationDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoListDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTreatmentDao
 import it.vittorioscocca.kidbox.data.local.dao.KBVaccineDao
+import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
 import it.vittorioscocca.kidbox.data.local.entity.KBAIConversationEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBAIMessageEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBCalendarEventEntity
@@ -62,9 +63,10 @@ import it.vittorioscocca.kidbox.data.local.entity.KBSharedLocationEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoListEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTreatmentEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBVaccineEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBWalletTicketEntity
 
 @Database(
-    version = 11,
+    version = 14,
     exportSchema = false,
     entities = [
         KBUserProfileEntity::class,
@@ -97,6 +99,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBVaccineEntity
         KBSharedLocationEntity::class,
         KBAIConversationEntity::class,
         KBAIMessageEntity::class,
+        KBWalletTicketEntity::class,
     ],
 )
 abstract class KidBoxDatabase : RoomDatabase() {
@@ -130,4 +133,5 @@ abstract class KidBoxDatabase : RoomDatabase() {
     abstract fun sharedLocationDao(): KBSharedLocationDao
     abstract fun aiConversationDao(): KBAIConversationDao
     abstract fun aiMessageDao(): KBAIMessageDao
+    abstract fun walletTicketDao(): WalletTicketDao
 }

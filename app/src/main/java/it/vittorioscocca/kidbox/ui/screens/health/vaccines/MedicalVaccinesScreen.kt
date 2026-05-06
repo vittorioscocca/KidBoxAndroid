@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -32,7 +30,6 @@ import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Vaccines
-import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Biotech
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.Delete
@@ -41,8 +38,7 @@ import androidx.compose.material.icons.outlined.LocalPharmacy
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.VerticalDivider
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -70,7 +66,9 @@ import it.vittorioscocca.kidbox.data.local.mapper.KBVaccineStatus
 import it.vittorioscocca.kidbox.data.local.mapper.KBVaccineType
 import it.vittorioscocca.kidbox.data.local.mapper.computedStatus
 import it.vittorioscocca.kidbox.domain.model.KBVaccine
-import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
+import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListAddBottomButton
+import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListDualSelectionBottomBar
+import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListTopToolbar
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -125,98 +123,70 @@ fun MedicalVaccinesScreen(
         }
     }
 
-    Column(
+    Scaffold(
         modifier = Modifier
             .fillMaxSize()
             .background(kb.background)
-            .statusBarsPadding()
-            .navigationBarsPadding(),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            KidBoxHeaderCircleButton(
-                icon = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Indietro",
-                onClick = onBack,
-            )
-            Spacer(Modifier.weight(1f))
-            Surface(
-                shape = RoundedCornerShape(999.dp),
-                color = kb.card,
-                tonalElevation = 1.dp,
-                shadowElevation = 2.dp,
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    val filterActive = state.timeFilter != VaccineListTimeFilter.ALL
-                    TextButton(
-                        onClick = { showFilterDialog = true },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    ) {
-                        Icon(
-                            Icons.Outlined.FilterList,
-                            contentDescription = "Filtro",
-                            tint = if (filterActive) SALMON else kb.title,
-                            modifier = Modifier.size(22.dp),
+            .statusBarsPadding(),
+        containerColor = kb.background,
+        bottomBar = {
+            if (!state.isLoading && !isTotallyEmpty) {
+                Column(Modifier.navigationBarsPadding()) {
+                    if (isSelecting) {
+                        HealthListDualSelectionBottomBar(
+                            tint = SALMON,
+                            allSelected = allFilteredIds.isNotEmpty() && selectedIds.size == allFilteredIds.size,
+                            hasSelection = selectedIds.isNotEmpty(),
+                            onToggleAll = {
+                                selectedIds =
+                                    if (selectedIds.size == allFilteredIds.size) emptySet() else allFilteredIds
+                            },
+                            onDelete = { showDeleteConfirm = true },
                         )
-                    }
-                    TextButton(
-                        onClick = {
-                            isSelecting = !isSelecting
-                            if (!isSelecting) selectedIds = emptySet()
-                        },
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
-                    ) {
-                        Text(
-                            if (isSelecting) "Fine" else "Seleziona",
-                            fontSize = 15.sp,
-                            color = kb.title,
-                            fontWeight = FontWeight.Medium,
+                    } else {
+                        HealthListAddBottomButton(
+                            tint = SALMON,
+                            label = "Aggiungi vaccino",
+                            onClick = onAdd,
                         )
-                    }
-                    if (!isSelecting) {
-                        Box(
-                            modifier = Modifier
-                                .padding(end = 6.dp, start = 2.dp)
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(SALMON.copy(alpha = 0.15f))
-                                .clickable { onAdd() },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                Icons.Default.Add,
-                                contentDescription = "Nuovo vaccino",
-                                tint = SALMON,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
                     }
                 }
             }
-        }
-
-        Text(
-            "Vaccini",
-            fontSize = 34.sp,
-            fontWeight = FontWeight.Bold,
-            color = kb.title,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-        )
-
-        if (state.timeFilter != VaccineListTimeFilter.ALL) {
-            VaccineFilterActivePill(
-                label = timeFilterLabel(state.timeFilter),
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                onClear = { viewModel.setTimeFilter(VaccineListTimeFilter.ALL) },
+        },
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+        ) {
+            HealthListTopToolbar(
+                tint = SALMON,
+                filterActive = state.timeFilter != VaccineListTimeFilter.ALL,
+                isSelecting = isSelecting,
+                onBack = onBack,
+                onFilterClick = { showFilterDialog = true },
+                onToggleSelectClick = {
+                    isSelecting = !isSelecting
+                    if (!isSelecting) selectedIds = emptySet()
+                },
+                onAddClick = onAdd,
             )
-        }
+
+            Text(
+                "Vaccini",
+                fontSize = 32.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = kb.title,
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp),
+            )
+
+            if (state.timeFilter != VaccineListTimeFilter.ALL) {
+                VaccineFilterActivePill(
+                    label = timeFilterLabel(state.timeFilter),
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+                    onClear = { viewModel.setTimeFilter(VaccineListTimeFilter.ALL) },
+                )
+            }
 
         if (state.isLoading) {
             Box(
@@ -241,7 +211,7 @@ fun MedicalVaccinesScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
+                    .padding(horizontal = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 item { Spacer(Modifier.height(4.dp)) }
@@ -293,23 +263,9 @@ fun MedicalVaccinesScreen(
                     },
                     onOpen = onOpen,
                 )
-                item { Spacer(Modifier.height(88.dp)) }
+                item { Spacer(Modifier.height(24.dp)) }
             }
         }
-
-        if (!state.isLoading && !isTotallyEmpty) {
-            if (isSelecting) {
-                SelectionBottomBar(
-                    allIds = allFilteredIds,
-                    selectedCount = selectedIds.size,
-                    onToggleSelectAll = {
-                        selectedIds = if (selectedIds.size == allFilteredIds.size) emptySet() else allFilteredIds
-                    },
-                    onDelete = { showDeleteConfirm = true },
-                )
-            } else {
-                AddVaccineButton(onClick = onAdd)
-            }
         }
     }
 
@@ -588,110 +544,6 @@ private fun VaccineRowIos(
                     tint = kb.subtitle.copy(alpha = 0.5f),
                     modifier = Modifier.size(16.dp),
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AddVaccineButton(onClick: () -> Unit) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        color = MaterialTheme.kidBoxColors.background,
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(SALMON)
-                .clickable(onClick = onClick)
-                .padding(vertical = 14.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clip(CircleShape)
-                        .background(Color.White),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = null,
-                        tint = SALMON,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-                Text(
-                    "Aggiungi vaccino",
-                    color = Color.White,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 17.sp,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SelectionBottomBar(
-    allIds: Set<String>,
-    selectedCount: Int,
-    onToggleSelectAll: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    val kb = MaterialTheme.kidBoxColors
-    val allSelected = allIds.isNotEmpty() && selectedCount == allIds.size
-    Column(modifier = Modifier.fillMaxWidth()) {
-        HorizontalDivider()
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(kb.background),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(
-                onClick = onToggleSelectAll,
-                modifier = Modifier.weight(1f),
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = if (allSelected) Icons.Default.CheckCircle else Icons.Outlined.Apps,
-                        contentDescription = null,
-                        tint = SALMON,
-                        modifier = Modifier.size(22.dp),
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        if (allSelected) "Deseleziona" else "Tutti",
-                        fontSize = 11.sp,
-                        color = SALMON,
-                    )
-                }
-            }
-            VerticalDivider(modifier = Modifier.height(40.dp))
-            TextButton(
-                onClick = onDelete,
-                enabled = selectedCount > 0,
-                modifier = Modifier.weight(1f),
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Outlined.Delete,
-                        contentDescription = null,
-                        tint = if (selectedCount > 0) RED else kb.subtitle,
-                        modifier = Modifier.size(22.dp),
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Elimina",
-                        fontSize = 11.sp,
-                        color = if (selectedCount > 0) RED else kb.subtitle,
-                    )
-                }
             }
         }
     }

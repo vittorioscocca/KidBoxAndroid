@@ -69,6 +69,8 @@ class MedicalExamRemoteStore @Inject constructor() {
         }
 
         val payload = mapOf(
+            // Obbligatorio per iOS: parseDTO richiede d["id"] (oltre a documentId).
+            "id" to dto.id,
             "familyId" to dto.familyId,
             "childId" to dto.childId,
             "name" to dto.name,

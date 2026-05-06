@@ -39,4 +39,7 @@ interface KBFamilyDao {
 
     @Query("DELETE FROM kb_families")
     suspend fun deleteAll()
+
+    @Query("SELECT id FROM kb_families LIMIT 1")
+    suspend fun peekAnyFamilyId(): String?
 }

@@ -24,6 +24,7 @@ private const val TAG = "MedicalVisitSync"
 class MedicalVisitSyncCenter @Inject constructor(
     private val remote: MedicalVisitRemoteStore,
     private val dao: KBMedicalVisitDao,
+    private val examSync: MedicalExamSyncCenter,
 ) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val listeners = mutableMapOf<String, ListenerRegistration>()
@@ -68,6 +69,7 @@ class MedicalVisitSyncCenter @Inject constructor(
                 dao.upsert(dto.toEntity(familyId))
             }
         }
+        examSync.retryAfterVisitSnapshotPersisted(familyId)
     }
 }
 
@@ -84,7 +86,7 @@ private fun RemoteMedicalVisitDto.toEntity(familyId: String) = KBMedicalVisitEnt
     recommendations = recommendations,
     linkedTreatmentIdsJson = linkedTreatmentIdsJson,
     linkedExamIdsJson = linkedExamIdsJson,
-    asNeededDrugsJson = null,
+    asNeededDrugsJson = asNeededDrugsJson.ifBlank { "[]" },
     therapyTypesJson = therapyTypesJson,
     prescribedExamsJson = null,
     photoUrlsJson = photoUrlsJson,

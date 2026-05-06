@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package it.vittorioscocca.kidbox.ui.screens.health.visits
 
 import android.Manifest
@@ -9,9 +11,11 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,9 +33,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MedicalServices
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.LocalPharmacy
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Notifications
@@ -41,9 +46,12 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -56,6 +64,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -64,11 +73,13 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.ai.AskAiButton
 import it.vittorioscocca.kidbox.data.local.mapper.KBDoctorSpecialization
 import it.vittorioscocca.kidbox.data.local.mapper.KBVisitStatus
 import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
 import it.vittorioscocca.kidbox.ui.screens.health.attachments.HealthAttachmentsCard
 import it.vittorioscocca.kidbox.ui.screens.health.attachments.KidBoxDocumentPickerSheet
+import it.vittorioscocca.kidbox.ui.theme.KidBoxColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.io.File
 import java.text.SimpleDateFormat
@@ -76,8 +87,12 @@ import java.util.Date
 import java.util.Locale
 
 private val DATE_LONG_FMT = SimpleDateFormat("d MMMM yyyy · HH:mm", Locale.ITALIAN)
+private val NEXT_VISIT_DATE_FMT = SimpleDateFormat("EEEE d MMMM yyyy", Locale.ITALIAN)
 private val ORANGE_DETAIL = Color(0xFFFF6B00)
 private val DANGER_RED = Color(0xFFD32F2F)
+/** Tint sezioni dettaglio visita (allineato a iOS). */
+private val VISIT_DETAIL_TINT = Color(0xFF5599D9)
+private val NEXT_APPT_GREEN = Color(0xFF2E7D32)
 
 @Composable
 fun MedicalVisitDetailScreen(
@@ -88,11 +103,20 @@ fun MedicalVisitDetailScreen(
     onEdit: () -> Unit,
     onOpenTreatment: (treatmentId: String) -> Unit = {},
     onOpenExam: (examId: String) -> Unit = {},
+    onOpenVisitAiChat: (
+        subjectName: String,
+        visitTitle: String,
+        visitDate: String,
+        diagnosis: String,
+        notes: String,
+    ) -> Unit = { _, _, _, _, _ -> },
     viewModel: MedicalVisitDetailViewModel = hiltViewModel(),
 ) {
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isAiGloballyEnabled by viewModel.isAiGloballyEnabled.collectAsStateWithLifecycle()
+    var showAiChat by remember { mutableStateOf(false) }
 
     LaunchedEffect(familyId, childId, visitId) { viewModel.bind(familyId, childId, visitId) }
     LaunchedEffect(state.deleted) { if (state.deleted) onBack() }
@@ -112,6 +136,21 @@ fun MedicalVisitDetailScreen(
             runCatching { context.startActivity(intent) }
             viewModel.consumeOpenFileEvent()
         }
+    }
+
+    LaunchedEffect(showAiChat) {
+        if (!showAiChat) return@LaunchedEffect
+        val v = state.visit
+        if (v != null) {
+            onOpenVisitAiChat(
+                state.childName.ifBlank { "Profilo" },
+                v.reason.ifBlank { "Visita medica" },
+                DATE_LONG_FMT.format(Date(v.dateEpochMillis)),
+                v.diagnosis.orEmpty(),
+                v.notes.orEmpty(),
+            )
+        }
+        showAiChat = false
     }
 
     val cameraFile = remember { File(File(context.cacheDir, "health-camera").apply { mkdirs() }, "visit_camera_tmp.jpg") }
@@ -185,19 +224,6 @@ fun MedicalVisitDetailScreen(
                             onClick = onBack,
                         )
                         Spacer(Modifier.weight(1f))
-                        KidBoxHeaderCircleButton(
-                            icon = Icons.Default.Edit,
-                            contentDescription = "Modifica",
-                            onClick = onEdit,
-                            iconTint = ORANGE_DETAIL,
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        KidBoxHeaderCircleButton(
-                            icon = Icons.Default.Delete,
-                            contentDescription = "Elimina",
-                            onClick = { viewModel.requestDelete() },
-                            iconTint = Color(0xFFE53935),
-                        )
                     }
                     Spacer(Modifier.height(8.dp))
 
@@ -266,11 +292,11 @@ fun MedicalVisitDetailScreen(
                     }
                     Spacer(Modifier.height(12.dp))
 
-                    // ── Esito card ─────────────────────────────────────────────
+                    // ── Esito (stesso ordine iOS) ───────────────────────────────
                     val hasDiagnosis = !visit.diagnosis.isNullOrBlank()
                     val hasRecommendations = !visit.recommendations.isNullOrBlank()
                     if (hasDiagnosis || hasRecommendations) {
-                        DetailSectionCard(title = "Esito") {
+                        DetailSectionCard(title = "Esito della Visita", titleAllCaps = false) {
                             if (hasDiagnosis) {
                                 DetailBlock("Diagnosi", visit.diagnosis!!)
                             }
@@ -282,80 +308,38 @@ fun MedicalVisitDetailScreen(
                         Spacer(Modifier.height(12.dp))
                     }
 
-                    // ── Note card ──────────────────────────────────────────────
-                    if (!visit.notes.isNullOrBlank()) {
-                        DetailSectionCard(title = "Appunti") {
-                            Text(visit.notes!!, fontSize = 14.sp, color = kb.title)
-                        }
+                    // ── Farmaci programmati (cure collegate) ───────────────────
+                    if (state.linkedTreatments.isNotEmpty()) {
+                        FarmaciProgrammatiCard(
+                            rows = state.linkedTreatments,
+                            tint = VISIT_DETAIL_TINT,
+                            kb = kb,
+                            onOpenTreatment = onOpenTreatment,
+                        )
                         Spacer(Modifier.height(12.dp))
                     }
 
-                    // ── Prossima visita card ────────────────────────────────────
-                    if (visit.nextVisitDateEpochMillis != null) {
-                        DetailSectionCard(title = "Prossima visita") {
-                            Text(
-                                DATE_LONG_FMT.format(Date(visit.nextVisitDateEpochMillis)),
-                                fontSize = 13.sp,
-                                color = kb.subtitle,
-                            )
-                            if (!visit.nextVisitReason.isNullOrBlank()) {
-                                Spacer(Modifier.height(4.dp))
-                                Text(visit.nextVisitReason!!, fontSize = 14.sp, color = kb.title)
-                            }
-                            if (visit.nextVisitReminderOn) {
-                                Spacer(Modifier.height(6.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.Default.Notifications,
-                                        contentDescription = null,
-                                        tint = ORANGE_DETAIL,
-                                        modifier = Modifier.size(14.dp),
-                                    )
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("Promemoria attivo", fontSize = 12.sp, color = ORANGE_DETAIL)
-                                }
-                            }
-                        }
+                    // ── Prescrizioni (al bisogno, terapie, esami) ───────────────
+                    val hasPrescriptions =
+                        state.asNeededDrugRows.isNotEmpty() ||
+                            state.therapyTypeLabels.isNotEmpty() ||
+                            state.linkedExams.isNotEmpty()
+                    if (hasPrescriptions) {
+                        PrescrizioniDetailCard(
+                            asNeeded = state.asNeededDrugRows,
+                            therapies = state.therapyTypeLabels,
+                            exams = state.linkedExams,
+                            tint = VISIT_DETAIL_TINT,
+                            kb = kb,
+                            onOpenExam = onOpenExam,
+                        )
                         Spacer(Modifier.height(12.dp))
                     }
 
-                    if (state.linkedTreatments.isNotEmpty() || state.linkedExams.isNotEmpty()) {
-                        DetailSectionCard(title = "Prescritto in questa visita") {
-                            if (state.linkedTreatments.isNotEmpty()) {
-                                Text("Cure", fontSize = 12.sp, color = kb.subtitle, fontWeight = FontWeight.SemiBold)
-                                Spacer(Modifier.height(6.dp))
-                                state.linkedTreatments.forEach { row ->
-                                    LinkedRow(
-                                        title = row.title,
-                                        subtitle = row.subtitle,
-                                        leadingIcon = { Icon(Icons.Default.Medication, contentDescription = null, tint = ORANGE_DETAIL, modifier = Modifier.size(22.dp)) },
-                                        onClick = { onOpenTreatment(row.id) },
-                                    )
-                                    Spacer(Modifier.height(6.dp))
-                                }
-                            }
-                            if (state.linkedExams.isNotEmpty()) {
-                                if (state.linkedTreatments.isNotEmpty()) Spacer(Modifier.height(8.dp))
-                                Text("Analisi / esami", fontSize = 12.sp, color = kb.subtitle, fontWeight = FontWeight.SemiBold)
-                                Spacer(Modifier.height(6.dp))
-                                state.linkedExams.forEach { row ->
-                                    LinkedRow(
-                                        title = row.title,
-                                        subtitle = row.subtitle,
-                                        leadingIcon = { Icon(Icons.Default.Science, contentDescription = null, tint = Color(0xFF40A6BF), modifier = Modifier.size(22.dp)) },
-                                        onClick = { onOpenExam(row.id) },
-                                    )
-                                    Spacer(Modifier.height(6.dp))
-                                }
-                            }
-                        }
-                        Spacer(Modifier.height(12.dp))
-                    }
-
-                    // ── Allegati card ──────────────────────────────────────────
+                    // ── Allegati ──────────────────────────────────────────────
                     HealthAttachmentsCard(
                         attachments = state.attachments,
-                        tintColor = ORANGE_DETAIL,
+                        tintColor = VISIT_DETAIL_TINT,
                         isUploading = state.isUploading,
                         onPickFile = { pickFileLauncher.launch(arrayOf("*/*")) },
                         onPickPhoto = { pickPhotoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
@@ -370,10 +354,29 @@ fun MedicalVisitDetailScreen(
                         onDeleteAttachment = { viewModel.deleteAttachment(it) },
                         onPickFromKidBoxDocuments = { showKidBoxDocPicker = true },
                     )
+                    Spacer(Modifier.height(12.dp))
+
+                    // ── Prossimo appuntamento (dopo allegati, come iOS) ─────────
+                    if (visit.nextVisitDateEpochMillis != null) {
+                        NextAppointmentCard(
+                            visit = visit,
+                            kb = kb,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                    }
+
+                    // ── Appunti ─────────────────────────────────────────────────
+                    if (!visit.notes.isNullOrBlank()) {
+                        DetailSectionCard(title = "Appunti", titleAllCaps = false) {
+                            Text(visit.notes!!, fontSize = 14.sp, color = kb.title)
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
+
                     Spacer(Modifier.height(24.dp))
                 }
 
-                // ── Sticky bottom action bar ───────────────────────────────────
+                // ── Sticky bottom action bar (stile iOS) ───────────────────────
                 Row(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -386,18 +389,30 @@ fun MedicalVisitDetailScreen(
                         onClick = onEdit,
                         modifier = Modifier.weight(1f).height(50.dp),
                         shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = ORANGE_DETAIL),
+                        colors = ButtonDefaults.buttonColors(containerColor = VISIT_DETAIL_TINT),
                     ) {
                         Text("Modifica", color = Color.White, fontWeight = FontWeight.SemiBold)
                     }
-                    Button(
+                    OutlinedButton(
                         onClick = { viewModel.requestDelete() },
                         modifier = Modifier.weight(1f).height(50.dp),
                         shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = DANGER_RED),
+                        border = BorderStroke(1.5.dp, DANGER_RED.copy(alpha = 0.5f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = DANGER_RED),
                     ) {
-                        Text("Elimina", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text("Elimina", fontWeight = FontWeight.SemiBold)
                     }
+                }
+
+                if (isAiGloballyEnabled) {
+                    AskAiButton(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 20.dp, bottom = 96.dp),
+                        isEnabled = true,
+                        contentDescription = "Chiedi all'AI sulla visita",
+                        onTap = { showAiChat = true },
+                    )
                 }
             }
         }
@@ -432,7 +447,228 @@ fun MedicalVisitDetailScreen(
 // ── Sub-composables ────────────────────────────────────────────────────────────
 
 @Composable
-private fun DetailSectionCard(title: String, content: @Composable () -> Unit) {
+private fun VisitDetailSectionHeader(title: String, icon: ImageVector, tint: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = tint)
+    }
+}
+
+@Composable
+private fun FarmaciProgrammatiCard(
+    rows: List<LinkedPrescriptionRow>,
+    tint: Color,
+    kb: KidBoxColorScheme,
+    onOpenTreatment: (String) -> Unit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = kb.card),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            VisitDetailSectionHeader(
+                title = "Farmaci Programmati (${rows.size})",
+                icon = Icons.Default.Medication,
+                tint = tint,
+            )
+            Spacer(Modifier.height(10.dp))
+            rows.forEach { row ->
+                LinkedRow(
+                    title = row.title,
+                    subtitle = row.subtitle,
+                    leadingIconTint = tint,
+                    onClick = { onOpenTreatment(row.id) },
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrescrizioniDetailCard(
+    asNeeded: List<LinkedPrescriptionRow>,
+    therapies: List<String>,
+    exams: List<LinkedPrescriptionRow>,
+    tint: Color,
+    kb: KidBoxColorScheme,
+    onOpenExam: (String) -> Unit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = kb.card),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            VisitDetailSectionHeader(
+                title = "Prescrizioni",
+                icon = Icons.Default.LocalPharmacy,
+                tint = tint,
+            )
+            Spacer(Modifier.height(12.dp))
+
+            if (asNeeded.isNotEmpty()) {
+                PrescriptionSubHeader(title = "Al Bisogno", icon = Icons.Default.LocalPharmacy, kb = kb)
+                Spacer(Modifier.height(8.dp))
+                asNeeded.forEach { drug ->
+                    AsNeededDrugRow(drug = drug, tint = tint, kb = kb)
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+
+            if (therapies.isNotEmpty()) {
+                if (asNeeded.isNotEmpty()) {
+                    HorizontalDivider(color = kb.subtitle.copy(alpha = 0.12f))
+                    Spacer(Modifier.height(12.dp))
+                }
+                PrescriptionSubHeader(title = "Terapie", icon = Icons.Default.DirectionsWalk, kb = kb)
+                Spacer(Modifier.height(8.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    therapies.forEach { label ->
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = tint.copy(alpha = 0.10f),
+                        ) {
+                            Text(
+                                label,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                fontSize = 12.sp,
+                                color = tint,
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (exams.isNotEmpty()) {
+                if (asNeeded.isNotEmpty() || therapies.isNotEmpty()) {
+                    HorizontalDivider(color = kb.subtitle.copy(alpha = 0.12f))
+                    Spacer(Modifier.height(12.dp))
+                }
+                PrescriptionSubHeader(
+                    title = "Esami Prescritti (${exams.size})",
+                    icon = Icons.Default.Science,
+                    kb = kb,
+                )
+                Spacer(Modifier.height(8.dp))
+                exams.forEach { row ->
+                    LinkedExamRow(
+                        row = row,
+                        tint = tint,
+                        onClick = { onOpenExam(row.id) },
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrescriptionSubHeader(title: String, icon: ImageVector, kb: KidBoxColorScheme) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(14.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = kb.subtitle)
+    }
+}
+
+@Composable
+private fun AsNeededDrugRow(drug: LinkedPrescriptionRow, tint: Color, kb: KidBoxColorScheme) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(kb.subtitle.copy(alpha = 0.08f))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(tint.copy(alpha = 0.15f)),
+        )
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(drug.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = kb.title)
+            if (!drug.subtitle.isNullOrBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(drug.subtitle, fontSize = 12.sp, color = kb.subtitle, maxLines = 2)
+            }
+        }
+    }
+}
+
+@Composable
+private fun NextAppointmentCard(visit: KBMedicalVisit, kb: KidBoxColorScheme) {
+    val nextMs = visit.nextVisitDateEpochMillis ?: return
+    Card(
+        colors = CardDefaults.cardColors(containerColor = kb.card),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(NEXT_APPT_GREEN.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Default.CalendarMonth,
+                    contentDescription = null,
+                    tint = NEXT_APPT_GREEN,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Prossimo Appuntamento", fontSize = 12.sp, color = kb.subtitle)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    NEXT_VISIT_DATE_FMT.format(Date(nextMs)),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = kb.title,
+                )
+                visit.nextVisitReason?.takeIf { it.isNotBlank() }?.let { reason ->
+                    Spacer(Modifier.height(4.dp))
+                    Text(reason, fontSize = 12.sp, color = kb.subtitle)
+                }
+                if (visit.nextVisitReminderOn) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Notifications,
+                            contentDescription = null,
+                            tint = ORANGE_DETAIL,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Promemoria attivo", fontSize = 12.sp, color = ORANGE_DETAIL)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailSectionCard(
+    title: String,
+    titleAllCaps: Boolean = true,
+    content: @Composable () -> Unit,
+) {
     val kb = MaterialTheme.kidBoxColors
     Card(
         colors = CardDefaults.cardColors(containerColor = kb.card),
@@ -440,8 +676,13 @@ private fun DetailSectionCard(title: String, content: @Composable () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(title.uppercase(), fontWeight = FontWeight.Bold, fontSize = 11.sp,
-                color = kb.subtitle, letterSpacing = 0.8.sp)
+            Text(
+                text = if (titleAllCaps) title.uppercase() else title,
+                fontWeight = FontWeight.Bold,
+                fontSize = if (titleAllCaps) 11.sp else 14.sp,
+                color = if (titleAllCaps) kb.subtitle else kb.title,
+                letterSpacing = if (titleAllCaps) 0.8.sp else 0.sp,
+            )
             Spacer(Modifier.height(8.dp))
             content()
         }
@@ -452,7 +693,7 @@ private fun DetailSectionCard(title: String, content: @Composable () -> Unit) {
 private fun LinkedRow(
     title: String,
     subtitle: String?,
-    leadingIcon: @Composable () -> Unit,
+    leadingIconTint: Color = VISIT_DETAIL_TINT,
     onClick: () -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -465,13 +706,86 @@ private fun LinkedRow(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        leadingIcon()
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(leadingIconTint.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.Medication,
+                contentDescription = null,
+                tint = leadingIconTint,
+                modifier = Modifier.size(18.dp),
+            )
+        }
         Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = kb.title)
             if (!subtitle.isNullOrBlank()) {
                 Spacer(Modifier.height(2.dp))
                 Text(subtitle, fontSize = 12.sp, color = kb.subtitle)
+            }
+        }
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = kb.subtitle.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun LinkedExamRow(
+    row: LinkedPrescriptionRow,
+    tint: Color,
+    onClick: () -> Unit,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    val iconTint = if (row.examUrgent) Color(0xFFE53935) else tint
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(kb.subtitle.copy(alpha = 0.08f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(iconTint.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.Science,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(row.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = kb.title)
+                if (row.examUrgent) {
+                    Spacer(Modifier.width(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = Color(0xFFE53935),
+                    ) {
+                        Text(
+                            "Urgente",
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                        )
+                    }
+                }
+            }
+            if (!row.subtitle.isNullOrBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(row.subtitle, fontSize = 12.sp, color = kb.subtitle)
             }
         }
         Icon(Icons.Default.ChevronRight, contentDescription = null, tint = kb.subtitle.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))

@@ -46,6 +46,7 @@ import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material.icons.filled.Favorite
@@ -678,6 +679,17 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
     FeatureItem("expenses", "Spese", "Rette, visite, extra", AppDestination.ExpensesHome.createRoute(familyId), Icons.Filled.Euro, Color(0xFFFFF3E6), Color(0xFFFF6B00), state.badgeExpenses, CounterField.EXPENSES),
     FeatureItem("documents", "Documenti", "Carte importanti", AppDestination.DocumentsHome.createRoute(familyId), Icons.Filled.Description, Color(0xFFEBF3FF), Color(0xFF2E86FF), state.badgeDocuments, CounterField.DOCUMENTS),
     FeatureItem(
+        "wallet",
+        "Wallet",
+        "Biglietti e PDF",
+        AppDestination.WalletHome.createRoute(familyId),
+        Icons.Filled.ConfirmationNumber,
+        Color(0xFFE8F4FF),
+        Color(0xFF007AFF),
+        state.badgeWallet,
+        CounterField.WALLET,
+    ),
+    FeatureItem(
         "location",
         "Posizione",
         "Dove sono tutti",
@@ -700,7 +712,7 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
         state.badgePhotos,
         CounterField.PHOTOS,
     ),
-    FeatureItem("ai", "Assistente AI", "Chiedi aiuto", AppDestination.AskExpert.route, Icons.Filled.Psychology, Color(0xFFEEF0FF), Color(0xFF5C6BC0)),
+    FeatureItem("ai", "Assistente AI", "Chiedi aiuto", AppDestination.PlanningAiChat.createRoute(familyId, state.familyName), Icons.Filled.Psychology, Color(0xFFEEF0FF), Color(0xFF5C6BC0)),
     FeatureItem("family", "Family", "Gestisci famiglia", AppDestination.FamilySettings.route, Icons.Filled.Person, Color(0xFFFFF3E6), Color(0xFFFF6B00)),
 )
 

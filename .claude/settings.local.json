@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/Users/vscocca/KidBox/KidBoxAndroid/gradlew :app:compileDebugKotlin --daemon)",
+      "Bash(gradle --version)"
+    ]
+  }
+}

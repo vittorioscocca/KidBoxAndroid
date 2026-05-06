@@ -107,6 +107,7 @@ import it.vittorioscocca.kidbox.domain.model.TreatmentSchedulePeriod
 import it.vittorioscocca.kidbox.domain.model.schedulePeriodForTime
 import it.vittorioscocca.kidbox.domain.model.schedulePeriodLabel
 import it.vittorioscocca.kidbox.ui.screens.health.attachments.HealthAttachmentsCard
+import it.vittorioscocca.kidbox.ui.screens.health.common.PrescribingVisitLinkCard
 import it.vittorioscocca.kidbox.ui.screens.health.attachments.KidBoxDocumentPickerSheet
 import it.vittorioscocca.kidbox.ui.theme.KidBoxColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
@@ -176,6 +177,8 @@ private fun isTherapeuticCalendarDayFuture(dayMillis: Long): Boolean {
 
 private data class ConfirmDoseUi(val slot: DoseSlot, val dayLabel: String, val dayDateMillis: Long)
 
+private val VISIT_PRESCRIBING_TINT = Color(0xFF5996D9)
+
 @Composable
 fun MedicalTreatmentDetailScreen(
     familyId: String,
@@ -183,6 +186,7 @@ fun MedicalTreatmentDetailScreen(
     treatmentId: String,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onOpenVisit: (visitId: String) -> Unit = {},
     viewModel: MedicalTreatmentDetailViewModel = hiltViewModel(),
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -529,6 +533,15 @@ fun MedicalTreatmentDetailScreen(
                         colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PURPLE_DETAIL),
                     )
                 }
+            }
+
+            state.prescribingVisitSummary?.let { pv ->
+                Spacer(Modifier.height(8.dp))
+                PrescribingVisitLinkCard(
+                    summary = pv,
+                    tint = VISIT_PRESCRIBING_TINT,
+                    onClick = { onOpenVisit(pv.visitId) },
+                )
             }
 
             HealthAttachmentsCard(

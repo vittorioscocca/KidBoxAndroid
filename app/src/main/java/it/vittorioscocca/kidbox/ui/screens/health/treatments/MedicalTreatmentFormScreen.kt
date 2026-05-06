@@ -98,7 +98,7 @@ fun MedicalTreatmentFormScreen(
     childId: String,
     treatmentId: String?,
     onBack: () -> Unit,
-    onSaved: () -> Unit = onBack,
+    onSaved: (treatmentId: String) -> Unit = { _ -> onBack() },
     viewModel: MedicalTreatmentFormViewModel = hiltViewModel(),
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -106,10 +106,12 @@ fun MedicalTreatmentFormScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(familyId, childId, treatmentId) { viewModel.bind(familyId, childId, treatmentId) }
-    LaunchedEffect(state.saved) {
+    LaunchedEffect(state.saved, state.treatmentId) {
         if (state.saved) {
             Toast.makeText(context, "Cura salvata", Toast.LENGTH_SHORT).show()
-            onSaved()
+            val id = state.treatmentId
+            viewModel.consumeSaved()
+            onSaved(id)
         }
     }
     LaunchedEffect(state.saveError) { state.saveError?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() } }

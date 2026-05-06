@@ -23,6 +23,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
 import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
 import it.vittorioscocca.kidbox.data.remote.family.FamilyHeroPhotoService
+import it.vittorioscocca.kidbox.data.repository.WalletRepository
 import it.vittorioscocca.kidbox.data.sync.FamilySyncCenter
 import it.vittorioscocca.kidbox.domain.auth.LogoutUseCase
 import it.vittorioscocca.kidbox.ui.screens.home.HeroCrop
@@ -74,6 +75,7 @@ data class HomeUiState(
     val badgeNotes: Int = 0,
     val badgeCalendar: Int = 0,
     val badgeExpenses: Int = 0,
+    val badgeWallet: Int = 0,
 )
 
 enum class HomeQuickAction(val key: String, val label: String) {
@@ -97,6 +99,7 @@ class HomeViewModel @Inject constructor(
     private val familySyncCenter: FamilySyncCenter,
     private val familySessionPreferences: FamilySessionPreferences,
     private val homeBadgeManager: HomeBadgeManager,
+    private val walletRepository: WalletRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -149,6 +152,7 @@ class HomeViewModel @Inject constructor(
 
                 if (familyId.isBlank()) {
                     homeBadgeManager.stopListening()
+                    walletRepository.stopRealtime()
                     syncedFamilyId = null
                     initialSyncCompleted = false
                     cancelMembersSyncTimeout()
@@ -200,6 +204,7 @@ class HomeViewModel @Inject constructor(
                     )
                 }.collect { (fam, memberCount, sharedUsers) ->
                     homeBadgeManager.startListening(familyId)
+                    walletRepository.startRealtime(familyId)
                     val shouldSyncMembers = !initialSyncCompleted || memberCount <= 0
                     val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
                     val isLocationSharing = if (currentUid.isBlank()) {
@@ -322,6 +327,7 @@ class HomeViewModel @Inject constructor(
                     badgeNotes = badges.notes,
                     badgeCalendar = badges.calendar,
                     badgeExpenses = badges.expenses,
+                    badgeWallet = badges.wallet,
                 )
             }
         }
@@ -691,6 +697,7 @@ class HomeViewModel @Inject constructor(
         "chat",
         "expenses",
         "documents",
+        "wallet",
         "location",
         "photos",
         "ai",
@@ -710,6 +717,7 @@ class HomeViewModel @Inject constructor(
     override fun onCleared() {
         cancelMembersSyncTimeout()
         homeBadgeManager.stopListening()
+        walletRepository.stopRealtime()
         super.onCleared()
     }
 }

@@ -17,6 +17,7 @@ import it.vittorioscocca.kidbox.data.sync.VaccineSyncCenter
 import it.vittorioscocca.kidbox.domain.model.HealthTimelineEvent
 import it.vittorioscocca.kidbox.domain.model.HealthTimelineEventKind
 import java.util.Calendar
+import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +32,22 @@ data class HealthTimelineState(
     val isLoading: Boolean = true,
     val subjectName: String = "",
     val events: List<HealthTimelineEvent> = emptyList(),
-    val eventsGroupedByYear: List<Pair<Int, List<HealthTimelineEvent>>> = emptyList(),
+    val selectedYear: Int? = null,
+    val searchQuery: String = "",
+    val activeKinds: Set<HealthTimelineEventKind> = emptySet(),
+    val availableYears: List<Int> = emptyList(),
+    val filteredCount: Int = 0,
+    val eventsGroupedByYearMonth: List<YearTimelineGroup> = emptyList(),
+)
+
+data class YearTimelineGroup(
+    val year: Int,
+    val months: List<MonthTimelineGroup>,
+)
+
+data class MonthTimelineGroup(
+    val month: Int,
+    val events: List<HealthTimelineEvent>,
 )
 
 @HiltViewModel
@@ -53,6 +69,7 @@ class HealthTimelineViewModel @Inject constructor(
 
     private var boundFamilyId = ""
     private var boundChildId = ""
+    private var allEvents: List<HealthTimelineEvent> = emptyList()
 
     fun bind(familyId: String, childId: String) {
         if (boundFamilyId == familyId && boundChildId == childId) return
@@ -145,29 +162,81 @@ class HealthTimelineViewModel @Inject constructor(
                     )
                 }
 
-            val combined = (visitEvents + examEvents + treatmentEvents + vaccineEvents)
+            (visitEvents + examEvents + treatmentEvents + vaccineEvents)
                 .sortedByDescending { it.dateEpochMillis }
-
-            val grouped = combined
-                .groupBy { event ->
-                    Calendar.getInstance().apply { timeInMillis = event.dateEpochMillis }
-                        .get(Calendar.YEAR)
-                }
-                .entries
-                .sortedByDescending { it.key }
-                .map { (year, events) -> year to events }
-
-            combined to grouped
         }
-            .onEach { (events, grouped) ->
+            .onEach { events ->
+                allEvents = events
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     events = events,
-                    eventsGroupedByYear = grouped,
+                    availableYears = extractAvailableYears(events),
                 )
+                recomputeFilteredState()
             }
             .launchIn(viewModelScope)
     }
+
+    fun toggleKind(kind: HealthTimelineEventKind) {
+        val current = _uiState.value.activeKinds.toMutableSet()
+        if (current.contains(kind)) current.remove(kind) else current.add(kind)
+        _uiState.value = _uiState.value.copy(activeKinds = current)
+        recomputeFilteredState()
+    }
+
+    fun setSelectedYear(year: Int?) {
+        _uiState.value = _uiState.value.copy(selectedYear = year)
+        recomputeFilteredState()
+    }
+
+    fun setSearchQuery(query: String) {
+        _uiState.value = _uiState.value.copy(searchQuery = query)
+        recomputeFilteredState()
+    }
+
+    private fun recomputeFilteredState() {
+        val s = _uiState.value
+        val q = s.searchQuery.trim().lowercase(Locale.ITALIAN)
+        val filtered = allEvents.filter { event ->
+            val kindOk = s.activeKinds.isEmpty() || s.activeKinds.contains(event.kind)
+            val yearOk = s.selectedYear == null || yearOf(event.dateEpochMillis) == s.selectedYear
+            val queryOk = q.isBlank() ||
+                event.title.lowercase(Locale.ITALIAN).contains(q) ||
+                event.subtitle.orEmpty().lowercase(Locale.ITALIAN).contains(q) ||
+                event.kind.rawLabel.lowercase(Locale.ITALIAN).contains(q)
+            kindOk && yearOk && queryOk
+        }
+        _uiState.value = s.copy(
+            filteredCount = filtered.size,
+            eventsGroupedByYearMonth = groupByYearMonth(filtered),
+        )
+    }
+
+    private fun extractAvailableYears(events: List<HealthTimelineEvent>): List<Int> =
+        events.map { yearOf(it.dateEpochMillis) }.distinct().sortedDescending()
+
+    private fun groupByYearMonth(events: List<HealthTimelineEvent>): List<YearTimelineGroup> {
+        val byYear = events.groupBy { yearOf(it.dateEpochMillis) }
+        return byYear.keys.sortedDescending().map { year ->
+            val yearEvents = byYear[year].orEmpty()
+            val byMonth = yearEvents.groupBy { monthOf(it.dateEpochMillis) }
+            YearTimelineGroup(
+                year = year,
+                months = byMonth.keys.sortedDescending().map { month ->
+                    MonthTimelineGroup(
+                        month = month,
+                        events = byMonth[month].orEmpty().sortedByDescending { it.dateEpochMillis },
+                    )
+                },
+            )
+        }
+    }
+
+    private fun yearOf(epochMillis: Long): Int =
+        Calendar.getInstance().apply { timeInMillis = epochMillis }.get(Calendar.YEAR)
+
+    private fun monthOf(epochMillis: Long): Int =
+        Calendar.getInstance().apply { timeInMillis = epochMillis }.get(Calendar.MONTH) + 1
 
     override fun onCleared() {
         super.onCleared()

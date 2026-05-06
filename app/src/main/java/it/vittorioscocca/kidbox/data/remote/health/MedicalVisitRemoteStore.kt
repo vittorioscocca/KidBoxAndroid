@@ -6,6 +6,8 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import javax.inject.Inject
 import javax.inject.Singleton
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
+import it.vittorioscocca.kidbox.data.local.mapper.encodeStringList
 import kotlinx.coroutines.tasks.await
 
 data class RemoteMedicalVisitDto(
@@ -26,6 +28,7 @@ data class RemoteMedicalVisitDto(
     val nextVisitReminderOn: Boolean,
     val linkedTreatmentIdsJson: String,
     val linkedExamIdsJson: String,
+    val asNeededDrugsJson: String,
     val therapyTypesJson: String,
     val photoUrlsJson: String,
     val isDeleted: Boolean,
@@ -60,6 +63,26 @@ class MedicalVisitRemoteStore @Inject constructor() {
                 if (snap == null) return@addSnapshotListener
                 val dtos = snap.documents.mapNotNull { doc ->
                     val data = doc.data ?: return@mapNotNull null
+                    val linkedTreatmentIdsJson = mergedStringListJsonField(
+                        data = data,
+                        jsonKey = "linkedTreatmentIdsJson",
+                        arrayKey = "linkedTreatmentIds",
+                    )
+                    val linkedExamIdsJson = mergedStringListJsonField(
+                        data = data,
+                        jsonKey = "linkedExamIdsJson",
+                        arrayKey = "linkedExamIds",
+                    )
+                    val therapyTypesJson = mergedStringListJsonField(
+                        data = data,
+                        jsonKey = "therapyTypesJson",
+                        arrayKey = "therapyTypesRaw",
+                    )
+                    val photoUrlsJson = mergedStringListJsonField(
+                        data = data,
+                        jsonKey = "photoUrlsJson",
+                        arrayKey = "photoURLs",
+                    )
                     RemoteMedicalVisitDto(
                         id = doc.id,
                         familyId = data["familyId"] as? String ?: familyId,
@@ -67,7 +90,8 @@ class MedicalVisitRemoteStore @Inject constructor() {
                         dateEpochMillis = (data["date"] as? Timestamp)?.toDate()?.time
                             ?: (data["dateEpochMillis"] as? Long ?: 0L),
                         doctorName = data["doctorName"] as? String,
-                        doctorSpecializationRaw = data["doctorSpecialization"] as? String,
+                        doctorSpecializationRaw = (data["doctorSpecialization"] as? String)
+                            ?: (data["doctorSpecializationRaw"] as? String),
                         reason = data["reason"] as? String ?: "",
                         diagnosis = data["diagnosis"] as? String,
                         recommendations = data["recommendations"] as? String,
@@ -78,10 +102,11 @@ class MedicalVisitRemoteStore @Inject constructor() {
                         nextVisitReason = data["nextVisitReason"] as? String,
                         reminderOn = data["reminderOn"] as? Boolean ?: false,
                         nextVisitReminderOn = data["nextVisitReminderOn"] as? Boolean ?: false,
-                        linkedTreatmentIdsJson = data["linkedTreatmentIdsJson"] as? String ?: "[]",
-                        linkedExamIdsJson = data["linkedExamIdsJson"] as? String ?: "[]",
-                        therapyTypesJson = data["therapyTypesJson"] as? String ?: "[]",
-                        photoUrlsJson = data["photoUrlsJson"] as? String ?: "[]",
+                        linkedTreatmentIdsJson = linkedTreatmentIdsJson,
+                        linkedExamIdsJson = linkedExamIdsJson,
+                        asNeededDrugsJson = data["asNeededDrugsJson"] as? String ?: "[]",
+                        therapyTypesJson = therapyTypesJson,
+                        photoUrlsJson = photoUrlsJson,
                         isDeleted = data["isDeleted"] as? Boolean ?: false,
                         updatedAtEpochMillis = (data["updatedAt"] as? Timestamp)?.toDate()?.time,
                         updatedBy = data["updatedBy"] as? String,
@@ -124,6 +149,7 @@ class MedicalVisitRemoteStore @Inject constructor() {
             "nextVisitReminderOn" to dto.nextVisitReminderOn,
             "linkedTreatmentIdsJson" to dto.linkedTreatmentIdsJson,
             "linkedExamIdsJson" to dto.linkedExamIdsJson,
+            "asNeededDrugsJson" to dto.asNeededDrugsJson,
             "therapyTypesJson" to dto.therapyTypesJson,
             "photoUrlsJson" to dto.photoUrlsJson,
             "isDeleted" to dto.isDeleted,
@@ -132,4 +158,25 @@ class MedicalVisitRemoteStore @Inject constructor() {
         )
         ref.set(payload, SetOptions.merge()).await()
     }
+}
+
+/**
+ * Preferisce gli array nativi Firestore (scritti da iOS); altrimenti usa la stringa JSON (Android).
+ */
+private fun mergedStringListJsonField(
+    data: Map<String, Any>,
+    jsonKey: String,
+    arrayKey: String,
+): String {
+    val fromArray = (data[arrayKey] as? List<*>)
+        ?.mapNotNull { it as? String }
+        .orEmpty()
+    if (fromArray.isNotEmpty()) {
+        return encodeStringList(fromArray)
+    }
+    val jsonPart = data[jsonKey] as? String
+    if (!jsonPart.isNullOrBlank() && decodeStringList(jsonPart).isNotEmpty()) {
+        return jsonPart
+    }
+    return jsonPart?.takeIf { it.isNotBlank() } ?: "[]"
 }

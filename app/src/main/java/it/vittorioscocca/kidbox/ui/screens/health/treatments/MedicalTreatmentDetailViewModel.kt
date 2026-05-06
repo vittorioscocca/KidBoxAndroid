@@ -10,21 +10,27 @@ import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import it.vittorioscocca.kidbox.data.local.mapper.scheduleTimesList
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
 import it.vittorioscocca.kidbox.data.repository.DocumentRepository
 import it.vittorioscocca.kidbox.data.repository.DoseLogRepository
+import it.vittorioscocca.kidbox.data.repository.MedicalVisitRepository
 import it.vittorioscocca.kidbox.data.repository.TreatmentRepository
+import it.vittorioscocca.kidbox.data.sync.MedicalVisitSyncCenter
 import it.vittorioscocca.kidbox.data.sync.TreatmentSyncCenter
 import it.vittorioscocca.kidbox.domain.model.KBDoseLog
+import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import it.vittorioscocca.kidbox.domain.model.TreatmentSchedulePeriod
 import it.vittorioscocca.kidbox.domain.model.schedulePeriodForTime
 import it.vittorioscocca.kidbox.domain.model.schedulePeriodLabel
 import it.vittorioscocca.kidbox.notifications.TreatmentNotificationManager
+import it.vittorioscocca.kidbox.ui.screens.health.common.PrescribingVisitSummary
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -62,6 +68,7 @@ data class DayEntry(
 data class MedicalTreatmentDetailState(
     val isLoading: Boolean = true,
     val treatment: KBTreatment? = null,
+    val prescribingVisitSummary: PrescribingVisitSummary? = null,
     val childName: String = "",
     val todaySlots: List<DoseSlot> = emptyList(),
     val calendarDays: List<DayEntry> = emptyList(),
@@ -79,6 +86,7 @@ data class MedicalTreatmentDetailState(
 @HiltViewModel
 class MedicalTreatmentDetailViewModel @Inject constructor(
     private val repository: TreatmentRepository,
+    private val visitRepository: MedicalVisitRepository,
     private val doseLogRepository: DoseLogRepository,
     private val notifManager: TreatmentNotificationManager,
     private val childDao: KBChildDao,
@@ -86,6 +94,7 @@ class MedicalTreatmentDetailViewModel @Inject constructor(
     private val attachmentService: HealthAttachmentService,
     private val documentRepository: DocumentRepository,
     private val treatmentSyncCenter: TreatmentSyncCenter,
+    private val visitSyncCenter: MedicalVisitSyncCenter,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MedicalTreatmentDetailState())
@@ -95,15 +104,18 @@ class MedicalTreatmentDetailViewModel @Inject constructor(
     private var childId = ""
     private var treatmentId = ""
     private var childName = ""
+    private var prescJob: Job? = null
 
     fun bind(familyId: String, childId: String, treatmentId: String) {
         if (this.treatmentId == treatmentId) return
         this.familyId = familyId
         this.childId = childId
         this.treatmentId = treatmentId
+        prescJob?.cancel()
 
         if (familyId.isNotBlank()) {
             treatmentSyncCenter.start(familyId)
+            visitSyncCenter.start(familyId)
         }
 
         viewModelScope.launch {
@@ -126,20 +138,34 @@ class MedicalTreatmentDetailViewModel @Inject constructor(
             Pair(treatment, logs)
         }
             .onEach { (treatment, logs) ->
+                prescJob?.cancel()
                 if (treatment == null) {
-                    _uiState.value = _uiState.value.copy(isLoading = false)
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        treatment = null,
+                        prescribingVisitSummary = null,
+                    )
                     return@onEach
                 }
-                val todaySlots = buildTodaySlots(treatment, logs)
-                val calendarDays = buildCalendarDays(treatment, logs)
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    treatment = treatment,
-                    todaySlots = todaySlots,
-                    calendarDays = calendarDays,
-                    isActive = treatment.isActive,
-                    isDeleted = treatment.isDeleted,
-                )
+                prescJob = viewModelScope.launch {
+                    val t = treatment
+                    val lg = logs
+                    val presc = resolvePrescribingVisitSummary(t)
+                    // Non usare `treatment?.id != t.id`: al primo load `treatment` è null e `null != t.id` è sempre true → schermo vuoto.
+                    val currentId = _uiState.value.treatment?.id
+                    if (currentId != null && currentId != t.id) return@launch
+                    val todaySlots = buildTodaySlots(t, lg)
+                    val calendarDays = buildCalendarDays(t, lg)
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        treatment = t,
+                        prescribingVisitSummary = presc,
+                        todaySlots = todaySlots,
+                        calendarDays = calendarDays,
+                        isActive = t.isActive,
+                        isDeleted = t.isDeleted,
+                    )
+                }
             }
             .launchIn(viewModelScope)
     }
@@ -358,5 +384,25 @@ class MedicalTreatmentDetailViewModel @Inject constructor(
         childDao.getById(id)?.name?.takeIf { it.isNotBlank() }?.let { return it }
         memberDao.getById(id)?.displayName?.takeIf { it.isNotBlank() }?.let { return it }
         return "Profilo"
+    }
+
+    /**
+     * Visita prescrittrice: da [KBTreatment.prescribingVisitId] oppure, se assente (dati legacy / solo link lato visita),
+     * dalla prima visita recente che include questa cura in [KBMedicalVisit.linkedTreatmentIdsJson].
+     */
+    private suspend fun resolvePrescribingVisitSummary(t: KBTreatment): PrescribingVisitSummary? {
+        fun toSummary(visit: KBMedicalVisit) = PrescribingVisitSummary(
+            visitId = visit.id,
+            reason = visit.reason.ifBlank { "Visita" },
+            dateEpochMillis = visit.dateEpochMillis,
+        )
+        t.prescribingVisitId?.let { vid ->
+            visitRepository.loadOnce(vid)?.let { return toSummary(it) }
+        }
+        val visits = visitRepository.listRecentVisitsForChild(t.familyId, t.childId, limit = 200)
+        val visit = visits.firstOrNull { v ->
+            !v.isDeleted && decodeStringList(v.linkedTreatmentIdsJson).contains(t.id)
+        } ?: return null
+        return toSummary(visit)
     }
 }

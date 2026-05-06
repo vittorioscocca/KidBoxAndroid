@@ -1,17 +1,21 @@
 package it.vittorioscocca.kidbox.data.local.mapper
 
 import it.vittorioscocca.kidbox.data.local.entity.KBMedicalVisitEntity
+import it.vittorioscocca.kidbox.domain.model.KBAsNeededDrug
 import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
+import it.vittorioscocca.kidbox.domain.model.KBTherapyType
+import java.util.UUID
 import org.json.JSONArray
+import org.json.JSONObject
 
 // ── Visit Status ─────────────────────────────────────────────────────────────
 
-enum class KBVisitStatus(val rawValue: String, val displayLabel: String) {
-    PENDING("pending", "In attesa"),
-    BOOKED("booked", "Prenotate"),
-    COMPLETED("completed", "Eseguite"),
-    RESULT_AVAILABLE("result_available", "Risultato disponibile"),
-    UNKNOWN_STATUS("unknown", "Senza stato");
+enum class KBVisitStatus(val rawValue: String, val displayLabel: String, val wizardChipLabel: String) {
+    PENDING("pending", "In attesa", "In attesa"),
+    BOOKED("booked", "Prenotata", "Prenotata"),
+    COMPLETED("completed", "Eseguite", "Eseguita"),
+    RESULT_AVAILABLE("result_available", "Risultato disponibile", "Risultati"),
+    UNKNOWN_STATUS("unknown", "Senza stato", "—");
 
     companion object {
         fun fromRaw(raw: String?): KBVisitStatus =
@@ -117,5 +121,55 @@ fun decodeStringList(raw: String?): List<String> {
     return runCatching {
         val arr = JSONArray(raw)
         (0 until arr.length()).map { arr.getString(it) }
+    }.getOrElse { emptyList() }
+}
+
+fun encodeAsNeededDrugs(list: List<KBAsNeededDrug>): String {
+    val arr = JSONArray()
+    for (d in list) {
+        arr.put(
+            JSONObject().apply {
+                put("id", d.id)
+                put("drugName", d.drugName)
+                put("dosageValue", d.dosageValue)
+                put("dosageUnit", d.dosageUnit)
+                d.instructions?.takeIf { it.isNotBlank() }?.let { put("instructions", it) }
+            },
+        )
+    }
+    return arr.toString()
+}
+
+fun decodeAsNeededDrugs(raw: String?): List<KBAsNeededDrug> {
+    if (raw.isNullOrBlank()) return emptyList()
+    return runCatching {
+        val arr = JSONArray(raw)
+        (0 until arr.length()).mapNotNull { i ->
+            val o = arr.optJSONObject(i) ?: return@mapNotNull null
+            KBAsNeededDrug(
+                id = o.optString("id").ifBlank { UUID.randomUUID().toString() },
+                drugName = o.optString("drugName"),
+                dosageValue = o.optDouble("dosageValue", 0.0),
+                dosageUnit = o.optString("dosageUnit", "mg"),
+                instructions = o.optString("instructions").takeIf { it.isNotBlank() },
+            )
+        }
+    }.getOrElse { emptyList() }
+}
+
+fun encodeTherapyTypes(types: List<KBTherapyType>): String {
+    val arr = JSONArray()
+    types.distinct().forEach { arr.put(it.rawValue) }
+    return arr.toString()
+}
+
+fun decodeTherapyTypes(raw: String?): List<KBTherapyType> {
+    if (raw.isNullOrBlank()) return emptyList()
+    return runCatching {
+        val arr = JSONArray(raw)
+        (0 until arr.length()).mapNotNull { i ->
+            val s = arr.optString(i)
+            KBTherapyType.entries.firstOrNull { it.rawValue == s }
+        }
     }.getOrElse { emptyList() }
 }

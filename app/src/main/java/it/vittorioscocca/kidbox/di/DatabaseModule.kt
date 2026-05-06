@@ -13,6 +13,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBAIConversationDao
 import it.vittorioscocca.kidbox.data.local.dao.KBAIMessageDao
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBCalendarEventDao
+import it.vittorioscocca.kidbox.data.local.dao.KBEventDao
 import it.vittorioscocca.kidbox.data.local.dao.KBChatMessageDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
@@ -34,6 +35,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBDoseLogDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoItemDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoListDao
 import it.vittorioscocca.kidbox.data.local.dao.KBUserProfileDao
+import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
 import javax.inject.Singleton
 
@@ -378,6 +380,61 @@ object DatabaseModule {
      * Documents can reference a health [childId] that is not in [kb_children] (e.g. adult profile).
      * Drop FK(childId → kb_children) so treatment/visit/exam attachments insert cleanly.
      */
+    private val MIGRATION_11_12 = object : Migration(11, 12) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE kb_treatments ADD COLUMN prescribingVisitId TEXT")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_treatments_prescribingVisitId ON kb_treatments(prescribingVisitId)")
+        }
+    }
+
+    private val MIGRATION_13_14 = object : Migration(13, 14) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `kb_wallet_tickets` ADD COLUMN `pdfThumbnailBase64` TEXT")
+            db.execSQL("ALTER TABLE `kb_wallet_tickets` ADD COLUMN `syncStateRaw` INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
+    private val MIGRATION_12_13 = object : Migration(12, 13) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `kb_wallet_tickets` (
+                    `id` TEXT NOT NULL,
+                    `familyId` TEXT NOT NULL,
+                    `title` TEXT NOT NULL,
+                    `kindRaw` TEXT NOT NULL,
+                    `eventDateEpochMillis` INTEGER,
+                    `eventEndDateEpochMillis` INTEGER,
+                    `location` TEXT,
+                    `seat` TEXT,
+                    `bookingCode` TEXT,
+                    `notes` TEXT,
+                    `emitter` TEXT,
+                    `pdfStorageURL` TEXT,
+                    `pdfStorageBytes` INTEGER NOT NULL,
+                    `pdfFileName` TEXT,
+                    `addToAppleWalletURL` TEXT,
+                    `barcodeText` TEXT,
+                    `barcodeFormat` TEXT,
+                    `createdBy` TEXT NOT NULL,
+                    `createdByName` TEXT NOT NULL,
+                    `updatedBy` TEXT NOT NULL,
+                    `updatedByName` TEXT NOT NULL,
+                    `createdAtEpochMillis` INTEGER NOT NULL,
+                    `updatedAtEpochMillis` INTEGER NOT NULL,
+                    `isDeleted` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`),
+                    FOREIGN KEY(`familyId`) REFERENCES `kb_families`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_kb_wallet_tickets_familyId` ON `kb_wallet_tickets` (`familyId`)")
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_kb_wallet_tickets_familyId_isDeleted` ON `kb_wallet_tickets` (`familyId`, `isDeleted`)",
+            )
+        }
+    }
+
     private val MIGRATION_10_11 = object : Migration(10, 11) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("PRAGMA foreign_keys=OFF")
@@ -455,6 +512,9 @@ object DatabaseModule {
         MIGRATION_8_9,
         MIGRATION_9_10,
         MIGRATION_10_11,
+        MIGRATION_11_12,
+        MIGRATION_12_13,
+        MIGRATION_13_14,
     )
         .fallbackToDestructiveMigration()
         .build()
@@ -473,6 +533,9 @@ object DatabaseModule {
 
     @Provides
     fun provideKBGroceryItemDao(database: KidBoxDatabase): KBGroceryItemDao = database.groceryItemDao()
+
+    @Provides
+    fun provideKBEventDao(database: KidBoxDatabase): KBEventDao = database.eventDao()
 
     @Provides
     fun provideKBNoteDao(database: KidBoxDatabase): KBNoteDao = database.noteDao()
@@ -541,4 +604,8 @@ object DatabaseModule {
     @Provides
     fun provideKBAIMessageDao(database: KidBoxDatabase): KBAIMessageDao =
         database.aiMessageDao()
+
+    @Provides
+    fun provideWalletTicketDao(database: KidBoxDatabase): WalletTicketDao =
+        database.walletTicketDao()
 }

@@ -68,15 +68,30 @@ class MedicalExamFormViewModel @Inject constructor(
 
     private var familyId: String = ""
     private var childId: String = ""
+    private var boundPrescribingVisitId: String? = null
 
-    fun bind(familyId: String, childId: String, examId: String?) {
-        if (this.familyId == familyId && this.childId == childId) return
+    fun bind(
+        familyId: String,
+        childId: String,
+        examId: String?,
+        prescribingVisitId: String? = null,
+        /** Increment when aprendo di nuovo il foglio “nuovo esame” dalla visita così si rigenera l’id. */
+        bindNonce: Int = 0,
+    ) {
         this.familyId = familyId
         this.childId = childId
+        this.boundPrescribingVisitId = prescribingVisitId
 
         viewModelScope.launch {
             val name = resolveChildName(childId)
-            _uiState.value = _uiState.value.copy(childName = name)
+            if (examId != null) {
+                loadExamIntoState(examId, name)
+            } else {
+                _uiState.value = MedicalExamFormState(
+                    examId = UUID.randomUUID().toString(),
+                    childName = name,
+                )
+            }
         }
 
         documentRepository.startRealtime(familyId)
@@ -84,8 +99,6 @@ class MedicalExamFormViewModel @Inject constructor(
             .map { docs -> docs.filter { ExamAttachmentTag.matches(it.notes, _uiState.value.examId) } }
             .onEach { docs -> _uiState.value = _uiState.value.copy(attachments = docs) }
             .launchIn(viewModelScope)
-
-        if (examId != null) loadExam(examId)
     }
 
     private suspend fun resolveChildName(id: String): String {
@@ -94,30 +107,29 @@ class MedicalExamFormViewModel @Inject constructor(
         return "Profilo"
     }
 
-    private fun loadExam(examId: String) {
-        _uiState.value = _uiState.value.copy(isLoading = true)
-        viewModelScope.launch {
-            val exam = repository.getById(examId)
-            if (exam != null) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    examId = exam.id,
-                    name = exam.name,
-                    isUrgent = exam.isUrgent,
-                    hasDeadline = exam.deadlineEpochMillis != null,
-                    deadlineEpochMillis = exam.deadlineEpochMillis ?: System.currentTimeMillis(),
-                    preparation = exam.preparation.orEmpty(),
-                    notes = exam.notes.orEmpty(),
-                    location = exam.location.orEmpty(),
-                    status = examStatusFromRaw(exam.statusRaw),
-                    reminderOn = exam.reminderOn,
-                    hasResult = exam.resultText != null || exam.resultDateEpochMillis != null,
-                    resultText = exam.resultText.orEmpty(),
-                    resultDateEpochMillis = exam.resultDateEpochMillis ?: System.currentTimeMillis(),
-                )
-            } else {
-                _uiState.value = _uiState.value.copy(isLoading = false)
-            }
+    private suspend fun loadExamIntoState(examId: String, childName: String) {
+        _uiState.value = _uiState.value.copy(isLoading = true, childName = childName)
+        val exam = repository.getById(examId)
+        if (exam != null) {
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                examId = exam.id,
+                childName = childName,
+                name = exam.name,
+                isUrgent = exam.isUrgent,
+                hasDeadline = exam.deadlineEpochMillis != null,
+                deadlineEpochMillis = exam.deadlineEpochMillis ?: System.currentTimeMillis(),
+                preparation = exam.preparation.orEmpty(),
+                notes = exam.notes.orEmpty(),
+                location = exam.location.orEmpty(),
+                status = examStatusFromRaw(exam.statusRaw),
+                reminderOn = exam.reminderOn,
+                hasResult = exam.resultText != null || exam.resultDateEpochMillis != null,
+                resultText = exam.resultText.orEmpty(),
+                resultDateEpochMillis = exam.resultDateEpochMillis ?: System.currentTimeMillis(),
+            )
+        } else {
+            _uiState.value = _uiState.value.copy(isLoading = false, childName = childName)
         }
     }
 
@@ -140,6 +152,7 @@ class MedicalExamFormViewModel @Inject constructor(
     fun setResultDateEpochMillis(v: Long) { _uiState.value = _uiState.value.copy(resultDateEpochMillis = v) }
     fun consumeOpenFileEvent() { _uiState.value = _uiState.value.copy(openFileEvent = null) }
     fun consumeUploadError() { _uiState.value = _uiState.value.copy(uploadError = null) }
+    fun consumeSaved() { _uiState.value = _uiState.value.copy(saved = false) }
 
     fun uploadAttachment(uri: Uri) {
         _uiState.value = _uiState.value.copy(isUploading = true, uploadError = null)
@@ -192,7 +205,7 @@ class MedicalExamFormViewModel @Inject constructor(
                 statusRaw = effectiveStatus.rawValue,
                 resultText = if (s.hasResult) s.resultText.takeIf { it.isNotBlank() } else null,
                 resultDateEpochMillis = if (s.hasResult) s.resultDateEpochMillis else null,
-                prescribingVisitId = null,
+                prescribingVisitId = boundPrescribingVisitId,
                 reminderOn = s.reminderOn && deadline != null,
                 isDeleted = false,
                 syncStateRaw = 0,
@@ -210,7 +223,7 @@ class MedicalExamFormViewModel @Inject constructor(
                         } else {
                             reminderScheduler.cancelExamReminder(savedExam.id)
                         }
-                        _uiState.value = _uiState.value.copy(isSaving = false, saved = true)
+                        _uiState.value = _uiState.value.copy(isSaving = false, saved = true, saveError = null)
                     },
                     onFailure = { err ->
                         _uiState.value = _uiState.value.copy(

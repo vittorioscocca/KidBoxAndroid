@@ -1,7 +1,8 @@
-@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@file:OptIn(
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+)
 
-// TODO: Period filters (all/year/month) from iOS are not implemented in this phase.
-//       Add a filter bar above the LazyColumn in a future iteration.
 package it.vittorioscocca.kidbox.ui.screens.health.timeline
 
 import androidx.compose.foundation.background
@@ -22,29 +23,47 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Medication
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.Vaccines
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +80,7 @@ import it.vittorioscocca.kidbox.domain.model.HealthTimelineEventKind
 import it.vittorioscocca.kidbox.ui.theme.KidBoxColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -77,6 +97,8 @@ fun HealthTimelineScreen(
 ) {
     val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var isSearchVisible by remember { mutableStateOf(false) }
+    var showYearSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(familyId, childId) { viewModel.bind(familyId, childId) }
 
@@ -103,12 +125,29 @@ fun HealthTimelineScreen(
                     contentDescription = "Indietro",
                     onClick = onBack,
                 )
+                Spacer(Modifier.weight(1f))
+                KidBoxHeaderCircleButton(
+                    icon = Icons.Default.Search,
+                    contentDescription = "Cerca",
+                    onClick = { isSearchVisible = !isSearchVisible },
+                )
+                Spacer(Modifier.width(6.dp))
+                if (isSearchVisible) {
+                    KidBoxHeaderCircleButton(
+                        icon = Icons.Default.Close,
+                        contentDescription = "Chiudi ricerca",
+                        onClick = {
+                            isSearchVisible = false
+                            viewModel.setSearchQuery("")
+                        },
+                    )
+                }
             }
 
             // Title + subject name
             Column(modifier = Modifier.padding(horizontal = 18.dp)) {
                 Text(
-                    "Storico Salute",
+                    "Storico",
                     fontSize = 32.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = kb.title,
@@ -118,7 +157,35 @@ fun HealthTimelineScreen(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            if (isSearchVisible) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = state.searchQuery,
+                    onValueChange = viewModel::setSearchQuery,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp),
+                    singleLine = true,
+                    placeholder = { Text("Cerca visite, esami, cure...") },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = kb.card,
+                        unfocusedContainerColor = kb.card,
+                        focusedBorderColor = Color(0xFFD98C59),
+                        unfocusedBorderColor = kb.subtitle.copy(alpha = 0.25f),
+                    ),
+                )
+            }
+
+            Spacer(Modifier.height(10.dp))
+            FilterBar(
+                selectedYear = state.selectedYear,
+                activeKinds = state.activeKinds,
+                onOpenYearFilter = { showYearSheet = true },
+                onToggleKind = viewModel::toggleKind,
+            )
+            HorizontalDivider(color = kb.subtitle.copy(alpha = 0.15f))
+            Spacer(Modifier.height(6.dp))
 
             when {
                 state.isLoading -> {
@@ -127,7 +194,7 @@ fun HealthTimelineScreen(
                     }
                 }
 
-                state.events.isEmpty() -> {
+                state.filteredCount == 0 -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -141,7 +208,7 @@ fun HealthTimelineScreen(
                             )
                             Spacer(Modifier.height(16.dp))
                             Text(
-                                "Nessun evento registrato",
+                                "Nessun evento trovato",
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = kb.title,
@@ -160,30 +227,36 @@ fun HealthTimelineScreen(
                     LazyColumn(
                         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
                     ) {
-                        state.eventsGroupedByYear.forEach { (year, yearEvents) ->
-                            stickyHeader(key = "year-$year") {
-                                YearHeader(year = year, kb = kb)
-                            }
-                            itemsIndexed(
-                                items = yearEvents,
-                                key = { _, event -> event.id },
-                            ) { index, event ->
-                                val isFirst = index == 0
-                                val isLast = index == yearEvents.lastIndex
-                                TimelineEventCard(
-                                    event = event,
-                                    isFirstInGroup = isFirst,
-                                    isLastInGroup = isLast,
-                                    onOpen = {
-                                        when (event.kind) {
-                                            HealthTimelineEventKind.VISIT -> onOpenVisit(event.sourceId)
-                                            HealthTimelineEventKind.EXAM -> onOpenExam(event.sourceId)
-                                            HealthTimelineEventKind.TREATMENT -> onOpenTreatment(event.sourceId)
-                                            HealthTimelineEventKind.VACCINE -> onOpenVaccine(event.sourceId)
-                                        }
-                                    },
+                        state.eventsGroupedByYearMonth.forEach { yearGroup ->
+                            stickyHeader(key = "year-${yearGroup.year}") {
+                                YearHeader(
+                                    year = yearGroup.year,
+                                    count = yearGroup.months.sumOf { it.events.size },
+                                    kb = kb,
                                 )
-                                Spacer(Modifier.height(if (isLast) 16.dp else 8.dp))
+                            }
+                            yearGroup.months.forEach { monthGroup ->
+                                item(key = "month-${yearGroup.year}-${monthGroup.month}") {
+                                    MonthHeader(month = monthGroup.month, kb = kb)
+                                }
+                                itemsIndexed(
+                                    items = monthGroup.events,
+                                    key = { _, event -> event.id },
+                                ) { index, event ->
+                                    val isLast = index == monthGroup.events.lastIndex
+                                    TimelineEventCard(
+                                        event = event,
+                                        isLastInGroup = isLast,
+                                        onOpen = {
+                                            when (event.kind) {
+                                                HealthTimelineEventKind.VISIT -> onOpenVisit(event.sourceId)
+                                                HealthTimelineEventKind.EXAM -> onOpenExam(event.sourceId)
+                                                HealthTimelineEventKind.TREATMENT -> onOpenTreatment(event.sourceId)
+                                                HealthTimelineEventKind.VACCINE -> onOpenVaccine(event.sourceId)
+                                            }
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
@@ -191,31 +264,159 @@ fun HealthTimelineScreen(
             }
         }
     }
+
+    if (showYearSheet) {
+        YearFilterSheet(
+            selectedYear = state.selectedYear,
+            availableYears = state.availableYears,
+            allEvents = state.events,
+            onSelectYear = {
+                viewModel.setSelectedYear(it)
+                showYearSheet = false
+            },
+            onDismiss = { showYearSheet = false },
+        )
+    }
 }
 
 @Composable
 private fun YearHeader(
     year: Int,
+    count: Int,
     kb: KidBoxColorScheme,
 ) {
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(kb.background)
             .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        Text(
+            year.toString(),
+            fontSize = 28.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = kb.title,
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "$count eventi",
+            fontSize = 12.sp,
+            color = kb.subtitle,
+        )
+    }
+}
+
+@Composable
+private fun MonthHeader(
+    month: Int,
+    kb: KidBoxColorScheme,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            monthLabel(month).uppercase(Locale.ITALIAN),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = kb.subtitle,
+        )
+        Spacer(Modifier.width(8.dp))
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = kb.subtitle.copy(alpha = 0.2f),
+        )
+    }
+}
+
+@Composable
+private fun FilterBar(
+    selectedYear: Int?,
+    activeKinds: Set<HealthTimelineEventKind>,
+    onOpenYearFilter: () -> Unit,
+    onToggleKind: (HealthTimelineEventKind) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 18.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FilterChip(
+            label = selectedYear?.toString() ?: "Anno",
+            leading = if (selectedYear == null) Icons.Default.CalendarMonth else Icons.Default.Check,
+            trailing = Icons.Default.ExpandMore,
+            active = selectedYear != null,
+            activeColor = Color(0xFFD98C59),
+            onClick = onOpenYearFilter,
+        )
+        Spacer(Modifier.width(8.dp))
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFFFF6B00).copy(alpha = 0.06f))
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-        ) {
-            Text(
-                year.toString(),
-                fontSize = 28.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = kb.title,
+                .width(1.dp)
+                .height(18.dp)
+                .background(MaterialTheme.kidBoxColors.subtitle.copy(alpha = 0.3f)),
+        )
+        Spacer(Modifier.width(8.dp))
+        HealthTimelineEventKind.entries.forEach { kind ->
+            val active = activeKinds.contains(kind)
+            FilterChip(
+                label = kind.rawLabel,
+                leading = kind.iconImageVector(),
+                active = active,
+                activeColor = Color(kind.tintColorArgb),
+                onClick = { onToggleKind(kind) },
             )
+            Spacer(Modifier.width(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun FilterChip(
+    label: String,
+    leading: ImageVector,
+    active: Boolean,
+    activeColor: Color,
+    onClick: () -> Unit,
+    trailing: ImageVector? = null,
+) {
+    val bg = if (active) activeColor else activeColor.copy(alpha = 0.12f)
+    val fg = if (active) Color.White else activeColor
+    Surface(
+        onClick = onClick,
+        color = bg,
+        shape = RoundedCornerShape(50),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(
+                leading,
+                contentDescription = null,
+                tint = fg,
+                modifier = Modifier.size(14.dp),
+            )
+            Text(
+                label,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = fg,
+            )
+            trailing?.let {
+                Icon(
+                    trailing,
+                    contentDescription = null,
+                    tint = fg,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
         }
     }
 }
@@ -223,84 +424,69 @@ private fun YearHeader(
 @Composable
 private fun TimelineEventCard(
     event: HealthTimelineEvent,
-    isFirstInGroup: Boolean,
     isLastInGroup: Boolean,
     onOpen: () -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
     val tintColor = Color(event.kind.tintColorArgb)
-    val isNavigable = true
+    val isNavigable = event.kind != HealthTimelineEventKind.VACCINE
     val dateText = remember(event.dateEpochMillis) {
         SimpleDateFormat("dd MMM yyyy", Locale.ITALIAN).format(Date(event.dateEpochMillis))
     }
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = kb.card),
-        shape = RoundedCornerShape(14.dp),
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(
-                if (isNavigable) {
-                    Modifier.clickable(onClick = onOpen)
-                } else {
-                    Modifier
-                },
-            ),
+            .height(IntrinsicSize.Min)
+            .then(if (isNavigable) Modifier.clickable(onClick = onOpen) else Modifier)
+            .padding(bottom = if (isLastInGroup) 8.dp else 14.dp),
     ) {
-        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            // Timeline connector column
-            Column(
+        // Timeline connector column (continuous line across rows)
+        Column(
+            modifier = Modifier
+                .width(32.dp)
+                .fillMaxHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
                 modifier = Modifier
-                    .width(36.dp)
-                    .fillMaxHeight(),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(tintColor.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center,
             ) {
-                // Line above
-                Box(
-                    modifier = Modifier
-                        .width(2.dp)
-                        .height(16.dp)
-                        .background(
-                            if (isFirstInGroup) Color.Transparent else tintColor.copy(alpha = 0.35f),
-                        ),
-                )
-                // Dot
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(tintColor),
-                )
-                // Line below
-                Box(
-                    modifier = Modifier
-                        .width(2.dp)
-                        .height(16.dp)
-                        .background(
-                            if (isLastInGroup) Color.Transparent else tintColor.copy(alpha = 0.35f),
-                        ),
+                Icon(
+                    event.kind.iconImageVector(),
+                    contentDescription = null,
+                    tint = tintColor,
+                    modifier = Modifier.size(15.dp),
                 )
             }
-
-            // Card body
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(top = 10.dp, bottom = 12.dp, end = 12.dp),
-            ) {
-                // Date row
-                Text(
-                    dateText,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = kb.subtitle,
+            if (!isLastInGroup) {
+                Box(
+                    modifier = Modifier
+                        .width(1.5.dp)
+                        .weight(1f)
+                        .background(kb.subtitle.copy(alpha = 0.2f)),
                 )
-                Spacer(Modifier.height(2.dp))
-                // Title + kind chip row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
+            }
+        }
+
+        Spacer(Modifier.width(12.dp))
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(top = 2.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
                         event.title,
@@ -309,50 +495,140 @@ private fun TimelineEventCard(
                         color = kb.title,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
                     )
-                    Spacer(Modifier.width(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Kind chip
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(tintColor.copy(alpha = 0.12f))
-                                .padding(horizontal = 8.dp, vertical = 3.dp),
-                        ) {
-                            Text(
-                                event.kind.rawLabel,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = tintColor,
-                            )
-                        }
-                        // Chevron for navigable kinds
-                        if (isNavigable) {
-                            Spacer(Modifier.width(4.dp))
-                            Icon(
-                                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                contentDescription = null,
-                                tint = kb.subtitle,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
+                    if (!event.subtitle.isNullOrBlank()) {
+                        Text(
+                            event.subtitle,
+                            fontSize = 14.sp,
+                            color = kb.subtitle,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
-                }
-                // Subtitle
-                if (event.subtitle != null) {
-                    Spacer(Modifier.height(2.dp))
                     Text(
-                        event.subtitle,
+                        dateText,
                         fontSize = 12.sp,
-                        color = kb.subtitle,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        color = kb.subtitle.copy(alpha = 0.8f),
                     )
+                }
+                Spacer(Modifier.width(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(tintColor.copy(alpha = 0.12f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    ) {
+                        Text(
+                            event.kind.rawLabel,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = tintColor,
+                        )
+                    }
+                    if (isNavigable) {
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = kb.subtitle.copy(alpha = 0.6f),
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun YearFilterSheet(
+    selectedYear: Int?,
+    availableYears: List<Int>,
+    allEvents: List<HealthTimelineEvent>,
+    onSelectYear: (Int?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = AlertDialogDefaults.containerColor,
+        modifier = Modifier.windowInsetsPadding(WindowInsets.ime),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+        ) {
+            Text(
+                "Filtra per anno",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            )
+            YearFilterRow(
+                text = "Tutti gli anni",
+                selected = selectedYear == null,
+                trailingText = null,
+                onClick = { onSelectYear(null) },
+            )
+            availableYears.forEach { year ->
+                val count = allEvents.count {
+                    Calendar.getInstance().apply { timeInMillis = it.dateEpochMillis }.get(Calendar.YEAR) == year
+                }
+                YearFilterRow(
+                    text = year.toString(),
+                    selected = selectedYear == year,
+                    trailingText = "$count eventi",
+                    onClick = { onSelectYear(year) },
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.End)
+                    .padding(horizontal = 12.dp),
+            ) {
+                Text("Chiudi")
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun YearFilterRow(
+    text: String,
+    selected: Boolean,
+    trailingText: String?,
+    onClick: () -> Unit,
+) {
+    ListItem(
+        headlineContent = {
+            Text(
+                text,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            )
+        },
+        supportingContent = trailingText?.let { { Text(it) } },
+        trailingContent = {
+            if (selected) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = null,
+                    tint = Color(0xFFD98C59),
+                )
+            }
+        },
+        modifier = Modifier.clickable(onClick = onClick),
+    )
+}
+
+private fun monthLabel(month: Int): String {
+    val calendar = Calendar.getInstance().apply {
+        set(Calendar.MONTH, month - 1)
+    }
+    return SimpleDateFormat("MMMM", Locale.ITALIAN).format(calendar.time)
 }
 
 private fun HealthTimelineEventKind.iconImageVector(): ImageVector = when (iconKey) {

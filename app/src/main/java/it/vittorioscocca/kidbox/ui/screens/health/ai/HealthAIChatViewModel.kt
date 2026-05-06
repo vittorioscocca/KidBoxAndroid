@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.health.ai
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,6 +24,7 @@ import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import it.vittorioscocca.kidbox.domain.model.KBVaccine
 import javax.inject.Inject
+import org.json.JSONArray
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,6 +50,7 @@ data class HealthAIChatState(
 
 @HiltViewModel
 class HealthAIChatViewModel @Inject constructor(
+    private val savedStateHandle: SavedStateHandle,
     private val chatRepository: HealthAIChatRepository,
     private val visitRepository: MedicalVisitRepository,
     private val examRepository: MedicalExamRepository,
@@ -107,7 +110,14 @@ class HealthAIChatViewModel @Inject constructor(
             }
 
             val resolvedName = subjectName.ifBlank { resolveSubjectName(childId) }
-            systemPrompt = HealthContextBuilder.buildSystemPrompt(
+            val navSubjectLabel = savedStateHandle.get<String>("subjectName")?.trim().orEmpty()
+            val displayName = navSubjectLabel.ifBlank { resolvedName }
+            val visitN = data.visits.count { !it.isDeleted }
+            val examN = data.exams.count { !it.isDeleted }
+            val activeCareN = countActiveTreatments(data.treatments)
+            val vaccineN = data.vaccines.count { !it.isDeleted }
+            val aggregateIntro = buildAggregateIntro(displayName, visitN, examN, activeCareN, vaccineN)
+            val contextBody = HealthContextBuilder.buildSystemPrompt(
                 subjectName = resolvedName,
                 subjectId = childId,
                 exams = data.exams,
@@ -117,6 +127,11 @@ class HealthAIChatViewModel @Inject constructor(
                 documentsByExamId = docsByExamId,
                 documentsByVisitId = docsByVisitId,
             )
+            val idAppendix = buildIdAppendixFromNavArgs()
+            systemPrompt = when {
+                idAppendix.isNotBlank() -> "$aggregateIntro\n\n$idAppendix\n\n$contextBody"
+                else -> "$aggregateIntro\n\n$contextBody"
+            }
 
             if (!initialized) {
                 initialized = true
@@ -139,12 +154,9 @@ class HealthAIChatViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(inputText = "", isLoading = true, errorMessage = null)
 
         viewModelScope.launch {
-            chatRepository.summarizeIfNeeded(conv, systemPrompt)
-            val fresh = chatRepository.getOrCreateConversation(familyId, childId, conv.scopeId)
-            conversation = fresh
-
-            chatRepository.sendMessage(fresh, text, systemPrompt)
+            chatRepository.sendMessage(conv, text, systemPrompt)
                 .onSuccess { (_, reply) ->
+                    conversation = chatRepository.getOrCreateConversation(familyId, childId, conv.scopeId)
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         usageToday = reply.usageToday,
@@ -187,6 +199,41 @@ class HealthAIChatViewModel @Inject constructor(
         return "Profilo"
     }
 
+    private fun buildAggregateIntro(
+        displayName: String,
+        visitCount: Int,
+        examCount: Int,
+        activeTreatmentCount: Int,
+        vaccineCount: Int,
+    ): String = """
+        Sei un assistente medico per l'app KidBox. Hai accesso alla storia clinica completa di $displayName.
+        Include: [$visitCount visite], [$examCount esami], [$activeTreatmentCount cure attive], [$vaccineCount vaccini].
+        Rispondi in italiano. Non sostituisci il medico.
+    """.trimIndent()
+
+    private fun countActiveTreatments(treatments: List<KBTreatment>): Int {
+        val now = System.currentTimeMillis()
+        return treatments.count { t ->
+            t.isActive && !t.isDeleted &&
+                (t.isLongTerm || t.endDateEpochMillis == null || t.endDateEpochMillis >= now)
+        }
+    }
+
+    private fun jsonIdCount(key: String): Int = runCatching {
+        val raw = savedStateHandle.get<String>(key).orEmpty()
+        if (raw.isBlank()) 0 else JSONArray(raw).length()
+    }.getOrElse { 0 }
+
+    /** Riferimenti ID passati dalla Home (nav); solo etichette, senza dati clinici nel testo. */
+    private fun buildIdAppendixFromNavArgs(): String {
+        val vn = jsonIdCount("visitIdsJson")
+        val en = jsonIdCount("examIdsJson")
+        val tn = jsonIdCount("treatmentIdsJson")
+        val vacn = jsonIdCount("vaccineIdsJson")
+        if (vn + en + tn + vacn == 0) return ""
+        return "Contesto navigazione: elenchi ID interni app — visite: $vn, esami: $en, cure: $tn, vaccini: $vacn."
+    }
+
     private fun buildDocMapByTag(
         allDocs: List<KBDocumentEntity>,
         keyExtractor: (KBDocumentEntity) -> String?,
@@ -206,3 +253,5 @@ class HealthAIChatViewModel @Inject constructor(
         val vaccines: List<KBVaccine>,
     )
 }
+
+typealias HealthAiChatViewModel = HealthAIChatViewModel

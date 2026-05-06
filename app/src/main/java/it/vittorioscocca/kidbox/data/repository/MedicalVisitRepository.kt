@@ -31,6 +31,16 @@ class MedicalVisitRepository @Inject constructor(
         dao.getById(visitId)?.toDomain()
     }
 
+    suspend fun listRecentVisitsForChild(familyId: String, childId: String, limit: Int = 30): List<KBMedicalVisit> =
+        withContext(Dispatchers.IO) {
+            dao.listRecentForChild(familyId, childId, limit).map { it.toDomain() }
+        }
+
+    suspend fun softDeleteById(visitId: String) {
+        val v = loadOnce(visitId) ?: return
+        delete(visitId, v.familyId)
+    }
+
     /**
      * Persist locally with PENDING_UPSERT, push to Firestore, then mark SYNCED.
      */
@@ -89,6 +99,7 @@ private fun KBMedicalVisit.toRemoteDto() = RemoteMedicalVisitDto(
     nextVisitReminderOn = nextVisitReminderOn,
     linkedTreatmentIdsJson = linkedTreatmentIdsJson,
     linkedExamIdsJson = linkedExamIdsJson,
+    asNeededDrugsJson = asNeededDrugsJson ?: "[]",
     therapyTypesJson = therapyTypesJson,
     photoUrlsJson = photoUrlsJson,
     isDeleted = isDeleted,

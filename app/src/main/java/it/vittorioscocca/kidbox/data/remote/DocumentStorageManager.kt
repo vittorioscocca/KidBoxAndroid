@@ -84,6 +84,28 @@ class DocumentStorageManager @Inject constructor(
         return downloadUrl
     }
 
+    /** Upload bytes already encrypted with [DocumentCryptoManager] (e.g. wallet PDF). */
+    suspend fun uploadEncryptedBytes(
+        storagePath: String,
+        encrypted: ByteArray,
+        mimeType: String,
+        fileName: String,
+    ): String {
+        Log.i(TAG_DOC_STORAGE, "uploadEncryptedBytes start path=$storagePath bytes=${encrypted.size}")
+        val ref = storage.reference.child(storagePath)
+        val metadata = StorageMetadata.Builder()
+            .setContentType("application/octet-stream")
+            .setCustomMetadata("kb_encrypted", "1")
+            .setCustomMetadata("kb_alg", "AES-GCM")
+            .setCustomMetadata("kb_orig_mime", mimeType)
+            .setCustomMetadata("kb_orig_name", fileName)
+            .build()
+        ref.putBytes(encrypted, metadata).await()
+        val downloadUrl = ref.downloadUrl.await().toString()
+        Log.i(TAG_DOC_STORAGE, "uploadEncryptedBytes ok path=$storagePath")
+        return downloadUrl
+    }
+
     suspend fun delete(storagePath: String) {
         if (storagePath.isBlank()) return
         Log.i(TAG_DOC_STORAGE, "delete start path=$storagePath")

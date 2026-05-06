@@ -437,3 +437,13 @@ private fun parseMarkdownBasic(text: String) = buildAnnotatedString {
     }
     if (cursor < text.length) append(text.substring(cursor))
 }
+
+/** Richiesta naming: stessa schermata di [HealthAIChatScreen]. */
+@Composable
+fun HealthAiChatScreen(
+    familyId: String,
+    childId: String,
+    onBack: () -> Unit,
+) {
+    HealthAIChatScreen(familyId = familyId, childId = childId, onBack = onBack)
+}

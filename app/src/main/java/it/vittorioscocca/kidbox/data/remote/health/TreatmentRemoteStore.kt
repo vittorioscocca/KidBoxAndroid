@@ -14,6 +14,7 @@ data class RemoteTreatmentDto(
     val id: String,
     val familyId: String,
     val childId: String,
+    val prescribingVisitId: String? = null,
     val drugName: String,
     val activeIngredient: String?,
     val dosageValue: Double,
@@ -92,6 +93,11 @@ class TreatmentRemoteStore @Inject constructor() {
         } else {
             payload["reminderEnabled"] = FieldValue.delete()
         }
+        if (dto.prescribingVisitId != null) {
+            payload["prescribingVisitId"] = dto.prescribingVisitId
+        } else {
+            payload["prescribingVisitId"] = FieldValue.delete()
+        }
         ref.set(payload, SetOptions.merge()).await()
     }
 
@@ -151,6 +157,7 @@ fun RemoteTreatmentDto.toEntity(): KBTreatmentEntity = KBTreatmentEntity(
     id = id,
     familyId = familyId,
     childId = childId,
+    prescribingVisitId = prescribingVisitId,
     drugName = drugName,
     activeIngredient = activeIngredient,
     dosageValue = dosageValue,

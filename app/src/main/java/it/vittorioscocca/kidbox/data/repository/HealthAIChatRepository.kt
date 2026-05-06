@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import it.vittorioscocca.kidbox.data.health.ai.HealthAiSummaryPolicy
 import it.vittorioscocca.kidbox.data.local.dao.KBAIConversationDao
 import it.vittorioscocca.kidbox.data.local.dao.KBAIMessageDao
 import it.vittorioscocca.kidbox.data.local.entity.KBAIConversationEntity
@@ -13,19 +14,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-
-private const val SUMMARY_THRESHOLD = 8
-private const val RECENT_TO_KEEP = 4
-
-private val SUMMARIZE_SYSTEM_PROMPT = """
-Riassumi in modo fedele e compatto la conversazione seguente.
-Mantieni:
-- richieste principali dell'utente
-- dati sanitari discussi (cure, vaccini, visite, esami)
-- risultati o referti menzionati
-- eventuali dubbi ancora aperti
-Non aggiungere nulla di nuovo.
-""".trimIndent()
 
 @Singleton
 class HealthAIChatRepository @Inject constructor(
@@ -71,11 +59,15 @@ class HealthAIChatRepository @Inject constructor(
         )
         messageDao.upsert(userMsg)
 
-        val allMessages = messageDao.getAllByConversationId(conversation.id)
-        val payloadMessages = buildPayloadMessages(conversation, allMessages.map { it.toDomain() })
-        val finalSystemPrompt = buildFinalSystemPrompt(conversation, systemPrompt)
+        var conv = conversationDao.getById(conversation.id)?.toDomain() ?: conversation
+        summarizeIfNeeded(conv)
+        conv = conversationDao.getById(conversation.id)?.toDomain() ?: conv
 
-        val reply = aiRepository.askAI(conversation.familyId, finalSystemPrompt, payloadMessages)
+        val allMessages = messageDao.getAllByConversationId(conv.id).map { it.toDomain() }
+        val payloadMessages = buildPayloadMessages(conv, allMessages)
+        val finalSystemPrompt = buildFinalSystemPrompt(conv, systemPrompt)
+
+        val reply = aiRepository.askAI(conv.familyId, finalSystemPrompt, payloadMessages)
             .getOrElse { err ->
                 messageDao.deleteById(userMsg.id)
                 throw err
@@ -91,19 +83,23 @@ class HealthAIChatRepository @Inject constructor(
         messageDao.upsert(assistantMsg)
 
         conversationDao.upsert(
-            conversation.toEntity().copy(updatedAtEpochMillis = System.currentTimeMillis()),
+            conv.toEntity().copy(updatedAtEpochMillis = System.currentTimeMillis()),
         )
 
         assistantMsg.toDomain() to reply
     }
 
-    suspend fun summarizeIfNeeded(conversation: KBAIConversation, systemPrompt: String) {
+    private suspend fun summarizeIfNeeded(conversation: KBAIConversation) {
         val allMessages = messageDao.getAllByConversationId(conversation.id)
         val total = allMessages.size
         val unsummarized = total - conversation.summarizedMessageCount
-        if (unsummarized <= SUMMARY_THRESHOLD || total <= RECENT_TO_KEEP) return
+        if (unsummarized <= HealthAiSummaryPolicy.SUMMARY_THRESHOLD ||
+            total <= HealthAiSummaryPolicy.RECENT_MESSAGES_TO_KEEP
+        ) {
+            return
+        }
 
-        val toSummarize = allMessages.take(total - RECENT_TO_KEEP)
+        val toSummarize = allMessages.take(total - HealthAiSummaryPolicy.RECENT_MESSAGES_TO_KEEP)
         val summaryInput = toSummarize.joinToString("\n") { msg ->
             "${if (msg.roleRaw == "user") "Utente" else "Assistente"}: ${msg.content}"
         }
@@ -117,8 +113,11 @@ class HealthAIChatRepository @Inject constructor(
             ),
         )
 
-        val result = aiRepository.askAI(conversation.familyId, SUMMARIZE_SYSTEM_PROMPT, summaryMessages)
-            .getOrNull() ?: return
+        val result = aiRepository.askAI(
+            conversation.familyId,
+            HealthAiSummaryPolicy.summarizeSystemPromptHealthOverview,
+            summaryMessages,
+        ).getOrNull() ?: return
 
         conversationDao.upsert(
             conversation.toEntity().copy(

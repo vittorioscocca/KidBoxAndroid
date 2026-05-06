@@ -79,6 +79,7 @@ private fun KBTreatment.toRemoteDto() = RemoteTreatmentDto(
     id = id,
     familyId = familyId,
     childId = childId,
+    prescribingVisitId = prescribingVisitId,
     drugName = drugName,
     activeIngredient = activeIngredient,
     dosageValue = dosageValue,

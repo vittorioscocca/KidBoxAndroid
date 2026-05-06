@@ -15,12 +15,14 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("familyId"), Index("childId")],
+    indices = [Index("familyId"), Index("childId"), Index("prescribingVisitId")],
 )
 data class KBTreatmentEntity(
     @PrimaryKey val id: String,
     val familyId: String,
     val childId: String,
+    /** Visita che ha prescritto la cura (opzionale; nessuna FK per evitare ordine sync visita/cure). */
+    val prescribingVisitId: String? = null,
     val drugName: String,
     val activeIngredient: String?,
     val dosageValue: Double,

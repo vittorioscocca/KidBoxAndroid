@@ -3,6 +3,7 @@ package it.vittorioscocca.kidbox.data.health.ai
 import android.util.Log
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import it.vittorioscocca.kidbox.domain.model.KBExamStatus
+import it.vittorioscocca.kidbox.domain.model.KBTextExtractionStatus
 import it.vittorioscocca.kidbox.domain.model.KBMedicalExam
 import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
@@ -121,8 +122,16 @@ REGOLE IMPORTANTI:
                 sb.appendLine("  Prossima visita: $nextDateStr$nextReason")
             }
             documentsByVisitId[v.id]?.forEach { doc ->
-                val text = doc.extractedText?.takeIf { it.isNotBlank() && doc.extractionStatusRaw > 0 }
-                if (text != null) sb.appendLine("  Referto allegato (${doc.title}):\n  $text")
+                val text = doc.extractedText?.takeIf {
+                    it.isNotBlank() && doc.extractionStatusRaw == KBTextExtractionStatus.COMPLETED.rawValue
+                }
+                if (text != null) {
+                    val prepared = HealthAiDocumentText.prepareExtractedTextForAi(text)
+                    if (prepared.isNotBlank()) {
+                        sb.appendLine("  Referto allegato (${doc.title}):")
+                        prepared.lines().forEach { line -> sb.appendLine("  $line") }
+                    }
+                }
             }
         }
 
@@ -138,11 +147,22 @@ REGOLE IMPORTANTI:
             val isOverdue = e.deadlineEpochMillis != null && e.deadlineEpochMillis < now && e.statusRaw in overdueStatuses
             val urgentStr = if (e.isUrgent) " {URGENTE}" else ""
             val overdueStr = if (isOverdue) " ⚠️ SCADUTA" else ""
-            val resultStr = e.resultText?.takeIf { it.isNotBlank() }?.let { " — Risultato: $it" } ?: ""
+            val resultStr = e.resultText?.takeIf { it.isNotBlank() }?.let { raw ->
+                val clipped = HealthAiDocumentText.prepareExtractedTextForAi(raw)
+                if (clipped.isBlank()) "" else " — Risultato: $clipped"
+            } ?: ""
             sb.appendLine("- ${e.name} [${e.statusRaw}]$urgentStr — $deadlineStr$overdueStr$resultStr")
             documentsByExamId[e.id]?.forEach { doc ->
-                val text = doc.extractedText?.takeIf { it.isNotBlank() && doc.extractionStatusRaw > 0 }
-                if (text != null) sb.appendLine("  Referto allegato (${doc.title}):\n  $text")
+                val text = doc.extractedText?.takeIf {
+                    it.isNotBlank() && doc.extractionStatusRaw == KBTextExtractionStatus.COMPLETED.rawValue
+                }
+                if (text != null) {
+                    val prepared = HealthAiDocumentText.prepareExtractedTextForAi(text)
+                    if (prepared.isNotBlank()) {
+                        sb.appendLine("  Referto allegato (${doc.title}):")
+                        prepared.lines().forEach { line -> sb.appendLine("  $line") }
+                    }
+                }
             }
         }
 

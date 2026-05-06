@@ -12,6 +12,9 @@ interface KBAIConversationDao {
     @Query("SELECT * FROM kb_ai_conversations WHERE scopeId = :scopeId LIMIT 1")
     suspend fun getByScope(scopeId: String): KBAIConversationEntity?
 
+    @Query("SELECT * FROM kb_ai_conversations WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): KBAIConversationEntity?
+
     @Query("SELECT * FROM kb_ai_conversations WHERE scopeId = :scopeId LIMIT 1")
     fun observeByScope(scopeId: String): Flow<KBAIConversationEntity?>
 

@@ -16,6 +16,12 @@ interface KBMedicalVisitDao {
     @Query("SELECT * FROM kb_medical_visits WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 ORDER BY dateEpochMillis DESC")
     fun observeByFamilyAndChild(familyId: String, childId: String): Flow<List<KBMedicalVisitEntity>>
 
+    @Query(
+        "SELECT * FROM kb_medical_visits WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 " +
+            "ORDER BY dateEpochMillis DESC LIMIT :limit",
+    )
+    suspend fun listRecentForChild(familyId: String, childId: String, limit: Int): List<KBMedicalVisitEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBMedicalVisitEntity)
 

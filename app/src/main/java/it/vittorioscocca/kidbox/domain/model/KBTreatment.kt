@@ -10,6 +10,8 @@ data class KBTreatment(
     val id: String,
     val familyId: String,
     val childId: String,
+    /** Visita che ha prescritto la cura (se collegata da modulo visita). */
+    val prescribingVisitId: String? = null,
     val drugName: String,
     val activeIngredient: String?,
     val dosageValue: Double,
