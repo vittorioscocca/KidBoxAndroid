@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.ai.AiSettings
+import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.repository.MedicalExamRepository
@@ -60,6 +61,7 @@ class MedicalExamsViewModel @Inject constructor(
     private val childDao: KBChildDao,
     private val memberDao: KBFamilyMemberDao,
     private val aiSettings: AiSettings,
+    private val healthAttachmentService: HealthAttachmentService,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MedicalExamsState())
@@ -80,6 +82,7 @@ class MedicalExamsViewModel @Inject constructor(
         rawExams = emptyList()
         _uiState.value = MedicalExamsState(isLoading = true)
         syncCenter.start(familyId)
+        healthAttachmentService.enqueueBackfillHealthExtraction(familyId)
         viewModelScope.launch {
             val name = resolveChildName(childId)
             _uiState.value = _uiState.value.copy(childName = name)

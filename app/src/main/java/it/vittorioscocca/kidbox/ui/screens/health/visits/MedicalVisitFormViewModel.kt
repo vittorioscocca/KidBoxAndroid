@@ -22,6 +22,8 @@ import it.vittorioscocca.kidbox.data.repository.MedicalExamRepository
 import it.vittorioscocca.kidbox.data.repository.MedicalVisitRepository
 import it.vittorioscocca.kidbox.data.repository.TreatmentRepository
 import it.vittorioscocca.kidbox.domain.model.KBAsNeededDrug
+import it.vittorioscocca.kidbox.domain.model.KBExamStatus
+import it.vittorioscocca.kidbox.domain.model.KBMedicalExam
 import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
 import it.vittorioscocca.kidbox.domain.model.KBTherapyType
 import it.vittorioscocca.kidbox.notifications.VisitReminderScheduler
@@ -259,9 +261,19 @@ class MedicalVisitFormViewModel @Inject constructor(
         }
     }
 
-    fun appendLinkedExamId(id: String) {
-        if (_uiState.value.linkedExamIds.contains(id)) return
-        _uiState.value = _uiState.value.copy(linkedExamIds = _uiState.value.linkedExamIds + id)
+    fun appendLinkedExamId(id: String, examName: String? = null) {
+        val normalizedId = id.trim()
+        if (normalizedId.isBlank() || _uiState.value.linkedExamIds.contains(normalizedId)) return
+        val current = _uiState.value
+        val updatedMap = current.linkedExamSummaries.toMutableMap()
+        val cleanName = examName?.trim().orEmpty()
+        if (cleanName.isNotBlank()) {
+            updatedMap[normalizedId] = cleanName to false
+        }
+        _uiState.value = current.copy(
+            linkedExamIds = current.linkedExamIds + normalizedId,
+            linkedExamSummaries = updatedMap,
+        )
         refreshPrescriptionSummaries()
     }
 
@@ -347,6 +359,18 @@ class MedicalVisitFormViewModel @Inject constructor(
             val createdAt = existing?.createdAtEpochMillis ?: now
             val nextDate = if (s.hasNextVisit) s.nextVisitDateMillis else null
             val nextReminderOn = s.hasNextVisit && s.nextVisitReminder
+            val normalizedLinkedTreatmentIds = s.linkedTreatmentIds
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .sorted()
+            val normalizedLinkedExamIds = s.linkedExamIds
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .sorted()
+            val linkedExamIdsJson = encodeStringList(normalizedLinkedExamIds)
+            val linkedTreatmentIdsJson = encodeStringList(normalizedLinkedTreatmentIds)
 
             val visit = KBMedicalVisit(
                 id = s.visitId,
@@ -359,11 +383,11 @@ class MedicalVisitFormViewModel @Inject constructor(
                 reason = s.reason.trim(),
                 diagnosis = s.diagnosis.takeIf { it.isNotBlank() },
                 recommendations = s.recommendations.takeIf { it.isNotBlank() },
-                linkedTreatmentIdsJson = encodeStringList(s.linkedTreatmentIds),
-                linkedExamIdsJson = encodeStringList(s.linkedExamIds),
+                linkedTreatmentIdsJson = linkedTreatmentIdsJson,
+                linkedExamIdsJson = linkedExamIdsJson,
                 asNeededDrugsJson = encodeAsNeededDrugs(s.asNeededDrugs),
                 therapyTypesJson = encodeTherapyTypes(s.therapyTypes),
-                prescribedExamsJson = encodeStringList(s.linkedExamIds),
+                prescribedExamsJson = linkedExamIdsJson,
                 photoUrlsJson = existing?.photoUrlsJson ?: "[]",
                 notes = s.notes.takeIf { it.isNotBlank() },
                 nextVisitDateEpochMillis = nextDate,
@@ -383,11 +407,13 @@ class MedicalVisitFormViewModel @Inject constructor(
             runCatching {
                 // La visita deve esistere in SQLite prima di aggiornare gli esami (FK prescribingVisitId → kb_medical_visits).
                 repository.save(visit)
-                linkExamsToVisit(visit.id, s.linkedExamIds)
-                linkTreatmentsToVisit(visit.id, s.linkedTreatmentIds)
+                linkExamsToVisit(visit.id, normalizedLinkedExamIds, s.linkedExamSummaries)
+                linkTreatmentsToVisit(visit.id, normalizedLinkedTreatmentIds)
                 for (uri in s.pendingAttachmentUris) {
-                    attachmentService.uploadVisitAttachment(uri, visit.id, familyId, childId)
+                    attachmentService.uploadVisitAttachment(uri, visit.id, familyId, childId).getOrThrow()
                 }
+                // Ensure OCR is ready immediately after save so AI can read visit reports.
+                attachmentService.ensureVisitAttachmentsExtraction(familyId, visit.id)
             }.fold(
                 onSuccess = {
                     scheduleReminders(visit)
@@ -403,27 +429,62 @@ class MedicalVisitFormViewModel @Inject constructor(
         }
     }
 
-    private suspend fun linkExamsToVisit(visitId: String, examIds: List<String>) {
+    private suspend fun linkExamsToVisit(
+        visitId: String,
+        examIds: List<String>,
+        examSummaries: Map<String, Pair<String, Boolean>>,
+    ) {
+        val now = System.currentTimeMillis()
         for (eid in examIds) {
-            val e = examRepository.getById(eid) ?: continue
-            if (e.prescribingVisitId == null) {
+            val e = examRepository.getById(eid)
+            if (e == null) {
+                val summary = examSummaries[eid]
+                val fallbackName = summary?.first?.trim().takeUnless { it.isNullOrBlank() } ?: "Esame prescritto"
+                val fallbackUrgent = summary?.second ?: false
                 examRepository.upsert(
-                    e.copy(
+                    KBMedicalExam(
+                        id = eid,
+                        familyId = familyId,
+                        childId = childId,
+                        name = fallbackName,
+                        isUrgent = fallbackUrgent,
+                        deadlineEpochMillis = null,
+                        preparation = null,
+                        notes = null,
+                        location = null,
+                        statusRaw = KBExamStatus.PENDING.rawValue,
+                        resultText = null,
+                        resultDateEpochMillis = null,
                         prescribingVisitId = visitId,
-                        updatedAtEpochMillis = System.currentTimeMillis(),
+                        reminderOn = false,
+                        isDeleted = false,
+                        syncStateRaw = 0,
+                        lastSyncError = null,
+                        createdAtEpochMillis = now,
+                        updatedAtEpochMillis = now,
+                        updatedBy = "",
+                        createdBy = "",
                     ),
                 )
+                continue
             }
+            examRepository.upsert(
+                e.copy(
+                    prescribingVisitId = e.prescribingVisitId ?: visitId,
+                    isDeleted = false, // publish draft exams created inside visit flow
+                    updatedAtEpochMillis = System.currentTimeMillis(),
+                ),
+            )
         }
     }
 
     private suspend fun linkTreatmentsToVisit(visitId: String, treatmentIds: List<String>) {
         for (tid in treatmentIds) {
             val t = treatmentRepository.getById(tid) ?: continue
-            if (t.prescribingVisitId != null) continue
             treatmentRepository.upsert(
                 t.copy(
-                    prescribingVisitId = visitId,
+                    prescribingVisitId = t.prescribingVisitId ?: visitId,
+                    isDeleted = false, // ensure treatment appears in "Cure" after visit save
                     updatedAtEpochMillis = System.currentTimeMillis(),
                 ),
             )

@@ -228,7 +228,7 @@ fun HealthHomeScreen(
             exit = fadeOut(),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 20.dp, bottom = 96.dp),
+                .padding(end = 20.dp, bottom = 20.dp),
         ) {
             val askEnabled = isAiGloballyEnabled &&
                 (state.visitCount > 0 || state.examCount > 0 ||

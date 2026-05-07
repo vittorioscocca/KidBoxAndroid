@@ -242,10 +242,12 @@ fun MedicalVisitFormScreen(
             // Nuova visita: riga visita non esiste ancora in Room → FK su prescribingVisitId fallirebbe.
             // Collegamento differito in MedicalVisitFormViewModel dopo repository.save(visit).
             prescribingVisitId = if (visitId != null) state.visitId else null,
+            // Nuova visita: l'esame creato dentro la visita resta bozza nascosta finché non salvo la visita.
+            saveAsDraftHidden = (visitId == null),
             bindNonce = examBindNonce,
             onBack = { showExamForm = false },
-            onSaved = { eid ->
-                viewModel.appendLinkedExamId(eid)
+            onSaved = { eid, examName ->
+                viewModel.appendLinkedExamId(eid, examName)
                 showExamForm = false
             },
         )
@@ -954,13 +956,14 @@ private fun Step3Prescriptions(
             } else {
                 state.linkedExamIds.forEach { id ->
                     val meta = state.linkedExamSummaries[id]
+                    val title = meta?.first?.takeIf { it.isNotBlank() } ?: "Esame in sincronizzazione"
                     Row(
                         Modifier
                             .fillMaxWidth()
                             .padding(vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(meta?.first ?: id, modifier = Modifier.weight(1f), color = kb.title)
+                        Text(title, modifier = Modifier.weight(1f), color = kb.title)
                         if (meta?.second == true) Text("Urgente", fontSize = 11.sp, color = Color(0xFFFF6B00))
                         IconButton(onClick = { viewModel.removeLinkedExamId(id) }) {
                             Icon(Icons.Default.Delete, contentDescription = null, tint = kb.subtitle)
@@ -1118,6 +1121,12 @@ private fun Step4AttachmentsNotes(
                         )
                     }
                 }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "I referti allegati verranno letti dall'AI dopo il salvataggio della visita.",
+                    fontSize = 11.sp,
+                    color = kb.subtitle,
+                )
                 Spacer(Modifier.height(10.dp))
             }
             val canAddAttachment = state.pendingAttachmentUris.size < 5

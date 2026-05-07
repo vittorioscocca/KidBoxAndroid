@@ -18,6 +18,9 @@ import it.vittorioscocca.kidbox.notifications.ExamReminderScheduler
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -69,18 +72,22 @@ class MedicalExamFormViewModel @Inject constructor(
     private var familyId: String = ""
     private var childId: String = ""
     private var boundPrescribingVisitId: String? = null
+    private var attachmentsJob: Job? = null
+    private var saveAsDraftHidden: Boolean = false
 
     fun bind(
         familyId: String,
         childId: String,
         examId: String?,
         prescribingVisitId: String? = null,
+        saveAsDraftHidden: Boolean = false,
         /** Increment when aprendo di nuovo il foglio “nuovo esame” dalla visita così si rigenera l’id. */
         bindNonce: Int = 0,
     ) {
         this.familyId = familyId
         this.childId = childId
         this.boundPrescribingVisitId = prescribingVisitId
+        this.saveAsDraftHidden = saveAsDraftHidden
 
         viewModelScope.launch {
             val name = resolveChildName(childId)
@@ -95,8 +102,13 @@ class MedicalExamFormViewModel @Inject constructor(
         }
 
         documentRepository.startRealtime(familyId)
-        documentRepository.observeAllDocuments(familyId)
-            .map { docs -> docs.filter { ExamAttachmentTag.matches(it.notes, _uiState.value.examId) } }
+        attachmentsJob?.cancel()
+        attachmentsJob = combine(
+            documentRepository.observeAllDocuments(familyId),
+            _uiState.map { it.examId }.distinctUntilChanged(),
+        ) { docs, currentExamId ->
+            docs.filter { ExamAttachmentTag.matches(it.notes, currentExamId) }
+        }
             .onEach { docs -> _uiState.value = _uiState.value.copy(attachments = docs) }
             .launchIn(viewModelScope)
     }
@@ -207,7 +219,7 @@ class MedicalExamFormViewModel @Inject constructor(
                 resultDateEpochMillis = if (s.hasResult) s.resultDateEpochMillis else null,
                 prescribingVisitId = boundPrescribingVisitId,
                 reminderOn = s.reminderOn && deadline != null,
-                isDeleted = false,
+                isDeleted = saveAsDraftHidden,
                 syncStateRaw = 0,
                 lastSyncError = null,
                 createdAtEpochMillis = now,

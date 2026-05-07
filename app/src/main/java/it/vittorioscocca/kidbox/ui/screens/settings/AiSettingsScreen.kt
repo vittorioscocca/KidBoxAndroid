@@ -35,12 +35,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,11 +79,32 @@ fun AiSettingsScreen(
     val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showRevokeConfirm by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    var showStubDialog by remember { mutableStateOf(false) }
+    var stubDialogTitle by remember { mutableStateOf("") }
+    var stubDialogBody by remember { mutableStateOf("") }
+
+    LaunchedEffect(state.message) {
+        val msg = state.message ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(msg)
+        viewModel.dismissMessage()
+    }
 
     if (state.pendingShowConsent) {
         AIConsentBottomSheet(
             onAccept = { viewModel.recordConsent() },
             onDismiss = { viewModel.dismissPendingConsent() },
+        )
+    }
+
+    if (showStubDialog) {
+        AlertDialog(
+            onDismissRequest = { showStubDialog = false },
+            title = { Text(stubDialogTitle) },
+            text = { Text(stubDialogBody) },
+            confirmButton = {
+                TextButton(onClick = { showStubDialog = false }) { Text("OK") }
+            },
         )
     }
 
@@ -108,6 +132,7 @@ fun AiSettingsScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = kb.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 modifier = Modifier.statusBarsPadding(),
@@ -141,12 +166,26 @@ fun AiSettingsScreen(
                 .padding(horizontal = 18.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            CurrentPlanCard(plan = state.plan)
+            CurrentPlanCard(
+                plan = state.plan,
+                usageToday = state.aiUsageToday,
+            )
 
             AIIntroCard()
 
             if (!state.plan.includesAI) {
-                AILockedBanner()
+                AILockedBanner(
+                    onDiscoverPlans = {
+                        stubDialogTitle = "Piani in arrivo su Android"
+                        stubDialogBody = "Su iOS puoi già gestire i piani Pro/Max. Su Android lo implementeremo a breve."
+                        showStubDialog = true
+                    },
+                    onRedeemOfferCode = {
+                        stubDialogTitle = "Riscatta codice offerta"
+                        stubDialogBody = "Su Android lo aggiungiamo presto. Per ora puoi riscattare il codice da iOS."
+                        showStubDialog = true
+                    },
+                )
             } else {
                 AIToggleCard(
                     isEnabled = state.isEnabled,
@@ -156,12 +195,10 @@ fun AiSettingsScreen(
                     onRevokeClick = { showRevokeConfirm = true },
                 )
 
-                if (state.isEnabled) {
-                    AIUsageCard(
-                        usageToday = state.aiUsageToday,
-                        dailyLimit = state.plan.aiDailyLimit,
-                    )
-                }
+                AIUsageCard(
+                    usageToday = state.aiUsageToday,
+                    dailyLimit = state.plan.aiDailyLimit,
+                )
             }
 
             AIPrivacyCard()
@@ -171,13 +208,30 @@ fun AiSettingsScreen(
                 onToggle = { viewModel.toggleWeeklySummary(it) },
             )
 
+            SubscriptionSectionCard(
+                plan = state.plan,
+                onManageSubscription = {
+                    stubDialogTitle = "Gestisci abbonamento"
+                    stubDialogBody = "Su Android questa sezione sarà collegata ai piani (Pro/Max) più avanti."
+                    showStubDialog = true
+                },
+                onRedeemOfferCode = {
+                    stubDialogTitle = "Riscatta codice offerta"
+                    stubDialogBody = "Funzione in arrivo su Android."
+                    showStubDialog = true
+                },
+            )
+
             Spacer(Modifier.height(24.dp))
         }
     }
 }
 
 @Composable
-private fun CurrentPlanCard(plan: KBPlan) {
+private fun CurrentPlanCard(
+    plan: KBPlan,
+    usageToday: Int,
+) {
     val gradientColors = when (plan) {
         KBPlan.MAX -> listOf(Color(0xFF7C3AED), Color(0xFF4F46E5))
         KBPlan.PRO -> listOf(Color(0xFF2563EB), Color(0xFF0EA5E9))
@@ -214,10 +268,21 @@ private fun CurrentPlanCard(plan: KBPlan) {
                     fontWeight = FontWeight.Bold,
                 )
                 if (plan.includesAI) {
+                    val availableToday = if (plan.aiDailyLimit == Int.MAX_VALUE) {
+                        null
+                    } else {
+                        (plan.aiDailyLimit - usageToday).coerceAtLeast(0)
+                    }
                     Text(
                         if (plan.aiDailyLimit == Int.MAX_VALUE) "AI illimitata" else "AI: ${plan.aiDailyLimit} messaggi/giorno",
                         color = Color.White.copy(alpha = 0.85f),
                         fontSize = 13.sp,
+                    )
+                    Text(
+                        if (availableToday == null) "Disponibili oggi: illimitati" else "Disponibili oggi: $availableToday",
+                        color = Color.White.copy(alpha = 0.92f),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
                     )
                 } else {
                     Text(
@@ -331,6 +396,7 @@ private fun AIToggleCard(
 private fun AIUsageCard(usageToday: Int, dailyLimit: Int) {
     val kb = MaterialTheme.kidBoxColors
     val isUnlimited = dailyLimit == Int.MAX_VALUE
+    val availableToday = if (isUnlimited) Int.MAX_VALUE else (dailyLimit - usageToday).coerceAtLeast(0)
     val progress = if (isUnlimited) 0f else usageToday.toFloat() / dailyLimit.coerceAtLeast(1)
     val progressColor = when {
         isUnlimited -> Color(0xFF3B82F6)
@@ -344,7 +410,7 @@ private fun AIUsageCard(usageToday: Int, dailyLimit: Int) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.BarChart, contentDescription = null, tint = progressColor, modifier = Modifier.size(18.dp))
                 Text(
-                    "  Utilizzo oggi",
+                    "  Messaggi AI oggi",
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
                     color = kb.title,
@@ -353,7 +419,14 @@ private fun AIUsageCard(usageToday: Int, dailyLimit: Int) {
             Spacer(Modifier.height(10.dp))
             if (isUnlimited) {
                 Text(
-                    "$usageToday messaggi inviati · limite illimitato",
+                    "Disponibili: illimitati",
+                    fontSize = 14.sp,
+                    color = kb.title,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "$usageToday messaggi inviati oggi",
                     fontSize = 14.sp,
                     color = kb.subtitle,
                 )
@@ -362,9 +435,9 @@ private fun AIUsageCard(usageToday: Int, dailyLimit: Int) {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text("$usageToday / $dailyLimit messaggi", fontSize = 14.sp, color = kb.title)
+                    Text("Disponibili: $availableToday", fontSize = 14.sp, color = kb.title, fontWeight = FontWeight.SemiBold)
                     Text(
-                        "${dailyLimit - usageToday} rimanenti",
+                        "Usati: $usageToday/$dailyLimit",
                         fontSize = 13.sp,
                         color = kb.subtitle,
                     )
@@ -431,31 +504,103 @@ private fun WeeklySummaryCard(isEnabled: Boolean, onToggle: (Boolean) -> Unit) {
 }
 
 @Composable
-private fun AILockedBanner() {
+private fun AILockedBanner(
+    onDiscoverPlans: () -> Unit,
+    onRedeemOfferCode: () -> Unit,
+) {
     val kb = MaterialTheme.kidBoxColors
-    Box(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFFF59E0B).copy(alpha = 0.12f))
-            .padding(16.dp),
+            .clip(RoundedCornerShape(16.dp)),
+        colors = CardDefaults.cardColors(containerColor = kb.card),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.Lock, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(22.dp))
-            Column(modifier = Modifier.padding(start = 12.dp)) {
-                Text(
-                    "Assistente AI non incluso",
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp,
-                    color = kb.title,
-                )
-                Text(
-                    "Aggiorna al piano Pro o Max per accedere all'assistente AI medico.",
-                    fontSize = 13.sp,
-                    color = kb.subtitle,
-                    lineHeight = 18.sp,
-                )
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Lock, contentDescription = null, tint = Color(0xFF6B7280), modifier = Modifier.size(22.dp))
+                Column(modifier = Modifier.padding(start = 12.dp)) {
+                    Text(
+                        "L'assistente AI è disponibile con Pro o Max",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.sp,
+                        color = kb.title,
+                    )
+                    Text(
+                        "Passa a Pro per 20 messaggi/giorno per membro, o a Max per 100.",
+                        fontSize = 13.sp,
+                        color = kb.subtitle,
+                        lineHeight = 18.sp,
+                    )
+                }
             }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F1FF)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("Scopri i piani", color = Color(0xFF1D4ED8), fontWeight = FontWeight.SemiBold)
+                    TextButton(onClick = onDiscoverPlans) { Text("Apri", color = Color(0xFF1D4ED8)) }
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(kb.card)
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Riscatta codice offerta", color = kb.title, fontWeight = FontWeight.SemiBold)
+                TextButton(onClick = onRedeemOfferCode) { Text("Apri") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubscriptionSectionCard(
+    plan: KBPlan,
+    onManageSubscription: () -> Unit,
+    onRedeemOfferCode: () -> Unit,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    SettingCard {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Abbonamento", fontWeight = FontWeight.Bold, color = kb.title)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Gestisci abbonamento", color = kb.title, fontWeight = FontWeight.Medium)
+                TextButton(onClick = onManageSubscription) { Text("Apri") }
+            }
+            HorizontalDivider(color = kb.divider)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Riscatta codice offerta", color = kb.title, fontWeight = FontWeight.Medium)
+                TextButton(onClick = onRedeemOfferCode) { Text("Apri") }
+            }
+            Text(
+                text = if (plan.includesAI) "Piano attivo su iOS. Android: integrazione in arrivo." else "Android: piani non ancora disponibili.",
+                color = kb.subtitle,
+                fontSize = 12.sp,
+            )
         }
     }
 }

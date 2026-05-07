@@ -15,6 +15,7 @@ import it.vittorioscocca.kidbox.data.sync.MedicalExamSyncCenter
 import it.vittorioscocca.kidbox.data.sync.MedicalVisitSyncCenter
 import it.vittorioscocca.kidbox.data.sync.TreatmentSyncCenter
 import it.vittorioscocca.kidbox.data.sync.VaccineSyncCenter
+import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
 import it.vittorioscocca.kidbox.domain.model.KBExamStatus
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -57,6 +58,7 @@ class HealthHomeViewModel @Inject constructor(
     private val examSyncCenter: MedicalExamSyncCenter,
     private val vaccineSyncCenter: VaccineSyncCenter,
     private val aiSettings: AiSettings,
+    private val healthAttachmentService: HealthAttachmentService,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HealthHomeState())
@@ -79,6 +81,7 @@ class HealthHomeViewModel @Inject constructor(
             visitSyncCenter.start(familyId)
             examSyncCenter.start(familyId)
             vaccineSyncCenter.start(familyId)
+            healthAttachmentService.enqueueBackfillHealthExtraction(familyId)
         }
 
         _uiState.value = _uiState.value.copy(hasAiConsent = aiConsentStore.hasHealthAiConsent())

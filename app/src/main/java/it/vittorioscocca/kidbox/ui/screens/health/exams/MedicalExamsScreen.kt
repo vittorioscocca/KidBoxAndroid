@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -296,7 +297,8 @@ fun MedicalExamsScreen(
                 AskAiButton(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 20.dp, bottom = 96.dp),
+                        .padding(end = 20.dp, bottom = 0.dp)
+                        .offset(y = 16.dp),
                     isEnabled = true,
                     contentDescription = "Chiedi all'AI sugli esami di $displayName",
                     onTap = {

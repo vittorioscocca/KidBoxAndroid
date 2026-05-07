@@ -352,7 +352,7 @@ fun MedicalExamDetailScreen(
                     AskAiButton(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(end = 20.dp, bottom = 96.dp),
+                            .padding(end = 20.dp, bottom = 92.dp),
                         isEnabled = true,
                         contentDescription = "Chiedi all'AI sull'analisi $examLabel",
                         onTap = { showAiChat = true },

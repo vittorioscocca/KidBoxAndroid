@@ -7,6 +7,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.health.ai.HealthContextBuilder
 import it.vittorioscocca.kidbox.data.health.ai.computeScopeId
 import it.vittorioscocca.kidbox.data.health.ExamAttachmentTag
+import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
+import it.vittorioscocca.kidbox.data.health.TreatmentAttachmentTag
 import it.vittorioscocca.kidbox.data.health.VisitAttachmentTag
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBDocumentDao
@@ -21,6 +23,7 @@ import it.vittorioscocca.kidbox.domain.model.KBAIConversation
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
 import it.vittorioscocca.kidbox.domain.model.KBMedicalExam
 import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
+import it.vittorioscocca.kidbox.domain.model.KBTextExtractionStatus
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import it.vittorioscocca.kidbox.domain.model.KBVaccine
 import javax.inject.Inject
@@ -29,7 +32,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -43,6 +45,10 @@ data class HealthAIChatState(
     val usageToday: Int = 0,
     val dailyLimit: Int = 0,
     val subjectName: String = "",
+    val activeTreatmentsCount: Int = 0,
+    val vaccinesCount: Int = 0,
+    val visitsCount: Int = 0,
+    val examsCount: Int = 0,
 ) {
     val canSend: Boolean get() = !isLoading && !isLoadingContext && inputText.isNotBlank()
     val isNearLimit: Boolean get() = dailyLimit > 0 && usageToday >= (dailyLimit * 0.8).toInt()
@@ -59,6 +65,7 @@ class HealthAIChatViewModel @Inject constructor(
     private val documentDao: KBDocumentDao,
     private val childDao: KBChildDao,
     private val memberDao: KBFamilyMemberDao,
+    private val healthAttachmentService: HealthAttachmentService,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HealthAIChatState())
@@ -70,6 +77,7 @@ class HealthAIChatViewModel @Inject constructor(
     private var systemPrompt = ""
     private var conversation: KBAIConversation? = null
     private var boundKey = ""
+    private var lastExtractionEnsureKey = ""
 
     fun bind(familyId: String, childId: String) {
         val key = "$familyId:$childId"
@@ -77,6 +85,7 @@ class HealthAIChatViewModel @Inject constructor(
         boundKey = key
         this.familyId = familyId
         this.childId = childId
+        healthAttachmentService.enqueueBackfillHealthExtraction(familyId)
 
         viewModelScope.launch {
             subjectName = resolveSubjectName(childId)
@@ -90,31 +99,71 @@ class HealthAIChatViewModel @Inject constructor(
             examRepository.observe(familyId, childId),
             treatmentRepository.observe(familyId, childId),
             vaccineRepository.observe(familyId, childId),
-        ) { visits, exams, treatments, vaccines ->
-            HealthData(visits, exams, treatments, vaccines)
+            documentDao.observeByFamilyId(familyId),
+        ) { visits, exams, treatments, vaccines, documents ->
+            HealthData(visits, exams, treatments, vaccines, documents)
         }.onEach { data ->
+            val activeVisits = data.visits.filter { !it.isDeleted }
+            val activeExams = data.exams.filter { !it.isDeleted }
+            val activeTreatments = data.treatments.filter { !it.isDeleted }
+            val allDocs = data.documents.filter { !it.isDeleted }
+            val relevantDocs = allDocs.filter { doc ->
+                activeExams.any { ExamAttachmentTag.matches(doc.notes, it.id) } ||
+                    activeVisits.any { VisitAttachmentTag.matches(doc.notes, it.id) } ||
+                    activeTreatments.any { TreatmentAttachmentTag.matches(doc.notes, it.id) }
+            }
+            val pendingRelevantDocsSignature = relevantDocs
+                .filter {
+                    it.extractedText.isNullOrBlank() ||
+                        it.extractionStatusRaw != KBTextExtractionStatus.COMPLETED.rawValue
+                }
+                .map { "${it.id}:${it.extractionStatusRaw}" }
+                .sorted()
+            val extractionEnsureKey = (
+                activeVisits.map { "v:${it.id}" } +
+                    activeExams.map { "e:${it.id}" } +
+                    activeTreatments.map { "t:${it.id}" } +
+                    pendingRelevantDocsSignature
+                )
+                .sorted()
+                .joinToString("|")
+            if (extractionEnsureKey != lastExtractionEnsureKey) {
+                activeVisits.forEach { visit ->
+                    healthAttachmentService.ensureVisitAttachmentsExtraction(familyId, visit.id)
+                }
+                activeExams.forEach { exam ->
+                    healthAttachmentService.ensureExamAttachmentsExtraction(familyId, exam.id)
+                }
+                activeTreatments.forEach { treatment ->
+                    healthAttachmentService.ensureTreatmentAttachmentsExtraction(familyId, treatment.id)
+                }
+                lastExtractionEnsureKey = extractionEnsureKey
+            }
+
             val scopeId = computeScopeId(
                 subjectId = childId,
-                examIds = data.exams.filter { !it.isDeleted }.map { it.id },
-                visitIds = data.visits.filter { !it.isDeleted }.map { it.id },
-                treatmentIds = data.treatments.filter { !it.isDeleted }.map { it.id },
+                examIds = activeExams.map { it.id },
+                visitIds = activeVisits.map { it.id },
+                treatmentIds = activeTreatments.map { it.id },
                 vaccineIds = data.vaccines.filter { !it.isDeleted }.map { it.id },
             )
 
-            val allDocs = documentDao.observeByFamilyId(familyId).first()
             val docsByExamId = buildDocMapByTag(allDocs) { doc ->
-                data.exams.firstOrNull { ExamAttachmentTag.matches(doc.notes, it.id) }?.id
+                activeExams.firstOrNull { ExamAttachmentTag.matches(doc.notes, it.id) }?.id
             }
             val docsByVisitId = buildDocMapByTag(allDocs) { doc ->
-                data.visits.firstOrNull { VisitAttachmentTag.matches(doc.notes, it.id) }?.id
+                activeVisits.firstOrNull { VisitAttachmentTag.matches(doc.notes, it.id) }?.id
+            }
+            val docsByTreatmentId = buildDocMapByTag(allDocs) { doc ->
+                activeTreatments.firstOrNull { TreatmentAttachmentTag.matches(doc.notes, it.id) }?.id
             }
 
             val resolvedName = subjectName.ifBlank { resolveSubjectName(childId) }
             val navSubjectLabel = savedStateHandle.get<String>("subjectName")?.trim().orEmpty()
             val displayName = navSubjectLabel.ifBlank { resolvedName }
-            val visitN = data.visits.count { !it.isDeleted }
-            val examN = data.exams.count { !it.isDeleted }
-            val activeCareN = countActiveTreatments(data.treatments)
+            val visitN = activeVisits.size
+            val examN = activeExams.size
+            val activeCareN = countActiveTreatments(activeTreatments)
             val vaccineN = data.vaccines.count { !it.isDeleted }
             val aggregateIntro = buildAggregateIntro(displayName, visitN, examN, activeCareN, vaccineN)
             val contextBody = HealthContextBuilder.buildSystemPrompt(
@@ -126,6 +175,7 @@ class HealthAIChatViewModel @Inject constructor(
                 vaccines = data.vaccines,
                 documentsByExamId = docsByExamId,
                 documentsByVisitId = docsByVisitId,
+                documentsByTreatmentId = docsByTreatmentId,
             )
             val idAppendix = buildIdAppendixFromNavArgs()
             systemPrompt = when {
@@ -144,6 +194,12 @@ class HealthAIChatViewModel @Inject constructor(
             }
 
             _uiState.value = _uiState.value.copy(isLoadingContext = false)
+                .copy(
+                    activeTreatmentsCount = activeCareN,
+                    vaccinesCount = vaccineN,
+                    visitsCount = visitN,
+                    examsCount = examN,
+                )
         }.launchIn(viewModelScope)
     }
 
@@ -251,6 +307,7 @@ class HealthAIChatViewModel @Inject constructor(
         val exams: List<KBMedicalExam>,
         val treatments: List<KBTreatment>,
         val vaccines: List<KBVaccine>,
+        val documents: List<KBDocumentEntity>,
     )
 }
 

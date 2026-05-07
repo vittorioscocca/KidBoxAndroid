@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
+import it.vittorioscocca.kidbox.domain.model.KBTextExtractionStatus
 import it.vittorioscocca.kidbox.ui.theme.KidBoxColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.io.File
@@ -198,25 +199,25 @@ fun HealthAttachmentsCard(
                     color = tintColor,
                     letterSpacing = 0.8.sp,
                 )
-                Spacer(Modifier.weight(1f))
                 if (isUploading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = tintColor,
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Caricamento…",
+                        fontSize = 11.sp,
+                        color = kb.subtitle,
                     )
-                } else {
-                    IconButton(
-                        onClick = { showSheet = true },
-                        modifier = Modifier.size(28.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = "Aggiungi allegato",
-                            tint = tintColor,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
+                }
+                Spacer(Modifier.weight(1f))
+                IconButton(
+                    onClick = { showSheet = true },
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Aggiungi allegato",
+                        tint = tintColor,
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
             }
 
@@ -311,6 +312,8 @@ private fun AttachmentRow(
                 fontSize = 11.sp,
                 color = kb.subtitle,
             )
+            Spacer(Modifier.height(2.dp))
+            ExtractionStatusLabel(doc = doc, kb = kb)
         }
 
         IconButton(
@@ -323,6 +326,66 @@ private fun AttachmentRow(
                 tint = kb.subtitle,
                 modifier = Modifier.size(18.dp),
             )
+        }
+    }
+}
+
+@Composable
+private fun ExtractionStatusLabel(doc: KBDocumentEntity, kb: KidBoxColorScheme) {
+    val status = KBTextExtractionStatus.fromRaw(doc.extractionStatusRaw)
+    when (status) {
+        KBTextExtractionStatus.COMPLETED -> {
+            if (!doc.extractedText.isNullOrBlank()) {
+                Text(
+                    "Leggibile dall'AI ✓",
+                    fontSize = 11.sp,
+                    color = Color(0xFF2E7D32),
+                    fontWeight = FontWeight.Medium,
+                )
+            } else {
+                Text(
+                    "Nessun testo rilevato",
+                    fontSize = 11.sp,
+                    color = kb.subtitle,
+                )
+            }
+        }
+        KBTextExtractionStatus.PENDING -> {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(10.dp),
+                    strokeWidth = 1.5.dp,
+                    color = kb.subtitle,
+                )
+                Text("In attesa di lettura…", fontSize = 11.sp, color = kb.subtitle)
+            }
+        }
+        KBTextExtractionStatus.PROCESSING -> {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(10.dp),
+                    strokeWidth = 1.5.dp,
+                    color = kb.subtitle,
+                )
+                Text("Lettura in corso…", fontSize = 11.sp, color = kb.subtitle)
+            }
+        }
+        KBTextExtractionStatus.FAILED -> {
+            Text(
+                "Lettura fallita",
+                fontSize = 11.sp,
+                color = Color(0xFFF59E0B),
+                fontWeight = FontWeight.Medium,
+            )
+        }
+        KBTextExtractionStatus.NONE -> {
+            Text("In attesa di lettura…", fontSize = 11.sp, color = kb.subtitle)
         }
     }
 }

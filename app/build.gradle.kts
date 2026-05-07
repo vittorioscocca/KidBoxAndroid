@@ -149,6 +149,7 @@ dependencies {
 
     // ML Kit barcode scanning (used by WalletPdfParser to scan barcodes from rendered PDF pages)
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    implementation("com.google.mlkit:text-recognition:16.0.1")
 
     // WorkManager (wallet reminders)
     implementation("androidx.work:work-runtime-ktx:2.9.0")

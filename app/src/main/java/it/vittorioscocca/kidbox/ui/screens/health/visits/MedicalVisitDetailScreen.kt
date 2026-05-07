@@ -408,7 +408,7 @@ fun MedicalVisitDetailScreen(
                     AskAiButton(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(end = 20.dp, bottom = 96.dp),
+                            .padding(end = 20.dp, bottom = 92.dp),
                         isEnabled = true,
                         contentDescription = "Chiedi all'AI sulla visita",
                         onTap = { showAiChat = true },
@@ -479,6 +479,7 @@ private fun FarmaciProgrammatiCard(
                     title = row.title,
                     subtitle = row.subtitle,
                     leadingIconTint = tint,
+                    enabled = row.id.isNotBlank(),
                     onClick = { onOpenTreatment(row.id) },
                 )
                 Spacer(Modifier.height(8.dp))
@@ -560,6 +561,7 @@ private fun PrescrizioniDetailCard(
                     LinkedExamRow(
                         row = row,
                         tint = tint,
+                        enabled = row.id.isNotBlank(),
                         onClick = { onOpenExam(row.id) },
                     )
                     Spacer(Modifier.height(8.dp))
@@ -694,6 +696,7 @@ private fun LinkedRow(
     title: String,
     subtitle: String?,
     leadingIconTint: Color = VISIT_DETAIL_TINT,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -702,7 +705,7 @@ private fun LinkedRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(kb.subtitle.copy(alpha = 0.08f))
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -728,7 +731,9 @@ private fun LinkedRow(
                 Text(subtitle, fontSize = 12.sp, color = kb.subtitle)
             }
         }
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = kb.subtitle.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+        if (enabled) {
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = kb.subtitle.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+        }
     }
 }
 
@@ -736,6 +741,7 @@ private fun LinkedRow(
 private fun LinkedExamRow(
     row: LinkedPrescriptionRow,
     tint: Color,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -745,7 +751,7 @@ private fun LinkedExamRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(kb.subtitle.copy(alpha = 0.08f))
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -788,7 +794,9 @@ private fun LinkedExamRow(
                 Text(row.subtitle, fontSize = 12.sp, color = kb.subtitle)
             }
         }
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = kb.subtitle.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+        if (enabled) {
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = kb.subtitle.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+        }
     }
 }
 

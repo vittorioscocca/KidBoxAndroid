@@ -31,6 +31,8 @@ data class PlanningAIChatState(
     val usageToday: Int = 0,
     val dailyLimit: Int = 0,
     val familyName: String = "",
+    val upcomingEventsCount: Int = 0,
+    val pendingGroceryCount: Int = 0,
 ) {
     val canSend: Boolean get() = !isLoading && !isLoadingContext && inputText.isNotBlank()
     val isNearLimit: Boolean get() = dailyLimit > 0 && usageToday >= (dailyLimit * 0.8).toInt()
@@ -117,6 +119,10 @@ class PlanningAIChatViewModel @Inject constructor(
             .launchIn(viewModelScope)
 
         _uiState.value = _uiState.value.copy(isLoadingContext = false)
+            .copy(
+                upcomingEventsCount = upcomingEvents.size,
+                pendingGroceryCount = pendingGrocery.size,
+            )
     }
 
     fun send() {

@@ -9,6 +9,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +39,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -61,6 +64,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,6 +80,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
 import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import kotlinx.coroutines.launch
 
 private val AI_BLUE = Color(0xFF5C6BC0)
 
@@ -96,6 +101,7 @@ fun AIChatScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     var showClearDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
 
@@ -151,7 +157,7 @@ fun AIChatScreen(
                         if (state.dailyLimit > 0) {
                             val usageColor = if (state.isNearLimit) Color(0xFFEF4444) else kb.subtitle
                             Text(
-                                "${state.usageToday}/${state.dailyLimit} messaggi oggi",
+                                "${state.usageToday}/${state.dailyLimit}",
                                 fontSize = 11.sp,
                                 color = usageColor,
                             )
@@ -202,23 +208,43 @@ fun AIChatScreen(
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(horizontal = 32.dp),
+                            modifier = Modifier.padding(horizontal = 24.dp),
                         ) {
                             Icon(
                                 Icons.Default.AutoAwesome,
                                 contentDescription = null,
                                 tint = AI_BLUE,
-                                modifier = Modifier.size(48.dp),
+                                modifier = Modifier.size(46.dp),
                             )
-                            Spacer(Modifier.height(12.dp))
+                            Spacer(Modifier.height(10.dp))
                             val name = state.familyName.ifBlank { "la tua famiglia" }
                             Text(
-                                "Ciao! Sono il tuo assistente AI.\nPosso aiutarti con la pianificazione di $name.",
+                                "Ciao! Sono il tuo assistente AI per $name.",
                                 fontSize = 15.sp,
                                 color = kb.subtitle,
                                 textAlign = TextAlign.Center,
                             )
-                            Spacer(Modifier.height(20.dp))
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "Ho accesso a: ${state.upcomingEventsCount} eventi in arrivo e ${state.pendingGroceryCount} elementi in lista spesa.",
+                                fontSize = 13.sp,
+                                color = kb.subtitle,
+                                textAlign = TextAlign.Center,
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "Puoi chiedermi una pianificazione rapida, priorita o promemoria utili.",
+                                fontSize = 13.sp,
+                                color = kb.subtitle,
+                                textAlign = TextAlign.Center,
+                            )
+                            Spacer(Modifier.height(14.dp))
+                            Text(
+                                "Puoi iniziare con uno di questi suggerimenti:",
+                                fontSize = 13.sp,
+                                color = kb.subtitle,
+                            )
+                            Spacer(Modifier.height(8.dp))
                             SUGGESTIONS.forEach { suggestion ->
                                 SuggestionChip(
                                     onClick = { viewModel.sendSuggestion(suggestion) },
@@ -240,20 +266,63 @@ fun AIChatScreen(
                 }
 
                 else -> {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-                        reverseLayout = true,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
                     ) {
-                        if (state.isLoading) {
-                            item { PlanningTypingIndicator() }
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 12.dp),
+                            reverseLayout = true,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            if (state.isLoading) {
+                                item { PlanningTypingIndicator() }
+                            }
+                            itemsIndexed(state.messages.reversed()) { _, message ->
+                                PlanningChatBubble(message = message)
+                            }
                         }
-                        itemsIndexed(state.messages.reversed()) { _, message ->
-                            PlanningChatBubble(message = message)
+                        val showScrollToBottom = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = showScrollToBottom,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(end = 8.dp, bottom = 12.dp),
+                            enter = fadeIn(),
+                            exit = fadeOut(),
+                        ) {
+                            androidx.compose.material3.IconButton(
+                                onClick = { scope.launch { listState.animateScrollToItem(0) } },
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(CircleShape)
+                                    .background(AI_BLUE),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Scorri in basso",
+                                    tint = Color.White,
+                                )
+                            }
                         }
                     }
                 }
+            }
+
+            if (state.dailyLimit > 0) {
+                Text(
+                    text = "${state.usageToday}/${state.dailyLimit}",
+                    fontSize = 11.sp,
+                    color = if (state.isNearLimit) Color(0xFFEF4444) else kb.subtitle,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 2.dp),
+                    textAlign = TextAlign.End,
+                )
             }
 
             Row(

@@ -614,7 +614,7 @@ fun AppNavGraph(
                 childId = childId,
                 examId = examId,
                 onBack = { navController.popBackStack() },
-                onSaved = { _: String -> navController.popBackStack() },
+                onSaved = { _, _ -> navController.popBackStack() },
             )
         }
 

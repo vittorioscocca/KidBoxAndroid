@@ -8,15 +8,21 @@ import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.KBDocumentDao
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
+import it.vittorioscocca.kidbox.data.health.ai.HealthAiDocumentText
 import it.vittorioscocca.kidbox.data.remote.DocumentStorageManager
 import it.vittorioscocca.kidbox.data.repository.DocumentRepository
+import it.vittorioscocca.kidbox.domain.model.KBTextExtractionStatus
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
 import java.io.File
 import java.io.IOException
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val TAG = "HealthAttachmentSvc"
@@ -28,11 +34,15 @@ class FileTooLargeException(message: String) : IOException(message)
 class HealthAttachmentService @Inject constructor(
     private val documentRepository: DocumentRepository,
     private val folderResolver: HealthFolderResolver,
+    private val textExtractor: HealthDocumentTextExtractor,
     private val storageManager: DocumentStorageManager,
     private val documentDao: KBDocumentDao,
     private val auth: FirebaseAuth,
     @ApplicationContext private val context: Context,
 ) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val backfillInFlightByFamily = ConcurrentHashMap<String, Boolean>()
+
 
     suspend fun uploadVisitAttachment(
         uri: Uri,
@@ -92,6 +102,103 @@ class HealthAttachmentService @Inject constructor(
             .onFailure { Log.w(TAG, "flushPending after delete failed", it) }
     }
 
+    /** iOS parity: extract text for old health attachments (visit/exam/treatment) in background. */
+    fun enqueueBackfillHealthExtraction(familyId: String) {
+        if (familyId.isBlank()) return
+        if (backfillInFlightByFamily.putIfAbsent(familyId, true) != null) return
+        scope.launch {
+            try {
+                backfillHealthExtractionInternal(familyId)
+            } finally {
+                backfillInFlightByFamily.remove(familyId)
+            }
+        }
+    }
+
+    /** Ensures extracted text exists for exam attachments before building AI context. */
+    suspend fun ensureExamAttachmentsExtraction(
+        familyId: String,
+        examId: String,
+    ) = withContext(Dispatchers.IO) {
+        if (familyId.isBlank() || examId.isBlank()) return@withContext
+        val uid = auth.currentUser?.uid ?: "local"
+        val candidates = documentDao.getAllByFamilyId(familyId)
+            .asSequence()
+            .filter { !it.isDeleted && ExamAttachmentTag.matches(it.notes, examId) }
+            .filter {
+                it.extractedText.isNullOrBlank() ||
+                    it.extractionStatusRaw in setOf(
+                        KBTextExtractionStatus.NONE.rawValue,
+                        KBTextExtractionStatus.PENDING.rawValue,
+                        KBTextExtractionStatus.PROCESSING.rawValue,
+                        KBTextExtractionStatus.FAILED.rawValue,
+                    )
+            }
+            .toList()
+        if (candidates.isEmpty()) return@withContext
+        for (doc in candidates) {
+            extractAndPersistText(doc, uid)
+        }
+        runCatching { documentRepository.flushPending(familyId) }
+            .onFailure { Log.w(TAG, "ensureExamAttachmentsExtraction flushPending failed familyId=$familyId", it) }
+    }
+
+    /** Ensures extracted text exists for visit attachments before building AI context. */
+    suspend fun ensureVisitAttachmentsExtraction(
+        familyId: String,
+        visitId: String,
+    ) = withContext(Dispatchers.IO) {
+        if (familyId.isBlank() || visitId.isBlank()) return@withContext
+        val uid = auth.currentUser?.uid ?: "local"
+        val candidates = documentDao.getAllByFamilyId(familyId)
+            .asSequence()
+            .filter { !it.isDeleted && VisitAttachmentTag.matches(it.notes, visitId) }
+            .filter {
+                it.extractedText.isNullOrBlank() ||
+                    it.extractionStatusRaw in setOf(
+                        KBTextExtractionStatus.NONE.rawValue,
+                        KBTextExtractionStatus.PENDING.rawValue,
+                        KBTextExtractionStatus.PROCESSING.rawValue,
+                        KBTextExtractionStatus.FAILED.rawValue,
+                    )
+            }
+            .toList()
+        if (candidates.isEmpty()) return@withContext
+        for (doc in candidates) {
+            extractAndPersistText(doc, uid)
+        }
+        runCatching { documentRepository.flushPending(familyId) }
+            .onFailure { Log.w(TAG, "ensureVisitAttachmentsExtraction flushPending failed familyId=$familyId", it) }
+    }
+
+    /** Ensures extracted text exists for treatment attachments before building AI context. */
+    suspend fun ensureTreatmentAttachmentsExtraction(
+        familyId: String,
+        treatmentId: String,
+    ) = withContext(Dispatchers.IO) {
+        if (familyId.isBlank() || treatmentId.isBlank()) return@withContext
+        val uid = auth.currentUser?.uid ?: "local"
+        val candidates = documentDao.getAllByFamilyId(familyId)
+            .asSequence()
+            .filter { !it.isDeleted && TreatmentAttachmentTag.matches(it.notes, treatmentId) }
+            .filter {
+                it.extractedText.isNullOrBlank() ||
+                    it.extractionStatusRaw in setOf(
+                        KBTextExtractionStatus.NONE.rawValue,
+                        KBTextExtractionStatus.PENDING.rawValue,
+                        KBTextExtractionStatus.PROCESSING.rawValue,
+                        KBTextExtractionStatus.FAILED.rawValue,
+                    )
+            }
+            .toList()
+        if (candidates.isEmpty()) return@withContext
+        for (doc in candidates) {
+            extractAndPersistText(doc, uid)
+        }
+        runCatching { documentRepository.flushPending(familyId) }
+            .onFailure { Log.w(TAG, "ensureTreatmentAttachmentsExtraction flushPending failed familyId=$familyId", it) }
+    }
+
     // ── Private ──────────────────────────────────────────────────────────────────
 
     private suspend fun upload(
@@ -149,7 +256,7 @@ class HealthAttachmentService @Inject constructor(
                 notes = tag,
                 extractedText = null,
                 extractedTextUpdatedAtEpochMillis = null,
-                extractionStatusRaw = 0,
+                extractionStatusRaw = KBTextExtractionStatus.PENDING.rawValue,
                 extractionError = null,
                 createdAtEpochMillis = now,
                 updatedAtEpochMillis = now,
@@ -189,8 +296,90 @@ class HealthAttachmentService @Inject constructor(
             runCatching { documentRepository.flushPending(familyId) }
                 .onFailure { Log.w(TAG, "flushPending failed, will retry on next sync", it) }
 
+            // 11. OCR in background (iOS-like): upload completes first, extraction status updates asynchronously.
+            scope.launch {
+                runCatching {
+                    extractAndPersistText(uploaded, uid)
+                    documentRepository.flushPending(familyId)
+                }.onFailure {
+                    Log.w(TAG, "background OCR update failed docId=$docId", it)
+                }
+            }
+
             uploaded
         }
+    }
+
+    private suspend fun backfillHealthExtractionInternal(familyId: String) {
+        val uid = auth.currentUser?.uid ?: "local"
+        val candidates = documentDao.getHealthDocumentsNeedingExtraction(familyId)
+        if (candidates.isEmpty()) return
+        Log.i(TAG, "Backfill extraction start familyId=$familyId count=${candidates.size}")
+
+        for (doc in candidates) {
+            extractAndPersistText(doc, uid)
+        }
+
+        runCatching { documentRepository.flushPending(familyId) }
+            .onFailure { Log.w(TAG, "Backfill flushPending failed familyId=$familyId", it) }
+        Log.i(TAG, "Backfill extraction completed familyId=$familyId")
+    }
+
+    private suspend fun extractAndPersistText(doc: KBDocumentEntity, uid: String) {
+        val processingAt = System.currentTimeMillis()
+        documentDao.upsert(
+            doc.copy(
+                extractionStatusRaw = KBTextExtractionStatus.PROCESSING.rawValue,
+                extractionError = null,
+                updatedAtEpochMillis = processingAt,
+                updatedBy = uid,
+                syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                lastSyncError = null,
+            ),
+        )
+        val previewFile = runCatching { documentRepository.preparePreviewFile(doc) }
+            .onFailure { Log.w(TAG, "Extraction skip docId=${doc.id}: preview unavailable", it) }
+            .getOrNull() ?: return
+
+        val bytes = runCatching { previewFile.readBytes() }
+            .onFailure { Log.w(TAG, "Extraction readBytes failed docId=${doc.id}", it) }
+            .getOrNull() ?: return
+        if (bytes.isEmpty()) return
+
+        val now = System.currentTimeMillis()
+        val extracted = runCatching {
+            textExtractor.extractText(
+                bytes = bytes,
+                mimeType = doc.mimeType,
+                fileName = doc.fileName,
+            )
+        }.onFailure {
+            Log.w(TAG, "Extraction engine failed docId=${doc.id} mime=${doc.mimeType}", it)
+        }.getOrDefault("")
+
+        val sanitized = HealthAiDocumentText.sanitizeExtractedText(extracted)
+        val updated = if (sanitized.isBlank()) {
+            doc.copy(
+                extractionStatusRaw = KBTextExtractionStatus.FAILED.rawValue,
+                extractionError = "Nessun testo rilevato nel documento",
+                updatedAtEpochMillis = now,
+                updatedBy = uid,
+                syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                lastSyncError = null,
+            )
+        } else {
+            doc.copy(
+                extractedText = sanitized,
+                extractedTextUpdatedAtEpochMillis = now,
+                extractionStatusRaw = KBTextExtractionStatus.COMPLETED.rawValue,
+                extractionError = null,
+                updatedAtEpochMillis = now,
+                updatedBy = uid,
+                syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                lastSyncError = null,
+            )
+        }
+        documentDao.upsert(updated)
     }
 
     private fun writePendingFile(docId: String, fileName: String, bytes: ByteArray): String {
@@ -244,4 +433,5 @@ class HealthAttachmentService @Inject constructor(
             else -> "application/octet-stream"
         }
     }
+
 }

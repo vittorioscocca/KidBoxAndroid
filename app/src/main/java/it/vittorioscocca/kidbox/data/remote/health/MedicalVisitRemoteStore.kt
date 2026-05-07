@@ -28,6 +28,7 @@ data class RemoteMedicalVisitDto(
     val nextVisitReminderOn: Boolean,
     val linkedTreatmentIdsJson: String,
     val linkedExamIdsJson: String,
+    val prescribedExamsJson: String,
     val asNeededDrugsJson: String,
     val therapyTypesJson: String,
     val photoUrlsJson: String,
@@ -78,6 +79,11 @@ class MedicalVisitRemoteStore @Inject constructor() {
                         jsonKey = "therapyTypesJson",
                         arrayKey = "therapyTypesRaw",
                     )
+                    val prescribedExamsJson = mergedStringListJsonField(
+                        data = data,
+                        jsonKey = "prescribedExamsJson",
+                        arrayKey = "prescribedExams",
+                    )
                     val photoUrlsJson = mergedStringListJsonField(
                         data = data,
                         jsonKey = "photoUrlsJson",
@@ -104,6 +110,7 @@ class MedicalVisitRemoteStore @Inject constructor() {
                         nextVisitReminderOn = data["nextVisitReminderOn"] as? Boolean ?: false,
                         linkedTreatmentIdsJson = linkedTreatmentIdsJson,
                         linkedExamIdsJson = linkedExamIdsJson,
+                        prescribedExamsJson = prescribedExamsJson,
                         asNeededDrugsJson = data["asNeededDrugsJson"] as? String ?: "[]",
                         therapyTypesJson = therapyTypesJson,
                         photoUrlsJson = photoUrlsJson,
@@ -149,6 +156,9 @@ class MedicalVisitRemoteStore @Inject constructor() {
             "nextVisitReminderOn" to dto.nextVisitReminderOn,
             "linkedTreatmentIdsJson" to dto.linkedTreatmentIdsJson,
             "linkedExamIdsJson" to dto.linkedExamIdsJson,
+            "prescribedExamsJson" to dto.prescribedExamsJson,
+            // Compatibility key: iOS can read a native array if needed.
+            "prescribedExams" to decodeStringList(dto.prescribedExamsJson),
             "asNeededDrugsJson" to dto.asNeededDrugsJson,
             "therapyTypesJson" to dto.therapyTypesJson,
             "photoUrlsJson" to dto.photoUrlsJson,

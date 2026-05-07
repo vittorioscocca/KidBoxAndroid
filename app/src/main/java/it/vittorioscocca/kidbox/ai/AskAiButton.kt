@@ -1,12 +1,14 @@
 package it.vittorioscocca.kidbox.ai
 
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -15,6 +17,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -49,14 +53,20 @@ fun AskAiButton(
             onTap()
         },
         modifier = modifier
-            .size(48.dp)
+            .navigationBarsPadding()
+            .padding(end = 4.dp, bottom = 4.dp)
+            .size(56.dp)
+            .shadow(14.dp, CircleShape, clip = false)
             .graphicsLayer(alpha = if (isEnabled) 1f else 0.4f),
-        containerColor = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        shape = CircleShape,
+        containerColor = Color(0xFFFF6B00),
+        contentColor = Color.White,
     ) {
         Icon(
             imageVector = Icons.Default.AutoAwesome,
             contentDescription = contentDescription,
+            tint = Color.White,
+            modifier = Modifier.size(26.dp),
         )
     }
 

@@ -6,6 +6,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -57,6 +60,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,6 +84,7 @@ import java.util.Date
 import java.util.Locale
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import kotlinx.coroutines.launch
 
 private val ORANGE = Color(0xFFFF6B00)
 private val DATE_SHORT = SimpleDateFormat("HH:mm", Locale.ITALIAN)
@@ -102,6 +107,7 @@ fun HealthAIChatScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     var showClearDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
 
@@ -131,7 +137,7 @@ fun HealthAIChatScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = kb.background),
                 title = {
                     Text(
-                        if (state.subjectName.isNotBlank()) "Salute di ${state.subjectName}" else "Assistente AI",
+                        "Salute",
                         fontWeight = FontWeight.Bold,
                         fontSize = 17.sp,
                         color = kb.title,
@@ -168,7 +174,6 @@ fun HealthAIChatScreen(
                     }
                 },
             )
-
             // ── Content ──────────────────────────────────────────────────────
             when {
                 state.isLoadingContext -> {
@@ -180,33 +185,49 @@ fun HealthAIChatScreen(
                                 "Preparando il contesto sanitario...",
                                 fontSize = 14.sp,
                                 color = kb.subtitle,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp),
                             )
                         }
                     }
                 }
 
                 state.messages.isEmpty() && !state.isLoading -> {
-                    // ── Empty state with suggestions ──────────────────────────
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(horizontal = 32.dp),
+                            modifier = Modifier.padding(horizontal = 24.dp),
                         ) {
                             Icon(
-                                Icons.Default.AutoAwesome,
+                                imageVector = Icons.Default.AutoAwesome,
                                 contentDescription = null,
                                 tint = ORANGE,
-                                modifier = Modifier.size(48.dp),
+                                modifier = Modifier.size(46.dp),
                             )
-                            Spacer(Modifier.height(12.dp))
-                            val name = state.subjectName.ifBlank { "questo profilo" }
+                            Spacer(Modifier.height(10.dp))
                             Text(
-                                "Fai una domanda sulla salute di $name",
+                                "Ciao! Sono il tuo assistente sanitario per ${state.subjectName.ifBlank { "questo profilo" }}.",
                                 fontSize = 15.sp,
                                 color = kb.subtitle,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                             )
-                            Spacer(Modifier.height(20.dp))
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "Ho accesso a: ${state.activeTreatmentsCount} cure attive, ${state.vaccinesCount} vaccini, ${state.visitsCount} visite, ${state.examsCount} esami.",
+                                fontSize = 13.sp,
+                                color = kb.subtitle,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "Puoi chiedermi un riepilogo, farmaci in corso, vaccini, visite recenti o esami in attesa.",
+                                fontSize = 13.sp,
+                                color = kb.subtitle,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            )
+                            Spacer(Modifier.height(14.dp))
                             SUGGESTIONS.forEach { suggestion ->
                                 SuggestionChip(
                                     onClick = { viewModel.sendSuggestion(suggestion) },
@@ -229,17 +250,48 @@ fun HealthAIChatScreen(
 
                 else -> {
                     // ── Messages list ─────────────────────────────────────────
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-                        reverseLayout = true,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
                     ) {
-                        if (state.isLoading) {
-                            item { TypingIndicatorBubble(kb = kb) }
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 12.dp),
+                            reverseLayout = true,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            if (state.isLoading) {
+                                item { TypingIndicatorBubble(kb = kb) }
+                            }
+                            itemsIndexed(state.messages.reversed()) { _, message ->
+                                MessageBubble(message = message, kb = kb)
+                            }
                         }
-                        itemsIndexed(state.messages.reversed()) { _, message ->
-                            MessageBubble(message = message, kb = kb)
+                        val showScrollToBottom = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = showScrollToBottom,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(end = 8.dp, bottom = 12.dp),
+                            enter = fadeIn(),
+                            exit = fadeOut(),
+                        ) {
+                            IconButton(
+                                onClick = { scope.launch { listState.animateScrollToItem(0) } },
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(CircleShape)
+                                    .background(ORANGE),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Scorri in basso",
+                                    tint = Color.White,
+                                )
+                            }
                         }
                     }
                 }
@@ -249,13 +301,13 @@ fun HealthAIChatScreen(
             if (state.dailyLimit > 0) {
                 val usageColor = if (state.isNearLimit) ORANGE else kb.subtitle
                 Text(
-                    "${state.usageToday}/${state.dailyLimit} messaggi oggi",
+                    "${state.usageToday}/${state.dailyLimit}",
                     fontSize = 11.sp,
                     color = usageColor,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 2.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
                 )
             }
 

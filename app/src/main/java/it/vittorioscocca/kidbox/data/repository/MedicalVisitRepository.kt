@@ -2,6 +2,8 @@ package it.vittorioscocca.kidbox.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.data.local.dao.KBMedicalVisitDao
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
+import it.vittorioscocca.kidbox.data.local.mapper.encodeStringList
 import it.vittorioscocca.kidbox.data.local.mapper.toDomain
 import it.vittorioscocca.kidbox.data.local.mapper.toEntity
 import it.vittorioscocca.kidbox.data.remote.health.MedicalVisitRemoteStore
@@ -82,6 +84,7 @@ class MedicalVisitRepository @Inject constructor(
 }
 
 private fun KBMedicalVisit.toRemoteDto() = RemoteMedicalVisitDto(
+    // Keep both keys coherent (legacy + current) to avoid Android/iOS drift.
     id = id,
     familyId = familyId,
     childId = childId,
@@ -98,7 +101,8 @@ private fun KBMedicalVisit.toRemoteDto() = RemoteMedicalVisitDto(
     reminderOn = reminderOn,
     nextVisitReminderOn = nextVisitReminderOn,
     linkedTreatmentIdsJson = linkedTreatmentIdsJson,
-    linkedExamIdsJson = linkedExamIdsJson,
+    linkedExamIdsJson = normalizedExamIdsJson(),
+    prescribedExamsJson = normalizedExamIdsJson(),
     asNeededDrugsJson = asNeededDrugsJson ?: "[]",
     therapyTypesJson = therapyTypesJson,
     photoUrlsJson = photoUrlsJson,
@@ -108,3 +112,12 @@ private fun KBMedicalVisit.toRemoteDto() = RemoteMedicalVisitDto(
     createdAtEpochMillis = createdAtEpochMillis,
     createdBy = createdBy,
 )
+
+private fun KBMedicalVisit.normalizedExamIdsJson(): String {
+    val merged = (decodeStringList(linkedExamIdsJson) + decodeStringList(prescribedExamsJson))
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .distinct()
+        .sorted()
+    return encodeStringList(merged)
+}

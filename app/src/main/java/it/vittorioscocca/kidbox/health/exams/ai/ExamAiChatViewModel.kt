@@ -5,21 +5,27 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.health.ExamAttachmentTag
+import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
 import it.vittorioscocca.kidbox.data.health.ai.HealthAiDocumentText
-import it.vittorioscocca.kidbox.data.health.ai.HealthAiSummaryPolicy
-import it.vittorioscocca.kidbox.data.remote.ai.AiRepository
 import it.vittorioscocca.kidbox.data.repository.DocumentRepository
+import it.vittorioscocca.kidbox.data.repository.HealthAIChatRepository
+import it.vittorioscocca.kidbox.data.repository.MedicalExamRepository
+import it.vittorioscocca.kidbox.domain.model.KBAIConversation
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
 import it.vittorioscocca.kidbox.domain.model.KBTextExtractionStatus
 import it.vittorioscocca.kidbox.health.visits.ai.AiMessage
 import org.json.JSONArray
-import java.util.UUID
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 data class ExamAiChatUiState(
@@ -28,19 +34,21 @@ data class ExamAiChatUiState(
     val errorMessage: String? = null,
     val isListMode: Boolean = false,
     val listExamCount: Int = 0,
+    val usageToday: Int = 0,
+    val dailyLimit: Int = 0,
 )
 
 @HiltViewModel
 class ExamAiChatViewModel @Inject constructor(
-    private val aiRepository: AiRepository,
     private val documentRepository: DocumentRepository,
+    private val examRepository: MedicalExamRepository,
+    private val chatRepository: HealthAIChatRepository,
+    private val healthAttachmentService: HealthAttachmentService,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-
-    private var summarizedMessageCount = 0
-    private var rollingSummary: String? = null
-
+    private val dateFmt = SimpleDateFormat("d MMM yyyy", Locale.ITALIAN)
     private val familyId: String = savedStateHandle["familyId"] ?: ""
+    private val childId: String = savedStateHandle["childId"] ?: ""
     private val examId: String = savedStateHandle["examId"] ?: ""
     private val examName: String = savedStateHandle["examName"] ?: savedStateHandle["name"] ?: ""
     private val subjectName: String = savedStateHandle["subjectName"] ?: ""
@@ -73,72 +81,70 @@ class ExamAiChatViewModel @Inject constructor(
         ),
     )
     val uiState: StateFlow<ExamAiChatUiState> = _uiState.asStateFlow()
+    private var conversation: KBAIConversation? = null
+
+    init {
+        if (familyId.isNotBlank()) {
+            healthAttachmentService.enqueueBackfillHealthExtraction(familyId)
+        }
+        bindConversation()
+    }
 
     fun sendMessage(text: String) {
         val trimmed = text.trim()
         if (trimmed.isBlank() || _uiState.value.isLoading) return
-
-        val userMessage = AiMessage(
-            id = UUID.randomUUID().toString(),
-            role = "user",
-            content = trimmed,
-            createdAt = System.currentTimeMillis(),
-        )
-        _uiState.value = _uiState.value.run {
-            copy(
-                messages = messages + userMessage,
-                isLoading = true,
-                errorMessage = null,
-                isListMode = isListMode,
-                listExamCount = listExamCount,
-            )
-        }
+        val conv = conversation ?: return
+        _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
 
         viewModelScope.launch {
             runCatching {
-                val msgs = _uiState.value.messages
-                val (newCount, newSummary) = HealthAiSummaryPolicy.summarizeInMemoryIfNeeded(
-                    familyId = familyId,
-                    messages = msgs,
-                    summarizedMessageCount = summarizedMessageCount,
-                    currentSummary = rollingSummary,
-                    aiRepository = aiRepository,
-                    summarySystemPrompt = HealthAiSummaryPolicy.summarizeSystemPromptExams,
+                val contextBlock = if (isListMode) loadExamListContextBlock() else loadExamRefertiBlock()
+                val basePrompt = buildSystemPrompt(contextBlock)
+                chatRepository.sendMessage(conv, trimmed, basePrompt).getOrThrow()
+            }.onSuccess {
+                val usage = it.second
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    isListMode = isListMode,
+                    usageToday = usage.usageToday,
+                    dailyLimit = usage.dailyLimit,
                 )
-                summarizedMessageCount = newCount
-                rollingSummary = newSummary
-
-                val refertiBlock = loadExamRefertiBlock()
-                val basePrompt = buildSystemPrompt(refertiBlock)
-                val finalPrompt = HealthAiSummaryPolicy.appendSummaryToSystemPrompt(basePrompt, rollingSummary)
-                val payload = msgs.drop(summarizedMessageCount).map { it.toKBAIMessage(examId) }
-                val aiReply = aiRepository.askAI(familyId, finalPrompt, payload).getOrThrow()
-                aiReply.reply
-            }.onSuccess { replyText ->
-                val assistant = AiMessage(
-                    id = UUID.randomUUID().toString(),
-                    role = "assistant",
-                    content = replyText,
-                    createdAt = System.currentTimeMillis(),
-                )
-                _uiState.value = _uiState.value.run {
-                    copy(
-                        messages = messages + assistant,
-                        isLoading = false,
-                        isListMode = isListMode,
-                        listExamCount = listExamCount,
-                    )
-                }
             }.onFailure { err ->
                 _uiState.value = _uiState.value.run {
                     copy(
                         isLoading = false,
                         errorMessage = err.message ?: "Errore AI",
                         isListMode = isListMode,
-                        listExamCount = listExamCount,
                     )
                 }
             }
+        }
+    }
+
+    private fun bindConversation() {
+        if (familyId.isBlank()) return
+        viewModelScope.launch {
+            val scopeId = if (isListMode) {
+                // Stable history for "lista esami": same chat for the same profile,
+                // independent from current filters/visible IDs.
+                "health_exam_list_v3:$familyId:${childId.ifBlank { subjectName }}"
+            } else {
+                "health_exam_single:$familyId:$examId"
+            }
+            val conv = chatRepository.getOrCreateConversation(
+                familyId = familyId,
+                childId = childId.ifBlank { "health_exam" },
+                scopeId = scopeId,
+            )
+            conversation = conv
+            chatRepository.observeMessages(conv.id)
+                .onEach { msgs ->
+                    _uiState.value = _uiState.value.copy(
+                        messages = msgs.map { it.toUiMessage() },
+                        isListMode = isListMode,
+                    )
+                }
+                .launchIn(viewModelScope)
         }
     }
 
@@ -154,12 +160,16 @@ class ExamAiChatViewModel @Inject constructor(
 
     private suspend fun loadExamRefertiBlock(): String {
         if (isListMode || familyId.isBlank() || examId.isBlank()) return ""
+        healthAttachmentService.ensureExamAttachmentsExtraction(familyId, examId)
         documentRepository.startRealtime(familyId)
         val docs = documentRepository.observeAllDocuments(familyId)
             .map { list ->
                 list.filter {
                     ExamAttachmentTag.matches(it.notes, examId) &&
-                        it.extractionStatusRaw == KBTextExtractionStatus.COMPLETED.rawValue
+                        (
+                            !it.extractedText.isNullOrBlank() ||
+                                it.extractionStatusRaw == KBTextExtractionStatus.COMPLETED.rawValue
+                            )
                 }
             }
             .first()
@@ -175,6 +185,52 @@ class ExamAiChatViewModel @Inject constructor(
             sb.appendLine("Tipo: ${doc.mimeType}")
             sb.appendLine("Testo estratto:")
             sb.appendLine(prepared)
+        }
+        return sb.toString().trimEnd()
+    }
+
+    private suspend fun loadExamListContextBlock(): String {
+        if (!isListMode || familyId.isBlank() || childId.isBlank()) return ""
+        // List-level AI must reason over the full exam history of the profile,
+        // not only currently visible/filtered rows.
+        val allExamsForChild = examRepository.listByFamilyAndChild(familyId, childId)
+            .filter { !it.isDeleted }
+            .sortedByDescending { it.updatedAtEpochMillis }
+        if (allExamsForChild.isEmpty()) return ""
+
+        // Ensure OCR for attachments before composing AI context.
+        allExamsForChild.take(30).forEach { exam ->
+            healthAttachmentService.ensureExamAttachmentsExtraction(familyId, exam.id)
+        }
+        val exams = allExamsForChild
+
+        documentRepository.startRealtime(familyId)
+        val docs = documentRepository.observeAllDocuments(familyId).first()
+            .filter { !it.isDeleted }
+
+        val sb = StringBuilder()
+        sb.appendLine("--- CONTESTO DETTAGLIATO STORIA ESAMI ---")
+        sb.appendLine("Totale esami profilo: ${exams.size}")
+
+        exams.take(30).forEachIndexed { index, exam ->
+            val examDocs = docs.filter { ExamAttachmentTag.matches(it.notes, exam.id) }
+            sb.appendLine()
+            sb.appendLine("${index + 1}) ${exam.name}")
+            sb.appendLine("   - id: ${exam.id}")
+            sb.appendLine("   - stato: ${exam.statusRaw}")
+            sb.appendLine("   - scadenza: ${exam.deadlineEpochMillis?.let { dateFmt.format(Date(it)) } ?: "—"}")
+            sb.appendLine("   - preparazione: ${exam.preparation?.ifBlank { "—" } ?: "—"}")
+            sb.appendLine("   - risultato: ${HealthAiDocumentText.prepareExtractedTextForAi(exam.resultText, 2500).ifBlank { "—" }}")
+            sb.appendLine("   - note: ${exam.notes?.ifBlank { "—" } ?: "—"}")
+            sb.appendLine("   - allegati: ${examDocs.size}")
+
+            examDocs.forEach { doc ->
+                val prepared = HealthAiDocumentText.prepareExtractedTextForAi(doc.extractedText, 4500)
+                if (prepared.isBlank()) return@forEach
+                sb.appendLine("     • Referto: ${doc.title} (${doc.mimeType})")
+                sb.appendLine("       Testo estratto:")
+                sb.appendLine(prepared.prependIndent("       "))
+            }
         }
         return sb.toString().trimEnd()
     }
@@ -205,20 +261,29 @@ class ExamAiChatViewModel @Inject constructor(
         val n = examIdsFromJson.size
         val preview = examIdsFromJson.take(40).joinToString(", ")
         val tail = if (n > 40) " … (+${n - 40} altri)" else ""
-        return """
-            Sei un assistente medico informativo. Spiega in modo generale esami, preparazioni, risultati e allegati quando rilevante.
+        return buildString {
+            appendLine(
+                """
+            Sei un assistente medico informativo. Hai accesso alla storia completa degli esami del profilo e ai testi OCR dei referti allegati.
+            Devi rispondere usando i dettagli dei referti disponibili nel contesto (valori, range, note, conclusioni) senza dire che serva aprire il singolo esame.
+            Se nel contesto ci sono referti o dati esame, NON dire "non ho accesso" o "non posso leggere i referti": usa le informazioni disponibili.
             Non sostituisci il medico. Rispondi in italiano.
-            Modalità elenco esami: ci sono $n esami/analisi visibili nell'elenco attuale (filtro periodo applicato) per il profilo "$subjectName".
-            ID esami (solo riferimento interno app): $preview$tail
-            Per dettagli su un singolo esame suggerisci di aprirlo nell'app.
-        """.trimIndent()
+            Modalità elenco esami: ci sono $n esami/analisi visibili nell'elenco attuale per il profilo "$subjectName".
+            ID visibili in elenco (riferimento interno): $preview$tail
+            Usa anche il contesto storico completo degli esami e referti allegati già fornito sotto.
+                """.trimIndent(),
+            )
+            if (refertiBlock.isNotBlank()) {
+                appendLine()
+                append(refertiBlock)
+            }
+        }.trimEnd()
     }
 
-    private fun AiMessage.toKBAIMessage(scope: String): KBAIMessage = KBAIMessage(
+    private fun KBAIMessage.toUiMessage(): AiMessage = AiMessage(
         id = id,
-        conversationId = scope.ifBlank { "exam_ai" },
-        roleRaw = role,
+        role = roleRaw,
         content = content,
-        createdAtEpochMillis = createdAt,
+        createdAt = createdAtEpochMillis,
     )
 }

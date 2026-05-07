@@ -13,7 +13,6 @@ import it.vittorioscocca.kidbox.data.local.mapper.computedStatus
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.math.abs
 import kotlin.math.floor
 import org.json.JSONArray
 import org.json.JSONException
@@ -28,11 +27,9 @@ fun computeScopeId(
     treatmentIds: List<String>,
     vaccineIds: List<String>,
 ): String {
-    val hash = (examIds + visitIds + treatmentIds + vaccineIds)
-        .sorted()
-        .joinToString("-")
-        .hashCode()
-    return "health-overview-$subjectId-${abs(hash)}"
+    // Keep a stable scope per subject so global health chat history is preserved
+    // even when visits/exams/treatments/vaccines change over time.
+    return "health-overview-v3-$subjectId"
 }
 
 object HealthContextBuilder {
@@ -46,6 +43,7 @@ object HealthContextBuilder {
         vaccines: List<KBVaccine>,
         documentsByExamId: Map<String, List<KBDocumentEntity>> = emptyMap(),
         documentsByVisitId: Map<String, List<KBDocumentEntity>> = emptyMap(),
+        documentsByTreatmentId: Map<String, List<KBDocumentEntity>> = emptyMap(),
     ): String {
         val now = System.currentTimeMillis()
         val sb = StringBuilder()
@@ -60,6 +58,7 @@ REGOLE IMPORTANTI:
 - Usa un linguaggio semplice, adatto a un genitore non esperto.
 - Puoi aiutare a capire cure in corso, vaccini, visite recenti, esami in attesa e referti allegati.
 - Se nei documenti ci sono testi estratti, usali per contestualizzare meglio.
+- Se nel contesto sono presenti visite/esami/cure o testi referto, NON dire "non ho accesso" o "non posso vedere i referti": usa i dati disponibili e cita chiaramente eventuali limiti solo su campi davvero mancanti.
 - Rispondi sempre in italiano.
             """.trimIndent(),
         )
@@ -79,6 +78,16 @@ REGOLE IMPORTANTI:
             val endDate = t.endDateEpochMillis?.let { DATE_FMT.format(Date(it)) } ?: "in corso"
             val notesStr = if (!t.notes.isNullOrBlank()) " — ${t.notes}" else ""
             sb.appendLine("- ${t.drugName} — $dosageStr ${t.dosageUnit}, ${t.dailyFrequency}x/giorno, ${t.durationDays} giorni (fine: $endDate)$notesStr")
+            documentsByTreatmentId[t.id]?.forEach { doc ->
+                val text = doc.extractedText?.takeIf { it.isNotBlank() }
+                if (text != null) {
+                    val prepared = HealthAiDocumentText.prepareExtractedTextForAi(text)
+                    if (prepared.isNotBlank()) {
+                        sb.appendLine("  Referto allegato (${doc.title}):")
+                        prepared.lines().forEach { line -> sb.appendLine("  $line") }
+                    }
+                }
+            }
         }
 
         // ── Vaccines ─────────────────────────────────────────────────────────────
@@ -122,9 +131,7 @@ REGOLE IMPORTANTI:
                 sb.appendLine("  Prossima visita: $nextDateStr$nextReason")
             }
             documentsByVisitId[v.id]?.forEach { doc ->
-                val text = doc.extractedText?.takeIf {
-                    it.isNotBlank() && doc.extractionStatusRaw == KBTextExtractionStatus.COMPLETED.rawValue
-                }
+                val text = doc.extractedText?.takeIf { it.isNotBlank() }
                 if (text != null) {
                     val prepared = HealthAiDocumentText.prepareExtractedTextForAi(text)
                     if (prepared.isNotBlank()) {
@@ -153,9 +160,7 @@ REGOLE IMPORTANTI:
             } ?: ""
             sb.appendLine("- ${e.name} [${e.statusRaw}]$urgentStr — $deadlineStr$overdueStr$resultStr")
             documentsByExamId[e.id]?.forEach { doc ->
-                val text = doc.extractedText?.takeIf {
-                    it.isNotBlank() && doc.extractionStatusRaw == KBTextExtractionStatus.COMPLETED.rawValue
-                }
+                val text = doc.extractedText?.takeIf { it.isNotBlank() }
                 if (text != null) {
                     val prepared = HealthAiDocumentText.prepareExtractedTextForAi(text)
                     if (prepared.isNotBlank()) {

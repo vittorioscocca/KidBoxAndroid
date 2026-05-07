@@ -7,6 +7,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.mapper.KBVisitStatus
 import it.vittorioscocca.kidbox.ai.AiSettings
+import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
 import it.vittorioscocca.kidbox.data.repository.MedicalVisitRepository
 import it.vittorioscocca.kidbox.data.sync.MedicalVisitSyncCenter
 import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
@@ -59,6 +60,7 @@ class MedicalVisitsViewModel @Inject constructor(
     private val childDao: KBChildDao,
     private val memberDao: KBFamilyMemberDao,
     private val aiSettings: AiSettings,
+    private val healthAttachmentService: HealthAttachmentService,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MedicalVisitsState())
@@ -79,6 +81,7 @@ class MedicalVisitsViewModel @Inject constructor(
         rawVisits = emptyList()
         _uiState.value = MedicalVisitsState(isLoading = true)
         syncCenter.start(familyId)
+        healthAttachmentService.enqueueBackfillHealthExtraction(familyId)
 
         viewModelScope.launch {
             val name = resolveChildName(childId)

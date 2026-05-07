@@ -26,6 +26,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -91,52 +92,60 @@ class MedicalVisitDetailViewModel @Inject constructor(
 
         viewModelScope.launch {
             val childName = resolveChildName(childId)
-            val visit = repository.loadOnce(visitId)
-            val treatmentRows = if (visit != null) {
-                decodeStringList(visit.linkedTreatmentIdsJson).mapNotNull { tid ->
-                    treatmentRepository.getById(tid)?.let { t ->
-                        val dosage = if (t.dosageValue % 1.0 == 0.0) "%.0f".format(t.dosageValue) else "%.1f".format(t.dosageValue)
-                        val tail = if (t.isLongTerm) "lungo termine" else "${t.durationDays}gg"
-                        LinkedPrescriptionRow(
-                            id = t.id,
-                            title = t.drugName,
-                            subtitle = "$dosage ${t.dosageUnit} · ${t.dailyFrequency}x/die · $tail",
-                        )
-                    }
-                }
-            } else {
-                emptyList()
+            _uiState.value = _uiState.value.copy(childName = childName)
+        }
+
+        combine(
+            repository.observe(familyId, childId),
+            examRepository.observe(familyId, childId),
+            treatmentRepository.observe(familyId, childId),
+        ) { visits, exams, treatments ->
+            Triple(visits, exams, treatments)
+        }.onEach { (visits, exams, treatments) ->
+            val visit = visits.firstOrNull { it.id == visitId }
+            if (visit == null) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    visit = null,
+                    linkedTreatments = emptyList(),
+                    linkedExams = emptyList(),
+                    asNeededDrugRows = emptyList(),
+                    therapyTypeLabels = emptyList(),
+                    error = "Visita non trovata",
+                )
+                return@onEach
             }
-            val examRows = if (visit != null) {
-                decodeStringList(visit.linkedExamIdsJson).mapNotNull { eid ->
-                    examRepository.getById(eid)?.let { e -> buildExamLinkedRow(e) }
-                }
-            } else {
-                emptyList()
+
+            val examsById = exams.associateBy { it.id }
+            val treatmentsById = treatments.associateBy { it.id }
+
+            val treatmentRows = decodeStringList(visit.linkedTreatmentIdsJson).map { tid ->
+                buildTreatmentLinkedRow(tid, treatmentsById[tid])
             }
-            val asNeededRows = visit?.let { v ->
-                decodeAsNeededDrugs(v.asNeededDrugsJson).map { d ->
-                    val dosage = if (d.dosageValue % 1.0 == 0.0) "%.0f".format(d.dosageValue) else "%.1f".format(d.dosageValue)
-                    val instr = d.instructions?.trim().orEmpty()
-                    val sub = buildString {
-                        append("$dosage ${d.dosageUnit}")
-                        if (instr.isNotEmpty()) append(" · ").append(instr)
-                    }
-                    LinkedPrescriptionRow(id = d.id, title = d.drugName, subtitle = sub)
+            val examRows = linkedExamIdsForVisit(visit).map { eid ->
+                buildExamLinkedRow(eid, examsById[eid])
+            }
+            val asNeededRows = decodeAsNeededDrugs(visit.asNeededDrugsJson).map { d ->
+                val dosage = if (d.dosageValue % 1.0 == 0.0) "%.0f".format(d.dosageValue) else "%.1f".format(d.dosageValue)
+                val instr = d.instructions?.trim().orEmpty()
+                val sub = buildString {
+                    append("$dosage ${d.dosageUnit}")
+                    if (instr.isNotEmpty()) append(" · ").append(instr)
                 }
-            } ?: emptyList()
-            val therapyLabels = visit?.let { decodeTherapyTypes(it.therapyTypesJson).map { it.rawValue } } ?: emptyList()
+                LinkedPrescriptionRow(id = d.id, title = d.drugName, subtitle = sub)
+            }
+            val therapyLabels = decodeTherapyTypes(visit.therapyTypesJson).map { it.rawValue }
+
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 visit = visit,
-                childName = childName,
                 linkedTreatments = treatmentRows,
                 linkedExams = examRows,
                 asNeededDrugRows = asNeededRows,
                 therapyTypeLabels = therapyLabels,
-                error = if (visit == null) "Visita non trovata" else null,
+                error = null,
             )
-        }
+        }.launchIn(viewModelScope)
 
         documentRepository.startRealtime(familyId)
 
@@ -211,6 +220,42 @@ class MedicalVisitDetailViewModel @Inject constructor(
             }
         }
         return LinkedPrescriptionRow(id = e.id, title = e.name, subtitle = subtitle, examUrgent = e.isUrgent)
+    }
+
+    private fun buildTreatmentLinkedRow(treatmentId: String, t: it.vittorioscocca.kidbox.domain.model.KBTreatment?): LinkedPrescriptionRow {
+        if (t == null) {
+            return LinkedPrescriptionRow(
+                id = "",
+                title = "Caricamento...",
+                subtitle = "Terapia/Farmaco in sincronizzazione",
+            )
+        }
+        val dosage = if (t.dosageValue % 1.0 == 0.0) "%.0f".format(t.dosageValue) else "%.1f".format(t.dosageValue)
+        val tail = if (t.isLongTerm) "lungo termine" else "${t.durationDays}gg"
+        return LinkedPrescriptionRow(
+            id = t.id,
+            title = t.drugName,
+            subtitle = "$dosage ${t.dosageUnit} · ${t.dailyFrequency}x/die · $tail",
+        )
+    }
+
+    private fun buildExamLinkedRow(examId: String, exam: KBMedicalExam?): LinkedPrescriptionRow {
+        return if (exam != null) {
+            buildExamLinkedRow(exam)
+        } else {
+            LinkedPrescriptionRow(
+                id = "",
+                title = "Caricamento...",
+                subtitle = "Esame prescritto in sincronizzazione",
+            )
+        }
+    }
+
+    private fun linkedExamIdsForVisit(visit: KBMedicalVisit): List<String> {
+        val ids = linkedSetOf<String>()
+        ids += decodeStringList(visit.linkedExamIdsJson)
+        ids += decodeStringList(visit.prescribedExamsJson)
+        return ids.toList()
     }
 
     private suspend fun resolveChildName(id: String): String {
