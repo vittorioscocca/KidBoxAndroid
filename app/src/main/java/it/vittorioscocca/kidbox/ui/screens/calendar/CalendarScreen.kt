@@ -413,12 +413,16 @@ private fun MiniMonthCard(
     onSelectDate: (LocalDate) -> Unit,
 ) {
     val firstDay = LocalDate.of(year, month, 1)
-    val days = monthGridDays(firstDay)
+    val days = remember(firstDay) {
+        monthGridDays(firstDay).toMutableList().apply {
+            while (size < 42) add(null)
+        }
+    }
     val monthTitle = firstDay.format(DateTimeFormatter.ofPattern("MMM", locale))
         .replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
 
     Card(
-        modifier = modifier,
+        modifier = modifier.height(172.dp),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
     ) {

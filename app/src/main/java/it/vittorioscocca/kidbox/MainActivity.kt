@@ -1,12 +1,15 @@
 package it.vittorioscocca.kidbox
 
 import android.app.Activity
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.core.app.NotificationManagerCompat
@@ -37,6 +40,8 @@ import it.vittorioscocca.kidbox.data.local.ThemePreference
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.navigation.AppNavGraph
 import it.vittorioscocca.kidbox.notifications.NotificationBadgeStore
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.WeeklySummaryService
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.WeeklySummaryDraftStore
 import it.vittorioscocca.kidbox.ui.splash.KidBoxSplashScreen
 import it.vittorioscocca.kidbox.ui.theme.KidBoxTheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
@@ -55,6 +60,9 @@ class MainActivity : ComponentActivity() {
     lateinit var themePreference: ThemePreference
 
     private var pendingPushDeepLink by mutableStateOf<PushDeepLink?>(null)
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { /* no-op */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
@@ -62,7 +70,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         clearAppBadgeAndNotifications()
         enableEdgeToEdge()
+        maybeRequestNotificationPermission()
         pendingPushDeepLink = parsePushDeepLink(intent)
+        intent?.let { handleActionIntent(it) }
         captureWalletShareIntent(intent)
         setContent {
             val theme by themePreference.getThemeFlow().collectAsState(AppTheme.SYSTEM)
@@ -215,6 +225,19 @@ class MainActivity : ComponentActivity() {
                                 }
                                 pendingPushDeepLink = null
                             }
+
+                            "weekly_summary" -> {
+                                val recap = intent?.getStringExtra("fullText").orEmpty()
+                                if (recap.isNotBlank()) {
+                                    WeeklySummaryDraftStore.save(this@MainActivity, recap)
+                                }
+                                if (deepLink.familyId.isNotBlank()) {
+                                    navController.navigate(
+                                        AppDestination.AiChat.createRoute(deepLink.familyId),
+                                    )
+                                }
+                                pendingPushDeepLink = null
+                            }
                         }
                     }
                 }
@@ -225,6 +248,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handleActionIntent(intent)
         pendingPushDeepLink = parsePushDeepLink(intent)
         captureWalletShareIntent(intent)
         clearAppBadgeAndNotifications()
@@ -233,6 +257,11 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         clearAppBadgeAndNotifications()
+        val familyId = getSharedPreferences("kidbox_prefs", MODE_PRIVATE)
+            .getString("active_family_id", null)
+        if (!familyId.isNullOrBlank()) {
+            WeeklySummaryService.scheduleWeeklyIfNeeded(this, familyId)
+        }
     }
 
     @Deprecated("Deprecated in Java")
@@ -290,6 +319,32 @@ class MainActivity : ComponentActivity() {
     private fun clearAppBadgeAndNotifications() {
         NotificationBadgeStore.reset(this)
         NotificationManagerCompat.from(this).cancelAll()
+    }
+
+    private fun handleActionIntent(intent: Intent) {
+        if (intent.action == "KB_OPEN_AI_CHAT") {
+            val familyId = intent.getStringExtra("push_family_id")
+                ?: intent.getStringExtra("familyId")
+                ?: return
+            pendingPushDeepLink = PushDeepLink(
+                type = "weekly_summary",
+                familyId = familyId,
+                itemId = null,
+                childId = null,
+                listId = null,
+                todoId = null,
+                expenseId = null,
+                docId = null,
+                noteId = null,
+                ticketId = null,
+            )
+        }
+    }
+
+    private fun maybeRequestNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
+        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }
 

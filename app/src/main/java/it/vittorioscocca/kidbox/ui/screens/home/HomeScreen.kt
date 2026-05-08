@@ -712,7 +712,7 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
         state.badgePhotos,
         CounterField.PHOTOS,
     ),
-    FeatureItem("ai", "Assistente AI", "Chiedi aiuto", AppDestination.PlanningAiChat.createRoute(familyId, state.familyName), Icons.Filled.Psychology, Color(0xFFEEF0FF), Color(0xFF5C6BC0)),
+    FeatureItem("ai", "Assistente AI", "Chiedi aiuto", AppDestination.AiChat.createRoute(familyId), Icons.Filled.Psychology, Color(0xFFEEF0FF), Color(0xFF5C6BC0)),
     FeatureItem("family", "Family", "Gestisci famiglia", AppDestination.FamilySettings.route, Icons.Filled.Person, Color(0xFFFFF3E6), Color(0xFFFF6B00)),
 )
 

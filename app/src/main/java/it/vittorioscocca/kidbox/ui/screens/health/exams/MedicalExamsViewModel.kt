@@ -126,7 +126,8 @@ class MedicalExamsViewModel @Inject constructor(
         val next = !st.isSelecting
         _uiState.value = st.copy(
             isSelecting = next,
-            selectedIds = if (next) st.selectedIds else emptySet(),
+            // Selection mode must always start from a clean state.
+            selectedIds = emptySet(),
             childName = st.childName,
         )
     }

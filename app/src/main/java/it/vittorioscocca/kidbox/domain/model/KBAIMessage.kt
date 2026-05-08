@@ -6,6 +6,7 @@ data class KBAIMessage(
     val roleRaw: String,
     val content: String,
     val createdAtEpochMillis: Long,
+    val isSummary: Boolean = false,
 ) {
     val isUser: Boolean get() = roleRaw == "user"
     val isAssistant: Boolean get() = roleRaw == "assistant"

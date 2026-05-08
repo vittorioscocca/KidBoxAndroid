@@ -106,7 +106,7 @@ fun LoginScreen(
                         .padding(horizontal = 32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Spacer(modifier = Modifier.height(160.dp))
+                    Spacer(modifier = Modifier.height(96.dp))
 
             // Logo
             Image(
@@ -142,6 +142,39 @@ fun LoginScreen(
 
             // Bottoni neri
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(
+                    onClick = { viewModel.signInApple(activity) },
+                    enabled = !isBusy,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = BlackButton,
+                        contentColor = Color.White,
+                        disabledContainerColor = BlackButton.copy(alpha = 0.5f),
+                        disabledContentColor = Color.White.copy(alpha = 0.5f),
+                    ),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_apple),
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text(
+                            "Continua con Apple",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 16.sp,
+                        )
+                    }
+                }
+
                 Button(
                     onClick = { viewModel.signInGoogle(activity) },
                     enabled = !isBusy,
@@ -289,6 +322,8 @@ fun LoginScreen(
                         "Privacy Policy",
                         fontSize = 12.sp,
                         color = OrangeAccent,
+                        maxLines = 1,
+                        softWrap = false,
                         modifier = Modifier.clickable {
                             uriHandler.openUri("https://vittorioscocca.github.io/KidBox/privacy/")
                         },

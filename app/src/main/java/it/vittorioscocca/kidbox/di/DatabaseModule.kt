@@ -34,6 +34,8 @@ import it.vittorioscocca.kidbox.data.local.dao.KBTreatmentDao
 import it.vittorioscocca.kidbox.data.local.dao.KBDoseLogDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoItemDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoListDao
+import it.vittorioscocca.kidbox.data.local.dao.KBRoutineDao
+import it.vittorioscocca.kidbox.data.local.dao.KBRoutineCheckDao
 import it.vittorioscocca.kidbox.data.local.dao.KBUserProfileDao
 import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
@@ -545,6 +547,12 @@ object DatabaseModule {
 
     @Provides
     fun provideKBTodoItemDao(database: KidBoxDatabase): KBTodoItemDao = database.todoItemDao()
+
+    @Provides
+    fun provideKBRoutineDao(database: KidBoxDatabase): KBRoutineDao = database.routineDao()
+
+    @Provides
+    fun provideKBRoutineCheckDao(database: KidBoxDatabase): KBRoutineCheckDao = database.routineCheckDao()
 
     @Provides
     fun provideKBCalendarEventDao(database: KidBoxDatabase): KBCalendarEventDao = database.calendarEventDao()

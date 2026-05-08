@@ -30,6 +30,10 @@ data class RemoteDocumentDto(
     val storagePath: String,
     val downloadURL: String?,
     val notes: String?,
+    val extractedText: String?,
+    val extractedTextUpdatedAtEpochMillis: Long?,
+    val extractionStatusRaw: Int?,
+    val extractionError: String?,
     val isDeleted: Boolean,
     val createdAtEpochMillis: Long?,
     val updatedAtEpochMillis: Long?,
@@ -120,6 +124,10 @@ class DocumentRemoteStore @Inject constructor(
                                 storagePath = (d["storagePath"] as? String)?.trim().orEmpty(),
                                 downloadURL = (d["downloadURL"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
                                 notes = (d["notes"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                                extractedText = (d["extractedText"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                                extractedTextUpdatedAtEpochMillis = (d["extractedTextUpdatedAt"] as? Timestamp)?.toDate()?.time,
+                                extractionStatusRaw = (d["extractionStatusRaw"] as? Number)?.toInt(),
+                                extractionError = (d["extractionError"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
                                 isDeleted = d["isDeleted"] as? Boolean ?: false,
                                 createdAtEpochMillis = (d["createdAt"] as? Timestamp)?.toDate()?.time,
                                 updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
@@ -268,31 +276,45 @@ class DocumentRemoteStore @Inject constructor(
                 "outbound document guard id=${entity.id} forcingCategory=$inferredExpenseCategoryId fromNotes=${entity.notes}",
             )
         }
+        val payload = mutableMapOf<String, Any?>(
+            "title" to entity.title,
+            "fileName" to entity.fileName,
+            "mimeType" to entity.mimeType,
+            "fileSize" to entity.fileSize,
+            "storagePath" to entity.storagePath,
+            "downloadURL" to entity.downloadURL,
+            "notes" to entity.notes,
+            "childId" to entity.childId,
+            "categoryId" to normalizedCategoryId,
+            // compatibilità cross-client: alcuni path storici leggono parentId/folderId
+            "parentId" to normalizedCategoryId,
+            "folderId" to normalizedCategoryId,
+            "isDeleted" to entity.isDeleted,
+            "updatedBy" to uid,
+            "updatedAt" to FieldValue.serverTimestamp(),
+            "createdAt" to timestampFromMillis(entity.createdAtEpochMillis),
+        )
+        // OCR fields must be additive: never wipe remote OCR with null from stale/local-only updates.
+        entity.extractedText
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { payload["extractedText"] = it }
+        entity.extractedTextUpdatedAtEpochMillis?.let {
+            payload["extractedTextUpdatedAt"] = timestampFromNullableMillis(it)
+        }
+        if (entity.extractionStatusRaw != 0 || !entity.extractionError.isNullOrBlank() || !entity.extractedText.isNullOrBlank()) {
+            payload["extractionStatusRaw"] = entity.extractionStatusRaw
+        }
+        entity.extractionError
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { payload["extractionError"] = it }
+
         db.collection("families")
             .document(entity.familyId)
             .collection("documents")
             .document(entity.id)
-            .set(
-                mapOf(
-                    "title" to entity.title,
-                    "fileName" to entity.fileName,
-                    "mimeType" to entity.mimeType,
-                    "fileSize" to entity.fileSize,
-                    "storagePath" to entity.storagePath,
-                    "downloadURL" to entity.downloadURL,
-                    "notes" to entity.notes,
-                    "childId" to entity.childId,
-                    "categoryId" to normalizedCategoryId,
-                    // compatibilità cross-client: alcuni path storici leggono parentId/folderId
-                    "parentId" to normalizedCategoryId,
-                    "folderId" to normalizedCategoryId,
-                    "isDeleted" to entity.isDeleted,
-                    "updatedBy" to uid,
-                    "updatedAt" to FieldValue.serverTimestamp(),
-                    "createdAt" to timestampFromMillis(entity.createdAtEpochMillis),
-                ),
-                SetOptions.merge(),
-            )
+            .set(payload, SetOptions.merge())
             .await()
     }
 
@@ -369,4 +391,7 @@ class DocumentRemoteStore @Inject constructor(
 
     private fun timestampFromMillis(epochMillis: Long): Timestamp =
         Timestamp(epochMillis / 1000, ((epochMillis % 1000) * 1_000_000).toInt())
+
+    private fun timestampFromNullableMillis(epochMillis: Long?): Timestamp? =
+        epochMillis?.let { Timestamp(it / 1000, ((it % 1000) * 1_000_000).toInt()) }
 }

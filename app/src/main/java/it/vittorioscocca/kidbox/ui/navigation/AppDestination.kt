@@ -11,6 +11,8 @@ sealed class AppDestination(val route: String) {
     data object Profile : AppDestination("profile")
     data object Settings : AppDestination("settings")
     data object AiSettings : AppDestination("ai_settings")
+    data object Plans : AppDestination("plans")
+    data object StorageUsage : AppDestination("storage_usage")
     data object MessageSettings : AppDestination("message_settings")
     data object NotificationSettings : AppDestination("notification_settings")
     data object Theme : AppDestination("theme")
@@ -255,6 +257,9 @@ sealed class AppDestination(val route: String) {
             "wallet_detail/$familyId/$ticketId"
     }
     data object AskExpert : AppDestination("ask_expert")
+    data object AiChat : AppDestination("ai_chat/{familyId}") {
+        fun createRoute(familyId: String): String = "ai_chat/$familyId"
+    }
     data object PlanningAiChat : AppDestination("planning_ai_chat/{familyId}?familyName={familyName}") {
         fun createRoute(familyId: String, familyName: String): String {
             val encodedName = java.net.URLEncoder.encode(familyName, Charsets.UTF_8.name())

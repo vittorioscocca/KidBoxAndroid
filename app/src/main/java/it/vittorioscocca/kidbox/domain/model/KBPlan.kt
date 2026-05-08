@@ -1,34 +1,56 @@
 package it.vittorioscocca.kidbox.domain.model
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.WorkspacePremium
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+enum class KBPlan(val rawValue: String) {
+    FREE("free"),
+    PRO("pro"),
+    MAX("max"), ;
 
-enum class KBPlan(
-    val raw: String,
-    val displayName: String,
-    val includesAI: Boolean,
-    val aiDailyLimit: Int,
-    val planColorValue: Long,
-    val planIconName: String,
-) {
-    FREE("free", "Free", false, 0, 0xFF9E9E9E, "star"),
-    PRO("pro", "Pro", true, 20, 0xFF2563EB, "auto_awesome"),
-    MAX("max", "Max", true, Int.MAX_VALUE, 0xFF7C3AED, "workspace_premium");
+    // Backward-compatible alias for existing Android call sites.
+    val raw: String get() = rawValue
 
-    val planColor: Color get() = Color(planColorValue)
+    val displayName: String get() = when (this) {
+        FREE -> "Free"
+        PRO -> "Pro"
+        MAX -> "Max"
+    }
 
-    val planIcon: ImageVector
-        get() = when (planIconName) {
-            "auto_awesome" -> Icons.Filled.AutoAwesome
-            "workspace_premium" -> Icons.Filled.WorkspacePremium
-            else -> Icons.Filled.Star
-        }
+    val monthlyPrice: String get() = when (this) {
+        FREE -> "Gratis"
+        PRO -> "€4,99/mese"
+        MAX -> "€9,99/mese"
+    }
+
+    val storageQuota: Long get() = when (this) {
+        FREE -> 200L * 1024 * 1024
+        PRO -> 5L * 1024 * 1024 * 1024
+        MAX -> 20L * 1024 * 1024 * 1024
+    }
+
+    val aiDailyLimit: Int get() = when (this) {
+        FREE -> 0
+        PRO -> 30
+        MAX -> 100
+    }
+
+    val includesAI: Boolean get() = this != FREE
+
+    val productId: String? get() = when (this) {
+        FREE -> null
+        PRO -> "it.vittorioscocca.kidbox.pro.monthly"
+        MAX -> "it.vittorioscocca.kidbox.max.monthly"
+    }
+
+    val badge: String get() = when (this) {
+        FREE -> ""
+        PRO -> "Più popolare"
+        MAX -> "Migliore"
+    }
 
     companion object {
-        fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: FREE
+        fun fromRawValue(raw: String?): KBPlan =
+            entries.firstOrNull { it.rawValue == raw } ?: FREE
+
+        // Backward-compatible helper for existing Android call sites.
+        fun from(raw: String?): KBPlan = fromRawValue(raw)
     }
 }

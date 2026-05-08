@@ -1,6 +1,5 @@
 package it.vittorioscocca.kidbox.data.repository
 
-import it.vittorioscocca.kidbox.data.health.ai.HealthAiSummaryPolicy
 import it.vittorioscocca.kidbox.data.local.dao.KBAIConversationDao
 import it.vittorioscocca.kidbox.data.local.dao.KBAIMessageDao
 import it.vittorioscocca.kidbox.data.local.entity.KBAIConversationEntity
@@ -90,42 +89,37 @@ class HealthAIChatRepository @Inject constructor(
     }
 
     private suspend fun summarizeIfNeeded(conversation: KBAIConversation) {
-        val allMessages = messageDao.getAllByConversationId(conversation.id)
-        val total = allMessages.size
-        val unsummarized = total - conversation.summarizedMessageCount
-        if (unsummarized <= HealthAiSummaryPolicy.SUMMARY_THRESHOLD ||
-            total <= HealthAiSummaryPolicy.RECENT_MESSAGES_TO_KEEP
-        ) {
-            return
-        }
+        // Legacy no-op.
+    }
 
-        val toSummarize = allMessages.take(total - HealthAiSummaryPolicy.RECENT_MESSAGES_TO_KEEP)
-        val summaryInput = toSummarize.joinToString("\n") { msg ->
-            "${if (msg.roleRaw == "user") "Utente" else "Assistente"}: ${msg.content}"
-        }
-        val summaryMessages = listOf(
-            KBAIMessage(
-                id = "summary-input",
+    suspend fun compactConversation(conversation: KBAIConversation): Boolean {
+        val allMessages = messageDao.getAllByConversationId(conversation.id)
+        if (allMessages.isEmpty()) return false
+        val fullPayload = allMessages.map { it.toDomain() }
+        val result = aiRepository.askAI(
+            conversation.familyId,
+            COMPACTION_SYSTEM_PROMPT,
+            fullPayload,
+        ).getOrNull() ?: return false
+
+        messageDao.deleteByConversationId(conversation.id)
+        messageDao.upsert(
+            KBAIMessageEntity(
+                id = "summary-${conversation.id}",
                 conversationId = conversation.id,
-                roleRaw = "user",
-                content = summaryInput,
+                roleRaw = "assistant",
+                content = result.reply,
                 createdAtEpochMillis = System.currentTimeMillis(),
             ),
         )
-
-        val result = aiRepository.askAI(
-            conversation.familyId,
-            HealthAiSummaryPolicy.summarizeSystemPromptHealthOverview,
-            summaryMessages,
-        ).getOrNull() ?: return
-
         conversationDao.upsert(
             conversation.toEntity().copy(
                 summary = result.reply,
-                summarizedMessageCount = toSummarize.size,
+                summarizedMessageCount = 0,
                 updatedAtEpochMillis = System.currentTimeMillis(),
             ),
         )
+        return true
     }
 
     fun observeMessages(conversationId: String): Flow<List<KBAIMessage>> =
@@ -145,7 +139,23 @@ class HealthAIChatRepository @Inject constructor(
     private fun buildPayloadMessages(
         conversation: KBAIConversation,
         allMessages: List<KBAIMessage>,
-    ): List<KBAIMessage> = allMessages.drop(conversation.summarizedMessageCount)
+    ): List<KBAIMessage> {
+        val summary = conversation.summary?.takeIf { it.isNotBlank() }
+        val summaryMessage = summary?.let {
+            KBAIMessage(
+                id = "summary-${conversation.id}",
+                conversationId = conversation.id,
+                roleRaw = "assistant",
+                content = it,
+                createdAtEpochMillis = System.currentTimeMillis(),
+                isSummary = true,
+            )
+        }
+        val recent = allMessages
+            .filterNot { msg -> summary != null && msg.roleRaw == "assistant" && msg.content == summary }
+            .takeLast(6)
+        return (listOfNotNull(summaryMessage) + recent).take(7)
+    }
 
     private fun buildFinalSystemPrompt(conversation: KBAIConversation, baseSystemPrompt: String): String {
         val summary = conversation.summary?.takeIf { it.isNotBlank() } ?: return baseSystemPrompt
@@ -183,4 +193,8 @@ private fun KBAIMessageEntity.toDomain() = KBAIMessage(
     roleRaw = roleRaw,
     content = content,
     createdAtEpochMillis = createdAtEpochMillis,
+    isSummary = id.startsWith("summary-"),
 )
+
+private const val COMPACTION_SYSTEM_PROMPT =
+    "Riassumi in modo conciso ma completo la conversazione seguente, mantenendo i punti chiave, le decisioni prese e il contesto importante. Il riassunto sarà usato come contesto per continuare la conversazione."

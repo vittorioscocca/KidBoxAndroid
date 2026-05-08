@@ -264,20 +264,28 @@ class WalletRepository @Inject constructor(
     }
 
     private fun decryptDto(dto: WalletTicketRemoteDto, familyId: String): DecryptedWallet? {
-        val titleB64 = dto.titleEnc
-        if (titleB64.isNullOrBlank()) {
-            Log.w(TAG, "ticket ${dto.id} missing titleEnc")
+        val title = when {
+            !dto.titleEnc.isNullOrBlank() -> decryptField(dto.titleEnc, familyId)
+                ?: dto.titlePlain?.trim()?.takeIf { it.isNotEmpty() }
+            else -> dto.titlePlain?.trim()?.takeIf { it.isNotEmpty() }
+        } ?: run {
+            Log.w(TAG, "ticket ${dto.id} missing/undecryptable title")
             return null
         }
-        val title = decryptField(titleB64, familyId) ?: return null
         return DecryptedWallet(
             title = title,
-            location = decryptField(dto.locationEnc, familyId),
-            seat = decryptField(dto.seatEnc, familyId),
-            bookingCode = decryptField(dto.bookingCodeEnc, familyId),
-            notes = decryptField(dto.notesEnc, familyId),
-            barcodeText = decryptField(dto.barcodeTextEnc, familyId),
-            pdfFileName = decryptField(dto.fileNameEnc, familyId),
+            location = decryptField(dto.locationEnc, familyId)
+                ?: dto.locationPlain?.trim()?.takeIf { it.isNotEmpty() },
+            seat = decryptField(dto.seatEnc, familyId)
+                ?: dto.seatPlain?.trim()?.takeIf { it.isNotEmpty() },
+            bookingCode = decryptField(dto.bookingCodeEnc, familyId)
+                ?: dto.bookingCodePlain?.trim()?.takeIf { it.isNotEmpty() },
+            notes = decryptField(dto.notesEnc, familyId)
+                ?: dto.notesPlain?.trim()?.takeIf { it.isNotEmpty() },
+            barcodeText = decryptField(dto.barcodeTextEnc, familyId)
+                ?: dto.barcodeTextPlain?.trim()?.takeIf { it.isNotEmpty() },
+            pdfFileName = decryptField(dto.fileNameEnc, familyId)
+                ?: dto.fileNamePlain?.trim()?.takeIf { it.isNotEmpty() },
         )
     }
 

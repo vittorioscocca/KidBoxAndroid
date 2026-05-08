@@ -4,8 +4,13 @@ import it.vittorioscocca.kidbox.data.local.entity.KBMedicalExamEntity
 import it.vittorioscocca.kidbox.domain.model.KBExamStatus
 import it.vittorioscocca.kidbox.domain.model.KBMedicalExam
 
-fun examStatusFromRaw(raw: String?): KBExamStatus =
-    KBExamStatus.values().firstOrNull { it.rawValue == raw } ?: KBExamStatus.PENDING
+fun examStatusFromRaw(raw: String?): KBExamStatus {
+    val normalized = raw?.trim()
+    return when (normalized) {
+        "Eseguita" -> KBExamStatus.DONE // legacy/feminine wording
+        else -> KBExamStatus.values().firstOrNull { it.rawValue == normalized } ?: KBExamStatus.PENDING
+    }
+}
 
 fun KBMedicalExamEntity.toDomain(): KBMedicalExam = KBMedicalExam(
     id = id,

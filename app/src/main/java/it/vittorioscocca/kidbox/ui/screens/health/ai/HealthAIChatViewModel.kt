@@ -67,6 +67,11 @@ class HealthAIChatViewModel @Inject constructor(
     private val memberDao: KBFamilyMemberDao,
     private val healthAttachmentService: HealthAttachmentService,
 ) : ViewModel() {
+    private val COMPACTION_THRESHOLD = 0.60
+    private var lastCompactionStep: Int = 0
+    private var messagesInSession: Int = 0
+    private var dailyLimit: Int = 0
+
 
     private val _uiState = MutableStateFlow(HealthAIChatState())
     val uiState: StateFlow<HealthAIChatState> = _uiState.asStateFlow()
@@ -187,6 +192,7 @@ class HealthAIChatViewModel @Inject constructor(
                 initialized = true
                 val conv = chatRepository.getOrCreateConversation(familyId, childId, scopeId)
                 conversation = conv
+                lastCompactionStep = if (conv.summary.isNullOrBlank()) 0 else 3
 
                 chatRepository.observeMessages(conv.id)
                     .onEach { msgs -> _uiState.value = _uiState.value.copy(messages = msgs) }
@@ -212,6 +218,9 @@ class HealthAIChatViewModel @Inject constructor(
         viewModelScope.launch {
             chatRepository.sendMessage(conv, text, systemPrompt)
                 .onSuccess { (_, reply) ->
+                    messagesInSession = reply.usageToday
+                    dailyLimit = reply.dailyLimit
+                    maybeCompactIfNeeded(conv)
                     conversation = chatRepository.getOrCreateConversation(familyId, childId, conv.scopeId)
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -228,6 +237,21 @@ class HealthAIChatViewModel @Inject constructor(
         }
     }
 
+    private suspend fun maybeCompactIfNeeded(conv: KBAIConversation) {
+        if (!shouldCompact()) return
+        val currentStep = (messagesInSession / (dailyLimit * 0.20)).toInt()
+        if (currentStep <= lastCompactionStep) return
+        val didCompact = chatRepository.compactConversation(conv)
+        if (didCompact) {
+            lastCompactionStep = currentStep
+        }
+    }
+
+    private fun shouldCompact(): Boolean {
+        if (dailyLimit <= 0) return false
+        return messagesInSession.toDouble() >= dailyLimit.toDouble() * COMPACTION_THRESHOLD
+    }
+
     fun setInput(text: String) {
         _uiState.value = _uiState.value.copy(inputText = text)
     }
@@ -241,6 +265,7 @@ class HealthAIChatViewModel @Inject constructor(
         val conv = conversation ?: return
         viewModelScope.launch {
             chatRepository.clearConversation(conv)
+            lastCompactionStep = 0
             _uiState.value = _uiState.value.copy(messages = emptyList())
         }
     }

@@ -69,7 +69,7 @@ data class MedicalVisitFormState(
     val nextVisitReminder: Boolean = true,
     val recentDoctors: List<Pair<String, String?>> = emptyList(),
     val linkedTreatmentSummaries: Map<String, String> = emptyMap(),
-    val linkedExamSummaries: Map<String, Pair<String, Boolean>> = emptyMap(),
+    val linkedExamSummaries: Map<String, LinkedExamSummary> = emptyMap(),
     val visitAttachments: List<KBDocumentEntity> = emptyList(),
     val saved: Boolean = false,
     val saveError: String? = null,
@@ -80,6 +80,12 @@ data class MedicalVisitFormState(
     val prescriptionsBadgeCount: Int
         get() = linkedTreatmentIds.size + asNeededDrugs.size + therapyTypes.size + linkedExamIds.size
 }
+
+data class LinkedExamSummary(
+    val name: String,
+    val isUrgent: Boolean,
+    val statusRaw: String,
+)
 
 private fun startOfTodayMillis(): Long =
     Calendar.getInstance().apply {
@@ -261,14 +267,23 @@ class MedicalVisitFormViewModel @Inject constructor(
         }
     }
 
-    fun appendLinkedExamId(id: String, examName: String? = null) {
+    fun appendLinkedExamId(
+        id: String,
+        examName: String? = null,
+        examStatusRaw: String? = null,
+    ) {
         val normalizedId = id.trim()
         if (normalizedId.isBlank() || _uiState.value.linkedExamIds.contains(normalizedId)) return
         val current = _uiState.value
         val updatedMap = current.linkedExamSummaries.toMutableMap()
         val cleanName = examName?.trim().orEmpty()
+        val cleanStatus = examStatusRaw?.trim().orEmpty()
         if (cleanName.isNotBlank()) {
-            updatedMap[normalizedId] = cleanName to false
+            updatedMap[normalizedId] = LinkedExamSummary(
+                name = cleanName,
+                isUrgent = false,
+                statusRaw = cleanStatus.ifBlank { KBExamStatus.PENDING.rawValue },
+            )
         }
         _uiState.value = current.copy(
             linkedExamIds = current.linkedExamIds + normalizedId,
@@ -297,10 +312,14 @@ class MedicalVisitFormViewModel @Inject constructor(
                     tMap[id] = "${t.drugName} · $d ${t.dosageUnit}"
                 }
             }
-            val eMap = mutableMapOf<String, Pair<String, Boolean>>()
+            val eMap = mutableMapOf<String, LinkedExamSummary>()
             for (id in s.linkedExamIds) {
                 examRepository.getById(id)?.let { e ->
-                    eMap[id] = e.name to e.isUrgent
+                    eMap[id] = LinkedExamSummary(
+                        name = e.name,
+                        isUrgent = e.isUrgent,
+                        statusRaw = e.statusRaw,
+                    )
                 }
             }
             _uiState.value = _uiState.value.copy(
@@ -407,7 +426,12 @@ class MedicalVisitFormViewModel @Inject constructor(
             runCatching {
                 // La visita deve esistere in SQLite prima di aggiornare gli esami (FK prescribingVisitId → kb_medical_visits).
                 repository.save(visit)
-                linkExamsToVisit(visit.id, normalizedLinkedExamIds, s.linkedExamSummaries)
+                linkExamsToVisit(
+                    visitId = visit.id,
+                    examIds = normalizedLinkedExamIds,
+                    examSummaries = s.linkedExamSummaries,
+                    visitStatus = s.visitStatus,
+                )
                 linkTreatmentsToVisit(visit.id, normalizedLinkedTreatmentIds)
                 for (uri in s.pendingAttachmentUris) {
                     attachmentService.uploadVisitAttachment(uri, visit.id, familyId, childId).getOrThrow()
@@ -432,15 +456,18 @@ class MedicalVisitFormViewModel @Inject constructor(
     private suspend fun linkExamsToVisit(
         visitId: String,
         examIds: List<String>,
-        examSummaries: Map<String, Pair<String, Boolean>>,
+        examSummaries: Map<String, LinkedExamSummary>,
+        visitStatus: KBVisitStatus,
     ) {
         val now = System.currentTimeMillis()
+        val fallbackStatus = visitStatus.toExamStatusRaw()
         for (eid in examIds) {
             val e = examRepository.getById(eid)
             if (e == null) {
                 val summary = examSummaries[eid]
-                val fallbackName = summary?.first?.trim().takeUnless { it.isNullOrBlank() } ?: "Esame prescritto"
-                val fallbackUrgent = summary?.second ?: false
+                val fallbackName = summary?.name?.trim().takeUnless { it.isNullOrBlank() } ?: "Esame prescritto"
+                val fallbackUrgent = summary?.isUrgent ?: false
+                val fallbackExamStatus = summary?.statusRaw?.trim().takeUnless { it.isNullOrBlank() } ?: fallbackStatus
                 examRepository.upsert(
                     KBMedicalExam(
                         id = eid,
@@ -452,7 +479,9 @@ class MedicalVisitFormViewModel @Inject constructor(
                         preparation = null,
                         notes = null,
                         location = null,
-                        statusRaw = KBExamStatus.PENDING.rawValue,
+                        // If the inline draft isn't readable yet, preserve the explicit
+                        // status chosen in exam form instead of falling back to visit status.
+                        statusRaw = fallbackExamStatus,
                         resultText = null,
                         resultDateEpochMillis = null,
                         prescribingVisitId = visitId,
@@ -522,4 +551,13 @@ class MedicalVisitFormViewModel @Inject constructor(
             reminderScheduler.cancel("${visit.id}_next_reminder", visit.id)
         }
     }
+}
+
+private fun KBVisitStatus.toExamStatusRaw(): String = when (this) {
+    KBVisitStatus.BOOKED -> KBExamStatus.BOOKED.rawValue
+    KBVisitStatus.COMPLETED -> KBExamStatus.DONE.rawValue
+    KBVisitStatus.RESULT_AVAILABLE -> KBExamStatus.RESULT_IN.rawValue
+    KBVisitStatus.PENDING,
+    KBVisitStatus.UNKNOWN_STATUS,
+    -> KBExamStatus.PENDING.rawValue
 }

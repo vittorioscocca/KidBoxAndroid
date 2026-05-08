@@ -12,6 +12,7 @@ import dagger.hilt.components.SingletonComponent
 import it.vittorioscocca.kidbox.data.remote.auth.AuthFacade
 import it.vittorioscocca.kidbox.data.remote.auth.AuthProvider
 import it.vittorioscocca.kidbox.data.remote.auth.AuthService
+import it.vittorioscocca.kidbox.data.remote.auth.FirebaseAppleAuthService
 import it.vittorioscocca.kidbox.data.remote.auth.GoogleAuthService
 import javax.inject.Singleton
 
@@ -40,10 +41,12 @@ object AuthModule {
     @Provides
     @Singleton
     fun provideAuthFacade(
+        appleAuthService: FirebaseAppleAuthService,
         googleAuthService: GoogleAuthService,
         firebaseAuth: FirebaseAuth,
     ): AuthFacade {
         val services: Map<AuthProvider, AuthService> = mapOf(
+            AuthProvider.APPLE to appleAuthService,
             AuthProvider.GOOGLE to googleAuthService,
         )
         return AuthFacade(services, firebaseAuth)

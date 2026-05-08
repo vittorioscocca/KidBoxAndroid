@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.AppTheme
+import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
 private data class SettingRowItem(
@@ -59,10 +61,15 @@ fun SettingsScreen(
     onMessageSettings: () -> Unit,
     onNotifications: () -> Unit,
     onAiSettings: () -> Unit,
+    onPlans: () -> Unit,
+    onStorageUsage: () -> Unit,
     viewModel: ThemeViewModel = hiltViewModel(),
+    subscriptionViewModel: SettingsSubscriptionViewModel = hiltViewModel(),
 ) {
     BackHandler { onBack() }
     val theme by viewModel.theme.collectAsStateWithLifecycle()
+    val plan by subscriptionViewModel.plan.collectAsStateWithLifecycle()
+    val isFamilyOwner by subscriptionViewModel.isFamilyOwner.collectAsStateWithLifecycle()
 
     val rows = listOf(
         SettingRowItem(
@@ -91,6 +98,13 @@ fun SettingsScreen(
             onClick = onAiSettings,
         ),
         SettingRowItem(
+            title = "Abbonamento",
+            subtitle = "Piano ${plan.displayName} · ${planStorage(plan)} · ${plan.aiDailyLimit} msg AI/gg",
+            icon = Icons.Filled.Star,
+            showChevron = true,
+            onClick = onPlans,
+        ),
+        SettingRowItem(
             title = "Notifiche",
             icon = Icons.Filled.Notifications,
             showChevron = true,
@@ -100,7 +114,7 @@ fun SettingsScreen(
             title = "Utilizzo spazio",
             icon = Icons.Filled.Storage,
             showChevron = true,
-            onClick = {},
+            onClick = if (isFamilyOwner && (plan == KBPlan.FREE || plan == KBPlan.PRO)) onPlans else onStorageUsage,
         ),
     )
 
@@ -137,6 +151,12 @@ fun SettingsScreen(
             }
         }
     }
+}
+
+private fun planStorage(plan: KBPlan): String = when (plan) {
+    KBPlan.FREE -> "200 MB"
+    KBPlan.PRO -> "5 GB"
+    KBPlan.MAX -> "20 GB"
 }
 
 private fun AppTheme.toSubtitle(): String = when (this) {

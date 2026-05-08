@@ -85,7 +85,7 @@ fun MedicalExamFormScreen(
     prescribingVisitId: String? = null,
     saveAsDraftHidden: Boolean = false,
     bindNonce: Int = 0,
-    onSaved: (examId: String, examName: String) -> Unit = { _, _ -> onBack() },
+    onSaved: (examId: String, examName: String, examStatusRaw: String) -> Unit = { _, _, _ -> onBack() },
     viewModel: MedicalExamFormViewModel = hiltViewModel(),
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -109,7 +109,7 @@ fun MedicalExamFormScreen(
             val id = state.examId
             val name = state.name.trim()
             viewModel.consumeSaved()
-            onSaved(id, name)
+            onSaved(id, name, state.status.rawValue)
         }
     }
     LaunchedEffect(state.saveError) {

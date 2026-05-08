@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -90,6 +91,7 @@ private val AccentOrange = Color(0xFFF2611A)
 fun ProfileScreen(
     onLoggedOut: () -> Unit,
     onBack: (() -> Unit)? = null,
+    onStorageUsage: () -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -210,6 +212,7 @@ fun ProfileScreen(
             .fillMaxSize()
             .background(kb.background)
             .statusBarsPadding()
+            .navigationBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -463,7 +466,7 @@ fun ProfileScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp)
-                    .clickable { },
+                    .clickable(onClick = onStorageUsage),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(Icons.Default.Home, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(16.dp))
@@ -503,7 +506,7 @@ fun ProfileScreen(
         if (state.saveSucceeded && !state.isDirty) {
             Text("Profilo salvato.", color = Color(0xFF2E7D32), style = MaterialTheme.typography.bodySmall)
         }
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(28.dp))
     }
 
     // ── Avatar cropper overlay ────────────────────────────────────────────────

@@ -35,6 +35,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +49,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -58,20 +63,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import it.vittorioscocca.kidbox.ui.screens.ai.common.ClaudeMarkdownText
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private val EXAM_EMPTY_SUGGESTIONS = listOf(
     "Quali esami richiedono attenzione?",
     "Ci sono esami in scadenza?",
     "Riassumi i referti disponibili",
 )
+private val EXAM_TIME = SimpleDateFormat("HH:mm", Locale.ITALIAN)
 
 @Composable
 fun ExamAiChatScreen(
@@ -79,6 +91,7 @@ fun ExamAiChatScreen(
     examName: String,
     subjectName: String,
     onBack: () -> Unit,
+    onOpenAiSettings: () -> Unit = {},
     viewModel: ExamAiChatViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -86,6 +99,8 @@ fun ExamAiChatScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     var input by remember { mutableStateOf("") }
+    var showClearDialog by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let {
@@ -119,6 +134,35 @@ fun ExamAiChatScreen(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Indietro",
                     )
+                }
+            },
+            actions = {
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "Menu",
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Nuova conversazione", color = Color(0xFFD32F2F)) },
+                            onClick = {
+                                showMenu = false
+                                showClearDialog = true
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Impostazioni AI") },
+                            onClick = {
+                                showMenu = false
+                                onOpenAiSettings()
+                            },
+                        )
+                    }
                 }
             },
         )
@@ -198,43 +242,57 @@ fun ExamAiChatScreen(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = 0.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(uiState.messages, key = { it.id }) { msg ->
                         val isUser = msg.role == "user"
+                        val maxUserWidth = LocalConfiguration.current.screenWidthDp.dp * 0.75f
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
                             horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .widthIn(max = 300.dp)
-                                    .clip(
-                                        RoundedCornerShape(
-                                            topStart = 14.dp,
-                                            topEnd = 14.dp,
-                                            bottomStart = if (isUser) 14.dp else 4.dp,
-                                            bottomEnd = if (isUser) 4.dp else 14.dp,
-                                        ),
+                            if (isUser) {
+                                Box(
+                                    modifier = Modifier
+                                        .widthIn(max = maxUserWidth)
+                                        .clip(
+                                            RoundedCornerShape(
+                                                topStart = 14.dp,
+                                                topEnd = 14.dp,
+                                                bottomStart = 14.dp,
+                                                bottomEnd = 4.dp,
+                                            ),
+                                        )
+                                        .background(MaterialTheme.colorScheme.primaryContainer)
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                ) {
+                                    Text(
+                                        text = msg.content,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                                     )
-                                    .background(
-                                        if (isUser) {
-                                            MaterialTheme.colorScheme.primaryContainer
-                                        } else {
-                                            MaterialTheme.colorScheme.surfaceVariant
-                                        },
-                                    )
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                            ) {
+                                }
                                 Text(
-                                    text = msg.content,
-                                    color = if (isUser) {
-                                        MaterialTheme.colorScheme.onPrimaryContainer
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
+                                    text = EXAM_TIME.format(Date(msg.createdAt)),
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 2.dp, start = 4.dp),
                                 )
+                            } else {
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    ClaudeMarkdownText(
+                                        text = msg.content,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                    Text(
+                                        text = EXAM_TIME.format(Date(msg.createdAt)),
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(top = 2.dp),
+                                    )
+                                }
                             }
                         }
                     }
@@ -352,6 +410,29 @@ fun ExamAiChatScreen(
     }
 
     SnackbarHost(hostState = snackbarHostState)
+
+    if (showClearDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDialog = false },
+            title = { Text("Nuova conversazione") },
+            text = { Text("La cronologia verrà eliminata e il contesto verrà ricostruito.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.clearConversation()
+                        showClearDialog = false
+                    },
+                ) {
+                    Text("Conferma", color = Color(0xFFD32F2F))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDialog = false }) {
+                    Text("Annulla")
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -385,35 +466,31 @@ private fun TypingIndicatorBubble() {
         label = "dot3",
     )
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, top = 2.dp, bottom = 2.dp),
         horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
+        Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(7.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha1.value)),
-            )
-            Box(
-                modifier = Modifier
-                    .size(7.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha2.value)),
-            )
-            Box(
-                modifier = Modifier
-                    .size(7.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha3.value)),
-            )
-        }
+                .size(7.dp)
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha1.value)),
+        )
+        Spacer(Modifier.width(6.dp))
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha2.value)),
+        )
+        Spacer(Modifier.width(6.dp))
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha3.value)),
+        )
     }
 }

@@ -70,6 +70,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -79,6 +80,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
 import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
+import it.vittorioscocca.kidbox.ui.screens.ai.common.ClaudeMarkdownText
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import kotlinx.coroutines.launch
 
@@ -95,6 +97,7 @@ fun AIChatScreen(
     familyId: String,
     familyName: String,
     onBack: () -> Unit,
+    onOpenAiSettings: () -> Unit = {},
     viewModel: PlanningAIChatViewModel = hiltViewModel(),
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -187,6 +190,13 @@ fun AIChatScreen(
                                     text = { Text("Nuova conversazione", color = Color(0xFFD32F2F)) },
                                     onClick = { showMenu = false; showClearDialog = true },
                                 )
+                                DropdownMenuItem(
+                                    text = { Text("Impostazioni AI") },
+                                    onClick = {
+                                        showMenu = false
+                                        onOpenAiSettings()
+                                    },
+                                )
                             }
                         }
                     }
@@ -275,7 +285,7 @@ fun AIChatScreen(
                             state = listState,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(horizontal = 12.dp),
+                                .padding(horizontal = 0.dp),
                             reverseLayout = true,
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
@@ -392,43 +402,43 @@ fun AIChatScreen(
 private fun PlanningChatBubble(message: KBAIMessage) {
     val kb = MaterialTheme.kidBoxColors
     val isUser = message.isUser
+    val maxUserWidth = LocalConfiguration.current.screenWidthDp.dp * 0.75f
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
     ) {
-        if (!isUser) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.padding(bottom = 4.dp, start = 4.dp),
+        if (isUser) {
+            Surface(
+                color = AI_BLUE,
+                shape = RoundedCornerShape(
+                    topStart = 18.dp,
+                    topEnd = 4.dp,
+                    bottomStart = 18.dp,
+                    bottomEnd = 18.dp,
+                ),
+                modifier = Modifier.widthIn(max = maxUserWidth),
             ) {
-                Icon(
-                    Icons.Default.AutoAwesome,
-                    contentDescription = null,
-                    tint = AI_BLUE,
-                    modifier = Modifier.size(13.dp),
+                Text(
+                    text = message.content,
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    lineHeight = 20.sp,
                 )
-                Text("Assistente AI", fontSize = 11.sp, color = AI_BLUE, fontWeight = FontWeight.Medium)
             }
-        }
-
-        Surface(
-            color = if (isUser) AI_BLUE else kb.card,
-            shape = RoundedCornerShape(
-                topStart = if (isUser) 18.dp else 4.dp,
-                topEnd = if (isUser) 4.dp else 18.dp,
-                bottomStart = 18.dp,
-                bottomEnd = 18.dp,
-            ),
-            modifier = Modifier.widthIn(max = 300.dp),
-        ) {
-            Text(
+        } else {
+            ClaudeMarkdownText(
                 text = message.content,
-                color = if (isUser) Color.White else kb.title,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                lineHeight = 20.sp,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = PlanningContextBuilder.formatTime(message.createdAtEpochMillis),
+                fontSize = 10.sp,
+                color = kb.subtitle,
+                modifier = Modifier.padding(start = 0.dp, top = 2.dp),
             )
         }
     }
@@ -437,41 +447,33 @@ private fun PlanningChatBubble(message: KBAIMessage) {
 @Composable
 private fun PlanningTypingIndicator() {
     Row(
-        modifier = Modifier.padding(start = 8.dp, bottom = 4.dp),
+        modifier = Modifier.padding(start = 16.dp, bottom = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Surface(color = MaterialTheme.kidBoxColors.card, shape = RoundedCornerShape(12.dp)) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                repeat(3) { index ->
-                    val transition = rememberInfiniteTransition(label = "dot$index")
-                    val alpha by transition.animateFloat(
-                        initialValue = 0.3f,
-                        targetValue = 1f,
-                        animationSpec = infiniteRepeatable(
-                            animation = keyframes {
-                                durationMillis = 1200
-                                0.3f at index * 200 using LinearEasing
-                                1f at index * 200 + 300 using LinearEasing
-                                0.3f at index * 200 + 600 using LinearEasing
-                                0.3f at 1200 using LinearEasing
-                            },
-                            repeatMode = RepeatMode.Restart,
-                        ),
-                        label = "alpha$index",
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(AI_BLUE.copy(alpha = alpha)),
-                    )
-                }
-            }
+        repeat(3) { index ->
+            val transition = rememberInfiniteTransition(label = "dot$index")
+            val alpha by transition.animateFloat(
+                initialValue = 0.3f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = keyframes {
+                        durationMillis = 1200
+                        0.3f at index * 200 using LinearEasing
+                        1f at index * 200 + 300 using LinearEasing
+                        0.3f at index * 200 + 600 using LinearEasing
+                        0.3f at 1200 using LinearEasing
+                    },
+                    repeatMode = RepeatMode.Restart,
+                ),
+                label = "alpha$index",
+            )
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(AI_BLUE.copy(alpha = alpha)),
+            )
         }
     }
 }

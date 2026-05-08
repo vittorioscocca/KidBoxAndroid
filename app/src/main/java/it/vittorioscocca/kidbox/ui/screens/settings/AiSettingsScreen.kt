@@ -26,6 +26,8 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -252,7 +254,12 @@ private fun CurrentPlanCard(
                     .background(Color.White.copy(alpha = 0.2f), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(plan.planIcon, contentDescription = null, tint = Color.White, modifier = Modifier.size(26.dp))
+                val planIcon = when (plan) {
+                    KBPlan.FREE -> Icons.Filled.Star
+                    KBPlan.PRO -> Icons.Filled.AutoAwesome
+                    KBPlan.MAX -> Icons.Filled.WorkspacePremium
+                }
+                Icon(planIcon, contentDescription = null, tint = Color.White, modifier = Modifier.size(26.dp))
             }
             Column(modifier = Modifier.padding(start = 14.dp)) {
                 Text(

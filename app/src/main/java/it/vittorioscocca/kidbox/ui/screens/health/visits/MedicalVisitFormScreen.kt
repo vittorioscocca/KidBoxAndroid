@@ -246,8 +246,12 @@ fun MedicalVisitFormScreen(
             saveAsDraftHidden = (visitId == null),
             bindNonce = examBindNonce,
             onBack = { showExamForm = false },
-            onSaved = { eid, examName ->
-                viewModel.appendLinkedExamId(eid, examName)
+            onSaved = { eid, examName, examStatusRaw ->
+                viewModel.appendLinkedExamId(
+                    id = eid,
+                    examName = examName,
+                    examStatusRaw = examStatusRaw,
+                )
                 showExamForm = false
             },
         )
@@ -956,7 +960,7 @@ private fun Step3Prescriptions(
             } else {
                 state.linkedExamIds.forEach { id ->
                     val meta = state.linkedExamSummaries[id]
-                    val title = meta?.first?.takeIf { it.isNotBlank() } ?: "Esame in sincronizzazione"
+                    val title = meta?.name?.takeIf { it.isNotBlank() } ?: "Esame in sincronizzazione"
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -964,7 +968,7 @@ private fun Step3Prescriptions(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(title, modifier = Modifier.weight(1f), color = kb.title)
-                        if (meta?.second == true) Text("Urgente", fontSize = 11.sp, color = Color(0xFFFF6B00))
+                        if (meta?.isUrgent == true) Text("Urgente", fontSize = 11.sp, color = Color(0xFFFF6B00))
                         IconButton(onClick = { viewModel.removeLinkedExamId(id) }) {
                             Icon(Icons.Default.Delete, contentDescription = null, tint = kb.subtitle)
                         }
@@ -1312,7 +1316,7 @@ private fun Step5Summary(
                 Text("Esami Prescritti (${state.linkedExamIds.size})", fontSize = 11.sp, color = kb.subtitle)
                 state.linkedExamIds.forEach { id ->
                     val meta = state.linkedExamSummaries[id]
-                    Text("· ${meta?.first ?: id}${if (meta?.second == true) " ⚠" else ""}", fontSize = 13.sp, color = kb.title)
+                    Text("· ${meta?.name ?: id}${if (meta?.isUrgent == true) " ⚠" else ""}", fontSize = 13.sp, color = kb.title)
                 }
             }
         }

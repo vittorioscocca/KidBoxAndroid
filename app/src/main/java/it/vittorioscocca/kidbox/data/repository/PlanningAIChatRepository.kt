@@ -164,4 +164,5 @@ private fun KBAIConversation.toEntity() = KBAIConversationEntity(
 private fun KBAIMessageEntity.toDomain() = KBAIMessage(
     id = id, conversationId = conversationId, roleRaw = roleRaw,
     content = content, createdAtEpochMillis = createdAtEpochMillis,
+    isSummary = id.startsWith("summary-"),
 )

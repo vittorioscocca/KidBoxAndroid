@@ -10,6 +10,7 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.SetOptions
+import androidx.core.text.HtmlCompat
 import it.vittorioscocca.kidbox.data.local.entity.KBNoteEntity
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -134,13 +135,42 @@ class NoteRemoteStore @Inject constructor(
     fun decryptOrFallback(
         dto: NoteRemoteDto,
     ): Pair<String, String> {
-        if (!dto.titleEnc.isNullOrBlank() && !dto.bodyEnc.isNullOrBlank()) {
-            return runCatching {
-                val title = crypto.decryptFromBase64(dto.titleEnc, dto.familyId)
-                val body = crypto.decryptFromBase64(dto.bodyEnc, dto.familyId)
-                title to body
-            }.getOrElse { (dto.titlePlain ?: "") to (dto.bodyPlain ?: "") }
+        val title = dto.titleEnc
+            ?.takeIf { it.isNotBlank() }
+            ?.let { runCatching { crypto.decryptFromBase64(it, dto.familyId) }.getOrNull() }
+            ?: dto.titlePlain.orEmpty()
+
+        val body = dto.bodyEnc
+            ?.takeIf { it.isNotBlank() }
+            ?.let { runCatching { crypto.decryptFromBase64(it, dto.familyId) }.getOrNull() }
+            ?: dto.bodyPlain.orEmpty()
+
+        val safeTitle = title.takeIf { it.isNotBlank() } ?: deriveTitleFromBody(body)
+        return safeTitle to body
+    }
+
+    private fun deriveTitleFromBody(body: String): String {
+        val plain = bodyToPlainText(body)
+            .lineSequence()
+            .map { it.trim() }
+            .firstOrNull { it.isNotEmpty() }
+            .orEmpty()
+        return plain.take(80)
+    }
+
+    private fun bodyToPlainText(raw: String): String {
+        var value = raw.replace('\u00A0', ' ')
+        if (value.isBlank()) return ""
+        if (value.contains('<') || value.contains("&lt;") || value.contains("&gt;") || value.contains("&amp;")) {
+            value = HtmlCompat.fromHtml(value, HtmlCompat.FROM_HTML_MODE_LEGACY).toString()
+            if (value.contains('<') && value.contains('>')) {
+                value = HtmlCompat.fromHtml(value, HtmlCompat.FROM_HTML_MODE_LEGACY).toString()
+            }
         }
-        return (dto.titlePlain ?: "") to (dto.bodyPlain ?: "")
+        return value
+            .replace(Regex("<[^>]+>"), " ")
+            .replace('\u00A0', ' ')
+            .replace(Regex("[\\t\\x0B\\f\\r ]+"), " ")
+            .trim()
     }
 }

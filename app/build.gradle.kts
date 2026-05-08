@@ -105,6 +105,8 @@ dependencies {
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    implementation("androidx.hilt:hilt-work:1.2.0")
+    ksp("androidx.hilt:hilt-compiler:1.2.0")
 
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
@@ -120,6 +122,8 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services)
     implementation(libs.googleid)
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+    implementation("com.android.billingclient:billing-ktx:7.1.1")
     implementation(libs.facebook.login)
     implementation("com.google.zxing:core:3.5.3")
 

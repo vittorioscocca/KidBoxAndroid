@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.auth
 
 import androidx.activity.ComponentActivity
+import android.content.ActivityNotFoundException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -10,6 +11,7 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import android.util.Log
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
 import it.vittorioscocca.kidbox.data.user.UserProfileRepository
 import it.vittorioscocca.kidbox.data.remote.auth.AuthError
@@ -33,6 +35,7 @@ class LoginViewModel @Inject constructor(
     private val emailAuth: EmailAuthService,
     private val onboardingPreferences: OnboardingPreferences,
     private val userProfileRepository: UserProfileRepository,
+    private val familyDao: KBFamilyDao,
 ) : ViewModel() {
 
     sealed class AuthCheckState {
@@ -97,6 +100,29 @@ class LoginViewModel @Inject constructor(
             } catch (e: Exception) {
                 if (e is AuthError.Cancelled) return@launch
                 _errorMessage.value = friendlyError(e)
+            } finally {
+                _isBusy.value = false
+            }
+        }
+    }
+
+    fun signInApple(activity: ComponentActivity) {
+        viewModelScope.launch {
+            _isBusy.value = true
+            _errorMessage.value = null
+            try {
+                auth.signIn(
+                    AuthProvider.APPLE,
+                    AuthPresentation.ActivityContext(activity),
+                )
+                onSignedInSuccessfully()
+            } catch (e: Exception) {
+                when (e) {
+                    is AuthError.Cancelled -> return@launch
+                    is ActivityNotFoundException ->
+                        _errorMessage.value = "Apple Sign-In non disponibile su questo dispositivo."
+                    else -> _errorMessage.value = friendlyError(e)
+                }
             } finally {
                 _isBusy.value = false
             }
@@ -199,6 +225,18 @@ class LoginViewModel @Inject constructor(
     }
 
     private suspend fun checkHasFamily(): Boolean {
+        // Prefer local state to avoid false negatives on slow/offline network.
+        runCatching { familyDao.hasAnyFamily() }
+            .onSuccess { hasLocalFamily ->
+                if (hasLocalFamily) {
+                    Log.d("KidBoxDebug", "checkHasFamily: local family found -> true")
+                    return true
+                }
+            }
+            .onFailure { err ->
+                Log.w("KidBoxDebug", "checkHasFamily local lookup failed: ${err.message}")
+            }
+
         return try {
             checkHasFamilyOnce()
         } catch (e: FirebaseFirestoreException) {

@@ -6,7 +6,7 @@ import com.google.firebase.auth.FirebaseUser
 /**
  * Facciata centrale per i provider registrati (stessa logica di [AuthFacade] su iOS).
  *
- * Su Android la mappa predefinita contiene solo **Google**; Apple non è disponibile come su iOS.
+ * Su Android la mappa predefinita contiene Google e Apple via Firebase OAuthProvider.
  * Facebook è gestito separatamente da [FacebookAuthService], come nel `LoginViewModel` iOS.
  */
 class AuthFacade(

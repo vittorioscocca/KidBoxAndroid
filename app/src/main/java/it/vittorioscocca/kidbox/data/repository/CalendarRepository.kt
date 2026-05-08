@@ -3,7 +3,10 @@ package it.vittorioscocca.kidbox.data.repository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
+import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBCalendarEventDao
+import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBCalendarEventEntity
 import it.vittorioscocca.kidbox.data.remote.calendar.CalendarEventRemoteChange
 import it.vittorioscocca.kidbox.data.remote.calendar.CalendarRemoteStore
@@ -21,6 +24,8 @@ import kotlinx.coroutines.sync.withLock
 @Singleton
 class CalendarRepository @Inject constructor(
     private val calendarDao: KBCalendarEventDao,
+    private val familyDao: KBFamilyDao,
+    private val childDao: KBChildDao,
     private val remoteStore: CalendarRemoteStore,
     private val auth: FirebaseAuth,
 ) {
@@ -61,8 +66,11 @@ class CalendarRepository @Inject constructor(
     }
 
     suspend fun upsertEventLocal(entity: KBCalendarEventEntity) {
+        ensureFamilyExists(entity.familyId)
+        val safeChildId = sanitizeChildId(entity.childId)
         calendarDao.upsert(
             entity.copy(
+                childId = safeChildId,
                 syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
                 isDeleted = false,
                 updatedAtEpochMillis = System.currentTimeMillis(),
@@ -155,11 +163,13 @@ class CalendarRepository @Inject constructor(
                     }
 
                     val now = System.currentTimeMillis()
+                    ensureFamilyExists(familyId)
+                    val safeChildId = sanitizeChildId(dto.childId)
                     calendarDao.upsert(
                         KBCalendarEventEntity(
                             id = dto.id,
                             familyId = familyId,
-                            childId = dto.childId,
+                            childId = safeChildId,
                             title = dto.title,
                             notes = dto.notes,
                             location = dto.location,
@@ -189,6 +199,37 @@ class CalendarRepository @Inject constructor(
         listener?.remove()
         listener = null
         listeningFamilyId = null
+    }
+
+    private suspend fun sanitizeChildId(childId: String?): String? {
+        val id = childId?.trim().orEmpty()
+        if (id.isBlank()) return null
+        return if (childDao.getById(id) != null) id else null
+    }
+
+    private suspend fun ensureFamilyExists(familyId: String) {
+        if (familyId.isBlank()) return
+        if (familyDao.getById(familyId) != null) return
+        val now = System.currentTimeMillis()
+        val uid = auth.currentUser?.uid ?: "local"
+        familyDao.upsert(
+            KBFamilyEntity(
+                id = familyId,
+                name = "Famiglia",
+                heroPhotoURL = null,
+                heroPhotoLocalPath = null,
+                heroPhotoUpdatedAtEpochMillis = null,
+                heroPhotoScale = null,
+                heroPhotoOffsetX = null,
+                heroPhotoOffsetY = null,
+                createdBy = uid,
+                updatedBy = uid,
+                createdAtEpochMillis = now,
+                updatedAtEpochMillis = now,
+                lastSyncAtEpochMillis = null,
+                lastSyncError = null,
+            ),
+        )
     }
 }
 

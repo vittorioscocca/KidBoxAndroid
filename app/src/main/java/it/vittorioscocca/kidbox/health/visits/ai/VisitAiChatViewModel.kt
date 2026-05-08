@@ -58,6 +58,11 @@ class VisitAiChatViewModel @Inject constructor(
     private val healthAttachmentService: HealthAttachmentService,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
+    private val COMPACTION_THRESHOLD = 0.60
+    private var lastCompactionStep: Int = 0
+    private var messagesInSession: Int = 0
+    private var dailyLimit: Int = 0
+
     private val dateFmt = SimpleDateFormat("d MMM yyyy", Locale.ITALIAN)
     private val familyId: String = savedStateHandle["familyId"] ?: ""
     private val childId: String = savedStateHandle["childId"] ?: ""
@@ -111,6 +116,9 @@ class VisitAiChatViewModel @Inject constructor(
                 chatRepository.sendMessage(conv, trimmed, basePrompt).getOrThrow()
             }.onSuccess {
                 val usage = it.second
+                messagesInSession = usage.usageToday
+                dailyLimit = usage.dailyLimit
+                maybeCompactIfNeeded(conv)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     isListMode = isListMode,
@@ -129,6 +137,21 @@ class VisitAiChatViewModel @Inject constructor(
         }
     }
 
+    private suspend fun maybeCompactIfNeeded(conv: KBAIConversation) {
+        if (!shouldCompact()) return
+        val currentStep = (messagesInSession / (dailyLimit * 0.20)).toInt()
+        if (currentStep <= lastCompactionStep) return
+        val didCompact = chatRepository.compactConversation(conv)
+        if (didCompact) {
+            lastCompactionStep = currentStep
+        }
+    }
+
+    private fun shouldCompact(): Boolean {
+        if (dailyLimit <= 0) return false
+        return messagesInSession.toDouble() >= dailyLimit.toDouble() * COMPACTION_THRESHOLD
+    }
+
     private fun bindConversation() {
         if (familyId.isBlank()) return
         viewModelScope.launch {
@@ -145,6 +168,7 @@ class VisitAiChatViewModel @Inject constructor(
                 scopeId = scopeId,
             )
             conversation = conv
+            lastCompactionStep = if (conv.summary.isNullOrBlank()) 0 else 3
             chatRepository.observeMessages(conv.id)
                 .onEach { msgs ->
                     _uiState.value = _uiState.value.copy(
@@ -163,6 +187,15 @@ class VisitAiChatViewModel @Inject constructor(
                 isListMode = isListMode,
                 listVisitCount = listVisitCount,
             )
+        }
+    }
+
+    fun clearConversation() {
+        val conv = conversation ?: return
+        viewModelScope.launch {
+            chatRepository.clearConversation(conv)
+            lastCompactionStep = 0
+            _uiState.value = _uiState.value.copy(messages = emptyList())
         }
     }
 

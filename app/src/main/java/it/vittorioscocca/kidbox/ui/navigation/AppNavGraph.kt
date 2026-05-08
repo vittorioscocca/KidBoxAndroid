@@ -31,9 +31,12 @@ import it.vittorioscocca.kidbox.ui.screens.settings.JoinFamilyScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.MessageSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.NotificationSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.AIChatScreen
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.PlanningAIChatScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.AiSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.SettingsScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.StorageUsageScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.ThemeScreen
+import it.vittorioscocca.kidbox.ui.subscription.PlansScreen
 import it.vittorioscocca.kidbox.ui.screens.calendar.CalendarScreen
 import it.vittorioscocca.kidbox.ui.screens.expenses.ExpensesHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.location.FamilyLocationScreen
@@ -149,6 +152,7 @@ fun AppNavGraph(
                         popUpTo(navController.graph.id) { inclusive = true }
                     }
                 },
+                onStorageUsage = { navController.navigate(AppDestination.StorageUsage.route) },
             )
         }
 
@@ -160,11 +164,24 @@ fun AppNavGraph(
                 onMessageSettings = { navController.navigate(AppDestination.MessageSettings.route) },
                 onNotifications = { navController.navigate(AppDestination.NotificationSettings.route) },
                 onAiSettings = { navController.navigate(AppDestination.AiSettings.route) },
+                onPlans = { navController.navigate(AppDestination.Plans.route) },
+                onStorageUsage = { navController.navigate(AppDestination.StorageUsage.route) },
             )
+        }
+
+        composable(AppDestination.Plans.route) {
+            PlansScreen(onDismiss = { navController.popBackStack() })
         }
 
         composable(AppDestination.AiSettings.route) {
             AiSettingsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(AppDestination.StorageUsage.route) {
+            StorageUsageScreen(
+                onBack = { navController.popBackStack() },
+                onOpenPlans = { navController.navigate(AppDestination.Plans.route) },
+            )
         }
 
         composable(AppDestination.MessageSettings.route) {
@@ -440,6 +457,7 @@ fun AppNavGraph(
                 visitId = visitIdArg,
                 subjectName = subjectNameArg,
                 onBack = { navController.popBackStack() },
+                onOpenAiSettings = { navController.navigate(AppDestination.AiSettings.route) },
             )
         }
 
@@ -467,6 +485,7 @@ fun AppNavGraph(
                 visitId = "",
                 subjectName = subjectNameArg,
                 onBack = { navController.popBackStack() },
+                onOpenAiSettings = { navController.navigate(AppDestination.AiSettings.route) },
             )
         }
 
@@ -614,7 +633,7 @@ fun AppNavGraph(
                 childId = childId,
                 examId = examId,
                 onBack = { navController.popBackStack() },
-                onSaved = { _, _ -> navController.popBackStack() },
+                onSaved = { _, _, _ -> navController.popBackStack() },
             )
         }
 
@@ -692,6 +711,7 @@ fun AppNavGraph(
                 examName = examNameArg,
                 subjectName = subjectNameArg,
                 onBack = { navController.popBackStack() },
+                onOpenAiSettings = { navController.navigate(AppDestination.AiSettings.route) },
             )
         }
 
@@ -870,6 +890,7 @@ fun AppNavGraph(
                 familyId = familyId,
                 childId = childId,
                 onBack = { navController.popBackStack() },
+                onOpenAiSettings = { navController.navigate(AppDestination.AiSettings.route) },
             )
         }
 
@@ -997,6 +1018,19 @@ fun AppNavGraph(
         composable(AppDestination.AskExpert.route) { PlaceholderScreen("Assistente AI") }
 
         composable(
+            route = AppDestination.AiChat.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            PlanningAIChatScreen(
+                onNavigateToCalendar = { navController.navigate(AppDestination.Calendar.createRoute(familyId)) },
+                onNavigateToTodo = { navController.navigate(AppDestination.Todo.route) },
+                onNavigateToHealth = { navController.navigate(AppDestination.PediatricChildSelector.createRoute(familyId)) },
+                onNavigateToUpgrade = { navController.navigate(AppDestination.AiSettings.route) },
+            )
+        }
+
+        composable(
             route = AppDestination.PlanningAiChat.route,
             arguments = listOf(
                 navArgument("familyId") { type = NavType.StringType },
@@ -1009,6 +1043,7 @@ fun AppNavGraph(
                 familyId = familyId,
                 familyName = familyName,
                 onBack = { navController.popBackStack() },
+                onOpenAiSettings = { navController.navigate(AppDestination.AiSettings.route) },
             )
         }
 

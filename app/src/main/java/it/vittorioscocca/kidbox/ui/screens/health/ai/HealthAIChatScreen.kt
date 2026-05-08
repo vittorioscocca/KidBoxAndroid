@@ -66,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
@@ -77,6 +78,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
+import it.vittorioscocca.kidbox.ui.screens.ai.common.ClaudeMarkdownText
 import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.SimpleDateFormat
@@ -101,6 +103,7 @@ fun HealthAIChatScreen(
     familyId: String,
     childId: String,
     onBack: () -> Unit,
+    onOpenAiSettings: () -> Unit = {},
     viewModel: HealthAIChatViewModel = hiltViewModel(),
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -151,25 +154,30 @@ fun HealthAIChatScreen(
                     )
                 },
                 actions = {
-                    if (state.messages.isNotEmpty()) {
-                        Box {
-                            KidBoxHeaderCircleButton(
-                                icon = Icons.Default.MoreVert,
-                                contentDescription = "Menu",
-                                onClick = { showMenu = true },
+                    Box {
+                        KidBoxHeaderCircleButton(
+                            icon = Icons.Default.MoreVert,
+                            contentDescription = "Menu",
+                            onClick = { showMenu = true },
+                        )
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Nuova conversazione", color = Color(0xFFD32F2F)) },
+                                onClick = {
+                                    showMenu = false
+                                    showClearDialog = true
+                                },
                             )
-                            DropdownMenu(
-                                expanded = showMenu,
-                                onDismissRequest = { showMenu = false },
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Nuova conversazione", color = Color(0xFFD32F2F)) },
-                                    onClick = {
-                                        showMenu = false
-                                        showClearDialog = true
-                                    },
-                                )
-                            }
+                            DropdownMenuItem(
+                                text = { Text("Impostazioni AI") },
+                                onClick = {
+                                    showMenu = false
+                                    onOpenAiSettings()
+                                },
+                            )
                         }
                     }
                 },
@@ -259,7 +267,7 @@ fun HealthAIChatScreen(
                             state = listState,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(horizontal = 12.dp),
+                                .padding(horizontal = 0.dp),
                             reverseLayout = true,
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
@@ -385,45 +393,51 @@ fun HealthAIChatScreen(
 @Composable
 private fun MessageBubble(message: KBAIMessage, kb: it.vittorioscocca.kidbox.ui.theme.KidBoxColorScheme) {
     val isUser = message.isUser
-    val maxWidthFraction = if (isUser) 0.8f else 0.9f
     val alignment = if (isUser) Alignment.End else Alignment.Start
-    val bgColor = if (isUser) ORANGE.copy(alpha = 0.12f) else kb.card
+    val maxUserWidth = LocalConfiguration.current.screenWidthDp.dp * 0.75f
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
         horizontalAlignment = alignment,
     ) {
-        Box(
-            modifier = Modifier
-                .widthIn(max = 300.dp)
-                .clip(
-                    RoundedCornerShape(
-                        topStart = 16.dp,
-                        topEnd = 16.dp,
-                        bottomStart = if (isUser) 16.dp else 4.dp,
-                        bottomEnd = if (isUser) 4.dp else 16.dp,
-                    ),
-                )
-                .background(bgColor)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-        ) {
-            if (isUser) {
+        if (isUser) {
+            Box(
+                modifier = Modifier
+                    .widthIn(max = maxUserWidth)
+                    .clip(
+                        RoundedCornerShape(
+                            topStart = 16.dp,
+                            topEnd = 16.dp,
+                            bottomStart = 16.dp,
+                            bottomEnd = 4.dp,
+                        ),
+                    )
+                    .background(ORANGE.copy(alpha = 0.12f))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
                 Text(message.content, fontSize = 14.sp, color = kb.title)
-            } else {
-                Text(
-                    text = parseMarkdownBasic(message.content),
-                    fontSize = 14.sp,
-                    color = kb.title,
-                    lineHeight = 20.sp,
-                )
             }
+            Spacer(Modifier.height(2.dp))
+            Text(
+                DATE_SHORT.format(Date(message.createdAtEpochMillis)),
+                fontSize = 10.sp,
+                color = kb.subtitle,
+            )
+        } else {
+            ClaudeMarkdownText(
+                text = message.content,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                DATE_SHORT.format(Date(message.createdAtEpochMillis)),
+                fontSize = 10.sp,
+                color = kb.subtitle,
+                modifier = Modifier.padding(start = 0.dp),
+            )
         }
-        Spacer(Modifier.height(2.dp))
-        Text(
-            DATE_SHORT.format(Date(message.createdAtEpochMillis)),
-            fontSize = 10.sp,
-            color = kb.subtitle,
-        )
     }
 }
 
@@ -448,21 +462,17 @@ private fun TypingIndicatorBubble(kb: it.vittorioscocca.kidbox.ui.theme.KidBoxCo
         ).value
     }
 
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 16.dp))
-            .background(kb.card)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+    Row(
+        modifier = Modifier.padding(start = 16.dp, top = 2.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            alphas.forEach { alpha ->
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(kb.subtitle.copy(alpha = alpha)),
-                )
-            }
+        alphas.forEach { alpha ->
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(kb.subtitle.copy(alpha = alpha)),
+            )
         }
     }
 }
@@ -496,6 +506,12 @@ fun HealthAiChatScreen(
     familyId: String,
     childId: String,
     onBack: () -> Unit,
+    onOpenAiSettings: () -> Unit = {},
 ) {
-    HealthAIChatScreen(familyId = familyId, childId = childId, onBack = onBack)
+    HealthAIChatScreen(
+        familyId = familyId,
+        childId = childId,
+        onBack = onBack,
+        onOpenAiSettings = onOpenAiSettings,
+    )
 }
