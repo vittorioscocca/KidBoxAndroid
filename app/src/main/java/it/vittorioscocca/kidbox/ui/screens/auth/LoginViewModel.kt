@@ -316,8 +316,12 @@ class LoginViewModel @Inject constructor(
     }
 
     private fun friendlyError(error: Throwable): String {
-        val fe = error as? FirebaseAuthException ?: return error.localizedMessage.orEmpty()
+        val fe = error as? FirebaseAuthException ?: error.cause as? FirebaseAuthException
+        if (fe == null) return error.localizedMessage.orEmpty()
         return when (fe.errorCode) {
+            ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL ->
+                "Questa email è già registrata con un altro accesso (Google, Apple o email). " +
+                    "Usa lo stesso pulsante di prima oppure contatta il supporto per unire gli accessi."
             ERROR_EMAIL_ALREADY_IN_USE ->
                 "Questa email è già registrata. Prova ad accedere."
             ERROR_INVALID_EMAIL -> "Indirizzo email non valido."
@@ -333,6 +337,8 @@ class LoginViewModel @Inject constructor(
     }
 
     private companion object {
+        private const val ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL =
+            "ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL"
         private const val ERROR_EMAIL_ALREADY_IN_USE = "ERROR_EMAIL_ALREADY_IN_USE"
         private const val ERROR_INVALID_EMAIL = "ERROR_INVALID_EMAIL"
         private const val ERROR_WEAK_PASSWORD = "ERROR_WEAK_PASSWORD"
