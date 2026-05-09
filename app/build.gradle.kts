@@ -83,6 +83,11 @@ configurations.configureEach {
         force(
             "androidx.core:core:1.15.0",
             "androidx.core:core-ktx:1.15.0",
+            // Stessa versione CameraX ovunque: evita che una dipendenza trasitiva abbassi camera-core / .so duplicati.
+            "androidx.camera:camera-core:1.5.3",
+            "androidx.camera:camera-camera2:1.5.3",
+            "androidx.camera:camera-lifecycle:1.5.3",
+            "androidx.camera:camera-view:1.5.3",
         )
     }
 }

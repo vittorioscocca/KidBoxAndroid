@@ -12,6 +12,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -666,7 +667,7 @@ class HomeViewModel @Inject constructor(
                 return HeroDownloadOutcome.Failed
             }
             Log.d(TAG, "downloadHeroToCache start familyId=$familyId uid=$uid")
-            val ref = com.google.firebase.storage.FirebaseStorage.getInstance()
+            val ref = FirebaseStorage.getInstance()
                 .reference.child("families/$familyId/hero/hero.jpg")
             val bytes: ByteArray = ref.getBytes(5 * 1024 * 1024).await()
             val file = saveToLocalCache(familyId, bytes, appContext)

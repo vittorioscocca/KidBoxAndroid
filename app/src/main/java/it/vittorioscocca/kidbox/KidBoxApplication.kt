@@ -10,11 +10,19 @@ import androidx.work.Configuration
 import androidx.work.WorkManager
 import dagger.hilt.android.HiltAndroidApp
 import it.vittorioscocca.kidbox.data.health.HealthOcrRecoveryMigration
+import it.vittorioscocca.kidbox.data.remote.AppCheckTokenCache
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.WeeklySummaryService
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @HiltAndroidApp
 class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFactory {
+
+    private val appInitScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     @Inject
     lateinit var hiltWorkerFactory: HiltWorkerFactory
@@ -25,6 +33,10 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
     override fun onCreate() {
         super.onCreate()
         AppCheckInstaller.install()
+        appInitScope.launch {
+            delay(750)
+            AppCheckTokenCache.warmUp()
+        }
         runCatching { WorkManager.initialize(this, workManagerConfiguration) }
         runCatching { healthOcrRecoveryMigration.runIfNeeded(this) }
         val familyId = getSharedPreferences("kidbox_prefs", MODE_PRIVATE)
