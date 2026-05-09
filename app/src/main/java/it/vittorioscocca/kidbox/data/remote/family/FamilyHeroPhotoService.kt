@@ -7,6 +7,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.storageMetadata
+import it.vittorioscocca.kidbox.data.remote.awaitDownloadUrlAfterWrite
+import it.vittorioscocca.kidbox.data.remote.prefetchAppCheckTokenForStorage
+import it.vittorioscocca.kidbox.data.remote.userMessageForFirebaseStorage
 import it.vittorioscocca.kidbox.ui.screens.home.HeroCrop
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -44,8 +47,13 @@ class FamilyHeroPhotoService @Inject constructor() {
 
         val metadata = storageMetadata { contentType = "image/jpeg" }
         Log.d(TAG, "hero upload attempting path=$path uid=${auth.currentUser?.uid} token=${auth.currentUser?.getIdToken(false)?.result?.token?.take(20)}")
-        ref.putBytes(imageData, metadata).await()
-        val url = ref.downloadUrl.await().toString()
+        val url = try {
+            prefetchAppCheckTokenForStorage()
+            ref.putBytes(imageData, metadata).await()
+            ref.awaitDownloadUrlAfterWrite()
+        } catch (e: Exception) {
+            throw Exception(e.userMessageForFirebaseStorage(), e)
+        }
         Log.d(TAG, "hero upload OK familyId=$familyId url=$url")
 
         // Scrivi su Firestore — identico a iOS

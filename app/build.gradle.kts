@@ -31,11 +31,16 @@ android {
         applicationId = "it.vittorioscocca.kidbox"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
+        versionCode = 8
         versionName = "1.0.0"
         manifestPlaceholders["googleMapsApiKey"] = mapsApiKey
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
         buildConfigField("Boolean", "AI_ENABLED", "true")
+
+        // Supporto pagine di memoria 16 kB (Android 15+): solo ABI con librerie compatibili.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
     }
 
     buildTypes {
@@ -65,6 +70,10 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+        // Abilita supporto dimensione pagina 16 kB (native libs non legacy-compress).
+        jniLibs {
+            useLegacyPackaging = false
         }
     }
 }
@@ -115,6 +124,7 @@ dependencies {
     implementation("com.google.firebase:firebase-storage-ktx")
     implementation(libs.firebase.messaging)
     implementation("com.google.firebase:firebase-functions-ktx")
+    implementation("com.google.firebase:firebase-appcheck")
 
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.play.services)

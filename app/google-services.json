@@ -30,6 +30,14 @@
           }
         },
         {
+          "client_id": "52613538008-j50hnmv7bqouc3t2isfcabcg7495dv32.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "it.vittorioscocca.kidbox",
+            "certificate_hash": "35968216f2b25ec762259ca67f8a893792f94248"
+          }
+        },
+        {
           "client_id": "52613538008-lpht7873gh01hl8dr1790ag6ost6np06.apps.googleusercontent.com",
           "client_type": 3
         }

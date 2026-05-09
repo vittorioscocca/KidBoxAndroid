@@ -12,6 +12,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.storage.StorageException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
@@ -35,6 +36,8 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -83,6 +86,12 @@ data class HomeUiState(
     val familyPlan: KBPlan = KBPlan.FREE,
 )
 
+private sealed class HeroDownloadOutcome {
+    data class Ok(val path: String) : HeroDownloadOutcome()
+    data object Absent : HeroDownloadOutcome()
+    data object Failed : HeroDownloadOutcome()
+}
+
 enum class HomeQuickAction(val key: String, val label: String) {
     EXPENSE("expense", "Spesa"),
     EVENT("event", "Evento"),
@@ -113,6 +122,9 @@ class HomeViewModel @Inject constructor(
     private val prefs = appContext.getSharedPreferences("home_quick_actions", Context.MODE_PRIVATE)
     private val featureOrderKey = "feature_order_v1"
     private var syncedFamilyId: String? = null
+    /** Evita download hero paralleli (burst App Check) e rifetch quando l'oggetto non esiste. */
+    private val heroCacheMutex = Mutex()
+    private val heroAbsentCacheKeys = mutableSetOf<String>()
     @Volatile
     private var initialSyncCompleted: Boolean = false
     private var membersSyncTimeoutJob: Job? = null
@@ -189,6 +201,7 @@ class HomeViewModel @Inject constructor(
                 }
                 if (syncedFamilyId != familyId) {
                     syncedFamilyId = familyId
+                    heroAbsentCacheKeys.clear()
                     initialSyncCompleted = false
                     Log.i(MEMBERS_SYNC_TAG, "startSync familyId=$familyId")
                     _uiState.value = _uiState.value.copy(
@@ -232,10 +245,39 @@ class HomeViewModel @Inject constructor(
                     // Se non abbiamo il file locale ma abbiamo l'URL, scarica in background
                     // Nel frattempo Coil usa l'URL remoto direttamente
                     if (localPath == null && remoteUrl != null) {
-                        viewModelScope.launch(Dispatchers.IO) {
-                            val path = downloadHeroToCache(fam!!.id, remoteUrl)
-                            if (path != null) {
-                                _uiState.value = _uiState.value.copy(heroPhotoLocalPath = path)
+                        val fid = fam!!.id
+                        val heroUrl = remoteUrl
+                        val absentKey = "$fid|$heroUrl"
+                        if (absentKey !in heroAbsentCacheKeys) {
+                            viewModelScope.launch(Dispatchers.IO) {
+                                heroCacheMutex.withLock {
+                                    val row = familyDao.getById(fid)
+                                    val onDisk = row?.heroPhotoLocalPath?.takeIf { File(it).exists() }
+                                    if (onDisk != null) {
+                                        withContext(Dispatchers.Main) {
+                                            _uiState.value =
+                                                _uiState.value.copy(heroPhotoLocalPath = onDisk)
+                                        }
+                                        return@withLock
+                                    }
+                                    if (absentKey in heroAbsentCacheKeys) return@withLock
+
+                                    when (
+                                        val outcome = downloadHeroToCache(fid, heroUrl)
+                                    ) {
+                                        is HeroDownloadOutcome.Ok -> {
+                                            withContext(Dispatchers.Main) {
+                                                _uiState.value = _uiState.value.copy(
+                                                    heroPhotoLocalPath = outcome.path,
+                                                )
+                                            }
+                                        }
+                                        HeroDownloadOutcome.Absent -> {
+                                            heroAbsentCacheKeys.add(absentKey)
+                                        }
+                                        HeroDownloadOutcome.Failed -> Unit
+                                    }
+                                }
                             }
                         }
                     }
@@ -612,14 +654,16 @@ class HomeViewModel @Inject constructor(
     //   https://firebasestorage.googleapis.com/v0/b/.../o/families%2F...%2Fhero%2Fhero.jpg?alt=media&token=...
     // Firebase Storage SDK riconosce il path e aggiunge l'auth header automaticamente.
 
-    private suspend fun downloadHeroToCache(familyId: String, url: String): String? {
-        if (familyId.isBlank() || url.isBlank()) return null
+    private suspend fun downloadHeroToCache(
+        familyId: String,
+        url: String,
+    ): HeroDownloadOutcome {
+        if (familyId.isBlank() || url.isBlank()) return HeroDownloadOutcome.Failed
         return try {
-            // Aspetta che Firebase Auth abbia un utente autenticato
             val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
             if (uid == null) {
                 Log.w(TAG, "downloadHeroToCache: not authenticated yet, skip")
-                return null
+                return HeroDownloadOutcome.Failed
             }
             Log.d(TAG, "downloadHeroToCache start familyId=$familyId uid=$uid")
             val ref = com.google.firebase.storage.FirebaseStorage.getInstance()
@@ -630,10 +674,16 @@ class HomeViewModel @Inject constructor(
                 familyDao.upsert(family.copy(heroPhotoLocalPath = file.absolutePath))
             }
             Log.d(TAG, "hero cached OK familyId=$familyId bytes=${bytes.size}")
-            file.absolutePath
+            HeroDownloadOutcome.Ok(file.absolutePath)
         } catch (e: Exception) {
-            Log.w(TAG, "hero download failed familyId=$familyId: ${e.message}")
-            null
+            val storageErr = e as? StorageException ?: (e.cause as? StorageException)
+            if (storageErr?.errorCode == StorageException.ERROR_OBJECT_NOT_FOUND) {
+                Log.d(TAG, "downloadHeroToCache: nessun hero su Storage familyId=$familyId")
+                HeroDownloadOutcome.Absent
+            } else {
+                Log.w(TAG, "hero download failed familyId=$familyId: ${e.message}")
+                HeroDownloadOutcome.Failed
+            }
         }
     }
 

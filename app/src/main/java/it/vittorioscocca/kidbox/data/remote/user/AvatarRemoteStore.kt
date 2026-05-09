@@ -1,6 +1,9 @@
 package it.vittorioscocca.kidbox.data.remote.user
 
 import com.google.firebase.storage.FirebaseStorage
+import it.vittorioscocca.kidbox.data.remote.awaitDownloadUrlAfterWrite
+import it.vittorioscocca.kidbox.data.remote.prefetchAppCheckTokenForStorage
+import it.vittorioscocca.kidbox.data.remote.userMessageForFirebaseStorage
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
@@ -17,7 +20,12 @@ class AvatarRemoteStore @Inject constructor() {
             "users/$uid/avatar.jpg"
         }
         val ref = storage.reference.child(path)
-        ref.putBytes(imageData).await()
-        return ref.downloadUrl.await().toString()
+        return try {
+            prefetchAppCheckTokenForStorage()
+            ref.putBytes(imageData).await()
+            ref.awaitDownloadUrlAfterWrite()
+        } catch (e: Exception) {
+            throw Exception(e.userMessageForFirebaseStorage(), e)
+        }
     }
 }

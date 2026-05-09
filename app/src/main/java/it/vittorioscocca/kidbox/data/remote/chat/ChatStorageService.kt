@@ -7,6 +7,10 @@ import com.google.firebase.storage.StorageMetadata
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.chat.model.ChatMessageType
 import it.vittorioscocca.kidbox.data.remote.DocumentCryptoManager
+import it.vittorioscocca.kidbox.data.remote.awaitDownloadUrlAfterWrite
+import it.vittorioscocca.kidbox.data.remote.getBytesWithRetry
+import it.vittorioscocca.kidbox.data.remote.prefetchAppCheckTokenForStorage
+import it.vittorioscocca.kidbox.data.remote.userMessageForFirebaseStorage
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -48,13 +52,18 @@ class ChatStorageService @Inject constructor(
         val metadata = StorageMetadata.Builder()
             .setContentType(mimeType)
             .build()
-        ref.putBytes(bytes, metadata).await()
-        val downloadUrl = ref.downloadUrl.await().toString()
-        return ChatMediaUploadResult(
-            storagePath = path,
-            downloadUrl = downloadUrl,
-            bytes = bytes.size.toLong(),
-        )
+        return try {
+            prefetchAppCheckTokenForStorage()
+            ref.putBytes(bytes, metadata).await()
+            val downloadUrl = ref.awaitDownloadUrlAfterWrite()
+            ChatMediaUploadResult(
+                storagePath = path,
+                downloadUrl = downloadUrl,
+                bytes = bytes.size.toLong(),
+            )
+        } catch (e: Exception) {
+            throw Exception(e.userMessageForFirebaseStorage(), e)
+        }
     }
 
     /**
@@ -66,7 +75,9 @@ class ChatStorageService @Inject constructor(
         storagePath: String,
         familyId: String,
     ): ByteArray {
-        val bytes = storage.reference.child(storagePath).getBytes(250L * 1024L * 1024L).await()
+        val bytes = storage.reference
+            .child(storagePath)
+            .getBytesWithRetry(250L * 1024L * 1024L)
         return if (storagePath.endsWith(".kbenc", ignoreCase = true)) {
             cryptoManager.decrypt(bytes, familyId)
         } else {

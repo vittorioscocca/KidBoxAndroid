@@ -1311,13 +1311,19 @@ private fun AudioContent(
     isOwn: Boolean,
     isTranscriptionEnabled: Boolean = true,
 ) {
-    val context = LocalContext.current
-    val mediaUrl = message.mediaUrl
-    var isPlaying by remember(mediaUrl) { mutableStateOf(false) }
-    var durationMs by remember(mediaUrl) { mutableStateOf((message.mediaDurationSeconds ?: 0) * 1000) }
-    var currentMs by remember(mediaUrl) { mutableStateOf(0) }
-    var isPrepared by remember(mediaUrl) { mutableStateOf(false) }
-    var speedIndex by remember(mediaUrl) { mutableStateOf(0) }
+    // File locale idrato da Storage: riproduzione affidabile anche se l'URL non risponde (token/App Check).
+    val playbackSource = remember(message.mediaLocalPath, message.mediaUrl) {
+        message.mediaLocalPath
+            ?.let { java.io.File(it) }
+            ?.takeIf { it.exists() }
+            ?.absolutePath
+            ?: message.mediaUrl
+    }
+    var isPlaying by remember(playbackSource) { mutableStateOf(false) }
+    var durationMs by remember(playbackSource) { mutableStateOf((message.mediaDurationSeconds ?: 0) * 1000) }
+    var currentMs by remember(playbackSource) { mutableStateOf(0) }
+    var isPrepared by remember(playbackSource) { mutableStateOf(false) }
+    var speedIndex by remember(playbackSource) { mutableStateOf(0) }
     val speedValues = remember { listOf(1.0f, 1.5f, 2.0f) }
     val speed = speedValues[speedIndex]
 
@@ -1326,20 +1332,16 @@ private fun AudioContent(
     // MediaMetadataRetriever / HTTP operations and blocks the audio focus subsystem —
     // this is the main cause of "a scatti" jank when the chat first loads.
     // The player is created and prepared only when the user taps the play button.
-    var player by remember(mediaUrl) { mutableStateOf<MediaPlayer?>(null) }
+    var player by remember(playbackSource) { mutableStateOf<MediaPlayer?>(null) }
 
     // Returns the existing player or creates+prepares a new one on first call.
     // Safe to call from click handlers (main thread).
     fun getOrCreatePlayer(): MediaPlayer? {
-        if (mediaUrl.isNullOrBlank()) return null
+        if (playbackSource.isNullOrBlank()) return null
         player?.let { return it }
         val p = MediaPlayer()
         runCatching {
-            val uri = mediaUrl.toUri()
-            when (uri.scheme?.lowercase()) {
-                "http", "https" -> p.setDataSource(mediaUrl)
-                else -> p.setDataSource(context, uri)
-            }
+            p.setDataSource(playbackSource)
             p.setOnPreparedListener { mp ->
                 isPrepared = true
                 if (mp.duration > 0) durationMs = mp.duration
@@ -1371,7 +1373,7 @@ private fun AudioContent(
             kotlinx.coroutines.delay(120)
         }
     }
-    DisposableEffect(mediaUrl) {
+    DisposableEffect(playbackSource) {
         onDispose {
             runCatching { player?.stop() }
             runCatching { player?.release() }
