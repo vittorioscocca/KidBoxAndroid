@@ -22,6 +22,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBChildEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
 import it.vittorioscocca.kidbox.data.local.entity.canonicalMemberDisplayName
+import it.vittorioscocca.kidbox.domain.family.ownershipUidFromFamilyFirestore
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -272,10 +273,17 @@ class FamilySyncCenter @Inject constructor(
                          * IMPORTANTE: il campo `updatedAt` su Firestore deve essere scritto con
                          * FieldValue.serverTimestamp() (già corretto nel ViewModel). Il problema era
                          * solo questo confronto lato ricezione.
+                         *
+                         * Ownership: **`ownerUid` / `createdBy` sul documento famiglia** devono poter
+                         * aggiornare Room anche quando `kb_families.createdBy` locale era ancora il
+                         * creatore storico (prima di un trasferimento). Per questo non preferiamo più
+                         * ciecamente `local.createdBy` se il remoto espone un proprietario esplicito.
                          */
                         val remoteUpdatedAt = (data["updatedAt"] as? com.google.firebase.Timestamp)
                             ?.toDate()?.time
                         val localUpdatedAt = local?.updatedAtEpochMillis ?: 0L
+                        val remoteOwnershipUid = ownershipUidFromFamilyFirestore(data)
+                        val localOwnershipUid = local?.createdBy?.trim()?.takeIf { it.isNotEmpty() }
 
                         // Accettiamo l'update remoto se:
                         // - non abbiamo dati locali (local == null)
@@ -284,6 +292,29 @@ class FamilySyncCenter @Inject constructor(
                         val shouldUpdate = local == null
                                 || remoteUpdatedAt == null
                                 || remoteUpdatedAt >= localUpdatedAt
+
+                        /** Solo patch proprietario quando LWW saltasse un tick ma il server ha già il nuovo owner. */
+                        val shouldMergeOwnershipOnly = !shouldUpdate &&
+                            !remoteOwnershipUid.isNullOrBlank() &&
+                            remoteOwnershipUid != localOwnershipUid &&
+                            local != null
+
+                        if (shouldMergeOwnershipOnly) {
+                            Log.d(
+                                TAG,
+                                "family ownership merge: remoteOwner=$remoteOwnershipUid localWas=$localOwnershipUid " +
+                                    "(solo createdBy Room, snapshot LWW ignorato)",
+                            )
+                            familyDao.upsert(
+                                local.copy(
+                                    createdBy = remoteOwnershipUid,
+                                    updatedAtEpochMillis = local.updatedAtEpochMillis,
+                                ),
+                            )
+                            familyFirstDone = true
+                            checkAllFirstDone()
+                            return@launch
+                        }
 
                         if (shouldUpdate) {
                             val remoteName = (data["name"] as? String).orEmpty()
@@ -298,8 +329,8 @@ class FamilySyncCenter @Inject constructor(
                                     heroPhotoScale = local?.heroPhotoScale,
                                     heroPhotoOffsetX = local?.heroPhotoOffsetX,
                                     heroPhotoOffsetY = local?.heroPhotoOffsetY,
-                                    createdBy = local?.createdBy
-                                        ?: (data["ownerUid"] as? String).orEmpty(),
+                                    createdBy = remoteOwnershipUid
+                                        ?: local?.createdBy.orEmpty(),
                                     updatedBy = (data["updatedBy"] as? String)
                                         ?: local?.updatedBy ?: "",
                                     createdAtEpochMillis = local?.createdAtEpochMillis ?: now,

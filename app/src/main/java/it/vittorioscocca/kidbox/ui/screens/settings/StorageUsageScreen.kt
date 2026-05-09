@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Note
 import androidx.compose.material.icons.filled.People
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -47,14 +49,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -62,6 +63,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBPlan
+import android.app.Activity
 import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
@@ -72,19 +74,35 @@ fun StorageUsageScreen(
     viewModel: StorageUsageViewModel = hiltViewModel(),
 ) {
     val kb = MaterialTheme.kidBoxColors
+    val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    val activity = context as? Activity
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var showStubDialog by remember { mutableStateOf(false) }
-    var stubDialogTitle by remember { mutableStateOf("") }
-    var stubDialogBody by remember { mutableStateOf("") }
 
-    LaunchedEffect(Unit) { viewModel.load() }
+    LaunchedEffect(Unit) {
+        viewModel.load()
+        viewModel.warmBilling()
+    }
 
-    if (showStubDialog) {
+    state.restoreDialogError?.let { err ->
         AlertDialog(
-            onDismissRequest = { showStubDialog = false },
-            title = { Text(stubDialogTitle) },
-            text = { Text(stubDialogBody) },
-            confirmButton = { TextButton(onClick = { showStubDialog = false }) { Text("OK") } },
+            onDismissRequest = viewModel::clearRestoreDialogError,
+            title = { Text("Ripristino acquisti") },
+            text = { Text(err) },
+            confirmButton = {
+                TextButton(onClick = viewModel::clearRestoreDialogError) { Text("OK") }
+            },
+        )
+    }
+
+    state.billingPurchaseError?.let { err ->
+        AlertDialog(
+            onDismissRequest = viewModel::clearBillingPurchaseError,
+            title = { Text("Errore acquisto") },
+            text = { Text(err) },
+            confirmButton = {
+                TextButton(onClick = viewModel::clearBillingPurchaseError) { Text("OK") }
+            },
         )
     }
 
@@ -166,9 +184,47 @@ fun StorageUsageScreen(
         Spacer(Modifier.height(14.dp))
         SectionCard(title = "Piani disponibili") {
             KBPlan.entries.forEachIndexed { idx, plan ->
-                PlanRow(plan = plan, current = state.plan)
+                PlanRow(
+                    plan = plan,
+                    current = state.plan,
+                    isFamilyOwner = state.isFamilyOwner,
+                    onPurchasePlan = {
+                        if (activity != null) {
+                            viewModel.purchase(plan, activity)
+                        }
+                    },
+                )
                 if (idx != KBPlan.entries.lastIndex) {
                     HorizontalDivider(color = kb.divider, modifier = Modifier.padding(start = 16.dp))
+                }
+            }
+            if (!state.isFamilyOwner) {
+                HorizontalDivider(color = kb.divider, modifier = Modifier.padding(start = 16.dp))
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF3EEFF)),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            "Piano gestito dal proprietario",
+                            color = Color(0xFF6D28D9),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                        )
+                        Text(
+                            "Solo il proprietario della famiglia può attivare o cambiare un abbonamento. " +
+                                "Chiedi al proprietario di passare a un piano superiore se serve più spazio o funzioni AI.",
+                            color = kb.subtitle,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                        )
+                    }
                 }
             }
         }
@@ -201,21 +257,17 @@ fun StorageUsageScreen(
                 icon = Icons.Filled.Refresh,
                 title = "Ripristina acquisti",
                 subtitle = null,
-                onClick = {
-                    stubDialogTitle = "Ripristina acquisti"
-                    stubDialogBody = "Funzione in arrivo su Android."
-                    showStubDialog = true
-                },
+                enabled = !state.isRestoreInProgress,
+                isLoading = state.isRestoreInProgress,
+                onClick = { viewModel.restorePurchases() },
             )
             HorizontalDivider(color = kb.divider, modifier = Modifier.padding(start = 16.dp))
             ActionRow(
                 icon = Icons.Filled.Redeem,
                 title = "Riscatta codice offerta",
-                subtitle = "Codice promozionale o offerta App Store",
+                subtitle = "Codice promo o carte regalo Google Play",
                 onClick = {
-                    stubDialogTitle = "Riscatta codice offerta"
-                    stubDialogBody = "Funzione in arrivo su Android."
-                    showStubDialog = true
+                    runCatching { uriHandler.openUri("https://play.google.com/redeem") }
                 },
             )
         }
@@ -293,7 +345,7 @@ private fun SpaceSummaryCard(
                     Text(
                         usedBytes.toStorageString(),
                         color = Color(0xFF5B8FDE),
-                        fontSize = 38.sp,
+                        fontSize = 30.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Clip,
@@ -301,8 +353,8 @@ private fun SpaceSummaryCard(
                     Text(
                         " / ${quota.toStorageString()}",
                         color = kb.subtitle,
-                        fontSize = 20.sp,
-                        modifier = Modifier.padding(start = 6.dp, bottom = 5.dp),
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(start = 6.dp, bottom = 4.dp),
                         maxLines = 1,
                     )
                 }
@@ -310,7 +362,7 @@ private fun SpaceSummaryCard(
                     text = "$percent%",
                     color = percentColor,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 36.sp,
+                    fontSize = 30.sp,
                     modifier = Modifier.padding(start = 16.dp),
                     maxLines = 1,
                 )
@@ -382,12 +434,26 @@ private fun StorageSectionRow(section: StorageUsageSectionUi, totalBytes: Long) 
 }
 
 @Composable
-private fun PlanRow(plan: KBPlan, current: KBPlan) {
+private fun PlanRow(
+    plan: KBPlan,
+    current: KBPlan,
+    isFamilyOwner: Boolean,
+    onPurchasePlan: () -> Unit,
+) {
     val kb = MaterialTheme.kidBoxColors
     val isCurrent = plan == current
+    val canPurchaseWholeRow =
+        isFamilyOwner && plan != KBPlan.FREE && !isCurrent
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (canPurchaseWholeRow) {
+                    Modifier.clickable(onClick = onPurchasePlan)
+                } else {
+                    Modifier
+                },
+            )
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -457,6 +523,8 @@ private fun ActionRow(
     title: String,
     subtitle: String?,
     trailing: Boolean = true,
+    enabled: Boolean = true,
+    isLoading: Boolean = false,
     onClick: () -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -475,8 +543,15 @@ private fun ActionRow(
             }
         }
         if (trailing) {
-            TextButton(onClick = onClick) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = kb.subtitle)
+            TextButton(onClick = onClick, enabled = enabled && !isLoading) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = kb.subtitle)
+                }
             }
         }
     }
@@ -487,6 +562,7 @@ private fun iconForSection(iconKey: String): ImageVector = when (iconKey) {
     "document" -> Icons.Filled.Description
     "wallet" -> Icons.Filled.Wallet
     "chat" -> Icons.Filled.ChatBubble
+    "salute" -> Icons.Filled.MedicalServices
     "expense" -> Icons.Filled.Euro
     "note" -> Icons.Filled.Note
     "calendar" -> Icons.Filled.CalendarMonth

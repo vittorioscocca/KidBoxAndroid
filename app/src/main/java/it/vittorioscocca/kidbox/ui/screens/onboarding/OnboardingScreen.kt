@@ -846,9 +846,12 @@ private fun InvitePartnerPageContent(familyId: String) {
                     onClick = {
                         val value = code.orEmpty()
                         if (value.isNotBlank()) {
-                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            cm.setPrimaryClip(ClipData.newPlainText("kidbox_invite_code", value))
-                            didCopy = true
+                            runCatching {
+                                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                cm.setPrimaryClip(ClipData.newPlainText("kidbox_invite_code", value))
+                            }.onSuccess {
+                                didCopy = true
+                            }
                         }
                     },
                 )

@@ -17,9 +17,11 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
+import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.data.remote.user.AvatarRemoteStore
 import it.vittorioscocca.kidbox.data.user.UserProfileRepository
 import it.vittorioscocca.kidbox.domain.auth.LogoutUseCase
+import it.vittorioscocca.kidbox.domain.model.KBPlan
 import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -70,6 +72,7 @@ class ProfileViewModel @Inject constructor(
     application: Application,
     private val userProfileRepository: UserProfileRepository,
     private val familyDao: KBFamilyDao,
+    private val subscriptionRepository: SubscriptionRepository,
     private val avatarRemoteStore: AvatarRemoteStore,
     private val auth: FirebaseAuth,
     private val logoutUseCase: LogoutUseCase,
@@ -126,6 +129,47 @@ class ProfileViewModel @Inject constructor(
                     saveSucceeded = false,
                     saveError = null,
                     isDirty = false,
+                )
+            }
+            loadSubscriptionSnapshot()
+        }
+    }
+
+    private suspend fun loadSubscriptionSnapshot() {
+        val familyId = familyDao.peekAnyFamilyId().orEmpty()
+        if (familyId.isBlank()) {
+            _uiState.update {
+                it.copy(
+                    planLabel = "Piano Free",
+                    storageUsedBytes = 0L,
+                    storageTotalBytes = KBPlan.FREE.storageQuota,
+                )
+            }
+            return
+        }
+
+        val plan = subscriptionRepository.getPlan(familyId)
+        runCatching {
+            val result = functions.getHttpsCallable("getStorageUsage")
+                .call(hashMapOf("familyId" to familyId))
+                .await()
+            @Suppress("UNCHECKED_CAST")
+            result.getData() as? Map<String, Any?>
+        }.onSuccess { payload ->
+            val usedBytes = (payload.orEmpty()["usedBytes"] as? Number)?.toLong() ?: 0L
+            _uiState.update {
+                it.copy(
+                    planLabel = "Piano ${plan.displayName}",
+                    storageUsedBytes = usedBytes.coerceAtLeast(0L),
+                    storageTotalBytes = plan.storageQuota,
+                )
+            }
+        }.onFailure {
+            // Keep quota from current plan even if usage fetch fails.
+            _uiState.update {
+                it.copy(
+                    planLabel = "Piano ${plan.displayName}",
+                    storageTotalBytes = plan.storageQuota,
                 )
             }
         }
@@ -230,9 +274,27 @@ class ProfileViewModel @Inject constructor(
     }
 
     private fun resolveCurrentLocation() {
+        val app = getApplication<Application>()
+        val hasFine = ContextCompat.checkSelfPermission(app, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        val hasCoarse = ContextCompat.checkSelfPermission(app, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!hasFine && !hasCoarse) {
+            return
+        }
+
         viewModelScope.launch {
             _uiState.update { it.copy(isResolvingLocation = true, saveError = null) }
             try {
+                val fineNow = ContextCompat.checkSelfPermission(app, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                    PackageManager.PERMISSION_GRANTED
+                val coarseNow = ContextCompat.checkSelfPermission(app, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                    PackageManager.PERMISSION_GRANTED
+                if (!fineNow && !coarseNow) {
+                    _uiState.update { it.copy(isResolvingLocation = false, saveError = null) }
+                    return@launch
+                }
+
                 val location = fusedLocation
                     .getCurrentLocation(
                         Priority.PRIORITY_HIGH_ACCURACY,

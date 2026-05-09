@@ -23,7 +23,10 @@ import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
 import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
 import it.vittorioscocca.kidbox.data.remote.family.FamilyHeroPhotoService
+import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.data.repository.WalletRepository
+import it.vittorioscocca.kidbox.domain.family.ownershipUidFromFamilyFirestore
+import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.data.sync.FamilySyncCenter
 import it.vittorioscocca.kidbox.domain.auth.LogoutUseCase
 import it.vittorioscocca.kidbox.ui.screens.home.HeroCrop
@@ -76,6 +79,8 @@ data class HomeUiState(
     val badgeCalendar: Int = 0,
     val badgeExpenses: Int = 0,
     val badgeWallet: Int = 0,
+    /** Piano abbonamento famiglia (Firestore); aggiorna card Assistente e paywall come iOS. */
+    val familyPlan: KBPlan = KBPlan.FREE,
 )
 
 enum class HomeQuickAction(val key: String, val label: String) {
@@ -100,6 +105,7 @@ class HomeViewModel @Inject constructor(
     private val familySessionPreferences: FamilySessionPreferences,
     private val homeBadgeManager: HomeBadgeManager,
     private val walletRepository: WalletRepository,
+    private val subscriptionRepository: SubscriptionRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -119,6 +125,7 @@ class HomeViewModel @Inject constructor(
     // (es. heroPhotoURL arriva da un altro device via Firestore), la UI si aggiorna.
     init {
         observeHomeData()
+        observeFamilyPlanFromFirestore()
         observeBadges()
         observeInitialSyncState()
         viewModelScope.launch { refreshAvatarUrl() }
@@ -256,6 +263,22 @@ class HomeViewModel @Inject constructor(
                     if (!shouldSyncMembers || memberCount > 0) {
                         cancelMembersSyncTimeout()
                     }
+                }
+            }
+        }
+    }
+
+    private fun observeFamilyPlanFromFirestore() {
+        viewModelScope.launch {
+            familyDao.observeAll().collectLatest { families ->
+                val familyId = families.firstOrNull()?.id.orEmpty()
+                val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+                if (familyId.isBlank()) {
+                    _uiState.value = _uiState.value.copy(familyPlan = KBPlan.FREE)
+                    return@collectLatest
+                }
+                subscriptionRepository.planFlow(familyId, uid).collectLatest { plan ->
+                    _uiState.value = _uiState.value.copy(familyPlan = plan)
                 }
             }
         }
@@ -432,7 +455,7 @@ class HomeViewModel @Inject constructor(
             Log.i(TAG, "bootstrapFromFirestore: selected familyId=$familyId from candidates=${distinctCandidates.size}")
             val familyData = selectedFamilyData
             val now = System.currentTimeMillis()
-            val createdBy = familyData["ownerUid"] as? String ?: uid
+            val createdBy = ownershipUidFromFamilyFirestore(familyData) ?: uid
             val family = KBFamilyEntity(
                 id = familyId,
                 name = (familyData["name"] as? String).orEmpty(),

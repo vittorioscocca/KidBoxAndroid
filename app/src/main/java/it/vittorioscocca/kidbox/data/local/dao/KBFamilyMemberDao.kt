@@ -13,6 +13,11 @@ interface KBFamilyMemberDao {
     @Query("SELECT * FROM kb_family_members WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): KBFamilyMemberEntity?
 
+    @Query(
+        "SELECT * FROM kb_family_members WHERE familyId = :familyId AND userId = :userId AND isDeleted = 0 LIMIT 1",
+    )
+    suspend fun getActiveByFamilyAndUser(familyId: String, userId: String): KBFamilyMemberEntity?
+
     @Query("SELECT * FROM kb_family_members WHERE familyId = :familyId AND isDeleted = 0")
     fun observeActiveByFamilyId(familyId: String): Flow<List<KBFamilyMemberEntity>>
 

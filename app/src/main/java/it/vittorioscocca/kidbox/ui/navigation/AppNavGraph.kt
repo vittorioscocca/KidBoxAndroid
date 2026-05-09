@@ -141,7 +141,13 @@ fun AppNavGraph(
 
         composable(AppDestination.Home.route) {
             HomeScreen(
-                onNavigate = { route -> navController.navigate(route) },
+                onNavigate = { route ->
+                    navController.navigate(route) {
+                        if (route == AppDestination.Plans.route) {
+                            launchSingleTop = true
+                        }
+                    }
+                },
             )
         }
 
@@ -153,6 +159,11 @@ fun AppNavGraph(
                     }
                 },
                 onStorageUsage = { navController.navigate(AppDestination.StorageUsage.route) },
+                onOpenPlans = {
+                    navController.navigate(AppDestination.Plans.route) {
+                        launchSingleTop = true
+                    }
+                },
             )
         }
 
@@ -164,7 +175,6 @@ fun AppNavGraph(
                 onMessageSettings = { navController.navigate(AppDestination.MessageSettings.route) },
                 onNotifications = { navController.navigate(AppDestination.NotificationSettings.route) },
                 onAiSettings = { navController.navigate(AppDestination.AiSettings.route) },
-                onPlans = { navController.navigate(AppDestination.Plans.route) },
                 onStorageUsage = { navController.navigate(AppDestination.StorageUsage.route) },
             )
         }
@@ -174,13 +184,24 @@ fun AppNavGraph(
         }
 
         composable(AppDestination.AiSettings.route) {
-            AiSettingsScreen(onBack = { navController.popBackStack() })
+            AiSettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenPlans = {
+                    navController.navigate(AppDestination.Plans.route) {
+                        launchSingleTop = true
+                    }
+                },
+            )
         }
 
         composable(AppDestination.StorageUsage.route) {
             StorageUsageScreen(
                 onBack = { navController.popBackStack() },
-                onOpenPlans = { navController.navigate(AppDestination.Plans.route) },
+                onOpenPlans = {
+                    navController.navigate(AppDestination.Plans.route) {
+                        launchSingleTop = true
+                    }
+                },
             )
         }
 

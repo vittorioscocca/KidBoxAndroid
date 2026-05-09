@@ -525,11 +525,13 @@ private fun LinksTab(
                     onGoToMessage(item.messageId)
                 },
                 onCopyLink = {
-                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
-                        as android.content.ClipboardManager
-                    clipboard.setPrimaryClip(
-                        android.content.ClipData.newPlainText("link", item.url),
-                    )
+                    runCatching {
+                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                            as android.content.ClipboardManager
+                        clipboard.setPrimaryClip(
+                            android.content.ClipData.newPlainText("link", item.url),
+                        )
+                    }
                 },
             )
             HorizontalDivider(

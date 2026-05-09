@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -78,6 +79,7 @@ fun PlansScreen(
             .background(kb.background)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
+            .navigationBarsPadding()
             .padding(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -98,6 +100,33 @@ fun PlansScreen(
             fontSize = 14.sp,
             modifier = Modifier.padding(top = 2.dp),
         )
+        if (!state.isFamilyOwner) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFF3EEFF)),
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        "Piano gestito dal proprietario",
+                        color = Color(0xFF6D28D9),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                    )
+                    Text(
+                        "Solo il proprietario della famiglia può attivare o cambiare un abbonamento. " +
+                            "Chiedi al proprietario di passare a un piano superiore se serve più spazio o funzioni AI.",
+                        color = kb.subtitle,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                    )
+                }
+            }
+        }
         Spacer(modifier = Modifier.height(16.dp))
 
         PlanCard(
@@ -177,7 +206,7 @@ fun PlansScreen(
                 CircularProgressIndicator()
             }
         }
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
@@ -196,6 +225,13 @@ private fun PlanCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .let { base ->
+                if (onButtonClick != null && !buttonLabel.isNullOrBlank()) {
+                    base.clickable(onClick = onButtonClick)
+                } else {
+                    base
+                }
+            }
             .border(
                 width = if (isCurrent) 2.dp else 0.dp,
                 color = if (isCurrent) Color(0xFF22C55E) else Color.Transparent,

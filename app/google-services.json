@@ -2,7 +2,7 @@
   "project_info": {
     "project_number": "52613538008",
     "project_id": "kidbox-42cd7",
-    "storage_bucket": "kidbox-42cd7-eu"
+    "storage_bucket": "kidbox-42cd7.firebasestorage.app"
   },
   "client": [
     {
@@ -19,6 +19,14 @@
           "android_info": {
             "package_name": "it.vittorioscocca.kidbox",
             "certificate_hash": "7462c4b43a1047fdec238d9683ba7b40e01f9464"
+          }
+        },
+        {
+          "client_id": "52613538008-arj1mnnb4083q6030pkhnr1vlkqoa9gt.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "it.vittorioscocca.kidbox",
+            "certificate_hash": "e57907d5e372a1373d48e4c9a79af456b998e46a"
           }
         },
         {

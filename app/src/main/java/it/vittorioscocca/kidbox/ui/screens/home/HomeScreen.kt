@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocalGroceryStore
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -108,6 +109,7 @@ import coil.compose.AsyncImage
 import java.io.File
 import kotlin.math.sqrt
 import it.vittorioscocca.kidbox.data.notification.CounterField
+import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.theme.KidBoxDarkColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
@@ -569,17 +571,40 @@ private data class FeatureItem(
     val badgeCount: Int = 0,
     val counterField: CounterField? = null,
     val isPulsing: Boolean = false,
+    /** Piano Free: card Assistente bloccata → tap apre schermata Piani (come iOS). */
+    val locked: Boolean = false,
 )
 
 @Composable
 private fun FeatureCard(item: FeatureItem, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val kidBox = MaterialTheme.kidBoxColors
-    val containerColor =
-        if (kidBox === KidBoxDarkColorScheme) kidBox.card else item.cardColor
+    val isDark = kidBox === KidBoxDarkColorScheme
+    val containerColor = when {
+        item.locked && isDark -> Color(0xFF2C2C30)
+        item.locked -> Color(0xFFF3F4F6)
+        isDark -> kidBox.card
+        else -> item.cardColor
+    }
+    val titleColor = when {
+        item.locked && isDark -> Color(0xFFD1D5DB)
+        item.locked -> Color(0xFF111827)
+        else -> kidBox.title
+    }
+    val subtitleColor = when {
+        item.locked -> Color(0xFF9CA3AF)
+        else -> kidBox.subtitle
+    }
+    val iconTint = if (item.locked) Color(0xFF9CA3AF) else item.iconColor
+    val borderColor = when {
+        !item.locked -> Color.Transparent
+        isDark -> Color.White.copy(alpha = 0.08f)
+        else -> Color(0xFFE5E7EB)
+    }
     Box {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
+                .border(1.dp, borderColor, RoundedCornerShape(16.dp))
                 .clickable(onClick = onClick)
                 .then(modifier),
             shape = RoundedCornerShape(16.dp),
@@ -587,9 +612,28 @@ private fun FeatureCard(item: FeatureItem, modifier: Modifier = Modifier, onClic
             colors = CardDefaults.cardColors(containerColor = containerColor),
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(item.icon, contentDescription = null, tint = item.iconColor, modifier = Modifier.size(28.dp))
-                Text(item.title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = MaterialTheme.kidBoxColors.title)
-                Text(item.subtitle, color = MaterialTheme.kidBoxColors.subtitle, fontSize = 12.sp)
+                Icon(item.icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(28.dp))
+                Text(item.title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = titleColor)
+                Text(item.subtitle, color = subtitleColor, fontSize = 12.sp)
+            }
+        }
+        if (item.locked) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 8.dp, end = 8.dp)
+                    .size(26.dp),
+                shape = CircleShape,
+                color = Color(0xFF9CA3AF),
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(
+                        Icons.Filled.Lock,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
             }
         }
         if (item.badgeCount > 0) {
@@ -712,7 +756,20 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
         state.badgePhotos,
         CounterField.PHOTOS,
     ),
-    FeatureItem("ai", "Assistente AI", "Chiedi aiuto", AppDestination.AiChat.createRoute(familyId), Icons.Filled.Psychology, Color(0xFFEEF0FF), Color(0xFF5C6BC0)),
+    FeatureItem(
+        id = "ai",
+        title = if (state.familyPlan == KBPlan.FREE) "Assistente" else "Assistente AI",
+        subtitle = if (state.familyPlan == KBPlan.FREE) "Disponibile con Pro o Max" else "Chiedi aiuto",
+        route = if (state.familyPlan == KBPlan.FREE) {
+            AppDestination.Plans.route
+        } else {
+            AppDestination.AiChat.createRoute(familyId)
+        },
+        icon = if (state.familyPlan == KBPlan.FREE) Icons.Filled.Lock else Icons.Filled.Psychology,
+        cardColor = Color(0xFFEEF0FF),
+        iconColor = Color(0xFF5C6BC0),
+        locked = state.familyPlan == KBPlan.FREE,
+    ),
     FeatureItem("family", "Family", "Gestisci famiglia", AppDestination.FamilySettings.route, Icons.Filled.Person, Color(0xFFFFF3E6), Color(0xFFFF6B00)),
 )
 

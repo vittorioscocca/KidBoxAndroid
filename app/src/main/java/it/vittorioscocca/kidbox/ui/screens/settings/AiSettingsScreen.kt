@@ -4,9 +4,11 @@ package it.vittorioscocca.kidbox.ui.screens.settings
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -53,6 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -75,17 +78,16 @@ private val CONSENT_GREEN = Color(0xFF059669)
 @Composable
 fun AiSettingsScreen(
     onBack: () -> Unit,
+    /** Apre la schermata Piani KidBox (stesso comportamento degli upgrade su iOS). */
+    onOpenPlans: () -> Unit,
     viewModel: AiSettingsViewModel = hiltViewModel(),
 ) {
     BackHandler { onBack() }
     val kb = MaterialTheme.kidBoxColors
+    val uriHandler = LocalUriHandler.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showRevokeConfirm by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
-    var showStubDialog by remember { mutableStateOf(false) }
-    var stubDialogTitle by remember { mutableStateOf("") }
-    var stubDialogBody by remember { mutableStateOf("") }
-
     LaunchedEffect(state.message) {
         val msg = state.message ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(msg)
@@ -96,17 +98,6 @@ fun AiSettingsScreen(
         AIConsentBottomSheet(
             onAccept = { viewModel.recordConsent() },
             onDismiss = { viewModel.dismissPendingConsent() },
-        )
-    }
-
-    if (showStubDialog) {
-        AlertDialog(
-            onDismissRequest = { showStubDialog = false },
-            title = { Text(stubDialogTitle) },
-            text = { Text(stubDialogBody) },
-            confirmButton = {
-                TextButton(onClick = { showStubDialog = false }) { Text("OK") }
-            },
         )
     }
 
@@ -165,6 +156,7 @@ fun AiSettingsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
                 .padding(horizontal = 18.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -177,15 +169,9 @@ fun AiSettingsScreen(
 
             if (!state.plan.includesAI) {
                 AILockedBanner(
-                    onDiscoverPlans = {
-                        stubDialogTitle = "Piani in arrivo su Android"
-                        stubDialogBody = "Su iOS puoi già gestire i piani Pro/Max. Su Android lo implementeremo a breve."
-                        showStubDialog = true
-                    },
+                    onDiscoverPlans = onOpenPlans,
                     onRedeemOfferCode = {
-                        stubDialogTitle = "Riscatta codice offerta"
-                        stubDialogBody = "Su Android lo aggiungiamo presto. Per ora puoi riscattare il codice da iOS."
-                        showStubDialog = true
+                        runCatching { uriHandler.openUri("https://play.google.com/redeem") }
                     },
                 )
             } else {
@@ -210,21 +196,7 @@ fun AiSettingsScreen(
                 onToggle = { viewModel.toggleWeeklySummary(it) },
             )
 
-            SubscriptionSectionCard(
-                plan = state.plan,
-                onManageSubscription = {
-                    stubDialogTitle = "Gestisci abbonamento"
-                    stubDialogBody = "Su Android questa sezione sarà collegata ai piani (Pro/Max) più avanti."
-                    showStubDialog = true
-                },
-                onRedeemOfferCode = {
-                    stubDialogTitle = "Riscatta codice offerta"
-                    stubDialogBody = "Funzione in arrivo su Android."
-                    showStubDialog = true
-                },
-            )
-
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(32.dp))
         }
     }
 }
@@ -543,7 +515,9 @@ private fun AILockedBanner(
             }
 
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onDiscoverPlans),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F1FF)),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
@@ -572,42 +546,6 @@ private fun AILockedBanner(
                 Text("Riscatta codice offerta", color = kb.title, fontWeight = FontWeight.SemiBold)
                 TextButton(onClick = onRedeemOfferCode) { Text("Apri") }
             }
-        }
-    }
-}
-
-@Composable
-private fun SubscriptionSectionCard(
-    plan: KBPlan,
-    onManageSubscription: () -> Unit,
-    onRedeemOfferCode: () -> Unit,
-) {
-    val kb = MaterialTheme.kidBoxColors
-    SettingCard {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Abbonamento", fontWeight = FontWeight.Bold, color = kb.title)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text("Gestisci abbonamento", color = kb.title, fontWeight = FontWeight.Medium)
-                TextButton(onClick = onManageSubscription) { Text("Apri") }
-            }
-            HorizontalDivider(color = kb.divider)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text("Riscatta codice offerta", color = kb.title, fontWeight = FontWeight.Medium)
-                TextButton(onClick = onRedeemOfferCode) { Text("Apri") }
-            }
-            Text(
-                text = if (plan.includesAI) "Piano attivo su iOS. Android: integrazione in arrivo." else "Android: piani non ancora disponibili.",
-                color = kb.subtitle,
-                fontSize = 12.sp,
-            )
         }
     }
 }

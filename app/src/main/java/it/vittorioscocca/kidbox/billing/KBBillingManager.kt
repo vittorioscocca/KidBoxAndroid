@@ -19,23 +19,29 @@ import com.android.billingclient.api.QueryPurchasesParams
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
+import it.vittorioscocca.kidbox.domain.family.isFamilySubscriptionManager
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 
 @Singleton
 class KBBillingManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val subscriptionRepository: SubscriptionRepository,
     private val familyDao: KBFamilyDao,
+    private val familyMemberDao: KBFamilyMemberDao,
     private val auth: FirebaseAuth,
 ) : PurchasesResponseListener {
 
@@ -74,6 +80,10 @@ class KBBillingManager @Inject constructor(
     private var currentUid: String = ""
     private var retryCount = 0
 
+    /** Completamento opzionale per schermate che devono attendere [onQueryPurchasesResponse]. */
+    private val restoreAwaitLock = Any()
+    private var pendingRestoreAwait: CompletableDeferred<String?>? = null
+
     private val purchasesUpdatedListener: PurchasesUpdatedListener = object : PurchasesUpdatedListener {
         override fun onPurchasesUpdated(
             result: BillingResult,
@@ -96,12 +106,20 @@ class KBBillingManager @Inject constructor(
         _purchaseError.value = null
     }
 
+    /** Usato dalle schermate che chiamano [restorePurchases] dopo [start] (connessione async). */
+    fun isBillingReady(): Boolean = billingClient.isReady
+
     fun start() {
         scope.launch {
             _isLoading.value = true
             currentFamilyId = familyDao.peekAnyFamilyId().orEmpty()
             currentUid = auth.currentUser?.uid.orEmpty()
-            _isFamilyOwner.value = computeFamilyOwner(currentFamilyId, currentUid)
+            _isFamilyOwner.value = isFamilySubscriptionManager(
+                familyDao,
+                familyMemberDao,
+                currentFamilyId,
+                currentUid,
+            )
             _currentPlan.value = subscriptionRepository.loadPlan(currentFamilyId, currentUid)
             connectBillingClient()
             _isLoading.value = false
@@ -139,9 +157,40 @@ class KBBillingManager @Inject constructor(
         }
     }
 
+    /** Avvia query acquisti subscription; per attendere risultati usare [restorePurchasesAwaitUi]. */
     fun restorePurchases() {
+        querySubscriptionPurchases()
+    }
+
+    /**
+     * Ripristino con attesa sicura dopo [start]/connessione Play Billing.
+     * Ritorna messaggio errore utente-friendly o `null` se ok / nessun acquisto recuperabile qui.
+     */
+    suspend fun restorePurchasesAwaitUi(timeoutMs: Long = 30_000L): String? {
+        clearError()
+        val deferred = CompletableDeferred<String?>()
+        synchronized(restoreAwaitLock) {
+            pendingRestoreAwait = deferred
+        }
+        querySubscriptionPurchases()
+        return try {
+            withTimeout(timeoutMs) {
+                deferred.await()
+            }
+        } catch (_: TimeoutCancellationException) {
+            synchronized(restoreAwaitLock) {
+                if (pendingRestoreAwait === deferred) {
+                    pendingRestoreAwait = null
+                }
+            }
+            "Ripristino in timeout. Riprova tra poco."
+        }
+    }
+
+    private fun querySubscriptionPurchases() {
         if (!billingClient.isReady) {
             _purchaseError.value = "Billing non ancora pronto."
+            completePendingRestoreAwaitIfNeeded()
             return
         }
         _isLoading.value = true
@@ -149,6 +198,24 @@ class KBBillingManager @Inject constructor(
             QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.SUBS).build(),
             this,
         )
+    }
+
+    /** Non sovrascrivere un completamento pendente dalla UI quando arriva anche il ripristino automatico al connect. */
+    private fun querySubscriptionPurchasesForAutoReconnect() {
+        if (!billingClient.isReady) return
+        _isLoading.value = true
+        billingClient.queryPurchasesAsync(
+            QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.SUBS).build(),
+            this,
+        )
+    }
+
+    private fun completePendingRestoreAwaitIfNeeded() {
+        synchronized(restoreAwaitLock) {
+            val d = pendingRestoreAwait ?: return
+            pendingRestoreAwait = null
+            d.complete(_purchaseError.value)
+        }
     }
 
     private fun connectBillingClient() {
@@ -171,7 +238,7 @@ class KBBillingManager @Inject constructor(
                     if (result.responseCode == BillingClient.BillingResponseCode.OK) {
                         retryCount = 0
                         queryProducts()
-                        restorePurchases()
+                        querySubscriptionPurchasesForAutoReconnect()
                     } else {
                         _purchaseError.value = result.debugMessage.ifBlank { "Errore inizializzazione billing." }
                     }
@@ -241,6 +308,7 @@ class KBBillingManager @Inject constructor(
         if (result.responseCode != BillingClient.BillingResponseCode.OK) {
             _isLoading.value = false
             _purchaseError.value = result.debugMessage.ifBlank { "Ripristino acquisti non riuscito." }
+            completePendingRestoreAwaitIfNeeded()
             return
         }
         scope.launch {
@@ -248,6 +316,7 @@ class KBBillingManager @Inject constructor(
                 processPurchase(purchase)
             }
             _isLoading.value = false
+            completePendingRestoreAwaitIfNeeded()
         }
     }
 
@@ -293,9 +362,4 @@ class KBBillingManager @Inject constructor(
         }
     }
 
-    private suspend fun computeFamilyOwner(familyId: String, uid: String): Boolean {
-        if (familyId.isBlank() || uid.isBlank()) return false
-        val family = familyDao.getById(familyId) ?: return false
-        return family.createdBy == uid
-    }
 }

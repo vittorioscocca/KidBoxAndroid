@@ -12,6 +12,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import it.vittorioscocca.kidbox.billing.KBBillingManager
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import javax.inject.Singleton
 
@@ -38,6 +39,7 @@ object BillingModule {
         @ApplicationContext context: Context,
         subscriptionRepository: SubscriptionRepository,
         familyDao: KBFamilyDao,
+        familyMemberDao: KBFamilyMemberDao,
         auth: FirebaseAuth,
-    ): KBBillingManager = KBBillingManager(context, subscriptionRepository, familyDao, auth)
+    ): KBBillingManager = KBBillingManager(context, subscriptionRepository, familyDao, familyMemberDao, auth)
 }

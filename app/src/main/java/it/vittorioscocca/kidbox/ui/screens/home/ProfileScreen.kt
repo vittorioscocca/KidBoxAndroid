@@ -82,6 +82,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.ui.screens.settings.toStorageString
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
 private val AccentOrange = Color(0xFFF2611A)
@@ -92,6 +93,7 @@ fun ProfileScreen(
     onLoggedOut: () -> Unit,
     onBack: (() -> Unit)? = null,
     onStorageUsage: () -> Unit = {},
+    onOpenPlans: () -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -444,6 +446,7 @@ fun ProfileScreen(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.kidBoxColors.rowBackground)
+                        .clickable(onClick = onOpenPlans)
                         .padding(horizontal = 10.dp, vertical = 4.dp),
                 ) {
                     Text("Upgrade", color = Color(0xFF2F80ED), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
@@ -457,7 +460,7 @@ fun ProfileScreen(
                 trackColor = kb.divider,
             )
             Text(
-                "${state.storageUsedBytes / 1_000_000} MB di ${state.storageTotalBytes / 1_000_000} MB",
+                "${state.storageUsedBytes.toStorageString()} di ${state.storageTotalBytes.toStorageString()}",
                 fontSize = 12.sp,
                 color = kb.subtitle,
             )
