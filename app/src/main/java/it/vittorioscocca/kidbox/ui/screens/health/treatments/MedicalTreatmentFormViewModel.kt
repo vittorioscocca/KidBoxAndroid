@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
+import it.vittorioscocca.kidbox.data.local.dao.PetDao
 import it.vittorioscocca.kidbox.data.repository.TreatmentRepository
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.map
@@ -37,6 +38,8 @@ data class MedicalTreatmentFormState(
     val isSaving: Boolean = false,
     val treatmentId: String = UUID.randomUUID().toString(),
     val childName: String = "",
+    /** Suggerimenti farmaco: catalogo veterinario (cane) vs pediatria. */
+    val forPetTreatment: Boolean = false,
     val drugName: String = "",
     val activeIngredient: String = "",
     val dosageValue: String = "1",
@@ -68,6 +71,7 @@ class MedicalTreatmentFormViewModel @Inject constructor(
     private val repository: TreatmentRepository,
     private val notifManager: TreatmentNotificationManager,
     private val childDao: KBChildDao,
+    private val petDao: PetDao,
     private val memberDao: KBFamilyMemberDao,
     private val attachmentService: HealthAttachmentService,
     private val documentRepository: DocumentRepository,
@@ -78,15 +82,20 @@ class MedicalTreatmentFormViewModel @Inject constructor(
 
     private var familyId = ""
     private var childId = ""
+    private var petId = ""
 
-    fun bind(familyId: String, childId: String, treatmentId: String?) {
-        if (this.familyId == familyId && this.childId == childId) return
+    fun bind(familyId: String, childId: String, petId: String = "", treatmentId: String?) {
+        if (this.familyId == familyId && this.childId == childId && this.petId == petId) return
         this.familyId = familyId
         this.childId = childId
+        this.petId = petId
 
         viewModelScope.launch {
-            val name = resolveChildName(childId)
-            _uiState.value = _uiState.value.copy(childName = name)
+            val name = resolveSubjectName(childId = childId, petId = petId)
+            _uiState.value = _uiState.value.copy(
+                childName = name,
+                forPetTreatment = petId.isNotBlank(),
+            )
         }
 
         documentRepository.startRealtime(familyId)
@@ -98,9 +107,13 @@ class MedicalTreatmentFormViewModel @Inject constructor(
         if (treatmentId != null) loadTreatment(treatmentId)
     }
 
-    private suspend fun resolveChildName(id: String): String {
-        childDao.getById(id)?.name?.takeIf { it.isNotBlank() }?.let { return it }
-        memberDao.getById(id)?.displayName?.takeIf { it.isNotBlank() }?.let { return it }
+    private suspend fun resolveSubjectName(childId: String, petId: String): String {
+        if (petId.isNotBlank()) {
+            petDao.getById(petId)?.name?.takeIf { it.isNotBlank() }?.let { return it }
+            return "Animale"
+        }
+        childDao.getById(childId)?.name?.takeIf { it.isNotBlank() }?.let { return it }
+        memberDao.getById(childId)?.displayName?.takeIf { it.isNotBlank() }?.let { return it }
         return "Profilo"
     }
 
@@ -109,10 +122,12 @@ class MedicalTreatmentFormViewModel @Inject constructor(
         viewModelScope.launch {
             val t = repository.getById(id)
             if (t != null) {
+                if (t.petId.isNotBlank()) petId = t.petId
                 val times = t.scheduleTimesData.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     treatmentId = t.id,
+                    forPetTreatment = t.petId.isNotBlank(),
                     drugName = t.drugName,
                     activeIngredient = t.activeIngredient.orEmpty(),
                     dosageValue = if (t.dosageValue % 1.0 == 0.0) "%.0f".format(t.dosageValue)
@@ -205,7 +220,8 @@ class MedicalTreatmentFormViewModel @Inject constructor(
             val treatment = KBTreatment(
                 id = s.treatmentId,
                 familyId = familyId,
-                childId = childId,
+                childId = if (petId.isNotBlank()) "" else childId,
+                petId = petId,
                 prescribingVisitId = s.prescribingVisitId,
                 drugName = s.drugName.trim(),
                 activeIngredient = s.activeIngredient.takeIf { it.isNotBlank() },

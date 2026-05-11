@@ -183,6 +183,7 @@ private val VISIT_PRESCRIBING_TINT = Color(0xFF5996D9)
 fun MedicalTreatmentDetailScreen(
     familyId: String,
     childId: String,
+    petId: String = "",
     treatmentId: String,
     onBack: () -> Unit,
     onEdit: () -> Unit,
@@ -193,7 +194,7 @@ fun MedicalTreatmentDetailScreen(
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(familyId, childId, treatmentId) { viewModel.bind(familyId, childId, treatmentId) }
+    LaunchedEffect(familyId, childId, petId, treatmentId) { viewModel.bind(familyId, childId, petId, treatmentId) }
     LaunchedEffect(state.isDeleted) { if (state.isDeleted) onBack() }
     LaunchedEffect(state.uploadError) {
         state.uploadError?.let { err ->

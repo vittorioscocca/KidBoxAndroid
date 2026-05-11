@@ -14,6 +14,7 @@ data class RemoteTreatmentDto(
     val id: String,
     val familyId: String,
     val childId: String,
+    val petId: String = "",
     val prescribingVisitId: String? = null,
     val drugName: String,
     val activeIngredient: String?,
@@ -98,6 +99,11 @@ class TreatmentRemoteStore @Inject constructor() {
         } else {
             payload["prescribingVisitId"] = FieldValue.delete()
         }
+        if (dto.petId.isNotBlank()) {
+            payload["petId"] = dto.petId
+        } else {
+            payload["petId"] = FieldValue.delete()
+        }
         ref.set(payload, SetOptions.merge()).await()
     }
 
@@ -120,7 +126,8 @@ class TreatmentRemoteStore @Inject constructor() {
         familyId: String,
     ): RemoteTreatmentDto? {
         val data = doc.data ?: return null
-        val childId = data["childId"] as? String ?: return null
+        val childId = (data["childId"] as? String)?.trim().orEmpty()
+        val petId = (data["petId"] as? String)?.trim().orEmpty()
         val drugName = data["drugName"] as? String ?: return null
         val startDate = data["startDate"] as? Timestamp ?: return null
 
@@ -131,6 +138,8 @@ class TreatmentRemoteStore @Inject constructor() {
             id = doc.id,
             familyId = familyId,
             childId = childId,
+            petId = petId,
+            prescribingVisitId = data["prescribingVisitId"] as? String,
             drugName = drugName,
             activeIngredient = data["activeIngredient"] as? String,
             dosageValue = (data["dosageValue"] as? Number)?.toDouble() ?: 0.0,
@@ -157,6 +166,7 @@ fun RemoteTreatmentDto.toEntity(): KBTreatmentEntity = KBTreatmentEntity(
     id = id,
     familyId = familyId,
     childId = childId,
+    petId = petId,
     prescribingVisitId = prescribingVisitId,
     drugName = drugName,
     activeIngredient = activeIngredient,

@@ -98,6 +98,28 @@ interface KBDocumentDao {
 
     @Query(
         """
+        SELECT * FROM kb_documents
+        WHERE familyId = :familyId
+          AND isDeleted = 0
+          AND (
+            lower(trim(notes)) LIKE 'homeitem:%'
+            OR lower(trim(notes)) LIKE 'housepayment:%'
+            OR lower(trim(notes)) LIKE 'vehicle:%'
+            OR lower(trim(notes)) LIKE 'vehicleevent:%'
+            OR lower(trim(notes)) LIKE 'petevent:%'
+          )
+          AND (
+            extractedText IS NULL
+            OR length(trim(extractedText)) = 0
+            OR extractionStatusRaw IN (0, 1, 2, 4)
+          )
+        ORDER BY updatedAtEpochMillis DESC
+        """,
+    )
+    suspend fun getLifeAreaDocumentsNeedingExtraction(familyId: String): List<KBDocumentEntity>
+
+    @Query(
+        """
         SELECT d.* FROM kb_documents d
         LEFT JOIN kb_document_categories c
             ON d.categoryId = c.id

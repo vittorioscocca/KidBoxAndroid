@@ -102,6 +102,9 @@ enum class HomeQuickAction(val key: String, val label: String) {
     MESSAGE("message", "Messaggio"),
     HEALTH("health", "Salute"),
     DOCUMENTS("documents", "Documenti"),
+    PETS("pets", "Animali"),
+    HOME_ITEMS("home_items", "Casa"),
+    VEHICLES("vehicles", "Garage"),
 }
 
 @HiltViewModel
@@ -774,6 +777,9 @@ class HomeViewModel @Inject constructor(
         "wallet",
         "location",
         "photos",
+        "pets",
+        "home_items",
+        "vehicles",
         "ai",
         "family",
     )

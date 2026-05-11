@@ -90,12 +90,18 @@ import java.util.Locale
 private val DATE_FMT_TREAT_FORM = SimpleDateFormat("d MMM yyyy", Locale.ITALIAN)
 private val PURPLE_FORM = Color(0xFF9573D9)
 private val DOSE_UNITS = listOf("ml", "mg", "gocce", "cpr", "bustine")
-private val COMMON_DRUGS_TREAT = listOf("Tachipirina", "Nurofen", "Augmentin", "Bentelan", "Aerosol", "Vitamina D")
+private val COMMON_DRUGS_PEDIATRIC = listOf("Tachipirina", "Nurofen", "Augmentin", "Bentelan", "Aerosol", "Vitamina D")
+/** Suggerimenti per nuove cure cane / veterinaria (non pediatria umana). */
+private val COMMON_DRUGS_PET_DOG = listOf(
+    "Frontline", "Advantix", "NexGard", "Bravecto", "Seresto",
+    "Milbemax", "Drontal", "Synulox", "Rimadyl", "Convenia",
+)
 
 @Composable
 fun MedicalTreatmentFormScreen(
     familyId: String,
     childId: String,
+    petId: String = "",
     treatmentId: String?,
     onBack: () -> Unit,
     onSaved: (treatmentId: String) -> Unit = { _ -> onBack() },
@@ -105,7 +111,7 @@ fun MedicalTreatmentFormScreen(
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(familyId, childId, treatmentId) { viewModel.bind(familyId, childId, treatmentId) }
+    LaunchedEffect(familyId, childId, petId, treatmentId) { viewModel.bind(familyId, childId, petId, treatmentId) }
     LaunchedEffect(state.saved, state.treatmentId) {
         if (state.saved) {
             Toast.makeText(context, "Cura salvata", Toast.LENGTH_SHORT).show()
@@ -230,12 +236,17 @@ fun MedicalTreatmentFormScreen(
                     singleLine = true,
                 )
                 Spacer(Modifier.height(8.dp))
-                Text("Farmaci suggeriti", fontSize = 12.sp, color = kb.subtitle)
+                Text(
+                    if (state.forPetTreatment) "Farmaci suggeriti (cane / veterinaria)" else "Farmaci suggeriti",
+                    fontSize = 12.sp,
+                    color = kb.subtitle,
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    COMMON_DRUGS_TREAT.forEach { drug ->
+                    val suggestedDrugs = if (state.forPetTreatment) COMMON_DRUGS_PET_DOG else COMMON_DRUGS_PEDIATRIC
+                    suggestedDrugs.forEach { drug ->
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(999.dp))

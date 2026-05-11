@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
+import it.vittorioscocca.kidbox.data.local.dao.PetDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTreatmentDao
 import it.vittorioscocca.kidbox.data.local.mapper.toDomain
 import it.vittorioscocca.kidbox.data.local.mapper.toEntity
@@ -21,11 +22,18 @@ class TreatmentRepository @Inject constructor(
     private val dao: KBTreatmentDao,
     private val remote: TreatmentRemoteStore,
     private val childDao: KBChildDao,
+    private val petDao: PetDao,
 ) {
     private val auth = FirebaseAuth.getInstance()
 
     fun observe(familyId: String, childId: String): Flow<List<KBTreatment>> =
         dao.observeByFamilyAndChild(familyId, childId).map { list -> list.map { it.toDomain() } }
+
+    fun observeByFamilyAndPet(familyId: String, petId: String): Flow<List<KBTreatment>> =
+        dao.observeByFamilyAndPet(familyId, petId).map { list -> list.map { it.toDomain() } }
+
+    fun observeForSubject(familyId: String, childId: String, petId: String): Flow<List<KBTreatment>> =
+        if (petId.isNotBlank()) observeByFamilyAndPet(familyId, petId) else observe(familyId, childId)
 
     suspend fun getById(id: String): KBTreatment? = withContext(Dispatchers.IO) {
         dao.getById(id)?.toDomain()
@@ -33,6 +41,10 @@ class TreatmentRepository @Inject constructor(
 
     suspend fun listByFamilyAndChild(familyId: String, childId: String): List<KBTreatment> = withContext(Dispatchers.IO) {
         dao.listByFamilyAndChild(familyId, childId).map { it.toDomain() }
+    }
+
+    suspend fun listByFamilyAndPet(familyId: String, petId: String): List<KBTreatment> = withContext(Dispatchers.IO) {
+        dao.listByFamilyAndPet(familyId, petId).map { it.toDomain() }
     }
 
     suspend fun upsert(treatment: KBTreatment): KBTreatment = withContext(Dispatchers.IO) {
@@ -47,7 +59,8 @@ class TreatmentRepository @Inject constructor(
         dao.upsert(pending.toEntity())
 
         runCatching {
-            val syncReminder = isPediatricHealthSubject(pending.familyId, pending.childId)
+            val syncReminder = isPediatricHealthSubject(pending.familyId, pending.childId) ||
+                isPetHealthSubject(pending.familyId, pending.petId)
             remote.upsert(pending.toRemoteDto(), syncReminder)
             dao.upsert(pending.copy(syncStateRaw = 0).toEntity())
         }.onFailure { err ->
@@ -73,12 +86,19 @@ class TreatmentRepository @Inject constructor(
         val row = childDao.getById(childId) ?: return false
         return row.familyId == familyId
     }
+
+    private suspend fun isPetHealthSubject(familyId: String, petId: String): Boolean {
+        if (petId.isBlank()) return false
+        val pet = petDao.getById(petId) ?: return false
+        return pet.familyId == familyId && !pet.isDeleted
+    }
 }
 
 private fun KBTreatment.toRemoteDto() = RemoteTreatmentDto(
     id = id,
     familyId = familyId,
     childId = childId,
+    petId = petId,
     prescribingVisitId = prescribingVisitId,
     drugName = drugName,
     activeIngredient = activeIngredient,

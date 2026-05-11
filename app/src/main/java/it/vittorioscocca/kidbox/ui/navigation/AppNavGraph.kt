@@ -18,6 +18,14 @@ import androidx.navigation.navArgument
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
 import it.vittorioscocca.kidbox.ui.screens.auth.LoginScreen
 import it.vittorioscocca.kidbox.ui.screens.grocery.GroceryListScreen
+import it.vittorioscocca.kidbox.ui.screens.homeitems.HomeItemDetailScreen
+import it.vittorioscocca.kidbox.ui.screens.homeitems.HomeItemsScreen
+import it.vittorioscocca.kidbox.ui.screens.homeitems.HousePaymentDetailScreen
+import it.vittorioscocca.kidbox.ui.screens.pets.PetDetailScreen
+import it.vittorioscocca.kidbox.ui.screens.pets.PetsScreen
+import it.vittorioscocca.kidbox.ui.screens.vehicles.VehicleDetailScreen
+import it.vittorioscocca.kidbox.ui.screens.vehicles.VehicleInterventionsListScreen
+import it.vittorioscocca.kidbox.ui.screens.vehicles.VehiclesScreen
 import it.vittorioscocca.kidbox.ui.screens.home.HomeScreen
 import it.vittorioscocca.kidbox.ui.screens.home.ProfileScreen
 import it.vittorioscocca.kidbox.ui.screens.onboarding.OnboardingScreen
@@ -331,6 +339,164 @@ fun AppNavGraph(
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
         ) {
             GroceryListScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(
+            route = AppDestination.Pets.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            PetsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onOpenPet = { petId ->
+                    navController.navigate(AppDestination.PetDetail.createRoute(familyId, petId))
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.PetTreatmentForm.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("petId") { type = NavType.StringType },
+                navArgument("treatmentId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val petId = backStackEntry.arguments?.getString("petId").orEmpty()
+            val treatmentId = backStackEntry.arguments?.getString("treatmentId")
+            MedicalTreatmentFormScreen(
+                familyId = familyId,
+                childId = "",
+                petId = petId,
+                treatmentId = treatmentId,
+                onBack = { navController.popBackStack() },
+                onSaved = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.PetTreatmentDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("petId") { type = NavType.StringType },
+                navArgument("treatmentId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val petId = backStackEntry.arguments?.getString("petId").orEmpty()
+            val treatmentId = backStackEntry.arguments?.getString("treatmentId").orEmpty()
+            MedicalTreatmentDetailScreen(
+                familyId = familyId,
+                childId = "",
+                petId = petId,
+                treatmentId = treatmentId,
+                onBack = { navController.popBackStack() },
+                onEdit = {
+                    navController.navigate(AppDestination.PetTreatmentForm.routeEdit(familyId, petId, treatmentId))
+                },
+                onOpenVisit = { },
+            )
+        }
+
+        composable(
+            route = AppDestination.PetDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("petId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val petId = backStackEntry.arguments?.getString("petId").orEmpty()
+            PetDetailScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onAddTreatment = {
+                    navController.navigate(AppDestination.PetTreatmentForm.routeNew(familyId, petId))
+                },
+                onOpenTreatment = { tid ->
+                    navController.navigate(AppDestination.PetTreatmentDetail.route(familyId, petId, tid))
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.HomeItems.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            HomeItemsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onOpenItem = { itemId ->
+                    navController.navigate(AppDestination.HomeItemDetail.createRoute(familyId, itemId))
+                },
+                onOpenHousePayment = { paymentId ->
+                    navController.navigate(AppDestination.HousePaymentDetail.createRoute(familyId, paymentId))
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.HousePaymentDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("paymentId") { type = NavType.StringType },
+            ),
+        ) {
+            HousePaymentDetailScreen(onNavigateBack = { navController.popBackStack() })
+        }
+
+        composable(
+            route = AppDestination.HomeItemDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("itemId") { type = NavType.StringType },
+            ),
+        ) {
+            HomeItemDetailScreen(onNavigateBack = { navController.popBackStack() })
+        }
+
+        composable(
+            route = AppDestination.Vehicles.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            VehiclesScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onOpenVehicle = { vehicleId ->
+                    navController.navigate(AppDestination.VehicleDetail.createRoute(familyId, vehicleId))
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.VehicleDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("vehicleId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val vehicleId = backStackEntry.arguments?.getString("vehicleId").orEmpty()
+            VehicleDetailScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onSeeAllInterventions = {
+                    navController.navigate(AppDestination.VehicleInterventions.createRoute(familyId, vehicleId))
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.VehicleInterventions.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("vehicleId") { type = NavType.StringType },
+            ),
+        ) {
+            VehicleInterventionsListScreen(onNavigateBack = { navController.popBackStack() })
         }
 
         composable(
@@ -825,6 +991,7 @@ fun AppNavGraph(
             MedicalTreatmentFormScreen(
                 familyId = familyId,
                 childId = childId,
+                petId = "",
                 treatmentId = treatmentId,
                 onBack = { navController.popBackStack() },
                 onSaved = { _: String -> navController.popBackStack() },
@@ -845,6 +1012,7 @@ fun AppNavGraph(
             MedicalTreatmentDetailScreen(
                 familyId = familyId,
                 childId = childId,
+                petId = "",
                 treatmentId = treatmentId,
                 onBack = { navController.popBackStack() },
                 onEdit = {

@@ -9,6 +9,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
+import it.vittorioscocca.kidbox.notifications.HousePaymentReminderScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -23,6 +24,7 @@ class FamilyLeaveService @Inject constructor(
     private val familyMemberDao: KBFamilyMemberDao,
     private val childDao: KBChildDao,
     private val familySyncCenter: it.vittorioscocca.kidbox.data.sync.FamilySyncCenter,
+    private val housePaymentReminderScheduler: HousePaymentReminderScheduler,
 ) {
     companion object {
         private const val TAG = "FamilyLeaveService"
@@ -78,6 +80,15 @@ class FamilyLeaveService @Inject constructor(
             .collection("memberships").document(familyId).delete().await()
 
         withContext(Dispatchers.IO) {
+            database.petDao().deleteAllByFamily(familyId)
+            database.petEventDao().deleteAllByFamily(familyId)
+            database.housePaymentDao().listIdsByFamily(familyId).forEach { pid ->
+                housePaymentReminderScheduler.cancelForPayment(pid)
+            }
+            database.housePaymentDao().deleteAllByFamily(familyId)
+            database.homeItemDao().deleteAllByFamily(familyId)
+            database.vehicleDao().deleteAllByFamily(familyId)
+            database.vehicleEventDao().deleteAllByFamily(familyId)
             val f = familyDao.deleteByFamilyId(familyId)
             val m = familyMemberDao.deleteByFamilyId(familyId)
             val c = childDao.deleteByFamilyId(familyId)
@@ -164,6 +175,15 @@ class FamilyLeaveService @Inject constructor(
             .collection("memberships").document(familyId).delete().await()
 
         withContext(Dispatchers.IO) {
+            database.petDao().deleteAllByFamily(familyId)
+            database.petEventDao().deleteAllByFamily(familyId)
+            database.housePaymentDao().listIdsByFamily(familyId).forEach { pid ->
+                housePaymentReminderScheduler.cancelForPayment(pid)
+            }
+            database.housePaymentDao().deleteAllByFamily(familyId)
+            database.homeItemDao().deleteAllByFamily(familyId)
+            database.vehicleDao().deleteAllByFamily(familyId)
+            database.vehicleEventDao().deleteAllByFamily(familyId)
             val f = familyDao.deleteByFamilyId(familyId)
             val m = familyMemberDao.deleteByFamilyId(familyId)
             val c = childDao.deleteByFamilyId(familyId)

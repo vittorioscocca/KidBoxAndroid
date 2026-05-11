@@ -9,6 +9,8 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import it.vittorioscocca.kidbox.data.local.dao.HomeItemDao
+import it.vittorioscocca.kidbox.data.local.dao.HousePaymentDao
 import it.vittorioscocca.kidbox.data.local.dao.KBAIConversationDao
 import it.vittorioscocca.kidbox.data.local.dao.KBAIMessageDao
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
@@ -36,7 +38,11 @@ import it.vittorioscocca.kidbox.data.local.dao.KBTodoItemDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoListDao
 import it.vittorioscocca.kidbox.data.local.dao.KBRoutineDao
 import it.vittorioscocca.kidbox.data.local.dao.KBRoutineCheckDao
+import it.vittorioscocca.kidbox.data.local.dao.PetDao
+import it.vittorioscocca.kidbox.data.local.dao.PetEventDao
 import it.vittorioscocca.kidbox.data.local.dao.KBUserProfileDao
+import it.vittorioscocca.kidbox.data.local.dao.VehicleDao
+import it.vittorioscocca.kidbox.data.local.dao.VehicleEventDao
 import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
 import javax.inject.Singleton
@@ -432,6 +438,194 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_19_20 = object : Migration(19, 20) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS house_payments (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    typeRaw TEXT NOT NULL,
+                    subtypeRaw TEXT,
+                    importo REAL,
+                    giornoDiScadenzaMensile INTEGER,
+                    dataScadenza INTEGER,
+                    dataScadenzaContratto INTEGER,
+                    fornitore TEXT,
+                    note TEXT,
+                    reminderOn INTEGER NOT NULL DEFAULT 1,
+                    isDeleted INTEGER NOT NULL DEFAULT 0,
+                    createdAt INTEGER NOT NULL,
+                    updatedAt INTEGER NOT NULL,
+                    createdBy TEXT NOT NULL,
+                    updatedBy TEXT NOT NULL,
+                    syncState INTEGER NOT NULL,
+                    FOREIGN KEY(familyId) REFERENCES kb_families(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_house_payments_familyId ON house_payments (familyId)")
+        }
+    }
+
+    private val MIGRATION_20_21 = object : Migration(20, 21) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE kb_treatments ADD COLUMN petId TEXT NOT NULL DEFAULT ''",
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_treatments_petId ON kb_treatments (petId)")
+        }
+    }
+
+    private val MIGRATION_18_19 = object : Migration(18, 19) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS pets (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    species TEXT NOT NULL,
+                    breed TEXT,
+                    birthDate INTEGER,
+                    color TEXT,
+                    chipCode TEXT,
+                    notes TEXT,
+                    photoURL TEXT,
+                    isDeleted INTEGER NOT NULL,
+                    createdAt INTEGER NOT NULL,
+                    updatedAt INTEGER NOT NULL,
+                    createdBy TEXT NOT NULL,
+                    updatedBy TEXT NOT NULL,
+                    syncState INTEGER NOT NULL,
+                    FOREIGN KEY(familyId) REFERENCES kb_families(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_pets_familyId ON pets (familyId)")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS pet_events (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    petId TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    eventType TEXT NOT NULL,
+                    date INTEGER NOT NULL,
+                    nextDueDate INTEGER,
+                    notes TEXT,
+                    vetName TEXT,
+                    cost REAL,
+                    reminderEnabled INTEGER NOT NULL,
+                    isDeleted INTEGER NOT NULL,
+                    createdAt INTEGER NOT NULL,
+                    updatedAt INTEGER NOT NULL,
+                    createdBy TEXT NOT NULL,
+                    updatedBy TEXT NOT NULL,
+                    syncState INTEGER NOT NULL,
+                    FOREIGN KEY(familyId) REFERENCES kb_families(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_pet_events_familyId ON pet_events (familyId)")
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_pet_events_familyId_petId ON pet_events (familyId, petId)",
+            )
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS home_items (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    brand TEXT,
+                    model TEXT,
+                    serialNumber TEXT,
+                    purchaseDate INTEGER,
+                    warrantyExpiryDate INTEGER,
+                    nextServiceDate INTEGER,
+                    servicePeriodMonths INTEGER,
+                    notes TEXT,
+                    reminderEnabled INTEGER NOT NULL,
+                    isDeleted INTEGER NOT NULL,
+                    createdAt INTEGER NOT NULL,
+                    updatedAt INTEGER NOT NULL,
+                    createdBy TEXT NOT NULL,
+                    updatedBy TEXT NOT NULL,
+                    syncState INTEGER NOT NULL,
+                    FOREIGN KEY(familyId) REFERENCES kb_families(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_home_items_familyId ON home_items (familyId)")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS vehicles (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    licensePlate TEXT,
+                    brand TEXT,
+                    model TEXT,
+                    year INTEGER,
+                    fuelType TEXT,
+                    color TEXT,
+                    vin TEXT,
+                    insuranceExpiryDate INTEGER,
+                    revisionExpiryDate INTEGER,
+                    taxExpiryDate INTEGER,
+                    lastServiceDate INTEGER,
+                    nextServiceDate INTEGER,
+                    currentKm INTEGER,
+                    notes TEXT,
+                    photoURL TEXT,
+                    reminderEnabled INTEGER NOT NULL,
+                    isDeleted INTEGER NOT NULL,
+                    createdAt INTEGER NOT NULL,
+                    updatedAt INTEGER NOT NULL,
+                    createdBy TEXT NOT NULL,
+                    updatedBy TEXT NOT NULL,
+                    syncState INTEGER NOT NULL,
+                    FOREIGN KEY(familyId) REFERENCES kb_families(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_vehicles_familyId ON vehicles (familyId)")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS vehicle_events (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    vehicleId TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    eventType TEXT NOT NULL,
+                    date INTEGER NOT NULL,
+                    km INTEGER,
+                    cost REAL,
+                    garageName TEXT,
+                    notes TEXT,
+                    isDeleted INTEGER NOT NULL,
+                    createdAt INTEGER NOT NULL,
+                    updatedAt INTEGER NOT NULL,
+                    createdBy TEXT NOT NULL,
+                    updatedBy TEXT NOT NULL,
+                    syncState INTEGER NOT NULL,
+                    FOREIGN KEY(familyId) REFERENCES kb_families(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_vehicle_events_familyId ON vehicle_events (familyId)")
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_vehicle_events_familyId_vehicleId ON vehicle_events (familyId, vehicleId)",
+            )
+        }
+    }
+
     private val MIGRATION_14_15 = object : Migration(14, 15) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(
@@ -574,6 +768,9 @@ object DatabaseModule {
         MIGRATION_15_16,
         MIGRATION_16_17,
         MIGRATION_17_18,
+        MIGRATION_18_19,
+        MIGRATION_19_20,
+        MIGRATION_20_21,
     )
         .fallbackToDestructiveMigration()
         .build()
@@ -673,4 +870,22 @@ object DatabaseModule {
     @Provides
     fun provideWalletTicketDao(database: KidBoxDatabase): WalletTicketDao =
         database.walletTicketDao()
+
+    @Provides
+    fun providePetDao(database: KidBoxDatabase): PetDao = database.petDao()
+
+    @Provides
+    fun providePetEventDao(database: KidBoxDatabase): PetEventDao = database.petEventDao()
+
+    @Provides
+    fun provideHomeItemDao(database: KidBoxDatabase): HomeItemDao = database.homeItemDao()
+
+    @Provides
+    fun provideHousePaymentDao(database: KidBoxDatabase): HousePaymentDao = database.housePaymentDao()
+
+    @Provides
+    fun provideVehicleDao(database: KidBoxDatabase): VehicleDao = database.vehicleDao()
+
+    @Provides
+    fun provideVehicleEventDao(database: KidBoxDatabase): VehicleEventDao = database.vehicleEventDao()
 }

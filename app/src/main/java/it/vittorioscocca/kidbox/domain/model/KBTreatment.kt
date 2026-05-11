@@ -10,6 +10,8 @@ data class KBTreatment(
     val id: String,
     val familyId: String,
     val childId: String,
+    /** Cura legata a un animale; vuoto se cura pediatrica. */
+    val petId: String = "",
     /** Visita che ha prescritto la cura (se collegata da modulo visita). */
     val prescribingVisitId: String? = null,
     val drugName: String,

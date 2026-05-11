@@ -17,13 +17,25 @@ import it.vittorioscocca.kidbox.data.local.dao.KBExpenseDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.dao.KBGroceryItemDao
+import it.vittorioscocca.kidbox.data.local.dao.HomeItemDao
+import it.vittorioscocca.kidbox.data.local.dao.HousePaymentDao
 import it.vittorioscocca.kidbox.data.local.dao.KBNoteDao
+import it.vittorioscocca.kidbox.data.local.dao.PetDao
+import it.vittorioscocca.kidbox.data.local.dao.PetEventDao
 import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
 import it.vittorioscocca.kidbox.data.local.dao.KBPediatricProfileDao
 import it.vittorioscocca.kidbox.data.local.dao.KBRoutineCheckDao
 import it.vittorioscocca.kidbox.data.local.dao.KBRoutineDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoItemDao
+import it.vittorioscocca.kidbox.data.local.dao.VehicleDao
+import it.vittorioscocca.kidbox.data.local.dao.VehicleEventDao
 import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
+import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
+import it.vittorioscocca.kidbox.data.home.HomeItemAttachmentTag
+import it.vittorioscocca.kidbox.data.home.HousePaymentAttachmentTag
+import it.vittorioscocca.kidbox.data.pets.PetEventAttachmentTag
+import it.vittorioscocca.kidbox.data.vehicles.VehicleAttachmentTag
+import it.vittorioscocca.kidbox.data.vehicles.VehicleEventAttachmentTag
 import it.vittorioscocca.kidbox.data.local.entity.KBCalendarEventEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBChatMessageEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBChildEntity
@@ -55,6 +67,7 @@ import it.vittorioscocca.kidbox.domain.model.KBGroceryItem
 import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
 import it.vittorioscocca.kidbox.domain.model.KBNote
 import it.vittorioscocca.kidbox.domain.model.KBPlan
+import it.vittorioscocca.kidbox.domain.model.KBTextExtractionStatus
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.domain.model.KBPediatricProfile
 import it.vittorioscocca.kidbox.domain.model.KBRoutine
@@ -122,6 +135,13 @@ class PlanningAIChatViewModel @Inject constructor(
     private val documentDao: KBDocumentDao,
     private val walletTicketDao: WalletTicketDao,
     private val pediatricProfileDao: KBPediatricProfileDao,
+    private val petDao: PetDao,
+    private val petEventDao: PetEventDao,
+    private val homeItemDao: HomeItemDao,
+    private val housePaymentDao: HousePaymentDao,
+    private val vehicleDao: VehicleDao,
+    private val vehicleEventDao: VehicleEventDao,
+    private val healthAttachmentService: HealthAttachmentService,
     private val auth: FirebaseAuth,
     @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle,
@@ -428,6 +448,73 @@ class PlanningAIChatViewModel @Inject constructor(
             emptyList()
         }
 
+        val pediatricProfiles = if (effectiveFamilyId.isNotBlank()) {
+            pediatricProfileDao.observeByFamilyId(effectiveFamilyId).first().map { it.toDomain() }
+        } else {
+            emptyList()
+        }
+
+        val pets = if (effectiveFamilyId.isNotBlank()) {
+            petDao.getAllByFamily(effectiveFamilyId)
+        } else {
+            emptyList()
+        }
+
+        val petEvents = if (effectiveFamilyId.isNotBlank() && pets.isNotEmpty()) {
+            pets.flatMap { pet ->
+                petEventDao.observeByPet(effectiveFamilyId, pet.id).first()
+            }.filterNot { it.isDeleted }
+                .sortedByDescending { it.date }
+                .take(50)
+        } else {
+            emptyList()
+        }
+
+        val homeItems = if (effectiveFamilyId.isNotBlank()) {
+            homeItemDao.observeByFamily(effectiveFamilyId).first().filterNot { it.isDeleted }
+        } else {
+            emptyList()
+        }
+
+        val housePayments = if (effectiveFamilyId.isNotBlank()) {
+            housePaymentDao.observeByFamily(effectiveFamilyId).first().filterNot { it.isDeleted }
+        } else {
+            emptyList()
+        }
+
+        val vehicles = if (effectiveFamilyId.isNotBlank()) {
+            vehicleDao.observeByFamily(effectiveFamilyId).first().filterNot { it.isDeleted }
+        } else {
+            emptyList()
+        }
+
+        val vehicleEvents = if (effectiveFamilyId.isNotBlank() && vehicles.isNotEmpty()) {
+            vehicles.flatMap { v ->
+                vehicleEventDao.observeByVehicle(effectiveFamilyId, v.id).first()
+            }.filterNot { it.isDeleted }
+                .sortedByDescending { it.date }
+                .take(50)
+        } else {
+            emptyList()
+        }
+
+        val homeItemIds = homeItems.map { it.id }.toSet()
+        val housePaymentIds = housePayments.map { it.id }.toSet()
+        val vehicleIds = vehicles.map { it.id }.toSet()
+        val vehicleEventIds = vehicleEvents.map { it.id }.toSet()
+        val petEventIds = petEvents.map { it.id }.toSet()
+
+        if (effectiveFamilyId.isNotBlank()) {
+            healthAttachmentService.ensureLifeAreaAttachmentsForPlanning(
+                familyId = effectiveFamilyId,
+                homeItemIds = homeItemIds,
+                housePaymentIds = housePaymentIds,
+                vehicleIds = vehicleIds,
+                vehicleEventIds = vehicleEventIds,
+                petEventIds = petEventIds,
+            )
+        }
+
         val documents = if (effectiveFamilyId.isNotBlank()) {
             documentDao.getAllByFamilyId(effectiveFamilyId)
                 .filterNot { it.isDeleted }
@@ -436,10 +523,17 @@ class PlanningAIChatViewModel @Inject constructor(
             emptyList()
         }
 
-        val pediatricProfiles = if (effectiveFamilyId.isNotBlank()) {
-            pediatricProfileDao.observeByFamilyId(effectiveFamilyId).first().map { it.toDomain() }
-        } else {
-            emptyList()
+        val lifeAreaDocuments = documents.filter { doc ->
+            doc.extractionStatusRaw == KBTextExtractionStatus.COMPLETED.rawValue &&
+                !doc.extractedText.isNullOrBlank() &&
+                lifeAreaDocMatchesContext(
+                    doc,
+                    homeItemIds,
+                    housePaymentIds,
+                    vehicleIds,
+                    vehicleEventIds,
+                    petEventIds,
+                )
         }
 
         val memberNamesResolved = if (seed.memberNames.isNotEmpty()) {
@@ -489,6 +583,13 @@ class PlanningAIChatViewModel @Inject constructor(
             allVisits = allVisits,
             allExams = allExams,
             allVaccines = allVaccines,
+            pets = pets,
+            petEvents = petEvents,
+            homeItems = homeItems,
+            housePayments = housePayments,
+            vehicles = vehicles,
+            vehicleEvents = vehicleEvents,
+            lifeAreaDocuments = lifeAreaDocuments,
         )
     }
 
@@ -501,6 +602,20 @@ class PlanningAIChatViewModel @Inject constructor(
             null -> error.message ?: "Errore inatteso."
         }
     }
+
+    private fun lifeAreaDocMatchesContext(
+        doc: KBDocument,
+        homeItemIds: Set<String>,
+        housePaymentIds: Set<String>,
+        vehicleIds: Set<String>,
+        vehicleEventIds: Set<String>,
+        petEventIds: Set<String>,
+    ): Boolean =
+        homeItemIds.any { HomeItemAttachmentTag.matches(doc.notes, it) } ||
+            housePaymentIds.any { HousePaymentAttachmentTag.matches(doc.notes, it) } ||
+            vehicleIds.any { VehicleAttachmentTag.matches(doc.notes, it) } ||
+            vehicleEventIds.any { VehicleEventAttachmentTag.matches(doc.notes, it) } ||
+            petEventIds.any { PetEventAttachmentTag.matches(doc.notes, it) }
 
     companion object {
         private const val SUMMARY_SYSTEM_PROMPT =
@@ -758,4 +873,11 @@ private fun emptyPlanningContext() = PlanningContextInput(
     allVisits = emptyList(),
     allExams = emptyList(),
     allVaccines = emptyList(),
+    pets = emptyList(),
+    petEvents = emptyList(),
+    homeItems = emptyList(),
+    housePayments = emptyList(),
+    vehicles = emptyList(),
+    vehicleEvents = emptyList(),
+    lifeAreaDocuments = emptyList(),
 )

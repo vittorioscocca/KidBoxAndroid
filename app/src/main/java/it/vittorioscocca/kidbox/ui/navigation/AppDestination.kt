@@ -260,6 +260,51 @@ sealed class AppDestination(val route: String) {
         fun createRoute(familyId: String, ticketId: String): String =
             "wallet_detail/$familyId/$ticketId"
     }
+
+    data object Pets : AppDestination("pets/{familyId}") {
+        fun createRoute(familyId: String): String = "pets/$familyId"
+    }
+
+    data object PetDetail : AppDestination("pet_detail/{familyId}/{petId}") {
+        fun createRoute(familyId: String, petId: String): String = "pet_detail/$familyId/$petId"
+    }
+
+    data object PetTreatmentDetail : AppDestination("pet_detail/{familyId}/{petId}/treatment/{treatmentId}") {
+        fun route(familyId: String, petId: String, treatmentId: String): String =
+            "pet_detail/$familyId/$petId/treatment/$treatmentId"
+    }
+
+    data object PetTreatmentForm : AppDestination("pet_detail/{familyId}/{petId}/treatment/form?treatmentId={treatmentId}") {
+        fun routeNew(familyId: String, petId: String): String = "pet_detail/$familyId/$petId/treatment/form"
+        fun routeEdit(familyId: String, petId: String, treatmentId: String): String =
+            "pet_detail/$familyId/$petId/treatment/form?treatmentId=$treatmentId"
+    }
+
+    data object HomeItems : AppDestination("home_items/{familyId}") {
+        fun createRoute(familyId: String): String = "home_items/$familyId"
+    }
+
+    data object HomeItemDetail : AppDestination("home_item_detail/{familyId}/{itemId}") {
+        fun createRoute(familyId: String, itemId: String): String = "home_item_detail/$familyId/$itemId"
+    }
+
+    data object HousePaymentDetail : AppDestination("house_payment_detail/{familyId}/{paymentId}") {
+        fun createRoute(familyId: String, paymentId: String): String =
+            "house_payment_detail/$familyId/$paymentId"
+    }
+
+    data object Vehicles : AppDestination("vehicles/{familyId}") {
+        fun createRoute(familyId: String): String = "vehicles/$familyId"
+    }
+
+    data object VehicleDetail : AppDestination("vehicle_detail/{familyId}/{vehicleId}") {
+        fun createRoute(familyId: String, vehicleId: String): String = "vehicle_detail/$familyId/$vehicleId"
+    }
+
+    data object VehicleInterventions : AppDestination("vehicle_interventions/{familyId}/{vehicleId}") {
+        fun createRoute(familyId: String, vehicleId: String): String = "vehicle_interventions/$familyId/$vehicleId"
+    }
+
     data object AskExpert : AppDestination("ask_expert")
     data object AiChat : AppDestination("ai_chat/{familyId}") {
         fun createRoute(familyId: String): String = "ai_chat/$familyId"

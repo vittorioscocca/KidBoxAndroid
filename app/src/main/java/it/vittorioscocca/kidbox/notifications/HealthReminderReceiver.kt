@@ -9,8 +9,13 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import dagger.hilt.android.EntryPointAccessors
 import it.vittorioscocca.kidbox.MainActivity
 import it.vittorioscocca.kidbox.R
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class HealthReminderReceiver : BroadcastReceiver() {
 
@@ -113,6 +118,103 @@ class HealthReminderReceiver : BroadcastReceiver() {
                     .build()
                 runCatching { NotificationManagerCompat.from(context).notify(notifId, notification) }
             }
+            TYPE_VEHICLE_DEADLINE -> {
+                val vehicleId = intent.getStringExtra(EXTRA_VEHICLE_ID).orEmpty()
+                val familyId = intent.getStringExtra(EXTRA_FAMILY_ID).orEmpty()
+                val vehicleName = intent.getStringExtra(EXTRA_VEHICLE_NAME).orEmpty()
+                val titlePrefix = intent.getStringExtra(EXTRA_VEHICLE_TITLE_PREFIX).orEmpty()
+                val slot = intent.getStringExtra(EXTRA_VEHICLE_SLOT).orEmpty()
+                val body = if (slot == "week") {
+                    "Tra una settimana — apri Garage."
+                } else {
+                    "Scadenza oggi — apri Garage."
+                }
+                val title = when {
+                    titlePrefix.isNotBlank() && vehicleName.isNotBlank() -> "$titlePrefix: $vehicleName"
+                    vehicleName.isNotBlank() -> "Garage: $vehicleName"
+                    else -> "Promemoria Garage"
+                }
+
+                val deepLink = Intent(context, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    putExtra("kb_deeplink_type", TYPE_VEHICLE_DEADLINE)
+                    putExtra("kb_familyId", familyId)
+                    putExtra("kb_vehicleId", vehicleId)
+                }
+                val notifId = ("$vehicleId|$slot|${titlePrefix.hashCode()}").hashCode()
+                val pendingIntent = PendingIntent.getActivity(
+                    context, notifId, deepLink,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+                val notification = NotificationCompat.Builder(context, CHANNEL_ID_HEALTH_REMINDERS)
+                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setContentTitle(title)
+                    .setContentText(body)
+                    .setAutoCancel(true)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setContentIntent(pendingIntent)
+                    .build()
+                runCatching { NotificationManagerCompat.from(context).notify(notifId, notification) }
+
+                val pendingResult = goAsync()
+                val appCtx = context.applicationContext
+                CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+                    try {
+                        val ep = EntryPointAccessors.fromApplication(
+                            appCtx,
+                            VehicleReminderEntryPoint::class.java,
+                        )
+                        ep.vehicleDeadlineReminderScheduler().rescheduleAfterAlarm(intent)
+                    } finally {
+                        pendingResult.finish()
+                    }
+                }
+            }
+            TYPE_HOUSE_PAYMENT -> {
+                val paymentId = intent.getStringExtra(EXTRA_HOUSE_PAYMENT_ID).orEmpty()
+                val familyId = intent.getStringExtra(EXTRA_FAMILY_ID).orEmpty()
+                val paymentName = intent.getStringExtra(EXTRA_HOUSE_PAYMENT_NAME).orEmpty()
+                val title = "Scadenza in arrivo"
+                val body = if (paymentName.isNotBlank()) {
+                    "$paymentName — tra 3 giorni."
+                } else {
+                    "Tra 3 giorni — apri Casa."
+                }
+                val deepLink = Intent(context, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    putExtra("kb_deeplink_type", TYPE_HOUSE_PAYMENT)
+                    putExtra("kb_familyId", familyId)
+                    putExtra("kb_house_payment_id", paymentId)
+                }
+                val notifId = paymentId.hashCode()
+                val pendingIntent = PendingIntent.getActivity(
+                    context, notifId, deepLink,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+                val notification = NotificationCompat.Builder(context, CHANNEL_ID_HEALTH_REMINDERS)
+                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setContentTitle(title)
+                    .setContentText(body)
+                    .setAutoCancel(true)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setContentIntent(pendingIntent)
+                    .build()
+                runCatching { NotificationManagerCompat.from(context).notify(notifId, notification) }
+
+                val pendingResult = goAsync()
+                val appCtx = context.applicationContext
+                CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+                    try {
+                        val ep = EntryPointAccessors.fromApplication(
+                            appCtx,
+                            VehicleReminderEntryPoint::class.java,
+                        )
+                        ep.housePaymentReminderScheduler().rescheduleAfterAlarm(intent)
+                    } finally {
+                        pendingResult.finish()
+                    }
+                }
+            }
             else -> {
                 val body = intent.getStringExtra(EXTRA_TITLE).orEmpty()
                 val familyId = intent.getStringExtra(EXTRA_FAMILY_ID).orEmpty()
@@ -161,9 +263,9 @@ class HealthReminderReceiver : BroadcastReceiver() {
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID_HEALTH_REMINDERS,
-                "Promemoria salute",
+                "Promemoria salute e Garage",
                 NotificationManager.IMPORTANCE_HIGH,
-            ).apply { description = "Promemoria locali visite, esami e cure" },
+            ).apply { description = "Promemoria locali visite, esami, cure e scadenze veicolo" },
         )
     }
 
@@ -187,5 +289,15 @@ class HealthReminderReceiver : BroadcastReceiver() {
         const val TYPE_VACCINE_REMINDER = "vaccine_reminder"
         const val TYPE_WALLET_REMINDER = "wallet_reminder"
         const val EXTRA_WALLET_TICKET_ID = "extra_wallet_ticket_id"
+        const val TYPE_VEHICLE_DEADLINE = "vehicle_deadline_reminder"
+        const val TYPE_HOUSE_PAYMENT = "house_payment_reminder"
+        const val EXTRA_HOUSE_PAYMENT_ID = "extra_house_payment_id"
+        const val EXTRA_HOUSE_PAYMENT_NAME = "extra_house_payment_name"
+        const val EXTRA_VEHICLE_ID = "extra_vehicle_id"
+        const val EXTRA_VEHICLE_NAME = "extra_vehicle_name"
+        const val EXTRA_VEHICLE_KIND = "extra_vehicle_kind"
+        const val EXTRA_VEHICLE_SLOT = "extra_vehicle_slot"
+        const val EXTRA_VEHICLE_TITLE_PREFIX = "extra_vehicle_title_prefix"
+        const val EXTRA_VEHICLE_ANCHOR_DAY_MILLIS = "extra_vehicle_anchor_day_millis"
     }
 }

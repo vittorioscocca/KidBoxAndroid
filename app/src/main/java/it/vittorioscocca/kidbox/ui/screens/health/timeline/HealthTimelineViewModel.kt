@@ -130,6 +130,7 @@ class HealthTimelineViewModel @Inject constructor(
 
             val treatmentEvents = treatments
                 .filter { !it.isDeleted }
+                .filter { it.petId.isBlank() }
                 .map { treatment ->
                     val subtitle = when {
                         treatment.isLongTerm -> "Lungo termine"

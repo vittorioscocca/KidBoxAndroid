@@ -346,6 +346,26 @@ class MainActivity : ComponentActivity() {
                                 }
                                 pendingPushDeepLink = null
                             }
+
+                            "vehicle_deadline_reminder" -> {
+                                val vehicleId = deepLink.itemId
+                                if (deepLink.familyId.isNotBlank() && !vehicleId.isNullOrBlank()) {
+                                    navController.navigate(
+                                        AppDestination.VehicleDetail.createRoute(deepLink.familyId, vehicleId),
+                                    )
+                                }
+                                pendingPushDeepLink = null
+                            }
+
+                            "house_payment_reminder" -> {
+                                val paymentId = deepLink.itemId
+                                if (deepLink.familyId.isNotBlank() && !paymentId.isNullOrBlank()) {
+                                    navController.navigate(
+                                        AppDestination.HousePaymentDetail.createRoute(deepLink.familyId, paymentId),
+                                    )
+                                }
+                                pendingPushDeepLink = null
+                            }
                         }
                     }
                 }
@@ -384,11 +404,15 @@ class MainActivity : ComponentActivity() {
         val deepLink = src.safeGetString("deep_link")
             ?: src.safeGetString("push_deep_link")
             ?: src.safeGetString("route")
-        val type = src.safeGetString("push_type")
+        val type = src?.getString("kb_deeplink_type")
+            ?: src.safeGetString("push_type")
             ?: src.safeGetString("type")
             ?: deepLink
             ?: return null
-        val familyId = src.safeGetString("push_family_id") ?: src.safeGetString("familyId") ?: ""
+        val familyId = src.safeGetString("kb_familyId")
+            ?: src.safeGetString("push_family_id")
+            ?: src.safeGetString("familyId")
+            ?: ""
         val itemId = src.safeGetString("push_item_id") ?: src.safeGetString("itemId")
         val docId = src.safeGetString("push_doc_id") ?: src.safeGetString("docId")
         val noteId = src.safeGetString("push_note_id") ?: src.safeGetString("noteId")
@@ -397,10 +421,12 @@ class MainActivity : ComponentActivity() {
         val listId = src.safeGetString("push_list_id") ?: src.safeGetString("listId")
         val todoId = src.safeGetString("push_todo_id") ?: src.safeGetString("todoId")
         val ticketId = src.safeGetString("ticketId")
+        val kbVehicleId = src.safeGetString("kb_vehicle_id")
+        val kbHousePaymentId = src.safeGetString("kb_house_payment_id")
         return PushDeepLink(
             type = type,
             familyId = familyId,
-            itemId = itemId ?: expenseId ?: docId ?: noteId ?: ticketId,
+            itemId = itemId ?: expenseId ?: docId ?: noteId ?: ticketId ?: kbVehicleId ?: kbHousePaymentId,
             childId = childId,
             listId = listId,
             todoId = todoId,

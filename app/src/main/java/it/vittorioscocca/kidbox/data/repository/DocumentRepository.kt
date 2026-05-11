@@ -20,6 +20,7 @@ import it.vittorioscocca.kidbox.data.remote.DocumentRemoteStore
 import it.vittorioscocca.kidbox.data.remote.RemoteDocumentDto
 import it.vittorioscocca.kidbox.data.remote.DocumentStorageManager
 import it.vittorioscocca.kidbox.data.remote.chat.ChatStorageService
+import it.vittorioscocca.kidbox.domain.model.KBTextExtractionStatus
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
 import java.io.File
@@ -696,6 +697,35 @@ class DocumentRepository @Inject constructor(
         return expenseFolder
     }
 
+    /** Cartella root «Garage» in Documenti (id deterministico, parity iOS `gar-root-{familyId}`). */
+    fun garageRootFolderId(familyId: String): String = "gar-root-$familyId"
+
+    suspend fun ensureGarageRootFolder(familyId: String): KBDocumentCategoryEntity {
+        val all = categoryDao.getAllByFamilyId(familyId)
+        val nextSort = (all.filter { it.parentId == null }.maxOfOrNull { it.sortOrder } ?: 0) + 1
+        return createFolderLocal(
+            familyId = familyId,
+            title = "Garage",
+            parentId = null,
+            forcedId = garageRootFolderId(familyId),
+            sortOrder = nextSort.coerceAtMost(96),
+        )
+    }
+
+    fun casaRootFolderId(familyId: String): String = "home-root-$familyId"
+
+    suspend fun ensureCasaRootFolder(familyId: String): KBDocumentCategoryEntity {
+        val all = categoryDao.getAllByFamilyId(familyId)
+        val nextSort = (all.filter { it.parentId == null }.maxOfOrNull { it.sortOrder } ?: 0) + 1
+        return createFolderLocal(
+            familyId = familyId,
+            title = "Casa",
+            parentId = null,
+            forcedId = casaRootFolderId(familyId),
+            sortOrder = nextSort.coerceAtMost(85),
+        )
+    }
+
     suspend fun uploadDocumentLocal(
         familyId: String,
         parentFolderId: String?,
@@ -1154,10 +1184,10 @@ class DocumentRepository @Inject constructor(
         if (local != null && local.exists()) {
             Log.d(TAG_DOC_REPO, "preparePreviewFile using local file docId=${document.id} localPath=${local.absolutePath}")
             val raw = local.readBytes()
-            val plain = if (isPlainChatDocument(document, local.absolutePath)) {
-                raw
-            } else {
-                storageManager.decryptCachedDocumentBytes(raw, document.familyId)
+            val plain = when {
+                isPlainChatDocument(document, local.absolutePath) -> raw
+                isPendingPlaintextAttachmentLocal(local.absolutePath) -> raw
+                else -> storageManager.decryptCachedDocumentBytes(raw, document.familyId)
             }
             output.writeBytes(plain)
             Log.d(TAG_DOC_REPO, "preparePreviewFile local decrypt done docId=${document.id} out=${output.absolutePath} plainBytes=${plain.size}")
@@ -1189,6 +1219,11 @@ class DocumentRepository @Inject constructor(
             absoluteLocalPath.contains("chat_media${File.separator}") ||
             absoluteLocalPath.contains("/chat_media/")
 
+    /** Allegati Salute/Casa/Garage: [HealthAttachmentService.writePendingFile] salva il file in chiaro prima dell'upload. */
+    private fun isPendingPlaintextAttachmentLocal(absoluteLocalPath: String): Boolean =
+        absoluteLocalPath.contains("${File.separator}kb_documents_pending${File.separator}") ||
+            absoluteLocalPath.contains("/kb_documents_pending/")
+
     fun expensesRootFolderId(familyId: String): String = "exp-root-$familyId"
 
     fun expenseCategoryFolderId(expenseId: String): String = "exp-cat-$expenseId"
@@ -1205,6 +1240,23 @@ class DocumentRepository @Inject constructor(
             plainBytes = local.readBytes(),
         )
         return doc.copy(storagePath = upload.storagePath, downloadURL = upload.downloadUrl)
+    }
+
+    /** Ordine pipeline OCR: snapshot Firestore spesso indietro rispetto al device locale. */
+    private fun extractionProgressRank(raw: Int): Int = when (raw) {
+        KBTextExtractionStatus.NONE.rawValue -> 0
+        KBTextExtractionStatus.PENDING.rawValue -> 1
+        KBTextExtractionStatus.PROCESSING.rawValue -> 2
+        KBTextExtractionStatus.COMPLETED.rawValue,
+        KBTextExtractionStatus.FAILED.rawValue,
+        -> 3
+        else -> 0
+    }
+
+    private fun mergeInboundDocumentExtractionStatus(remote: Int?, local: Int?): Int {
+        val loc = local ?: KBTextExtractionStatus.NONE.rawValue
+        if (remote == null) return loc
+        return if (extractionProgressRank(loc) >= extractionProgressRank(remote)) loc else remote
     }
 
     private suspend fun applyInboundChange(
@@ -1588,7 +1640,10 @@ class DocumentRepository @Inject constructor(
             notes = dto.notes ?: local?.notes,
             extractedText = dto.extractedText ?: local?.extractedText,
             extractedTextUpdatedAtEpochMillis = dto.extractedTextUpdatedAtEpochMillis ?: local?.extractedTextUpdatedAtEpochMillis,
-            extractionStatusRaw = dto.extractionStatusRaw ?: local?.extractionStatusRaw ?: 0,
+            extractionStatusRaw = mergeInboundDocumentExtractionStatus(
+                remote = dto.extractionStatusRaw,
+                local = local?.extractionStatusRaw,
+            ),
             extractionError = dto.extractionError ?: local?.extractionError,
             createdAtEpochMillis = local?.createdAtEpochMillis ?: dto.createdAtEpochMillis ?: now,
             updatedAtEpochMillis = remoteUpdatedAt.takeIf { it > 0L } ?: now,

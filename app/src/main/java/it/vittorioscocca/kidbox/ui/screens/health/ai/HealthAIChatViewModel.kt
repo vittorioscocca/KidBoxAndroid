@@ -110,7 +110,8 @@ class HealthAIChatViewModel @Inject constructor(
         }.onEach { data ->
             val activeVisits = data.visits.filter { !it.isDeleted }
             val activeExams = data.exams.filter { !it.isDeleted }
-            val activeTreatments = data.treatments.filter { !it.isDeleted }
+            val treatmentsForChild = data.treatments.filter { it.petId.isBlank() }
+            val activeTreatments = treatmentsForChild.filter { !it.isDeleted }
             val allDocs = data.documents.filter { !it.isDeleted }
             val relevantDocs = allDocs.filter { doc ->
                 activeExams.any { ExamAttachmentTag.matches(doc.notes, it.id) } ||
@@ -176,7 +177,7 @@ class HealthAIChatViewModel @Inject constructor(
                 subjectId = childId,
                 exams = data.exams,
                 visits = data.visits,
-                treatments = data.treatments,
+                treatments = treatmentsForChild,
                 vaccines = data.vaccines,
                 documentsByExamId = docsByExamId,
                 documentsByVisitId = docsByVisitId,

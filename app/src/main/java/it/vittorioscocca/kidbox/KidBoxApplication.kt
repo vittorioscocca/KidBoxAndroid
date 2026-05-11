@@ -10,7 +10,11 @@ import androidx.work.Configuration
 import androidx.work.WorkManager
 import dagger.hilt.android.HiltAndroidApp
 import it.vittorioscocca.kidbox.data.health.HealthOcrRecoveryMigration
+import it.vittorioscocca.kidbox.data.local.dao.HousePaymentDao
+import it.vittorioscocca.kidbox.data.local.dao.VehicleDao
 import it.vittorioscocca.kidbox.data.remote.AppCheckTokenCache
+import it.vittorioscocca.kidbox.notifications.HousePaymentReminderScheduler
+import it.vittorioscocca.kidbox.notifications.VehicleDeadlineReminderScheduler
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.WeeklySummaryService
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -30,6 +34,18 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
     @Inject
     lateinit var healthOcrRecoveryMigration: HealthOcrRecoveryMigration
 
+    @Inject
+    lateinit var vehicleDeadlineReminderScheduler: VehicleDeadlineReminderScheduler
+
+    @Inject
+    lateinit var vehicleDao: VehicleDao
+
+    @Inject
+    lateinit var housePaymentDao: HousePaymentDao
+
+    @Inject
+    lateinit var housePaymentReminderScheduler: HousePaymentReminderScheduler
+
     override fun onCreate() {
         super.onCreate()
         AppCheckInstaller.install()
@@ -43,6 +59,16 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
             .getString("active_family_id", null)
         if (!familyId.isNullOrBlank()) {
             WeeklySummaryService.scheduleWeeklyIfNeeded(this, familyId)
+            appInitScope.launch(Dispatchers.IO) {
+                runCatching {
+                    vehicleDao.listActiveByFamily(familyId).forEach { entity ->
+                        vehicleDeadlineReminderScheduler.syncVehicle(entity)
+                    }
+                    housePaymentDao.listActiveByFamily(familyId).forEach { hp ->
+                        housePaymentReminderScheduler.syncPayment(hp)
+                    }
+                }
+            }
         }
     }
 

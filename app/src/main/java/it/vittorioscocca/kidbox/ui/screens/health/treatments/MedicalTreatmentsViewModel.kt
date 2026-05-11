@@ -71,6 +71,7 @@ class MedicalTreatmentsViewModel @Inject constructor(
             val prev = _uiState.value
             val filtered = treatments
                 .filter { !it.isDeleted }
+                .filter { it.petId.isBlank() }
                 .filter {
                     passesTreatmentTimeFilter(
                         it,
@@ -93,7 +94,7 @@ class MedicalTreatmentsViewModel @Inject constructor(
                 }
             }
 
-            val anyNonDeleted = treatments.any { !it.isDeleted }
+            val anyNonDeleted = treatments.any { !it.isDeleted && it.petId.isBlank() }
             val emptyDueToFilter = anyNonDeleted && filtered.isEmpty() && prev.timeFilter != TreatmentTimeFilter.ALL
 
             MedicalTreatmentsState(

@@ -8,6 +8,7 @@ import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
 import it.vittorioscocca.kidbox.data.health.TreatmentAttachmentTag
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
+import it.vittorioscocca.kidbox.data.local.dao.PetDao
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import it.vittorioscocca.kidbox.data.local.mapper.scheduleTimesList
 import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
@@ -90,6 +91,7 @@ class MedicalTreatmentDetailViewModel @Inject constructor(
     private val doseLogRepository: DoseLogRepository,
     private val notifManager: TreatmentNotificationManager,
     private val childDao: KBChildDao,
+    private val petDao: PetDao,
     private val memberDao: KBFamilyMemberDao,
     private val attachmentService: HealthAttachmentService,
     private val documentRepository: DocumentRepository,
@@ -102,14 +104,18 @@ class MedicalTreatmentDetailViewModel @Inject constructor(
 
     private var familyId = ""
     private var childId = ""
+    private var petId = ""
     private var treatmentId = ""
     private var childName = ""
     private var prescJob: Job? = null
 
-    fun bind(familyId: String, childId: String, treatmentId: String) {
-        if (this.treatmentId == treatmentId) return
+    fun bind(familyId: String, childId: String, petId: String = "", treatmentId: String) {
+        if (this.treatmentId == treatmentId && this.familyId == familyId && this.childId == childId && this.petId == petId) {
+            return
+        }
         this.familyId = familyId
         this.childId = childId
+        this.petId = petId
         this.treatmentId = treatmentId
         prescJob?.cancel()
 
@@ -119,7 +125,7 @@ class MedicalTreatmentDetailViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            childName = resolveChildName(childId)
+            childName = resolveSubjectName(childId = childId, petId = petId)
             _uiState.value = _uiState.value.copy(childName = childName)
         }
 
@@ -131,7 +137,7 @@ class MedicalTreatmentDetailViewModel @Inject constructor(
             .launchIn(viewModelScope)
 
         combine(
-            repository.observe(familyId, childId),
+            repository.observeForSubject(familyId, childId, petId),
             doseLogRepository.observeByTreatment(treatmentId),
         ) { treatments, logs ->
             val treatment = treatments.firstOrNull { it.id == treatmentId }
@@ -274,7 +280,12 @@ class MedicalTreatmentDetailViewModel @Inject constructor(
     fun uploadAttachment(uri: Uri) {
         _uiState.value = _uiState.value.copy(isUploading = true, uploadError = null)
         viewModelScope.launch {
-            attachmentService.uploadTreatmentAttachment(uri, treatmentId, familyId, childId)
+            attachmentService.uploadTreatmentAttachment(
+                uri,
+                treatmentId,
+                familyId,
+                if (petId.isNotBlank()) null else childId.takeIf { it.isNotBlank() },
+            )
                 .onSuccess { _uiState.value = _uiState.value.copy(isUploading = false) }
                 .onFailure { err ->
                     _uiState.value = _uiState.value.copy(isUploading = false, uploadError = err.message ?: "Errore durante l'upload")
@@ -380,9 +391,13 @@ class MedicalTreatmentDetailViewModel @Inject constructor(
         }
     }
 
-    private suspend fun resolveChildName(id: String): String {
-        childDao.getById(id)?.name?.takeIf { it.isNotBlank() }?.let { return it }
-        memberDao.getById(id)?.displayName?.takeIf { it.isNotBlank() }?.let { return it }
+    private suspend fun resolveSubjectName(childId: String, petId: String): String {
+        if (petId.isNotBlank()) {
+            petDao.getById(petId)?.name?.takeIf { it.isNotBlank() }?.let { return it }
+            return "Animale"
+        }
+        childDao.getById(childId)?.name?.takeIf { it.isNotBlank() }?.let { return it }
+        memberDao.getById(childId)?.displayName?.takeIf { it.isNotBlank() }?.let { return it }
         return "Profilo"
     }
 

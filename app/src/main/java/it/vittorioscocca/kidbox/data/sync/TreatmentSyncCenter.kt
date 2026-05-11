@@ -4,6 +4,7 @@ import android.util.Log
 import com.google.firebase.firestore.ListenerRegistration
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTreatmentDao
+import it.vittorioscocca.kidbox.data.local.dao.PetDao
 import it.vittorioscocca.kidbox.data.remote.health.RemoteTreatmentDto
 import it.vittorioscocca.kidbox.data.remote.health.TreatmentRemoteStore
 import it.vittorioscocca.kidbox.data.remote.health.toEntity
@@ -21,6 +22,7 @@ class TreatmentSyncCenter @Inject constructor(
     private val remote: TreatmentRemoteStore,
     private val dao: KBTreatmentDao,
     private val childDao: KBChildDao,
+    private val petDao: PetDao,
     private val doseLogSyncCenter: DoseLogSyncCenter,
 ) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -54,6 +56,12 @@ class TreatmentSyncCenter @Inject constructor(
         return row.familyId == familyId
     }
 
+    private suspend fun isPetInFamily(familyId: String, petId: String): Boolean {
+        if (petId.isBlank()) return false
+        val pet = petDao.getById(petId) ?: return false
+        return pet.familyId == familyId && !pet.isDeleted
+    }
+
     private suspend fun applyInbound(dtos: List<RemoteTreatmentDto>) {
         for (dto in dtos) {
             val local = dao.getById(dto.id)
@@ -73,7 +81,8 @@ class TreatmentSyncCenter @Inject constructor(
 
             if (remoteStamp >= localStamp) {
                 val pediatric = isPediatricHealthSubject(dto.familyId, dto.childId)
-                val merged = if (pediatric) {
+                val petSubject = isPetInFamily(dto.familyId, dto.petId)
+                val merged = if (pediatric || petSubject) {
                     dto.toEntity()
                 } else {
                     val fromRemote = dto.toEntity()

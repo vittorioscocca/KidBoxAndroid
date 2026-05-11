@@ -15,12 +15,14 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("familyId"), Index("childId"), Index("prescribingVisitId")],
+    indices = [Index("familyId"), Index("childId"), Index("petId"), Index("prescribingVisitId")],
 )
 data class KBTreatmentEntity(
     @PrimaryKey val id: String,
     val familyId: String,
     val childId: String,
+    /** Cura legata a un animale (stessa collection Firestore `treatments` che iOS); vuoto se cura pediatrica. */
+    val petId: String = "",
     /** Visita che ha prescritto la cura (opzionale; nessuna FK per evitare ordine sync visita/cure). */
     val prescribingVisitId: String? = null,
     val drugName: String,

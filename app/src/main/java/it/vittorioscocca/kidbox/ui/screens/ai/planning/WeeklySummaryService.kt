@@ -26,10 +26,10 @@ import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.remote.ai.AIService
 import it.vittorioscocca.kidbox.data.repository.KBAIRepository
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
+import it.vittorioscocca.kidbox.domain.model.ai.AIMessageRole
 import java.util.Calendar
 import java.util.Locale
 import java.util.UUID
-
 object WeeklySummaryService {
     private const val PREFS_NAME = "kidbox_prefs"
     private const val PREF_LAST_ISO_WEEK = "kb_weeklySummary_lastISOWeek"
@@ -136,6 +136,7 @@ object WeeklySummaryService {
         @Assisted params: WorkerParameters,
         private val aiService: AIService,
         private val kbAIRepository: KBAIRepository,
+        private val weeklyDataMessageBuilder: WeeklySummaryDataMessageBuilder,
     ) : CoroutineWorker(appContext, params) {
 
         override suspend fun doWork(): Result {
@@ -153,7 +154,10 @@ object WeeklySummaryService {
                 - Se non c'è niente di significativo: "Settimana tranquilla! Nessuna scadenza urgente."
             """.trimIndent()
 
-            val userMessage = "Genera il recap della settimana corrente per la mia famiglia."
+            val userMessage = weeklyDataMessageBuilder.buildWeeklyDataMessage(
+                familyId = familyId,
+                familyName = familyName,
+            )
             val syntheticMessage = KBAIMessage(
                 id = UUID.randomUUID().toString(),
                 conversationId = "weekly-summary-$familyId",
@@ -180,7 +184,7 @@ object WeeklySummaryService {
                     )
                     kbAIRepository.addMessage(
                         conversationId = conversation.id,
-                        role = it.vittorioscocca.kidbox.domain.model.ai.AIMessageRole.ASSISTANT,
+                        role = AIMessageRole.ASSISTANT,
                         content = response.reply,
                     )
                 }

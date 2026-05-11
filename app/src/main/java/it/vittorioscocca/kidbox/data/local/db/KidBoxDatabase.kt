@@ -32,6 +32,12 @@ import it.vittorioscocca.kidbox.data.local.dao.KBSharedLocationDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoListDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTreatmentDao
 import it.vittorioscocca.kidbox.data.local.dao.KBVaccineDao
+import it.vittorioscocca.kidbox.data.local.dao.HomeItemDao
+import it.vittorioscocca.kidbox.data.local.dao.HousePaymentDao
+import it.vittorioscocca.kidbox.data.local.dao.PetDao
+import it.vittorioscocca.kidbox.data.local.dao.PetEventDao
+import it.vittorioscocca.kidbox.data.local.dao.VehicleDao
+import it.vittorioscocca.kidbox.data.local.dao.VehicleEventDao
 import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
 import it.vittorioscocca.kidbox.data.local.entity.KBAIConversationEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBAIMessageEntity
@@ -64,9 +70,15 @@ import it.vittorioscocca.kidbox.data.local.entity.KBTodoListEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTreatmentEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBVaccineEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBWalletTicketEntity
+import it.vittorioscocca.kidbox.data.local.entity.HomeItemEntity
+import it.vittorioscocca.kidbox.data.local.entity.HousePaymentEntity
+import it.vittorioscocca.kidbox.data.local.entity.PetEntity
+import it.vittorioscocca.kidbox.data.local.entity.PetEventEntity
+import it.vittorioscocca.kidbox.data.local.entity.VehicleEntity
+import it.vittorioscocca.kidbox.data.local.entity.VehicleEventEntity
 
 @Database(
-    version = 18,
+    version = 21,
     exportSchema = false,
     entities = [
         KBUserProfileEntity::class,
@@ -100,6 +112,12 @@ import it.vittorioscocca.kidbox.data.local.entity.KBWalletTicketEntity
         KBAIConversationEntity::class,
         KBAIMessageEntity::class,
         KBWalletTicketEntity::class,
+        PetEntity::class,
+        PetEventEntity::class,
+        HomeItemEntity::class,
+        HousePaymentEntity::class,
+        VehicleEntity::class,
+        VehicleEventEntity::class,
     ],
 )
 abstract class KidBoxDatabase : RoomDatabase() {
@@ -134,4 +152,10 @@ abstract class KidBoxDatabase : RoomDatabase() {
     abstract fun aiConversationDao(): KBAIConversationDao
     abstract fun aiMessageDao(): KBAIMessageDao
     abstract fun walletTicketDao(): WalletTicketDao
+    abstract fun petDao(): PetDao
+    abstract fun petEventDao(): PetEventDao
+    abstract fun homeItemDao(): HomeItemDao
+    abstract fun housePaymentDao(): HousePaymentDao
+    abstract fun vehicleDao(): VehicleDao
+    abstract fun vehicleEventDao(): VehicleEventDao
 }

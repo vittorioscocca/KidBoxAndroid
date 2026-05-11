@@ -12,6 +12,11 @@ import it.vittorioscocca.kidbox.data.local.mapper.encodeStringList
 import it.vittorioscocca.kidbox.data.health.ai.HealthAiDocumentText
 import it.vittorioscocca.kidbox.data.remote.DocumentStorageManager
 import it.vittorioscocca.kidbox.data.repository.DocumentRepository
+import it.vittorioscocca.kidbox.data.home.HomeItemAttachmentTag
+import it.vittorioscocca.kidbox.data.home.HousePaymentAttachmentTag
+import it.vittorioscocca.kidbox.data.pets.PetEventAttachmentTag
+import it.vittorioscocca.kidbox.data.vehicles.VehicleAttachmentTag
+import it.vittorioscocca.kidbox.data.vehicles.VehicleEventAttachmentTag
 import it.vittorioscocca.kidbox.domain.model.KBTextExtractionStatus
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
@@ -57,6 +62,7 @@ class HealthAttachmentService @Inject constructor(
         childId = childId,
         tag = VisitAttachmentTag.make(visitId),
         storageScopeSegment = "visit-attachments/$visitId",
+        resolveCategoryId = { folderResolver.ensureHealthFolders(familyId).second.id },
     )
 
     suspend fun uploadExamAttachment(
@@ -70,19 +76,74 @@ class HealthAttachmentService @Inject constructor(
         childId = childId,
         tag = ExamAttachmentTag.make(examId),
         storageScopeSegment = "exam-attachments/$examId",
+        resolveCategoryId = { folderResolver.ensureHealthFolders(familyId).second.id },
     )
 
     suspend fun uploadTreatmentAttachment(
         uri: Uri,
         treatmentId: String,
         familyId: String,
-        childId: String,
+        childId: String?,
     ): Result<KBDocumentEntity> = upload(
         uri = uri,
         familyId = familyId,
         childId = childId,
         tag = TreatmentAttachmentTag.make(treatmentId),
         storageScopeSegment = "treatment-attachments/$treatmentId",
+        resolveCategoryId = { folderResolver.ensureHealthFolders(familyId).second.id },
+    )
+
+    /** Allegati veicolo (cartella Documenti › Garage, parity iOS). */
+    suspend fun uploadVehicleAttachment(
+        uri: Uri,
+        vehicleId: String,
+        familyId: String,
+    ): Result<KBDocumentEntity> = upload(
+        uri = uri,
+        familyId = familyId,
+        childId = null,
+        tag = VehicleAttachmentTag.make(vehicleId),
+        storageScopeSegment = "vehicle-attachments/$vehicleId",
+        resolveCategoryId = { documentRepository.ensureGarageRootFolder(familyId).id },
+    )
+
+    suspend fun uploadVehicleEventAttachment(
+        uri: Uri,
+        eventId: String,
+        familyId: String,
+    ): Result<KBDocumentEntity> = upload(
+        uri = uri,
+        familyId = familyId,
+        childId = null,
+        tag = VehicleEventAttachmentTag.make(eventId),
+        storageScopeSegment = "vehicle-event-attachments/$eventId",
+        resolveCategoryId = { documentRepository.ensureGarageRootFolder(familyId).id },
+    )
+
+    suspend fun uploadHomeItemAttachment(
+        uri: Uri,
+        homeItemId: String,
+        familyId: String,
+    ): Result<KBDocumentEntity> = upload(
+        uri = uri,
+        familyId = familyId,
+        childId = null,
+        tag = HomeItemAttachmentTag.make(homeItemId),
+        storageScopeSegment = "home-item-attachments/$homeItemId",
+        resolveCategoryId = { documentRepository.ensureCasaRootFolder(familyId).id },
+    )
+
+    suspend fun uploadHousePaymentAttachment(
+        uri: Uri,
+        paymentId: String,
+        familyId: String,
+    ): Result<KBDocumentEntity> = upload(
+        uri = uri,
+        familyId = familyId,
+        childId = null,
+        tag = HousePaymentAttachmentTag.make(paymentId),
+        storageScopeSegment = "house-payment-attachments/$paymentId",
+        resolveCategoryId = { documentRepository.ensureCasaRootFolder(familyId).id },
     )
 
     /** Downloads (or returns the cached plaintext) for a document. */
@@ -102,6 +163,58 @@ class HealthAttachmentService @Inject constructor(
         // Flush the soft-delete to Firestore
         runCatching { documentRepository.flushPending(doc.familyId) }
             .onFailure { Log.w(TAG, "flushPending after delete failed", it) }
+    }
+
+    suspend fun deleteAllGarageAttachmentsForVehicle(vehicleId: String, familyId: String) = withContext(Dispatchers.IO) {
+        if (familyId.isBlank() || vehicleId.isBlank()) return@withContext
+        val docs = documentDao.getAllByFamilyId(familyId)
+            .filter { !it.isDeleted && VehicleAttachmentTag.matches(it.notes, vehicleId) }
+        for (doc in docs) {
+            try {
+                deleteAttachment(doc)
+            } catch (e: Exception) {
+                Log.w(TAG, "deleteAllGarageAttachmentsForVehicle doc=${doc.id}", e)
+            }
+        }
+    }
+
+    suspend fun deleteAllGarageAttachmentsForVehicleEvent(eventId: String, familyId: String) = withContext(Dispatchers.IO) {
+        if (familyId.isBlank() || eventId.isBlank()) return@withContext
+        val docs = documentDao.getAllByFamilyId(familyId)
+            .filter { !it.isDeleted && VehicleEventAttachmentTag.matches(it.notes, eventId) }
+        for (doc in docs) {
+            try {
+                deleteAttachment(doc)
+            } catch (e: Exception) {
+                Log.w(TAG, "deleteAllGarageAttachmentsForVehicleEvent doc=${doc.id}", e)
+            }
+        }
+    }
+
+    suspend fun deleteAllCasaAttachmentsForHomeItem(homeItemId: String, familyId: String) = withContext(Dispatchers.IO) {
+        if (familyId.isBlank() || homeItemId.isBlank()) return@withContext
+        val docs = documentDao.getAllByFamilyId(familyId)
+            .filter { !it.isDeleted && HomeItemAttachmentTag.matches(it.notes, homeItemId) }
+        for (doc in docs) {
+            try {
+                deleteAttachment(doc)
+            } catch (e: Exception) {
+                Log.w(TAG, "deleteAllCasaAttachmentsForHomeItem doc=${doc.id}", e)
+            }
+        }
+    }
+
+    suspend fun deleteAllCasaAttachmentsForHousePayment(paymentId: String, familyId: String) = withContext(Dispatchers.IO) {
+        if (familyId.isBlank() || paymentId.isBlank()) return@withContext
+        val docs = documentDao.getAllByFamilyId(familyId)
+            .filter { !it.isDeleted && HousePaymentAttachmentTag.matches(it.notes, paymentId) }
+        for (doc in docs) {
+            try {
+                deleteAttachment(doc)
+            } catch (e: Exception) {
+                Log.w(TAG, "deleteAllCasaAttachmentsForHousePayment doc=${doc.id}", e)
+            }
+        }
     }
 
     /** iOS parity: extract text for old health attachments (visit/exam/treatment) in background. */
@@ -201,14 +314,46 @@ class HealthAttachmentService @Inject constructor(
             .onFailure { Log.w(TAG, "ensureTreatmentAttachmentsExtraction flushPending failed familyId=$familyId", it) }
     }
 
+    /**
+     * Estrae testo per allegati Casa / Garage / eventi animali inclusi nel contesto
+     * dell'agente di pianificazione (parity iOS: OCR prima del prompt).
+     */
+    suspend fun ensureLifeAreaAttachmentsForPlanning(
+        familyId: String,
+        homeItemIds: Set<String>,
+        housePaymentIds: Set<String>,
+        vehicleIds: Set<String>,
+        vehicleEventIds: Set<String>,
+        petEventIds: Set<String>,
+    ) = withContext(Dispatchers.IO) {
+        if (familyId.isBlank()) return@withContext
+        val uid = auth.currentUser?.uid ?: "local"
+        val pending = documentDao.getLifeAreaDocumentsNeedingExtraction(familyId)
+        if (pending.isEmpty()) return@withContext
+        val candidates = pending.filter { doc ->
+            homeItemIds.any { HomeItemAttachmentTag.matches(doc.notes, it) } ||
+                housePaymentIds.any { HousePaymentAttachmentTag.matches(doc.notes, it) } ||
+                vehicleIds.any { VehicleAttachmentTag.matches(doc.notes, it) } ||
+                vehicleEventIds.any { VehicleEventAttachmentTag.matches(doc.notes, it) } ||
+                petEventIds.any { PetEventAttachmentTag.matches(doc.notes, it) }
+        }
+        if (candidates.isEmpty()) return@withContext
+        for (doc in candidates) {
+            extractAndPersistText(doc, uid)
+        }
+        runCatching { documentRepository.flushPending(familyId) }
+            .onFailure { Log.w(TAG, "ensureLifeAreaAttachmentsForPlanning flushPending failed familyId=$familyId", it) }
+    }
+
     // ── Private ──────────────────────────────────────────────────────────────────
 
     private suspend fun upload(
         uri: Uri,
         familyId: String,
-        childId: String,
+        childId: String?,
         tag: String,
         storageScopeSegment: String,
+        resolveCategoryId: suspend () -> String,
     ): Result<KBDocumentEntity> = withContext(Dispatchers.IO) {
         runCatching {
             val cr = context.contentResolver
@@ -228,13 +373,16 @@ class HealthAttachmentService @Inject constructor(
             val fileName = fileNameFromUri(uri).ifBlank { "attachment_${System.currentTimeMillis()}" }
             val title = titleFromFileName(fileName)
 
-            // 4. docId + paths
+            // 4. docId + paths — MUST use `documents/` (same as DocumentStorageManager.uploadEncrypted
+            // and iOS DocumentStorageService). Firebase Storage rules typically deny writes under
+            // home-item-attachments / vehicle-attachments / … (403).
             val docId = UUID.randomUUID().toString()
             val safeFile = safeFileName(fileName)
-            val storagePath = "families/$familyId/$storageScopeSegment/$docId/$safeFile.kbenc"
+            val storagePath = "families/$familyId/documents/$docId/$safeFile.kbenc"
+            Log.d(TAG, "Storage path (logical scope=$storageScopeSegment) -> $storagePath")
 
-            // 5. Ensure Salute/Referti folder hierarchy
-            val (_, referti) = folderResolver.ensureHealthFolders(familyId)
+            // 5. Target folder (Salute/Referti o Garage)
+            val categoryId = resolveCategoryId()
 
             // 6. Write plaintext to local cache
             val localPath = writePendingFile(docId, fileName, bytes)
@@ -247,7 +395,7 @@ class HealthAttachmentService @Inject constructor(
                 id = docId,
                 familyId = familyId,
                 childId = childId,
-                categoryId = referti.id,
+                categoryId = categoryId,
                 localPath = localPath,
                 title = title,
                 fileName = fileName,
@@ -317,9 +465,11 @@ class HealthAttachmentService @Inject constructor(
 
     private suspend fun backfillHealthExtractionInternal(familyId: String) {
         val uid = auth.currentUser?.uid ?: "local"
-        val candidates = documentDao.getHealthDocumentsNeedingExtraction(familyId)
+        val health = documentDao.getHealthDocumentsNeedingExtraction(familyId)
+        val lifeArea = documentDao.getLifeAreaDocumentsNeedingExtraction(familyId)
+        val candidates = (health + lifeArea).distinctBy { it.id }
         if (candidates.isEmpty()) return
-        Log.i(TAG, "Backfill extraction start familyId=$familyId count=${candidates.size}")
+        Log.i(TAG, "Backfill extraction start familyId=$familyId count=${candidates.size} (health+life)")
 
         for (doc in candidates) {
             extractAndPersistText(doc, uid)
@@ -344,12 +494,23 @@ class HealthAttachmentService @Inject constructor(
         )
         val previewFile = runCatching { documentRepository.preparePreviewFile(doc) }
             .onFailure { Log.w(TAG, "Extraction skip docId=${doc.id}: preview unavailable", it) }
-            .getOrNull() ?: return
+            .getOrNull()
+        if (previewFile == null) {
+            markExtractionFailed(doc, uid, "Anteprima non disponibile")
+            return
+        }
 
         val bytes = runCatching { previewFile.readBytes() }
             .onFailure { Log.w(TAG, "Extraction readBytes failed docId=${doc.id}", it) }
-            .getOrNull() ?: return
-        if (bytes.isEmpty()) return
+            .getOrNull()
+        if (bytes == null) {
+            markExtractionFailed(doc, uid, "Impossibile leggere il file")
+            return
+        }
+        if (bytes.isEmpty()) {
+            markExtractionFailed(doc, uid, "File vuoto")
+            return
+        }
 
         val now = System.currentTimeMillis()
         val extracted = runCatching {
@@ -385,6 +546,20 @@ class HealthAttachmentService @Inject constructor(
             )
         }
         documentDao.upsert(updated)
+    }
+
+    private suspend fun markExtractionFailed(doc: KBDocumentEntity, uid: String, message: String) {
+        val t = System.currentTimeMillis()
+        documentDao.upsert(
+            doc.copy(
+                extractionStatusRaw = KBTextExtractionStatus.FAILED.rawValue,
+                extractionError = message,
+                updatedAtEpochMillis = t,
+                updatedBy = uid,
+                syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                lastSyncError = null,
+            ),
+        )
     }
 
     private fun writePendingFile(docId: String, fileName: String, bytes: ByteArray): String {

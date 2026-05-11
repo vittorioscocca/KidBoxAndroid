@@ -225,6 +225,7 @@ fun MedicalVisitFormScreen(
         MedicalTreatmentFormScreen(
             familyId = familyId,
             childId = childId,
+            petId = "",
             treatmentId = null,
             onBack = { showTreatmentForm = false },
             onSaved = { tid ->

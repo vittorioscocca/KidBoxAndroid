@@ -55,6 +55,9 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -413,6 +416,11 @@ fun HomeScreen(
                         onClick = {
                             if (draggingId == null) {
                                 viewModel.onFeatureOpened(item.counterField)
+                                when (item.id) {
+                                    "pets" -> viewModel.recordQuickAction(HomeQuickAction.PETS)
+                                    "home_items" -> viewModel.recordQuickAction(HomeQuickAction.HOME_ITEMS)
+                                    "vehicles" -> viewModel.recordQuickAction(HomeQuickAction.VEHICLES)
+                                }
                                 onNavigate(item.route)
                             }
                         },
@@ -753,6 +761,33 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
         CounterField.PHOTOS,
     ),
     FeatureItem(
+        "pets",
+        "Animali",
+        "Cure e promemoria",
+        AppDestination.Pets.createRoute(familyId),
+        Icons.Filled.Pets,
+        Color(0xFFFFF6ED),
+        Color(0xFFFF9500),
+    ),
+    FeatureItem(
+        "home_items",
+        "Casa",
+        "Garanzie e manutenzioni",
+        AppDestination.HomeItems.createRoute(familyId),
+        Icons.Filled.Home,
+        Color(0xFFF8F3E6),
+        Color(0xFF8B6914),
+    ),
+    FeatureItem(
+        "vehicles",
+        "Garage",
+        "Auto e scadenze",
+        AppDestination.Vehicles.createRoute(familyId),
+        Icons.Filled.DirectionsCar,
+        Color(0xFFF0F0F0),
+        Color(0xFF1A1A1A),
+    ),
+    FeatureItem(
         id = "ai",
         title = if (state.familyPlan == KBPlan.FREE) "Assistente" else "Assistente AI",
         subtitle = if (state.familyPlan == KBPlan.FREE) "Disponibile con Pro o Max" else "Chiedi aiuto",
@@ -848,6 +883,9 @@ private fun actionIcon(action: HomeQuickAction): ImageVector = when (action) {
     HomeQuickAction.MESSAGE -> Icons.AutoMirrored.Filled.Chat
     HomeQuickAction.HEALTH -> Icons.Filled.Favorite
     HomeQuickAction.DOCUMENTS -> Icons.Filled.Description
+    HomeQuickAction.PETS -> Icons.Filled.Pets
+    HomeQuickAction.HOME_ITEMS -> Icons.Filled.Home
+    HomeQuickAction.VEHICLES -> Icons.Filled.DirectionsCar
 }
 
 private fun quickActionRoute(action: HomeQuickAction, familyId: String): String = when (action) {
@@ -859,4 +897,7 @@ private fun quickActionRoute(action: HomeQuickAction, familyId: String): String 
     HomeQuickAction.MESSAGE -> AppDestination.Chat.route
     HomeQuickAction.HEALTH -> AppDestination.PediatricChildSelector.createRoute(familyId)
     HomeQuickAction.DOCUMENTS -> AppDestination.DocumentsHome.createRoute(familyId)
+    HomeQuickAction.PETS -> AppDestination.Pets.createRoute(familyId)
+    HomeQuickAction.HOME_ITEMS -> AppDestination.HomeItems.createRoute(familyId)
+    HomeQuickAction.VEHICLES -> AppDestination.Vehicles.createRoute(familyId)
 }
