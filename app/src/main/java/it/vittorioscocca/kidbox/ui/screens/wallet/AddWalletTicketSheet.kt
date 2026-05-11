@@ -26,9 +26,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.FilterChip
@@ -39,6 +41,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
@@ -60,8 +63,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.data.wallet.WalletParsedData
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.domain.model.WalletTicketKind
+import it.vittorioscocca.kidbox.ui.screens.health.attachments.KidBoxDocumentPickerSheet
+import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerFullscreenDialog
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -90,6 +97,11 @@ fun AddWalletTicketSheet(
     var notes by rememberSaveable { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
+
+    var showVisibilityPicker by remember { mutableStateOf(false) }
+    var showKidBoxDocumentPicker by remember { mutableStateOf(false) }
+    var draftVisibilityScope by remember { mutableStateOf(KBVisibilityScope.ONLY_CREATOR) }
+    var draftVisibilityMemberIds by remember { mutableStateOf<List<String>>(emptyList()) }
 
     val dateFmt = remember { SimpleDateFormat("EEE d MMM yyyy, HH:mm", Locale.ITALIAN) }
 
@@ -136,6 +148,38 @@ fun AddWalletTicketSheet(
         ) {
             DatePicker(state = datePickerState)
         }
+    }
+
+    if (showVisibilityPicker) {
+        VisibilityPickerFullscreenDialog(
+            currentUid = FirebaseAuth.getInstance().currentUser?.uid,
+            scopeSectionTitle = "Chi può vedere questo biglietto",
+            membersExcludingSelf = state.visibilityMembers,
+            initialScope = draftVisibilityScope,
+            initialMemberIds = draftVisibilityMemberIds,
+            onDismiss = { showVisibilityPicker = false },
+            onConfirmed = { scope, ids ->
+                draftVisibilityScope = scope
+                draftVisibilityMemberIds = ids
+            },
+        )
+    }
+
+    if (showKidBoxDocumentPicker) {
+        KidBoxDocumentPickerSheet(
+            familyId = familyId,
+            pdfOnly = true,
+            onDismiss = { showKidBoxDocumentPicker = false },
+            onPickedUri = { uri ->
+                showKidBoxDocumentPicker = false
+                pdfUri = uri
+                pdfFileName = runCatching {
+                    context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+                        ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+                }.getOrNull() ?: "documento.pdf"
+                viewModel.parsePdf(context, uri, pdfFileName)
+            },
+        )
     }
 
     if (showTimePicker) {
@@ -215,6 +259,8 @@ fun AddWalletTicketSheet(
                                 bookingCode = bookingCode.ifBlank { null },
                                 notes = notes.ifBlank { null },
                             ),
+                            visibilityScope = draftVisibilityScope,
+                            visibilityMemberIds = draftVisibilityMemberIds,
                             context = context,
                             onSuccess = onDismiss,
                         )
@@ -231,12 +277,64 @@ fun AddWalletTicketSheet(
 
             HorizontalDivider()
 
+            Text(
+                "Visibilità",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Surface(
+                onClick = { showVisibilityPicker = true },
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        KBVisibilityScope.chipLabel(draftVisibilityScope),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Icon(
+                        Icons.Filled.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            HorizontalDivider()
+
             // PDF section
             Text(
                 "PDF",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                OutlinedButton(
+                    modifier = Modifier.weight(1f),
+                    onClick = { pdfPicker.launch("application/pdf") },
+                ) {
+                    Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Dispositivo", maxLines = 1)
+                }
+                OutlinedButton(
+                    modifier = Modifier.weight(1f),
+                    onClick = { showKidBoxDocumentPicker = true },
+                ) {
+                    Text("KidBox", maxLines = 1)
+                }
+            }
 
             Box(
                 modifier = Modifier
@@ -245,12 +343,10 @@ fun AddWalletTicketSheet(
                         MaterialTheme.colorScheme.surfaceVariant,
                         RoundedCornerShape(12.dp),
                     )
-                    .clickable { pdfPicker.launch("application/pdf") }
                     .padding(16.dp),
             ) {
                 if (pdfUri != null) {
                     Column {
-                        // Thumbnail preview
                         parsedData?.thumbnailBase64?.let { b64 ->
                             val bytes = runCatching { Base64.decode(b64, Base64.DEFAULT) }.getOrNull()
                             val bmp = bytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
@@ -272,30 +368,17 @@ fun AddWalletTicketSheet(
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
-                            "Tocca per cambiare",
+                            "Usa i pulsanti sopra per cambiare file",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 } else {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "Nessun PDF selezionato",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Icon(
-                            Icons.Filled.PictureAsPdf,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            "  Scegli PDF",
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
+                    Text(
+                        "Scegli un PDF dal dispositivo o dai documenti KidBox.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 

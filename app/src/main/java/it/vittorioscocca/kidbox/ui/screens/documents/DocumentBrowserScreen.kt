@@ -54,7 +54,9 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FileCopy
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MergeType
@@ -100,9 +102,13 @@ import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentCategoryEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
+import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerFullscreenDialog
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -133,6 +139,13 @@ fun DocumentBrowserScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val currentUid = remember { FirebaseAuth.getInstance().currentUser?.uid }
+    var showUploadVisibilityGate by remember { mutableStateOf(false) }
+    var showUploadVisibilityPicker by remember { mutableStateOf(false) }
+    var draftUploadScope by remember { mutableStateOf(KBVisibilityScope.FAMILY) }
+    var draftUploadMemberIds by remember { mutableStateOf(setOf<String>()) }
+    var documentInfoForDialog by remember { mutableStateOf<KBDocumentEntity?>(null) }
+    var showDocumentDetailVisibilityPicker by remember { mutableStateOf(false) }
     var showUploadSheet by remember { mutableStateOf(false) }
     var showCreateFolderDialog by remember { mutableStateOf(false) }
     var showMoveSheet by remember { mutableStateOf(false) }
@@ -253,7 +266,9 @@ fun DocumentBrowserScreen(
                     onAdd = {
                         if (!state.isSelecting) {
                             uploadTargetFolderId = state.breadcrumbs.lastOrNull()?.id
-                            showUploadSheet = true
+                            draftUploadScope = KBVisibilityScope.FAMILY
+                            draftUploadMemberIds = emptySet()
+                            showUploadVisibilityGate = true
                         }
                     },
                 )
@@ -605,6 +620,143 @@ fun DocumentBrowserScreen(
         )
     }
 
+    if (showUploadVisibilityGate) {
+        AlertDialog(
+            onDismissRequest = {
+                showUploadVisibilityPicker = false
+                showUploadVisibilityGate = false
+            },
+            title = { Text("Visibilità del documento") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Scegli chi può vedere questo file prima di caricarlo. Potrai modificarla in seguito dalle informazioni sul documento.",
+                        color = MaterialTheme.kidBoxColors.subtitle,
+                    )
+                    Surface(
+                        onClick = { showUploadVisibilityPicker = true },
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.kidBoxColors.card,
+                    ) {
+                        Text(
+                            KBVisibilityScope.chipLabel(draftUploadScope),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.kidBoxColors.title,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.setPendingUploadVisibility(draftUploadScope, draftUploadMemberIds)
+                        showUploadVisibilityPicker = false
+                        showUploadVisibilityGate = false
+                        showUploadSheet = true
+                    },
+                ) { Text("Continua") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showUploadVisibilityPicker = false
+                        showUploadVisibilityGate = false
+                    },
+                ) { Text("Annulla") }
+            },
+        )
+    }
+
+    if (showUploadVisibilityPicker && showUploadVisibilityGate) {
+        VisibilityPickerFullscreenDialog(
+            currentUid = currentUid,
+            scopeSectionTitle = "Chi può vedere questo documento?",
+            membersExcludingSelf = state.visibilityMembers,
+            initialScope = draftUploadScope,
+            initialMemberIds = draftUploadMemberIds.toList(),
+            onDismiss = { showUploadVisibilityPicker = false },
+            onConfirmed = { scope, ids ->
+                draftUploadScope = KBVisibilityScope.normalized(scope)
+                draftUploadMemberIds = ids.toSet()
+                showUploadVisibilityPicker = false
+            },
+        )
+    }
+
+    if (documentInfoForDialog != null) {
+        val docInfo = documentInfoForDialog!!
+        AlertDialog(
+            onDismissRequest = {
+                documentInfoForDialog = null
+                showDocumentDetailVisibilityPicker = false
+            },
+            title = { Text(docInfo.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Visibilità", fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.title)
+                    Surface(
+                        onClick = { showDocumentDetailVisibilityPicker = true },
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.kidBoxColors.card,
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                KBVisibilityScope.chipLabel(docInfo.visibilityScope),
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.kidBoxColors.title,
+                            )
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = null,
+                                tint = MaterialTheme.kidBoxColors.subtitle,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+                    Text(
+                        "Tocca il riquadro per modificare chi può vedere questo documento.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.kidBoxColors.subtitle,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        documentInfoForDialog = null
+                        showDocumentDetailVisibilityPicker = false
+                    },
+                ) { Text("Chiudi") }
+            },
+        )
+    }
+
+    if (showDocumentDetailVisibilityPicker && documentInfoForDialog != null) {
+        val d = documentInfoForDialog!!
+        VisibilityPickerFullscreenDialog(
+            currentUid = currentUid,
+            scopeSectionTitle = "Chi può vedere questo documento?",
+            membersExcludingSelf = state.visibilityMembers,
+            initialScope = KBVisibilityScope.normalized(d.visibilityScope),
+            initialMemberIds = decodeStringList(d.visibilityMemberIdsJson),
+            onDismiss = { showDocumentDetailVisibilityPicker = false },
+            onConfirmed = { scope, ids ->
+                viewModel.updateDocumentVisibility(d, scope, ids)
+                showDocumentDetailVisibilityPicker = false
+                documentInfoForDialog = null
+            },
+        )
+    }
+
     if (showUploadSheet) {
         DocumentUploadBottomSheet(
             onDismiss = {
@@ -701,8 +853,18 @@ fun DocumentBrowserScreen(
     }
 
     if (contextMenuTarget != null) {
+        val isDocumentTarget = contextMenuTarget is ContextMenuTarget.Document
         ContextActionBottomSheet(
             onDismiss = { contextMenuTarget = null },
+            showDocumentInfo = isDocumentTarget,
+            onDocumentInfo = {
+                val d = (contextMenuTarget as? ContextMenuTarget.Document)?.value
+                if (d != null) {
+                    documentInfoForDialog = d
+                    showDocumentDetailVisibilityPicker = false
+                }
+                contextMenuTarget = null
+            },
             onRename = {
                 val target = contextMenuTarget ?: return@ContextActionBottomSheet
                 renameText = when (target) {
@@ -1221,6 +1383,8 @@ private fun BottomAction(
 @Composable
 private fun ContextActionBottomSheet(
     onDismiss: () -> Unit,
+    showDocumentInfo: Boolean,
+    onDocumentInfo: () -> Unit,
     onRename: () -> Unit,
     onMove: () -> Unit,
     onCopy: () -> Unit,
@@ -1244,6 +1408,9 @@ private fun ContextActionBottomSheet(
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (showDocumentInfo) {
+                SheetAction("Informazioni", icon = Icons.Default.Info, onClick = onDocumentInfo)
+            }
             SheetAction("Rinomina", icon = Icons.Default.Edit, onClick = onRename)
             SheetAction("Sposta in...", icon = Icons.Default.DriveFileMove, onClick = onMove)
             SheetAction("Copia in...", icon = Icons.Default.ContentCopy, onClick = onCopy)

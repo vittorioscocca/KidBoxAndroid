@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox.ui.screens.ai.planning
 
 import android.content.Context
 import android.util.Log
+import com.google.firebase.auth.FirebaseAuth
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -17,6 +18,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.dao.KBGroceryItemDao
 import it.vittorioscocca.kidbox.data.local.dao.KBNoteDao
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
 import it.vittorioscocca.kidbox.data.local.dao.KBPediatricProfileDao
 import it.vittorioscocca.kidbox.data.local.dao.KBRoutineCheckDao
 import it.vittorioscocca.kidbox.data.local.dao.KBRoutineDao
@@ -53,6 +55,7 @@ import it.vittorioscocca.kidbox.domain.model.KBGroceryItem
 import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
 import it.vittorioscocca.kidbox.domain.model.KBNote
 import it.vittorioscocca.kidbox.domain.model.KBPlan
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.domain.model.KBPediatricProfile
 import it.vittorioscocca.kidbox.domain.model.KBRoutine
 import it.vittorioscocca.kidbox.domain.model.KBRoutineCheck
@@ -119,6 +122,7 @@ class PlanningAIChatViewModel @Inject constructor(
     private val documentDao: KBDocumentDao,
     private val walletTicketDao: WalletTicketDao,
     private val pediatricProfileDao: KBPediatricProfileDao,
+    private val auth: FirebaseAuth,
     @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
@@ -338,8 +342,17 @@ class PlanningAIChatViewModel @Inject constructor(
         val childrenEntities = if (effectiveFamilyId.isNotBlank()) childDao.getChildrenByFamilyId(effectiveFamilyId) else emptyList()
 
         val calendarEvents = if (effectiveFamilyId.isNotBlank()) {
+            val uid = FirebaseAuth.getInstance().currentUser?.uid
             calendarEventDao.observeByFamilyId(effectiveFamilyId).first()
                 .filterNot { it.isDeleted }
+                .filter { row ->
+                    KBVisibilityScope.isVisible(
+                        KBVisibilityScope.normalized(row.visibilityScope),
+                        decodeStringList(row.visibilityMemberIdsJson),
+                        row.createdBy.takeIf { it.isNotBlank() },
+                        uid,
+                    )
+                }
                 .map { it.toDomain() }
         } else {
             emptyList()
@@ -463,7 +476,14 @@ class PlanningAIChatViewModel @Inject constructor(
             pendingGroceryItems = groceryItems.filter { !it.isPurchased },
             recentChatMessages = chatMessages.sortedByDescending { it.createdAtEpochMillis }.take(15),
             recentDocuments = documents.sortedByDescending { it.updatedAtEpochMillis }.take(10),
-            recentWalletTickets = if (effectiveFamilyId.isNotBlank()) walletTicketDao.getActiveByFamilyId(effectiveFamilyId).take(10) else emptyList(),
+            recentWalletTickets = if (effectiveFamilyId.isNotBlank()) {
+                walletTicketDao.getActiveByFamilyId(
+                    effectiveFamilyId,
+                    auth.currentUser?.uid.orEmpty(),
+                ).take(10)
+            } else {
+                emptyList()
+            },
             children = children,
             pediatricProfiles = pediatricProfiles,
             allVisits = allVisits,
@@ -503,6 +523,8 @@ private fun KBCalendarEventEntity.toDomain() = KBCalendarEvent(
     reminderMinutes = reminderMinutes,
     linkedHealthItemId = linkedHealthItemId,
     linkedHealthItemType = linkedHealthItemType,
+    visibilityScope = KBVisibilityScope.normalized(visibilityScope),
+    visibilityMemberIds = decodeStringList(visibilityMemberIdsJson),
     isDeleted = isDeleted,
     createdAtEpochMillis = createdAtEpochMillis,
     updatedAtEpochMillis = updatedAtEpochMillis,
@@ -568,6 +590,8 @@ private fun KBNoteEntity.toDomain() = KBNote(
     familyId = familyId,
     title = title,
     body = body,
+    visibilityScope = KBVisibilityScope.normalized(visibilityScope),
+    visibilityMemberIds = decodeStringList(visibilityMemberIdsJson),
     createdBy = createdBy,
     createdByName = createdByName,
     updatedBy = updatedBy,
@@ -673,6 +697,9 @@ private fun KBDocumentEntity.toDomain() = KBDocument(
     createdAtEpochMillis = createdAtEpochMillis,
     updatedAtEpochMillis = updatedAtEpochMillis,
     updatedBy = updatedBy,
+    createdBy = createdBy,
+    visibilityScope = visibilityScope,
+    visibilityMemberIdsJson = visibilityMemberIdsJson,
     isDeleted = isDeleted,
     syncStateRaw = syncStateRaw,
     lastSyncError = lastSyncError,

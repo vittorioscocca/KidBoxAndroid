@@ -18,6 +18,7 @@ import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.data.repository.TodoRepository
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -226,6 +227,8 @@ class ShareActionHandler @Inject constructor(
                 reminderMinutes = null,
                 linkedHealthItemId = null,
                 linkedHealthItemType = null,
+                visibilityScope = KBVisibilityScope.FAMILY,
+                visibilityMemberIdsJson = "[]",
                 isDeleted = false,
                 createdAtEpochMillis = now,
                 updatedAtEpochMillis = now,

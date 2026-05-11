@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
 import it.vittorioscocca.kidbox.data.wallet.WalletReminderPrefs
@@ -20,12 +21,14 @@ class WalletReminderScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
     private val walletTicketDao: WalletTicketDao,
     private val walletReminderPrefs: WalletReminderPrefs,
+    private val auth: FirebaseAuth,
 ) {
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
     suspend fun rescheduleForFamily(familyId: String) = withContext(Dispatchers.IO) {
         if (familyId.isBlank()) return@withContext
-        val tickets = walletTicketDao.getActiveByFamilyId(familyId)
+        val uid = auth.currentUser?.uid.orEmpty()
+        val tickets = walletTicketDao.getActiveByFamilyId(familyId, uid)
         for (t in tickets) {
             cancelTicket(t.id)
         }

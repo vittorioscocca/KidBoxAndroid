@@ -160,7 +160,13 @@ fun NotesHomeScreen(
                     icon = Icons.Default.Add,
                     onClick = {
                         viewModel.createEmptyNote { noteId ->
-                            onNavigate(AppDestination.NoteDetail.createRoute(familyId = familyId, noteId = noteId))
+                            onNavigate(
+                                AppDestination.NoteDetail.createRoute(
+                                    familyId = familyId,
+                                    noteId = noteId,
+                                    isNewNote = true,
+                                ),
+                            )
                         }
                     },
                 )

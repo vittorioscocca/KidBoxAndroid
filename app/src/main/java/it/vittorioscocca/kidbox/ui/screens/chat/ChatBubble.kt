@@ -104,6 +104,7 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import it.vittorioscocca.kidbox.data.chat.model.ChatMessageType
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import it.vittorioscocca.kidbox.util.ChatDocumentFileNaming
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
@@ -1200,14 +1201,21 @@ private fun DocumentContent(
                 isDownloading = true
                 downloadError = null
                 runCatching {
-                    val fileName = message.text?.takeIf { it.isNotBlank() } ?: "documento"
-                    val cacheDir = File(context.cacheDir, "kb_docs").also { it.mkdirs() }
-                    val dest = File(cacheDir, fileName.replace('/', '_'))
-                    withContext(Dispatchers.IO) {
-                        URL(url).openStream().use { src -> dest.outputStream().use { dst -> src.copyTo(dst) } }
+                    val bytes = withContext(Dispatchers.IO) {
+                        URL(url).openStream().use { it.readBytes() }
                     }
+                    val safeName = ChatDocumentFileNaming.cachePreviewFileName(
+                        messageId = message.id,
+                        displayText = message.text,
+                        bytes = bytes,
+                    )
+                    val cacheDir = File(context.cacheDir, "kb_docs").also { it.mkdirs() }
+                    val dest = File(cacheDir, safeName)
+                    withContext(Dispatchers.IO) { dest.writeBytes(bytes) }
                     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", dest)
-                    val mime = mimeFromFileName(fileName)
+                    val mime = ChatDocumentFileNaming.mimeFromBytes(bytes)
+                        .takeIf { it != "application/octet-stream" }
+                        ?: mimeFromFileName(safeName)
                     val intent = Intent(Intent.ACTION_VIEW).apply {
                         setDataAndType(uri, mime)
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

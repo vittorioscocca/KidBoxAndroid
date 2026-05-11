@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -311,11 +310,10 @@ fun RichNoteEditor(
             }
         }
         if (isKeyboardVisible && isBodyFocused) {
-            Spacer(Modifier.height(10.dp))
+            // Con windowSoftInputMode=adjustResize il bounds del composable terminano già sopra la IME:
+            // NON usare windowInsetsPadding(ime) qui — duplicava l’inset e lasciava fascia bianca sopra tastiera.
             RichToolbarBar(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .imePadding(),
+                modifier = Modifier.fillMaxWidth(),
                 state = toolbarState,
                 isAaExpanded = isAaExpanded,
                 onAction = { command ->

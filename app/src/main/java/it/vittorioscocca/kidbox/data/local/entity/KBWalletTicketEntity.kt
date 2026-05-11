@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 
 @Entity(
     tableName = "kb_wallet_tickets",
@@ -43,5 +44,9 @@ data class KBWalletTicketEntity(
     val createdAtEpochMillis: Long,
     val updatedAtEpochMillis: Long,
     val isDeleted: Boolean,
+    /** `"family"` | `"members"` | `"private"` — default personale come iOS. */
+    val visibilityScope: String = KBVisibilityScope.ONLY_CREATOR,
+    /** JSON array uid ([encodeStringList]) se [visibilityScope] == `"members"`. */
+    val visibilityMemberIdsJson: String = "[]",
     val syncStateRaw: Int = 0,
 )

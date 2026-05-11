@@ -10,6 +10,7 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.SetOptions
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoItemEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoListEntity
 import javax.inject.Inject
@@ -42,7 +43,15 @@ data class TodoItemRemoteDto(
     val assignedTo: String?,
     val createdBy: String?,
     val priorityRaw: Int?,
+    val visibilityScope: String?,
+    val visibilityMemberIds: List<String>,
 )
+
+@Suppress("UNCHECKED_CAST")
+private fun readFirestoreTodoStringIds(data: Map<String, Any?>, key: String): List<String> {
+    val raw = data[key] ?: return emptyList()
+    return (raw as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+}
 
 sealed interface TodoListRemoteChange {
     data class Upsert(val dto: TodoListRemoteDto) : TodoListRemoteChange
@@ -123,7 +132,7 @@ class TodoRemoteStore @Inject constructor(
                     } else if (snap != null) {
                         val changes = snap.documentChanges.mapNotNull { diff ->
                             val doc = diff.document
-                            val d = doc.data
+                            val d = doc.data ?: return@mapNotNull null
                             val title = (d["title"] as? String)?.trim().orEmpty()
                             val cid = (d["childId"] as? String)?.trim().orEmpty()
                             if (title.isEmpty() || cid.isEmpty()) {
@@ -146,6 +155,8 @@ class TodoRemoteStore @Inject constructor(
                                     assignedTo = d["assignedTo"] as? String,
                                     createdBy = d["createdBy"] as? String,
                                     priorityRaw = (d["priority"] as? Number)?.toInt(),
+                                    visibilityScope = d["visibilityScope"] as? String,
+                                    visibilityMemberIds = readFirestoreTodoStringIds(d, "visibilityMemberIds"),
                                 )
                                 when (diff.type) {
                                     DocumentChange.Type.ADDED,
@@ -208,6 +219,8 @@ class TodoRemoteStore @Inject constructor(
         payload["dueAt"] = todo.dueAtEpochMillis?.let { Timestamp(it / 1000, ((it % 1000) * 1_000_000).toInt()) }
         payload["doneAt"] = todo.doneAtEpochMillis?.let { Timestamp(it / 1000, ((it % 1000) * 1_000_000).toInt()) }
         if (!todo.createdBy.isNullOrBlank()) payload["createdBy"] = todo.createdBy
+        payload["visibilityScope"] = todo.visibilityScope
+        payload["visibilityMemberIds"] = decodeStringList(todo.visibilityMemberIdsJson)
         db.collection("families").document(todo.familyId).collection("todos").document(todo.id)
             .set(payload, SetOptions.merge())
             .await()

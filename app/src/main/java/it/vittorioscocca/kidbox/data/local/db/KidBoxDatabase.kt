@@ -66,7 +66,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBVaccineEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBWalletTicketEntity
 
 @Database(
-    version = 14,
+    version = 18,
     exportSchema = false,
     entities = [
         KBUserProfileEntity::class,

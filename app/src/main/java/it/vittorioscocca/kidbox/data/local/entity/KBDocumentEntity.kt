@@ -43,6 +43,11 @@ data class KBDocumentEntity(
     val createdAtEpochMillis: Long,
     val updatedAtEpochMillis: Long,
     val updatedBy: String,
+    /** Owner uid quando [visibilityScope] è `"private"` (solo creatore). */
+    val createdBy: String,
+    val visibilityScope: String,
+    /** JSON array di uid quando [visibilityScope] è `"members"`. */
+    val visibilityMemberIdsJson: String,
     val isDeleted: Boolean,
     val syncStateRaw: Int,
     val lastSyncError: String?,

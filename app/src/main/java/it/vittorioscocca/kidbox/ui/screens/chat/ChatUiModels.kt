@@ -9,6 +9,7 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import it.vittorioscocca.kidbox.data.chat.model.ContactPayload
 import it.vittorioscocca.kidbox.data.chat.model.LabeledStringValue
 import it.vittorioscocca.kidbox.domain.model.KBChatMessage
+import it.vittorioscocca.kidbox.util.ChatDocumentFileNaming
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -54,14 +55,21 @@ data class UiChatMessage(
         get() = SimpleDateFormat("HH:mm", Locale.ITALY).format(Date(createdAtMillis))
 }
 
-internal fun KBChatMessage.toUi(): UiChatMessage =
-    UiChatMessage(
+internal fun KBChatMessage.toUi(): UiChatMessage {
+    val resolvedType = ChatMessageType.fromRaw(typeRaw)
+    val displayText = when {
+        resolvedType == ChatMessageType.DOCUMENT &&
+            !text.isNullOrBlank() &&
+            ChatDocumentFileNaming.isMsfPlaceholder(text) -> "Allegato"
+        else -> text
+    }
+    return UiChatMessage(
         id = id,
         familyId = familyId,
         senderId = senderId,
         senderName = senderName.ifBlank { "Utente" },
-        type = ChatMessageType.fromRaw(typeRaw),
-        text = text,
+        type = resolvedType,
+        text = displayText,
         latitude = latitude,
         longitude = longitude,
         mediaUrl = mediaURL,
@@ -82,6 +90,7 @@ internal fun KBChatMessage.toUi(): UiChatMessage =
         isDeletedForEveryone = isDeletedForEveryone,
         syncStateRaw = syncStateRaw,
     )
+}
 
 internal fun Map<String, List<String>>.toJsonStringOrNull(): String? {
     if (isEmpty()) return null

@@ -22,6 +22,9 @@ data class KBNoteEntity(
     val familyId: String,
     val title: String,
     val body: String,
+    val visibilityScope: String,
+    /** JSON array serialized like altre liste (vedi encodeStringList). */
+    val visibilityMemberIdsJson: String,
     val createdBy: String,
     val createdByName: String,
     val updatedBy: String,

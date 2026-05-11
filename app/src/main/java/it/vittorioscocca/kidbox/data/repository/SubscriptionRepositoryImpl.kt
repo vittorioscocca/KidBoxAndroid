@@ -14,10 +14,12 @@ import kotlinx.coroutines.tasks.await
 
 @Singleton
 class SubscriptionRepositoryImpl @Inject constructor(
-    private val firestore: FirebaseFirestore,
     private val functions: FirebaseFunctions,
     private val auth: FirebaseAuth,
 ) : SubscriptionRepository {
+
+    /** Always [FirebaseFirestore.getInstance] — dopo [FirebaseFirestore.terminate] il singleton si rinnova. */
+    private val firestore get() = FirebaseFirestore.getInstance()
 
     override fun planFlow(familyId: String, uid: String): Flow<KBPlan> = callbackFlow {
         if (familyId.isBlank()) {

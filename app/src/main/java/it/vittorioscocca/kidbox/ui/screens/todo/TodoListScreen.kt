@@ -60,6 +60,11 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoItemEntity
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
+import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerBottomSheet
+import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerMember
+import it.vittorioscocca.kidbox.ui.navigation.CONTENT_NO_LONGER_AVAILABLE_MESSAGE
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.time.Instant
 import java.time.ZoneId
@@ -101,6 +106,8 @@ fun TodoListScreen(
                 assignedTo = effective.assignedTo,
                 priorityRaw = if (effective.urgent) 1 else 0,
                 reminderEnabled = effective.reminderEnabled,
+                visibilityScope = effective.visibilityScope,
+                visibilityMemberIds = effective.visibilityMemberIds,
             )
         } else {
             viewModel.updateTodo(
@@ -111,6 +118,8 @@ fun TodoListScreen(
                 assignedTo = effective.assignedTo,
                 priorityRaw = if (effective.urgent) 1 else 0,
                 reminderEnabled = effective.reminderEnabled,
+                visibilityScope = effective.visibilityScope,
+                visibilityMemberIds = effective.visibilityMemberIds,
             )
         }
         if (effective.reminderEnabled && effective.dueAt != null) {
@@ -124,6 +133,31 @@ fun TodoListScreen(
             .fillMaxSize()
             .background(kb.background),
     ) {
+        if (state.listAccessDenied) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Spacer(Modifier.height(10.dp))
+                HeaderCircleButton(icon = Icons.AutoMirrored.Filled.ArrowBack, onClick = onBack)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    CONTENT_NO_LONGER_AVAILABLE_MESSAGE,
+                    fontSize = 17.sp,
+                    color = kb.subtitle,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    "Questa lista contiene solo attività personali di altri membri.",
+                    fontSize = 14.sp,
+                    color = kb.subtitle,
+                )
+                Spacer(Modifier.weight(1f))
+            }
+        } else {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -186,6 +220,7 @@ fun TodoListScreen(
                 item { Spacer(Modifier.height(24.dp)) }
             }
         }
+        }
 
         SnackbarHost(
             hostState = snackbarHostState,
@@ -199,6 +234,7 @@ fun TodoListScreen(
         TodoEditDialog(
             initial = editingTodo,
             members = state.members,
+            currentUid = state.currentUid,
             onDismiss = { showEditor = false },
             onSave = { form ->
                 val mustAskPermission = form.reminderEnabled &&
@@ -217,6 +253,8 @@ fun TodoListScreen(
                             assignedTo = form.assignedTo,
                             priorityRaw = if (form.urgent) 1 else 0,
                             reminderEnabled = form.reminderEnabled,
+                            visibilityScope = form.visibilityScope,
+                            visibilityMemberIds = form.visibilityMemberIds,
                         )
                     } else {
                         viewModel.updateTodo(
@@ -227,6 +265,8 @@ fun TodoListScreen(
                             assignedTo = form.assignedTo,
                             priorityRaw = if (form.urgent) 1 else 0,
                             reminderEnabled = form.reminderEnabled,
+                            visibilityScope = form.visibilityScope,
+                            visibilityMemberIds = form.visibilityMemberIds,
                         )
                     }
                     if (form.reminderEnabled && form.dueAt != null) {
@@ -327,12 +367,15 @@ private data class TodoEditForm(
     val assignedTo: String?,
     val urgent: Boolean,
     val reminderEnabled: Boolean,
+    val visibilityScope: String,
+    val visibilityMemberIds: List<String>,
 )
 
 @Composable
 private fun TodoEditDialog(
     initial: KBTodoItemEntity?,
     members: List<TodoMemberUi>,
+    currentUid: String,
     onDismiss: () -> Unit,
     onSave: (TodoEditForm) -> Unit,
 ) {
@@ -346,6 +389,32 @@ private fun TodoEditDialog(
     var urgent by remember(initial?.id) { mutableStateOf((initial?.priorityRaw ?: 0) == 1) }
     var assignedTo by remember(initial?.id) { mutableStateOf(initial?.assignedTo) }
     var showAssigneePicker by remember { mutableStateOf(false) }
+    var visScope by remember(initial?.id) {
+        mutableStateOf(
+            if (initial == null) KBVisibilityScope.FAMILY else KBVisibilityScope.normalized(initial.visibilityScope),
+        )
+    }
+    var visMemberIds by remember(initial?.id) {
+        mutableStateOf(
+            if (initial == null) {
+                emptySet()
+            } else {
+                decodeStringList(initial.visibilityMemberIdsJson).toSet()
+            },
+        )
+    }
+    var showVisPick by remember { mutableStateOf(false) }
+    var showVisLocked by remember { mutableStateOf(false) }
+    val visibilityPickerMembers = remember(members, currentUid) {
+        members
+            .filter { it.uid != currentUid }
+            .map { VisibilityPickerMember(uid = it.uid, displayName = it.displayName) }
+            .sortedBy { it.displayName.lowercase() }
+    }
+    val canEditTodoVisibility = remember(initial?.id, initial?.createdBy, currentUid) {
+        initial == null || initial.createdBy.isNullOrBlank() || initial.createdBy == currentUid
+    }
+    val displayVisScope = KBVisibilityScope.normalized(visScope)
 
     fun pickDate() {
         val cal = Calendar.getInstance().apply { timeInMillis = dueAt }
@@ -387,6 +456,34 @@ private fun TodoEditDialog(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 TextField(value = title, onValueChange = { title = it }, placeholder = { Text("Titolo") })
                 TextField(value = notes, onValueChange = { notes = it }, placeholder = { Text("Note") })
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            if (canEditTodoVisibility) {
+                                showVisPick = true
+                            } else {
+                                showVisLocked = true
+                            }
+                        },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.rowBackground),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("Visibilità", fontSize = 13.sp, color = MaterialTheme.kidBoxColors.subtitle)
+                        Text(
+                            KBVisibilityScope.chipLabel(displayVisScope),
+                            fontSize = 15.sp,
+                            color = MaterialTheme.kidBoxColors.title,
+                        )
+                    }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                     Text("Scadenza")
                     Switch(
@@ -485,6 +582,12 @@ private fun TodoEditDialog(
                             assignedTo = assignedTo,
                             urgent = urgent,
                             reminderEnabled = dueEnabled && reminderEnabled,
+                            visibilityScope = visScope,
+                            visibilityMemberIds = if (KBVisibilityScope.normalized(visScope) == KBVisibilityScope.MEMBERS) {
+                                visMemberIds.toList().sorted()
+                            } else {
+                                emptyList()
+                            },
                         ),
                     )
                 },
@@ -545,6 +648,33 @@ private fun TodoEditDialog(
             },
             confirmButton = {},
             dismissButton = { TextButton(onClick = { showAssigneePicker = false }) { Text("Chiudi") } },
+        )
+    }
+
+    if (showVisPick && canEditTodoVisibility) {
+        VisibilityPickerBottomSheet(
+            currentUid = currentUid,
+            scopeSectionTitle = "Chi può vedere questo to-do",
+            membersExcludingSelf = visibilityPickerMembers,
+            initialScope = visScope,
+            initialMemberIds = visMemberIds.toList(),
+            onDismiss = { showVisPick = false },
+            onConfirmed = { scope, ids ->
+                visScope = scope
+                visMemberIds = ids.toSet()
+                showVisPick = false
+            },
+        )
+    }
+
+    if (showVisLocked) {
+        AlertDialog(
+            onDismissRequest = { showVisLocked = false },
+            title = { Text("Visibilità bloccata") },
+            text = { Text("Solo chi ha creato il to-do può modificare la visibilità.") },
+            confirmButton = {
+                TextButton(onClick = { showVisLocked = false }) { Text("OK") }
+            },
         )
     }
 }

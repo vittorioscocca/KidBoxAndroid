@@ -12,7 +12,9 @@ import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.SetOptions
 import it.vittorioscocca.kidbox.data.local.entity.KBWalletTicketEntity
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
 import it.vittorioscocca.kidbox.data.remote.DocumentCryptoManager
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
@@ -49,6 +51,8 @@ data class WalletTicketRemoteDto(
     val createdByName: String?,
     val updatedBy: String?,
     val updatedByName: String?,
+    val visibilityScope: String = KBVisibilityScope.ONLY_CREATOR,
+    val visibilityMemberIds: List<String> = emptyList(),
 )
 
 sealed interface WalletRemoteChange {
@@ -84,6 +88,10 @@ class WalletRemoteStore @Inject constructor(
                                 is Double -> v.toLong()
                                 else -> 0L
                             }
+                            fun stringListField(key: String): List<String> = when (val v = d[key]) {
+                                is List<*> -> v.mapNotNull { it as? String }
+                                else -> emptyList()
+                            }
                             val dto = WalletTicketRemoteDto(
                                 id = doc.id,
                                 familyId = familyId,
@@ -116,6 +124,10 @@ class WalletRemoteStore @Inject constructor(
                                 createdByName = d["createdByName"] as? String,
                                 updatedBy = d["updatedBy"] as? String,
                                 updatedByName = d["updatedByName"] as? String,
+                                visibilityScope = KBVisibilityScope.normalizedWallet(
+                                    d["visibilityScope"] as? String,
+                                ),
+                                visibilityMemberIds = stringListField("visibilityMemberIds"),
                             )
                             when (diff.type) {
                                 DocumentChange.Type.ADDED,
@@ -153,6 +165,8 @@ class WalletRemoteStore @Inject constructor(
             "pdfStorageURL" to ticket.pdfStorageURL,
             "pdfStorageBytes" to ticket.pdfStorageBytes,
             "barcodeFormat" to ticket.barcodeFormat,
+            "visibilityScope" to ticket.visibilityScope,
+            "visibilityMemberIds" to decodeStringList(ticket.visibilityMemberIdsJson),
             "isDeleted" to false,
             "updatedBy" to uid,
             "updatedByName" to displayName,
@@ -187,6 +201,9 @@ class WalletRemoteStore @Inject constructor(
         pdfStorageURL: String,
         pdfStorageBytes: Long,
         displayName: String,
+        kindRaw: String = "other",
+        emitter: String? = null,
+        eventDateEpochMillis: Long? = null,
     ) {
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
         val ref = db.collection("families").document(familyId).collection("walletTickets").document(ticketId)
@@ -195,14 +212,22 @@ class WalletRemoteStore @Inject constructor(
             "schemaVersion" to 1,
             "titleEnc" to titleEnc,
             "fileNameEnc" to fileNameEnc,
-            "kind" to "other",
+            "kind" to kindRaw,
             "pdfStorageURL" to pdfStorageURL,
             "pdfStorageBytes" to pdfStorageBytes,
+            "visibilityScope" to KBVisibilityScope.ONLY_CREATOR,
+            "visibilityMemberIds" to emptyList<String>(),
             "isDeleted" to false,
             "updatedBy" to uid,
             "updatedByName" to displayName,
             "updatedAt" to FieldValue.serverTimestamp(),
         )
+        if (!emitter.isNullOrBlank()) {
+            payload["emitter"] = emitter
+        }
+        eventDateEpochMillis?.let { ms ->
+            payload["eventDate"] = Timestamp(ms / 1000, 0)
+        }
         if (!exists) {
             payload["createdAt"] = FieldValue.serverTimestamp()
             payload["createdBy"] = uid

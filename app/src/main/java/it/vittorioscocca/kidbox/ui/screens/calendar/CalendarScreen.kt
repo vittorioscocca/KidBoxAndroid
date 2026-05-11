@@ -45,6 +45,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -67,7 +68,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.data.local.entity.KBCalendarEventEntity
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
+import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerFullscreenDialog
+import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerMember
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.time.Instant
 import java.time.LocalDate
@@ -87,6 +93,24 @@ fun CalendarScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showForm by remember { mutableStateOf(false) }
     var editingEvent by remember { mutableStateOf<KBCalendarEventEntity?>(null) }
+    val currentUid = remember { FirebaseAuth.getInstance().currentUser?.uid }
+
+    // Visibility state hoisted here so the picker dialog can be shown OUTSIDE the bottom sheet,
+    // avoiding the nested-sheet issue on MIUI and other ROM variants.
+    var showVisibilityPicker by remember { mutableStateOf(false) }
+    var draftVisibilityScope by remember { mutableStateOf(KBVisibilityScope.FAMILY) }
+    var draftVisibilityMemberIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+
+    // Sync draft visibility whenever the form is opened or the edited event changes.
+    LaunchedEffect(showForm, editingEvent?.id) {
+        if (showForm) {
+            val evt = editingEvent
+            draftVisibilityScope = KBVisibilityScope.normalized(evt?.visibilityScope)
+            draftVisibilityMemberIds = decodeStringList(evt?.visibilityMemberIdsJson).toSet()
+        } else {
+            showVisibilityPicker = false
+        }
+    }
 
     LaunchedEffect(familyId) {
         viewModel.bindFamily(familyId)
@@ -185,10 +209,31 @@ fun CalendarScreen(
         CalendarEventDialog(
             initial = editingEvent,
             selectedDate = state.selectedDate,
+            currentUid = currentUid,
+            visibilityScope = draftVisibilityScope,
+            visibilityMemberIds = draftVisibilityMemberIds,
+            onRequestVisibilityPicker = { showVisibilityPicker = true },
             onDismiss = { showForm = false },
             onSave = { draft ->
                 viewModel.saveEvent(draft, editingEvent)
                 showForm = false
+            },
+        )
+    }
+
+    // The picker is a sibling of CalendarEventDialog (NOT nested inside its ModalBottomSheet).
+    if (showVisibilityPicker && showForm) {
+        VisibilityPickerFullscreenDialog(
+            currentUid = currentUid,
+            scopeSectionTitle = "Chi può vedere questo evento?",
+            membersExcludingSelf = state.visibilityMembers,
+            initialScope = draftVisibilityScope,
+            initialMemberIds = draftVisibilityMemberIds.toList(),
+            onDismiss = { showVisibilityPicker = false },
+            onConfirmed = { scope, ids ->
+                draftVisibilityScope = KBVisibilityScope.normalized(scope)
+                draftVisibilityMemberIds = ids.toSet()
+                showVisibilityPicker = false
             },
         )
     }
@@ -504,7 +549,7 @@ private fun CalendarEventCard(
         shape = RoundedCornerShape(14.dp),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(event.title, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text(event.title, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = MaterialTheme.kidBoxColors.title)
             Text(timeLabel, color = MaterialTheme.kidBoxColors.subtitle, fontSize = 12.sp)
             Text(categoryLabel(event.categoryRaw), color = categoryColor(event.categoryRaw), fontSize = 12.sp)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -521,12 +566,20 @@ private fun CalendarEventCard(
 private fun CalendarEventDialog(
     initial: KBCalendarEventEntity?,
     selectedDate: LocalDate,
+    currentUid: String?,
+    /** Current visibility selection – owned by CalendarScreen so the picker can open outside this sheet. */
+    visibilityScope: String,
+    visibilityMemberIds: Set<String>,
+    /** Called when the user taps "Cambia" – CalendarScreen will open the full-screen picker. */
+    onRequestVisibilityPicker: () -> Unit,
     onDismiss: () -> Unit,
     onSave: (CalendarDraftInput) -> Unit,
 ) {
     val context = LocalContext.current
     val locale = Locale("it", "IT")
     val formatter = remember { DateTimeFormatter.ofPattern("dd MMM yyyy", locale) }
+    val kb = MaterialTheme.kidBoxColors
+    val colorScheme = MaterialTheme.colorScheme
 
     val initialStart = initial?.let {
         Instant.ofEpochMilli(it.startDateEpochMillis).atZone(ZoneId.systemDefault()).toLocalDateTime()
@@ -547,6 +600,14 @@ private fun CalendarEventDialog(
     var startTime by remember { mutableStateOf(initialStart.toLocalTime().withSecond(0).withNano(0)) }
     var endDate by remember { mutableStateOf(initialEnd.toLocalDate()) }
     var endTime by remember { mutableStateOf(initialEnd.toLocalTime().withSecond(0).withNano(0)) }
+
+    val canEditVisibility = remember(initial?.id, currentUid) {
+        when {
+            initial == null -> true
+            initial.createdBy.isBlank() -> true
+            else -> initial.createdBy == (currentUid?.takeIf { it.isNotBlank() } ?: "")
+        }
+    }
 
     fun pickDate(current: LocalDate, onPicked: (LocalDate) -> Unit) {
         DatePickerDialog(
@@ -579,18 +640,23 @@ private fun CalendarEventDialog(
         dragHandle = null,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .imePadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PillButton(text = "Annulla", onClick = onDismiss)
                 Spacer(modifier = Modifier.weight(1f))
-                Text(text = titleText, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = titleText,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = kb.title,
+                )
                 Spacer(modifier = Modifier.weight(1f))
                 Spacer(modifier = Modifier.size(74.dp))
             }
@@ -601,10 +667,10 @@ private fun CalendarEventDialog(
                     TextField(
                         value = title,
                         onValueChange = { title = it },
-                        placeholder = { Text("Es. Visita pediatrica") },
+                        placeholder = { Text("Es. Visita pediatrica", color = kb.subtitle.copy(alpha = 0.72f)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = textFieldColors(),
+                        colors = calendarTextFieldColors(),
                     )
                     Divider()
                     Text("CATEGORIA", fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
@@ -623,8 +689,22 @@ private fun CalendarEventDialog(
             Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Tutto il giorno", modifier = Modifier.weight(1f), fontSize = 16.sp)
-                        Switch(checked = isAllDay, onCheckedChange = { isAllDay = it })
+                        Text(
+                            "Tutto il giorno",
+                            modifier = Modifier.weight(1f),
+                            fontSize = 16.sp,
+                            color = kb.title,
+                        )
+                        Switch(
+                            checked = isAllDay,
+                            onCheckedChange = { isAllDay = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = colorScheme.surface,
+                                checkedTrackColor = colorScheme.primary,
+                                uncheckedThumbColor = kb.subtitle,
+                                uncheckedTrackColor = kb.surfaceOverlay,
+                            ),
+                        )
                     }
                     Divider()
                     DateTimeRow(
@@ -632,6 +712,8 @@ private fun CalendarEventDialog(
                         dateText = startDate.format(formatter),
                         timeText = startTime.format(DateTimeFormatter.ofPattern("HH:mm")),
                         allDay = isAllDay,
+                        labelColor = kb.title,
+                        valueColor = kb.title,
                         onPickDate = { pickDate(startDate) { startDate = it } },
                         onPickTime = { pickTime(startTime) { startTime = it } },
                     )
@@ -641,6 +723,8 @@ private fun CalendarEventDialog(
                         dateText = endDate.format(formatter),
                         timeText = endTime.format(DateTimeFormatter.ofPattern("HH:mm")),
                         allDay = isAllDay,
+                        labelColor = kb.title,
+                        valueColor = kb.title,
                         onPickDate = { pickDate(endDate) { endDate = it } },
                         onPickTime = { pickTime(endTime) { endTime = it } },
                     )
@@ -654,7 +738,13 @@ private fun CalendarEventDialog(
                             "monthly" to "Mensile",
                             "yearly" to "Annuale",
                         ).forEach { (raw, label) ->
-                            SmallChip(label, selected = recurrence == raw) { recurrence = raw }
+                            SmallChip(
+                                label,
+                                selected = recurrence == raw,
+                                selectedBg = colorScheme.primaryContainer,
+                                selectedContent = colorScheme.onPrimaryContainer,
+                                unselectedContent = kb.title,
+                            ) { recurrence = raw }
                         }
                     }
                 }
@@ -665,8 +755,70 @@ private fun CalendarEventDialog(
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Promemoria", modifier = Modifier.weight(1f), fontSize = 16.sp)
-                    Switch(checked = reminderOn, onCheckedChange = { reminderOn = it })
+                    Text(
+                        "Promemoria",
+                        modifier = Modifier.weight(1f),
+                        fontSize = 16.sp,
+                        color = kb.title,
+                    )
+                    Switch(
+                        checked = reminderOn,
+                        onCheckedChange = { reminderOn = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = colorScheme.surface,
+                            checkedTrackColor = colorScheme.primary,
+                            uncheckedThumbColor = kb.subtitle,
+                            uncheckedTrackColor = kb.surfaceOverlay,
+                        ),
+                    )
+                }
+            }
+
+            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = kb.card)) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        "VISIBILITÀ",
+                        fontSize = 12.sp,
+                        color = kb.subtitle,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    if (canEditVisibility) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(kb.surfaceOverlay)
+                                .clickable { onRequestVisibilityPicker() }
+                                .padding(horizontal = 12.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    KBVisibilityScope.chipLabel(visibilityScope),
+                                    color = kb.title,
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 15.sp,
+                                )
+                            }
+                            Text("Cambia ›", color = kb.subtitle, fontSize = 14.sp)
+                        }
+                    } else {
+                        Text(
+                            KBVisibilityScope.chipLabel(
+                                KBVisibilityScope.normalized(initial?.visibilityScope ?: KBVisibilityScope.FAMILY),
+                            ),
+                            color = kb.title,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 15.sp,
+                        )
+                        Text(
+                            "Solo chi ha creato l'evento può modificare la visibilità.",
+                            color = kb.subtitle,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
                 }
             }
 
@@ -676,20 +828,20 @@ private fun CalendarEventDialog(
                     TextField(
                         value = location,
                         onValueChange = { location = it },
-                        placeholder = { Text("Indirizzo o luogo") },
+                        placeholder = { Text("Indirizzo o luogo", color = kb.subtitle.copy(alpha = 0.72f)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = textFieldColors(),
+                        colors = calendarTextFieldColors(),
                     )
                     Divider()
                     Text("NOTE", fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
                     TextField(
                         value = notes,
                         onValueChange = { notes = it },
-                        placeholder = { Text("Aggiungi note...") },
+                        placeholder = { Text("Aggiungi note...", color = kb.subtitle.copy(alpha = 0.72f)) },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 3,
-                        colors = textFieldColors(),
+                        colors = calendarTextFieldColors(),
                     )
                 }
             }
@@ -710,6 +862,8 @@ private fun CalendarEventDialog(
                             reminderMinutes = if (reminderOn) 30 else null,
                             startEpochMillis = startDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
                             endEpochMillis = endDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+                            visibilityScope = visibilityScope,
+                            visibilityMemberIds = visibilityMemberIds.toList().sorted(),
                         ),
                     )
                 },
@@ -719,11 +873,14 @@ private fun CalendarEventDialog(
                     .height(52.dp),
                 shape = RoundedCornerShape(999.dp),
             ) {
-                Text(if (initial == null) "Aggiungi evento" else "Salva evento")
+                Text(
+                    if (initial == null) "Aggiungi evento" else "Salva evento",
+                    color = colorScheme.onPrimary,
+                )
             }
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+            }
         }
-    }
 }
 
 @Composable
@@ -732,20 +889,29 @@ private fun DateTimeRow(
     dateText: String,
     timeText: String,
     allDay: Boolean,
+    labelColor: Color,
+    valueColor: Color,
     onPickDate: () -> Unit,
     onPickTime: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(label, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Text(
+            label,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = labelColor,
+        )
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             PickerPill(
                 value = dateText,
+                textColor = valueColor,
                 onClick = onPickDate,
                 modifier = Modifier.weight(1f),
             )
             if (!allDay) {
                 PickerPill(
                     value = timeText,
+                    textColor = valueColor,
                     onClick = onPickTime,
                     modifier = Modifier.weight(0.65f),
                 )
@@ -757,13 +923,15 @@ private fun DateTimeRow(
 @Composable
 private fun PickerPill(
     value: String,
+    textColor: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val kb = MaterialTheme.kidBoxColors
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(MaterialTheme.kidBoxColors.card)
+            .background(kb.surfaceOverlay)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
@@ -773,6 +941,7 @@ private fun PickerPill(
             textAlign = TextAlign.Center,
             fontWeight = FontWeight.Medium,
             fontSize = 15.sp,
+            color = textColor,
         )
     }
 }
@@ -784,6 +953,7 @@ private fun CategoryPill(
     color: Color,
     onClick: () -> Unit,
 ) {
+    val kb = MaterialTheme.kidBoxColors
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
@@ -798,7 +968,12 @@ private fun CategoryPill(
                 .size(8.dp)
                 .background(color, CircleShape),
         )
-        Text(text, modifier = Modifier.padding(start = 6.dp), fontWeight = FontWeight.Medium)
+        Text(
+            text,
+            modifier = Modifier.padding(start = 6.dp),
+            fontWeight = FontWeight.Medium,
+            color = kb.title,
+        )
     }
 }
 
@@ -806,17 +981,27 @@ private fun CategoryPill(
 private fun SmallChip(
     text: String,
     selected: Boolean,
+    selectedBg: Color,
+    selectedContent: Color,
+    unselectedContent: Color,
     onClick: () -> Unit,
 ) {
+    val kb = MaterialTheme.kidBoxColors
+    val border = if (selected) MaterialTheme.colorScheme.primary else kb.divider
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(if (selected) Color(0xFFE9F2FF) else MaterialTheme.kidBoxColors.card)
-            .border(1.dp, if (selected) Color(0xFF64B5F6) else MaterialTheme.kidBoxColors.divider, RoundedCornerShape(999.dp))
+            .background(if (selected) selectedBg else Color.Transparent)
+            .border(1.dp, border, RoundedCornerShape(999.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 5.dp),
     ) {
-        Text(text, fontSize = 13.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+        Text(
+            text,
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (selected) selectedContent else unselectedContent,
+        )
     }
 }
 
@@ -870,18 +1055,26 @@ private fun PillButton(
             text = text,
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
             fontWeight = FontWeight.Medium,
+            color = MaterialTheme.kidBoxColors.title,
         )
     }
 }
 
 @Composable
-private fun textFieldColors() = TextFieldDefaults.colors(
+private fun calendarTextFieldColors() = TextFieldDefaults.colors(
     focusedContainerColor = Color.Transparent,
     unfocusedContainerColor = Color.Transparent,
     disabledContainerColor = Color.Transparent,
+    errorContainerColor = Color.Transparent,
     focusedIndicatorColor = Color.Transparent,
     unfocusedIndicatorColor = Color.Transparent,
     disabledIndicatorColor = Color.Transparent,
+    errorIndicatorColor = Color.Transparent,
+    cursorColor = MaterialTheme.kidBoxColors.title,
+    focusedTextColor = MaterialTheme.kidBoxColors.title,
+    unfocusedTextColor = MaterialTheme.kidBoxColors.title,
+    focusedPlaceholderColor = MaterialTheme.kidBoxColors.subtitle.copy(alpha = 0.72f),
+    unfocusedPlaceholderColor = MaterialTheme.kidBoxColors.subtitle.copy(alpha = 0.72f),
 )
 
 private fun monthGridDays(monthFirstDate: LocalDate): List<LocalDate?> {

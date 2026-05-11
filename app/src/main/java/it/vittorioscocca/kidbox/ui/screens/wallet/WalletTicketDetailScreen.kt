@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PictureAsPdf
@@ -43,6 +44,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -52,6 +54,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,12 +73,17 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
+import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.data.local.entity.KBWalletTicketEntity
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
+import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerFullscreenDialog
 import it.vittorioscocca.kidbox.domain.model.WalletTicketKind
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 @Composable
 fun WalletTicketDetailScreen(
@@ -87,8 +95,12 @@ fun WalletTicketDetailScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val ticket = state.tickets.firstOrNull { it.id == ticketId }
     val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showVisibilityPicker by remember { mutableStateOf(false) }
+    var draftVisibilityScope by remember { mutableStateOf(KBVisibilityScope.ONLY_CREATOR) }
+    var draftVisibilityMemberIds by remember { mutableStateOf<List<String>>(emptyList()) }
 
     BackHandler { onBack() }
 
@@ -103,7 +115,7 @@ fun WalletTicketDetailScreen(
         tmpFile.writeBytes(bytes)
         val uri = FileProvider.getUriForFile(
             context,
-            "${context.packageName}.provider",
+            "${context.packageName}.fileprovider",
             tmpFile,
         )
         val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -136,6 +148,21 @@ fun WalletTicketDetailScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) { Text("Annulla") }
+            },
+        )
+    }
+
+    if (showVisibilityPicker) {
+        VisibilityPickerFullscreenDialog(
+            currentUid = FirebaseAuth.getInstance().currentUser?.uid,
+            scopeSectionTitle = "Chi può vedere questo biglietto",
+            membersExcludingSelf = state.visibilityMembers,
+            initialScope = draftVisibilityScope,
+            initialMemberIds = draftVisibilityMemberIds,
+            onDismiss = { showVisibilityPicker = false },
+            onConfirmed = { scope, ids ->
+                showVisibilityPicker = false
+                viewModel.updateTicketVisibility(ticketId, scope, ids)
             },
         )
     }
@@ -179,6 +206,45 @@ fun WalletTicketDetailScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
+            Surface(
+                onClick = {
+                    val uid = FirebaseAuth.getInstance().currentUser?.uid
+                    val createdBy = ticket.createdBy.trim()
+                    if (createdBy.isNotEmpty() && uid != null && createdBy != uid) {
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar(
+                                "Solo chi ha creato il biglietto può modificare la visibilità.",
+                            )
+                        }
+                        return@Surface
+                    }
+                    draftVisibilityScope = KBVisibilityScope.normalizedWallet(ticket.visibilityScope)
+                    draftVisibilityMemberIds = decodeStringList(ticket.visibilityMemberIdsJson)
+                    showVisibilityPicker = true
+                },
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        KBVisibilityScope.chipLabel(KBVisibilityScope.normalizedWallet(ticket.visibilityScope)),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Icon(
+                        Icons.Filled.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
             // Header card
             WalletTicketCard(
                 ticket = ticket,

@@ -12,6 +12,7 @@ import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.SetOptions
 import androidx.core.text.HtmlCompat
 import it.vittorioscocca.kidbox.data.local.entity.KBNoteEntity
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
@@ -30,7 +31,15 @@ data class NoteRemoteDto(
     val createdByName: String?,
     val updatedBy: String?,
     val updatedByName: String?,
+    val visibilityScope: String?,
+    val visibilityMemberIds: List<String>,
 )
+
+@Suppress("UNCHECKED_CAST")
+private fun readFirestoreStringIds(data: Map<String, Any?>, key: String): List<String> {
+    val raw = data[key] ?: return emptyList()
+    return (raw as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+}
 
 sealed interface NoteRemoteChange {
     data class Upsert(val dto: NoteRemoteDto) : NoteRemoteChange
@@ -58,7 +67,7 @@ class NoteRemoteStore @Inject constructor(
                     } else if (snap != null) {
                         val changes = snap.documentChanges.mapNotNull { diff ->
                             val doc = diff.document
-                            val d = doc.data
+                            val d = doc.data ?: return@mapNotNull null
                             val dto = NoteRemoteDto(
                                 id = doc.id,
                                 familyId = familyId,
@@ -73,6 +82,8 @@ class NoteRemoteStore @Inject constructor(
                                 createdByName = d["createdByName"] as? String,
                                 updatedBy = d["updatedBy"] as? String,
                                 updatedByName = d["updatedByName"] as? String,
+                                visibilityScope = d["visibilityScope"] as? String,
+                                visibilityMemberIds = readFirestoreStringIds(d, "visibilityMemberIds"),
                             )
                             when (diff.type) {
                                 DocumentChange.Type.ADDED,
@@ -100,6 +111,8 @@ class NoteRemoteStore @Inject constructor(
             "schemaVersion" to 1,
             "titleEnc" to titleEnc,
             "bodyEnc" to bodyEnc,
+            "visibilityScope" to note.visibilityScope,
+            "visibilityMemberIds" to decodeStringList(note.visibilityMemberIdsJson),
             "title" to FieldValue.delete(),
             "body" to FieldValue.delete(),
             "isDeleted" to false,

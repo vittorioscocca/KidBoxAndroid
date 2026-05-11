@@ -68,11 +68,14 @@ private val GradientStart = Color(0xFFFFBF40)
 private val GradientEnd = Color(0xFFF26010)
 
 @Composable
-fun KidBoxSplashScreen(onFinished: () -> Unit) {
+fun KidBoxSplashScreen(
+    onFinished: () -> Unit,
+    modifier: Modifier = Modifier.fillMaxSize(),
+) {
     val density = LocalDensity.current
     val context = LocalContext.current
     val view = LocalView.current
-    val activity = context as? Activity
+    val activity = remember(context) { context.findActivity() }
     activity?.window?.attributes?.layoutInDisplayCutoutMode =
         android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
     val window = activity?.window
@@ -174,7 +177,7 @@ fun KidBoxSplashScreen(onFinished: () -> Unit) {
         onFinished()
     }
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = modifier) {
         val wPx = with(density) { maxWidth.toPx() }
         val hPx = with(density) { maxHeight.toPx() }
         val gradientBrush = remember(wPx, hPx) {

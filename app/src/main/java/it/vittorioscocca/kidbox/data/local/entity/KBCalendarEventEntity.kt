@@ -38,6 +38,10 @@ data class KBCalendarEventEntity(
     val reminderMinutes: Int?,
     val linkedHealthItemId: String?,
     val linkedHealthItemType: String?,
+    /** `"family"` | `"members"` | `"private"` (solo creatore) — come note/to‑do e iOS. */
+    val visibilityScope: String,
+    /** JSON array uid (encodeStringList), usato quando [visibilityScope] è `"members"`. */
+    val visibilityMemberIdsJson: String,
     val isDeleted: Boolean,
     val createdAtEpochMillis: Long,
     val updatedAtEpochMillis: Long,

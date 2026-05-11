@@ -28,11 +28,15 @@ sealed class AppDestination(val route: String) {
     data object NotesHome : AppDestination("notes_home/{familyId}") {
         fun createRoute(familyId: String): String = "notes_home/$familyId"
     }
-    data object NoteDetail : AppDestination("note_detail/{familyId}/{noteId}") {
+    data object NoteDetail : AppDestination("note_detail/{familyId}/{noteId}?isNewNote={isNewNote}") {
         fun createRoute(
             familyId: String,
             noteId: String,
-        ): String = "note_detail/$familyId/$noteId"
+            isNewNote: Boolean = false,
+        ): String {
+            val base = "note_detail/$familyId/$noteId"
+            return if (isNewNote) "$base?isNewNote=true" else base
+        }
     }
     data object Todo : AppDestination("todo")
     data object TodoList : AppDestination("todo_list/{familyId}/{childId}/{listId}?highlightTodoId={highlightTodoId}") {

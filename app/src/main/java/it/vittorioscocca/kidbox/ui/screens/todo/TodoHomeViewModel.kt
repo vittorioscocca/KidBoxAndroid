@@ -8,15 +8,16 @@ import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.notification.CounterField
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
 import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
 import it.vittorioscocca.kidbox.data.repository.TodoRepository
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
+import it.vittorioscocca.kidbox.domain.model.TodoListExposure
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -68,12 +69,29 @@ class TodoHomeViewModel @Inject constructor(
                 error,
             ) { lists, todos, members, err ->
                 val meUid = auth.currentUser?.uid.orEmpty()
+                val uidForVis = meUid.takeIf { it.isNotBlank() }
+                val todosInChild = todos.filter { !it.isDeleted }
+                val visibleListRows = lists.filter { list ->
+                    TodoListExposure.memberCanSeeListRow(
+                        listId = list.id,
+                        todosForChild = todosInChild,
+                        currentUid = uidForVis,
+                    )
+                }
+                val visibleTodos = todos.filter { todo ->
+                    KBVisibilityScope.isVisible(
+                        KBVisibilityScope.normalized(todo.visibilityScope),
+                        decodeStringList(todo.visibilityMemberIdsJson),
+                        todo.createdBy?.takeIf { it.isNotBlank() },
+                        uidForVis,
+                    )
+                }
                 TodoHomeUiState(
                     familyId = familyId,
                     childId = childId,
                     currentUid = meUid,
-                    lists = lists,
-                    todos = todos,
+                    lists = visibleListRows,
+                    todos = visibleTodos,
                     members = members.map { m ->
                         val label = if (m.userId == meUid) {
                             "Me"
@@ -87,8 +105,7 @@ class TodoHomeViewModel @Inject constructor(
                     isLoading = false,
                     errorMessage = err,
                 )
-            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodoHomeUiState())
-                .collect { stateBacking.value = it }
+            }.collect { stateBacking.value = it }
         }
     }
 

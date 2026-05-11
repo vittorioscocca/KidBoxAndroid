@@ -12,12 +12,16 @@ import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBWalletTicketEntity
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
+import it.vittorioscocca.kidbox.data.local.mapper.encodeStringList
 import it.vittorioscocca.kidbox.data.remote.DocumentCryptoManager
 import it.vittorioscocca.kidbox.data.remote.DocumentStorageManager
 import it.vittorioscocca.kidbox.data.remote.wallet.WalletRemoteChange
 import it.vittorioscocca.kidbox.data.remote.wallet.WalletRemoteStore
 import it.vittorioscocca.kidbox.data.remote.wallet.WalletTicketRemoteDto
 import it.vittorioscocca.kidbox.data.wallet.WalletParsedData
+import it.vittorioscocca.kidbox.data.wallet.WalletPdfParser
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.notifications.WalletReminderScheduler
 import java.util.UUID
 import javax.inject.Inject
@@ -50,8 +54,10 @@ class WalletRepository @Inject constructor(
     private var walletListener: ListenerRegistration? = null
     private var listeningFamilyId: String? = null
 
-    fun observeActiveByFamilyId(familyId: String): Flow<List<KBWalletTicketEntity>> =
-        walletTicketDao.observeActiveByFamilyId(familyId)
+    fun observeActiveByFamilyId(familyId: String): Flow<List<KBWalletTicketEntity>> {
+        val uid = auth.currentUser?.uid.orEmpty()
+        return walletTicketDao.observeActiveByFamilyId(familyId, uid)
+    }
 
     fun startRealtime(
         familyId: String,
@@ -87,6 +93,8 @@ class WalletRepository @Inject constructor(
         fileName: String,
         parsed: WalletParsedData,
         title: String,
+        visibilityScope: String,
+        visibilityMemberIds: List<String>,
     ): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
             val user = auth.currentUser ?: error("Non autenticato")
@@ -105,6 +113,10 @@ class WalletRepository @Inject constructor(
             )
 
             val now = System.currentTimeMillis()
+            val effectiveScope = KBVisibilityScope.normalizedWallet(visibilityScope)
+            val membersJson = encodeStringList(
+                if (effectiveScope == KBVisibilityScope.MEMBERS) visibilityMemberIds else emptyList(),
+            )
             val entity = KBWalletTicketEntity(
                 id = ticketId,
                 familyId = familyId,
@@ -131,6 +143,8 @@ class WalletRepository @Inject constructor(
                 createdAtEpochMillis = now,
                 updatedAtEpochMillis = now,
                 isDeleted = false,
+                visibilityScope = effectiveScope,
+                visibilityMemberIdsJson = membersJson,
                 syncStateRaw = 1,
             )
             walletTicketDao.upsert(entity)
@@ -149,9 +163,54 @@ class WalletRepository @Inject constructor(
             .onFailure { Log.w(TAG, "remote softDelete failed: ${it.message}") }
     }
 
+    suspend fun updateWalletTicketVisibility(
+        ticketId: String,
+        familyId: String,
+        visibilityScope: String,
+        visibilityMemberIds: List<String>,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val user = auth.currentUser ?: error("Non autenticato")
+            val displayName = user.displayName?.trim().orEmpty().ifBlank { "Tu" }
+            val existing = walletTicketDao.getById(ticketId) ?: error("Biglietto non trovato")
+            if (existing.familyId != familyId) error("Famiglia non valida")
+            val cid = existing.createdBy.trim()
+            if (cid.isNotEmpty() && cid != user.uid) {
+                error("Solo chi ha creato il biglietto può modificare la visibilità")
+            }
+
+            val effectiveScope = KBVisibilityScope.normalizedWallet(visibilityScope)
+            val membersJson = encodeStringList(
+                if (effectiveScope == KBVisibilityScope.MEMBERS) visibilityMemberIds else emptyList(),
+            )
+            val now = System.currentTimeMillis()
+            val updated = existing.copy(
+                visibilityScope = effectiveScope,
+                visibilityMemberIdsJson = membersJson,
+                updatedBy = user.uid,
+                updatedByName = displayName,
+                updatedAtEpochMillis = now,
+                syncStateRaw = 1,
+            )
+            walletTicketDao.upsert(updated)
+            remoteStore.upsert(updated, displayName)
+            walletTicketDao.upsert(updated.copy(syncStateRaw = 0))
+        }
+    }
+
     suspend fun openPdf(familyId: String, ticketId: String): ByteArray = withContext(Dispatchers.IO) {
         val ticket = walletTicketDao.getById(ticketId)
             ?: error("Biglietto non trovato")
+        val uid = auth.currentUser?.uid
+        if (!KBVisibilityScope.isVisible(
+                KBVisibilityScope.normalizedWallet(ticket.visibilityScope),
+                decodeStringList(ticket.visibilityMemberIdsJson),
+                ticket.createdBy,
+                uid,
+            )
+        ) {
+            error("Biglietto non disponibile")
+        }
         val storagePath = "families/$familyId/wallet/$ticketId/ticket.pdf.kbenc"
         documentStorage.downloadDecrypted(storagePath, familyId)
     }
@@ -169,6 +228,9 @@ class WalletRepository @Inject constructor(
             val ticketId = UUID.randomUUID().toString()
             var title = queryDisplayName(uri) ?: "Biglietto.pdf"
             if (title.isBlank()) title = "Biglietto.pdf"
+            val parsed = runCatching {
+                WalletPdfParser.parse(context, bytes, title.removeSuffix(".pdf"))
+            }.getOrNull()
             val storagePath = "families/$familyId/wallet/$ticketId/ticket.pdf.kbenc"
             val encryptedPdf = documentCrypto.encrypt(bytes, familyId)
             val encSize = encryptedPdf.size.toLong()
@@ -188,6 +250,9 @@ class WalletRepository @Inject constructor(
                 pdfStorageURL = downloadUrl,
                 pdfStorageBytes = encSize,
                 displayName = displayName,
+                kindRaw = parsed?.kind?.raw ?: "other",
+                emitter = parsed?.emitter,
+                eventDateEpochMillis = parsed?.eventDate,
             )
             ticketId
         }
@@ -253,6 +318,8 @@ class WalletRepository @Inject constructor(
                                 createdAtEpochMillis = dto.createdAtEpochMillis ?: local?.createdAtEpochMillis ?: now,
                                 updatedAtEpochMillis = dto.updatedAtEpochMillis ?: now,
                                 isDeleted = false,
+                                visibilityScope = KBVisibilityScope.normalizedWallet(dto.visibilityScope),
+                                visibilityMemberIdsJson = encodeStringList(dto.visibilityMemberIds),
                                 syncStateRaw = 0,
                             ),
                         )

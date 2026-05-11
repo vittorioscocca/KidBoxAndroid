@@ -16,21 +16,33 @@ interface WalletTicketDao {
         """
         SELECT * FROM kb_wallet_tickets
         WHERE familyId = :familyId AND isDeleted = 0
+          AND (
+            visibilityScope = 'family'
+            OR (LENGTH(:currentUid) > 0 AND visibilityScope = 'members'
+                AND visibilityMemberIdsJson LIKE '%' || :currentUid || '%')
+            OR (LENGTH(:currentUid) > 0 AND visibilityScope = 'private' AND createdBy = :currentUid)
+          )
         ORDER BY
             CASE WHEN eventDateEpochMillis IS NULL THEN 1 ELSE 0 END,
             eventDateEpochMillis ASC,
             updatedAtEpochMillis DESC
         """,
     )
-    fun observeActiveByFamilyId(familyId: String): Flow<List<KBWalletTicketEntity>>
+    fun observeActiveByFamilyId(familyId: String, currentUid: String): Flow<List<KBWalletTicketEntity>>
 
     @Query(
         """
         SELECT * FROM kb_wallet_tickets
         WHERE familyId = :familyId AND isDeleted = 0
+          AND (
+            visibilityScope = 'family'
+            OR (LENGTH(:currentUid) > 0 AND visibilityScope = 'members'
+                AND visibilityMemberIdsJson LIKE '%' || :currentUid || '%')
+            OR (LENGTH(:currentUid) > 0 AND visibilityScope = 'private' AND createdBy = :currentUid)
+          )
         """,
     )
-    suspend fun getActiveByFamilyId(familyId: String): List<KBWalletTicketEntity>
+    suspend fun getActiveByFamilyId(familyId: String, currentUid: String): List<KBWalletTicketEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBWalletTicketEntity)

@@ -51,4 +51,6 @@ data class KBTodoItemEntity(
     val assignedTo: String?,
     val createdBy: String?,
     val priorityRaw: Int?,
+    val visibilityScope: String,
+    val visibilityMemberIdsJson: String,
 )

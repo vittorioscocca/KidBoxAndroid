@@ -9,9 +9,12 @@ import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBNoteEntity
 import it.vittorioscocca.kidbox.data.remote.notes.NoteRemoteChange
 import it.vittorioscocca.kidbox.data.remote.notes.NoteRemoteStore
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
+import it.vittorioscocca.kidbox.data.local.mapper.encodeStringList
 import it.vittorioscocca.kidbox.data.remote.notes.noteTitleForStorage
 import it.vittorioscocca.kidbox.domain.model.KBNote
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -78,6 +81,8 @@ class NoteRepository @Inject constructor(
         noteId: String? = null,
         title: String,
         body: String,
+        visibilityScope: String? = null,
+        visibilityMemberIds: List<String>? = null,
     ): String {
         ensureFamilyExists(familyId)
         val now = System.currentTimeMillis()
@@ -86,11 +91,17 @@ class NoteRepository @Inject constructor(
         val current = noteDao.getById(id)
         val storedTitle = title.noteTitleForStorage()
         val storedBody = body.trimEnd()
+        val scopeStored = KBVisibilityScope.normalized(visibilityScope ?: current?.visibilityScope)
+        val idsJsonStored = encodeStringList(
+            visibilityMemberIds ?: decodeStringList(current?.visibilityMemberIdsJson),
+        )
         val target = KBNoteEntity(
             id = id,
             familyId = familyId,
             title = storedTitle,
             body = storedBody,
+            visibilityScope = scopeStored,
+            visibilityMemberIdsJson = idsJsonStored,
             createdBy = current?.createdBy ?: uid,
             createdByName = current?.createdByName.orEmpty(),
             updatedBy = uid,
@@ -177,12 +188,16 @@ class NoteRepository @Inject constructor(
                         val storedTitle = remoteTitle.noteTitleForStorage()
                         val storedBody = remoteBody.trimEnd()
                         val now = System.currentTimeMillis()
+                        val remoteScope = KBVisibilityScope.normalized(dto.visibilityScope)
+                        val remoteMemberIds = dto.visibilityMemberIds
                         noteDao.upsert(
                             KBNoteEntity(
                                 id = dto.id,
                                 familyId = dto.familyId,
                                 title = storedTitle,
                                 body = storedBody,
+                                visibilityScope = remoteScope,
+                                visibilityMemberIdsJson = encodeStringList(remoteMemberIds),
                                 createdBy = dto.createdBy ?: local?.createdBy.orEmpty(),
                                 createdByName = dto.createdByName ?: local?.createdByName.orEmpty(),
                                 updatedBy = dto.updatedBy ?: local?.updatedBy.orEmpty(),
@@ -260,6 +275,8 @@ class NoteRepository @Inject constructor(
         familyId = familyId,
         title = title,
         body = body,
+        visibilityScope = KBVisibilityScope.normalized(visibilityScope),
+        visibilityMemberIds = decodeStringList(visibilityMemberIdsJson),
         createdBy = createdBy,
         createdByName = createdByName,
         updatedBy = updatedBy,

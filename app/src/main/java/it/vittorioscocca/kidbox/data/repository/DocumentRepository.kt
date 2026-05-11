@@ -13,11 +13,17 @@ import it.vittorioscocca.kidbox.data.local.dao.KBExpenseDao
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentCategoryEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
+import it.vittorioscocca.kidbox.data.local.mapper.encodeStringList
 import it.vittorioscocca.kidbox.data.remote.DocumentRemoteChange
 import it.vittorioscocca.kidbox.data.remote.DocumentRemoteStore
+import it.vittorioscocca.kidbox.data.remote.RemoteDocumentDto
 import it.vittorioscocca.kidbox.data.remote.DocumentStorageManager
+import it.vittorioscocca.kidbox.data.remote.chat.ChatStorageService
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
 import java.io.File
+import java.util.ArrayDeque
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -33,6 +39,14 @@ import kotlinx.coroutines.sync.withLock
 
 private const val TAG_DOC_REPO = "KB_Doc_Repo"
 private const val TAG_DOC_SYNC = "KB_Doc_Sync"
+
+private fun KBDocumentEntity.isVisibleToCurrentUser(uid: String?): Boolean {
+    val scope = KBVisibilityScope.normalized(visibilityScope)
+    val members = decodeStringList(visibilityMemberIdsJson)
+    val creator = createdBy.takeIf { it.isNotBlank() } ?: updatedBy.takeIf { it.isNotBlank() }
+    return KBVisibilityScope.isVisible(scope, members, creator, uid)
+}
+
 
 /** Titoli usati per i placeholder di categoria creati al volo da applyInboundDocument. */
 private val PLACEHOLDER_CATEGORY_TITLES = setOf(
@@ -55,6 +69,7 @@ class DocumentRepository @Inject constructor(
     private val database: KidBoxDatabase,
     private val remoteStore: DocumentRemoteStore,
     private val storageManager: DocumentStorageManager,
+    private val chatStorageService: ChatStorageService,
     private val auth: FirebaseAuth,
     @ApplicationContext private val context: Context,
 ) {
@@ -67,6 +82,56 @@ class DocumentRepository @Inject constructor(
     private val healedFamiliesInSession = mutableSetOf<String>()
     private val lastRootSystemHiddenSignatureByFamily = mutableMapOf<String, String>()
 
+    /**
+     * Cartella visibile se il sottoalbero è **vuoto** (nessun doc non eliminato) oppure
+     * se esiste **almeno un documento** nel sottoalbero che l’utente corrente può vedere.
+     */
+    private fun folderIsBrowsableByViewer(
+        folder: KBDocumentCategoryEntity,
+        allCategories: List<KBDocumentCategoryEntity>,
+        allDocuments: List<KBDocumentEntity>,
+        viewerUid: String?,
+    ): Boolean {
+        if (folder.isDeleted) return false
+        val subtreeDocs = documentsInSubtreeForFolder(folder, allCategories, allDocuments)
+        if (subtreeDocs.isEmpty()) return true
+        return subtreeDocs.any { it.isVisibleToCurrentUser(viewerUid) }
+    }
+
+    private fun collectDescendantFolderIds(rootId: String, categories: List<KBDocumentCategoryEntity>): Set<String> {
+        val active = categories.filter { !it.isDeleted }
+        val byParent = active.groupBy { it.parentId }
+        val out = linkedSetOf<String>()
+        val queue = ArrayDeque<String>()
+        queue.add(rootId)
+        while (queue.isNotEmpty()) {
+            val id = queue.removeFirst()
+            if (!out.add(id)) continue
+            byParent[id]?.forEach { queue.add(it.id) }
+        }
+        return out
+    }
+
+    private fun documentsInSubtreeForFolder(
+        folder: KBDocumentCategoryEntity,
+        allCategories: List<KBDocumentCategoryEntity>,
+        allDocuments: List<KBDocumentEntity>,
+    ): List<KBDocumentEntity> {
+        val subtreeIds = collectDescendantFolderIds(folder.id, allCategories)
+        val expenseIdFolder = parseExpenseIdFromCategoryId(folder.id)
+        return allDocuments.filter { doc ->
+            if (doc.isDeleted) return@filter false
+            if (!doc.categoryId.isNullOrBlank() && doc.categoryId in subtreeIds) return@filter true
+            if (expenseIdFolder != null &&
+                parseExpenseIdFromNotes(doc.notes) == expenseIdFolder &&
+                (doc.categoryId.isNullOrBlank() || doc.categoryId in subtreeIds)
+            ) {
+                return@filter true
+            }
+            false
+        }
+    }
+
     fun observeBrowser(
         familyId: String,
         parentFolderId: String?,
@@ -77,7 +142,9 @@ class DocumentRepository @Inject constructor(
                 categoriesFlow,
                 documentDao.observeRootVisibleByFamilyId(familyId),
                 documentDao.observeRootHiddenSystemEncodedByFamilyId(familyId),
-            ) { categories, rootVisibleDocuments, hiddenSystemEncoded ->
+                documentDao.observeByFamilyId(familyId),
+            ) { categories, rootVisibleDocuments, hiddenSystemEncoded, allFamilyDocuments ->
+                val viewerUid = auth.currentUser?.uid
                 val hiddenSystemNames = hiddenSystemEncoded.map { it.fileName.ifBlank { it.title } }.sorted()
                 val hiddenSystemSignature = hiddenSystemNames.joinToString("|")
                 val previousSystem = lastRootSystemHiddenSignatureByFamily[familyId]
@@ -87,11 +154,15 @@ class DocumentRepository @Inject constructor(
                         Log.d(TAG_DOC_SYNC, "Hiding system-encoded file from Root: $fileName")
                     }
                 }
+                val rootFolders = categories
+                    .filter { it.parentId == null && !it.isDeleted }
+                    .filter { folderIsBrowsableByViewer(it, categories, allFamilyDocuments, viewerUid) }
+                    .sortedWith(compareBy<KBDocumentCategoryEntity> { it.sortOrder }.thenBy { it.title.lowercase() })
                 DocumentBrowserData(
-                    folders = categories
-                        .filter { it.parentId == null && !it.isDeleted }
-                        .sortedWith(compareBy<KBDocumentCategoryEntity> { it.sortOrder }.thenBy { it.title.lowercase() }),
-                    documents = rootVisibleDocuments.sortedByDescending { it.updatedAtEpochMillis },
+                    folders = rootFolders,
+                    documents = rootVisibleDocuments
+                        .filter { it.isVisibleToCurrentUser(viewerUid) }
+                        .sortedByDescending { it.updatedAtEpochMillis },
                 )
             }
         } else {
@@ -99,6 +170,7 @@ class DocumentRepository @Inject constructor(
                 categoriesFlow,
                 documentDao.observeByFamilyId(familyId),
             ) { categories, documents ->
+                val viewerUid = auth.currentUser?.uid
                 val expenseIdFromFolder = parseExpenseIdFromCategoryId(parentFolderId)
                 val documentsInFolder = documents
                     .filter { doc ->
@@ -109,11 +181,14 @@ class DocumentRepository @Inject constructor(
                         expenseIdFromFolder != null && parseExpenseIdFromNotes(doc.notes) == expenseIdFromFolder
                     }
                     .distinctBy { it.id }
+                    .filter { it.isVisibleToCurrentUser(viewerUid) }
                     .sortedByDescending { it.updatedAtEpochMillis }
+                val childFolders = categories
+                    .filter { it.parentId == parentFolderId && !it.isDeleted }
+                    .filter { folderIsBrowsableByViewer(it, categories, documents, viewerUid) }
+                    .sortedWith(compareBy<KBDocumentCategoryEntity> { it.sortOrder }.thenBy { it.title.lowercase() })
                 DocumentBrowserData(
-                    folders = categories
-                        .filter { it.parentId == parentFolderId && !it.isDeleted }
-                        .sortedWith(compareBy<KBDocumentCategoryEntity> { it.sortOrder }.thenBy { it.title.lowercase() }),
+                    folders = childFolders,
                     documents = documentsInFolder,
                 )
             }
@@ -122,11 +197,22 @@ class DocumentRepository @Inject constructor(
 
     fun observeAllDocuments(familyId: String): Flow<List<KBDocumentEntity>> =
         documentDao.observeByFamilyId(familyId)
-            .map { list -> list.filter { !it.isDeleted } }
+            .map { list ->
+                val uid = auth.currentUser?.uid
+                list.filter { !it.isDeleted && it.isVisibleToCurrentUser(uid) }
+            }
 
     fun observeAllFolders(familyId: String): Flow<List<KBDocumentCategoryEntity>> =
-        categoryDao.observeByFamilyId(familyId)
-            .map { list -> list.filter { !it.isDeleted } }
+        combine(
+            categoryDao.observeByFamilyId(familyId),
+            documentDao.observeByFamilyId(familyId),
+        ) { categories, docs ->
+            val uid = auth.currentUser?.uid
+            categories.filter {
+                !it.isDeleted &&
+                    folderIsBrowsableByViewer(it, categories, docs, uid)
+            }
+        }
 
     suspend fun getDocumentById(documentId: String): KBDocumentEntity? = documentDao.getById(documentId)
 
@@ -618,9 +704,21 @@ class DocumentRepository @Inject constructor(
         bytes: ByteArray,
         notes: String? = null,
         forcedId: String? = null,
+        visibilityScope: String = KBVisibilityScope.FAMILY,
+        visibilityMemberIdsJson: String = encodeStringList(emptyList()),
+        createdBy: String? = null,
     ) {
         val now = System.currentTimeMillis()
         val uid = auth.currentUser?.uid ?: "local"
+        var effectiveScope = KBVisibilityScope.normalized(visibilityScope)
+        var membersJson = visibilityMemberIdsJson
+        if (effectiveScope == KBVisibilityScope.MEMBERS && decodeStringList(membersJson).isEmpty()) {
+            effectiveScope = KBVisibilityScope.FAMILY
+            membersJson = encodeStringList(emptyList())
+        } else if (effectiveScope != KBVisibilityScope.MEMBERS) {
+            membersJson = encodeStringList(emptyList())
+        }
+        val storedCreatedBy = (createdBy?.takeIf { it.isNotBlank() } ?: uid).ifBlank { "local" }
         val id = forcedId ?: UUID.randomUUID().toString()
         val localPath = persistPendingPlainFile(id, fileName, bytes).absolutePath
         val placeholderStoragePath = "families/$familyId/documents/$id/${safeFileName(fileName)}.kbenc"
@@ -644,6 +742,9 @@ class DocumentRepository @Inject constructor(
             createdAtEpochMillis = now,
             updatedAtEpochMillis = now,
             updatedBy = uid,
+            createdBy = storedCreatedBy,
+            visibilityScope = effectiveScope,
+            visibilityMemberIdsJson = membersJson,
             isDeleted = false,
             syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
             lastSyncError = null,
@@ -733,6 +834,9 @@ class DocumentRepository @Inject constructor(
                 createdAtEpochMillis = now,
                 updatedAtEpochMillis = now,
                 updatedBy = uid,
+                createdBy = uid,
+                visibilityScope = KBVisibilityScope.FAMILY,
+                visibilityMemberIdsJson = encodeStringList(emptyList()),
                 isDeleted = false,
                 syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
                 lastSyncError = null,
@@ -890,6 +994,40 @@ class DocumentRepository @Inject constructor(
         )
     }
 
+    suspend fun updateDocumentVisibilityLocal(
+        document: KBDocumentEntity,
+        visibilityScope: String,
+        visibilityMemberIdsJson: String,
+    ) {
+        val uid = auth.currentUser?.uid ?: document.updatedBy
+        var scope = KBVisibilityScope.normalized(visibilityScope)
+        var membersJson = visibilityMemberIdsJson
+        if (scope == KBVisibilityScope.MEMBERS && decodeStringList(membersJson).isEmpty()) {
+            scope = KBVisibilityScope.FAMILY
+            membersJson = encodeStringList(emptyList())
+        } else if (scope != KBVisibilityScope.MEMBERS) {
+            membersJson = encodeStringList(emptyList())
+        }
+        val storedCreatedBy = when {
+            scope == KBVisibilityScope.ONLY_CREATOR ->
+                document.createdBy.takeIf { it.isNotBlank() }
+                    ?: uid.takeIf { it.isNotBlank() }
+                    ?: document.updatedBy
+            else -> document.createdBy
+        }
+        documentDao.upsert(
+            document.copy(
+                visibilityScope = scope,
+                visibilityMemberIdsJson = membersJson,
+                createdBy = storedCreatedBy,
+                updatedAtEpochMillis = System.currentTimeMillis(),
+                updatedBy = uid,
+                syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                lastSyncError = null,
+            ),
+        )
+    }
+
     suspend fun renameFolderLocal(
         folder: KBDocumentCategoryEntity,
         newTitle: String,
@@ -918,6 +1056,9 @@ class DocumentRepository @Inject constructor(
             createdAtEpochMillis = now,
             updatedAtEpochMillis = now,
             updatedBy = uid,
+            createdBy = uid,
+            visibilityScope = KBVisibilityScope.FAMILY,
+            visibilityMemberIdsJson = encodeStringList(emptyList()),
             syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
             lastSyncError = null,
         )
@@ -1012,19 +1153,41 @@ class DocumentRepository @Inject constructor(
         val local = document.localPath?.let { File(it) }
         if (local != null && local.exists()) {
             Log.d(TAG_DOC_REPO, "preparePreviewFile using local file docId=${document.id} localPath=${local.absolutePath}")
-            local.copyTo(output, overwrite = true)
-            Log.d(TAG_DOC_REPO, "preparePreviewFile local copy done docId=${document.id} out=${output.absolutePath}")
+            val raw = local.readBytes()
+            val plain = if (isPlainChatDocument(document, local.absolutePath)) {
+                raw
+            } else {
+                storageManager.decryptCachedDocumentBytes(raw, document.familyId)
+            }
+            output.writeBytes(plain)
+            Log.d(TAG_DOC_REPO, "preparePreviewFile local decrypt done docId=${document.id} out=${output.absolutePath} plainBytes=${plain.size}")
             return output
         }
-        Log.d(TAG_DOC_REPO, "preparePreviewFile downloading+decrypting docId=${document.id}")
-        val decrypted = storageManager.downloadDecrypted(
-            storagePath = document.storagePath,
-            familyId = document.familyId,
-        )
+        Log.d(TAG_DOC_REPO, "preparePreviewFile downloading docId=${document.id} chatPath=${isChatStoragePath(document.storagePath)}")
+        val decrypted = if (isChatStoragePath(document.storagePath)) {
+            chatStorageService.downloadDecrypted(
+                storagePath = document.storagePath,
+                familyId = document.familyId,
+            )
+        } else {
+            storageManager.downloadDecrypted(
+                storagePath = document.storagePath,
+                familyId = document.familyId,
+            )
+        }
         output.writeBytes(decrypted)
-        Log.d(TAG_DOC_REPO, "preparePreviewFile decrypt done docId=${document.id} outSize=${output.length()}")
+        Log.d(TAG_DOC_REPO, "preparePreviewFile download done docId=${document.id} outSize=${output.length()}")
         return output
     }
+
+    /** File allegati chat: su Storage sono in chiaro (stesso modello iOS), salvo legacy `.kbenc`. */
+    private fun isChatStoragePath(storagePath: String): Boolean =
+        storagePath.contains("/chat/")
+
+    private fun isPlainChatDocument(doc: KBDocumentEntity, absoluteLocalPath: String): Boolean =
+        doc.notes == "chat_plain" ||
+            absoluteLocalPath.contains("chat_media${File.separator}") ||
+            absoluteLocalPath.contains("/chat_media/")
 
     fun expensesRootFolderId(familyId: String): String = "exp-root-$familyId"
 
@@ -1235,7 +1398,7 @@ class DocumentRepository @Inject constructor(
 
     private suspend fun applyInboundDocument(
         familyId: String,
-        dto: it.vittorioscocca.kidbox.data.remote.RemoteDocumentDto,
+        dto: RemoteDocumentDto,
         now: Long,
         isFromCache: Boolean,
     ) {
@@ -1398,6 +1561,17 @@ class DocumentRepository @Inject constructor(
             }
         }
 
+        val remoteNormScope = KBVisibilityScope.normalized(dto.visibilityScope)
+        val remoteMembers = dto.visibilityMemberIds.orEmpty().distinct().sorted()
+        val visibilityMemberIdsStored = encodeStringList(
+            if (remoteNormScope == KBVisibilityScope.MEMBERS) remoteMembers else emptyList(),
+        )
+        val inferredCreatedBy = dto.createdBy?.takeIf { it.isNotBlank() }
+            ?: dto.updatedBy?.takeIf { it.isNotBlank() }
+            ?: local?.createdBy?.takeIf { it.isNotBlank() }
+            ?: local?.updatedBy?.takeIf { it.isNotBlank() }
+            ?: ""
+
         val targetDocument = KBDocumentEntity(
             id = dto.id,
             familyId = familyId,
@@ -1419,6 +1593,9 @@ class DocumentRepository @Inject constructor(
             createdAtEpochMillis = local?.createdAtEpochMillis ?: dto.createdAtEpochMillis ?: now,
             updatedAtEpochMillis = remoteUpdatedAt.takeIf { it > 0L } ?: now,
             updatedBy = dto.updatedBy ?: local?.updatedBy ?: "",
+            createdBy = inferredCreatedBy,
+            visibilityScope = remoteNormScope,
+            visibilityMemberIdsJson = visibilityMemberIdsStored,
             isDeleted = false,
             syncStateRaw = KBSyncState.SYNCED.rawValue,
             lastSyncError = null,
@@ -1434,6 +1611,9 @@ class DocumentRepository @Inject constructor(
             local.notes == targetDocument.notes &&
             local.updatedAtEpochMillis == targetDocument.updatedAtEpochMillis &&
             local.updatedBy == targetDocument.updatedBy &&
+            local.createdBy == targetDocument.createdBy &&
+            local.visibilityScope == targetDocument.visibilityScope &&
+            local.visibilityMemberIdsJson == targetDocument.visibilityMemberIdsJson &&
             !local.isDeleted &&
             KBSyncState.fromRaw(local.syncStateRaw) == KBSyncState.SYNCED
         if (unchangedDocument) {

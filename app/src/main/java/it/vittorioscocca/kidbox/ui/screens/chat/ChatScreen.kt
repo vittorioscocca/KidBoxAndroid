@@ -42,10 +42,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -162,6 +161,7 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import android.media.MediaMetadataRetriever
+import it.vittorioscocca.kidbox.util.ChatDocumentFileNaming
 import it.vittorioscocca.kidbox.util.VideoCompressor
 import it.vittorioscocca.kidbox.util.fixVideoFrameOrientation
 import java.io.ByteArrayOutputStream
@@ -389,9 +389,16 @@ fun ChatScreen(
             scope.launch {
                 val bytes = readUriBytes(context, uri)
                 if (bytes != null) {
-                    val fileName = uri.lastPathSegment?.substringAfterLast('/') ?: "documento"
-                    val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
-                    viewModel.sendDocumentAttachment(fileName = fileName, mimeType = mime, bytes = bytes)
+                    val display = ChatDocumentFileNaming.queryDisplayName(context.contentResolver, uri)
+                    val resolverMime = context.contentResolver.getType(uri) ?: "application/octet-stream"
+                    val fileName = ChatDocumentFileNaming.finalFileNameForUpload(display, resolverMime, bytes)
+                    val mimeForUpload = when (resolverMime) {
+                        "", "application/octet-stream", "binary/octet-stream" ->
+                            ChatDocumentFileNaming.mimeFromBytes(bytes).takeIf { it != "application/octet-stream" }
+                                ?: resolverMime
+                        else -> resolverMime
+                    }
+                    viewModel.sendDocumentAttachment(fileName = fileName, mimeType = mimeForUpload, bytes = bytes)
                 }
             }
         }
@@ -516,7 +523,8 @@ fun ChatScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.kidBoxColors.background)
-            .navigationBarsPadding()
+            // Sposta l'intera schermata sopra la tastiera.
+            // L'IME non è gestito dallo Scaffold (vedi MainActivity), quindi va applicato qui.
             .imePadding(),
     ) {
         Column(
@@ -630,6 +638,8 @@ fun ChatScreen(
                 )
             }
 
+            // Con adjustResize il layout termina già sopra la IME: niente windowInsetsPadding(ime) sul composer
+            // (stessa correzione delle note — evita fascia bianca tra barra e tastiera).
             ReplyComposerBar(
                 state = state,
                 inputBarState = inputBarState,
@@ -911,7 +921,6 @@ private fun Header(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .statusBarsPadding()
             .padding(start = 4.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -2109,12 +2118,11 @@ private suspend fun saveMediaToDevice(
             }
         }
         ChatMessageType.DOCUMENT -> {
-            // Cerca di mantenere il nome file originale dall'URL.
-            val rawName = url.substringAfterLast('/').takeIf { it.isNotBlank() && it.length <= 200 }
-                ?: "documento_$ts"
+            val outName = ChatDocumentFileNaming.displayNameForSaveToDownloads(url, bytes, ts)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val values = ContentValues().apply {
-                    put(MediaStore.Downloads.DISPLAY_NAME, rawName)
+                    put(MediaStore.Downloads.DISPLAY_NAME, outName)
+                    put(MediaStore.Downloads.MIME_TYPE, ChatDocumentFileNaming.mimeFromBytes(bytes))
                     put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/KidBox")
                     put(MediaStore.Downloads.IS_PENDING, 1)
                 }
@@ -2125,7 +2133,7 @@ private suspend fun saveMediaToDevice(
             } else {
                 val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
                     .also { it.mkdirs() }
-                java.io.File(dir, rawName).writeBytes(bytes)
+                java.io.File(dir, outName).writeBytes(bytes)
             }
         }
         else -> {}

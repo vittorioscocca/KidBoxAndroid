@@ -8,10 +8,12 @@ import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.KBDocumentDao
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
+import it.vittorioscocca.kidbox.data.local.mapper.encodeStringList
 import it.vittorioscocca.kidbox.data.health.ai.HealthAiDocumentText
 import it.vittorioscocca.kidbox.data.remote.DocumentStorageManager
 import it.vittorioscocca.kidbox.data.repository.DocumentRepository
 import it.vittorioscocca.kidbox.domain.model.KBTextExtractionStatus
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
 import java.io.File
 import java.io.IOException
@@ -261,6 +263,9 @@ class HealthAttachmentService @Inject constructor(
                 createdAtEpochMillis = now,
                 updatedAtEpochMillis = now,
                 updatedBy = uid,
+                createdBy = uid,
+                visibilityScope = KBVisibilityScope.FAMILY,
+                visibilityMemberIdsJson = encodeStringList(emptyList()),
                 isDeleted = false,
                 syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
                 lastSyncError = null,

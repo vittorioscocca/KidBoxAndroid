@@ -13,6 +13,8 @@ import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.SetOptions
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentCategoryEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
@@ -38,6 +40,9 @@ data class RemoteDocumentDto(
     val createdAtEpochMillis: Long?,
     val updatedAtEpochMillis: Long?,
     val updatedBy: String?,
+    val visibilityScope: String?,
+    val visibilityMemberIds: List<String>?,
+    val createdBy: String?,
 )
 
 data class RemoteDocumentCategoryDto(
@@ -132,6 +137,9 @@ class DocumentRemoteStore @Inject constructor(
                                 createdAtEpochMillis = (d["createdAt"] as? Timestamp)?.toDate()?.time,
                                 updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
                                 updatedBy = (d["updatedBy"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                                visibilityScope = (d["visibilityScope"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                                visibilityMemberIds = visibilityMemberIdsFromFirestore(d["visibilityMemberIds"]),
+                                createdBy = (d["createdBy"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
                             )
                             onChange(DocumentRemoteChange.UpsertDocument(dto, isFromCache = isFromCache))
                             upsertCount += 1
@@ -260,6 +268,11 @@ class DocumentRemoteStore @Inject constructor(
 
     suspend fun upsertDocument(entity: KBDocumentEntity) {
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
+        val ref = db.collection("families")
+            .document(entity.familyId)
+            .collection("documents")
+            .document(entity.id)
+        val exists = ref.get().await().exists()
         val inferredExpenseCategoryId = entity.notes
             ?.takeIf { it.startsWith("expense:") }
             ?.substringAfter("expense:")
@@ -276,6 +289,11 @@ class DocumentRemoteStore @Inject constructor(
                 "outbound document guard id=${entity.id} forcingCategory=$inferredExpenseCategoryId fromNotes=${entity.notes}",
             )
         }
+        val normalizedVis = KBVisibilityScope.normalized(entity.visibilityScope)
+        val memberIdsOutbound = decodeStringList(entity.visibilityMemberIdsJson)
+        val visibilityMemberIdsFirestore = memberIdsOutbound
+            .takeIf { normalizedVis == KBVisibilityScope.MEMBERS }
+            .orEmpty()
         val payload = mutableMapOf<String, Any?>(
             "title" to entity.title,
             "fileName" to entity.fileName,
@@ -289,11 +307,20 @@ class DocumentRemoteStore @Inject constructor(
             // compatibilità cross-client: alcuni path storici leggono parentId/folderId
             "parentId" to normalizedCategoryId,
             "folderId" to normalizedCategoryId,
+            "visibilityScope" to normalizedVis,
+            "visibilityMemberIds" to visibilityMemberIdsFirestore,
             "isDeleted" to entity.isDeleted,
             "updatedBy" to uid,
             "updatedAt" to FieldValue.serverTimestamp(),
             "createdAt" to timestampFromMillis(entity.createdAtEpochMillis),
         )
+        if (!exists) {
+            payload["createdBy"] = if (entity.createdBy.isBlank()) uid else entity.createdBy
+        }
+        // Aggiorna createdBy quando il doc passa a "solo io" (anche dopo la prima creazione).
+        if (normalizedVis == KBVisibilityScope.ONLY_CREATOR) {
+            payload["createdBy"] = entity.createdBy.takeIf { it.isNotBlank() } ?: uid
+        }
         // OCR fields must be additive: never wipe remote OCR with null from stale/local-only updates.
         entity.extractedText
             ?.trim()
@@ -310,12 +337,12 @@ class DocumentRemoteStore @Inject constructor(
             ?.takeIf { it.isNotEmpty() }
             ?.let { payload["extractionError"] = it }
 
-        db.collection("families")
-            .document(entity.familyId)
-            .collection("documents")
-            .document(entity.id)
-            .set(payload, SetOptions.merge())
-            .await()
+        ref.set(payload, SetOptions.merge()).await()
+    }
+
+    private fun visibilityMemberIdsFromFirestore(raw: Any?): List<String> = when (raw) {
+        is List<*> -> raw.mapNotNull { it as? String }.distinct()
+        else -> emptyList()
     }
 
     suspend fun upsertCategory(entity: KBDocumentCategoryEntity) {

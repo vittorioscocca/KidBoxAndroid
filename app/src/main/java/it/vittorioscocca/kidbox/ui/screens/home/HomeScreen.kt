@@ -27,10 +27,8 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
@@ -175,8 +173,6 @@ fun HomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 16.dp),
         ) {
@@ -423,6 +419,8 @@ fun HomeScreen(
                     )
                 }
             }
+            // Evita che l’ultima riga resti sotto al FAB (overlay in basso a destra).
+            Spacer(Modifier.height(88.dp))
         }
 
         HomeFab(
@@ -664,9 +662,7 @@ private fun HomeFab(
 ) {
     val rotation by animateFloatAsState(if (expanded) 45f else 0f, label = "fab_rotation")
     Column(
-        modifier = modifier
-            .wrapContentSize()
-            .navigationBarsPadding(),
+        modifier = modifier.wrapContentSize(),
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {

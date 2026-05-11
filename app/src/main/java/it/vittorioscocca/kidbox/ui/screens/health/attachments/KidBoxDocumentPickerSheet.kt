@@ -36,6 +36,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +59,7 @@ private val PickerTint = Color(0xFF9573D9)
 @Composable
 fun KidBoxDocumentPickerSheet(
     familyId: String,
+    pdfOnly: Boolean = false,
     onDismiss: () -> Unit,
     onPickedUri: (Uri) -> Unit,
     viewModel: KidBoxDocumentPickerViewModel = hiltViewModel(),
@@ -66,6 +68,16 @@ fun KidBoxDocumentPickerSheet(
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val visibleDocuments = remember(state.documents, pdfOnly) {
+        if (pdfOnly) {
+            state.documents.filter { doc ->
+                doc.mimeType.contains("pdf", ignoreCase = true) ||
+                    doc.fileName.lowercase().endsWith(".pdf")
+            }
+        } else {
+            state.documents
+        }
+    }
 
     LaunchedEffect(familyId) { viewModel.bindFamily(familyId) }
 
@@ -134,7 +146,7 @@ fun KidBoxDocumentPickerSheet(
                     }
                 }
                 Text(
-                    "Scegli da KidBox",
+                    if (pdfOnly) "Scegli un PDF da KidBox" else "Scegli da KidBox",
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     textAlign = TextAlign.Center,
                     fontSize = 13.sp,
@@ -147,10 +159,10 @@ fun KidBoxDocumentPickerSheet(
                         .fillMaxWidth()
                         .height(420.dp),
                 ) {
-                    if (state.folders.isEmpty() && state.documents.isEmpty() && !state.isBusy) {
+                    if (state.folders.isEmpty() && visibleDocuments.isEmpty() && !state.isBusy) {
                         item {
                             Text(
-                                "Cartella vuota",
+                                if (pdfOnly) "Nessun PDF in questa cartella." else "Cartella vuota",
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(32.dp),
@@ -177,7 +189,7 @@ fun KidBoxDocumentPickerSheet(
                             color = kb.subtitle.copy(alpha = 0.12f),
                         )
                     }
-                    items(state.documents, key = { it.id }) { doc ->
+                    items(visibleDocuments, key = { it.id }) { doc ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()

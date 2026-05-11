@@ -79,6 +79,10 @@ class KidBoxDocumentPickerViewModel @Inject constructor(
         familyId.value = id
         folderStack.value = listOf(null to "Documenti")
         error.value = null
+        // Avvia il listener Firestore → Room se non è già attivo per questa famiglia.
+        // Senza questo, se l'utente non ha mai aperto la sezione Documenti nella sessione
+        // corrente, il DB locale è vuoto e il picker mostra "Cartella vuota".
+        documentRepository.startRealtime(familyId = id)
     }
 
     fun openFolder(folder: KBDocumentCategoryEntity) {

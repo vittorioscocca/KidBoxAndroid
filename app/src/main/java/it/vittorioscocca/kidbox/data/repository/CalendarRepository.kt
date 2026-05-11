@@ -8,8 +8,10 @@ import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBCalendarEventDao
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBCalendarEventEntity
+import it.vittorioscocca.kidbox.data.local.mapper.encodeStringList
 import it.vittorioscocca.kidbox.data.remote.calendar.CalendarEventRemoteChange
 import it.vittorioscocca.kidbox.data.remote.calendar.CalendarRemoteStore
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -157,14 +159,23 @@ class CalendarRepository @Inject constructor(
                         return@forEach
                     }
 
+                    val localSync = local?.syncStateRaw?.let(KBSyncState::fromRaw) ?: KBSyncState.SYNCED
+                    val localHasPendingOutbound =
+                        local != null &&
+                            (localSync == KBSyncState.PENDING_UPSERT || localSync == KBSyncState.ERROR)
                     val remoteUpdatedAt = dto.updatedAtEpochMillis ?: 0L
-                    if (local != null && remoteUpdatedAt < local.updatedAtEpochMillis) {
+                    if (
+                        localHasPendingOutbound &&
+                        remoteUpdatedAt < local.updatedAtEpochMillis
+                    ) {
                         return@forEach
                     }
 
                     val now = System.currentTimeMillis()
                     ensureFamilyExists(familyId)
                     val safeChildId = sanitizeChildId(dto.childId)
+                    val remoteScope = KBVisibilityScope.normalized(dto.visibilityScope)
+                    val remoteMemberIds = dto.visibilityMemberIds
                     calendarDao.upsert(
                         KBCalendarEventEntity(
                             id = dto.id,
@@ -181,6 +192,8 @@ class CalendarRepository @Inject constructor(
                             reminderMinutes = dto.reminderMinutes,
                             linkedHealthItemId = dto.linkedHealthItemId,
                             linkedHealthItemType = dto.linkedHealthItemType,
+                            visibilityScope = remoteScope,
+                            visibilityMemberIdsJson = encodeStringList(remoteMemberIds),
                             isDeleted = false,
                             createdAtEpochMillis = local?.createdAtEpochMillis ?: dto.createdAtEpochMillis ?: now,
                             updatedAtEpochMillis = dto.updatedAtEpochMillis ?: now,

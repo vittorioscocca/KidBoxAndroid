@@ -396,6 +396,59 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_15_16 = object : Migration(15, 16) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE kb_calendar_events ADD COLUMN visibilityScope TEXT NOT NULL DEFAULT 'family'",
+            )
+            db.execSQL(
+                "ALTER TABLE kb_calendar_events ADD COLUMN visibilityMemberIdsJson TEXT NOT NULL DEFAULT '[]'",
+            )
+        }
+    }
+
+    private val MIGRATION_16_17 = object : Migration(16, 17) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE kb_documents ADD COLUMN createdBy TEXT NOT NULL DEFAULT ''",
+            )
+            db.execSQL(
+                "ALTER TABLE kb_documents ADD COLUMN visibilityScope TEXT NOT NULL DEFAULT 'family'",
+            )
+            db.execSQL(
+                "ALTER TABLE kb_documents ADD COLUMN visibilityMemberIdsJson TEXT NOT NULL DEFAULT '[]'",
+            )
+        }
+    }
+
+    private val MIGRATION_17_18 = object : Migration(17, 18) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE kb_wallet_tickets ADD COLUMN visibilityScope TEXT NOT NULL DEFAULT 'private'",
+            )
+            db.execSQL(
+                "ALTER TABLE kb_wallet_tickets ADD COLUMN visibilityMemberIdsJson TEXT NOT NULL DEFAULT '[]'",
+            )
+        }
+    }
+
+    private val MIGRATION_14_15 = object : Migration(14, 15) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE kb_notes ADD COLUMN visibilityScope TEXT NOT NULL DEFAULT 'family'",
+            )
+            db.execSQL(
+                "ALTER TABLE kb_notes ADD COLUMN visibilityMemberIdsJson TEXT NOT NULL DEFAULT '[]'",
+            )
+            db.execSQL(
+                "ALTER TABLE kb_todo_items ADD COLUMN visibilityScope TEXT NOT NULL DEFAULT 'family'",
+            )
+            db.execSQL(
+                "ALTER TABLE kb_todo_items ADD COLUMN visibilityMemberIdsJson TEXT NOT NULL DEFAULT '[]'",
+            )
+        }
+    }
+
     private val MIGRATION_12_13 = object : Migration(12, 13) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(
@@ -517,6 +570,10 @@ object DatabaseModule {
         MIGRATION_11_12,
         MIGRATION_12_13,
         MIGRATION_13_14,
+        MIGRATION_14_15,
+        MIGRATION_15_16,
+        MIGRATION_16_17,
+        MIGRATION_17_18,
     )
         .fallbackToDestructiveMigration()
         .build()

@@ -14,9 +14,9 @@ data class AIRemotePrefs(
 
 @Singleton
 class AIRemotePreferences @Inject constructor(
-    private val firestore: FirebaseFirestore,
     private val auth: FirebaseAuth,
 ) {
+    private val firestore get() = FirebaseFirestore.getInstance()
     private val uid get() = auth.currentUser?.uid
 
     suspend fun fetch(): AIRemotePrefs? {

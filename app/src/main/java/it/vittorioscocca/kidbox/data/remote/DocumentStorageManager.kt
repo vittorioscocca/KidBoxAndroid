@@ -59,6 +59,12 @@ class DocumentStorageManager @Inject constructor(
         return plain
     }
 
+    /** Decripta byte letti dalla cache locale documenti (stesso formato del blob `.kbenc` su Storage). */
+    fun decryptCachedDocumentBytes(combined: ByteArray, familyId: String): ByteArray {
+        Log.d(TAG_DOC_STORAGE, "decryptCachedDocumentBytes bytes=${combined.size} familyId=$familyId")
+        return cryptoManager.decrypt(combined, familyId)
+    }
+
     /** Upload already-encrypted bytes (or plain bytes that will be encrypted) to an explicit [storagePath].
      *  Returns the download URL. Useful when the caller needs a non-standard storage path. */
     suspend fun uploadEncryptedToPath(

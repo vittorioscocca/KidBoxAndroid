@@ -18,27 +18,45 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.platform.LocalView
 import androidx.navigation.compose.rememberNavController
 import com.facebook.CallbackManager
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.AndroidEntryPoint
 import it.vittorioscocca.kidbox.data.local.AppTheme
 import android.net.Uri
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
 import it.vittorioscocca.kidbox.data.wallet.PendingWalletImport
 import it.vittorioscocca.kidbox.data.local.ThemePreference
+import it.vittorioscocca.kidbox.data.local.dao.KBNoteDao
+import it.vittorioscocca.kidbox.data.local.dao.KBTodoItemDao
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
+import it.vittorioscocca.kidbox.domain.model.TodoListExposure
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.navigation.AppNavGraph
+import it.vittorioscocca.kidbox.ui.navigation.CONTENT_NO_LONGER_AVAILABLE_MESSAGE
+import it.vittorioscocca.kidbox.ui.state.BannerMessageStore
 import it.vittorioscocca.kidbox.notifications.NotificationBadgeStore
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.WeeklySummaryService
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.WeeklySummaryDraftStore
@@ -46,6 +64,9 @@ import it.vittorioscocca.kidbox.ui.splash.KidBoxSplashScreen
 import it.vittorioscocca.kidbox.ui.theme.KidBoxTheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -58,6 +79,18 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var themePreference: ThemePreference
+
+    @Inject
+    lateinit var noteDao: KBNoteDao
+
+    @Inject
+    lateinit var todoItemDao: KBTodoItemDao
+
+    @Inject
+    lateinit var firebaseAuth: FirebaseAuth
+
+    @Inject
+    lateinit var bannerMessageStore: BannerMessageStore
 
     private var pendingPushDeepLink by mutableStateOf<PushDeepLink?>(null)
     private val notificationPermissionLauncher = registerForActivityResult(
@@ -90,14 +123,23 @@ class MainActivity : ComponentActivity() {
                 }
             }
             KidBoxTheme(darkTheme = darkTheme) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.kidBoxColors.background),
-                ) {
-                    val navController = rememberNavController()
-                    var showSplash by remember { mutableStateOf(true) }
+                val snackHostState = remember { SnackbarHostState() }
+                val composeScope = rememberCoroutineScope()
+                LaunchedEffect(Unit) {
+                    bannerMessageStore.message.collect { msg ->
+                        if (!msg.isNullOrBlank()) {
+                            snackHostState.showSnackbar(msg)
+                            bannerMessageStore.clear()
+                        }
+                    }
+                }
 
+                val navController = rememberNavController()
+                var showSplash by remember { mutableStateOf(true) }
+
+                // Splash a tutto schermo: NON dentro lo Scaffold con padding system bars,
+                // altrimenti resta una fascia in alto col containerColor (sfondo chiaro).
+                Box(modifier = Modifier.fillMaxSize()) {
                     Crossfade(
                         targetState = showSplash,
                         animationSpec = tween(500),
@@ -106,11 +148,33 @@ class MainActivity : ComponentActivity() {
                         if (splash) {
                             KidBoxSplashScreen(onFinished = { showSplash = false })
                         } else {
-                            AppNavGraph(
-                                navController = navController,
-                                startDestination = AppDestination.Login.route,
-                                onboardingPreferences = onboardingPreferences,
-                            )
+                            Scaffold(
+                                modifier = Modifier.fillMaxSize(),
+                                containerColor = MaterialTheme.kidBoxColors.background,
+                                snackbarHost = { SnackbarHost(snackHostState) },
+                                // Scaffold gestisce solo system bars (status + nav bar) e display cutout.
+                                // L'IME (tastiera) è escluso: ogni schermata con input applica il proprio imePadding().
+                                // Questo evita il doppio offset (gap sopra la tastiera) che si verifica quando
+                                // safeDrawing (default) include l'IME e la schermata aggiunge un altro imePadding().
+                                contentWindowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout),
+                            ) { pad ->
+                                Box(
+                                    modifier = Modifier
+                                        .padding(pad)
+                                        // Consuma i system bar insets già applicati via pad, così le schermate
+                                        // figlie che hanno ancora statusBarsPadding/navigationBarsPadding non
+                                        // li ricalcolano (padding = 0, già gestito qui).
+                                        .consumeWindowInsets(pad)
+                                        .fillMaxSize()
+                                        .background(MaterialTheme.kidBoxColors.background),
+                                ) {
+                                    AppNavGraph(
+                                        navController = navController,
+                                        startDestination = AppDestination.Login.route,
+                                        onboardingPreferences = onboardingPreferences,
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -138,14 +202,40 @@ class MainActivity : ComponentActivity() {
                                     !deepLink.childId.isNullOrBlank() &&
                                     !deepLink.listId.isNullOrBlank()
                                 ) {
-                                    navController.navigate(
-                                        AppDestination.TodoList.createRoute(
-                                            familyId = deepLink.familyId,
-                                            childId = deepLink.childId!!,
-                                            listId = deepLink.listId!!,
-                                            highlightTodoId = deepLink.todoId,
-                                        ),
-                                    )
+                                    val tid = deepLink.todoId
+                                    val uid = firebaseAuth.currentUser?.uid
+                                    val openList = if (tid.isNullOrBlank()) {
+                                        val fid = deepLink.familyId!!
+                                        val cid = deepLink.childId!!
+                                        val lid = deepLink.listId!!
+                                        val allTodos =
+                                            withContext(Dispatchers.IO) { todoItemDao.getByFamilyAndChild(fid, cid) }
+                                        TodoListExposure.memberCanSeeListRow(lid, allTodos, uid)
+                                    } else {
+                                        val entity = withContext(Dispatchers.IO) { todoItemDao.getById(tid) }
+                                        entity != null &&
+                                            KBVisibilityScope.isVisible(
+                                                KBVisibilityScope.normalized(entity.visibilityScope),
+                                                decodeStringList(entity.visibilityMemberIdsJson),
+                                                entity.createdBy?.takeIf { it.isNotBlank() },
+                                                uid,
+                                            )
+                                    }
+                                    composeScope.launch {
+                                        if (!openList) {
+                                            bannerMessageStore.show(CONTENT_NO_LONGER_AVAILABLE_MESSAGE)
+                                            navController.navigate(AppDestination.Todo.route)
+                                        } else {
+                                            navController.navigate(
+                                                AppDestination.TodoList.createRoute(
+                                                    familyId = deepLink.familyId,
+                                                    childId = deepLink.childId!!,
+                                                    listId = deepLink.listId!!,
+                                                    highlightTodoId = deepLink.todoId,
+                                                ),
+                                            )
+                                        }
+                                    }
                                 }
                                 pendingPushDeepLink = null
                             }
@@ -178,12 +268,30 @@ class MainActivity : ComponentActivity() {
                                 if (deepLink.familyId.isNotBlank()) {
                                     val targetNoteId = deepLink.noteId ?: deepLink.itemId
                                     if (!targetNoteId.isNullOrBlank()) {
-                                        navController.navigate(
-                                            AppDestination.NoteDetail.createRoute(
-                                                familyId = deepLink.familyId,
-                                                noteId = targetNoteId,
-                                            ),
-                                        )
+                                        val entity = withContext(Dispatchers.IO) { noteDao.getById(targetNoteId) }
+                                        val uid = firebaseAuth.currentUser?.uid
+                                        val visible = entity != null &&
+                                            KBVisibilityScope.isVisible(
+                                                KBVisibilityScope.normalized(entity.visibilityScope),
+                                                decodeStringList(entity.visibilityMemberIdsJson),
+                                                entity.createdBy.takeIf { it.isNotBlank() },
+                                                uid,
+                                            )
+                                        composeScope.launch {
+                                            if (visible) {
+                                                navController.navigate(
+                                                    AppDestination.NoteDetail.createRoute(
+                                                        familyId = deepLink.familyId,
+                                                        noteId = targetNoteId,
+                                                    ),
+                                                )
+                                            } else {
+                                                bannerMessageStore.show(CONTENT_NO_LONGER_AVAILABLE_MESSAGE)
+                                                navController.navigate(
+                                                    AppDestination.NotesHome.createRoute(deepLink.familyId),
+                                                )
+                                            }
+                                        }
                                     } else {
                                         navController.navigate(AppDestination.NotesHome.createRoute(deepLink.familyId))
                                     }

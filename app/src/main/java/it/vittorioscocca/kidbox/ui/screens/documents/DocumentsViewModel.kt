@@ -2,16 +2,21 @@ package it.vittorioscocca.kidbox.ui.screens.documents
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.local.DocumentsSavedSort
 import it.vittorioscocca.kidbox.data.local.DocumentsSavedViewMode
 import it.vittorioscocca.kidbox.data.local.DocumentsUiPreferences
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentCategoryEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
+import it.vittorioscocca.kidbox.data.local.mapper.encodeStringList
 import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.data.notification.CountersService
 import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
 import it.vittorioscocca.kidbox.data.repository.DocumentRepository
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
+import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerMember
 import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -46,6 +51,7 @@ data class DocumentsUiState(
     val folders: List<KBDocumentCategoryEntity> = emptyList(),
     val documents: List<KBDocumentEntity> = emptyList(),
     val highlightedDocumentId: String? = null,
+    val visibilityMembers: List<VisibilityPickerMember> = emptyList(),
     val isStabilizingHierarchy: Boolean = false,
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
@@ -57,20 +63,28 @@ class DocumentsViewModel @Inject constructor(
     private val countersService: CountersService,
     private val homeBadgeManager: HomeBadgeManager,
     private val uiPreferences: DocumentsUiPreferences,
+    private val familyMemberDao: KBFamilyMemberDao,
+    private val auth: FirebaseAuth,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DocumentsUiState())
     val uiState: StateFlow<DocumentsUiState> = _uiState.asStateFlow()
     private var folderObservationJob: Job? = null
     private var debounceHealJob: Job? = null
+    private var visibilityMembersJob: Job? = null
+    private val pendingUploadScope = MutableStateFlow(KBVisibilityScope.FAMILY)
+    private val pendingMemberIds = MutableStateFlow<Set<String>>(emptySet())
     private var rootGateStartedAtMillis: Long = 0L
 
     fun bindFamily(familyId: String) {
         if (familyId.isBlank() || _uiState.value.familyId == familyId) return
+        visibilityMembersJob?.cancel()
+        resetPendingUploadVisibility()
         _uiState.value = DocumentsUiState(
             familyId = familyId,
             mode = uiPreferences.getViewMode().toUiMode(),
             sort = uiPreferences.getSort().toUiSort(),
             sortAscending = uiPreferences.getSortAscending(),
+            visibilityMembers = emptyList(),
         )
         rootGateStartedAtMillis = System.currentTimeMillis()
         repository.startRealtime(
@@ -89,6 +103,41 @@ class DocumentsViewModel @Inject constructor(
             }
             observeCurrentFolder()
         }
+        visibilityMembersJob = viewModelScope.launch {
+            familyMemberDao.observeActiveByFamilyId(familyId).collect { members ->
+                val uid = auth.currentUser?.uid
+                val visibilityMembers = members
+                    .asSequence()
+                    .filter { it.userId.isNotBlank() && (uid == null || it.userId != uid) }
+                    .map { row ->
+                        VisibilityPickerMember(
+                            uid = row.userId,
+                            displayName = row.displayName?.takeIf { it.isNotBlank() }
+                                ?: row.email?.takeIf { it.isNotBlank() }
+                                ?: row.userId,
+                        )
+                    }
+                    .distinctBy { it.uid }
+                    .sortedBy { it.displayName.lowercase() }
+                    .toList()
+                _uiState.value = _uiState.value.copy(visibilityMembers = visibilityMembers)
+            }
+        }
+    }
+
+    fun setPendingUploadVisibility(scope: String, memberIds: Set<String>) {
+        var s = KBVisibilityScope.normalized(scope)
+        val ids = memberIds.toSet()
+        if (s == KBVisibilityScope.MEMBERS && ids.isEmpty()) {
+            s = KBVisibilityScope.FAMILY
+        }
+        pendingUploadScope.value = s
+        pendingMemberIds.value = if (s == KBVisibilityScope.MEMBERS) ids else emptySet()
+    }
+
+    private fun resetPendingUploadVisibility() {
+        pendingUploadScope.value = KBVisibilityScope.FAMILY
+        pendingMemberIds.value = emptySet()
     }
 
     fun setMode(mode: DocumentsViewMode) {
@@ -180,6 +229,31 @@ class DocumentsViewModel @Inject constructor(
     fun selectedDocuments(): List<KBDocumentEntity> {
         val state = _uiState.value
         return state.documents.filter { it.id in state.selectedDocumentIds }
+    }
+
+    fun updateDocumentVisibility(
+        document: KBDocumentEntity,
+        visibilityScope: String,
+        visibilityMemberIds: List<String>,
+    ) {
+        val familyId = _uiState.value.familyId
+        if (familyId.isBlank()) return
+        var scope = KBVisibilityScope.normalized(visibilityScope)
+        var ids = visibilityMemberIds
+        if (scope == KBVisibilityScope.MEMBERS && ids.isEmpty()) {
+            scope = KBVisibilityScope.FAMILY
+        }
+        val json = encodeStringList(
+            if (scope == KBVisibilityScope.MEMBERS) ids.sorted() else emptyList(),
+        )
+        viewModelScope.launch {
+            runCatching {
+                repository.updateDocumentVisibilityLocal(document, scope, json)
+                repository.flushPending(familyId)
+            }.onFailure {
+                _uiState.value = _uiState.value.copy(errorMessage = it.localizedMessage ?: "Errore aggiornamento visibilità")
+            }
+        }
     }
 
     fun renameDocument(
@@ -387,12 +461,24 @@ class DocumentsViewModel @Inject constructor(
         val parentId = targetFolderId ?: _uiState.value.breadcrumbs.lastOrNull()?.id
         viewModelScope.launch {
             runCatching {
+                val uid = auth.currentUser?.uid.orEmpty()
+                var scope = pendingUploadScope.value
+                var memberIds = pendingMemberIds.value.toList()
+                if (scope == KBVisibilityScope.MEMBERS && memberIds.isEmpty()) {
+                    scope = KBVisibilityScope.FAMILY
+                }
+                val membersJson = encodeStringList(
+                    if (scope == KBVisibilityScope.MEMBERS) memberIds.sorted() else emptyList(),
+                )
                 repository.uploadDocumentLocal(
                     familyId = familyId,
                     parentFolderId = parentId,
                     fileName = fileName,
                     mimeType = mimeType,
                     bytes = bytes,
+                    visibilityScope = scope,
+                    visibilityMemberIdsJson = membersJson,
+                    createdBy = uid.ifBlank { null },
                 )
                 repository.flushPending(familyId)
             }.onFailure {

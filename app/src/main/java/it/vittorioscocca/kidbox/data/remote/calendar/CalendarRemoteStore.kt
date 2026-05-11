@@ -11,6 +11,8 @@ import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.SetOptions
 import it.vittorioscocca.kidbox.data.local.entity.KBCalendarEventEntity
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
@@ -30,6 +32,8 @@ data class CalendarEventRemoteDto(
     val reminderMinutes: Int?,
     val linkedHealthItemId: String?,
     val linkedHealthItemType: String?,
+    val visibilityScope: String,
+    val visibilityMemberIds: List<String>,
     val isDeleted: Boolean,
     val createdAtEpochMillis: Long?,
     val updatedAtEpochMillis: Long?,
@@ -83,6 +87,8 @@ class CalendarRemoteStore @Inject constructor(
                                     reminderMinutes = (d["reminderMinutes"] as? Number)?.toInt(),
                                     linkedHealthItemId = (d["linkedHealthItemId"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
                                     linkedHealthItemType = (d["linkedHealthItemType"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                                    visibilityScope = KBVisibilityScope.normalized(d["visibilityScope"] as? String),
+                                    visibilityMemberIds = visibilityMemberIdsFromFirestore(d["visibilityMemberIds"]),
                                     isDeleted = d["isDeleted"] as? Boolean ?: false,
                                     createdAtEpochMillis = (d["createdAt"] as? Timestamp)?.toDate()?.time,
                                     updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
@@ -119,6 +125,8 @@ class CalendarRemoteStore @Inject constructor(
             "reminderMinutes" to event.reminderMinutes,
             "linkedHealthItemId" to event.linkedHealthItemId,
             "linkedHealthItemType" to event.linkedHealthItemType,
+            "visibilityScope" to KBVisibilityScope.normalized(event.visibilityScope),
+            "visibilityMemberIds" to decodeStringList(event.visibilityMemberIdsJson),
             "isDeleted" to event.isDeleted,
             "createdBy" to event.createdBy,
             "updatedBy" to uid,
@@ -158,5 +166,10 @@ class CalendarRemoteStore @Inject constructor(
 
     private fun timestampFromMillis(epochMillis: Long): Timestamp =
         Timestamp(epochMillis / 1000, ((epochMillis % 1000) * 1_000_000).toInt())
+
+    private fun visibilityMemberIdsFromFirestore(raw: Any?): List<String> = when (raw) {
+        is List<*> -> raw.mapNotNull { it as? String }.distinct()
+        else -> emptyList()
+    }
 }
 

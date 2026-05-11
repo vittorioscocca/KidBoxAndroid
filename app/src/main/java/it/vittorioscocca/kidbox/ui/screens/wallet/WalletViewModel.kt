@@ -4,7 +4,9 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.entity.KBWalletTicketEntity
 import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
@@ -13,16 +15,20 @@ import it.vittorioscocca.kidbox.data.wallet.PendingWalletImport
 import it.vittorioscocca.kidbox.data.wallet.WalletParsedData
 import it.vittorioscocca.kidbox.data.wallet.WalletPdfParser
 import it.vittorioscocca.kidbox.domain.model.WalletTicketKind
+import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerMember
+import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 data class WalletUiState(
     val familyId: String = "",
     val tickets: List<KBWalletTicketEntity> = emptyList(),
+    val visibilityMembers: List<VisibilityPickerMember> = emptyList(),
     val isLoading: Boolean = true,
     val hasQueuedSharePdf: Boolean = false,
     val isImporting: Boolean = false,
@@ -33,6 +39,8 @@ data class WalletUiState(
 @HiltViewModel
 class WalletViewModel @Inject constructor(
     private val walletRepository: WalletRepository,
+    private val familyMemberDao: KBFamilyMemberDao,
+    private val auth: FirebaseAuth,
     private val badgeManager: HomeBadgeManager,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(WalletUiState())
@@ -59,10 +67,28 @@ class WalletViewModel @Inject constructor(
 
         observeJob?.cancel()
         observeJob = viewModelScope.launch {
-            walletRepository.observeActiveByFamilyId(familyId).collect { list ->
+            combine(
+                walletRepository.observeActiveByFamilyId(familyId),
+                familyMemberDao.observeActiveByFamilyId(familyId),
+            ) { tickets, members ->
+                val uid = auth.currentUser?.uid
+                val picker = members
+                    .asSequence()
+                    .filter { it.userId != uid }
+                    .map { m ->
+                        VisibilityPickerMember(
+                            uid = m.userId,
+                            displayName = m.displayName?.takeIf { it.isNotBlank() } ?: "Membro",
+                        )
+                    }
+                    .sortedBy { it.displayName.lowercase(Locale.getDefault()) }
+                    .toList()
+                tickets to picker
+            }.collect { (tickets, picker) ->
                 _uiState.value = _uiState.value.copy(
                     familyId = familyId,
-                    tickets = list,
+                    tickets = tickets,
+                    visibilityMembers = picker,
                     isLoading = false,
                     hasQueuedSharePdf = PendingWalletImport.peek() != null,
                 )
@@ -130,6 +156,8 @@ class WalletViewModel @Inject constructor(
         pdfUri: Uri,
         title: String,
         parsed: WalletParsedData,
+        visibilityScope: String,
+        visibilityMemberIds: List<String>,
         context: Context,
         onSuccess: () -> Unit,
     ) {
@@ -154,6 +182,8 @@ class WalletViewModel @Inject constructor(
                 fileName = fileName,
                 parsed = parsed,
                 title = title,
+                visibilityScope = visibilityScope,
+                visibilityMemberIds = visibilityMemberIds,
             )
             _uiState.value = _uiState.value.copy(
                 isImporting = false,
@@ -172,6 +202,25 @@ class WalletViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { walletRepository.deleteTicket(ticketId, familyId) }
                 .onFailure { _uiState.value = _uiState.value.copy(message = it.message ?: "Errore eliminazione") }
+        }
+    }
+
+    fun updateTicketVisibility(ticketId: String, visibilityScope: String, visibilityMemberIds: List<String>) {
+        val familyId = _uiState.value.familyId
+        if (familyId.isBlank()) return
+        viewModelScope.launch {
+            val result = walletRepository.updateWalletTicketVisibility(
+                ticketId = ticketId,
+                familyId = familyId,
+                visibilityScope = visibilityScope,
+                visibilityMemberIds = visibilityMemberIds,
+            )
+            _uiState.value = _uiState.value.copy(
+                message = result.fold(
+                    onSuccess = { "Visibilità aggiornata" },
+                    onFailure = { it.message ?: "Aggiornamento non riuscito" },
+                ),
+            )
         }
     }
 

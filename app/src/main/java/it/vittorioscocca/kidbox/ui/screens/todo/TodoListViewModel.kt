@@ -7,7 +7,10 @@ import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoItemEntity
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
 import it.vittorioscocca.kidbox.data.repository.TodoRepository
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
+import it.vittorioscocca.kidbox.domain.model.TodoListExposure
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -27,6 +30,8 @@ data class TodoListUiState(
     val members: List<TodoMemberUi> = emptyList(),
     val highlightTodoId: String? = null,
     val smartKind: TodoSmartKind? = null,
+    /** Lista con solo To-Do di altri utenti (non visibili a me). */
+    val listAccessDenied: Boolean = false,
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
 )
@@ -52,6 +57,15 @@ class TodoListViewModel @Inject constructor(
         error,
     ) { lists, todos, members, err ->
         val meUid = auth.currentUser?.uid.orEmpty()
+        val uidForVis = meUid.takeIf { it.isNotBlank() }
+        val todosVisible = todos.filter { todo ->
+            KBVisibilityScope.isVisible(
+                KBVisibilityScope.normalized(todo.visibilityScope),
+                decodeStringList(todo.visibilityMemberIdsJson),
+                todo.createdBy?.takeIf { it.isNotBlank() },
+                uidForVis,
+            )
+        }
         val memberItems = members.map { member ->
             TodoMemberUi(
                 uid = member.userId,
@@ -68,7 +82,12 @@ class TodoListViewModel @Inject constructor(
             memberItems.add(0, TodoMemberUi(uid = meUid, displayName = "Me"))
         }
         val listName = lists.firstOrNull { it.id == listId }?.name ?: titleForKind(kind)
-        val listScoped = if (kind == null) todos.filter { it.listId == listId } else todos
+        val todosForChild = todos.filter {
+            it.familyId == familyId && it.childId == childId && !it.isDeleted
+        }
+        val listAccessDenied = kind == null && listId.isNotBlank() &&
+            !TodoListExposure.memberCanSeeListRow(listId, todosForChild, uidForVis)
+        val listScoped = if (kind == null) todosVisible.filter { it.listId == listId } else todosVisible
         val filtered = when (kind) {
             TodoSmartKind.TODAY -> {
                 val dayStart = java.time.LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
@@ -94,6 +113,7 @@ class TodoListViewModel @Inject constructor(
             members = memberItems,
             highlightTodoId = highlightTodoIdArg,
             smartKind = kind,
+            listAccessDenied = listAccessDenied,
             isLoading = false,
             errorMessage = err,
         )
@@ -116,6 +136,8 @@ class TodoListViewModel @Inject constructor(
         assignedTo: String?,
         priorityRaw: Int,
         reminderEnabled: Boolean,
+        visibilityScope: String,
+        visibilityMemberIds: List<String>,
     ) {
         if (familyId.isBlank() || childId.isBlank() || listId.isBlank()) return
         viewModelScope.launch {
@@ -130,6 +152,8 @@ class TodoListViewModel @Inject constructor(
                     assignedTo = assignedTo,
                     priorityRaw = priorityRaw,
                     reminderEnabled = reminderEnabled,
+                    visibilityScope = visibilityScope,
+                    visibilityMemberIds = visibilityMemberIds,
                 )
             }.onFailure { error.value = it.message ?: "Errore durante il salvataggio To-Do" }
         }
@@ -143,6 +167,8 @@ class TodoListViewModel @Inject constructor(
         assignedTo: String?,
         priorityRaw: Int,
         reminderEnabled: Boolean,
+        visibilityScope: String,
+        visibilityMemberIds: List<String>,
     ) {
         viewModelScope.launch {
             runCatching {
@@ -154,6 +180,8 @@ class TodoListViewModel @Inject constructor(
                     assignedTo = assignedTo,
                     priorityRaw = priorityRaw,
                     reminderEnabled = reminderEnabled,
+                    visibilityScope = visibilityScope,
+                    visibilityMemberIds = visibilityMemberIds,
                 )
             }.onFailure { error.value = it.message ?: "Errore durante aggiornamento To-Do" }
         }

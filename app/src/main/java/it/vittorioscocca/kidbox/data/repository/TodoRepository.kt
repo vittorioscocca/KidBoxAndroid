@@ -3,8 +3,13 @@ package it.vittorioscocca.kidbox.data.repository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
+import it.vittorioscocca.kidbox.data.local.mapper.encodeStringList
+import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoItemDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoListDao
+import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoItemEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoListEntity
 import it.vittorioscocca.kidbox.data.notification.TodoReminderScheduler
@@ -12,6 +17,7 @@ import it.vittorioscocca.kidbox.data.remote.todo.TodoItemRemoteChange
 import it.vittorioscocca.kidbox.data.remote.todo.TodoListRemoteChange
 import it.vittorioscocca.kidbox.data.remote.todo.TodoRemoteStore
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -29,6 +35,8 @@ class TodoRepository @Inject constructor(
     private val remoteStore: TodoRemoteStore,
     private val auth: FirebaseAuth,
     private val reminderScheduler: TodoReminderScheduler,
+    private val familyDao: KBFamilyDao,
+    private val childDao: KBChildDao,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val realtimeMutex = Mutex()
@@ -140,9 +148,15 @@ class TodoRepository @Inject constructor(
         assignedTo: String?,
         priorityRaw: Int?,
         reminderEnabled: Boolean,
+        visibilityScope: String = KBVisibilityScope.FAMILY,
+        visibilityMemberIds: List<String> = emptyList(),
     ) {
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()
+        val normalizedScope = KBVisibilityScope.normalized(visibilityScope)
+        val memberIdsJson = encodeStringList(
+            if (normalizedScope == KBVisibilityScope.MEMBERS) visibilityMemberIds else emptyList(),
+        )
         val todo = KBTodoItemEntity(
             id = java.util.UUID.randomUUID().toString(),
             familyId = familyId,
@@ -165,6 +179,8 @@ class TodoRepository @Inject constructor(
             assignedTo = assignedTo,
             createdBy = uid,
             priorityRaw = priorityRaw ?: 0,
+            visibilityScope = normalizedScope,
+            visibilityMemberIdsJson = memberIdsJson,
         )
         val reminderId = if (todo.reminderEnabled && dueAtEpochMillis != null) {
             reminderScheduler.schedule(
@@ -192,10 +208,22 @@ class TodoRepository @Inject constructor(
         assignedTo: String?,
         priorityRaw: Int?,
         reminderEnabled: Boolean,
+        /** Se null, mantiene scope e membri già salvati sul todo (evita regressioni nei flussi tipo promemoria). */
+        visibilityScope: String? = null,
+        visibilityMemberIds: List<String>? = null,
     ) {
         val existing = itemDao.getById(todoId) ?: return
         if (!existing.reminderId.isNullOrBlank() && (!reminderEnabled || dueAtEpochMillis == null)) {
             reminderScheduler.cancel(existing.reminderId)
+        }
+        val normalizedScope = visibilityScope?.let { KBVisibilityScope.normalized(it) }
+            ?: existing.visibilityScope
+        val memberIdsJson = if (visibilityMemberIds != null) {
+            encodeStringList(
+                if (normalizedScope == KBVisibilityScope.MEMBERS) visibilityMemberIds else emptyList(),
+            )
+        } else {
+            existing.visibilityMemberIdsJson
         }
         val local = existing.copy(
             title = title,
@@ -208,6 +236,8 @@ class TodoRepository @Inject constructor(
             updatedBy = auth.currentUser?.uid ?: existing.updatedBy,
             syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
             lastSyncError = null,
+            visibilityScope = normalizedScope,
+            visibilityMemberIdsJson = memberIdsJson,
         )
         val reminderId = if (local.reminderEnabled && dueAtEpochMillis != null) {
             reminderScheduler.schedule(
@@ -266,6 +296,10 @@ class TodoRepository @Inject constructor(
                         listDao.deleteById(dto.id)
                         return@forEach
                     }
+                    ensureFamilyExists(dto.familyId)
+                    if (childDao.getById(dto.childId) == null) {
+                        return@forEach
+                    }
                     val local = listDao.getById(dto.id)
                     if (local != null && (dto.updatedAtEpochMillis ?: 0L) < local.updatedAtEpochMillis) {
                         return@forEach
@@ -304,10 +338,27 @@ class TodoRepository @Inject constructor(
                     ) {
                         return@forEach
                     }
-                    if (local != null && (dto.updatedAtEpochMillis ?: 0L) < local.updatedAtEpochMillis) {
+                    // LWW sul timestamp solo se questo device ha ancora modifiche da inviare: altrimenti
+                    // lo skew tra millis locali e serverTimestamp Firestore blocca gli aggiornamenti remoti
+                    // (es. iOS cambia visibilità → Android resta sulla copia locale fino al re-entry).
+                    val localSync = local?.syncStateRaw?.let(KBSyncState::fromRaw) ?: KBSyncState.SYNCED
+                    val localHasPendingOutbound =
+                        local != null &&
+                            (localSync == KBSyncState.PENDING_UPSERT || localSync == KBSyncState.ERROR)
+                    if (
+                        localHasPendingOutbound &&
+                        (dto.updatedAtEpochMillis ?: 0L) < local.updatedAtEpochMillis
+                    ) {
+                        return@forEach
+                    }
+                    ensureFamilyExists(dto.familyId)
+                    if (childDao.getById(dto.childId) == null) {
                         return@forEach
                     }
                     val now = System.currentTimeMillis()
+                    val remoteScope = KBVisibilityScope.normalized(dto.visibilityScope)
+                    val remoteMemberIds = dto.visibilityMemberIds
+                    val safeListId = resolveReferencedListId(dto.listId)
                     itemDao.upsert(
                         KBTodoItemEntity(
                             id = dto.id,
@@ -323,7 +374,7 @@ class TodoRepository @Inject constructor(
                             updatedAtEpochMillis = dto.updatedAtEpochMillis ?: now,
                             updatedBy = dto.updatedBy ?: local?.updatedBy ?: "",
                             isDeleted = false,
-                            listId = dto.listId,
+                            listId = safeListId,
                             reminderEnabled = local?.reminderEnabled ?: false,
                             reminderId = local?.reminderId,
                             syncStateRaw = KBSyncState.SYNCED.rawValue,
@@ -331,11 +382,45 @@ class TodoRepository @Inject constructor(
                             assignedTo = dto.assignedTo,
                             createdBy = local?.createdBy ?: dto.createdBy,
                             priorityRaw = dto.priorityRaw ?: 0,
+                            visibilityScope = remoteScope,
+                            visibilityMemberIdsJson = encodeStringList(remoteMemberIds),
                         ),
                     )
                 }
             }
         }
+    }
+
+    /** Evita SQLITE_CONSTRAINT_FOREIGNKEY: liste possono arrivare dopo i todo nello snapshot. */
+    private suspend fun resolveReferencedListId(listId: String?): String? {
+        val id = listId?.trim().orEmpty()
+        if (id.isEmpty()) return null
+        return if (listDao.getById(id) != null) id else null
+    }
+
+    private suspend fun ensureFamilyExists(familyId: String) {
+        if (familyId.isBlank()) return
+        if (familyDao.getById(familyId) != null) return
+        val now = System.currentTimeMillis()
+        val uid = auth.currentUser?.uid ?: "local"
+        familyDao.upsert(
+            KBFamilyEntity(
+                id = familyId,
+                name = "Famiglia",
+                heroPhotoURL = null,
+                heroPhotoLocalPath = null,
+                heroPhotoUpdatedAtEpochMillis = null,
+                heroPhotoScale = null,
+                heroPhotoOffsetX = null,
+                heroPhotoOffsetY = null,
+                createdBy = uid,
+                updatedBy = uid,
+                createdAtEpochMillis = now,
+                updatedAtEpochMillis = now,
+                lastSyncAtEpochMillis = null,
+                lastSyncError = null,
+            ),
+        )
     }
 
     private fun stopRealtimeLocked() {

@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox.ui.screens.notes
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
@@ -25,6 +26,7 @@ data class NotesHomeUiState(
 class NotesHomeViewModel @Inject constructor(
     private val noteRepository: NoteRepository,
     private val badgeManager: HomeBadgeManager,
+    private val auth: FirebaseAuth,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(NotesHomeUiState())
     val uiState: StateFlow<NotesHomeUiState> = _uiState.asStateFlow()
@@ -53,9 +55,11 @@ class NotesHomeViewModel @Inject constructor(
         observeJob?.cancel()
         observeJob = viewModelScope.launch {
             noteRepository.observeByFamilyId(familyId).collect { notes ->
+                val uid = auth.currentUser?.uid
+                val visible = notes.filter { it.isVisibleTo(uid) }.sortedByDescending { it.updatedAtEpochMillis }
                 _uiState.value = _uiState.value.copy(
                     familyId = familyId,
-                    notes = notes.sortedByDescending { it.updatedAtEpochMillis },
+                    notes = visible,
                     isLoading = false,
                 )
             }

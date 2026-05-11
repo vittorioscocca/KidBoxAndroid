@@ -16,6 +16,8 @@ data class KBCalendarEvent(
     val reminderMinutes: Int?,
     val linkedHealthItemId: String?,
     val linkedHealthItemType: String?,
+    val visibilityScope: String = KBVisibilityScope.FAMILY,
+    val visibilityMemberIds: List<String> = emptyList(),
     val isDeleted: Boolean,
     val createdAtEpochMillis: Long,
     val updatedAtEpochMillis: Long,

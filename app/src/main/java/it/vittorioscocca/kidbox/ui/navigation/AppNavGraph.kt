@@ -275,13 +275,19 @@ fun AppNavGraph(
             arguments = listOf(
                 navArgument("familyId") { type = NavType.StringType },
                 navArgument("noteId") { type = NavType.StringType },
+                navArgument("isNewNote") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                },
             ),
         ) { backStackEntry ->
             val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
             val noteId = backStackEntry.arguments?.getString("noteId").orEmpty()
+            val isNewNote = backStackEntry.arguments?.getBoolean("isNewNote") ?: false
             NoteDetailScreen(
                 familyId = familyId,
                 noteId = noteId,
+                isNewNote = isNewNote,
                 onBack = { navController.popBackStack() },
             )
         }

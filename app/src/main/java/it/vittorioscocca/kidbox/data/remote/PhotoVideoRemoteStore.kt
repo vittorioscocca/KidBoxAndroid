@@ -70,9 +70,8 @@ sealed interface PhotoAlbumRemoteChange {
 }
 
 @Singleton
-class PhotoVideoRemoteStore @Inject constructor(
-    private val firestore: FirebaseFirestore,
-) {
+class PhotoVideoRemoteStore @Inject constructor() {
+    private val firestore get() = FirebaseFirestore.getInstance()
     fun listenPhotos(
         familyId: String,
         onChange: (PhotoRemoteChange) -> Unit,
