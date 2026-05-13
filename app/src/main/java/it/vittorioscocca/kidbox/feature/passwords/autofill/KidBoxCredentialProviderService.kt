@@ -7,6 +7,7 @@ import android.os.CancellationSignal
 import android.os.OutcomeReceiver
 import android.util.Log
 import androidx.credentials.exceptions.ClearCredentialException
+import androidx.credentials.provider.Action
 import androidx.credentials.provider.BeginCreateCredentialResponse
 import androidx.credentials.provider.BeginCreatePasswordCredentialRequest
 import androidx.credentials.provider.BeginGetCredentialRequest
@@ -73,13 +74,30 @@ class KidBoxCredentialProviderService : CredentialProviderService() {
 
         val passwordOption = request.beginGetCredentialOptions.filterIsInstance<BeginGetPasswordOption>().firstOrNull()
         if (passwordOption == null) {
+            // Chrome su siti con passkey manda solo BeginGetPublicKeyCredentialOption.
+            // PasswordCredentialEntry richiede BeginGetPasswordOption, quindi non possiamo
+            // creare voci password dirette. Restituiamo un'Action visibile nel selettore
+            // così l'utente sa che KidBox è disponibile e può aprirlo per copiare la password.
             Log.i(
                 TAG,
-                "onBeginGetCredentialRequest: no BeginGetPasswordOption (caller=${calling?.packageName} origin=${calling?.origin} types=${
+                "onBeginGetCredentialRequest: no BeginGetPasswordOption — caller=${calling?.packageName} origin=${calling?.origin} types=${
                     request.beginGetCredentialOptions.joinToString { it.type }
-                })",
+                }",
             )
-            callback.onResult(BeginGetCredentialResponse(emptyList(), emptyList(), emptyList(), null))
+            val openIntent = packageManager.getLaunchIntentForPackage(packageName)
+                ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (openIntent != null && snapshot.items.isNotEmpty()) {
+                val pi = PendingIntent.getActivity(
+                    this,
+                    PI_REQ_ACTION_OPEN,
+                    openIntent,
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                )
+                val action = Action(title = "KidBox", pendingIntent = pi)
+                callback.onResult(BeginGetCredentialResponse(emptyList(), listOf(action), emptyList(), null))
+            } else {
+                callback.onResult(BeginGetCredentialResponse(emptyList(), emptyList(), emptyList(), null))
+            }
             return
         }
 
@@ -196,6 +214,7 @@ class KidBoxCredentialProviderService : CredentialProviderService() {
         const val ACTION_CREATE_PASSWORD = "it.vittorioscocca.kidbox.autofill.CM_CREATE_PASSWORD"
         const val EXTRA_ENTRY_ID = "kidbox.autofill.entryId"
         private const val PI_REQ_CREATE = 91002
+        private const val PI_REQ_ACTION_OPEN = 91003
     }
 }
 

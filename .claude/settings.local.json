@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(/Users/vscocca/KidBox/KidBoxAndroid/gradlew :app:compileDebugKotlin --daemon)",
-      "Bash(gradle --version)"
+      "Bash(gradle --version)",
+      "Bash(xargs cat)",
+      "Bash(./gradlew :app:compileDebugKotlin --quiet)",
+      "Bash(gradle :app:compileDebugKotlin --quiet)",
+      "Bash(find ~/.gradle/wrapper/dists -name \"gradle\" -type f 2>/dev/null | head -3)",
+      "Bash(/Users/vscocca/.gradle/wrapper/dists/gradle-8.10.2-bin/a04bxjujx95o3nb99gddekhwo/gradle-8.10.2/bin/gradle :app:compileDebugKotlin --quiet)"
     ]
   }
 }

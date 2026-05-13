@@ -111,15 +111,24 @@ class KidBoxAutofillService : AutofillService() {
                 authIntent,
                 PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             ).intentSender
-            val dataset = Dataset.Builder(presentation)
+            // Android 15+ / alcune ROM: build() fallisce se non c’è almeno un setValue/setField
+            // (solo setAuthentication non popola i field id interni).
+            val datasetBuilder = Dataset.Builder(presentation)
+            parsed.usernameId?.let { userField ->
+                datasetBuilder.setValue(userField, AutofillValue.forText(""))
+            }
+            datasetBuilder.setValue(parsed.passwordId!!, AutofillValue.forText(""))
+            val dataset = datasetBuilder
                 .setAuthentication(sender)
                 .build()
             responseBuilder.addDataset(dataset)
         }
         val saveTypes = SaveInfo.SAVE_DATA_TYPE_USERNAME or SaveInfo.SAVE_DATA_TYPE_PASSWORD
-        // SaveInfo.Builder.setRequiredIds(AutofillId...) è API 30+; sugli stub di compilazione può
-        // non essere esposta. Salva comunque username+password senza vincolare gli id (comportamento ok).
-        responseBuilder.setSaveInfo(SaveInfo.Builder(saveTypes).build())
+        // parsed.passwordId è non-null qui (controllo all'inizio di onFillRequest).
+        // requiredIds dice al sistema quale campo monitorare — senza MIUI ignora il save dialog.
+        val saveInfoBuilder = SaveInfo.Builder(saveTypes, arrayOf(parsed.passwordId!!))
+        parsed.usernameId?.let { saveInfoBuilder.setOptionalIds(arrayOf(it)) }
+        responseBuilder.setSaveInfo(saveInfoBuilder.build())
         Log.i(
             TAG,
             "onFillRequest: FillResponse pkg=$pkg host=${requestHost ?: "?"} datasets=${displayItems.size}",
