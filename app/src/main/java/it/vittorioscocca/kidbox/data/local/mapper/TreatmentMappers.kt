@@ -4,6 +4,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBDoseLogEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTreatmentEntity
 import it.vittorioscocca.kidbox.domain.model.KBDoseLog
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
+import it.vittorioscocca.kidbox.domain.model.plannedFiniteDosesTotal
 
 fun KBTreatmentEntity.toDomain(): KBTreatment = KBTreatment(
     id = id,
@@ -20,6 +21,7 @@ fun KBTreatmentEntity.toDomain(): KBTreatment = KBTreatment(
     startDateEpochMillis = startDateEpochMillis,
     endDateEpochMillis = endDateEpochMillis,
     dailyFrequency = dailyFrequency,
+    intervalBetweenDosesDays = intervalBetweenDosesDays,
     scheduleTimesData = scheduleTimesData,
     isActive = isActive,
     notes = notes,
@@ -49,6 +51,7 @@ fun KBTreatment.toEntity(): KBTreatmentEntity = KBTreatmentEntity(
     startDateEpochMillis = startDateEpochMillis,
     endDateEpochMillis = endDateEpochMillis,
     dailyFrequency = dailyFrequency,
+    intervalBetweenDosesDays = intervalBetweenDosesDays,
     scheduleTimesData = scheduleTimesData,
     isActive = isActive,
     notes = notes,
@@ -103,4 +106,4 @@ fun KBTreatment.scheduleTimesList(): List<String> =
     scheduleTimesData.split(",").map { it.trim() }.filter { it.isNotEmpty() }
 
 fun KBTreatment.totalDoses(): Int =
-    if (isLongTerm) -1 else dailyFrequency * durationDays
+    if (isLongTerm) -1 else plannedFiniteDosesTotal()

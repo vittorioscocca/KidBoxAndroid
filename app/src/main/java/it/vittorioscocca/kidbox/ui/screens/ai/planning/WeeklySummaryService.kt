@@ -24,9 +24,11 @@ import dagger.assisted.AssistedInject
 import it.vittorioscocca.kidbox.MainActivity
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.remote.ai.AIService
+import it.vittorioscocca.kidbox.data.remote.ai.AIServiceException
 import it.vittorioscocca.kidbox.data.repository.KBAIRepository
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
 import it.vittorioscocca.kidbox.domain.model.ai.AIMessageRole
+import it.vittorioscocca.kidbox.domain.model.ai.AIServiceError
 import java.util.Calendar
 import java.util.Locale
 import java.util.UUID
@@ -190,7 +192,12 @@ object WeeklySummaryService {
                 }
                 scheduleMonday8amNotification(applicationContext, familyId, familyName, response.reply)
             }
-            return if (result.isSuccess) Result.success() else Result.retry()
+            if (result.isSuccess) return Result.success()
+            // Evita loop infiniti su errori client (es. App Check 403): ritenta solo rete / rate limit.
+            val err = result.exceptionOrNull()
+            val retry = err is AIServiceException &&
+                (err.serviceError == AIServiceError.NetworkError || err.serviceError == AIServiceError.RateLimitReached)
+            return if (retry) Result.retry() else Result.failure()
         }
     }
 }

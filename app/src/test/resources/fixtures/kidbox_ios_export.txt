@@ -1,0 +1,21 @@
+# KidBox Password Export v1
+---
+Title: Gmail
+Username: mario@example.com
+Password: super-secret
+WebSite: https://mail.google.com
+Group: Personal
+Visibility: family
+Note: riga1\nriga2
+CreatedBy: u1
+---
+---
+Title: Bank
+Username: mario
+Password: pass-123
+WebSite: https://bank.example
+Group: Finance
+Visibility: private
+Note: conto principale
+CreatedBy: u1
+---

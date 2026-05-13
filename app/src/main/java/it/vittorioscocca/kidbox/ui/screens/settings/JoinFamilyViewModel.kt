@@ -4,15 +4,23 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.vittorioscocca.kidbox.data.crypto.FamilyKeyEscrow
+import it.vittorioscocca.kidbox.data.crypto.FamilyKeyStore
 import it.vittorioscocca.kidbox.data.remote.family.InviteRemoteStore
 import it.vittorioscocca.kidbox.data.remote.family.JoinPayloadParser
 import it.vittorioscocca.kidbox.data.remote.family.JoinWrapService
+import it.vittorioscocca.kidbox.data.repository.PasswordsRepository
 import it.vittorioscocca.kidbox.data.sync.FamilySyncCenter
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 private const val TAG = "JoinFamilyViewModel"
@@ -42,6 +50,7 @@ data class JoinFamilyUiState(
 class JoinFamilyViewModel @Inject constructor(
     application: Application,
     private val familySyncCenter: FamilySyncCenter,
+    private val passwordsRepository: PasswordsRepository,
 ) : AndroidViewModel(application) {
 
     private val inviteRemote = InviteRemoteStore()
@@ -60,6 +69,7 @@ class JoinFamilyViewModel @Inject constructor(
             try {
                 val raw = rawPayload.trim()
                 // Step 1: unwrap master key (secret Base64URL da kidbox://join) + salva in FamilyKeyStore
+                val parsedForFamilyCheck = joinWrapService.parse(raw)
                 joinWrapService.join(getApplication(), raw)
                 Log.i(TAG, "QR join: master key saved")
 
@@ -72,8 +82,13 @@ class JoinFamilyViewModel @Inject constructor(
                     return@launch
                 }
 
-                // Step 3: join tramite membership code
-                joinWithCodeInternal(code, onJoined)
+                // Step 3: join tramite membership code (stesso casing dei doc `invites/{CODE}` su Firestore)
+                joinWithCodeInternal(
+                    code = code.trim().uppercase(),
+                    onJoined = onJoined,
+                    expectedFamilyIdFromInviteQr = parsedForFamilyCheck?.familyId,
+                    didCryptoUnwrap = true,
+                )
 
             } catch (e: Exception) {
                 Log.e(TAG, "QR join failed: ${e.message}")
@@ -88,15 +103,36 @@ class JoinFamilyViewModel @Inject constructor(
     fun joinWithCode(code: String, onJoined: () -> Unit) {
         viewModelScope.launch {
             _uiState.value = JoinFamilyUiState(isBusy = true)
-            joinWithCodeInternal(code.trim().uppercase(), onJoined)
+            joinWithCodeInternal(
+                code = code.trim().uppercase(),
+                onJoined = onJoined,
+                expectedFamilyIdFromInviteQr = null,
+                didCryptoUnwrap = false,
+            )
         }
     }
 
-    private suspend fun joinWithCodeInternal(code: String, onJoined: () -> Unit) {
+    private suspend fun joinWithCodeInternal(
+        code: String,
+        onJoined: () -> Unit,
+        expectedFamilyIdFromInviteQr: String?,
+        didCryptoUnwrap: Boolean,
+    ) {
         try {
             Log.d(TAG, "resolveInvite start code=$code")
             val familyId = inviteRemote.resolveInvite(code)
             Log.d(TAG, "resolveInvite OK familyId=$familyId")
+
+            if (expectedFamilyIdFromInviteQr != null && expectedFamilyIdFromInviteQr != familyId) {
+                Log.e(
+                    TAG,
+                    "join aborted: invite QR familyId=$expectedFamilyIdFromInviteQr != code familyId=$familyId",
+                )
+                _uiState.value = JoinFamilyUiState(
+                    error = "Invito incoerente: il codice non corrisponde al QR.",
+                )
+                return
+            }
 
             Log.d(TAG, "addMember start familyId=$familyId")
             inviteRemote.addMember(familyId)
@@ -106,6 +142,34 @@ class JoinFamilyViewModel @Inject constructor(
             // Reset FamilySyncCenter così startObserving() fa bootstrap della nuova famiglia
             familySyncCenter.stopSync()
             familySyncCenter.startSync(familyId)
+
+            withTimeoutOrNull(30_000) {
+                familySyncCenter.initialSyncDone.first { it }
+            } ?: Log.w(TAG, "initialSyncDone timeout after join familyId=$familyId — continuing")
+
+            val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+            if (uid.isNotBlank()) {
+                withContext(Dispatchers.IO) {
+                    FamilyKeyEscrow.ensureFamilyKeyAvailable(getApplication(), familyId, uid)
+                }
+                if (!FamilyKeyStore.hasFamilyKey(getApplication(), familyId, uid) && !didCryptoUnwrap) {
+                    Log.e(
+                        TAG,
+                        "join: membership code only — no vault key (use crypto invite QR) familyId=$familyId",
+                    )
+                } else if (FamilyKeyStore.hasFamilyKey(getApplication(), familyId, uid)) {
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            passwordsRepository.hydratePasswordRoomFromServer(familyId)
+                        }.onFailure { e ->
+                            Log.e(TAG, "hydratePasswordRoomFromServer failed: ${e.message}", e)
+                        }
+                    }
+                    withContext(Dispatchers.IO) {
+                        passwordsRepository.awaitForceRestartRealtime(familyId)
+                    }
+                }
+            }
             onJoined()
         } catch (e: Exception) {
             Log.e(TAG, "joinWithCode failed: ${e.message}")

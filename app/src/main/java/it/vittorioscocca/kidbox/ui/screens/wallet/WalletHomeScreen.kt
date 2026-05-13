@@ -2,8 +2,6 @@
 
 package it.vittorioscocca.kidbox.ui.screens.wallet
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -82,12 +80,6 @@ fun WalletHomeScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var showAddSheet by remember { mutableStateOf(false) }
-
-    val pdfPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent(),
-    ) { uri ->
-        uri?.let { viewModel.importPdf(it) }
-    }
 
     LaunchedEffect(familyId) {
         viewModel.bind(familyId)

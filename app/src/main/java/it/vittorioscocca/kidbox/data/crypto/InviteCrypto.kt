@@ -25,6 +25,10 @@ object InviteCrypto {
     /** Base64 URL-safe senza padding, allineato a iOS `Data.fromBase64url` / encoding URL-safe. */
     private const val BASE64URL_FLAGS = Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
 
+    /** Allineato a iOS `FamilyKeyEscrowService` (salt / context). */
+    private const val ESCROW_SALT = "kidbox-escrow-salt-2026"
+    private const val ESCROW_CONTEXT = "kidbox-key-escrow-v1"
+
     // ── Randomness ────────────────────────────────────────────────────────────
 
     fun randomBytes(count: Int): ByteArray {
@@ -57,6 +61,22 @@ object InviteCrypto {
         val okm = hmacSha256(prk, t1Input)
         // Take first 32 bytes (SHA256 output is already 32 bytes)
         return okm.copyOf(32)
+    }
+
+    /**
+     * Chiave AES-256 per wrappare la family master key nell'escrow Firestore
+     * (`families/{familyId}/memberKeyBackups/{userId}`), identica a iOS
+     * `FamilyKeyEscrowService.deriveEscrowKey` (HKDF-SHA256, RFC 5869).
+     */
+    fun deriveEscrowWrapKey(userId: String, familyId: String): ByteArray {
+        val ikmPreimage = "$userId:$familyId:$ESCROW_CONTEXT".toByteArray(Charsets.UTF_8)
+        val ikm = MessageDigest.getInstance("SHA-256").digest(ikmPreimage)
+        val salt = ESCROW_SALT.toByteArray(Charsets.UTF_8)
+        val actualSalt = if (salt.isEmpty()) ByteArray(32) { 0 } else salt
+        val prk = hmacSha256(actualSalt, ikm)
+        val info = "$ESCROW_CONTEXT:$userId:$familyId".toByteArray(Charsets.UTF_8)
+        val t1Input = info + byteArrayOf(0x01)
+        return hmacSha256(prk, t1Input).copyOf(32)
     }
 
     private fun hmacSha256(key: ByteArray, data: ByteArray): ByteArray {

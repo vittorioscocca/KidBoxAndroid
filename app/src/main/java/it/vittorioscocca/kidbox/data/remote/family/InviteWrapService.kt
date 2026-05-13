@@ -6,6 +6,7 @@ import android.util.Log
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import it.vittorioscocca.kidbox.data.crypto.FamilyKeyEscrow
 import it.vittorioscocca.kidbox.data.crypto.FamilyKeyStore
 import it.vittorioscocca.kidbox.data.crypto.InviteCrypto
 import kotlinx.coroutines.tasks.await
@@ -49,8 +50,12 @@ class InviteWrapService(
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
         require(familyId.isNotBlank()) { "familyId vuoto" }
 
-        // 1) Assicura master key in FamilyKeyStore
+        // 1) Assicura master key in FamilyKeyStore (come iOS: escrow prima di generarne una nuova)
         val familyKeyBytes: ByteArray = FamilyKeyStore.loadFamilyKey(context, familyId, uid)
+            ?: FamilyKeyEscrow.recover(familyId, uid)?.also { recovered ->
+                FamilyKeyStore.saveFamilyKey(context, recovered, familyId, uid)
+                Log.i(TAG, "Family master key recovered from escrow familyId=$familyId")
+            }
             ?: run {
                 val newKey = InviteCrypto.generateFamilyKey()
                 FamilyKeyStore.saveFamilyKey(context, newKey, familyId, uid)
@@ -92,6 +97,8 @@ class InviteWrapService(
             ).await()
 
         Log.i(TAG, "Invite created inviteId=$inviteId familyId=$familyId")
+
+        FamilyKeyEscrow.backup(context, familyId, uid)
 
         // 5) QR payload con secret URL-safe (non su Firestore)
         val secretB64url = InviteCrypto.toBase64Url(secret)

@@ -11,6 +11,7 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.Source
 import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.data.crypto.FamilyKeyEscrow
 import it.vittorioscocca.kidbox.data.crypto.FamilyKeyStore
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
@@ -207,6 +208,13 @@ class FamilySyncCenter @Inject constructor(
             if (currentFamilyId != familyId) {
                 Log.w(TAG, "startSync: family changed before listeners, skip")
                 return@launch
+            }
+
+            val uidForEscrow = auth.currentUser?.uid.orEmpty()
+            if (uidForEscrow.isNotEmpty()) {
+                withContext(Dispatchers.IO) {
+                    FamilyKeyEscrow.ensureFamilyKeyAvailable(appContext, familyId, uidForEscrow)
+                }
             }
 
             var familyFirstDone = false

@@ -38,6 +38,9 @@ import it.vittorioscocca.kidbox.data.local.dao.PetDao
 import it.vittorioscocca.kidbox.data.local.dao.PetEventDao
 import it.vittorioscocca.kidbox.data.local.dao.VehicleDao
 import it.vittorioscocca.kidbox.data.local.dao.VehicleEventDao
+import it.vittorioscocca.kidbox.data.local.dao.PasswordEntryDao
+import it.vittorioscocca.kidbox.data.local.dao.PasswordGroupDao
+import it.vittorioscocca.kidbox.data.local.dao.PwnedPrefixCacheDao
 import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
 import it.vittorioscocca.kidbox.data.local.entity.KBAIConversationEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBAIMessageEntity
@@ -76,9 +79,12 @@ import it.vittorioscocca.kidbox.data.local.entity.PetEntity
 import it.vittorioscocca.kidbox.data.local.entity.PetEventEntity
 import it.vittorioscocca.kidbox.data.local.entity.VehicleEntity
 import it.vittorioscocca.kidbox.data.local.entity.VehicleEventEntity
+import it.vittorioscocca.kidbox.data.local.entity.PasswordEntryEntity
+import it.vittorioscocca.kidbox.data.local.entity.PasswordGroupEntity
+import it.vittorioscocca.kidbox.data.local.entity.PwnedPrefixCacheEntity
 
 @Database(
-    version = 21,
+    version = 26,
     exportSchema = false,
     entities = [
         KBUserProfileEntity::class,
@@ -118,6 +124,9 @@ import it.vittorioscocca.kidbox.data.local.entity.VehicleEventEntity
         HousePaymentEntity::class,
         VehicleEntity::class,
         VehicleEventEntity::class,
+        PasswordEntryEntity::class,
+        PasswordGroupEntity::class,
+        PwnedPrefixCacheEntity::class,
     ],
 )
 abstract class KidBoxDatabase : RoomDatabase() {
@@ -158,4 +167,7 @@ abstract class KidBoxDatabase : RoomDatabase() {
     abstract fun housePaymentDao(): HousePaymentDao
     abstract fun vehicleDao(): VehicleDao
     abstract fun vehicleEventDao(): VehicleEventDao
+    abstract fun passwordEntryDao(): PasswordEntryDao
+    abstract fun passwordGroupDao(): PasswordGroupDao
+    abstract fun pwnedPrefixCacheDao(): PwnedPrefixCacheDao
 }

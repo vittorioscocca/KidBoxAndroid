@@ -109,6 +109,7 @@ private fun KBTreatment.toRemoteDto() = RemoteTreatmentDto(
     startDateEpochMillis = startDateEpochMillis,
     endDateEpochMillis = endDateEpochMillis,
     dailyFrequency = dailyFrequency,
+    intervalBetweenDosesDays = intervalBetweenDosesDays,
     scheduleTimes = scheduleTimesList(),
     isActive = isActive,
     notes = notes,

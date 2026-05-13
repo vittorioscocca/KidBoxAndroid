@@ -23,8 +23,9 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
@@ -65,6 +66,7 @@ fun SettingsScreen(
     onNotifications: () -> Unit,
     onAiSettings: () -> Unit,
     onStorageUsage: () -> Unit,
+    onAutoFillSettings: () -> Unit,
     viewModel: ThemeViewModel = hiltViewModel(),
 ) {
     BackHandler { onBack() }
@@ -117,6 +119,13 @@ fun SettingsScreen(
             icon = Icons.Filled.Storage,
             showChevron = true,
             onClick = onStorageUsage,
+        ),
+        SettingRowItem(
+            title = "AutoFill",
+            subtitle = "Password, biometria, servizi di sistema",
+            icon = Icons.Filled.Key,
+            showChevron = true,
+            onClick = onAutoFillSettings,
         ),
     )
 

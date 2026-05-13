@@ -43,6 +43,9 @@ import it.vittorioscocca.kidbox.data.local.dao.PetEventDao
 import it.vittorioscocca.kidbox.data.local.dao.KBUserProfileDao
 import it.vittorioscocca.kidbox.data.local.dao.VehicleDao
 import it.vittorioscocca.kidbox.data.local.dao.VehicleEventDao
+import it.vittorioscocca.kidbox.data.local.dao.PasswordEntryDao
+import it.vittorioscocca.kidbox.data.local.dao.PasswordGroupDao
+import it.vittorioscocca.kidbox.data.local.dao.PwnedPrefixCacheDao
 import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
 import javax.inject.Singleton
@@ -478,6 +481,113 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_21_22 = object : Migration(21, 22) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `password_entries` (
+                    `id` TEXT NOT NULL,
+                    `familyId` TEXT NOT NULL,
+                    `createdBy` TEXT NOT NULL,
+                    `visibility` TEXT NOT NULL,
+                    `groupId` TEXT,
+                    `titleCipher` BLOB NOT NULL,
+                    `usernameCipher` BLOB,
+                    `passwordCipher` BLOB NOT NULL,
+                    `websiteCipher` BLOB,
+                    `notesCipher` BLOB,
+                    `otpConfigCipher` BLOB,
+                    `iconURL` TEXT,
+                    `lastUsedAtEpochMillis` INTEGER,
+                    `passwordUpdatedAtEpochMillis` INTEGER NOT NULL,
+                    `expiresAtEpochMillis` INTEGER,
+                    `createdAtEpochMillis` INTEGER NOT NULL,
+                    `updatedAtEpochMillis` INTEGER NOT NULL,
+                    `deletedAtEpochMillis` INTEGER,
+                    `syncStateRaw` INTEGER NOT NULL DEFAULT 0,
+                    `lastSyncError` TEXT,
+                    PRIMARY KEY(`id`),
+                    FOREIGN KEY(`familyId`) REFERENCES `kb_families`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_password_entries_familyId` ON `password_entries` (`familyId`)",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_password_entries_familyId_updatedAtEpochMillis` ON `password_entries` (`familyId`, `updatedAtEpochMillis`)",
+            )
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `password_groups` (
+                    `id` TEXT NOT NULL,
+                    `familyId` TEXT NOT NULL,
+                    `nameCipher` BLOB NOT NULL,
+                    `icon` TEXT NOT NULL,
+                    `color` TEXT NOT NULL,
+                    `visibility` TEXT NOT NULL,
+                    `createdBy` TEXT NOT NULL,
+                    `createdAtEpochMillis` INTEGER NOT NULL,
+                    `updatedAtEpochMillis` INTEGER NOT NULL,
+                    `deletedAtEpochMillis` INTEGER,
+                    `syncStateRaw` INTEGER NOT NULL DEFAULT 0,
+                    `lastSyncError` TEXT,
+                    PRIMARY KEY(`id`),
+                    FOREIGN KEY(`familyId`) REFERENCES `kb_families`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_password_groups_familyId` ON `password_groups` (`familyId`)",
+            )
+        }
+    }
+
+    private val MIGRATION_22_23 = object : Migration(22, 23) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE password_entries ADD COLUMN visibilityMemberIdsJson TEXT NOT NULL DEFAULT '[]'",
+            )
+        }
+    }
+
+    private val MIGRATION_23_24 = object : Migration(23, 24) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE password_entries ADD COLUMN isFavorite INTEGER NOT NULL DEFAULT 0",
+            )
+        }
+    }
+
+    private val MIGRATION_24_25 = object : Migration(24, 25) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE password_entries ADD COLUMN pwnedCount INTEGER",
+            )
+            db.execSQL(
+                "ALTER TABLE password_entries ADD COLUMN pwnedCheckedAt INTEGER",
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS pwned_prefix_cache (
+                    prefix TEXT NOT NULL PRIMARY KEY,
+                    body TEXT NOT NULL,
+                    fetchedAt INTEGER NOT NULL
+                )
+                """.trimIndent(),
+            )
+        }
+    }
+
+    private val MIGRATION_25_26 = object : Migration(25, 26) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE kb_treatments ADD COLUMN intervalBetweenDosesDays INTEGER NOT NULL DEFAULT 0",
+            )
+        }
+    }
+
     private val MIGRATION_18_19 = object : Migration(18, 19) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(
@@ -771,6 +881,11 @@ object DatabaseModule {
         MIGRATION_18_19,
         MIGRATION_19_20,
         MIGRATION_20_21,
+        MIGRATION_21_22,
+        MIGRATION_22_23,
+        MIGRATION_23_24,
+        MIGRATION_24_25,
+        MIGRATION_25_26,
     )
         .fallbackToDestructiveMigration()
         .build()
@@ -888,4 +1003,13 @@ object DatabaseModule {
 
     @Provides
     fun provideVehicleEventDao(database: KidBoxDatabase): VehicleEventDao = database.vehicleEventDao()
+
+    @Provides
+    fun providePasswordEntryDao(database: KidBoxDatabase): PasswordEntryDao = database.passwordEntryDao()
+
+    @Provides
+    fun providePasswordGroupDao(database: KidBoxDatabase): PasswordGroupDao = database.passwordGroupDao()
+
+    @Provides
+    fun providePwnedPrefixCacheDao(database: KidBoxDatabase): PwnedPrefixCacheDao = database.pwnedPrefixCacheDao()
 }

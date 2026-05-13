@@ -34,6 +34,15 @@ class FamilySessionPreferences @Inject constructor(
         prefs.edit().putString(KEY_ACTIVE_FAMILY_ID, id).apply()
     }
 
+    fun getActiveFamilyId(): String? {
+        prefs.getString(KEY_ACTIVE_FAMILY_ID, null)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+        // Legacy: alcune build scrivevano solo su KidBoxPrefs; autofill legge qui senza aprire la Home.
+        return runCatching {
+            context.getSharedPreferences(LEGACY_PREFS_NAME, Context.MODE_PRIVATE)
+                .getString(KEY_ACTIVE_FAMILY_ID, null)?.trim()?.takeIf { it.isNotEmpty() }
+        }.getOrNull()
+    }
+
     /** Chiamare prima di [markSkipHomeBootstrapOnce] non necessario: usato da access lost. */
     fun markSkipHomeBootstrapOnce() {
         prefs.edit().putBoolean(KEY_SKIP_HOME_BOOTSTRAP_ONCE, true).apply()

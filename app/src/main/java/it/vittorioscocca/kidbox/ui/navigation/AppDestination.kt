@@ -10,6 +10,7 @@ sealed class AppDestination(val route: String) {
     data object Home : AppDestination("home")
     data object Profile : AppDestination("profile")
     data object Settings : AppDestination("settings")
+    data object AutoFillSettings : AppDestination("autofill_settings")
     data object AiSettings : AppDestination("ai_settings")
     data object Plans : AppDestination("plans")
     data object StorageUsage : AppDestination("storage_usage")
@@ -259,6 +260,50 @@ sealed class AppDestination(val route: String) {
     data object WalletDetail : AppDestination("wallet_detail/{familyId}/{ticketId}") {
         fun createRoute(familyId: String, ticketId: String): String =
             "wallet_detail/$familyId/$ticketId"
+    }
+    data object PasswordsHome : AppDestination("passwords_home/{familyId}") {
+        fun createRoute(familyId: String): String = "passwords_home/$familyId"
+    }
+
+    data object PasswordsImportExport : AppDestination("passwords_import_export/{familyId}?familyName={familyName}") {
+        fun createRoute(familyId: String, familyName: String = ""): String {
+            val enc = java.net.URLEncoder.encode(familyName, Charsets.UTF_8.name())
+            return "passwords_import_export/$familyId?familyName=$enc"
+        }
+    }
+
+    data object PasswordsSecurity : AppDestination("passwords_security/{familyId}") {
+        fun createRoute(familyId: String): String = "passwords_security/$familyId"
+    }
+
+    data object PasswordsSettings : AppDestination("passwords_settings/{familyId}") {
+        fun createRoute(familyId: String): String = "passwords_settings/$familyId"
+    }
+
+    data object PasswordsGroups : AppDestination("passwords_groups/{familyId}") {
+        fun createRoute(familyId: String): String = "passwords_groups/$familyId"
+    }
+
+    data object PasswordGroupDetail : AppDestination("password_group_detail/{familyId}?groupId={groupId}") {
+        fun createRouteForNew(familyId: String): String = "password_group_detail/$familyId"
+
+        fun createRouteForEdit(familyId: String, groupId: String): String {
+            val encodedGroupId = java.net.URLEncoder.encode(groupId, Charsets.UTF_8.name())
+            return "password_group_detail/$familyId?groupId=$encodedGroupId"
+        }
+    }
+
+    data object PasswordsAdd : AppDestination("passwords_add/{familyId}") {
+        fun createRoute(familyId: String): String = "passwords_add/$familyId"
+    }
+
+    data object PasswordsEdit : AppDestination("passwords_edit/{familyId}/{passwordId}") {
+        fun createRoute(familyId: String, passwordId: String): String =
+            "passwords_edit/$familyId/$passwordId"
+    }
+
+    data object PasswordDetail : AppDestination("password_detail/{familyId}/{passwordId}") {
+        fun createRoute(familyId: String, passwordId: String): String = "password_detail/$familyId/$passwordId"
     }
 
     data object Pets : AppDestination("pets/{familyId}") {

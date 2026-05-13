@@ -5,7 +5,6 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import it.vittorioscocca.kidbox.util.fixBitmapOrientationFromBytes
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -84,6 +83,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.screens.settings.toStorageString
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import it.vittorioscocca.kidbox.ui.util.rememberSingleImagePicker
+import it.vittorioscocca.kidbox.ui.util.singleImageRequest
 
 private val AccentOrange = Color(0xFFF2611A)
 
@@ -109,9 +110,7 @@ fun ProfileScreen(
     // URI of the image the user picked from the gallery — drives the crop overlay
     var avatarCropUri by remember { mutableStateOf<Uri?>(null) }
 
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-    ) { uri ->
+    val photoPickerLauncher = rememberSingleImagePicker { uri ->
         if (uri != null) avatarCropUri = uri
     }
 
@@ -328,9 +327,7 @@ fun ProfileScreen(
                                 .clip(CircleShape)
                                 .background(AccentOrange)
                                 .clickable {
-                                    photoPickerLauncher.launch(
-                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                                    )
+                                    photoPickerLauncher.launch(singleImageRequest())
                                 },
                             contentAlignment = Alignment.Center,
                         ) {

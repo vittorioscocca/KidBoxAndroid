@@ -10,9 +10,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -114,6 +111,8 @@ import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.theme.KidBoxDarkColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import it.vittorioscocca.kidbox.ui.util.rememberSingleImagePicker
+import it.vittorioscocca.kidbox.ui.util.singleImageRequest
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -136,9 +135,7 @@ fun HomeScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val photoPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-    ) { uri: Uri? ->
+    val photoPicker = rememberSingleImagePicker { uri: Uri? ->
         uri?.let { viewModel.onHeroPhotoSelected(it, context) }
     }
 
@@ -233,9 +230,7 @@ fun HomeScreen(
                 heroOffsetX = state.heroPhotoOffsetX,
                 heroOffsetY = state.heroPhotoOffsetY,
                 onChangePhoto = {
-                    photoPicker.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                    )
+                    photoPicker.launch(singleImageRequest())
                 },
             )
             if (state.isMembersSyncing) {
@@ -800,6 +795,16 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
         cardColor = Color(0xFFEEF0FF),
         iconColor = Color(0xFF5C6BC0),
         locked = state.familyPlan == KBPlan.FREE,
+    ),
+    FeatureItem(
+        "passwords",
+        "Password",
+        "Credenziali di famiglia",
+        AppDestination.PasswordsHome.createRoute(familyId),
+        Icons.Filled.Lock,
+        Color(0xFFEFF6FF),
+        Color(0xFF2563EB),
+        state.badgePasswords,
     ),
     FeatureItem("family", "Family", "Gestisci famiglia", AppDestination.FamilySettings.route, Icons.Filled.Person, Color(0xFFFFF3E6), Color(0xFFFF6B00)),
 )

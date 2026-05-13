@@ -25,6 +25,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
 import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
 import it.vittorioscocca.kidbox.data.remote.family.FamilyHeroPhotoService
+import it.vittorioscocca.kidbox.data.repository.PasswordsRepository
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.data.repository.WalletRepository
 import it.vittorioscocca.kidbox.domain.family.ownershipUidFromFamilyFirestore
@@ -83,6 +84,7 @@ data class HomeUiState(
     val badgeCalendar: Int = 0,
     val badgeExpenses: Int = 0,
     val badgeWallet: Int = 0,
+    val badgePasswords: Int = 0,
     /** Piano abbonamento famiglia (Firestore); aggiorna card Assistente e paywall come iOS. */
     val familyPlan: KBPlan = KBPlan.FREE,
 )
@@ -118,6 +120,7 @@ class HomeViewModel @Inject constructor(
     private val familySessionPreferences: FamilySessionPreferences,
     private val homeBadgeManager: HomeBadgeManager,
     private val walletRepository: WalletRepository,
+    private val passwordsRepository: PasswordsRepository,
     private val subscriptionRepository: SubscriptionRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
@@ -132,6 +135,7 @@ class HomeViewModel @Inject constructor(
     @Volatile
     private var initialSyncCompleted: Boolean = false
     private var membersSyncTimeoutJob: Job? = null
+    private var passwordBadgeJob: Job? = null
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
@@ -176,6 +180,7 @@ class HomeViewModel @Inject constructor(
                 if (familyId.isBlank()) {
                     homeBadgeManager.stopListening()
                     walletRepository.stopRealtime()
+                    passwordsRepository.stopRealtime()
                     syncedFamilyId = null
                     initialSyncCompleted = false
                     cancelMembersSyncTimeout()
@@ -214,6 +219,14 @@ class HomeViewModel @Inject constructor(
                     )
                     scheduleMembersSyncTimeout(familyId)
                     familySyncCenter.startSync(familyId)
+                    passwordBadgeJob?.cancel()
+                    passwordBadgeJob = viewModelScope.launch {
+                        passwordsRepository.observeVisibleEntries(familyId).collectLatest { entries ->
+                            _uiState.value = _uiState.value.copy(
+                                badgePasswords = entries.count { it.deletedAtEpochMillis == null && (it.pwnedCount ?: 0) > 0 },
+                            )
+                        }
+                    }
                 }
 
                 combine(
@@ -229,6 +242,7 @@ class HomeViewModel @Inject constructor(
                 }.collect { (fam, memberCount, sharedUsers) ->
                     homeBadgeManager.startListening(familyId)
                     walletRepository.startRealtime(familyId)
+                    passwordsRepository.startRealtime(familyId)
                     val shouldSyncMembers = !initialSyncCompleted || memberCount <= 0
                     val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
                     val isLocationSharing = if (currentUid.isBlank()) {
@@ -798,6 +812,7 @@ class HomeViewModel @Inject constructor(
         cancelMembersSyncTimeout()
         homeBadgeManager.stopListening()
         walletRepository.stopRealtime()
+        passwordsRepository.stopRealtime()
         super.onCleared()
     }
 }

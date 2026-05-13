@@ -26,13 +26,39 @@ object AppCheckTokenCache {
     @Volatile
     private var tokenExpiryEpochMs: Long = 0L
 
-    private const val TTL_MS = 55L * 60 * 1000
+    /** Dopo errori App Check (403 / rate limit) evita raffiche verso Firebase fino a questo istante. */
+    @Volatile
+    private var fetchCooldownUntilEpochMs: Long = 0L
 
-    private fun Throwable.isTooManyAttempts(): Boolean {
-        val m = message ?: ""
-        if (m.contains("Too many attempts", ignoreCase = true)) return true
-        return cause?.message?.contains("Too many attempts", ignoreCase = true) == true
+    private const val TTL_MS = 55L * 60 * 1000
+    private const val COOLDOWN_AFTER_HARD_FAIL_MS = 30L * 60 * 1000
+
+    private fun Throwable.messagesChain(): String {
+        val sb = StringBuilder()
+        var t: Throwable? = this
+        while (t != null) {
+            sb.append(t.message).append(' ').append(t.localizedMessage).append(' ')
+            t = t.cause
+        }
+        return sb.toString()
     }
+
+    private fun Throwable.isTooManyAttempts(): Boolean =
+        messagesChain().contains("Too many attempts", ignoreCase = true)
+
+    private fun Throwable.isAppCheckHardFailure(): Boolean {
+        val m = messagesChain()
+        if (m.contains("App attestation failed", ignoreCase = true)) return true
+        if (m.contains("attestation failed", ignoreCase = true)) return true
+        if (m.contains("403", ignoreCase = false) && m.contains("app check", ignoreCase = true)) return true
+        if (m.contains("PERMISSION_DENIED", ignoreCase = true) && m.contains("app check", ignoreCase = true)) {
+            return true
+        }
+        return false
+    }
+
+    private fun Throwable.shouldBackoffForRateLimit(): Boolean =
+        isTooManyAttempts()
 
     suspend fun warmUp() {
         getToken(forceRefresh = false)
@@ -44,13 +70,21 @@ object AppCheckTokenCache {
      */
     suspend fun getToken(forceRefresh: Boolean = false): String? {
         val now = System.currentTimeMillis()
-        if (!forceRefresh && cachedToken != null && now < tokenExpiryEpochMs) {
+        val cacheValid = cachedToken != null && now < tokenExpiryEpochMs
+        if (!forceRefresh && cacheValid) {
             return cachedToken
+        }
+        if (!forceRefresh && now < fetchCooldownUntilEpochMs) {
+            return null
         }
         return mutex.withLock {
             val now2 = System.currentTimeMillis()
-            if (!forceRefresh && cachedToken != null && now2 < tokenExpiryEpochMs) {
+            val cacheValid2 = cachedToken != null && now2 < tokenExpiryEpochMs
+            if (!forceRefresh && cacheValid2) {
                 return@withLock cachedToken
+            }
+            if (!forceRefresh && now2 < fetchCooldownUntilEpochMs) {
+                return@withLock null
             }
             refreshLocked(forceRefresh)
         }
@@ -64,12 +98,21 @@ object AppCheckTokenCache {
                     .await()
                 cachedToken = result.token
                 tokenExpiryEpochMs = System.currentTimeMillis() + TTL_MS
+                fetchCooldownUntilEpochMs = 0L
                 return cachedToken
             } catch (e: Throwable) {
-                if (e.isTooManyAttempts() && attempt < 3) {
-                    delay(500L shl attempt)
+                if (e.isAppCheckHardFailure()) {
+                    Log.w(TAG, "App Check attestation / policy failure (no retry): ${e.message}")
+                    fetchCooldownUntilEpochMs = System.currentTimeMillis() + COOLDOWN_AFTER_HARD_FAIL_MS
+                    return null
+                }
+                if (e.shouldBackoffForRateLimit() && attempt < 3) {
+                    delay(1_000L shl attempt)
                 } else {
                     Log.w(TAG, "Failed to get token: ${e.message}")
+                    if (e.isTooManyAttempts()) {
+                        fetchCooldownUntilEpochMs = System.currentTimeMillis() + COOLDOWN_AFTER_HARD_FAIL_MS
+                    }
                     return null
                 }
             }

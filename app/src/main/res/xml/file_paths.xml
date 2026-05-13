@@ -3,6 +3,9 @@
     <cache-path
         name="cache"
         path="." />
+    <cache-path
+        name="kbpw_exports"
+        path="kbpw/" />
     <files-path
         name="files"
         path="." />

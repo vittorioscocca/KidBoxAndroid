@@ -17,6 +17,8 @@ import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import it.vittorioscocca.kidbox.data.health.TreatmentAttachmentTag
 import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
+import kotlin.math.max
+import kotlin.math.min
 import it.vittorioscocca.kidbox.notifications.TreatmentNotificationManager
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -48,7 +50,11 @@ data class MedicalTreatmentFormState(
     val durationDays: Int = 5,
     val startDateEpochMillis: Long = System.currentTimeMillis(),
     val dailyFrequency: Int = 1,
+    val intervalBetweenDosesDays: Int = 0,
     val scheduleTimes: List<String> = listOf("08:00"),
+    val showCustomFrequencySheet: Boolean = false,
+    val customIntervalDaysDraft: Int = 30,
+    val customIntervalYearsDraft: Int = 1,
     val notes: String = "",
     val reminderEnabled: Boolean = false,
     /** Impostato quando la cura è collegata da una visita. */
@@ -60,7 +66,10 @@ data class MedicalTreatmentFormState(
     val saved: Boolean = false,
     val saveError: String? = null,
 ) {
-    val canSave: Boolean get() = drugName.isNotBlank() && scheduleTimes.size == dailyFrequency
+    val scheduleSlotCount: Int get() = if (intervalBetweenDosesDays > 0) 1 else dailyFrequency
+
+    val canSave: Boolean get() =
+        drugName.isNotBlank() && scheduleTimes.size == scheduleSlotCount
 
     val endDateEpochMillis: Long get() =
         startDateEpochMillis + TimeUnit.DAYS.toMillis((durationDays - 1).toLong())
@@ -124,6 +133,11 @@ class MedicalTreatmentFormViewModel @Inject constructor(
             if (t != null) {
                 if (t.petId.isNotBlank()) petId = t.petId
                 val times = t.scheduleTimesData.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                val interval = t.intervalBetweenDosesDays
+                val trimmedTimes = when {
+                    interval > 0 -> listOf(times.firstOrNull() ?: "08:00")
+                    else -> times.ifEmpty { listOf("08:00") }
+                }
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     treatmentId = t.id,
@@ -137,7 +151,8 @@ class MedicalTreatmentFormViewModel @Inject constructor(
                     durationDays = t.durationDays,
                     startDateEpochMillis = t.startDateEpochMillis,
                     dailyFrequency = t.dailyFrequency,
-                    scheduleTimes = times.ifEmpty { listOf("08:00") },
+                    intervalBetweenDosesDays = interval,
+                    scheduleTimes = trimmedTimes,
                     notes = t.notes.orEmpty(),
                     reminderEnabled = t.reminderEnabled,
                     prescribingVisitId = t.prescribingVisitId,
@@ -162,7 +177,43 @@ class MedicalTreatmentFormViewModel @Inject constructor(
         val defaults = DEFAULT_TIMES_BY_FREQ[freq] ?: List(freq) { "08:00" }
         _uiState.value = _uiState.value.copy(
             dailyFrequency = freq,
+            intervalBetweenDosesDays = 0,
             scheduleTimes = defaults,
+        )
+    }
+
+    fun openCustomFrequencySheet() {
+        val s = _uiState.value
+        val interval = s.intervalBetweenDosesDays
+        val daysDraft = if (interval > 0) interval else 30
+        val yearsDraft = max(1, min(20, (interval + 182) / 365))
+        _uiState.value = s.copy(
+            showCustomFrequencySheet = true,
+            customIntervalDaysDraft = daysDraft,
+            customIntervalYearsDraft = yearsDraft,
+        )
+    }
+
+    fun dismissCustomFrequencySheet() {
+        _uiState.value = _uiState.value.copy(showCustomFrequencySheet = false)
+    }
+
+    fun setCustomIntervalDaysDraft(v: Int) {
+        _uiState.value = _uiState.value.copy(customIntervalDaysDraft = v.coerceIn(1, 730))
+    }
+
+    fun setCustomIntervalYearsDraft(v: Int) {
+        _uiState.value = _uiState.value.copy(customIntervalYearsDraft = v.coerceIn(1, 20))
+    }
+
+    fun applyIntervalDays(n: Int) {
+        val capped = min(7300, max(1, n))
+        val first = _uiState.value.scheduleTimes.firstOrNull() ?: "08:00"
+        _uiState.value = _uiState.value.copy(
+            intervalBetweenDosesDays = capped,
+            dailyFrequency = 1,
+            scheduleTimes = listOf(first),
+            showCustomFrequencySheet = false,
         )
     }
 
@@ -232,6 +283,7 @@ class MedicalTreatmentFormViewModel @Inject constructor(
                 startDateEpochMillis = s.startDateEpochMillis,
                 endDateEpochMillis = endDate,
                 dailyFrequency = s.dailyFrequency,
+                intervalBetweenDosesDays = s.intervalBetweenDosesDays,
                 scheduleTimesData = s.scheduleTimes.joinToString(","),
                 isActive = true,
                 notes = s.notes.takeIf { it.isNotBlank() },

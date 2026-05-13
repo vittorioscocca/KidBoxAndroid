@@ -152,6 +152,9 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.ui.graphics.asImageBitmap
 import it.vittorioscocca.kidbox.data.chat.model.ChatMessageType
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import it.vittorioscocca.kidbox.ui.util.imageAndVideoRequest
+import it.vittorioscocca.kidbox.ui.util.singleImageRequest
+import it.vittorioscocca.kidbox.ui.util.videoOnlyRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
@@ -348,10 +351,19 @@ fun ChatScreen(
         }
     }
 
-    // Multi-select photo picker — stages items into the preview tray.
-    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
-        if (uris.isNotEmpty()) {
-            pendingMedia = (pendingMedia + uris.take(10).map { it to false }).take(10)
+    // Multi-select gallery (foto e/o video) — Photo Picker, nessun permesso READ_MEDIA_*.
+    val galleryMultiPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(10),
+    ) { uris: List<Uri> ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        scope.launch {
+            val items = withContext(Dispatchers.IO) {
+                uris.take(10).map { uri ->
+                    val mime = context.contentResolver.getType(uri) ?: ""
+                    uri to mime.startsWith("video/")
+                }
+            }
+            pendingMedia = (pendingMedia + items).take(10)
         }
     }
     val cameraPicker = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bmp: Bitmap? ->
@@ -359,28 +371,6 @@ fun ChatScreen(
             scope.launch {
                 val bytes = bitmapToJpegBytes(bmp)
                 if (bytes != null) viewModel.sendMediaAttachment(bytes, isVideo = false)
-            }
-        }
-    }
-    // Multi-select video picker — stages items into the preview tray.
-    val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
-        if (uris.isNotEmpty()) {
-            pendingMedia = (pendingMedia + uris.take(10).map { it to true }).take(10)
-        }
-    }
-    // Combined photo+video multi-select — resolves MIME then stages into tray.
-    val mediaGroupPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenMultipleDocuments(),
-    ) { uris ->
-        if (uris.isNotEmpty()) {
-            scope.launch {
-                val items = withContext(Dispatchers.IO) {
-                    uris.take(10).map { uri ->
-                        val mime = context.contentResolver.getType(uri) ?: ""
-                        uri to mime.startsWith("video/")
-                    }
-                }
-                pendingMedia = (pendingMedia + items).take(10)
             }
         }
     }
@@ -845,15 +835,15 @@ fun ChatScreen(
             },
             onPickImage = {
                 showAttachmentSheet = false
-                imagePicker.launch("image/*")
+                galleryMultiPicker.launch(singleImageRequest())
             },
             onPickVideo = {
                 showAttachmentSheet = false
-                videoPicker.launch("video/*")
+                galleryMultiPicker.launch(videoOnlyRequest())
             },
             onPickMediaGroup = {
                 showAttachmentSheet = false
-                mediaGroupPicker.launch(arrayOf("image/*", "video/*"))
+                galleryMultiPicker.launch(imageAndVideoRequest())
             },
             onPickDocument = {
                 showAttachmentSheet = false

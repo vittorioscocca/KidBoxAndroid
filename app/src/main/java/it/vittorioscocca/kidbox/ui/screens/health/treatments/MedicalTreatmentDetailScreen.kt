@@ -104,6 +104,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import it.vittorioscocca.kidbox.domain.model.TreatmentSchedulePeriod
+import it.vittorioscocca.kidbox.domain.model.frequencyDisplayLabel
+import it.vittorioscocca.kidbox.domain.model.plannedFiniteDosesTotal
 import it.vittorioscocca.kidbox.domain.model.schedulePeriodForTime
 import it.vittorioscocca.kidbox.domain.model.schedulePeriodLabel
 import it.vittorioscocca.kidbox.ui.screens.health.attachments.HealthAttachmentsCard
@@ -250,7 +252,11 @@ fun MedicalTreatmentDetailScreen(
 
     val dosageStr = if (treatment.dosageValue % 1.0 == 0.0) "%.0f".format(treatment.dosageValue) else "%.1f".format(treatment.dosageValue)
     val allSlots = state.calendarDays.flatMap { it.slots }
-    val totalDoses = allSlots.size
+    val totalDoses = if (!treatment.isLongTerm && treatment.intervalBetweenDosesDays > 0) {
+        treatment.plannedFiniteDosesTotal()
+    } else {
+        allSlots.size
+    }
     val takenDoses = allSlots.count { it.state == DoseState.TAKEN }
     val progressPct = if (totalDoses > 0) ((takenDoses * 100f) / totalDoses).toInt() else 0
     val endMillis = treatment.endDateEpochMillis ?: (treatment.startDateEpochMillis + 24L * 60L * 60L * 1000L * (treatment.durationDays - 1))
@@ -328,7 +334,7 @@ fun MedicalTreatmentDetailScreen(
                     }
                     Spacer(Modifier.height(8.dp))
                     Text("$dosageStr ${treatment.dosageUnit}", fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = PURPLE_DETAIL)
-                    Text("${treatment.dailyFrequency} volte al giorno", fontSize = 14.sp, color = kb.subtitle)
+                    Text(treatment.frequencyDisplayLabel, fontSize = 14.sp, color = kb.subtitle)
                 }
             }
 
@@ -454,7 +460,6 @@ fun MedicalTreatmentDetailScreen(
                             Text(SimpleDateFormat("d", Locale.ITALIAN).format(d), color = if (selected) Color.White else kb.title, fontWeight = FontWeight.Bold)
                             Text(SimpleDateFormat("MMM", Locale.ITALIAN).format(d), color = if (selected) Color.White.copy(alpha = 0.9f) else kb.subtitle, fontSize = 11.sp)
                             val allDosesTaken = day.slots.isNotEmpty() &&
-                                day.slots.size == treatment.dailyFrequency &&
                                 day.slots.all { it.state == DoseState.TAKEN }
                             if (allDosesTaken) {
                                 Spacer(Modifier.height(2.dp))
@@ -496,7 +501,15 @@ fun MedicalTreatmentDetailScreen(
 
             Card(colors = CardDefaults.cardColors(containerColor = kb.card), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Text("Imposta gli orari per ${treatment.dailyFrequency} dosi giornaliere", color = kb.subtitle, fontSize = 13.sp)
+                    Text(
+                        if (treatment.intervalBetweenDosesDays > 0) {
+                            "È previsto un solo orario nei giorni di dose (ogni ${treatment.intervalBetweenDosesDays} giorni)."
+                        } else {
+                            "Imposta gli orari per ${treatment.dailyFrequency} dosi giornaliere"
+                        },
+                        color = kb.subtitle,
+                        fontSize = 13.sp,
+                    )
                     Spacer(Modifier.height(8.dp))
                     treatment.scheduleTimesData.split(",").map { it.trim() }.filter { it.isNotBlank() }.forEachIndexed { i, time ->
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -526,7 +539,15 @@ fun MedicalTreatmentDetailScreen(
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(if (treatment.reminderEnabled) "Promemoria attivo" else "Promemoria disattivato", color = kb.title)
-                        Text("Notifica per ogni dose agli orari impostati", color = kb.subtitle, fontSize = 12.sp)
+                        Text(
+                            if (treatment.intervalBetweenDosesDays > 0) {
+                                "Notifica nei giorni di dose (ogni ${treatment.intervalBetweenDosesDays} giorni)"
+                            } else {
+                                "Notifica per ogni dose agli orari impostati"
+                            },
+                            color = kb.subtitle,
+                            fontSize = 12.sp,
+                        )
                     }
                     Switch(
                         checked = treatment.reminderEnabled,

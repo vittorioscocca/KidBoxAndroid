@@ -7,7 +7,6 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -103,6 +102,8 @@ import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentCategoryEntity
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import it.vittorioscocca.kidbox.ui.util.rememberSingleImagePicker
+import it.vittorioscocca.kidbox.ui.util.singleImageRequest
 import java.io.ByteArrayOutputStream
 import java.text.NumberFormat
 import java.time.Instant
@@ -173,19 +174,18 @@ fun ExpensesHomeScreen(
             bytes = stream.toByteArray(),
         )
     }
-    val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-    ) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
-        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: ByteArray(0)
-        if (bytes.isNotEmpty()) {
-            selectedKidBoxDocumentId = null
-            pendingAttachment = PendingExpenseAttachment(
-                fileName = "foto_${System.currentTimeMillis()}.jpg",
-                mimeType = mime,
-                bytes = bytes,
-            )
+    val galleryLauncher = rememberSingleImagePicker { uri ->
+        uri?.let { u ->
+            val mime = context.contentResolver.getType(u) ?: "image/jpeg"
+            val bytes = context.contentResolver.openInputStream(u)?.use { it.readBytes() } ?: ByteArray(0)
+            if (bytes.isNotEmpty()) {
+                selectedKidBoxDocumentId = null
+                pendingAttachment = PendingExpenseAttachment(
+                    fileName = "foto_${System.currentTimeMillis()}.jpg",
+                    mimeType = mime,
+                    bytes = bytes,
+                )
+            }
         }
     }
     val fileLauncher = rememberLauncherForActivityResult(
@@ -314,7 +314,7 @@ fun ExpensesHomeScreen(
             },
             onPickCamera = { cameraLauncher.launch(null) },
             onPickPhoto = {
-                galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                galleryLauncher.launch(singleImageRequest())
             },
             onPickFile = { fileLauncher.launch(arrayOf("*/*")) },
             onPickKidBoxDocument = { docId ->

@@ -96,22 +96,48 @@ class TreatmentNotificationManager @Inject constructor(
         var lastFireMillis = 0L
 
         var currentDay = windowStartDay
-        while (currentDay <= endDay) {
+        dayLoop@ while (currentDay <= endDay) {
             val dayOffset = ChronoUnit.DAYS.between(
                 java.time.Instant.ofEpochMilli(startDay).atZone(java.time.ZoneId.systemDefault()).toLocalDate(),
                 java.time.Instant.ofEpochMilli(currentDay).atZone(java.time.ZoneId.systemDefault()).toLocalDate(),
             ).toInt()
 
-            for ((slotIndex, timeStr) in times.withIndex()) {
-                val fireMillis = buildFireMillis(currentDay, timeStr) ?: continue
-                if (fireMillis <= now) continue
+            val intervalN = treatment.intervalBetweenDosesDays
+            if (intervalN > 0) {
+                if (dayOffset < 0 || dayOffset % intervalN != 0) {
+                    currentDay += 86_400_000L
+                    continue@dayLoop
+                }
+                val timeStr = times.firstOrNull()
+                if (timeStr == null) {
+                    currentDay += 86_400_000L
+                    continue@dayLoop
+                }
+                val fireMillis = buildFireMillis(currentDay, timeStr)
+                if (fireMillis == null) {
+                    currentDay += 86_400_000L
+                    continue@dayLoop
+                }
+                if (fireMillis > now) {
+                    val slotLabel = schedulePeriodLabel(timeStr, 0)
+                    val dosageStr = treatment.dosageValue.formatted()
+                    val body = "$slotLabel · $dosageStr ${treatment.dosageUnit} per $childName"
+                    scheduleAlarm(treatment, dayOffset, 0, timeStr, fireMillis, body)
+                    recordEntry(treatment.id, dayOffset, 0, fireMillis)
+                    if (fireMillis > lastFireMillis) lastFireMillis = fireMillis
+                }
+            } else {
+                for ((slotIndex, timeStr) in times.withIndex()) {
+                    val fireMillis = buildFireMillis(currentDay, timeStr) ?: continue
+                    if (fireMillis <= now) continue
 
-                val slotLabel = schedulePeriodLabel(timeStr, slotIndex)
-                val dosageStr = treatment.dosageValue.formatted()
-                val body = "$slotLabel · $dosageStr ${treatment.dosageUnit} per $childName"
-                scheduleAlarm(treatment, dayOffset, slotIndex, timeStr, fireMillis, body)
-                recordEntry(treatment.id, dayOffset, slotIndex, fireMillis)
-                if (fireMillis > lastFireMillis) lastFireMillis = fireMillis
+                    val slotLabel = schedulePeriodLabel(timeStr, slotIndex)
+                    val dosageStr = treatment.dosageValue.formatted()
+                    val body = "$slotLabel · $dosageStr ${treatment.dosageUnit} per $childName"
+                    scheduleAlarm(treatment, dayOffset, slotIndex, timeStr, fireMillis, body)
+                    recordEntry(treatment.id, dayOffset, slotIndex, fireMillis)
+                    if (fireMillis > lastFireMillis) lastFireMillis = fireMillis
+                }
             }
             currentDay += 86_400_000L
         }

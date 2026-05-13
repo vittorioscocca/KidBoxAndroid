@@ -16,7 +16,6 @@ import android.net.Uri
 import android.util.Base64
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -108,6 +107,8 @@ import it.vittorioscocca.kidbox.data.local.entity.KBFamilyPhotoEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBPhotoAlbumEntity
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import it.vittorioscocca.kidbox.ui.util.imageAndVideoRequest
+import it.vittorioscocca.kidbox.ui.util.rememberMultiMediaPicker
 import it.vittorioscocca.kidbox.util.fixBitmapOrientationFromFile
 import it.vittorioscocca.kidbox.util.fixVideoFrameOrientation
 import java.io.File
@@ -141,9 +142,7 @@ fun FamilyPhotosScreen(
     var longPressMenuPhoto by remember { mutableStateOf<KBFamilyPhotoEntity?>(null) }
     var groupMode by remember { mutableStateOf(PhotoGroupMode.DAY) }
 
-    val multiMediaPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(30),
-    ) { uris: List<Uri> ->
+    val multiMediaPicker = rememberMultiMediaPicker(maxItems = 30) { uris: List<Uri> ->
         if (uris.isNotEmpty()) viewModel.importMediaBatch(uris, state.selectedAlbumId)
     }
     val takePictureLauncher = rememberLauncherForActivityResult(
@@ -217,9 +216,7 @@ fun FamilyPhotosScreen(
                     if (currentTab == PhotosTab.ALBUMS) {
                         showCreateAlbum = true
                     } else {
-                        multiMediaPicker.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
-                        )
+                        multiMediaPicker.launch(imageAndVideoRequest())
                     }
                 },
             )
@@ -286,9 +283,7 @@ fun FamilyPhotosScreen(
                         selectedPhotoIds = selectedPhotoIds,
                         uploadingPhotoIds = state.uploadingPhotoIds,
                         onEmptyPick = {
-                            multiMediaPicker.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
-                            )
+                            multiMediaPicker.launch(imageAndVideoRequest())
                         },
                         onEmptyCamera = {
                             val uri = createCaptureUri(context) ?: run {

@@ -42,6 +42,7 @@ import it.vittorioscocca.kidbox.ui.screens.ai.planning.AIChatScreen
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.PlanningAIChatScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.AiSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.SettingsScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.AutoFillSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.StorageUsageScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.ThemeScreen
 import it.vittorioscocca.kidbox.ui.subscription.PlansScreen
@@ -50,6 +51,14 @@ import it.vittorioscocca.kidbox.ui.screens.expenses.ExpensesHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.location.FamilyLocationScreen
 import it.vittorioscocca.kidbox.ui.screens.wallet.WalletHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.wallet.WalletTicketDetailScreen
+import it.vittorioscocca.kidbox.ui.screens.passwords.AddPasswordScreen
+import it.vittorioscocca.kidbox.ui.screens.passwords.PasswordDetailScreen
+import it.vittorioscocca.kidbox.ui.screens.passwords.PasswordGroupDetailScreen
+import it.vittorioscocca.kidbox.ui.screens.passwords.PasswordsGroupsScreen
+import it.vittorioscocca.kidbox.ui.screens.passwords.PasswordsHomeScreen
+import it.vittorioscocca.kidbox.ui.screens.passwords.PasswordsImportExportScreen
+import it.vittorioscocca.kidbox.ui.screens.passwords.PasswordsSettingsScreen
+import it.vittorioscocca.kidbox.ui.screens.passwords.PasswordsSecurityScreen
 import it.vittorioscocca.kidbox.ui.screens.notes.NoteDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.notes.NotesHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.photos.FamilyPhotosScreen
@@ -184,7 +193,12 @@ fun AppNavGraph(
                 onNotifications = { navController.navigate(AppDestination.NotificationSettings.route) },
                 onAiSettings = { navController.navigate(AppDestination.AiSettings.route) },
                 onStorageUsage = { navController.navigate(AppDestination.StorageUsage.route) },
+                onAutoFillSettings = { navController.navigate(AppDestination.AutoFillSettings.route) },
             )
+        }
+
+        composable(AppDestination.AutoFillSettings.route) {
+            AutoFillSettingsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(AppDestination.Plans.route) {
@@ -1207,6 +1221,164 @@ fun AppNavGraph(
                 familyId = familyId,
                 ticketId = ticketId,
                 onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.PasswordsHome.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            PasswordsHomeScreen(
+                familyId = familyId,
+                onBack = { navController.popBackStack() },
+                onOpenImportExport = {
+                    navController.navigate(AppDestination.PasswordsImportExport.createRoute(familyId, ""))
+                },
+                onOpenSecurity = {
+                    navController.navigate(AppDestination.PasswordsSecurity.createRoute(familyId))
+                },
+                onOpenSettings = {
+                    navController.navigate(AppDestination.PasswordsSettings.createRoute(familyId))
+                },
+                onManageGroups = {
+                    navController.navigate(AppDestination.PasswordsGroups.createRoute(familyId))
+                },
+                onAddPassword = {
+                    navController.navigate(AppDestination.PasswordsAdd.createRoute(familyId))
+                },
+                onOpenPassword = { passwordId ->
+                    navController.navigate(AppDestination.PasswordDetail.createRoute(familyId, passwordId))
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.PasswordsSecurity.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            PasswordsSecurityScreen(
+                familyId = familyId,
+                onBack = { navController.popBackStack() },
+                onOpenPassword = { passwordId ->
+                    navController.navigate(AppDestination.PasswordDetail.createRoute(familyId, passwordId))
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.PasswordsSettings.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) {
+            PasswordsSettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenAutoFillSettings = { navController.navigate(AppDestination.AutoFillSettings.route) },
+            )
+        }
+
+        composable(
+            route = AppDestination.PasswordsGroups.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            PasswordsGroupsScreen(
+                familyId = familyId,
+                onBack = { navController.popBackStack() },
+                onOpenCreateGroup = {
+                    navController.navigate(AppDestination.PasswordGroupDetail.createRouteForNew(familyId))
+                },
+                onOpenGroup = { groupId ->
+                    navController.navigate(AppDestination.PasswordGroupDetail.createRouteForEdit(familyId, groupId))
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.PasswordGroupDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("groupId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val groupId = backStackEntry.arguments?.getString("groupId")
+            PasswordGroupDetailScreen(
+                familyId = familyId,
+                groupId = groupId,
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.PasswordsAdd.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            AddPasswordScreen(
+                familyId = familyId,
+                editingEntryId = null,
+                onBack = { navController.popBackStack() },
+                onSaved = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.PasswordsEdit.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("passwordId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val passwordId = backStackEntry.arguments?.getString("passwordId").orEmpty()
+            AddPasswordScreen(
+                familyId = familyId,
+                editingEntryId = passwordId.takeIf { it.isNotBlank() },
+                onBack = { navController.popBackStack() },
+                onSaved = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.PasswordsImportExport.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("familyName") { type = NavType.StringType; defaultValue = "" },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val familyName = backStackEntry.arguments?.getString("familyName")
+            PasswordsImportExportScreen(
+                familyId = familyId,
+                familyName = familyName,
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.PasswordDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("passwordId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val passwordId = backStackEntry.arguments?.getString("passwordId").orEmpty()
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            PasswordDetailScreen(
+                familyId = familyId,
+                passwordId = passwordId,
+                onBack = { navController.popBackStack() },
+                onChangePassword = {
+                    navController.navigate(AppDestination.PasswordsEdit.createRoute(familyId, passwordId))
+                },
+                onOpenSecurityReport = { fid ->
+                    navController.navigate(AppDestination.PasswordsSecurity.createRoute(fid))
+                },
             )
         }
 

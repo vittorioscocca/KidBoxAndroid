@@ -69,6 +69,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
+import it.vittorioscocca.kidbox.domain.model.frequencyDisplayLabel
+import it.vittorioscocca.kidbox.domain.model.plannedFiniteDosesTotal
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListAddBottomButton
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListTopToolbar
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
@@ -689,7 +691,7 @@ private fun TreatmentRow(
                 }
                 val dosageStr = if (treatment.dosageValue % 1.0 == 0.0) "%.0f".format(treatment.dosageValue) else "%.1f".format(treatment.dosageValue)
                 Text(
-                    "$dosageStr ${treatment.dosageUnit} · ${treatment.dailyFrequency} volte al giorno",
+                    "$dosageStr ${treatment.dosageUnit} · ${treatment.frequencyDisplayLabel}",
                     fontSize = 12.sp,
                     color = PURPLE,
                 )
@@ -701,7 +703,7 @@ private fun TreatmentRow(
                     }
                 } else {
                     val currentDay = daysSinceStart.coerceAtMost(treatment.durationDays.toLong())
-                    val totalPlanned = treatment.durationDays * treatment.dailyFrequency
+                    val totalPlanned = treatment.plannedFiniteDosesTotal()
                     val taken = takenSoFar.coerceIn(0, totalPlanned)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(13.dp))

@@ -16,6 +16,11 @@ object KBVisibilityScope {
         else -> FAMILY
     }
 
+    /** Passwords supportano anche `members` (allineato a iOS). */
+    fun normalizedPassword(scope: String?): String {
+        return normalized(scope)
+    }
+
     /** Wallet: default creator-only; unknown/blank → [ONLY_CREATOR]. */
     fun normalizedWallet(scope: String?): String {
         val s = scope?.trim().orEmpty()

@@ -10,7 +10,6 @@ import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import android.widget.Toast
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -110,6 +109,8 @@ import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerFullscreenDialog
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import it.vittorioscocca.kidbox.ui.util.rememberSingleImagePicker
+import it.vittorioscocca.kidbox.ui.util.singleImageRequest
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -195,20 +196,19 @@ fun DocumentBrowserScreen(
         )
     }
 
-    val photoLibraryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-    ) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
-        val fileName = guessFileName(uri.toString(), mime)
-        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: ByteArray(0)
-        if (bytes.isNotEmpty()) {
-            viewModel.importDocument(
-                fileName = fileName,
-                mimeType = mime,
-                bytes = bytes,
-                targetFolderId = uploadTargetFolderId,
-            )
+    val photoLibraryLauncher = rememberSingleImagePicker { uri ->
+        uri?.let { u ->
+            val mime = context.contentResolver.getType(u) ?: "image/jpeg"
+            val fileName = guessFileName(u.toString(), mime)
+            val bytes = context.contentResolver.openInputStream(u)?.use { it.readBytes() } ?: ByteArray(0)
+            if (bytes.isNotEmpty()) {
+                viewModel.importDocument(
+                    fileName = fileName,
+                    mimeType = mime,
+                    bytes = bytes,
+                    targetFolderId = uploadTargetFolderId,
+                )
+            }
         }
     }
 
@@ -769,9 +769,7 @@ fun DocumentBrowserScreen(
             },
             onPhotoLibrary = {
                 showUploadSheet = false
-                photoLibraryLauncher.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                )
+                photoLibraryLauncher.launch(singleImageRequest())
             },
             onFile = {
                 showUploadSheet = false

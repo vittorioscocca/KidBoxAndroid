@@ -119,7 +119,7 @@ fun AddWalletTicketSheet(
     }
 
     val pdfPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent(),
+        contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri != null) {
             pdfUri = uri
@@ -322,7 +322,7 @@ fun AddWalletTicketSheet(
             ) {
                 OutlinedButton(
                     modifier = Modifier.weight(1f),
-                    onClick = { pdfPicker.launch("application/pdf") },
+                    onClick = { pdfPicker.launch(arrayOf("application/pdf")) },
                 ) {
                     Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))

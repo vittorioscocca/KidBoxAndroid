@@ -22,6 +22,7 @@ import it.vittorioscocca.kidbox.domain.model.KBDoseLog
 import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import it.vittorioscocca.kidbox.domain.model.TreatmentSchedulePeriod
+import it.vittorioscocca.kidbox.domain.model.isScheduledDoseDayTherapeutic
 import it.vittorioscocca.kidbox.domain.model.schedulePeriodForTime
 import it.vittorioscocca.kidbox.domain.model.schedulePeriodLabel
 import it.vittorioscocca.kidbox.notifications.TreatmentNotificationManager
@@ -364,6 +365,7 @@ class MedicalTreatmentDetailViewModel @Inject constructor(
         val dayNumber = daysSinceStart + 1
         if (!treatment.isLongTerm && dayNumber > treatment.durationDays) return emptyList()
         val times = treatment.scheduleTimesList()
+        if (!treatment.isScheduledDoseDayTherapeutic(dayNumber)) return emptyList()
         return sortedSlotIndices(times).map { idx ->
             makeDoseSlot(dayNumber, idx, times[idx], doseLogForSlot(logs, dayNumber, idx))
         }
@@ -383,9 +385,13 @@ class MedicalTreatmentDetailViewModel @Inject constructor(
         val order = sortedSlotIndices(times)
         return (1..capped).map { dayNum ->
             val dayMillis = startMillis + TimeUnit.DAYS.toMillis((dayNum - 1).toLong())
-            val slots = order.map { idx ->
-                val time = times[idx]
-                makeDoseSlot(dayNum, idx, time, doseLogForSlot(logs, dayNum, idx))
+            val slots = if (treatment.isScheduledDoseDayTherapeutic(dayNum)) {
+                order.map { idx ->
+                    val time = times[idx]
+                    makeDoseSlot(dayNum, idx, time, doseLogForSlot(logs, dayNum, idx))
+                }
+            } else {
+                emptyList()
             }
             DayEntry(dayNumber = dayNum, dateMillis = dayMillis, slots = slots)
         }

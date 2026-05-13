@@ -34,6 +34,7 @@ data class KBTreatmentEntity(
     val startDateEpochMillis: Long,
     val endDateEpochMillis: Long?,
     val dailyFrequency: Int,
+    val intervalBetweenDosesDays: Int = 0,
     val scheduleTimesData: String,
     val isActive: Boolean,
     val notes: String?,

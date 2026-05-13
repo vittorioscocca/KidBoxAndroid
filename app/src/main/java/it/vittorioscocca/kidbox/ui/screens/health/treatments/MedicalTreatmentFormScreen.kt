@@ -10,6 +10,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -46,10 +47,13 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -57,6 +61,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -70,6 +75,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -110,6 +116,11 @@ fun MedicalTreatmentFormScreen(
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val frequencySummary = if (state.intervalBetweenDosesDays > 0) {
+        "Ogni ${state.intervalBetweenDosesDays} giorni"
+    } else {
+        "${state.dailyFrequency} dosi al giorno"
+    }
 
     LaunchedEffect(familyId, childId, petId, treatmentId) { viewModel.bind(familyId, childId, petId, treatmentId) }
     LaunchedEffect(state.saved, state.treatmentId) {
@@ -329,11 +340,11 @@ fun MedicalTreatmentFormScreen(
                     Spacer(Modifier.height(16.dp))
                 }
 
-                TreatSectionLabel("Frequenza giornaliera")
+                TreatSectionLabel("Frequenza")
                 val freqOptions = listOf(1 to "Mattina", 2 to "Mattina + Sera", 3 to "Mattina + Pranzo + Sera", 4 to "Mattina + Pranzo + Sera + Notte")
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     freqOptions.forEach { (freq, subtitle) ->
-                        val selected = state.dailyFrequency == freq
+                        val selected = state.intervalBetweenDosesDays == 0 && state.dailyFrequency == freq
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -349,6 +360,41 @@ fun MedicalTreatmentFormScreen(
                             }
                         }
                     }
+                }
+                Spacer(Modifier.height(10.dp))
+                HorizontalDivider(color = kb.subtitle.copy(alpha = 0.2f))
+                Spacer(Modifier.height(10.dp))
+                if (state.intervalBetweenDosesDays > 0) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            "Ogni ${state.intervalBetweenDosesDays} giorni",
+                            fontWeight = FontWeight.SemiBold,
+                            color = kb.title,
+                            fontSize = 14.sp,
+                        )
+                        TextButton(onClick = { viewModel.openCustomFrequencySheet() }) {
+                            Text("Modifica", color = PURPLE_FORM, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                OutlinedButton(
+                    onClick = { viewModel.openCustomFrequencySheet() },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, PURPLE_FORM.copy(alpha = 0.45f)),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Transparent),
+                ) {
+                    Text(
+                        "Personalizza frequenza assunzione",
+                        color = PURPLE_FORM,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                    )
                 }
             }
 
@@ -392,7 +438,7 @@ fun MedicalTreatmentFormScreen(
                 }
                 Spacer(Modifier.height(12.dp))
                 TreatSectionLabel("Riepilogo rapido")
-                Text("${state.dailyFrequency} dosi al giorno · ${if (state.isLongTerm) "Lungo termine" else "${state.durationDays} giorni"}", fontSize = 12.sp, color = kb.subtitle)
+                Text("$frequencySummary · ${if (state.isLongTerm) "Lungo termine" else "${state.durationDays} giorni"}", fontSize = 12.sp, color = kb.subtitle)
             }
 
             if (currentStep == 3) {
@@ -401,14 +447,23 @@ fun MedicalTreatmentFormScreen(
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(value = "${state.dosageValue} ${state.dosageUnit}", onValueChange = {}, readOnly = true, label = { Text("Dosaggio") }, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(value = "${state.dailyFrequency}x/die", onValueChange = {}, readOnly = true, label = { Text("Frequenza") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = frequencySummary, onValueChange = {}, readOnly = true, label = { Text("Frequenza") }, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(value = DATE_FMT_TREAT_FORM.format(Date(state.startDateEpochMillis)), onValueChange = {}, readOnly = true, label = { Text("Inizio") }, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(16.dp))
 
                 TreatSectionLabel("Promemoria")
                 TreatSwitchRow("Avvisami agli orari di somministrazione", state.reminderEnabled, viewModel::setReminderEnabled)
-                Text("Le notifiche vengono pianificate per tutti i giorni della cura.", fontSize = 11.sp, color = kb.subtitle, modifier = Modifier.padding(top = 4.dp))
+                Text(
+                    if (state.intervalBetweenDosesDays > 0) {
+                        "Le notifiche arrivano nei giorni di dose (ogni ${state.intervalBetweenDosesDays} giorni), all'orario impostato."
+                    } else {
+                        "Le notifiche vengono pianificate per tutti i giorni della cura."
+                    },
+                    fontSize = 11.sp,
+                    color = kb.subtitle,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
                 Spacer(Modifier.height(16.dp))
 
                 TreatSectionLabel("Note")
@@ -511,6 +566,113 @@ fun MedicalTreatmentFormScreen(
                         viewModel.setScheduleTime(slot, "$h:$m")
                         timePickerSlot = null
                     }) { Text("OK") }
+                }
+            }
+        }
+    }
+
+    if (state.showCustomFrequencySheet) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.dismissCustomFrequencySheet() },
+            sheetState = sheetState,
+        ) {
+            val sheetScroll = rememberScrollState()
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 32.dp)
+                    .verticalScroll(sheetScroll),
+            ) {
+                Text("Frequenza assunzione", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = kb.title)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Indica ogni quanti giorni assumere una dose. È previsto un solo orario al giorno di assunzione.",
+                    fontSize = 12.sp,
+                    color = kb.subtitle,
+                )
+                Spacer(Modifier.height(16.dp))
+                Text("Preimpostate", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = kb.title)
+                Spacer(Modifier.height(6.dp))
+                val presets = listOf(
+                    "Ogni 7 giorni" to 7,
+                    "Ogni 15 giorni" to 15,
+                    "Circa 2 volte al mese (~15 giorni)" to 15,
+                    "Circa 1 volta al mese (~30 giorni)" to 30,
+                    "Una volta all'anno (~365 giorni)" to 365,
+                )
+                presets.forEach { (label, days) ->
+                    TextButton(
+                        onClick = { viewModel.applyIntervalDays(days) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(label, color = PURPLE_FORM, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Start)
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("Personalizzato", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = kb.title)
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("Ogni ${state.customIntervalDaysDraft} giorni", color = kb.title, fontWeight = FontWeight.SemiBold)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { viewModel.setCustomIntervalDaysDraft(state.customIntervalDaysDraft - 1) }) {
+                            Icon(Icons.Default.Remove, contentDescription = "Meno giorni", tint = kb.title)
+                        }
+                        IconButton(onClick = { viewModel.setCustomIntervalDaysDraft(state.customIntervalDaysDraft + 1) }) {
+                            Icon(Icons.Default.Add, contentDescription = "Più giorni", tint = kb.title)
+                        }
+                    }
+                }
+                Button(
+                    onClick = { viewModel.applyIntervalDays(state.customIntervalDaysDraft) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PURPLE_FORM),
+                ) {
+                    Text("Usa questo intervallo", color = Color.White, fontWeight = FontWeight.SemiBold)
+                }
+                Spacer(Modifier.height(16.dp))
+                Text("Anni", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = kb.title)
+                Spacer(Modifier.height(8.dp))
+                val yearsLabel = if (state.customIntervalYearsDraft == 1) {
+                    "Ogni 1 anno"
+                } else {
+                    "Ogni ${state.customIntervalYearsDraft} anni"
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(yearsLabel, color = kb.title, fontWeight = FontWeight.SemiBold)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { viewModel.setCustomIntervalYearsDraft(state.customIntervalYearsDraft - 1) }) {
+                            Icon(Icons.Default.Remove, contentDescription = "Meno anni", tint = kb.title)
+                        }
+                        IconButton(onClick = { viewModel.setCustomIntervalYearsDraft(state.customIntervalYearsDraft + 1) }) {
+                            Icon(Icons.Default.Add, contentDescription = "Più anni", tint = kb.title)
+                        }
+                    }
+                }
+                Button(
+                    onClick = { viewModel.applyIntervalDays(state.customIntervalYearsDraft * 365) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PURPLE_FORM),
+                ) {
+                    Text("Usa questo intervallo", color = Color.White, fontWeight = FontWeight.SemiBold)
+                }
+                Spacer(Modifier.height(16.dp))
+                TextButton(
+                    onClick = { viewModel.dismissCustomFrequencySheet() },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Chiudi", color = kb.subtitle)
                 }
             }
         }

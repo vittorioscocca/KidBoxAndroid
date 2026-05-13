@@ -5,6 +5,7 @@ import android.util.Log
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import it.vittorioscocca.kidbox.data.crypto.FamilyKeyEscrow
 import it.vittorioscocca.kidbox.data.crypto.FamilyKeyStore
 import it.vittorioscocca.kidbox.data.crypto.InviteCrypto
 import kotlinx.coroutines.tasks.await
@@ -126,6 +127,8 @@ class JoinWrapService(
 
         FamilyKeyStore.saveFamilyKey(context, familyKeyBytes, familyId, uid)
         Log.i(TAG, "master key saved familyId=$familyId")
+
+        FamilyKeyEscrow.backupRawKey(familyKeyBytes, familyId, uid)
 
         try {
             docRef.delete().await()

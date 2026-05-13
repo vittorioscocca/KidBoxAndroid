@@ -129,4 +129,23 @@ object FamilyKeyStore {
             getFallbackPrefs(context).contains(prefKey(familyId, userId))
         }.getOrDefault(false)
     }
+
+    /**
+     * Elenco `familyId` per cui esiste una chiave salvata per [userId].
+     * Usato da autofill quando `active_family_id` non è ancora in prefs (es. processo a freddo).
+     */
+    fun listFamilyIdsHavingKeyForUser(context: Context, userId: String): List<String> {
+        val suffix = "_$userId"
+        val out = LinkedHashSet<String>()
+        fun scan(p: android.content.SharedPreferences) {
+            for (key in p.all.keys) {
+                if (!key.startsWith("fk_") || !key.endsWith(suffix)) continue
+                val mid = key.removePrefix("fk_").removeSuffix(suffix)
+                if (mid.isNotBlank()) out.add(mid)
+            }
+        }
+        runCatching { scan(getPrefs(context)) }
+        runCatching { scan(getFallbackPrefs(context)) }
+        return out.toList()
+    }
 }
