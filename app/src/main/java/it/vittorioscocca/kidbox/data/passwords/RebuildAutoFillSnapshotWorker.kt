@@ -39,7 +39,11 @@ class RebuildAutoFillSnapshotWorker @AssistedInject constructor(
         val uid = auth.currentUser?.uid?.trim().orEmpty()
         val familyId = familySessionPreferences.getActiveFamilyId()?.trim().orEmpty()
         if (uid.isBlank() || familyId.isBlank()) {
-            encryptedStore.delete()
+            // Non cancellare lo snapshot esistente: potrebbe essere un avvio a freddo in cui
+            // Firebase Auth non ha ancora ripristinato la sessione. Cancellare qui causerebbe
+            // un ciclo dove il servizio autofill vede snapshot null → schedula rebuild →
+            // rebuild cancella snapshot → loop. Si cancella solo al logout esplicito.
+            Log.d(TAG, "skip rebuild: uid=${uid.isBlank()} familyId=${familyId.isBlank()}")
             return Result.success()
         }
         val familyKey = FamilyKeyStore.loadFamilyKey(appContext, familyId, uid)

@@ -41,23 +41,26 @@ class KidBoxCredentialProviderService : CredentialProviderService() {
             uid,
         ).orEmpty()
         if (uid.isBlank()) {
-            callback.onResult(BeginGetCredentialResponse(emptyList(), emptyList(), emptyList(), null))
+            // Firebase Auth non ancora ripristinato (cold start) oppure utente non loggato.
+            // Mostriamo comunque l'Action così KidBox è visibile nel selettore di Chrome.
+            Log.d(TAG, "onBeginGetCredentialRequest: uid blank — returning fallback action")
+            callback.onResult(BeginGetCredentialResponse(emptyList(), listOf(openKidBoxAction()), emptyList(), null))
             return
         }
         if (familyId.isBlank()) {
-            Log.d(TAG, "onBeginGetCredentialRequest: no familyId")
-            callback.onResult(BeginGetCredentialResponse(emptyList(), emptyList(), emptyList(), null))
+            Log.d(TAG, "onBeginGetCredentialRequest: no familyId — returning fallback action")
+            callback.onResult(BeginGetCredentialResponse(emptyList(), listOf(openKidBoxAction()), emptyList(), null))
             return
         }
         val snapshot = AutoFillSnapshotLoader.load(applicationContext, familyId, uid, deps.autoFillSnapshotEncryptedStore())
         if (snapshot == null) {
-            Log.d(TAG, "onBeginGetCredentialRequest: snapshot null familyId=$familyId")
+            Log.d(TAG, "onBeginGetCredentialRequest: snapshot null familyId=$familyId — scheduling rebuild")
             deps.passwordsRepository().scheduleAutofillSnapshotRebuild()
-            callback.onResult(BeginGetCredentialResponse(emptyList(), emptyList(), emptyList(), null))
+            callback.onResult(BeginGetCredentialResponse(emptyList(), listOf(openKidBoxAction()), emptyList(), null))
             return
         }
         if (snapshot.items.isEmpty()) {
-            Log.d(TAG, "onBeginGetCredentialRequest: snapshot empty familyId=$familyId")
+            Log.d(TAG, "onBeginGetCredentialRequest: snapshot empty familyId=$familyId — scheduling rebuild")
             deps.passwordsRepository().scheduleAutofillSnapshotRebuild()
             callback.onResult(BeginGetCredentialResponse(emptyList(), emptyList(), emptyList(), null))
             return
@@ -84,20 +87,7 @@ class KidBoxCredentialProviderService : CredentialProviderService() {
                     request.beginGetCredentialOptions.joinToString { it.type }
                 }",
             )
-            val openIntent = packageManager.getLaunchIntentForPackage(packageName)
-                ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            if (openIntent != null && snapshot.items.isNotEmpty()) {
-                val pi = PendingIntent.getActivity(
-                    this,
-                    PI_REQ_ACTION_OPEN,
-                    openIntent,
-                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-                )
-                val action = Action(title = "KidBox", pendingIntent = pi)
-                callback.onResult(BeginGetCredentialResponse(emptyList(), listOf(action), emptyList(), null))
-            } else {
-                callback.onResult(BeginGetCredentialResponse(emptyList(), emptyList(), emptyList(), null))
-            }
+            callback.onResult(BeginGetCredentialResponse(emptyList(), listOf(openKidBoxAction()), emptyList(), null))
             return
         }
 
@@ -205,6 +195,19 @@ class KidBoxCredentialProviderService : CredentialProviderService() {
             if (!linked.isNullOrBlank()) return linked.removePrefix("www.")
         }
         return null
+    }
+
+    private fun openKidBoxAction(): Action {
+        val intent = packageManager.getLaunchIntentForPackage(packageName)
+            ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            ?: Intent()
+        val pi = PendingIntent.getActivity(
+            this,
+            PI_REQ_ACTION_OPEN,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        return Action(title = "KidBox", pendingIntent = pi)
     }
 
     companion object {

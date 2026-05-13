@@ -7,7 +7,9 @@
       "Bash(./gradlew :app:compileDebugKotlin --quiet)",
       "Bash(gradle :app:compileDebugKotlin --quiet)",
       "Bash(find ~/.gradle/wrapper/dists -name \"gradle\" -type f 2>/dev/null | head -3)",
-      "Bash(/Users/vscocca/.gradle/wrapper/dists/gradle-8.10.2-bin/a04bxjujx95o3nb99gddekhwo/gradle-8.10.2/bin/gradle :app:compileDebugKotlin --quiet)"
+      "Bash(/Users/vscocca/.gradle/wrapper/dists/gradle-8.10.2-bin/a04bxjujx95o3nb99gddekhwo/gradle-8.10.2/bin/gradle :app:compileDebugKotlin --quiet)",
+      "Bash(find ~ -name \"*.jks\" -o -name \"*.keystore\" 2>/dev/null | grep -v \".gradle\\\\|cache\\\\|Library/Caches\" | head -10)",
+      "Bash(keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android)"
     ]
   }
 }
