@@ -80,7 +80,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
 import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
-import it.vittorioscocca.kidbox.ui.screens.ai.common.ClaudeMarkdownText
+import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatListScrollEffect
+import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatStandardMessageRow
+import it.vittorioscocca.kidbox.ui.screens.ai.common.rememberStreamScrollTick
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import kotlinx.coroutines.launch
 
@@ -112,9 +114,15 @@ fun AIChatScreen(
 
     LaunchedEffect(familyId) { viewModel.bind(familyId, familyName) }
 
-    LaunchedEffect(state.messages.size) {
-        if (state.messages.isNotEmpty()) listState.animateScrollToItem(0)
-    }
+    val (streamScrollTick, onStreamScrollTick) = rememberStreamScrollTick()
+    AIChatListScrollEffect(
+        listState = listState,
+        messageCount = state.messages.size,
+        isLoading = state.isLoading,
+        streamingMessageId = state.streamingMessageId,
+        streamScrollTick = streamScrollTick,
+        reverseLayout = true,
+    )
 
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let { err ->
@@ -292,8 +300,19 @@ fun AIChatScreen(
                             if (state.isLoading) {
                                 item { PlanningTypingIndicator() }
                             }
-                            itemsIndexed(state.messages.reversed()) { _, message ->
-                                PlanningChatBubble(message = message)
+                            itemsIndexed(
+                                state.messages.reversed(),
+                                key = { _, message -> message.id },
+                            ) { _, message ->
+                                AIChatStandardMessageRow(
+                                    message = message,
+                                    kb = kb,
+                                    userBubbleColor = AI_BLUE,
+                                    userTextColor = Color.White,
+                                    streamingMessageId = state.streamingMessageId,
+                                    onStreamScrollTick = onStreamScrollTick,
+                                    onStreamingComplete = viewModel::finishStreaming,
+                                )
                             }
                         }
                         val showScrollToBottom = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
@@ -395,52 +414,6 @@ fun AIChatScreen(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
-    }
-}
-
-@Composable
-private fun PlanningChatBubble(message: KBAIMessage) {
-    val kb = MaterialTheme.kidBoxColors
-    val isUser = message.isUser
-    val maxUserWidth = LocalConfiguration.current.screenWidthDp.dp * 0.75f
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
-    ) {
-        if (isUser) {
-            Surface(
-                color = AI_BLUE,
-                shape = RoundedCornerShape(
-                    topStart = 18.dp,
-                    topEnd = 4.dp,
-                    bottomStart = 18.dp,
-                    bottomEnd = 18.dp,
-                ),
-                modifier = Modifier.widthIn(max = maxUserWidth),
-            ) {
-                Text(
-                    text = message.content,
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    lineHeight = 20.sp,
-                )
-            }
-        } else {
-            ClaudeMarkdownText(
-                text = message.content,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(
-                text = PlanningContextBuilder.formatTime(message.createdAtEpochMillis),
-                fontSize = 10.sp,
-                color = kb.subtitle,
-                modifier = Modifier.padding(start = 0.dp, top = 2.dp),
-            )
-        }
     }
 }
 

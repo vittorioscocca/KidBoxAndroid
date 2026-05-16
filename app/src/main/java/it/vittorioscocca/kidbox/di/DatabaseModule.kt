@@ -13,6 +13,8 @@ import it.vittorioscocca.kidbox.data.local.dao.HomeItemDao
 import it.vittorioscocca.kidbox.data.local.dao.HousePaymentDao
 import it.vittorioscocca.kidbox.data.local.dao.KBAIConversationDao
 import it.vittorioscocca.kidbox.data.local.dao.KBAIMessageDao
+import it.vittorioscocca.kidbox.data.local.dao.KBHealthInsightDao
+import it.vittorioscocca.kidbox.data.local.dao.KBMemoryFactDao
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBCalendarEventDao
 import it.vittorioscocca.kidbox.data.local.dao.KBEventDao
@@ -588,6 +590,45 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_26_27 = object : Migration(26, 27) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS kb_memory_facts (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    categoryRaw TEXT NOT NULL,
+                    createdAtEpochMillis INTEGER NOT NULL,
+                    updatedAtEpochMillis INTEGER NOT NULL,
+                    sourceConversationId TEXT
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_memory_facts_familyId ON kb_memory_facts(familyId)")
+        }
+    }
+
+    private val MIGRATION_27_28 = object : Migration(27, 28) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS kb_health_insights (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    fullText TEXT NOT NULL,
+                    monthKey TEXT NOT NULL,
+                    createdAtEpochMillis INTEGER NOT NULL,
+                    isRead INTEGER NOT NULL DEFAULT 0
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_kb_health_insights_familyId ON kb_health_insights(familyId)",
+            )
+        }
+    }
+
     private val MIGRATION_18_19 = object : Migration(18, 19) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(
@@ -886,6 +927,8 @@ object DatabaseModule {
         MIGRATION_23_24,
         MIGRATION_24_25,
         MIGRATION_25_26,
+        MIGRATION_26_27,
+        MIGRATION_27_28,
     )
         .fallbackToDestructiveMigration()
         .build()
@@ -981,6 +1024,14 @@ object DatabaseModule {
     @Provides
     fun provideKBAIMessageDao(database: KidBoxDatabase): KBAIMessageDao =
         database.aiMessageDao()
+
+    @Provides
+    fun provideKBMemoryFactDao(database: KidBoxDatabase): KBMemoryFactDao =
+        database.memoryFactDao()
+
+    @Provides
+    fun provideKBHealthInsightDao(database: KidBoxDatabase): KBHealthInsightDao =
+        database.healthInsightDao()
 
     @Provides
     fun provideWalletTicketDao(database: KidBoxDatabase): WalletTicketDao =

@@ -10,6 +10,7 @@ import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import it.vittorioscocca.kidbox.domain.model.KBVaccine
 import it.vittorioscocca.kidbox.data.local.mapper.KBVaccineStatus
 import it.vittorioscocca.kidbox.data.local.mapper.computedStatus
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.PlanningAIActionBlock
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -173,7 +174,9 @@ REGOLE IMPORTANTI:
 
         sb.appendLine()
         sb.appendLine("--- FINE CONTESTO SALUTE ---")
-        sb.append("Rispondi alle domande usando le informazioni sopra.")
+        sb.appendLine("Rispondi alle domande usando le informazioni sopra.")
+        sb.appendLine()
+        sb.appendLine(PlanningAIActionBlock.promptSection)
 
         val prompt = sb.toString()
         Log.d(TAG, "buildSystemPrompt for $subjectName: ${prompt.take(200)}...")

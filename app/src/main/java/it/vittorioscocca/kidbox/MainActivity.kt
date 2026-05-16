@@ -58,6 +58,10 @@ import it.vittorioscocca.kidbox.ui.navigation.AppNavGraph
 import it.vittorioscocca.kidbox.ui.navigation.CONTENT_NO_LONGER_AVAILABLE_MESSAGE
 import it.vittorioscocca.kidbox.ui.state.BannerMessageStore
 import it.vittorioscocca.kidbox.notifications.NotificationBadgeStore
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.DailyBriefingDraftStore
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.DailyBriefingService
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.HealthPatternAnalyzerService
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.HealthPatternDraftStore
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.WeeklySummaryService
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.WeeklySummaryDraftStore
 import it.vittorioscocca.kidbox.ui.splash.KidBoxSplashScreen
@@ -347,6 +351,32 @@ class MainActivity : ComponentActivity() {
                                 pendingPushDeepLink = null
                             }
 
+                            "daily_briefing" -> {
+                                val recap = intent?.getStringExtra("fullText").orEmpty()
+                                if (recap.isNotBlank()) {
+                                    DailyBriefingDraftStore.save(this@MainActivity, recap)
+                                }
+                                if (deepLink.familyId.isNotBlank()) {
+                                    navController.navigate(
+                                        AppDestination.AiChat.createRoute(deepLink.familyId),
+                                    )
+                                }
+                                pendingPushDeepLink = null
+                            }
+
+                            "health_pattern" -> {
+                                val recap = intent?.getStringExtra("fullText").orEmpty()
+                                if (recap.isNotBlank()) {
+                                    HealthPatternDraftStore.save(this@MainActivity, recap)
+                                }
+                                if (deepLink.familyId.isNotBlank()) {
+                                    navController.navigate(
+                                        AppDestination.AiChat.createRoute(deepLink.familyId),
+                                    )
+                                }
+                                pendingPushDeepLink = null
+                            }
+
                             "vehicle_deadline_reminder" -> {
                                 val vehicleId = deepLink.itemId
                                 if (deepLink.familyId.isNotBlank() && !vehicleId.isNullOrBlank()) {
@@ -389,6 +419,8 @@ class MainActivity : ComponentActivity() {
             .getString("active_family_id", null)
         if (!familyId.isNullOrBlank()) {
             WeeklySummaryService.scheduleWeeklyIfNeeded(this, familyId)
+            DailyBriefingService.scheduleDailyIfNeeded(this, familyId)
+            HealthPatternAnalyzerService.scheduleMonthlyIfNeeded(this, familyId)
         }
     }
 
@@ -460,8 +492,11 @@ class MainActivity : ComponentActivity() {
             val familyId = intent.getStringExtra("push_family_id")
                 ?: intent.getStringExtra("familyId")
                 ?: return
+            val type = intent.getStringExtra("push_type")
+                ?: intent.getStringExtra("type")
+                ?: "weekly_summary"
             pendingPushDeepLink = PushDeepLink(
-                type = "weekly_summary",
+                type = type,
                 familyId = familyId,
                 itemId = null,
                 childId = null,

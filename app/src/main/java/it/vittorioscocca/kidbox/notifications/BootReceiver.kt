@@ -8,6 +8,7 @@ import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.AiScheduledNotificationsRestorer
 import kotlinx.coroutines.launch
 
 /**
@@ -38,7 +39,8 @@ class BootReceiver : BroadcastReceiver() {
                 val hpDao = ep.housePaymentDao()
                 val hpSched = ep.housePaymentReminderScheduler()
                 hpDao.listActiveByFamily(familyId).forEach { hpSched.syncPayment(it) }
-                Log.d("BootReceiver", "BOOT_COMPLETED — vehicle + house payment alarms refreshed")
+                AiScheduledNotificationsRestorer.restoreAfterBoot(appCtx)
+                Log.d("BootReceiver", "BOOT_COMPLETED — vehicle, house payment, AI briefing alarms refreshed")
             } finally {
                 pendingResult.finish()
             }

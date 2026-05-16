@@ -12,6 +12,9 @@ interface KBAIMessageDao {
     @Query("SELECT * FROM kb_ai_messages WHERE conversationId = :conversationId ORDER BY createdAtEpochMillis ASC")
     fun observeByConversationId(conversationId: String): Flow<List<KBAIMessageEntity>>
 
+    @Query("SELECT * FROM kb_ai_messages WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): KBAIMessageEntity?
+
     @Query("SELECT * FROM kb_ai_messages WHERE conversationId = :conversationId ORDER BY createdAtEpochMillis ASC")
     suspend fun getAllByConversationId(conversationId: String): List<KBAIMessageEntity>
 

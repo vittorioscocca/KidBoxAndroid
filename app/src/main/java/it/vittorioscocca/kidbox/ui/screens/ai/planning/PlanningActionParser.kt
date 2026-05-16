@@ -4,26 +4,35 @@ import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
 import it.vittorioscocca.kidbox.domain.model.KBTodoItem
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import java.util.Calendar
-import java.util.Locale
 import java.util.UUID
+import java.util.regex.Pattern
 
-enum class PlanningActionKind { CREATE_EVENT, CREATE_TODO, SET_REMINDER, NAVIGATE }
-enum class PlanningNavigationTarget { CALENDAR, TODO, HEALTH, NONE }
+enum class PlanningActionKind {
+    CREATE_EVENT,
+    CREATE_TODO,
+    CREATE_GROCERY,
+    CREATE_NOTE,
+    SET_REMINDER,
+    NAVIGATE,
+}
+
+enum class PlanningNavigationTarget {
+    CALENDAR,
+    TODO,
+    HEALTH,
+    NONE,
+}
 
 sealed class PlanningReminderContext {
-    data class Todo(val todo: KBTodoItem, val dueAt: Long) : PlanningReminderContext()
-    data class Visit(val visit: KBMedicalVisit, val childName: String) : PlanningReminderContext()
-    data class Exam(
-        val examName: String,
-        val examId: String,
-        val childName: String,
-        val childId: String,
+    data class FreeText(
         val familyId: String,
-        val deadline: Long,
+        val title: String,
+        val dueAtEpochMillis: Long,
+        val childId: String? = null,
+        val listId: String? = null,
     ) : PlanningReminderContext()
-    data class Treatment(val treatment: KBTreatment, val childName: String) : PlanningReminderContext()
-    data class FreeText(val title: String, val dueAt: Long, val familyId: String) : PlanningReminderContext()
-    object None : PlanningReminderContext()
+
+    data class ExistingTodo(val title: String) : PlanningReminderContext()
 }
 
 data class PlanningAction(
@@ -31,13 +40,38 @@ data class PlanningAction(
     val kind: PlanningActionKind,
     val title: String,
     val subtitle: String,
-    val reminderContext: PlanningReminderContext = PlanningReminderContext.None,
     val navigationTarget: PlanningNavigationTarget = PlanningNavigationTarget.NONE,
+    val reminderContext: PlanningReminderContext = PlanningReminderContext.FreeText(
+        familyId = "",
+        title = "",
+        dueAtEpochMillis = System.currentTimeMillis(),
+    ),
     val prefilledEventTitle: String? = null,
     val prefilledTodoTitle: String? = null,
+    val groceryItems: List<String> = emptyList(),
+    val noteBody: String? = null,
 )
 
 object PlanningActionParser {
+
+    /** Card solo per proposte, non dopo azioni già completate dall'assistente. */
+    fun shouldOfferCreatableActionCard(lower: String): Boolean {
+        val completion = listOf(
+            "ho aggiunto", "ho creato", "ho inserito", "ho salvato", "ho registrato",
+            "è stato aggiunto", "sono stati aggiunti", "li ho aggiunti", "l'ho aggiunto",
+            "aggiunto alla lista", "inserito nella lista", "già aggiunto", "già inserito",
+            "ho impostato", "promemoria attivo",
+        )
+        if (completion.any { lower.contains(it) }) return false
+        val proposal = listOf(
+            "vuoi che", "posso ", "vuoi ", "desideri che", "preferisci che",
+            "ti va se", "posso aggiungere", "posso creare", "posso inserire",
+            "vuoi che aggiunga", "vuoi che crei", "vuoi che imposti",
+            "crea un to-do", "creare un", "aggiungere al calendario",
+        )
+        return proposal.any { lower.contains(it) }
+    }
+
     fun parse(
         text: String,
         openTodos: List<KBTodoItem>,
@@ -45,62 +79,151 @@ object PlanningActionParser {
         treatments: List<KBTreatment>,
         familyId: String,
     ): List<PlanningAction> {
-        val lower = text.lowercase(Locale.ROOT)
+        val lower = text.lowercase()
         val actions = mutableListOf<PlanningAction>()
-        extractCreateEvent(lower, text)?.let(actions::add)
-        extractCreateTodo(lower, text)?.let(actions::add)
-        extractReminder(lower, text, openTodos, visits, treatments, familyId)?.let(actions::add)
-        extractNavigate(lower)?.let(actions::add)
-        return actions.take(2)
-    }
+        val offerCreatableCards = shouldOfferCreatableActionCard(lower)
 
-    private fun extractCreateEvent(lower: String, text: String): PlanningAction? {
-        if (listOf("aggiungo al calendario", "creo l'evento", "inserisco nel calendario", "posso aggiungere al calendario").none { lower.contains(it) }) return null
-        val title = extractQuoted(text) ?: "Nuovo evento"
-        return PlanningAction( kind = PlanningActionKind.CREATE_EVENT, title = "Crea evento", subtitle = title, prefilledEventTitle = title )
-    }
-    private fun extractCreateTodo(lower: String, text: String): PlanningAction? {
-        if (listOf("aggiungo il to-do", "creo il to-do", "aggiungo al to-do", "posso aggiungere il to-do").none { lower.contains(it) }) return null
-        val title = extractQuoted(text) ?: "Nuovo to-do"
-        return PlanningAction(kind = PlanningActionKind.CREATE_TODO, title = "Aggiungi to-do", subtitle = title, prefilledTodoTitle = title)
-    }
-    private fun extractReminder(lower: String, text: String, todos: List<KBTodoItem>, visits: List<KBMedicalVisit>, treatments: List<KBTreatment>, familyId: String): PlanningAction? {
-        if (listOf("vuoi che imposti un promemoria", "imposto un promemoria", "ti ricordo", "vuoi un promemoria").none { lower.contains(it) }) return null
-        val subject = extractQuoted(text) ?: "Promemoria"
-        val todo = todos.firstOrNull { it.title.contains(subject, true) }
-        if (todo != null) return PlanningAction(kind = PlanningActionKind.SET_REMINDER, title = "Imposta promemoria", subtitle = subject, reminderContext = PlanningReminderContext.Todo(todo, todo.dueAtEpochMillis ?: tomorrow8()))
-        val visit = visits.firstOrNull { it.reason.contains(subject, true) }
-        if (visit != null) return PlanningAction(kind = PlanningActionKind.SET_REMINDER, title = "Imposta promemoria", subtitle = subject, reminderContext = PlanningReminderContext.Visit(visit, "Figlio"))
-        val treatment = treatments.firstOrNull { it.drugName.contains(subject, true) }
-        if (treatment != null) return PlanningAction(kind = PlanningActionKind.SET_REMINDER, title = "Imposta promemoria", subtitle = subject, reminderContext = PlanningReminderContext.Treatment(treatment, "Figlio"))
-        return PlanningAction(kind = PlanningActionKind.SET_REMINDER, title = "Imposta promemoria", subtitle = subject, reminderContext = PlanningReminderContext.FreeText(subject, parseDate(lower), familyId))
-    }
-    private fun extractNavigate(lower: String): PlanningAction? = when {
-        lower.contains("apri il calendario") || lower.contains("vai al calendario") -> PlanningAction(kind = PlanningActionKind.NAVIGATE, title = "Apri calendario", subtitle = "", navigationTarget = PlanningNavigationTarget.CALENDAR)
-        lower.contains("apri i to-do") || lower.contains("vai ai to-do") -> PlanningAction(kind = PlanningActionKind.NAVIGATE, title = "Apri to-do", subtitle = "", navigationTarget = PlanningNavigationTarget.TODO)
-        lower.contains("apri la sezione salute") || lower.contains("vai alla salute") -> PlanningAction(kind = PlanningActionKind.NAVIGATE, title = "Apri salute", subtitle = "", navigationTarget = PlanningNavigationTarget.HEALTH)
-        else -> null
-    }
-
-    private fun parseDate(lower: String): Long {
-        if (lower.contains("dopodomani")) return offsetDay(2)
-        if (lower.contains("domani")) return offsetDay(1)
-        Regex("tra\\s+(\\d+)\\s+giorni").find(lower)?.groupValues?.getOrNull(1)?.toIntOrNull()?.let { return offsetDay(it) }
-        Regex("ore\\s*(\\d{1,2}):(\\d{2})").find(lower)?.let { m ->
-            val h = m.groupValues[1].toIntOrNull() ?: 8
-            val mm = m.groupValues[2].toIntOrNull() ?: 0
-            val c = Calendar.getInstance()
-            c.set(Calendar.HOUR_OF_DAY, h); c.set(Calendar.MINUTE, mm); c.set(Calendar.SECOND, 0); c.set(Calendar.MILLISECOND, 0)
-            return c.timeInMillis
+        if (offerCreatableCards &&
+            (lower.contains("vuoi che crei l'evento") || lower.contains("posso aggiungere al calendario") ||
+                lower.contains("aggiungere al calendario"))
+        ) {
+            val title = extractQuoted(text) ?: "Nuovo evento"
+            actions += PlanningAction(
+                kind = PlanningActionKind.CREATE_EVENT,
+                title = title,
+                subtitle = "Crea evento in calendario",
+                prefilledEventTitle = title,
+            )
         }
-        return tomorrow8()
+
+        val grocerySignals = listOf(
+            "lista della spesa", "lista spesa", "alla spesa", "nella spesa",
+            "aggiungo alla lista", "aggiunto alla lista",
+        )
+        if (offerCreatableCards &&
+            grocerySignals.any { lower.contains(it) } &&
+            (lower.contains("vuoi che") || lower.contains("posso "))
+        ) {
+            val items = extractGroceryItems(text)
+            val title = items.firstOrNull() ?: extractQuoted(text) ?: "Articoli spesa"
+            actions += PlanningAction(
+                kind = PlanningActionKind.CREATE_GROCERY,
+                title = title,
+                subtitle = if (items.size > 1) "${items.size} articoli" else "Aggiungi alla lista spesa",
+                groceryItems = items.ifEmpty { listOf(title) },
+            )
+        }
+
+        if (offerCreatableCards &&
+            (lower.contains("vuoi che") || lower.contains("posso ")) &&
+            lower.contains("nota")
+        ) {
+            val title = extractQuoted(text) ?: "Nuova nota"
+            actions += PlanningAction(
+                kind = PlanningActionKind.CREATE_NOTE,
+                title = title,
+                subtitle = "Salva nelle note famiglia",
+                noteBody = title,
+            )
+        }
+
+        if (offerCreatableCards &&
+            (lower.contains("vuoi che aggiunga il to-do") || lower.contains("crea un to-do") ||
+                lower.contains("posso aggiungere il to-do"))
+        ) {
+            val title = extractQuoted(text) ?: "Nuovo to-do"
+            actions += PlanningAction(
+                kind = PlanningActionKind.CREATE_TODO,
+                title = title,
+                subtitle = "Aggiunto alla lista condivisa",
+                prefilledTodoTitle = title,
+            )
+        }
+
+        val reminderPhrases = listOf(
+            "vuoi che imposti un promemoria",
+            "posso impostare un promemoria",
+            "ti ricordo con una notifica",
+        )
+        if (reminderPhrases.any { lower.contains(it) }) {
+            val quoted = extractQuoted(text)
+            val due = extractDate(lower) ?: (System.currentTimeMillis() + 86_400_000L)
+            actions += PlanningAction(
+                kind = PlanningActionKind.SET_REMINDER,
+                title = quoted ?: "Promemoria",
+                subtitle = "Notifica locale programmata",
+                reminderContext = PlanningReminderContext.FreeText(
+                    familyId = familyId,
+                    title = quoted ?: "Promemoria",
+                    dueAtEpochMillis = due,
+                ),
+            )
+        }
+
+        if (lower.contains("apri il calendario") || lower.contains("vai al calendario")) {
+            actions += PlanningAction(
+                kind = PlanningActionKind.NAVIGATE,
+                title = "Apri Calendario",
+                subtitle = "Vai alla vista calendario",
+                navigationTarget = PlanningNavigationTarget.CALENDAR,
+            )
+        }
+        if (lower.contains("apri i to-do") || lower.contains("vai ai to-do")) {
+            actions += PlanningAction(
+                kind = PlanningActionKind.NAVIGATE,
+                title = "Apri To-Do",
+                subtitle = "Vai alla lista to-do",
+                navigationTarget = PlanningNavigationTarget.TODO,
+            )
+        }
+        if (lower.contains("apri salute") || lower.contains("vai alla sezione salute")) {
+            actions += PlanningAction(
+                kind = PlanningActionKind.NAVIGATE,
+                title = "Apri Salute",
+                subtitle = "Vai alla sezione sanitaria",
+                navigationTarget = PlanningNavigationTarget.HEALTH,
+            )
+        }
+
+        return actions
     }
-    private fun extractQuoted(text: String): String? = Regex("\"(.*?)\"|'(.*?)'").find(text)?.groupValues?.drop(1)?.firstOrNull { it.isNotBlank() }
-    private fun tomorrow8(): Long = offsetDay(1)
-    private fun offsetDay(days: Int): Long {
-        val c = Calendar.getInstance()
-        c.add(Calendar.DAY_OF_YEAR, days)
-        c.set(Calendar.HOUR_OF_DAY, 8); c.set(Calendar.MINUTE, 0); c.set(Calendar.SECOND, 0); c.set(Calendar.MILLISECOND, 0)
-        return c.timeInMillis
+
+    private fun extractQuoted(text: String): String? {
+        val patterns = listOf(
+            Pattern.compile("\"([^\"]+)\""),
+            Pattern.compile("«([^»]+)»"),
+            Pattern.compile("'([^']+)'"),
+        )
+        for (pattern in patterns) {
+            val matcher = pattern.matcher(text)
+            if (matcher.find()) return matcher.group(1)?.trim()
+        }
+        return null
+    }
+
+    private fun extractGroceryItems(text: String): List<String> {
+        val quoted = Pattern.compile("[\"«']([^\"»']+)[\"»']").matcher(text)
+        val items = mutableListOf<String>()
+        while (quoted.find()) {
+            quoted.group(1)?.trim()?.takeIf { it.isNotEmpty() }?.let { items += it }
+        }
+        if (items.isNotEmpty()) return items
+        text.lineSequence().forEach { line ->
+            val trimmed = line.trim()
+            if (trimmed.startsWith("- ") || trimmed.startsWith("• ")) {
+                items += trimmed.removePrefix("- ").removePrefix("• ").trim()
+            }
+        }
+        return items
+    }
+
+    private fun extractDate(lower: String): Long? {
+        val cal = Calendar.getInstance()
+        val base = when {
+            lower.contains("dopodomani") -> cal.apply { add(Calendar.DAY_OF_YEAR, 2) }.timeInMillis
+            lower.contains("domani") -> cal.apply { add(Calendar.DAY_OF_YEAR, 1) }.timeInMillis
+            else -> cal.apply { add(Calendar.DAY_OF_YEAR, 1) }.timeInMillis
+        }
+        return base
     }
 }

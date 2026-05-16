@@ -22,34 +22,36 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import it.vittorioscocca.kidbox.MainActivity
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ai.AiSettings
+import it.vittorioscocca.kidbox.ai.DailyBriefingPrefs
 import it.vittorioscocca.kidbox.data.remote.ai.AIService
 import it.vittorioscocca.kidbox.data.remote.ai.AIServiceException
-import it.vittorioscocca.kidbox.data.repository.KBAIRepository
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
 import it.vittorioscocca.kidbox.domain.model.ai.AIMessageRole
 import it.vittorioscocca.kidbox.domain.model.ai.AIServiceError
 import it.vittorioscocca.kidbox.notifications.ExactAlarmScheduler
+import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 import java.util.UUID
-object WeeklySummaryService {
+
+object DailyBriefingService {
     private const val PREFS_NAME = "kidbox_prefs"
-    private const val PREF_LAST_ISO_WEEK = "kb_weeklySummary_lastISOWeek"
-    private const val PREF_LAST_TEXT = "kb_weeklySummary_lastText"
-    private const val PREF_ENABLED = "kb_weeklySummaryEnabled"
-    private const val WORK_NAME = "kb_weekly_summary_generation"
-    private const val WORK_TAG = "kb_weekly_summary"
+    private const val PREF_LAST_ISO_DATE = "kb_dailyBriefing_lastISODate"
+    private const val PREF_LAST_TEXT = "kb_dailyBriefing_lastText"
+    private const val WORK_NAME = "kb_daily_briefing_generation"
+    private const val WORK_TAG = "kb_daily_briefing"
     private const val KEY_FAMILY_ID = "familyId"
     private const val KEY_FAMILY_NAME = "familyName"
 
-    fun scheduleWeeklyIfNeeded(context: Context, familyId: String) {
+    fun scheduleDailyIfNeeded(context: Context, familyId: String) {
         if (familyId.isBlank()) return
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        if (!prefs.getBoolean(PREF_ENABLED, true)) return
-        if (prefs.getString(PREF_LAST_ISO_WEEK, null) == currentISOWeek()) return
-        val familyName = prefs.getString("active_family_name", "la tua famiglia") ?: "la tua famiglia"
+        if (!prefs.getBoolean(DailyBriefingPrefs.WORKER_KEY_ENABLED, true)) return
+        if (prefs.getString(PREF_LAST_ISO_DATE, null) == todayIsoDate()) return
 
-        val request = OneTimeWorkRequestBuilder<WeeklySummaryWorker>()
+        val familyName = prefs.getString("active_family_name", "la tua famiglia") ?: "la tua famiglia"
+        val request = OneTimeWorkRequestBuilder<DailyBriefingWorker>()
             .setInputData(
                 Data.Builder()
                     .putString(KEY_FAMILY_ID, familyId)
@@ -71,47 +73,45 @@ object WeeklySummaryService {
         )
     }
 
-    fun currentISOWeek(): String {
-        val c = Calendar.getInstance(Locale.getDefault())
-        return "%04d-W%02d".format(Locale.getDefault(), currentISOYear(), c.get(Calendar.WEEK_OF_YEAR))
+    fun todayIsoDate(): String {
+        val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        return fmt.format(System.currentTimeMillis())
     }
 
-    fun currentISOYear(): Int = Calendar.getInstance(Locale.getDefault()).weekYear
-
-    fun scheduleMonday8amNotification(
+    fun scheduleDaily8amNotification(
         context: Context,
         familyId: String,
         familyName: String,
-        recap: String,
+        briefingText: String,
     ) {
         ensureChannel(context)
-        val triggerAt = nextMondayAt8am()
-        val intent = Intent(context, WeeklySummaryBroadcastReceiver::class.java).apply {
-            action = WeeklySummaryBroadcastReceiver.ACTION_WEEKLY_SUMMARY
+        val triggerAt = nextTodayOrTomorrowAt8am()
+        val intent = Intent(context, DailyBriefingBroadcastReceiver::class.java).apply {
+            action = DailyBriefingBroadcastReceiver.ACTION_DAILY_BRIEFING
             putExtra("familyId", familyId)
             putExtra("familyName", familyName)
-            putExtra("fullText", recap.take(500))
-            putExtra("type", "weekly_summary")
+            putExtra("fullText", briefingText.take(500))
+            putExtra("type", "daily_briefing")
         }
         val pendingIntent = PendingIntent.getBroadcast(
             context,
-            ("weekly:$familyId").hashCode(),
+            ("daily:$familyId").hashCode(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         ExactAlarmScheduler.scheduleRtcWakeupAllowWhileIdle(context, triggerAt, pendingIntent)
     }
 
-    private fun nextMondayAt8am(): Long {
+    private fun nextTodayOrTomorrowAt8am(): Long {
         val now = Calendar.getInstance()
         val target = Calendar.getInstance().apply {
-            set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
             set(Calendar.HOUR_OF_DAY, 8)
             set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
-            if (before(now)) add(Calendar.WEEK_OF_YEAR, 1)
-            if (timeInMillis <= System.currentTimeMillis()) add(Calendar.WEEK_OF_YEAR, 1)
+            if (before(now) || timeInMillis <= System.currentTimeMillis()) {
+                add(Calendar.DAY_OF_YEAR, 1)
+            }
         }
         return target.timeInMillis
     }
@@ -119,80 +119,75 @@ object WeeklySummaryService {
     private fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (manager.getNotificationChannel(WeeklySummaryBroadcastReceiver.CHANNEL_ID) != null) return
+        if (manager.getNotificationChannel(DailyBriefingBroadcastReceiver.CHANNEL_ID) != null) return
         manager.createNotificationChannel(
             NotificationChannel(
-                WeeklySummaryBroadcastReceiver.CHANNEL_ID,
-                "Sintesi settimanale",
+                DailyBriefingBroadcastReceiver.CHANNEL_ID,
+                "Briefing quotidiano",
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "Recap automatico settimanale della famiglia"
+                description = "Briefing mattutino AI della famiglia"
             },
         )
     }
 
     @HiltWorker
-    class WeeklySummaryWorker @AssistedInject constructor(
+    class DailyBriefingWorker @AssistedInject constructor(
         @Assisted appContext: Context,
         @Assisted params: WorkerParameters,
         private val aiService: AIService,
-        private val kbAIRepository: KBAIRepository,
-        private val weeklyDataMessageBuilder: WeeklySummaryDataMessageBuilder,
+        private val dailyDataMessageBuilder: DailyBriefingDataMessageBuilder,
+        private val aiSettings: AiSettings,
+        private val dailyBriefingPrefs: DailyBriefingPrefs,
     ) : CoroutineWorker(appContext, params) {
 
         override suspend fun doWork(): Result {
+            if (!dailyBriefingPrefs.isEnabledNow()) return Result.success()
+            if (!aiSettings.isEnabled.value) return Result.success()
+
             val familyId = inputData.getString(KEY_FAMILY_ID) ?: return Result.failure()
             val familyName = inputData.getString(KEY_FAMILY_NAME) ?: "la tua famiglia"
+            val today = todayIsoDate()
+            val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            if (prefs.getString(PREF_LAST_ISO_DATE, null) == today) return Result.success()
 
             val systemPrompt = """
                 Sei l'assistente AI di KidBox per la famiglia $familyName.
-                Genera una sintesi settimanale BREVE (max 5 punti bullet).
-                - Scrivi in italiano, tono caldo e pratico
-                - Max 5 punti, ognuno max 15 parole
-                - Niente intestazioni, markdown o emoji
-                - Evidenzia: scadenze importanti, cure, eventi, todo urgenti, spese significative
-                - Termina con UN solo suggerimento pratico
-                - Se non c'è niente di significativo: "Settimana tranquilla! Nessuna scadenza urgente."
+                Genera un briefing del mattino ULTRA-BREVE (max 4 bullet) focalizzato SOLO su oggi e domani.
+                REGOLE:
+                - Scrivi in italiano, tono pratico e diretto.
+                - Esattamente 3-4 punti bullet (•), ognuno su una riga.
+                - Ogni punto: max 12 parole.
+                - Zero intestazioni, zero markdown, zero intro.
+                - Includi solo: eventi oggi/domani con orario, dosi medicine oggi, todo in scadenza oggi, scadenze critiche nelle prossime 48h.
+                - Termina SEMPRE con una riga vuota e poi: "Cosa vuoi organizzare oggi?"
+                - Se non c'è nulla di rilevante: "Giornata libera da impegni. Buona giornata!"
             """.trimIndent()
 
-            val userMessage = weeklyDataMessageBuilder.buildWeeklyDataMessage(
-                familyId = familyId,
-                familyName = familyName,
-            )
+            val userMessage = dailyDataMessageBuilder.buildDailyDataMessage(familyId)
             val syntheticMessage = KBAIMessage(
                 id = UUID.randomUUID().toString(),
-                conversationId = "weekly-summary-$familyId",
+                conversationId = "daily-briefing-$familyId",
                 roleRaw = "user",
                 content = userMessage,
                 createdAtEpochMillis = System.currentTimeMillis(),
             )
+
             val result = aiService.sendMessage(
                 messages = listOf(syntheticMessage),
                 systemPrompt = systemPrompt,
                 familyId = familyId,
             )
+
             result.onSuccess { response ->
-                val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 prefs.edit()
-                    .putString(PREF_LAST_ISO_WEEK, currentISOWeek())
+                    .putString(PREF_LAST_ISO_DATE, today)
                     .putString(PREF_LAST_TEXT, response.reply)
                     .apply()
-                // Keep recap trace in AI conversation scope.
-                runCatching {
-                    val conversation = kbAIRepository.getOrCreateConversation(
-                        scopeId = "planning-agent-$familyId",
-                        familyId = familyId,
-                    )
-                    kbAIRepository.addMessage(
-                        conversationId = conversation.id,
-                        role = AIMessageRole.ASSISTANT,
-                        content = response.reply,
-                    )
-                }
-                scheduleMonday8amNotification(applicationContext, familyId, familyName, response.reply)
+                scheduleDaily8amNotification(applicationContext, familyId, familyName, response.reply)
             }
+
             if (result.isSuccess) return Result.success()
-            // Evita loop infiniti su errori client (es. App Check 403): ritenta solo rete / rate limit.
             val err = result.exceptionOrNull()
             val retry = err is AIServiceException &&
                 (err.serviceError == AIServiceError.NetworkError || err.serviceError == AIServiceError.RateLimitReached)
@@ -201,45 +196,45 @@ object WeeklySummaryService {
     }
 }
 
-class WeeklySummaryBroadcastReceiver : BroadcastReceiver() {
+class DailyBriefingBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val familyId = intent.getStringExtra("familyId").orEmpty()
         val familyName = intent.getStringExtra("familyName").orEmpty().ifBlank { "la tua famiglia" }
         val fullText = intent.getStringExtra("fullText").orEmpty()
-        val firstLine = fullText.lineSequence().firstOrNull()?.take(100).orEmpty()
+        val firstLine = fullText.lineSequence().firstOrNull { it.isNotBlank() }?.take(100).orEmpty()
 
         val openIntent = Intent(context, MainActivity::class.java).apply {
             action = "KB_OPEN_AI_CHAT"
             addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            putExtra("push_type", "weekly_summary")
+            putExtra("push_type", "daily_briefing")
             putExtra("push_family_id", familyId)
             putExtra("familyName", familyName)
             putExtra("fullText", fullText.take(500))
-            putExtra("type", "weekly_summary")
+            putExtra("type", "daily_briefing")
         }
         val pending = PendingIntent.getActivity(
             context,
-            ("weekly-open:$familyId").hashCode(),
+            ("daily-open:$familyId").hashCode(),
             openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_kidbox)
-            .setContentTitle("Settimana di $familyName")
-            .setContentText(firstLine.ifBlank { "Apri il recap settimanale" })
+            .setContentTitle("☀️ Buongiorno, $familyName")
+            .setContentText(firstLine.ifBlank { "Il tuo briefing del giorno è pronto." })
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pending)
             .build()
         runCatching {
-            NotificationManagerCompat.from(context).notify(("weekly:$familyId").hashCode(), notification)
+            NotificationManagerCompat.from(context).notify(("daily:$familyId").hashCode(), notification)
         }
 
-        WeeklySummaryService.scheduleMonday8amNotification(context, familyId, familyName, fullText)
+        DailyBriefingService.scheduleDaily8amNotification(context, familyId, familyName, fullText)
     }
 
     companion object {
-        const val CHANNEL_ID = "kb_weekly_summary"
-        const val ACTION_WEEKLY_SUMMARY = "it.vittorioscocca.kidbox.WEEKLY_SUMMARY"
+        const val CHANNEL_ID = "kb_daily_briefing"
+        const val ACTION_DAILY_BRIEFING = "it.vittorioscocca.kidbox.DAILY_BRIEFING"
     }
 }

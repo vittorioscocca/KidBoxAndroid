@@ -86,7 +86,10 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
-import it.vittorioscocca.kidbox.ui.screens.ai.common.ClaudeMarkdownText
+import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatListScrollEffect
+import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatStandardMessageRow
+import it.vittorioscocca.kidbox.ui.screens.ai.common.TypewriterClaudeMarkdownText
+import it.vittorioscocca.kidbox.ui.screens.ai.common.rememberStreamScrollTick
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -106,9 +109,16 @@ fun PlanningAIChatScreen(
     val scope = rememberCoroutineScope()
     val hiddenActions = remember { mutableStateListOf<String>() }
     val doneActions = remember { mutableStateMapOf<String, Boolean>() }
-    val reminderService = hiltViewModel<PlanningAIChatActionsViewModel>().reminderService
+    val actionsViewModel = hiltViewModel<PlanningAIChatActionsViewModel>()
+    val reminderService = actionsViewModel.reminderService
     var showMenu by remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.actionExecutionSummary) {
+        val summary = state.actionExecutionSummary ?: return@LaunchedEffect
+        snackHost.showSnackbar(summary)
+        viewModel.clearActionExecutionSummary()
+    }
 
     val contextInput = remember {
         PlanningContextInput(
@@ -139,9 +149,15 @@ fun PlanningAIChatScreen(
     }
 
     LaunchedEffect(Unit) { viewModel.loadOrCreateConversation(contextInput) }
-    LaunchedEffect(state.messages.size) {
-        if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.lastIndex)
-    }
+    val (streamScrollTick, onStreamScrollTick) = rememberStreamScrollTick()
+    AIChatListScrollEffect(
+        listState = listState,
+        messageCount = state.messages.size,
+        isLoading = state.isLoading,
+        streamingMessageId = state.streamingMessageId,
+        streamScrollTick = streamScrollTick,
+        reverseLayout = false,
+    )
 
     Scaffold(
         topBar = {
@@ -280,9 +296,16 @@ fun PlanningAIChatScreen(
                         modifier = Modifier.fillMaxSize().padding(horizontal = 0.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        items(state.messages) { msg ->
-                            AIChatBubbleView(msg)
-                            if (msg.isAssistant) {
+                        items(state.messages, key = { it.id }) { msg ->
+                            AIChatBubbleView(
+                                message = msg,
+                                streamingMessageId = state.streamingMessageId,
+                                onStreamScrollTick = onStreamScrollTick,
+                                onStreamingComplete = viewModel::finishStreaming,
+                            )
+                            if (msg.isAssistant && state.streamingMessageId != msg.id &&
+                                msg.id !in state.autoExecutedMessageIds
+                            ) {
                                 val actions = PlanningActionParser.parse(
                                     text = msg.content,
                                     openTodos = state.parserOpenTodos,
@@ -298,16 +321,13 @@ fun PlanningAIChatScreen(
                                                 when (it.kind) {
                                                     PlanningActionKind.SET_REMINDER -> {
                                                         val result = reminderService.schedule(it.reminderContext)
-                                                        snackHost.showSnackbar(result.toString())
+                                                        snackHost.showSnackbar(result)
                                                     }
-                                                    PlanningActionKind.CREATE_EVENT -> {
-                                                        onNavigateToCalendar()
-                                                        snackHost.showSnackbar("Apri calendario per creare: ${it.prefilledEventTitle ?: it.subtitle}")
-                                                    }
-                                                    PlanningActionKind.CREATE_TODO -> {
-                                                        onNavigateToTodo()
-                                                        snackHost.showSnackbar("Apri to-do per aggiungere: ${it.prefilledTodoTitle ?: it.subtitle}")
-                                                    }
+                                                    PlanningActionKind.CREATE_EVENT,
+                                                    PlanningActionKind.CREATE_TODO,
+                                                    PlanningActionKind.CREATE_GROCERY,
+                                                    PlanningActionKind.CREATE_NOTE,
+                                                    -> viewModel.executeCardAction(it)
                                                     PlanningActionKind.NAVIGATE -> when (it.navigationTarget) {
                                                         PlanningNavigationTarget.CALENDAR -> onNavigateToCalendar()
                                                         PlanningNavigationTarget.TODO -> onNavigateToTodo()
@@ -384,9 +404,15 @@ fun PlanningAIChatScreen(
 }
 
 @Composable
-fun AIChatBubbleView(message: KBAIMessage) {
+fun AIChatBubbleView(
+    message: KBAIMessage,
+    streamingMessageId: String? = null,
+    onStreamScrollTick: () -> Unit = {},
+    onStreamingComplete: (String) -> Unit = {},
+) {
     val isUser = message.isUser
     val maxUserWidth = LocalConfiguration.current.screenWidthDp.dp * 0.75f
+    val isStreaming = streamingMessageId == message.id && message.isAssistant
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -411,9 +437,12 @@ fun AIChatBubbleView(message: KBAIMessage) {
                     )
                 }
             } else {
-                ClaudeMarkdownText(
-                    message.content,
+                TypewriterClaudeMarkdownText(
+                    text = message.content,
+                    streamReveal = isStreaming,
                     modifier = Modifier.fillMaxWidth(),
+                    onRevealTick = onStreamScrollTick,
+                    onRevealComplete = { onStreamingComplete(message.id) },
                 )
             }
             Text(
@@ -472,6 +501,8 @@ fun PlanningActionCard(
             val icon = when (action.kind) {
                 PlanningActionKind.CREATE_EVENT -> Icons.Default.CalendarMonth
                 PlanningActionKind.CREATE_TODO -> Icons.Default.TaskAlt
+                PlanningActionKind.CREATE_GROCERY -> Icons.Default.CheckCircle
+                PlanningActionKind.CREATE_NOTE -> Icons.Default.CheckCircle
                 PlanningActionKind.SET_REMINDER -> Icons.Default.Notifications
                 PlanningActionKind.NAVIGATE -> Icons.Default.ArrowForward
             }
@@ -490,6 +521,8 @@ fun PlanningActionCard(
                     if (done) "Fatto ✓" else when (action.kind) {
                         PlanningActionKind.CREATE_EVENT -> "Crea"
                         PlanningActionKind.CREATE_TODO -> "Aggiungi"
+                        PlanningActionKind.CREATE_GROCERY -> "Aggiungi"
+                        PlanningActionKind.CREATE_NOTE -> "Salva"
                         PlanningActionKind.SET_REMINDER -> "Attiva"
                         PlanningActionKind.NAVIGATE -> "Vai"
                     },

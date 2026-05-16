@@ -84,10 +84,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatStreamingDelivery
 import kotlinx.coroutines.launch
 
 data class PlanningChatUiState(
     val messages: List<KBAIMessage> = emptyList(),
+    val streamingMessageId: String? = null,
     val isLoading: Boolean = false,
     val isLoadingContext: Boolean = false,
     val errorMessage: String? = null,
@@ -106,6 +108,8 @@ data class PlanningChatUiState(
     val parserVisits: List<KBMedicalVisit> = emptyList(),
     val parserTreatments: List<KBTreatment> = emptyList(),
     val parserFamilyId: String = "",
+    val actionExecutionSummary: String? = null,
+    val autoExecutedMessageIds: Set<String> = emptySet(),
 ) {
     val canSend: Boolean get() = inputText.isNotBlank() && !isLoading && !isLoadingContext
     val isNearLimit: Boolean get() = dailyLimit > 0 && usageToday >= (dailyLimit * 0.8).toInt()
@@ -114,6 +118,7 @@ data class PlanningChatUiState(
 @HiltViewModel
 class PlanningAIChatViewModel @Inject constructor(
     private val kbAIRepository: KBAIRepository,
+    private val actionPipeline: KidBoxAIActionPipeline,
     private val aiService: AIService,
     private val subscriptionRepository: SubscriptionRepository,
     private val familyDao: KBFamilyDao,
@@ -142,6 +147,7 @@ class PlanningAIChatViewModel @Inject constructor(
     private val vehicleDao: VehicleDao,
     private val vehicleEventDao: VehicleEventDao,
     private val healthAttachmentService: HealthAttachmentService,
+    private val familyMemoryService: FamilyMemoryService,
     private val auth: FirebaseAuth,
     @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle,
@@ -193,8 +199,9 @@ class PlanningAIChatViewModel @Inject constructor(
                 val enrichedInput = buildContextInput(input)
                 lastInput = enrichedInput
                 conversation = kbAIRepository.getOrCreateConversation(scopeId, effectiveFamilyId)
+                val memoryFacts = familyMemoryService.fetchFactTexts(effectiveFamilyId)
                 systemPrompt = PlanningContextBuilder.build(
-                    enrichedInput,
+                    enrichedInput.copy(familyMemoryFacts = memoryFacts),
                 )
                 observeJob?.cancel()
                 observeJob = viewModelScope.launch {
@@ -202,12 +209,14 @@ class PlanningAIChatViewModel @Inject constructor(
                         _uiState.update { it.copy(messages = msgs) }
                     }
                 }
-                val pendingWeeklyRecap = WeeklySummaryDraftStore.consume(context)
-                if (!pendingWeeklyRecap.isNullOrBlank()) {
+                val pendingRecap = HealthPatternDraftStore.consume(context)
+                    ?: WeeklySummaryDraftStore.consume(context)
+                    ?: DailyBriefingDraftStore.consume(context)
+                if (!pendingRecap.isNullOrBlank()) {
                     kbAIRepository.addMessage(
                         conversationId = conversation!!.id,
                         role = AIMessageRole.ASSISTANT,
-                        content = pendingWeeklyRecap,
+                        content = pendingRecap,
                     )
                 }
                 _uiState.update {
@@ -255,17 +264,88 @@ class PlanningAIChatViewModel @Inject constructor(
                 val enrichedInput = buildContextInput(input)
                 lastInput = enrichedInput
                 kbAIRepository.addMessage(conv.id, AIMessageRole.USER, text)
-                systemPrompt = PlanningContextBuilder.build(enrichedInput)
+                val memoryFacts = familyMemoryService.fetchFactTexts(effectiveFamilyId)
+                systemPrompt = PlanningContextBuilder.build(
+                    enrichedInput.copy(familyMemoryFacts = memoryFacts),
+                )
                 val payload = buildApiMessages(conversation = conv, latestUserText = text)
                 val reply = aiService.sendMessage(payload, systemPrompt, effectiveFamilyId).getOrThrow()
-                kbAIRepository.addMessage(conv.id, AIMessageRole.ASSISTANT, reply.reply)
+                val outcome = actionPipeline.processReply(
+                    reply = reply.reply,
+                    familyId = effectiveFamilyId,
+                    defaultChildId = childDao.getChildrenByFamilyId(effectiveFamilyId).firstOrNull()?.id,
+                )
+                val assistantMsg = kbAIRepository.addMessage(conv.id, AIMessageRole.ASSISTANT, outcome.displayText)
+                val executionSummary = outcome.executionSummary
+                val autoExecutedIds = if (outcome.didAutoExecute) {
+                    _uiState.value.autoExecutedMessageIds + assistantMsg.id
+                } else {
+                    _uiState.value.autoExecutedMessageIds
+                }
                 messagesInSession = reply.usageToday
                 dailyLimit = reply.dailyLimit
                 maybeCompactIfNeeded(conv.id, reply.usageToday, reply.dailyLimit)
-                _uiState.update { it.copy(isLoading = false, usageToday = reply.usageToday, dailyLimit = reply.dailyLimit) }
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        streamingMessageId = AIChatStreamingDelivery.beginAssistantReveal(assistantMsg.id),
+                        usageToday = reply.usageToday,
+                        dailyLimit = reply.dailyLimit,
+                        actionExecutionSummary = executionSummary,
+                        autoExecutedMessageIds = autoExecutedIds,
+                        pendingGroceryCount = groceryItemDao.observeByFamilyId(effectiveFamilyId).first()
+                            .count { !it.isPurchased && !it.isDeleted },
+                    )
+                }
             }.onFailure { err ->
                 _uiState.update { it.copy(isLoading = false, errorMessage = localizeError(err)) }
             }
+        }
+    }
+
+    fun executeCardAction(action: PlanningAction) {
+        viewModelScope.launch {
+            val pending = groceryItemDao.observeByFamilyId(effectiveFamilyId).first()
+                .filter { !it.isPurchased && !it.isDeleted }
+                .map { it.name.lowercase() }
+                .toSet()
+            val dto = when (action.kind) {
+                PlanningActionKind.CREATE_GROCERY -> PlanningExecutableActionDto(
+                    type = "grocery_add",
+                    items = action.groceryItems,
+                )
+                PlanningActionKind.CREATE_TODO -> PlanningExecutableActionDto(
+                    type = "todo_add",
+                    title = action.prefilledTodoTitle ?: action.title,
+                )
+                PlanningActionKind.CREATE_NOTE -> PlanningExecutableActionDto(
+                    type = "note_add",
+                    title = action.title,
+                    body = action.noteBody ?: action.title,
+                )
+                PlanningActionKind.CREATE_EVENT -> PlanningExecutableActionDto(
+                    type = "event_add",
+                    title = action.prefilledEventTitle ?: action.title,
+                    startAt = java.time.Instant.ofEpochMilli(System.currentTimeMillis() + 86_400_000L).toString(),
+                )
+                else -> return@launch
+            }
+            val summary = actionPipeline.executeActions(
+                familyId = effectiveFamilyId,
+                actions = listOf(dto),
+                defaultChildId = childDao.getChildrenByFamilyId(effectiveFamilyId).firstOrNull()?.id,
+            )
+            _uiState.update { it.copy(actionExecutionSummary = summary) }
+        }
+    }
+
+    fun clearActionExecutionSummary() = _uiState.update { it.copy(actionExecutionSummary = null) }
+
+    fun finishStreaming(messageId: String) {
+        _uiState.update {
+            it.copy(
+                streamingMessageId = AIChatStreamingDelivery.finishReveal(messageId, it.streamingMessageId),
+            )
         }
     }
 
@@ -289,7 +369,14 @@ class PlanningAIChatViewModel @Inject constructor(
             kbAIRepository.clearConversation(conv.id)
             val refreshed = kbAIRepository.getOrCreateConversation(scopeId, effectiveFamilyId)
             conversation = refreshed
-            _uiState.update { it.copy(messages = emptyList(), errorMessage = null) }
+            _uiState.update {
+                it.copy(
+                    messages = emptyList(),
+                    errorMessage = null,
+                    streamingMessageId = null,
+                    autoExecutedMessageIds = emptySet(),
+                )
+            }
         }
     }
 
@@ -308,10 +395,18 @@ class PlanningAIChatViewModel @Inject constructor(
         val conv = conversation ?: return
         val all = kbAIRepository.observeMessages(conversationId).first().sortedBy { it.createdAtEpochMillis }
         if (all.isEmpty()) return
+        val messagesForMemory = all
         val summary = aiService.sendMessage(all, SUMMARY_SYSTEM_PROMPT, effectiveFamilyId).getOrThrow().reply
         kbAIRepository.clearAndSeedSummary(conversationId, summary)
         conversation = conv.copy(summary = summary, summarizedMessageCount = 0)
         lastCompactionStep = currentStep
+        viewModelScope.launch {
+            familyMemoryService.extractAndStore(
+                familyId = effectiveFamilyId,
+                conversationId = conversationId,
+                transcriptMessages = messagesForMemory,
+            )
+        }
     }
 
     private fun shouldCompact(): Boolean {

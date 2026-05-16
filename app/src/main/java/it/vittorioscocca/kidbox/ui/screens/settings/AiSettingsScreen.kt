@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -47,6 +48,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,15 +57,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ai.AIConsentBottomSheet
+import it.vittorioscocca.kidbox.notifications.ExactAlarmScheduler
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
@@ -194,6 +203,20 @@ fun AiSettingsScreen(
             WeeklySummaryCard(
                 isEnabled = state.isWeeklySummaryEnabled,
                 onToggle = { viewModel.toggleWeeklySummary(it) },
+            )
+
+            DailyBriefingCard(
+                isEnabled = state.isDailyBriefingEnabled,
+                onToggle = { viewModel.toggleDailyBriefing(it) },
+            )
+
+            HealthPatternCard(
+                isEnabled = state.isHealthPatternEnabled,
+                onToggle = viewModel::toggleHealthPattern,
+            )
+
+            ExactAlarmPermissionBanner(
+                visible = state.isDailyBriefingEnabled || state.isWeeklySummaryEnabled,
             )
 
             Spacer(Modifier.height(32.dp))
@@ -475,6 +498,108 @@ private fun WeeklySummaryCard(isEnabled: Boolean, onToggle: (Boolean) -> Unit) {
                 Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
                     Text("Riepilogo settimanale AI", fontSize = 15.sp, color = kb.title, fontWeight = FontWeight.Medium)
                     Text("Ricevi un riassunto AI ogni settimana", fontSize = 12.sp, color = kb.subtitle)
+                }
+                Switch(checked = isEnabled, onCheckedChange = onToggle)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExactAlarmPermissionBanner(visible: Boolean) {
+    val context = LocalContext.current
+    var needsPermission by remember {
+        mutableStateOf(!ExactAlarmScheduler.canScheduleExactAlarms(context))
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                needsPermission = !ExactAlarmScheduler.canScheduleExactAlarms(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    if (!visible || !needsPermission) return
+
+    val kb = MaterialTheme.kidBoxColors
+    SettingCard {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        ) {
+            Text(
+                stringResource(R.string.ai_exact_alarm_banner_title),
+                fontSize = 15.sp,
+                color = kb.title,
+                fontWeight = FontWeight.Medium,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                stringResource(R.string.ai_exact_alarm_banner_body),
+                fontSize = 12.sp,
+                color = kb.subtitle,
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                stringResource(R.string.ai_exact_alarm_banner_action),
+                fontSize = 14.sp,
+                color = Color(0xFF2563EB),
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickable {
+                    ExactAlarmScheduler.requestExactAlarmSettingsIntent(context)?.let { intent ->
+                        runCatching { context.startActivity(intent) }
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun DailyBriefingCard(isEnabled: Boolean, onToggle: (Boolean) -> Unit) {
+    val kb = MaterialTheme.kidBoxColors
+    SettingCard {
+        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.WbSunny, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(20.dp))
+                Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text("Briefing quotidiano AI", fontSize = 15.sp, color = kb.title, fontWeight = FontWeight.Medium)
+                    Text("Notifica ogni mattina alle 8:00 con gli impegni del giorno", fontSize = 12.sp, color = kb.subtitle)
+                }
+                Switch(checked = isEnabled, onCheckedChange = onToggle)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HealthPatternCard(isEnabled: Boolean, onToggle: (Boolean) -> Unit) {
+    val kb = MaterialTheme.kidBoxColors
+    SettingCard {
+        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Filled.BarChart,
+                    contentDescription = null,
+                    tint = Color(0xFF10B981),
+                    modifier = Modifier.size(20.dp),
+                )
+                Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text("Pattern salute AI", fontSize = 15.sp, color = kb.title, fontWeight = FontWeight.Medium)
+                    Text("Analisi mensile della storia sanitaria dei figli", fontSize = 12.sp, color = kb.subtitle)
                 }
                 Switch(checked = isEnabled, onCheckedChange = onToggle)
             }

@@ -104,6 +104,18 @@
             android:name=".ui.screens.ai.planning.WeeklySummaryBroadcastReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".ui.screens.ai.planning.DailyBriefingBroadcastReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".ui.screens.ai.planning.HealthPatternBroadcastReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="it.vittorioscocca.kidbox.HEALTH_PATTERN" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

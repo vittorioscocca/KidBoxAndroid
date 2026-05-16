@@ -15,6 +15,9 @@ import it.vittorioscocca.kidbox.data.local.dao.VehicleDao
 import it.vittorioscocca.kidbox.data.remote.AppCheckTokenCache
 import it.vittorioscocca.kidbox.notifications.HousePaymentReminderScheduler
 import it.vittorioscocca.kidbox.notifications.VehicleDeadlineReminderScheduler
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.DailyBriefingService
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.FamilyMemoryService
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.HealthPatternAnalyzerService
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.WeeklySummaryService
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -46,6 +49,9 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
     @Inject
     lateinit var housePaymentReminderScheduler: HousePaymentReminderScheduler
 
+    @Inject
+    lateinit var familyMemoryService: FamilyMemoryService
+
     override fun onCreate() {
         super.onCreate()
         AppCheckInstaller.install()
@@ -59,6 +65,11 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
             .getString("active_family_id", null)
         if (!familyId.isNullOrBlank()) {
             WeeklySummaryService.scheduleWeeklyIfNeeded(this, familyId)
+            DailyBriefingService.scheduleDailyIfNeeded(this, familyId)
+            HealthPatternAnalyzerService.scheduleMonthlyIfNeeded(this, familyId)
+            appInitScope.launch(Dispatchers.IO) {
+                runCatching { familyMemoryService.loadFromFirestore(familyId) }
+            }
             appInitScope.launch(Dispatchers.IO) {
                 runCatching {
                     vehicleDao.listActiveByFamily(familyId).forEach { entity ->

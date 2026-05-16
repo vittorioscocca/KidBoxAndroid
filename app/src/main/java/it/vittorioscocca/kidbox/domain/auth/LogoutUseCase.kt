@@ -4,6 +4,7 @@ import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.FamilyMemoryService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -14,6 +15,7 @@ class LogoutUseCase @Inject constructor(
     private val database: KidBoxDatabase,
     private val familySessionPreferences: FamilySessionPreferences,
     private val onboardingPreferences: OnboardingPreferences,
+    private val familyMemoryService: FamilyMemoryService,
 ) {
     /**
      * Logout standard (allineato iOS): sign-out + wipe locale,
@@ -26,6 +28,7 @@ class LogoutUseCase @Inject constructor(
             database.clearAllTables()
         }
         familySessionPreferences.clearActiveFamilyId()
+        familyMemoryService.clearFirestoreLoadCache()
     }
 
     /**

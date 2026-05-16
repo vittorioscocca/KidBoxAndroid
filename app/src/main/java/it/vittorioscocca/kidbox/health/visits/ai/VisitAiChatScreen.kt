@@ -69,7 +69,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import it.vittorioscocca.kidbox.ui.screens.ai.common.ClaudeMarkdownText
+import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatListScrollEffect
+import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatStandardMessageRow
+import it.vittorioscocca.kidbox.ui.screens.ai.common.rememberStreamScrollTick
+import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.imePadding
@@ -94,12 +97,28 @@ fun VisitAiChatScreen(
     viewModel: VisitAiChatViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val kb = MaterialTheme.kidBoxColors
     val snackbarHostState = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val (streamScrollTick, onStreamScrollTick) = rememberStreamScrollTick()
+    AIChatListScrollEffect(
+        listState = listState,
+        messageCount = uiState.messages.size,
+        isLoading = uiState.isLoading,
+        streamingMessageId = uiState.streamingMessageId,
+        streamScrollTick = streamScrollTick,
+        reverseLayout = false,
+    )
     var input by remember { mutableStateOf("") }
     var showClearDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.actionExecutionSummary) {
+        val summary = uiState.actionExecutionSummary ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(summary)
+        viewModel.clearActionExecutionSummary()
+    }
 
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let {
@@ -245,55 +264,18 @@ fun VisitAiChatScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(uiState.messages, key = { it.id }) { msg ->
-                        val isUser = msg.role == "user"
-                        val maxUserWidth = LocalConfiguration.current.screenWidthDp.dp * 0.75f
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
-                        ) {
-                            if (isUser) {
-                                Box(
-                                    modifier = Modifier
-                                        .widthIn(max = maxUserWidth)
-                                        .clip(
-                                            RoundedCornerShape(
-                                                topStart = 14.dp,
-                                                topEnd = 14.dp,
-                                                bottomStart = 14.dp,
-                                                bottomEnd = 4.dp,
-                                            ),
-                                        )
-                                        .background(MaterialTheme.colorScheme.primaryContainer)
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                                ) {
-                                    Text(
-                                        text = msg.content,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    )
-                                }
-                                Text(
-                                    text = VISIT_TIME.format(Date(msg.createdAt)),
-                                    fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 2.dp, start = 4.dp),
-                                )
-                            } else {
-                                Column(modifier = Modifier.fillMaxWidth()) {
-                                    ClaudeMarkdownText(
-                                        text = msg.content,
-                                        modifier = Modifier.fillMaxWidth(),
-                                    )
-                                    Text(
-                                        text = VISIT_TIME.format(Date(msg.createdAt)),
-                                        fontSize = 10.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(top = 2.dp),
-                                    )
-                                }
-                            }
-                        }
+                        AIChatStandardMessageRow(
+                            messageId = msg.id,
+                            content = msg.content,
+                            isUser = msg.role == "user",
+                            createdAtEpochMillis = msg.createdAt,
+                            kb = kb,
+                            userBubbleColor = MaterialTheme.colorScheme.primaryContainer,
+                            userTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            isStreaming = uiState.streamingMessageId == msg.id && msg.role != "user",
+                            onStreamScrollTick = onStreamScrollTick,
+                            onStreamingComplete = { viewModel.finishStreaming(msg.id) },
+                        )
                     }
                     if (uiState.isLoading) {
                         item(key = "typing_indicator") {

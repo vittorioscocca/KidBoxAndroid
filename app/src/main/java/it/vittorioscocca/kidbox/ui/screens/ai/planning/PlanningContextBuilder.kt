@@ -61,6 +61,8 @@ data class PlanningContextInput(
     val vehicleEvents: List<VehicleEventEntity> = emptyList(),
     /** Documenti Casa / Garage / eventi animali con OCR completato (testo pronto per l'AI). */
     val lifeAreaDocuments: List<KBDocument> = emptyList(),
+    /** Fatti narrativi appresi dalle conversazioni precedenti. */
+    val familyMemoryFacts: List<String> = emptyList(),
 )
 
 object PlanningContextBuilder {
@@ -73,6 +75,18 @@ object PlanningContextBuilder {
             appendLine("Membri: ${input.memberNames.joinToString(", ")}.")
             appendLine("Oggi è ${formatDate(now)}.")
             appendLine("Orizzonte temporale: da oggi a ${formatDate(horizonEnd)}.")
+            if (input.familyMemoryFacts.isNotEmpty()) {
+                appendLine()
+                appendLine("## Memoria famiglia (fatti appresi dalle conversazioni precedenti)")
+                input.familyMemoryFacts.forEach { fact ->
+                    appendLine("• $fact")
+                }
+                appendLine()
+                appendLine(
+                    "Usa questi fatti per personalizzare le risposte senza menzionare esplicitamente " +
+                        "che li hai memorizzati, a meno che non sia rilevante.",
+                )
+            }
             appendLine()
             appendLine("Regole:")
             appendLine("- Aiuta i genitori a pianificare, trovare slot liberi e gestire le attività familiari")
@@ -84,6 +98,8 @@ object PlanningContextBuilder {
             appendLine("  o 'Posso aggiungere al calendario \"[titolo evento]\"?'")
             appendLine("  o 'Posso aggiungere il to-do \"[titolo]\"?'")
             appendLine("- Proponi UNA sola azione alla volta")
+            appendLine()
+            appendLine(PlanningAIActionBlock.promptSection)
             appendLine()
             appendLine("## Oggi ${formatDateShort(now)}")
             appendLine("Slot ore: ${input.calendarEvents.filter { sameDay(it.startDateEpochMillis, now) }.joinToString(", ") { "${formatTime(it.startDateEpochMillis)}-${formatTime(it.endDateEpochMillis)}" }}")

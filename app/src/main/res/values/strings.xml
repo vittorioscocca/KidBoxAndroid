@@ -8,4 +8,7 @@
     <string name="facebook_client_token" translatable="false">5b9865a1b3cafd6f89a71162d5c4094f</string>
     <!-- Maps key is injected from local.properties (MAPS_API_KEY). -->
     <string name="google_maps_key" translatable="false"></string>
+    <string name="ai_exact_alarm_banner_title">Notifiche puntuali alle 8:00</string>
+    <string name="ai_exact_alarm_banner_body">Per ricevere briefing e riepilogo esattamente alle 8:00, consenti gli allarmi e promemoria per KidBox nelle impostazioni di sistema.</string>
+    <string name="ai_exact_alarm_banner_action">Apri impostazioni</string>
 </resources>

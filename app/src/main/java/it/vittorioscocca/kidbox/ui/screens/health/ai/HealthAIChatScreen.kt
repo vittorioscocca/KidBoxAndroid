@@ -78,7 +78,9 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
-import it.vittorioscocca.kidbox.ui.screens.ai.common.ClaudeMarkdownText
+import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatListScrollEffect
+import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatStandardMessageRow
+import it.vittorioscocca.kidbox.ui.screens.ai.common.rememberStreamScrollTick
 import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.SimpleDateFormat
@@ -116,8 +118,20 @@ fun HealthAIChatScreen(
 
     LaunchedEffect(familyId, childId) { viewModel.bind(familyId, childId) }
 
-    LaunchedEffect(state.messages.size) {
-        if (state.messages.isNotEmpty()) listState.animateScrollToItem(0)
+    val (streamScrollTick, onStreamScrollTick) = rememberStreamScrollTick()
+    AIChatListScrollEffect(
+        listState = listState,
+        messageCount = state.messages.size,
+        isLoading = state.isLoading,
+        streamingMessageId = state.streamingMessageId,
+        streamScrollTick = streamScrollTick,
+        reverseLayout = true,
+    )
+
+    LaunchedEffect(state.actionExecutionSummary) {
+        val summary = state.actionExecutionSummary ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(summary)
+        viewModel.clearActionExecutionSummary()
     }
 
     LaunchedEffect(state.errorMessage) {
@@ -274,8 +288,18 @@ fun HealthAIChatScreen(
                             if (state.isLoading) {
                                 item { TypingIndicatorBubble(kb = kb) }
                             }
-                            itemsIndexed(state.messages.reversed()) { _, message ->
-                                MessageBubble(message = message, kb = kb)
+                            itemsIndexed(
+                                state.messages.reversed(),
+                                key = { _, message -> message.id },
+                            ) { _, message ->
+                                AIChatStandardMessageRow(
+                                    message = message,
+                                    kb = kb,
+                                    userBubbleColor = ORANGE.copy(alpha = 0.12f),
+                                    streamingMessageId = state.streamingMessageId,
+                                    onStreamScrollTick = onStreamScrollTick,
+                                    onStreamingComplete = viewModel::finishStreaming,
+                                )
                             }
                         }
                         val showScrollToBottom = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
@@ -387,57 +411,6 @@ fun HealthAIChatScreen(
                 TextButton(onClick = { showClearDialog = false }) { Text("Annulla") }
             },
         )
-    }
-}
-
-@Composable
-private fun MessageBubble(message: KBAIMessage, kb: it.vittorioscocca.kidbox.ui.theme.KidBoxColorScheme) {
-    val isUser = message.isUser
-    val alignment = if (isUser) Alignment.End else Alignment.Start
-    val maxUserWidth = LocalConfiguration.current.screenWidthDp.dp * 0.75f
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        horizontalAlignment = alignment,
-    ) {
-        if (isUser) {
-            Box(
-                modifier = Modifier
-                    .widthIn(max = maxUserWidth)
-                    .clip(
-                        RoundedCornerShape(
-                            topStart = 16.dp,
-                            topEnd = 16.dp,
-                            bottomStart = 16.dp,
-                            bottomEnd = 4.dp,
-                        ),
-                    )
-                    .background(ORANGE.copy(alpha = 0.12f))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-            ) {
-                Text(message.content, fontSize = 14.sp, color = kb.title)
-            }
-            Spacer(Modifier.height(2.dp))
-            Text(
-                DATE_SHORT.format(Date(message.createdAtEpochMillis)),
-                fontSize = 10.sp,
-                color = kb.subtitle,
-            )
-        } else {
-            ClaudeMarkdownText(
-                text = message.content,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                DATE_SHORT.format(Date(message.createdAtEpochMillis)),
-                fontSize = 10.sp,
-                color = kb.subtitle,
-                modifier = Modifier.padding(start = 0.dp),
-            )
-        }
     }
 }
 

@@ -4,6 +4,8 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import it.vittorioscocca.kidbox.data.local.dao.KBAIConversationDao
 import it.vittorioscocca.kidbox.data.local.dao.KBAIMessageDao
+import it.vittorioscocca.kidbox.data.local.dao.KBHealthInsightDao
+import it.vittorioscocca.kidbox.data.local.dao.KBMemoryFactDao
 import it.vittorioscocca.kidbox.data.local.dao.KBCalendarEventDao
 import it.vittorioscocca.kidbox.data.local.dao.KBChatMessageDao
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
@@ -44,6 +46,8 @@ import it.vittorioscocca.kidbox.data.local.dao.PwnedPrefixCacheDao
 import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
 import it.vittorioscocca.kidbox.data.local.entity.KBAIConversationEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBAIMessageEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBHealthInsightEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBMemoryFactEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBCalendarEventEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBChatMessageEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBChildEntity
@@ -84,7 +88,7 @@ import it.vittorioscocca.kidbox.data.local.entity.PasswordGroupEntity
 import it.vittorioscocca.kidbox.data.local.entity.PwnedPrefixCacheEntity
 
 @Database(
-    version = 26,
+    version = 28,
     exportSchema = false,
     entities = [
         KBUserProfileEntity::class,
@@ -127,6 +131,8 @@ import it.vittorioscocca.kidbox.data.local.entity.PwnedPrefixCacheEntity
         PasswordEntryEntity::class,
         PasswordGroupEntity::class,
         PwnedPrefixCacheEntity::class,
+        KBMemoryFactEntity::class,
+        KBHealthInsightEntity::class,
     ],
 )
 abstract class KidBoxDatabase : RoomDatabase() {
@@ -170,4 +176,6 @@ abstract class KidBoxDatabase : RoomDatabase() {
     abstract fun passwordEntryDao(): PasswordEntryDao
     abstract fun passwordGroupDao(): PasswordGroupDao
     abstract fun pwnedPrefixCacheDao(): PwnedPrefixCacheDao
+    abstract fun memoryFactDao(): KBMemoryFactDao
+    abstract fun healthInsightDao(): KBHealthInsightDao
 }

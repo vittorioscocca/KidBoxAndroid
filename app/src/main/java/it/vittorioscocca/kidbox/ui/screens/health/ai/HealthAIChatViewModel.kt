@@ -26,9 +26,13 @@ import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
 import it.vittorioscocca.kidbox.domain.model.KBTextExtractionStatus
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import it.vittorioscocca.kidbox.domain.model.KBVaccine
+import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatStreamingDelivery
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.FamilyMemoryPromptSection
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.FamilyMemoryService
 import javax.inject.Inject
 import org.json.JSONArray
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
@@ -39,6 +43,7 @@ import kotlinx.coroutines.launch
 data class HealthAIChatState(
     val isLoadingContext: Boolean = true,
     val isLoading: Boolean = false,
+    val streamingMessageId: String? = null,
     val messages: List<KBAIMessage> = emptyList(),
     val inputText: String = "",
     val errorMessage: String? = null,
@@ -49,6 +54,8 @@ data class HealthAIChatState(
     val vaccinesCount: Int = 0,
     val visitsCount: Int = 0,
     val examsCount: Int = 0,
+    val actionExecutionSummary: String? = null,
+    val autoExecutedMessageIds: Set<String> = emptySet(),
 ) {
     val canSend: Boolean get() = !isLoading && !isLoadingContext && inputText.isNotBlank()
     val isNearLimit: Boolean get() = dailyLimit > 0 && usageToday >= (dailyLimit * 0.8).toInt()
@@ -66,6 +73,7 @@ class HealthAIChatViewModel @Inject constructor(
     private val childDao: KBChildDao,
     private val memberDao: KBFamilyMemberDao,
     private val healthAttachmentService: HealthAttachmentService,
+    private val familyMemoryService: FamilyMemoryService,
 ) : ViewModel() {
     private val COMPACTION_THRESHOLD = 0.60
     private var lastCompactionStep: Int = 0
@@ -184,10 +192,11 @@ class HealthAIChatViewModel @Inject constructor(
                 documentsByTreatmentId = docsByTreatmentId,
             )
             val idAppendix = buildIdAppendixFromNavArgs()
-            systemPrompt = when {
+            val basePrompt = when {
                 idAppendix.isNotBlank() -> "$aggregateIntro\n\n$idAppendix\n\n$contextBody"
                 else -> "$aggregateIntro\n\n$contextBody"
             }
+            systemPrompt = FamilyMemoryPromptSection.append(basePrompt, familyMemoryService, familyId)
 
             if (!initialized) {
                 initialized = true
@@ -217,16 +226,27 @@ class HealthAIChatViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(inputText = "", isLoading = true, errorMessage = null)
 
         viewModelScope.launch {
-            chatRepository.sendMessage(conv, text, systemPrompt)
-                .onSuccess { (_, reply) ->
-                    messagesInSession = reply.usageToday
-                    dailyLimit = reply.dailyLimit
+            val promptWithMemory = FamilyMemoryPromptSection.append(systemPrompt, familyMemoryService, familyId)
+            chatRepository.sendMessage(conv, text, promptWithMemory)
+                .onSuccess { result ->
+                    messagesInSession = result.reply.usageToday
+                    dailyLimit = result.reply.dailyLimit
                     maybeCompactIfNeeded(conv)
                     conversation = chatRepository.getOrCreateConversation(familyId, childId, conv.scopeId)
+                    val autoIds = if (result.didAutoExecute) {
+                        _uiState.value.autoExecutedMessageIds + result.assistantMessage.id
+                    } else {
+                        _uiState.value.autoExecutedMessageIds
+                    }
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        usageToday = reply.usageToday,
-                        dailyLimit = reply.dailyLimit,
+                        streamingMessageId = AIChatStreamingDelivery.beginAssistantReveal(
+                            result.assistantMessage.id,
+                        ),
+                        usageToday = result.reply.usageToday,
+                        dailyLimit = result.reply.dailyLimit,
+                        actionExecutionSummary = result.executionSummary,
+                        autoExecutedMessageIds = autoIds,
                     )
                 }
                 .onFailure { err ->
@@ -242,9 +262,18 @@ class HealthAIChatViewModel @Inject constructor(
         if (!shouldCompact()) return
         val currentStep = (messagesInSession / (dailyLimit * 0.20)).toInt()
         if (currentStep <= lastCompactionStep) return
+        val messagesForMemory = chatRepository.observeMessages(conv.id).first()
+            .sortedBy { it.createdAtEpochMillis }
         val didCompact = chatRepository.compactConversation(conv)
         if (didCompact) {
             lastCompactionStep = currentStep
+            viewModelScope.launch {
+                familyMemoryService.extractAndStore(
+                    familyId = familyId,
+                    conversationId = conv.id,
+                    transcriptMessages = messagesForMemory,
+                )
+            }
         }
     }
 
@@ -262,12 +291,29 @@ class HealthAIChatViewModel @Inject constructor(
         send()
     }
 
+    fun finishStreaming(messageId: String) {
+        _uiState.value = _uiState.value.copy(
+            streamingMessageId = AIChatStreamingDelivery.finishReveal(
+                messageId,
+                _uiState.value.streamingMessageId,
+            ),
+        )
+    }
+
+    fun clearActionExecutionSummary() {
+        _uiState.value = _uiState.value.copy(actionExecutionSummary = null)
+    }
+
     fun clearConversation() {
         val conv = conversation ?: return
         viewModelScope.launch {
             chatRepository.clearConversation(conv)
             lastCompactionStep = 0
-            _uiState.value = _uiState.value.copy(messages = emptyList())
+            _uiState.value = _uiState.value.copy(
+                messages = emptyList(),
+                streamingMessageId = null,
+                autoExecutedMessageIds = emptySet(),
+            )
         }
     }
 

@@ -32,6 +32,7 @@ import it.vittorioscocca.kidbox.domain.family.ownershipUidFromFamilyFirestore
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.data.sync.FamilySyncCenter
 import it.vittorioscocca.kidbox.domain.auth.LogoutUseCase
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.FamilyMemoryService
 import it.vittorioscocca.kidbox.ui.screens.home.HeroCrop
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -122,6 +123,7 @@ class HomeViewModel @Inject constructor(
     private val walletRepository: WalletRepository,
     private val passwordsRepository: PasswordsRepository,
     private val subscriptionRepository: SubscriptionRepository,
+    private val familyMemoryService: FamilyMemoryService,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -219,6 +221,9 @@ class HomeViewModel @Inject constructor(
                     )
                     scheduleMembersSyncTimeout(familyId)
                     familySyncCenter.startSync(familyId)
+                    viewModelScope.launch(Dispatchers.IO) {
+                        familyMemoryService.loadFromFirestore(familyId)
+                    }
                     passwordBadgeJob?.cancel()
                     passwordBadgeJob = viewModelScope.launch {
                         passwordsRepository.observeVisibleEntries(familyId).collectLatest { entries ->
@@ -569,6 +574,7 @@ class HomeViewModel @Inject constructor(
                 }
             }
             Log.i(TAG, "bootstrapFromFirestore: members upserted count=${memberDocs.size} familyId=$familyId")
+            familyMemoryService.loadFromFirestore(familyId)
         } catch (e: Exception) {
             Log.w(TAG, "HomeViewModel bootstrap failed: ${e.message}")
             _uiState.value = HomeUiState(isLoading = false, familyId = "")

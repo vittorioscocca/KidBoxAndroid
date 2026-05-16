@@ -7,4 +7,5 @@ import javax.inject.Inject
 @HiltViewModel
 class PlanningAIChatActionsViewModel @Inject constructor(
     val reminderService: PlanningReminderService,
+    val actionExecutor: PlanningActionExecutor,
 ) : ViewModel()

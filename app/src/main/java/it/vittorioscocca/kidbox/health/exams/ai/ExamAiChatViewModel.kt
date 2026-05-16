@@ -14,6 +14,10 @@ import it.vittorioscocca.kidbox.domain.model.KBAIConversation
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
 import it.vittorioscocca.kidbox.domain.model.KBTextExtractionStatus
 import it.vittorioscocca.kidbox.health.visits.ai.AiMessage
+import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatStreamingDelivery
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.FamilyMemoryPromptSection
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.FamilyMemoryService
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.PlanningAIActionBlock
 import org.json.JSONArray
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -30,12 +34,14 @@ import kotlinx.coroutines.launch
 
 data class ExamAiChatUiState(
     val messages: List<AiMessage> = emptyList(),
+    val streamingMessageId: String? = null,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val isListMode: Boolean = false,
     val listExamCount: Int = 0,
     val usageToday: Int = 0,
     val dailyLimit: Int = 0,
+    val actionExecutionSummary: String? = null,
 )
 
 @HiltViewModel
@@ -44,6 +50,7 @@ class ExamAiChatViewModel @Inject constructor(
     private val examRepository: MedicalExamRepository,
     private val chatRepository: HealthAIChatRepository,
     private val healthAttachmentService: HealthAttachmentService,
+    private val familyMemoryService: FamilyMemoryService,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val COMPACTION_THRESHOLD = 0.60
@@ -105,17 +112,21 @@ class ExamAiChatViewModel @Inject constructor(
             runCatching {
                 val contextBlock = if (isListMode) loadExamListContextBlock() else loadExamRefertiBlock()
                 val basePrompt = buildSystemPrompt(contextBlock)
-                chatRepository.sendMessage(conv, trimmed, basePrompt).getOrThrow()
-            }.onSuccess {
-                val usage = it.second
-                messagesInSession = usage.usageToday
-                dailyLimit = usage.dailyLimit
+                val promptWithMemory = FamilyMemoryPromptSection.append(basePrompt, familyMemoryService, familyId)
+                chatRepository.sendMessage(conv, trimmed, promptWithMemory).getOrThrow()
+            }.onSuccess { result ->
+                messagesInSession = result.reply.usageToday
+                dailyLimit = result.reply.dailyLimit
                 maybeCompactIfNeeded(conv)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
+                    streamingMessageId = AIChatStreamingDelivery.beginAssistantReveal(
+                        result.assistantMessage.id,
+                    ),
                     isListMode = isListMode,
-                    usageToday = usage.usageToday,
-                    dailyLimit = usage.dailyLimit,
+                    usageToday = result.reply.usageToday,
+                    dailyLimit = result.reply.dailyLimit,
+                    actionExecutionSummary = result.executionSummary,
                 )
             }.onFailure { err ->
                 _uiState.value = _uiState.value.run {
@@ -133,9 +144,18 @@ class ExamAiChatViewModel @Inject constructor(
         if (!shouldCompact()) return
         val currentStep = (messagesInSession / (dailyLimit * 0.20)).toInt()
         if (currentStep <= lastCompactionStep) return
+        val messagesForMemory = chatRepository.observeMessages(conv.id).first()
+            .sortedBy { it.createdAtEpochMillis }
         val didCompact = chatRepository.compactConversation(conv)
         if (didCompact) {
             lastCompactionStep = currentStep
+            viewModelScope.launch {
+                familyMemoryService.extractAndStore(
+                    familyId = familyId,
+                    conversationId = conv.id,
+                    transcriptMessages = messagesForMemory,
+                )
+            }
         }
     }
 
@@ -172,6 +192,10 @@ class ExamAiChatViewModel @Inject constructor(
         }
     }
 
+    fun clearActionExecutionSummary() {
+        _uiState.value = _uiState.value.copy(actionExecutionSummary = null)
+    }
+
     fun clearError() {
         _uiState.value = _uiState.value.run {
             copy(
@@ -182,12 +206,22 @@ class ExamAiChatViewModel @Inject constructor(
         }
     }
 
+    fun finishStreaming(messageId: String) {
+        _uiState.value = _uiState.value.copy(
+            streamingMessageId = AIChatStreamingDelivery.finishReveal(
+                messageId,
+                _uiState.value.streamingMessageId,
+            ),
+            isListMode = isListMode,
+        )
+    }
+
     fun clearConversation() {
         val conv = conversation ?: return
         viewModelScope.launch {
             chatRepository.clearConversation(conv)
             lastCompactionStep = 0
-            _uiState.value = _uiState.value.copy(messages = emptyList())
+            _uiState.value = _uiState.value.copy(messages = emptyList(), streamingMessageId = null)
         }
     }
 
@@ -285,11 +319,12 @@ class ExamAiChatViewModel @Inject constructor(
             - allegati: $attachmentsSummary
         """.trimIndent()
         if (!isListMode) {
-            return if (refertiBlock.isBlank()) {
+            val base = if (refertiBlock.isBlank()) {
                 singleExam
             } else {
                 singleExam + "\n\n" + refertiBlock
             }
+            return base + "\n\n" + PlanningAIActionBlock.promptSection
         }
         val n = examIdsFromJson.size
         val preview = examIdsFromJson.take(40).joinToString(", ")
@@ -310,6 +345,8 @@ class ExamAiChatViewModel @Inject constructor(
                 appendLine()
                 append(refertiBlock)
             }
+            appendLine()
+            append(PlanningAIActionBlock.promptSection)
         }.trimEnd()
     }
 

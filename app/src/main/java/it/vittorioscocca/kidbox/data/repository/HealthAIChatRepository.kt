@@ -8,17 +8,26 @@ import it.vittorioscocca.kidbox.data.remote.ai.AiReply
 import it.vittorioscocca.kidbox.data.remote.ai.AiRepository
 import it.vittorioscocca.kidbox.domain.model.KBAIConversation
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.KidBoxAIActionPipeline
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
+data class HealthAISendResult(
+    val assistantMessage: KBAIMessage,
+    val reply: AiReply,
+    val executionSummary: String?,
+    val didAutoExecute: Boolean,
+)
+
 @Singleton
 class HealthAIChatRepository @Inject constructor(
     private val conversationDao: KBAIConversationDao,
     private val messageDao: KBAIMessageDao,
     private val aiRepository: AiRepository,
+    private val actionPipeline: KidBoxAIActionPipeline,
 ) {
 
     suspend fun getOrCreateConversation(
@@ -47,7 +56,7 @@ class HealthAIChatRepository @Inject constructor(
         conversation: KBAIConversation,
         userText: String,
         systemPrompt: String,
-    ): Result<Pair<KBAIMessage, AiReply>> = runCatching {
+    ): Result<HealthAISendResult> = runCatching {
         val now = System.currentTimeMillis()
         val userMsg = KBAIMessageEntity(
             id = UUID.randomUUID().toString(),
@@ -72,11 +81,20 @@ class HealthAIChatRepository @Inject constructor(
                 throw err
             }
 
+        val defaultChildId = conv.childId.takeIf {
+            it.isNotBlank() && it != "health_visit" && !it.startsWith("health_")
+        }
+        val outcome = actionPipeline.processReply(
+            reply = reply.reply,
+            familyId = conv.familyId,
+            defaultChildId = defaultChildId,
+        )
+
         val assistantMsg = KBAIMessageEntity(
             id = UUID.randomUUID().toString(),
             conversationId = conversation.id,
             roleRaw = "assistant",
-            content = reply.reply,
+            content = outcome.displayText,
             createdAtEpochMillis = System.currentTimeMillis(),
         )
         messageDao.upsert(assistantMsg)
@@ -85,7 +103,12 @@ class HealthAIChatRepository @Inject constructor(
             conv.toEntity().copy(updatedAtEpochMillis = System.currentTimeMillis()),
         )
 
-        assistantMsg.toDomain() to reply
+        HealthAISendResult(
+            assistantMessage = assistantMsg.toDomain(),
+            reply = reply,
+            executionSummary = outcome.executionSummary,
+            didAutoExecute = outcome.didAutoExecute,
+        )
     }
 
     private suspend fun summarizeIfNeeded(conversation: KBAIConversation) {

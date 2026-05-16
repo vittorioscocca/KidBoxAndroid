@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.ai.AiSettings
+import it.vittorioscocca.kidbox.ai.DailyBriefingPrefs
+import it.vittorioscocca.kidbox.ai.HealthPatternPrefs
 import it.vittorioscocca.kidbox.ai.WeeklySummaryPrefs
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.remote.ai.AIRemotePreferences
@@ -24,6 +26,8 @@ data class AiSettingsUiState(
     val consentDate: Long? = null,
     val aiUsageToday: Int = 0,
     val isWeeklySummaryEnabled: Boolean = true,
+    val isDailyBriefingEnabled: Boolean = true,
+    val isHealthPatternEnabled: Boolean = true,
     val pendingShowConsent: Boolean = false,
     val message: String? = null,
 )
@@ -32,6 +36,8 @@ data class AiSettingsUiState(
 class AiSettingsViewModel @Inject constructor(
     private val aiSettings: AiSettings,
     private val weeklySummaryPrefs: WeeklySummaryPrefs,
+    private val dailyBriefingPrefs: DailyBriefingPrefs,
+    private val healthPatternPrefs: HealthPatternPrefs,
     private val aiRemotePrefs: AIRemotePreferences,
     private val subscriptionRepository: SubscriptionRepository,
     private val familyDao: KBFamilyDao,
@@ -43,6 +49,8 @@ class AiSettingsViewModel @Inject constructor(
             consentGiven = aiSettings.consentGiven.value,
             consentDate = aiSettings.consentDate.value,
             isWeeklySummaryEnabled = weeklySummaryPrefs.isEnabled.value,
+            isDailyBriefingEnabled = dailyBriefingPrefs.isEnabled.value,
+            isHealthPatternEnabled = healthPatternPrefs.isEnabled.value,
         ),
     )
     val uiState: StateFlow<AiSettingsUiState> = _uiState.asStateFlow()
@@ -129,6 +137,16 @@ class AiSettingsViewModel @Inject constructor(
     fun toggleWeeklySummary(enabled: Boolean) {
         weeklySummaryPrefs.setEnabled(enabled)
         _uiState.update { it.copy(isWeeklySummaryEnabled = enabled) }
+    }
+
+    fun toggleDailyBriefing(enabled: Boolean) {
+        dailyBriefingPrefs.setEnabled(enabled)
+        _uiState.update { it.copy(isDailyBriefingEnabled = enabled) }
+    }
+
+    fun toggleHealthPattern(enabled: Boolean) {
+        healthPatternPrefs.setEnabled(enabled)
+        _uiState.update { it.copy(isHealthPatternEnabled = enabled) }
     }
 
     fun dismissMessage() {

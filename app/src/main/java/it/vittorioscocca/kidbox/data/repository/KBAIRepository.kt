@@ -49,6 +49,11 @@ class KBAIRepository @Inject constructor(
         return entity.toDomain()
     }
 
+    suspend fun updateMessageContent(messageId: String, content: String) {
+        val existing = messageDao.getById(messageId) ?: return
+        messageDao.upsert(existing.copy(content = content))
+    }
+
     fun observeMessages(conversationId: String): Flow<List<KBAIMessage>> =
         messageDao.observeByConversationId(conversationId).map { rows -> rows.map { it.toDomain() } }
 
