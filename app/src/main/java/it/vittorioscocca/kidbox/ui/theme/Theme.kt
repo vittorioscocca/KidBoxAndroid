@@ -29,6 +29,9 @@ data class KidBoxColorScheme(
      * element is always slightly contrasted against its parent regardless of theme.
      */
     val surfaceOverlay: Color,
+    /** Pill visibilità nelle note (es. «Tutta la famiglia»). */
+    val visibilityChipBackground: Color,
+    val visibilityChipForeground: Color,
 )
 
 val KidBoxLightColorScheme = KidBoxColorScheme(
@@ -40,6 +43,8 @@ val KidBoxLightColorScheme = KidBoxColorScheme(
     rowBackground = Color(0xFFFFFFFF),
     incomingBubble = Color(0xFFFFFFFF),
     surfaceOverlay = Color(0x0F000000),
+    visibilityChipBackground = Color(0xFFF2F1E9),
+    visibilityChipForeground = Color(0xFF1A1A1A),
 )
 
 val KidBoxDarkColorScheme = KidBoxColorScheme(
@@ -51,6 +56,8 @@ val KidBoxDarkColorScheme = KidBoxColorScheme(
     rowBackground = Color(0xFF2C2C2E),
     incomingBubble = Color(0xFF3A3A3C),
     surfaceOverlay = Color(0x1AFFFFFF),
+    visibilityChipBackground = Color(0xFF3A3A3C),
+    visibilityChipForeground = Color(0xFFFFFFFF),
 )
 
 val LocalKidBoxColors = staticCompositionLocalOf { KidBoxLightColorScheme }

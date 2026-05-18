@@ -23,8 +23,31 @@ sealed class AppDestination(val route: String) {
     data object EditChild : AppDestination("edit_child/{childId}") {
         fun createRoute(childId: String): String = "edit_child/$childId"
     }
-    data object FamilyPhotos : AppDestination("family_photos/{familyId}") {
-        fun createRoute(familyId: String): String = "family_photos/$familyId"
+    data object FamilyPhotos : AppDestination("family_photos/{familyId}?initialAlbumId={initialAlbumId}") {
+        fun createRoute(familyId: String, initialAlbumId: String? = null): String {
+            val base = "family_photos/$familyId"
+            return if (initialAlbumId.isNullOrBlank()) {
+                base
+            } else {
+                val enc = java.net.URLEncoder.encode(initialAlbumId, Charsets.UTF_8.name())
+                "$base?initialAlbumId=$enc"
+            }
+        }
+    }
+
+    data object PhotoAlbumDetail : AppDestination(
+        "photo_album/{familyId}/{albumId}?albumTitle={albumTitle}&isTripAlbum={isTripAlbum}",
+    ) {
+        fun createRoute(
+            familyId: String,
+            albumId: String,
+            albumTitle: String,
+            isTripAlbum: Boolean = false,
+        ): String {
+            fun enc(value: String) =
+                java.net.URLEncoder.encode(value, Charsets.UTF_8.name()).replace("+", "%20")
+            return "photo_album/$familyId/$albumId?albumTitle=${enc(albumTitle)}&isTripAlbum=$isTripAlbum"
+        }
     }
     data object NotesHome : AppDestination("notes_home/{familyId}") {
         fun createRoute(familyId: String): String = "notes_home/$familyId"
@@ -231,13 +254,23 @@ sealed class AppDestination(val route: String) {
     data object ChatMediaGallery : AppDestination("chat_media_gallery/{familyId}") {
         fun createRoute(familyId: String): String = "chat_media_gallery/$familyId"
     }
-    data object ExpensesHome : AppDestination("expenses_home/{familyId}?highlightExpenseId={highlightExpenseId}") {
+    data object ExpensesHome : AppDestination(
+        "expenses_home/{familyId}?highlightExpenseId={highlightExpenseId}&initialCategoryId={initialCategoryId}",
+    ) {
         fun createRoute(
             familyId: String,
             highlightExpenseId: String? = null,
+            initialCategoryId: String? = null,
         ): String {
             val base = "expenses_home/$familyId"
-            return if (highlightExpenseId.isNullOrBlank()) base else "$base?highlightExpenseId=$highlightExpenseId"
+            val params = buildList {
+                if (!highlightExpenseId.isNullOrBlank()) add("highlightExpenseId=$highlightExpenseId")
+                if (!initialCategoryId.isNullOrBlank()) {
+                    val enc = java.net.URLEncoder.encode(initialCategoryId, Charsets.UTF_8.name())
+                    add("initialCategoryId=$enc")
+                }
+            }
+            return if (params.isEmpty()) base else "$base?${params.joinToString("&")}"
         }
     }
     data object DocumentsHome : AppDestination("documents_home/{familyId}?highlightDocumentId={highlightDocumentId}&folderId={folderId}") {
@@ -361,4 +394,82 @@ sealed class AppDestination(val route: String) {
         }
     }
     data object FamilySettings : AppDestination("family_settings")
+
+    data object TravelList : AppDestination("travel/{familyId}") {
+        fun createRoute(familyId: String): String = "travel/$familyId"
+    }
+
+    data object TravelAllTrips : AppDestination("travel/{familyId}/all") {
+        fun createRoute(familyId: String): String = "travel/$familyId/all"
+    }
+
+    data object TravelDiscover : AppDestination("travel/{familyId}/discover") {
+        fun createRoute(familyId: String): String = "travel/$familyId/discover"
+    }
+
+    data object TravelDestinationDetail : AppDestination("travel/{familyId}/destination/{destinationId}") {
+        fun createRoute(familyId: String, destinationId: String): String =
+            "travel/$familyId/destination/$destinationId"
+    }
+
+    data object TravelWizard : AppDestination("travel/{familyId}/wizard?destination={destination}") {
+        fun createRoute(familyId: String, destinationName: String? = null): String {
+            val encoded = destinationName?.let {
+                java.net.URLEncoder.encode(it, Charsets.UTF_8.name())
+            }.orEmpty()
+            return "travel/$familyId/wizard?destination=$encoded"
+        }
+    }
+
+    data object TravelProposal : AppDestination("travel/{familyId}/proposal") {
+        fun createRoute(familyId: String): String = "travel/$familyId/proposal"
+    }
+
+    data object TravelDetail : AppDestination("travel/{familyId}/detail/{tripId}") {
+        fun createRoute(familyId: String, tripId: String): String = "travel/$familyId/detail/$tripId"
+    }
+
+    data object TravelCategoryResults : AppDestination("travel/{familyId}/detail/{tripId}/places/{kind}") {
+        fun createRoute(familyId: String, tripId: String, kind: String): String =
+            "travel/$familyId/detail/$tripId/places/$kind"
+    }
+
+    data object TravelPlaceDetail : AppDestination(
+        "travel/{familyId}/place?placeName={placeName}&locationContext={locationContext}&scheduleBadge={scheduleBadge}&time={time}&staySummary={staySummary}&costSummary={costSummary}&nextStopTitle={nextStopTitle}",
+    ) {
+        fun createRoute(
+            familyId: String,
+            placeName: String,
+            locationContext: String,
+            scheduleBadge: String,
+            time: String = "",
+            staySummary: String = "",
+            costSummary: String = "",
+            nextStopTitle: String? = null,
+        ): String {
+            fun e(s: String) = java.net.URLEncoder.encode(s, Charsets.UTF_8.name())
+            return buildString {
+                append("travel/$familyId/place")
+                append("?placeName=${e(placeName)}")
+                append("&locationContext=${e(locationContext)}")
+                append("&scheduleBadge=${e(scheduleBadge)}")
+                append("&time=${e(time)}")
+                append("&staySummary=${e(staySummary)}")
+                append("&costSummary=${e(costSummary)}")
+                append("&nextStopTitle=${e(nextStopTitle.orEmpty())}")
+            }
+        }
+
+        fun createRoute(familyId: String, context: it.vittorioscocca.kidbox.ui.screens.travel.TravelItineraryStopContext): String =
+            createRoute(
+                familyId = familyId,
+                placeName = context.placeName,
+                locationContext = context.locationContext,
+                scheduleBadge = context.scheduleBadge,
+                time = context.time,
+                staySummary = context.staySummary,
+                costSummary = context.costSummary,
+                nextStopTitle = context.nextStopTitle,
+            )
+    }
 }

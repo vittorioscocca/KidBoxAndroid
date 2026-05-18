@@ -121,6 +121,7 @@ import kotlinx.coroutines.withTimeout
 fun ExpensesHomeScreen(
     familyId: String,
     highlightExpenseId: String? = null,
+    initialCategoryId: String? = null,
     onBack: () -> Unit,
     onNavigate: (String) -> Unit,
     viewModel: ExpensesViewModel = hiltViewModel(),
@@ -141,6 +142,7 @@ fun ExpensesHomeScreen(
     var isOpeningAttachment by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(familyId) { viewModel.bindFamily(familyId) }
+    LaunchedEffect(initialCategoryId) { viewModel.setInitialCategoryFilter(initialCategoryId) }
     LaunchedEffect(highlightExpenseId, state.expenses, consumedHighlightExpenseId) {
         if (consumedHighlightExpenseId) return@LaunchedEffect
         val id = highlightExpenseId ?: return@LaunchedEffect

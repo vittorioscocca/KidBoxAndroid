@@ -62,6 +62,7 @@ import it.vittorioscocca.kidbox.ui.screens.passwords.PasswordsSecurityScreen
 import it.vittorioscocca.kidbox.ui.screens.notes.NoteDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.notes.NotesHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.photos.FamilyPhotosScreen
+import it.vittorioscocca.kidbox.ui.screens.photos.PhotoAlbumDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.chat.ChatMediaGalleryScreen
 import it.vittorioscocca.kidbox.ui.screens.chat.ChatScreen
 import it.vittorioscocca.kidbox.ui.screens.chat.ChatViewModel
@@ -86,6 +87,20 @@ import it.vittorioscocca.kidbox.ui.screens.health.vaccines.MedicalVaccinesScreen
 import it.vittorioscocca.kidbox.ui.screens.health.vaccines.MedicalVaccineFormScreen
 import it.vittorioscocca.kidbox.ui.screens.health.timeline.HealthTimelineScreen
 import it.vittorioscocca.kidbox.ui.screens.health.ai.HealthAIChatScreen
+import it.vittorioscocca.kidbox.ui.screens.travel.TravelCategoryResultsScreen
+import it.vittorioscocca.kidbox.ui.screens.travel.TravelDetailScreen
+import it.vittorioscocca.kidbox.ui.screens.travel.TravelItineraryStopContext
+import it.vittorioscocca.kidbox.ui.screens.travel.TravelPlaceDetailScreen
+import it.vittorioscocca.kidbox.ui.screens.travel.decodeNavArg
+import it.vittorioscocca.kidbox.ui.screens.travel.TravelDestinationDetailScreen
+import it.vittorioscocca.kidbox.ui.screens.travel.TravelDiscoverScreen
+import it.vittorioscocca.kidbox.ui.screens.travel.TravelDiscoverViewModel
+import it.vittorioscocca.kidbox.ui.screens.travel.TravelAllTripsScreen
+import it.vittorioscocca.kidbox.ui.screens.travel.TravelListScreen
+import it.vittorioscocca.kidbox.ui.screens.travel.TravelProposalRoute
+import it.vittorioscocca.kidbox.ui.screens.travel.TravelWizardScreen
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 
 @Composable
 fun AppNavGraph(
@@ -163,6 +178,12 @@ fun AppNavGraph(
                         if (route == AppDestination.Plans.route) {
                             launchSingleTop = true
                         }
+                    }
+                },
+                onReloadHome = {
+                    navController.navigate(AppDestination.Home.route) {
+                        popUpTo(AppDestination.Home.route) { inclusive = true }
+                        launchSingleTop = true
                     }
                 },
             )
@@ -273,11 +294,46 @@ fun AppNavGraph(
 
         composable(
             route = AppDestination.FamilyPhotos.route,
-            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
-        ) {
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("initialAlbumId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
             FamilyPhotosScreen(
                 onBack = { navController.popBackStack() },
+                onOpenAlbumDetail = { albumId, albumTitle ->
+                    navController.navigate(
+                        AppDestination.PhotoAlbumDetail.createRoute(
+                            familyId = familyId,
+                            albumId = albumId,
+                            albumTitle = albumTitle,
+                        ),
+                    )
+                },
             )
+        }
+
+        composable(
+            route = AppDestination.PhotoAlbumDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("albumId") { type = NavType.StringType },
+                navArgument("albumTitle") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("isTripAlbum") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                },
+            ),
+        ) {
+            PhotoAlbumDetailScreen(onBack = { navController.popBackStack() })
         }
 
         composable(
@@ -1142,13 +1198,21 @@ fun AppNavGraph(
                     nullable = true
                     defaultValue = null
                 },
+                navArgument("initialCategoryId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
             ),
         ) { backStackEntry ->
             val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
             val highlightExpenseId = backStackEntry.arguments?.getString("highlightExpenseId")
+            val initialCategoryId = decodeNavArg(backStackEntry.arguments?.getString("initialCategoryId"))
+                .takeIf { it.isNotBlank() }
             ExpensesHomeScreen(
                 familyId = familyId,
                 highlightExpenseId = highlightExpenseId,
+                initialCategoryId = initialCategoryId,
                 onBack = { navController.popBackStack() },
                 onNavigate = { route -> navController.navigate(route) },
             )
@@ -1379,6 +1443,188 @@ fun AppNavGraph(
                 onOpenSecurityReport = { fid ->
                     navController.navigate(AppDestination.PasswordsSecurity.createRoute(fid))
                 },
+            )
+        }
+
+        composable(
+            route = AppDestination.TravelList.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            TravelListScreen(
+                familyId = familyId,
+                onNavigateBack = { navController.popBackStack() },
+                onOpenWizard = { navController.navigate(AppDestination.TravelWizard.createRoute(familyId)) },
+                onOpenDiscover = { navController.navigate(AppDestination.TravelDiscover.createRoute(familyId)) },
+                onOpenTrip = { tripId ->
+                    navController.navigate(AppDestination.TravelDetail.createRoute(familyId, tripId))
+                },
+                onOpenAllTrips = {
+                    navController.navigate(AppDestination.TravelAllTrips.createRoute(familyId))
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.TravelAllTrips.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            TravelAllTripsScreen(
+                familyId = familyId,
+                onNavigateBack = { navController.popBackStack() },
+                onOpenTrip = { tripId ->
+                    navController.navigate(AppDestination.TravelDetail.createRoute(familyId, tripId))
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.TravelDiscover.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            TravelDiscoverScreen(
+                familyId = familyId,
+                onNavigateBack = { navController.popBackStack() },
+                onOpenDestination = { destinationId ->
+                    navController.navigate(AppDestination.TravelDestinationDetail.createRoute(familyId, destinationId))
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.TravelDestinationDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("destinationId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val destinationId = backStackEntry.arguments?.getString("destinationId").orEmpty()
+            val discoverEntry = remember(backStackEntry) {
+                navController.getBackStackEntry(AppDestination.TravelDiscover.createRoute(familyId))
+            }
+            val discoverViewModel: TravelDiscoverViewModel = hiltViewModel(discoverEntry)
+            TravelDestinationDetailScreen(
+                familyId = familyId,
+                destinationId = destinationId,
+                onNavigateBack = { navController.popBackStack() },
+                onPlanTrip = { encodedDestination ->
+                    val decoded = URLDecoder.decode(encodedDestination, StandardCharsets.UTF_8.name())
+                    navController.navigate(AppDestination.TravelWizard.createRoute(familyId, decoded))
+                },
+                onTripAccepted = { tripId ->
+                    navController.navigate(AppDestination.TravelDetail.createRoute(familyId, tripId)) {
+                        popUpTo(AppDestination.TravelDiscover.createRoute(familyId)) { inclusive = true }
+                    }
+                },
+                viewModel = discoverViewModel,
+            )
+        }
+
+        composable(
+            route = AppDestination.TravelWizard.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("destination") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = ""
+                },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val destinationRaw = backStackEntry.arguments?.getString("destination").orEmpty()
+            val prefill = destinationRaw.takeIf { it.isNotBlank() }?.let {
+                URLDecoder.decode(it, StandardCharsets.UTF_8.name())
+            }
+            TravelWizardScreen(
+                familyId = familyId,
+                prefillDestinationName = prefill,
+                navController = navController,
+                onNavigateBack = { navController.popBackStack() },
+                onOpenPlans = { navController.navigate(AppDestination.Plans.route) },
+            )
+        }
+
+        composable(
+            route = AppDestination.TravelProposal.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            TravelProposalRoute(
+                familyId = familyId,
+                navController = navController,
+                backStackEntry = backStackEntry,
+                onOpenPlans = { navController.navigate(AppDestination.Plans.route) },
+            )
+        }
+
+        composable(
+            route = AppDestination.TravelDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("tripId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val tripId = backStackEntry.arguments?.getString("tripId").orEmpty()
+            TravelDetailScreen(
+                tripId = tripId,
+                familyId = familyId,
+                navController = navController,
+            )
+        }
+
+        composable(
+            route = AppDestination.TravelCategoryResults.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("tripId") { type = NavType.StringType },
+                navArgument("kind") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val tripId = backStackEntry.arguments?.getString("tripId").orEmpty()
+            val kind = backStackEntry.arguments?.getString("kind").orEmpty()
+            TravelCategoryResultsScreen(
+                familyId = familyId,
+                tripId = tripId,
+                kind = kind,
+                navController = navController,
+                backStackEntry = backStackEntry,
+            )
+        }
+
+        composable(
+            route = AppDestination.TravelPlaceDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("placeName") { type = NavType.StringType },
+                navArgument("locationContext") { type = NavType.StringType },
+                navArgument("scheduleBadge") { type = NavType.StringType },
+                navArgument("time") { type = NavType.StringType; defaultValue = "" },
+                navArgument("staySummary") { type = NavType.StringType; defaultValue = "" },
+                navArgument("costSummary") { type = NavType.StringType; defaultValue = "" },
+                navArgument("nextStopTitle") { type = NavType.StringType; defaultValue = "" },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val context = TravelItineraryStopContext(
+                id = decodeNavArg(backStackEntry.arguments?.getString("placeName")),
+                placeName = decodeNavArg(backStackEntry.arguments?.getString("placeName")),
+                locationContext = decodeNavArg(backStackEntry.arguments?.getString("locationContext")),
+                scheduleBadge = decodeNavArg(backStackEntry.arguments?.getString("scheduleBadge")),
+                time = decodeNavArg(backStackEntry.arguments?.getString("time")),
+                staySummary = decodeNavArg(backStackEntry.arguments?.getString("staySummary")),
+                costSummary = decodeNavArg(backStackEntry.arguments?.getString("costSummary")),
+                nextStopTitle = decodeNavArg(backStackEntry.arguments?.getString("nextStopTitle")).takeIf { it.isNotBlank() },
+            )
+            TravelPlaceDetailScreen(
+                context = context,
+                familyId = familyId,
+                onBack = { navController.popBackStack() },
             )
         }
 

@@ -50,7 +50,13 @@ class FamilyPhotosViewModel @Inject constructor(
     private val countersService: CountersService,
 ) : ViewModel() {
     private val familyId: String = savedStateHandle.get<String>("familyId").orEmpty()
-    private val _uiState = MutableStateFlow(FamilyPhotosUiState(familyId = familyId))
+    private val initialAlbumId: String? = savedStateHandle.get<String>("initialAlbumId")?.takeIf { it.isNotBlank() }
+    private val _uiState = MutableStateFlow(
+        FamilyPhotosUiState(
+            familyId = familyId,
+            selectedAlbumId = initialAlbumId,
+        ),
+    )
     val uiState: StateFlow<FamilyPhotosUiState> = _uiState.asStateFlow()
 
     init {
@@ -68,10 +74,14 @@ class FamilyPhotosViewModel @Inject constructor(
                 ) { albums, photos ->
                     albums to photos.sortedByDescending { it.takenAtEpochMillis }
                 }.collectLatest { (albums, photos) ->
+                    val pendingAlbumId = initialAlbumId?.takeIf { id ->
+                        albums.any { it.id == id }
+                    }
                     _uiState.value = _uiState.value.copy(
                         albums = albums,
                         photos = photos,
                         isLoading = false,
+                        selectedAlbumId = pendingAlbumId ?: _uiState.value.selectedAlbumId,
                     )
                 }
             }
@@ -165,6 +175,43 @@ class FamilyPhotosViewModel @Inject constructor(
                 repository.flushPending(familyId)
             }.onFailure { err ->
                 _uiState.value = _uiState.value.copy(errorMessage = err.localizedMessage ?: "Errore eliminazione multipla")
+            }
+            _uiState.value = _uiState.value.copy(isBusy = false)
+        }
+    }
+
+    fun deleteAlbum(albumId: String) {
+        if (albumId.isBlank()) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isBusy = true, errorMessage = null)
+            runCatching {
+                repository.deleteAlbum(albumId)
+                repository.flushPending(familyId)
+                if (_uiState.value.selectedAlbumId == albumId) {
+                    _uiState.value = _uiState.value.copy(selectedAlbumId = null)
+                }
+            }.onFailure { err ->
+                _uiState.value = _uiState.value.copy(errorMessage = err.localizedMessage ?: "Errore eliminazione album")
+            }
+            _uiState.value = _uiState.value.copy(isBusy = false)
+        }
+    }
+
+    fun deleteAlbums(albumIds: Collection<String>) {
+        if (albumIds.isEmpty()) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isBusy = true, errorMessage = null)
+            runCatching {
+                repository.deleteAlbums(albumIds)
+                repository.flushPending(familyId)
+                val selected = _uiState.value.selectedAlbumId
+                if (selected != null && albumIds.contains(selected)) {
+                    _uiState.value = _uiState.value.copy(selectedAlbumId = null)
+                }
+            }.onFailure { err ->
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = err.localizedMessage ?: "Errore eliminazione album",
+                )
             }
             _uiState.value = _uiState.value.copy(isBusy = false)
         }

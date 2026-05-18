@@ -66,7 +66,10 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.text.style.TextOverflow
 import it.vittorioscocca.kidbox.domain.model.KBEmergencyContact
+import it.vittorioscocca.kidbox.domain.model.ReferenceDoctorDraft
+import it.vittorioscocca.kidbox.domain.model.groupedOfficeHourDisplayLines
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.util.UUID
 
@@ -88,6 +91,7 @@ fun MedicalRecordScreen(
     var showAddContact by remember { mutableStateOf(false) }
     var draftContact by remember { mutableStateOf<KBEmergencyContact?>(null) }
     var bloodMenuExpanded by remember { mutableStateOf(false) }
+    var showReferenceDoctorForm by remember { mutableStateOf(false) }
     val contactPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickContact()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         val selected = readContact(context, uri)
@@ -128,7 +132,13 @@ fun MedicalRecordScreen(
         state.saveError?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
     }
 
-    val primaryDoctorLabel = if (state.isChild) "Pediatra di riferimento" else "Medico di base"
+    val primaryDoctorLabel = if (state.isChild) "Pediatra di riferimento" else "Medico di riferimento"
+    val addDoctorLabel = when {
+        state.referenceDoctor.hasDoctor && state.isChild -> "Modifica Pediatra di riferimento"
+        state.referenceDoctor.hasDoctor -> "Modifica Medico di riferimento"
+        state.isChild -> "Aggiungi Pediatra di riferimento"
+        else -> "Aggiungi Medico di riferimento"
+    }
 
     Box(
         modifier = Modifier
@@ -226,45 +236,39 @@ fun MedicalRecordScreen(
             )
             Spacer(Modifier.height(16.dp))
 
-            // ── Medico di riferimento ─────────────────────────────────────────────
+            // ── Medico / pediatra di riferimento ────────────────────────────────
             SectionLabel(primaryDoctorLabel)
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                TextField(
-                    value = state.doctorName,
-                    onValueChange = viewModel::setDoctorName,
-                    placeholder = { Text("Dott./Dott.ssa") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        disabledIndicatorColor = Color.Transparent,
-                    ),
-                )
+                if (!state.referenceDoctor.hasDoctor) {
+                    Text(
+                        "Nessun medico aggiunto",
+                        color = kb.subtitle,
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                    )
+                } else {
+                    ReferenceDoctorSummary(
+                        draft = state.referenceDoctor,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    )
+                }
                 HorizontalDivider(color = kb.subtitle.copy(alpha = 0.15f))
-                TextField(
-                    value = state.doctorPhone,
-                    onValueChange = viewModel::setDoctorPhone,
-                    placeholder = { Text("Telefono") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        disabledIndicatorColor = Color.Transparent,
-                    ),
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF0A84FF))
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(onClick = { showReferenceDoctorForm = true }) {
+                        Text(addDoctorLabel, color = Color(0xFF0A84FF), fontSize = 16.sp)
+                    }
+                }
             }
             Spacer(Modifier.height(20.dp))
 
@@ -373,6 +377,18 @@ fun MedicalRecordScreen(
             }
             Spacer(Modifier.height(60.dp))
         }
+
+        if (showReferenceDoctorForm) {
+            ReferenceDoctorFormScreen(
+                isChild = state.isChild,
+                initial = state.referenceDoctor,
+                onDismiss = { showReferenceDoctorForm = false },
+                onSave = { draft ->
+                    viewModel.setReferenceDoctor(draft)
+                    showReferenceDoctorForm = false
+                },
+            )
+        }
     }
 
     // ── Dialogs ────────────────────────────────────────────────────────────────
@@ -399,6 +415,31 @@ fun MedicalRecordScreen(
                 editingContact = null
             },
         )
+    }
+
+}
+
+@Composable
+private fun ReferenceDoctorSummary(
+    draft: ReferenceDoctorDraft,
+    modifier: Modifier = Modifier,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(draft.name, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = kb.title)
+        if (draft.address.isNotBlank()) {
+            Text(draft.address, fontSize = 14.sp, color = kb.subtitle, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        }
+        if (draft.website.isNotBlank()) {
+            Text(draft.website, fontSize = 14.sp, color = Color(0xFF0A84FF), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        draft.officeHours.groupedOfficeHourDisplayLines().forEach { line ->
+            Text(
+                line,
+                fontSize = 12.sp,
+                color = kb.subtitle,
+            )
+        }
     }
 }
 

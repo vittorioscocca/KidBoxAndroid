@@ -8,13 +8,17 @@ import it.vittorioscocca.kidbox.ai.DailyBriefingPrefs
 import it.vittorioscocca.kidbox.ai.HealthPatternPrefs
 import it.vittorioscocca.kidbox.ai.WeeklySummaryPrefs
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
+import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
+import it.vittorioscocca.kidbox.data.remote.ai.AIService
 import it.vittorioscocca.kidbox.data.remote.ai.AIRemotePreferences
+import it.vittorioscocca.kidbox.data.remote.ai.AIUsageTracker
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -41,6 +45,9 @@ class AiSettingsViewModel @Inject constructor(
     private val aiRemotePrefs: AIRemotePreferences,
     private val subscriptionRepository: SubscriptionRepository,
     private val familyDao: KBFamilyDao,
+    private val aiService: AIService,
+    private val familySessionPreferences: FamilySessionPreferences,
+    private val aiUsageTracker: AIUsageTracker,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -57,18 +64,30 @@ class AiSettingsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { loadRemoteData() }
+        viewModelScope.launch {
+            aiUsageTracker.state.collectLatest { snapshot ->
+                if (snapshot.dailyLimit > 0) {
+                    _uiState.update { it.copy(aiUsageToday = snapshot.usageToday) }
+                }
+            }
+        }
     }
 
     private suspend fun loadRemoteData() {
         _uiState.update { it.copy(isLoading = true) }
-        val familyId = familyDao.peekAnyFamilyId().orEmpty()
+        val familyId = familySessionPreferences.getActiveFamilyId()
+            ?: familyDao.peekAnyFamilyId().orEmpty()
         val plan = subscriptionRepository.getPlan(familyId)
         val remote = aiRemotePrefs.fetch()
+        val usage = aiService.fetchUsage(familyId).getOrNull()
+        val usageToday = usage?.usageToday ?: aiUsageTracker.state.value.usageToday
+        usage?.let { aiUsageTracker.apply(it.usageToday, it.dailyLimit) }
         _uiState.update {
             it.copy(
                 isLoading = false,
                 plan = plan,
-                aiUsageToday = remote?.usageToday ?: 0,
+                isEnabled = remote?.aiEnabled ?: it.isEnabled,
+                aiUsageToday = usageToday,
             )
         }
     }

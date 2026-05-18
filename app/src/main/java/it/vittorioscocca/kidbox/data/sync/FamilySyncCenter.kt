@@ -23,6 +23,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBChildEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
 import it.vittorioscocca.kidbox.data.local.entity.canonicalMemberDisplayName
+import it.vittorioscocca.kidbox.data.repository.TripRepository
 import it.vittorioscocca.kidbox.domain.family.ownershipUidFromFamilyFirestore
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -53,6 +54,7 @@ class FamilySyncCenter @Inject constructor(
     private val userProfileDao: KBUserProfileDao,
     private val database: KidBoxDatabase,
     private val sessionPrefs: FamilySessionPreferences,
+    private val tripRepository: TripRepository,
     @ApplicationContext private val appContext: Context,
 ) {
     /** Sempre [FirebaseFirestore.getInstance] — mai un `val` fisso (dopo terminate il singleton si rinnova). */
@@ -192,6 +194,7 @@ class FamilySyncCenter @Inject constructor(
         sessionPrefs.setActiveFamilyId(familyId)
         _initialSyncDone.value = false
         Log.d(TAG, "startSync familyId=$familyId")
+        tripRepository.startRealtime(familyId)
 
         // Prefetch fire-and-forget: completa Room asincronamente quando la rete c'è,
         // ma NON blocca mai l'attacco dei listener — altrimenti, offline, la Home
@@ -915,6 +918,7 @@ class FamilySyncCenter @Inject constructor(
     fun stopSync() {
         ownerSyncRecoveryJob?.cancel()
         ownerSyncRecoveryJob = null
+        tripRepository.stopRealtime()
         familyListener?.remove()
         membersListener?.remove()
         childrenListener?.remove()

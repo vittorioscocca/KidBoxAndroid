@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.local.mapper
 
 import it.vittorioscocca.kidbox.data.local.entity.KBPediatricProfileEntity
+import it.vittorioscocca.kidbox.domain.model.KBDoctorOfficeHourSlot
 import it.vittorioscocca.kidbox.domain.model.KBEmergencyContact
 import it.vittorioscocca.kidbox.domain.model.KBPediatricProfile
 import org.json.JSONArray
@@ -17,6 +18,9 @@ fun KBPediatricProfileEntity.toDomain(): KBPediatricProfile = KBPediatricProfile
     medicalNotes = medicalNotes,
     doctorName = doctorName,
     doctorPhone = doctorPhone,
+    doctorAddress = doctorAddress,
+    doctorWebsite = doctorWebsite,
+    doctorOfficeHoursJson = doctorOfficeHoursJson,
     updatedAtEpochMillis = updatedAtEpochMillis,
     updatedBy = updatedBy,
     syncStateRaw = syncStateRaw,
@@ -33,6 +37,9 @@ fun KBPediatricProfile.toEntity(): KBPediatricProfileEntity = KBPediatricProfile
     medicalNotes = medicalNotes,
     doctorName = doctorName,
     doctorPhone = doctorPhone,
+    doctorAddress = doctorAddress,
+    doctorWebsite = doctorWebsite,
+    doctorOfficeHoursJson = doctorOfficeHoursJson,
     updatedAtEpochMillis = updatedAtEpochMillis,
     updatedBy = updatedBy,
     syncStateRaw = syncStateRaw,
@@ -54,6 +61,40 @@ fun KBPediatricProfile.decodeEmergencyContacts(): List<KBEmergencyContact> {
             )
         }
     }.getOrElse { emptyList() }
+}
+
+fun KBPediatricProfile.decodeOfficeHours(): List<KBDoctorOfficeHourSlot> =
+    doctorOfficeHoursJson.decodeOfficeHours()
+
+fun String?.decodeOfficeHours(): List<KBDoctorOfficeHourSlot> {
+    val raw = this ?: return emptyList()
+    return runCatching {
+        val arr = JSONArray(raw)
+        (0 until arr.length()).map { idx ->
+            val obj = arr.getJSONObject(idx)
+            KBDoctorOfficeHourSlot(
+                id = obj.optString("id").ifBlank { UUID.randomUUID().toString() },
+                weekday = obj.optString("weekday"),
+                fromTime = obj.optString("fromTime"),
+                toTime = obj.optString("toTime"),
+            )
+        }
+    }.getOrElse { emptyList() }
+}
+
+fun List<KBDoctorOfficeHourSlot>.encodeOfficeHoursForStorage(): String? {
+    if (isEmpty()) return null
+    val arr = JSONArray()
+    forEach { slot ->
+        val obj = JSONObject().apply {
+            put("id", slot.id)
+            put("weekday", slot.weekday)
+            put("fromTime", slot.fromTime)
+            put("toTime", slot.toTime)
+        }
+        arr.put(obj)
+    }
+    return arr.toString()
 }
 
 /** Encode emergency contacts list to the JSON column. Returns null for an empty list. */

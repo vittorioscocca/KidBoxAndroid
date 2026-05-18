@@ -4,13 +4,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
+import it.vittorioscocca.kidbox.data.local.mapper.decodeEmergencyContacts
+import it.vittorioscocca.kidbox.data.local.mapper.decodeOfficeHours
 import it.vittorioscocca.kidbox.data.repository.PediatricProfileRepository
 import it.vittorioscocca.kidbox.data.sync.PediatricProfileSyncCenter
 import it.vittorioscocca.kidbox.domain.model.KBEmergencyContact
+import it.vittorioscocca.kidbox.domain.model.ReferenceDoctorDraft
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 data class MedicalRecordState(
@@ -20,8 +25,7 @@ data class MedicalRecordState(
     val bloodGroup: String = "Non specificato",
     val allergies: String = "",
     val medicalNotes: String = "",
-    val doctorName: String = "",
-    val doctorPhone: String = "",
+    val referenceDoctor: ReferenceDoctorDraft = ReferenceDoctorDraft(),
     val emergencyContacts: List<KBEmergencyContact> = emptyList(),
     val saveError: String? = null,
     val savedAt: Long? = null,
@@ -39,30 +43,28 @@ class MedicalRecordViewModel @Inject constructor(
 
     private var familyId: String = ""
     private var childId: String = ""
+    private var observeJobStarted = false
 
     fun bind(familyId: String, childId: String) {
-        if (this.familyId == familyId && this.childId == childId) return
+        val idsChanged = this.familyId != familyId || this.childId != childId
         this.familyId = familyId
         this.childId = childId
         syncCenter.start(familyId, childId)
-        viewModelScope.launch {
-            val isChild = childDao.getById(childId) != null
-            val profile = repository.loadOnce(childId)
-            if (profile == null) {
-                _uiState.value = _uiState.value.copy(isLoading = false, isChild = isChild)
-                return@launch
+
+        if (!observeJobStarted || idsChanged) {
+            observeJobStarted = true
+            viewModelScope.launch {
+                val isChild = childDao.getById(childId) != null
+                repository.observe(familyId, childId)
+                    .map { profile -> profile to isChild }
+                    .distinctUntilChanged()
+                    .collect { (profile, childFlag) ->
+                        applyProfile(profile, childFlag, fromRemote = true)
+                    }
             }
-            _uiState.value = MedicalRecordState(
-                isLoading = false,
-                isChild = isChild,
-                bloodGroup = profile.bloodGroup ?: "Non specificato",
-                allergies = profile.allergies.orEmpty(),
-                medicalNotes = profile.medicalNotes.orEmpty(),
-                doctorName = profile.doctorName.orEmpty(),
-                doctorPhone = profile.doctorPhone.orEmpty(),
-                emergencyContacts = repository.decodeContacts(profile),
-            )
         }
+
+        refreshFromLocal()
     }
 
     override fun onCleared() {
@@ -72,11 +74,56 @@ class MedicalRecordViewModel @Inject constructor(
         }
     }
 
+    private fun refreshFromLocal() {
+        viewModelScope.launch {
+            val isChild = childDao.getById(childId) != null
+            val profile = repository.loadOnce(childId)
+            applyProfile(profile, isChild, fromRemote = false)
+        }
+    }
+
+    private fun applyProfile(
+        profile: it.vittorioscocca.kidbox.domain.model.KBPediatricProfile?,
+        isChild: Boolean,
+        fromRemote: Boolean,
+    ) {
+        if (profile == null) {
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                isChild = isChild,
+            )
+            return
+        }
+
+        // Non sovrascrivere modifiche in corso con snapshot Firestore.
+        if (fromRemote && (_uiState.value.isSaving || _uiState.value.saveError != null)) {
+            return
+        }
+
+        _uiState.value = MedicalRecordState(
+            isLoading = false,
+            isChild = isChild,
+            bloodGroup = profile.bloodGroup?.takeIf { it.isNotBlank() } ?: "Non specificato",
+            allergies = profile.allergies.orEmpty(),
+            medicalNotes = profile.medicalNotes.orEmpty(),
+            referenceDoctor = ReferenceDoctorDraft(
+                name = profile.doctorName.orEmpty(),
+                address = profile.doctorAddress.orEmpty(),
+                website = profile.doctorWebsite.orEmpty(),
+                officeHours = profile.decodeOfficeHours(),
+            ),
+            emergencyContacts = profile.decodeEmergencyContacts(),
+            saveError = _uiState.value.saveError,
+            savedAt = _uiState.value.savedAt,
+        )
+    }
+
     fun setBloodGroup(v: String) { _uiState.value = _uiState.value.copy(bloodGroup = v) }
     fun setAllergies(v: String) { _uiState.value = _uiState.value.copy(allergies = v) }
     fun setMedicalNotes(v: String) { _uiState.value = _uiState.value.copy(medicalNotes = v) }
-    fun setDoctorName(v: String) { _uiState.value = _uiState.value.copy(doctorName = v) }
-    fun setDoctorPhone(v: String) { _uiState.value = _uiState.value.copy(doctorPhone = v) }
+    fun setReferenceDoctor(draft: ReferenceDoctorDraft) {
+        _uiState.value = _uiState.value.copy(referenceDoctor = draft)
+    }
 
     fun upsertContact(contact: KBEmergencyContact) {
         val current = _uiState.value.emergencyContacts.toMutableList()
@@ -99,11 +146,10 @@ class MedicalRecordViewModel @Inject constructor(
                 repository.save(
                     familyId = familyId,
                     childId = childId,
-                    bloodGroup = s.bloodGroup.takeIf { it != "Non specificato" },
+                    bloodGroup = s.bloodGroup,
                     allergies = s.allergies,
                     medicalNotes = s.medicalNotes,
-                    doctorName = s.doctorName,
-                    doctorPhone = s.doctorPhone,
+                    referenceDoctor = s.referenceDoctor,
                     emergencyContacts = s.emergencyContacts,
                 )
             }.fold(
@@ -111,6 +157,7 @@ class MedicalRecordViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(
                         isSaving = false,
                         savedAt = System.currentTimeMillis(),
+                        saveError = null,
                     )
                 },
                 onFailure = { err ->

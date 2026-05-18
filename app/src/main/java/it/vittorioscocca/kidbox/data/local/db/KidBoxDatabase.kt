@@ -43,6 +43,11 @@ import it.vittorioscocca.kidbox.data.local.dao.VehicleEventDao
 import it.vittorioscocca.kidbox.data.local.dao.PasswordEntryDao
 import it.vittorioscocca.kidbox.data.local.dao.PasswordGroupDao
 import it.vittorioscocca.kidbox.data.local.dao.PwnedPrefixCacheDao
+import it.vittorioscocca.kidbox.data.local.dao.KBPackingItemDao
+import it.vittorioscocca.kidbox.data.local.dao.KBTripDao
+import it.vittorioscocca.kidbox.data.local.dao.KBTripDayPlanDao
+import it.vittorioscocca.kidbox.data.local.dao.KBTripExpenseDao
+import it.vittorioscocca.kidbox.data.local.dao.KBTripLegDao
 import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
 import it.vittorioscocca.kidbox.data.local.entity.KBAIConversationEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBAIMessageEntity
@@ -86,9 +91,14 @@ import it.vittorioscocca.kidbox.data.local.entity.VehicleEventEntity
 import it.vittorioscocca.kidbox.data.local.entity.PasswordEntryEntity
 import it.vittorioscocca.kidbox.data.local.entity.PasswordGroupEntity
 import it.vittorioscocca.kidbox.data.local.entity.PwnedPrefixCacheEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBPackingItemEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBTripEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBTripDayPlanEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBTripExpenseEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBTripLegEntity
 
 @Database(
-    version = 28,
+    version = 31,
     exportSchema = false,
     entities = [
         KBUserProfileEntity::class,
@@ -133,6 +143,11 @@ import it.vittorioscocca.kidbox.data.local.entity.PwnedPrefixCacheEntity
         PwnedPrefixCacheEntity::class,
         KBMemoryFactEntity::class,
         KBHealthInsightEntity::class,
+        KBTripEntity::class,
+        KBTripLegEntity::class,
+        KBTripDayPlanEntity::class,
+        KBTripExpenseEntity::class,
+        KBPackingItemEntity::class,
     ],
 )
 abstract class KidBoxDatabase : RoomDatabase() {
@@ -178,4 +193,9 @@ abstract class KidBoxDatabase : RoomDatabase() {
     abstract fun pwnedPrefixCacheDao(): PwnedPrefixCacheDao
     abstract fun memoryFactDao(): KBMemoryFactDao
     abstract fun healthInsightDao(): KBHealthInsightDao
+    abstract fun tripDao(): KBTripDao
+    abstract fun tripLegDao(): KBTripLegDao
+    abstract fun tripDayPlanDao(): KBTripDayPlanDao
+    abstract fun tripExpenseDao(): KBTripExpenseDao
+    abstract fun packingItemDao(): KBPackingItemDao
 }

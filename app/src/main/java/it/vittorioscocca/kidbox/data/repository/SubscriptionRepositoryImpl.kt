@@ -58,25 +58,28 @@ class SubscriptionRepositoryImpl @Inject constructor(
 
     override suspend fun loadPlan(familyId: String, uid: String): KBPlan {
         return runCatching {
-            var rawPlan: String? = null
+            var plan = KBPlan.FREE
 
             if (familyId.isNotBlank()) {
                 val familyDoc = firestore.collection("families").document(familyId).get().await()
-                rawPlan = familyDoc.getString("planOverride")
-                    ?.takeIf { it.isNotBlank() }
-                    ?: familyDoc.getString("plan")
-            }
-
-            if (rawPlan.isNullOrBlank() || KBPlan.fromRawValue(rawPlan) == KBPlan.FREE) {
-                val effectiveUid = uid.ifBlank { auth.currentUser?.uid.orEmpty() }
-                if (effectiveUid.isNotBlank()) {
-                    val userDoc = firestore.collection("users").document(effectiveUid).get().await()
-                    val userPlan = userDoc.getString("plan")
-                    if (!userPlan.isNullOrBlank()) rawPlan = userPlan
+                val data = familyDoc.data.orEmpty()
+                val override = (data["planOverride"] as? String)?.trim()?.lowercase()
+                plan = if (override == KBPlan.PRO.rawValue || override == KBPlan.MAX.rawValue) {
+                    KBPlan.fromRawValue(override)
+                } else {
+                    KBPlan.fromRawValue(data["plan"] as? String)
                 }
             }
 
-            KBPlan.fromRawValue(rawPlan)
+            if (plan == KBPlan.FREE) {
+                val effectiveUid = uid.ifBlank { auth.currentUser?.uid.orEmpty() }
+                if (effectiveUid.isNotBlank()) {
+                    val userDoc = firestore.collection("users").document(effectiveUid).get().await()
+                    plan = KBPlan.fromRawValue(userDoc.getString("plan"))
+                }
+            }
+
+            plan
         }.getOrDefault(KBPlan.FREE)
     }
 

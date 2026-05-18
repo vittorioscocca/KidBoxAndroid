@@ -127,6 +127,7 @@ private enum class PhotoGroupMode { DAY, MONTH, YEAR }
 @Composable
 fun FamilyPhotosScreen(
     onBack: () -> Unit,
+    onOpenAlbumDetail: (albumId: String, albumTitle: String) -> Unit = { _, _ -> },
     viewModel: FamilyPhotosViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -136,10 +137,13 @@ fun FamilyPhotosScreen(
     var viewerPhotoId by remember { mutableStateOf<String?>(null) }
     var isSelectionMode by remember { mutableStateOf(false) }
     var selectedPhotoIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var isAlbumSelectionMode by remember { mutableStateOf(false) }
+    var selectedAlbumIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showAlbumActionPicker by remember { mutableStateOf(false) }
     var isMoveAction by remember { mutableStateOf(false) }
     var pendingCaptureUri by remember { mutableStateOf<Uri?>(null) }
     var longPressMenuPhoto by remember { mutableStateOf<KBFamilyPhotoEntity?>(null) }
+    var longPressMenuAlbum by remember { mutableStateOf<KBPhotoAlbumEntity?>(null) }
     var groupMode by remember { mutableStateOf(PhotoGroupMode.DAY) }
 
     val multiMediaPicker = rememberMultiMediaPicker(maxItems = 30) { uris: List<Uri> ->
@@ -177,6 +181,16 @@ fun FamilyPhotosScreen(
         selectedPhotoIds = selectedPhotoIds.intersect(visibleIds)
         if (selectedPhotoIds.isEmpty()) isSelectionMode = false
     }
+    LaunchedEffect(state.albums, currentTab) {
+        if (currentTab != PhotosTab.ALBUMS) {
+            isAlbumSelectionMode = false
+            selectedAlbumIds = emptySet()
+            return@LaunchedEffect
+        }
+        val visibleIds = state.albums.map { it.id }.toSet()
+        selectedAlbumIds = selectedAlbumIds.intersect(visibleIds)
+        if (selectedAlbumIds.isEmpty()) isAlbumSelectionMode = false
+    }
 
     Box(
         modifier = Modifier
@@ -193,6 +207,8 @@ fun FamilyPhotosScreen(
             TopHeader(
                 tab = currentTab,
                 isSelectionMode = isSelectionMode,
+                isAlbumSelectionMode = isAlbumSelectionMode,
+                hasAlbums = state.albums.isNotEmpty(),
                 groupMode = groupMode,
                 onBack = onBack,
                 onToggleSelection = {
@@ -203,9 +219,17 @@ fun FamilyPhotosScreen(
                         isSelectionMode = true
                     }
                 },
+                onToggleAlbumSelection = {
+                    if (isAlbumSelectionMode) {
+                        isAlbumSelectionMode = false
+                        selectedAlbumIds = emptySet()
+                    } else {
+                        isAlbumSelectionMode = true
+                    }
+                },
                 onGroupModeSelected = { groupMode = it },
                 onCamera = {
-                    val uri = createCaptureUri(context) ?: run {
+                    val uri = photosCreateCaptureUri(context) ?: run {
                         Toast.makeText(context, "Impossibile aprire la fotocamera", Toast.LENGTH_LONG).show()
                         return@TopHeader
                     }
@@ -272,6 +296,37 @@ fun FamilyPhotosScreen(
                 }
             }
 
+            if (currentTab == PhotosTab.ALBUMS && isAlbumSelectionMode) {
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Surface(
+                        color = Color(0xFF1E88E5),
+                        shape = RoundedCornerShape(999.dp),
+                    ) {
+                        Text(
+                            text = "${selectedAlbumIds.size} selezionati",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(
+                        onClick = {
+                            val visibleIds = state.albums.map { it.id }.toSet()
+                            selectedAlbumIds = if (selectedAlbumIds.size == visibleIds.size) emptySet() else visibleIds
+                            if (selectedAlbumIds.isEmpty()) isAlbumSelectionMode = false
+                        },
+                    ) {
+                        Text(if (selectedAlbumIds.size == state.albums.size) "Deseleziona tutto" else "Seleziona tutto")
+                    }
+                }
+            }
+
             Spacer(Modifier.height(8.dp))
             when (currentTab) {
                 PhotosTab.LIBRARY -> {
@@ -286,7 +341,7 @@ fun FamilyPhotosScreen(
                             multiMediaPicker.launch(imageAndVideoRequest())
                         },
                         onEmptyCamera = {
-                            val uri = createCaptureUri(context) ?: run {
+                            val uri = photosCreateCaptureUri(context) ?: run {
                                 Toast.makeText(context, "Impossibile aprire la fotocamera", Toast.LENGTH_LONG).show()
                                 return@LibraryContent
                             }
@@ -316,14 +371,46 @@ fun FamilyPhotosScreen(
                         isLoading = state.isLoading,
                         albums = state.albums,
                         allPhotos = state.photos,
+                        isSelectionMode = isAlbumSelectionMode,
+                        selectedAlbumIds = selectedAlbumIds,
                         onCreateAlbum = { showCreateAlbum = true },
-                        onOpenAlbum = { album ->
-                            viewModel.selectAlbum(album.id)
-                            currentTab = PhotosTab.LIBRARY
+                        onAlbumTap = { album ->
+                            if (isAlbumSelectionMode) {
+                                selectedAlbumIds = if (selectedAlbumIds.contains(album.id)) {
+                                    selectedAlbumIds - album.id
+                                } else {
+                                    selectedAlbumIds + album.id
+                                }
+                                if (selectedAlbumIds.isEmpty()) isAlbumSelectionMode = false
+                            } else {
+                                onOpenAlbumDetail(album.id, album.title)
+                            }
+                        },
+                        onAlbumLongPress = { album ->
+                            longPressMenuAlbum = album
                         },
                     )
                 }
             }
+        }
+
+        if (isAlbumSelectionMode && currentTab == PhotosTab.ALBUMS) {
+            AlbumSelectionActionBar(
+                selectedCount = selectedAlbumIds.size,
+                onDelete = {
+                    viewModel.deleteAlbums(selectedAlbumIds)
+                    selectedAlbumIds = emptySet()
+                    isAlbumSelectionMode = false
+                },
+                onDeselect = {
+                    selectedAlbumIds = emptySet()
+                    isAlbumSelectionMode = false
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .navigationBarsPadding(),
+            )
         }
 
         if (isSelectionMode && currentTab == PhotosTab.LIBRARY) {
@@ -414,9 +501,28 @@ fun FamilyPhotosScreen(
         )
     }
 
+    longPressMenuAlbum?.let { album ->
+        AlbumLongPressMenuDialog(
+            onDismiss = { longPressMenuAlbum = null },
+            onOpen = {
+                longPressMenuAlbum = null
+                onOpenAlbumDetail(album.id, album.title)
+            },
+            onSelect = {
+                longPressMenuAlbum = null
+                isAlbumSelectionMode = true
+                selectedAlbumIds = setOf(album.id)
+            },
+            onDelete = {
+                longPressMenuAlbum = null
+                viewModel.deleteAlbum(album.id)
+            },
+        )
+    }
+
     val startIndex = viewerPhotoId?.let { id -> state.filteredPhotos.indexOfFirst { it.id == id } } ?: -1
     if (startIndex >= 0) {
-        FullscreenMediaViewer(
+        PhotosFullscreenMediaViewer(
             photos = state.filteredPhotos,
             startIndex = startIndex,
             onDismiss = { viewerPhotoId = null },
@@ -443,9 +549,12 @@ fun FamilyPhotosScreen(
 private fun TopHeader(
     tab: PhotosTab,
     isSelectionMode: Boolean,
+    isAlbumSelectionMode: Boolean,
+    hasAlbums: Boolean,
     groupMode: PhotoGroupMode,
     onBack: () -> Unit,
     onToggleSelection: () -> Unit,
+    onToggleAlbumSelection: () -> Unit,
     onGroupModeSelected: (PhotoGroupMode) -> Unit,
     onCamera: () -> Unit,
     onPlus: () -> Unit,
@@ -505,7 +614,15 @@ private fun TopHeader(
                 HeaderCircleButton(icon = Icons.Default.Add, onClick = onPlus)
             }
         } else {
-            Spacer(modifier = Modifier.size(44.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (hasAlbums) {
+                    HeaderCircleButton(
+                        icon = if (isAlbumSelectionMode) Icons.Default.Done else Icons.Default.DoneAll,
+                        onClick = onToggleAlbumSelection,
+                    )
+                }
+                HeaderCircleButton(icon = Icons.Default.Add, onClick = onPlus)
+            }
         }
     }
 }
@@ -621,8 +738,11 @@ private fun AlbumsContent(
     isLoading: Boolean,
     albums: List<KBPhotoAlbumEntity>,
     allPhotos: List<KBFamilyPhotoEntity>,
+    isSelectionMode: Boolean,
+    selectedAlbumIds: Set<String>,
     onCreateAlbum: () -> Unit,
-    onOpenAlbum: (KBPhotoAlbumEntity) -> Unit,
+    onAlbumTap: (KBPhotoAlbumEntity) -> Unit,
+    onAlbumLongPress: (KBPhotoAlbumEntity) -> Unit,
 ) {
     Spacer(Modifier.height(8.dp))
     if (isLoading) {
@@ -633,6 +753,7 @@ private fun AlbumsContent(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        if (!isSelectionMode) {
         Surface(
             onClick = onCreateAlbum,
             shape = RoundedCornerShape(999.dp),
@@ -654,12 +775,13 @@ private fun AlbumsContent(
                 )
             }
         }
+        }
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 56.dp),
+                .padding(top = if (isSelectionMode) 8.dp else 56.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -668,9 +790,49 @@ private fun AlbumsContent(
                 AlbumCard(
                     albumTitle = album.title,
                     coverPhoto = cover,
-                    onClick = { onOpenAlbum(album) },
+                    isSelectionMode = isSelectionMode,
+                    isSelected = selectedAlbumIds.contains(album.id),
+                    onClick = { onAlbumTap(album) },
+                    onLongClick = { onAlbumLongPress(album) },
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun AlbumSelectionActionBar(
+    selectedCount: Int,
+    onDelete: () -> Unit,
+    onDeselect: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+        color = MaterialTheme.kidBoxColors.card,
+        shadowElevation = 12.dp,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PhotosActionIconButton(
+                icon = Icons.Default.Close,
+                label = "Annulla",
+                enabled = true,
+                onClick = onDeselect,
+            )
+            PhotosActionIconButton(
+                icon = Icons.Default.Delete,
+                label = "Elimina",
+                enabled = selectedCount > 0,
+                destructive = true,
+                onClick = onDelete,
+            )
         }
     }
 }
@@ -701,37 +863,37 @@ private fun SelectionActionBar(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ActionIconButton(
+            PhotosActionIconButton(
                 icon = Icons.Default.Close,
                 label = "Annulla",
                 enabled = true,
                 onClick = onDeselect,
             )
-            ActionIconButton(
+            PhotosActionIconButton(
                 icon = Icons.AutoMirrored.Filled.PlaylistAdd,
                 label = "Aggiungi",
                 enabled = selectedCount > 0,
                 onClick = onAdd,
             )
-            ActionIconButton(
+            PhotosActionIconButton(
                 icon = Icons.AutoMirrored.Filled.DriveFileMove,
                 label = "Sposta",
                 enabled = selectedCount > 0,
                 onClick = onMove,
             )
-            ActionIconButton(
+            PhotosActionIconButton(
                 icon = Icons.Default.RemoveCircleOutline,
                 label = "Rimuovi",
                 enabled = canRemoveFromAlbum,
                 onClick = onRemove,
             )
-            ActionIconButton(
+            PhotosActionIconButton(
                 icon = Icons.Default.Image,
                 label = "Copertina",
                 enabled = canSetCover,
                 onClick = onSetCover,
             )
-            ActionIconButton(
+            PhotosActionIconButton(
                 icon = Icons.Default.Delete,
                 label = "Elimina",
                 enabled = selectedCount > 0,
@@ -871,18 +1033,25 @@ private fun buildPhotoSections(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AlbumCard(
     albumTitle: String,
     coverPhoto: KBFamilyPhotoEntity?,
+    isSelectionMode: Boolean,
+    isSelected: Boolean,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
 ) {
     Card(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+            ),
     ) {
         Box(
             modifier = Modifier
@@ -906,6 +1075,32 @@ private fun AlbumCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(Icons.Default.Image, contentDescription = null, tint = MaterialTheme.kidBoxColors.subtitle)
+                }
+            }
+            if (isSelectionMode) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            if (isSelected) Color(0xFF1E88E5).copy(alpha = 0.35f) else Color.Black.copy(alpha = 0.2f),
+                        ),
+                )
+                Surface(
+                    color = if (isSelected) Color(0xFF1E88E5) else Color.Black.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(999.dp),
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp),
+                ) {
+                    Text(
+                        text = if (isSelected) "✓" else "",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .size(22.dp)
+                            .padding(top = 1.dp),
+                        textAlign = TextAlign.Center,
+                    )
                 }
             }
         }
@@ -1012,7 +1207,7 @@ private fun PhotoGridItem(
                         )
                         Spacer(Modifier.width(2.dp))
                         Text(
-                            text = formatDuration(photo.videoDurationSeconds),
+                            text = photosFormatDuration(photo.videoDurationSeconds),
                             color = Color.White,
                             fontSize = 10.sp,
                         )
@@ -1055,6 +1250,67 @@ private fun PhotoGridItem(
             }
         }
     }
+}
+
+@Composable
+private fun AlbumLongPressMenuDialog(
+    onDismiss: () -> Unit,
+    onOpen: () -> Unit,
+    onSelect: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Azioni album") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Surface(
+                    onClick = onOpen,
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.kidBoxColors.card,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = "Apri",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        color = MaterialTheme.kidBoxColors.title,
+                    )
+                }
+                Surface(
+                    onClick = onSelect,
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.kidBoxColors.card,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = "Seleziona",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        color = MaterialTheme.kidBoxColors.title,
+                    )
+                }
+                Surface(
+                    onClick = onDelete,
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFFFEBEE),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = "Elimina album",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        color = Color(0xFFE35156),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Chiudi") }
+        },
+    )
 }
 
 @Composable
@@ -1119,7 +1375,7 @@ private fun PhotoLongPressMenuDialog(
 }
 
 @Composable
-private fun ActionIconButton(
+internal fun PhotosActionIconButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     enabled: Boolean,
@@ -1223,7 +1479,7 @@ private fun CreateAlbumDialog(
     )
 }
 
-private fun formatDuration(durationSeconds: Double?): String {
+internal fun photosFormatDuration(durationSeconds: Double?): String {
     if (durationSeconds == null || durationSeconds <= 0.0) return "00:00"
     val total = durationSeconds.toInt()
     val minutes = total / 60
@@ -1233,7 +1489,7 @@ private fun formatDuration(durationSeconds: Double?): String {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun FullscreenMediaViewer(
+internal fun PhotosFullscreenMediaViewer(
     photos: List<KBFamilyPhotoEntity>,
     startIndex: Int,
     onDismiss: () -> Unit,
@@ -1433,7 +1689,7 @@ private fun FullscreenMediaViewer(
                 }
                 currentPhoto?.takeIf { it.mimeType.startsWith("video/") }?.let { video ->
                     Text(
-                        text = formatDuration(video.videoDurationSeconds),
+                        text = photosFormatDuration(video.videoDurationSeconds),
                         color = Color.White.copy(alpha = 0.82f),
                         fontSize = 12.sp,
                         modifier = Modifier
@@ -2083,7 +2339,7 @@ private fun shareMedia(
     context.startActivity(Intent.createChooser(intent, "Condividi").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 }
 
-private fun createCaptureUri(context: android.content.Context): Uri? {
+internal fun photosCreateCaptureUri(context: android.content.Context): Uri? {
     return runCatching {
         val dir = File(context.cacheDir, "kb_photo_capture").apply { mkdirs() }
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())

@@ -69,6 +69,8 @@ class PhotoVideoRepository @Inject constructor(
         albumDao.observeByFamilyId(familyId)
             .map { it.sortedWith(compareBy<KBPhotoAlbumEntity> { album -> album.sortOrder }.thenBy { album -> album.title.lowercase(Locale.ROOT) }) }
 
+    suspend fun getAlbum(albumId: String): KBPhotoAlbumEntity? = albumDao.getById(albumId)
+
     fun startRealtime(
         familyId: String,
         onPermissionDenied: (() -> Unit)? = null,
@@ -302,6 +304,40 @@ class PhotoVideoRepository @Inject constructor(
                 lastSyncError = null,
             ),
         )
+    }
+
+    suspend fun deleteAlbum(albumId: String) {
+        val album = albumDao.getById(albumId) ?: return
+        if (album.isDeleted) return
+        val now = System.currentTimeMillis()
+        val uid = auth.currentUser?.uid ?: album.updatedBy
+        photoDao.getAllByFamilyId(album.familyId)
+            .filter { !it.isDeleted && parseAlbumIds(it.albumIdsRaw).contains(albumId) }
+            .forEach { photo ->
+                val updatedAlbumIds = parseAlbumIds(photo.albumIdsRaw).toMutableSet().apply { remove(albumId) }
+                photoDao.upsert(
+                    photo.copy(
+                        albumIdsRaw = updatedAlbumIds.joinToString(","),
+                        updatedAtEpochMillis = now,
+                        updatedBy = uid,
+                        syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+                        lastSyncError = null,
+                    ),
+                )
+            }
+        albumDao.upsert(
+            album.copy(
+                isDeleted = true,
+                updatedAtEpochMillis = now,
+                updatedBy = uid,
+                syncStateRaw = KBSyncState.PENDING_DELETE.rawValue,
+                lastSyncError = null,
+            ),
+        )
+    }
+
+    suspend fun deleteAlbums(albumIds: Collection<String>) {
+        albumIds.distinct().forEach { deleteAlbum(it) }
     }
 
     suspend fun preparePreviewFile(photo: KBFamilyPhotoEntity): File {

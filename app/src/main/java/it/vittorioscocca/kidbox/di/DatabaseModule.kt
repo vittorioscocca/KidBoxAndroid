@@ -24,6 +24,11 @@ import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyPhotoDao
 import it.vittorioscocca.kidbox.data.local.dao.KBGroceryItemDao
 import it.vittorioscocca.kidbox.data.local.dao.KBNoteDao
+import it.vittorioscocca.kidbox.data.local.dao.KBPackingItemDao
+import it.vittorioscocca.kidbox.data.local.dao.KBTripDao
+import it.vittorioscocca.kidbox.data.local.dao.KBTripDayPlanDao
+import it.vittorioscocca.kidbox.data.local.dao.KBTripExpenseDao
+import it.vittorioscocca.kidbox.data.local.dao.KBTripLegDao
 import it.vittorioscocca.kidbox.data.local.dao.KBExpenseDao
 import it.vittorioscocca.kidbox.data.local.dao.KBExpenseCategoryDao
 import it.vittorioscocca.kidbox.data.local.dao.KBDocumentDao
@@ -609,6 +614,135 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_28_29 = object : Migration(28, 29) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE kb_pediatric_profiles ADD COLUMN doctorAddress TEXT")
+            db.execSQL("ALTER TABLE kb_pediatric_profiles ADD COLUMN doctorWebsite TEXT")
+            db.execSQL("ALTER TABLE kb_pediatric_profiles ADD COLUMN doctorOfficeHoursJson TEXT")
+        }
+    }
+
+    private val MIGRATION_30_31 = object : Migration(30, 31) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE kb_trips ADD COLUMN photoAlbumId TEXT")
+            db.execSQL("ALTER TABLE kb_trips ADD COLUMN notesNoteId TEXT")
+            db.execSQL("ALTER TABLE kb_trips ADD COLUMN todoListId TEXT")
+        }
+    }
+
+    private val MIGRATION_29_30 = object : Migration(29, 30) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS kb_trips (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    startDateEpoch INTEGER NOT NULL,
+                    endDateEpoch INTEGER NOT NULL,
+                    participantIdsJson TEXT NOT NULL DEFAULT '[]',
+                    budgetTotal REAL NOT NULL DEFAULT 0.0,
+                    currency TEXT NOT NULL DEFAULT 'EUR',
+                    statusRaw TEXT NOT NULL DEFAULT 'planning',
+                    aiProposalJson TEXT,
+                    createdAtEpoch INTEGER NOT NULL,
+                    updatedAtEpoch INTEGER NOT NULL,
+                    createdBy TEXT NOT NULL,
+                    updatedBy TEXT NOT NULL,
+                    syncStateRaw INTEGER NOT NULL DEFAULT 0,
+                    lastSyncError TEXT
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_trips_familyId ON kb_trips(familyId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_trips_startDateEpoch ON kb_trips(startDateEpoch)")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS kb_trip_legs (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    tripId TEXT NOT NULL,
+                    `order` INTEGER NOT NULL,
+                    fromLocation TEXT NOT NULL,
+                    toLocation TEXT NOT NULL,
+                    transportModeRaw TEXT NOT NULL,
+                    departureAtEpoch INTEGER,
+                    arrivalAtEpoch INTEGER,
+                    notes TEXT,
+                    updatedAtEpoch INTEGER NOT NULL,
+                    FOREIGN KEY(tripId) REFERENCES kb_trips(id) ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_trip_legs_tripId ON kb_trip_legs(tripId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_trip_legs_familyId ON kb_trip_legs(familyId)")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS kb_trip_day_plans (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    tripId TEXT NOT NULL,
+                    dateString TEXT NOT NULL,
+                    location TEXT NOT NULL,
+                    morningPlan TEXT NOT NULL,
+                    afternoonPlan TEXT NOT NULL,
+                    eveningPlan TEXT NOT NULL,
+                    accommodationName TEXT,
+                    accommodationType TEXT,
+                    accommodationCostPerNight REAL,
+                    weatherBackupPlan TEXT,
+                    estimatedDailyCost REAL,
+                    updatedAtEpoch INTEGER NOT NULL,
+                    FOREIGN KEY(tripId) REFERENCES kb_trips(id) ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_trip_day_plans_tripId ON kb_trip_day_plans(tripId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_trip_day_plans_familyId ON kb_trip_day_plans(familyId)")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS kb_trip_expenses (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    tripId TEXT NOT NULL,
+                    dateString TEXT NOT NULL,
+                    amount REAL NOT NULL,
+                    currency TEXT NOT NULL,
+                    categoryRaw TEXT NOT NULL,
+                    description TEXT,
+                    paidBy TEXT NOT NULL,
+                    updatedAtEpoch INTEGER NOT NULL,
+                    FOREIGN KEY(tripId) REFERENCES kb_trips(id) ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_trip_expenses_tripId ON kb_trip_expenses(tripId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_trip_expenses_familyId ON kb_trip_expenses(familyId)")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS kb_packing_items (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    tripId TEXT NOT NULL,
+                    label TEXT NOT NULL,
+                    categoryRaw TEXT NOT NULL,
+                    isChecked INTEGER NOT NULL DEFAULT 0,
+                    isAIGenerated INTEGER NOT NULL DEFAULT 0,
+                    fromMedicalProfile INTEGER NOT NULL DEFAULT 0,
+                    updatedAtEpoch INTEGER NOT NULL,
+                    FOREIGN KEY(tripId) REFERENCES kb_trips(id) ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_packing_items_tripId ON kb_packing_items(tripId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_packing_items_familyId ON kb_packing_items(familyId)")
+        }
+    }
+
     private val MIGRATION_27_28 = object : Migration(27, 28) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(
@@ -929,6 +1063,9 @@ object DatabaseModule {
         MIGRATION_25_26,
         MIGRATION_26_27,
         MIGRATION_27_28,
+        MIGRATION_28_29,
+        MIGRATION_29_30,
+        MIGRATION_30_31,
     )
         .fallbackToDestructiveMigration()
         .build()
@@ -1063,4 +1200,19 @@ object DatabaseModule {
 
     @Provides
     fun providePwnedPrefixCacheDao(database: KidBoxDatabase): PwnedPrefixCacheDao = database.pwnedPrefixCacheDao()
+
+    @Provides
+    fun provideKBTripDao(database: KidBoxDatabase): KBTripDao = database.tripDao()
+
+    @Provides
+    fun provideKBTripLegDao(database: KidBoxDatabase): KBTripLegDao = database.tripLegDao()
+
+    @Provides
+    fun provideKBTripDayPlanDao(database: KidBoxDatabase): KBTripDayPlanDao = database.tripDayPlanDao()
+
+    @Provides
+    fun provideKBTripExpenseDao(database: KidBoxDatabase): KBTripExpenseDao = database.tripExpenseDao()
+
+    @Provides
+    fun provideKBPackingItemDao(database: KidBoxDatabase): KBPackingItemDao = database.packingItemDao()
 }

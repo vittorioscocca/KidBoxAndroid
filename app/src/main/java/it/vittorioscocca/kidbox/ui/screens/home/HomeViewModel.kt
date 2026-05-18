@@ -176,10 +176,8 @@ class HomeViewModel @Inject constructor(
     private fun observeHomeData() {
         viewModelScope.launch {
             familyDao.observeAll().collectLatest { families ->
-                val family = families.firstOrNull()
-                val familyId = family?.id.orEmpty()
-
-                if (familyId.isBlank()) {
+                if (families.isEmpty()) {
+                    val familyId = ""
                     homeBadgeManager.stopListening()
                     walletRepository.stopRealtime()
                     passwordsRepository.stopRealtime()
@@ -210,6 +208,16 @@ class HomeViewModel @Inject constructor(
                     _uiState.value = HomeUiState(isLoading = false, familyId = "")
                     return@collectLatest
                 }
+
+                val activeFamilyId = familySessionPreferences.getActiveFamilyId()
+                val selectedFamily = if (activeFamilyId != null) {
+                    families.firstOrNull { it.id == activeFamilyId } ?: families.first()
+                } else {
+                    families.first()
+                }
+                val familyId = selectedFamily.id
+                familySessionPreferences.setActiveFamilyId(familyId)
+
                 if (syncedFamilyId != familyId) {
                     syncedFamilyId = familyId
                     heroAbsentCacheKeys.clear()
@@ -240,7 +248,7 @@ class HomeViewModel @Inject constructor(
                     sharedLocationDao.observeActiveByFamilyId(familyId),
                 ) { fams, members, sharedUsers ->
                     Triple(
-                        fams.firstOrNull(),
+                        fams.firstOrNull { it.id == familyId },
                         members.size,
                         sharedUsers,
                     )
@@ -336,7 +344,16 @@ class HomeViewModel @Inject constructor(
     private fun observeFamilyPlanFromFirestore() {
         viewModelScope.launch {
             familyDao.observeAll().collectLatest { families ->
-                val familyId = families.firstOrNull()?.id.orEmpty()
+                if (families.isEmpty()) {
+                    _uiState.value = _uiState.value.copy(familyPlan = KBPlan.FREE)
+                    return@collectLatest
+                }
+                val activeFamilyId = familySessionPreferences.getActiveFamilyId()
+                val familyId = if (activeFamilyId != null) {
+                    families.firstOrNull { it.id == activeFamilyId }?.id ?: families.first().id
+                } else {
+                    families.first().id
+                }
                 val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
                 if (familyId.isBlank()) {
                     _uiState.value = _uiState.value.copy(familyPlan = KBPlan.FREE)
@@ -477,9 +494,18 @@ class HomeViewModel @Inject constructor(
                 return
             }
 
+            val preferredId = familySessionPreferences.getActiveFamilyId()
+            val orderedCandidates = if (
+                preferredId != null && distinctCandidates.contains(preferredId)
+            ) {
+                listOf(preferredId) + distinctCandidates.filter { it != preferredId }
+            } else {
+                distinctCandidates
+            }
+
             var selectedFamilyId: String? = null
             var selectedFamilyData: Map<String, Any> = emptyMap()
-            for (candidateId in distinctCandidates) {
+            for (candidateId in orderedCandidates) {
                 try {
                     val myMemberDoc = db.collection("families")
                         .document(candidateId)

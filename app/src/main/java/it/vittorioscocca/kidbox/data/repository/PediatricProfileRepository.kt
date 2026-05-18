@@ -2,10 +2,11 @@ package it.vittorioscocca.kidbox.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.data.local.dao.KBPediatricProfileDao
-import it.vittorioscocca.kidbox.data.local.mapper.decodeEmergencyContacts
 import it.vittorioscocca.kidbox.data.local.mapper.encodeForStorage
+import it.vittorioscocca.kidbox.data.local.mapper.encodeOfficeHoursForStorage
 import it.vittorioscocca.kidbox.data.local.mapper.toDomain
 import it.vittorioscocca.kidbox.data.local.mapper.toEntity
+import it.vittorioscocca.kidbox.domain.model.ReferenceDoctorDraft
 import it.vittorioscocca.kidbox.data.remote.health.PediatricProfileRemoteStore
 import it.vittorioscocca.kidbox.data.remote.health.RemotePediatricProfileDto
 import it.vittorioscocca.kidbox.domain.model.KBEmergencyContact
@@ -34,9 +35,6 @@ class PediatricProfileRepository @Inject constructor(
         dao.getByChildId(childId)?.toDomain()
     }
 
-    suspend fun decodeContacts(profile: KBPediatricProfile): List<KBEmergencyContact> =
-        profile.decodeEmergencyContacts()
-
     /**
      * Persists the profile locally with [KBSyncState.PENDING_UPSERT], then pushes to
      * Firestore. On success marks [KBSyncState.SYNCED]; on failure leaves the pending state
@@ -48,13 +46,14 @@ class PediatricProfileRepository @Inject constructor(
         bloodGroup: String?,
         allergies: String?,
         medicalNotes: String?,
-        doctorName: String?,
-        doctorPhone: String?,
+        referenceDoctor: ReferenceDoctorDraft,
         emergencyContacts: List<KBEmergencyContact>,
     ) = withContext(Dispatchers.IO) {
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()
         val contactsJson = emergencyContacts.encodeForStorage()
+        val officeHoursJson = referenceDoctor.officeHours.encodeOfficeHoursForStorage()
+        val existing = dao.getByChildId(childId)
 
         val updated = KBPediatricProfile(
             id = childId,
@@ -64,8 +63,11 @@ class PediatricProfileRepository @Inject constructor(
             bloodGroup = bloodGroup?.takeIf { it.isNotBlank() && it != "Non specificato" },
             allergies = allergies?.takeIf { it.isNotBlank() },
             medicalNotes = medicalNotes?.takeIf { it.isNotBlank() },
-            doctorName = doctorName?.takeIf { it.isNotBlank() },
-            doctorPhone = doctorPhone?.takeIf { it.isNotBlank() },
+            doctorName = referenceDoctor.name.takeIf { it.isNotBlank() },
+            doctorPhone = existing?.doctorPhone,
+            doctorAddress = referenceDoctor.address.takeIf { it.isNotBlank() },
+            doctorWebsite = referenceDoctor.website.takeIf { it.isNotBlank() },
+            doctorOfficeHoursJson = officeHoursJson,
             updatedAtEpochMillis = now,
             updatedBy = uid,
             syncStateRaw = 1, // PENDING_UPSERT
@@ -73,7 +75,7 @@ class PediatricProfileRepository @Inject constructor(
         )
         dao.upsert(updated.toEntity())
 
-        runCatching {
+        try {
             remote.upsert(
                 RemotePediatricProfileDto(
                     id = childId,
@@ -84,15 +86,24 @@ class PediatricProfileRepository @Inject constructor(
                     medicalNotes = updated.medicalNotes,
                     doctorName = updated.doctorName,
                     doctorPhone = updated.doctorPhone,
+                    doctorAddress = updated.doctorAddress,
+                    doctorWebsite = updated.doctorWebsite,
+                    doctorOfficeHoursJson = updated.doctorOfficeHoursJson,
                     emergencyContactsJson = updated.emergencyContactsJson,
                     isDeleted = false,
                     updatedAtEpochMillis = now,
                     updatedBy = uid,
-                )
+                ),
             )
-            dao.upsert(updated.copy(syncStateRaw = 0).toEntity()) // SYNCED
-        }.onFailure { err ->
-            dao.upsert(updated.copy(syncStateRaw = 1, lastSyncError = err.message).toEntity())
+            dao.upsert(updated.copy(syncStateRaw = 0, lastSyncError = null).toEntity())
+        } catch (err: Exception) {
+            dao.upsert(
+                updated.copy(
+                    syncStateRaw = 1,
+                    lastSyncError = err.message ?: "Sincronizzazione Firestore non riuscita",
+                ).toEntity(),
+            )
+            throw err
         }
     }
 }

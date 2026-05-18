@@ -62,9 +62,9 @@ class PediatricProfileSyncCenter @Inject constructor(
         val localStamp = local?.updatedAtEpochMillis ?: 0L
         val localSync = local?.syncStateRaw ?: 0
 
-        // Anti-resurrect: a local pending write that is newer than the remote snapshot wins.
-        if (local != null && localSync == 1 && localStamp > remoteStamp) {
-            Log.d(TAG, "skip anti-resurrect childId=$childId localStamp=$localStamp remoteStamp=$remoteStamp")
+        // Non sovrascrivere finché il push locale non è completato.
+        if (local != null && localSync == 1) {
+            Log.d(TAG, "skip pending local childId=$childId")
             return
         }
 
@@ -79,14 +79,17 @@ class PediatricProfileSyncCenter @Inject constructor(
                     id = childId,
                     familyId = familyId,
                     childId = childId,
-                    emergencyContactsJson = dto.emergencyContactsJson,
-                    bloodGroup = dto.bloodGroup,
-                    allergies = dto.allergies,
-                    medicalNotes = dto.medicalNotes,
-                    doctorName = dto.doctorName,
-                    doctorPhone = dto.doctorPhone,
+                    emergencyContactsJson = dto.emergencyContactsJson ?: local?.emergencyContactsJson,
+                    bloodGroup = dto.bloodGroup ?: local?.bloodGroup,
+                    allergies = dto.allergies ?: local?.allergies,
+                    medicalNotes = dto.medicalNotes ?: local?.medicalNotes,
+                    doctorName = dto.doctorName ?: local?.doctorName,
+                    doctorPhone = dto.doctorPhone ?: local?.doctorPhone,
+                    doctorAddress = dto.doctorAddress ?: local?.doctorAddress,
+                    doctorWebsite = dto.doctorWebsite ?: local?.doctorWebsite,
+                    doctorOfficeHoursJson = dto.doctorOfficeHoursJson ?: local?.doctorOfficeHoursJson,
                     updatedAtEpochMillis = remoteStamp,
-                    updatedBy = dto.updatedBy,
+                    updatedBy = dto.updatedBy ?: local?.updatedBy,
                     syncStateRaw = 0, // SYNCED
                     lastSyncError = null,
                 )

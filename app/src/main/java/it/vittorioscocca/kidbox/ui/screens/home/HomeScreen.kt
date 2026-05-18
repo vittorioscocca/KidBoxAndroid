@@ -55,7 +55,10 @@ import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Pets
+import androidx.compose.material.icons.filled.Luggage
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -64,8 +67,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -108,19 +114,24 @@ import java.io.File
 import kotlin.math.sqrt
 import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.domain.model.KBPlan
+import it.vittorioscocca.kidbox.ui.family.FamilySwitcherBottomSheet
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.theme.KidBoxDarkColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import it.vittorioscocca.kidbox.ui.util.rememberSingleImagePicker
 import it.vittorioscocca.kidbox.ui.util.singleImageRequest
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onNavigate: (String) -> Unit,
+    onReloadHome: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var showFamilySwitcher by remember { mutableStateOf(false) }
+    val familySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val snackbarHostState = remember { SnackbarHostState() }
     val pendingUri by viewModel.pendingHeroUri.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -210,13 +221,42 @@ fun HomeScreen(
             }
 
             Spacer(modifier = Modifier.size(12.dp))
-            Text(
-                "KidBox",
-                fontSize = 34.sp,
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = (-0.5).sp,
-                color = MaterialTheme.kidBoxColors.title,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "KidBox",
+                        fontSize = 34.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = (-0.5).sp,
+                        color = MaterialTheme.kidBoxColors.title,
+                    )
+                    if (state.familyName.isNotBlank()) {
+                        Text(
+                            text = state.familyName,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.kidBoxColors.subtitle,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                IconButton(
+                    onClick = { showFamilySwitcher = true },
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.SwapHoriz,
+                        contentDescription = "Cambia famiglia",
+                        tint = MaterialTheme.kidBoxColors.title,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.size(16.dp))
 
@@ -438,6 +478,25 @@ fun HomeScreen(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp),
+        )
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 88.dp),
+        )
+    }
+
+    if (showFamilySwitcher) {
+        FamilySwitcherBottomSheet(
+            sheetState = familySheetState,
+            snackbarHostState = snackbarHostState,
+            onDismiss = { showFamilySwitcher = false },
+            onSwitchComplete = {
+                showFamilySwitcher = false
+                onReloadHome()
+            },
         )
     }
 }
@@ -781,6 +840,20 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
         Icons.Filled.DirectionsCar,
         Color(0xFFF0F0F0),
         Color(0xFF1A1A1A),
+    ),
+    FeatureItem(
+        id = "travel",
+        title = "Viaggi",
+        subtitle = if (state.familyPlan == KBPlan.FREE) {
+            "Piano Pro o Max per l'AI"
+        } else {
+            "Pianifica con l'AI"
+        },
+        route = AppDestination.TravelList.createRoute(familyId),
+        icon = if (state.familyPlan == KBPlan.FREE) Icons.Filled.Lock else Icons.Filled.Luggage,
+        cardColor = Color(0xFFE0F7FA),
+        iconColor = Color(0xFF00838F),
+        locked = state.familyPlan == KBPlan.FREE,
     ),
     FeatureItem(
         id = "ai",

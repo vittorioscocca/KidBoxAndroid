@@ -47,8 +47,11 @@ enum class KBPlan(val rawValue: String) {
     }
 
     companion object {
-        fun fromRawValue(raw: String?): KBPlan =
-            entries.firstOrNull { it.rawValue == raw } ?: FREE
+        fun fromRawValue(raw: String?): KBPlan {
+            val normalized = raw?.trim()?.lowercase().orEmpty()
+            if (normalized.isEmpty()) return FREE
+            return entries.firstOrNull { it.rawValue == normalized } ?: FREE
+        }
 
         // Backward-compatible helper for existing Android call sites.
         fun from(raw: String?): KBPlan = fromRawValue(raw)

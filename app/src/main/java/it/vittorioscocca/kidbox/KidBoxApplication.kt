@@ -5,6 +5,8 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import it.vittorioscocca.kidbox.network.KidBoxHttpHeaders
+import okhttp3.OkHttpClient
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.WorkManager
@@ -103,5 +105,15 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
             }
             .respectCacheHeaders(false)
             .crossfade(true)
+            .okHttpClient {
+                OkHttpClient.Builder()
+                    .addInterceptor { chain ->
+                        val request = chain.request().newBuilder()
+                            .header("User-Agent", KidBoxHttpHeaders.USER_AGENT)
+                            .build()
+                        chain.proceed(request)
+                    }
+                    .build()
+            }
             .build()
 }

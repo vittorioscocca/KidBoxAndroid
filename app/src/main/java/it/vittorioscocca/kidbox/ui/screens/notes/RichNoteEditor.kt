@@ -52,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -239,8 +240,8 @@ fun RichNoteEditor(
                             isVerticalScrollBarEnabled = true
                             setPadding(20, 12, 20, 20)
                             hint = "Testo"
-                            setTextColor(resolveTextColor())
-                            setHintTextColor(resolveHintColor())
+                            setTextColor(kb.title.toArgb())
+                            setHintTextColor(kb.subtitle.toArgb())
                             textSize = 16f
                             inputType = InputType.TYPE_CLASS_TEXT or
                                 InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or
@@ -296,6 +297,8 @@ fun RichNoteEditor(
                     },
                     update = { editText ->
                         editTextRef[0] = editText
+                        editText.setTextColor(kb.title.toArgb())
+                        editText.setHintTextColor(kb.subtitle.toArgb())
                         val currentBody = spannedToHtml(editText.text ?: "")
                         val targetBody = body
                         if (currentBody != targetBody) {
@@ -872,9 +875,3 @@ private fun spannedToHtml(
     )
 }
 
-private fun EditText.resolveTextColor(): Int = android.graphics.Color.parseColor("#EAEAEA").takeIf {
-    resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK ==
-        android.content.res.Configuration.UI_MODE_NIGHT_YES
-} ?: android.graphics.Color.parseColor("#1A1A1A")
-
-private fun EditText.resolveHintColor(): Int = android.graphics.Color.parseColor("#8A8A8A")

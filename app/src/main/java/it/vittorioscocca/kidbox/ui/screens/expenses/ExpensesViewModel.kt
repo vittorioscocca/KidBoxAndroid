@@ -63,6 +63,7 @@ data class ExpensesUiState(
     val period: ExpensePeriod = ExpensePeriod.SIX_MONTHS,
     val customStartEpochMillis: Long = System.currentTimeMillis(),
     val customEndEpochMillis: Long = System.currentTimeMillis(),
+    val selectedCategoryFilter: String? = null,
     val expenses: List<KBExpenseEntity> = emptyList(),
     val visibleExpenses: List<KBExpenseEntity> = emptyList(),
     val categories: List<KBExpenseCategoryEntity> = emptyList(),
@@ -128,6 +129,12 @@ class ExpensesViewModel @Inject constructor(
             runCatching { repository.seedDefaultCategories(familyId) }
             runCatching { repository.flushPending(familyId) }
         }
+    }
+
+    fun setInitialCategoryFilter(categoryId: String?) {
+        if (_uiState.value.selectedCategoryFilter == categoryId) return
+        _uiState.value = _uiState.value.copy(selectedCategoryFilter = categoryId?.takeIf { it.isNotBlank() })
+        recomputeCharts()
     }
 
     fun setPeriod(period: ExpensePeriod) {
@@ -289,7 +296,10 @@ class ExpensesViewModel @Inject constructor(
             customStartEpochMillis = state.customStartEpochMillis,
             customEndEpochMillis = state.customEndEpochMillis,
         )
-        val visible = state.expenses.filter { it.dateEpochMillis in range.startEpochMillis until range.endExclusiveEpochMillis }
+        val inRange = state.expenses.filter { it.dateEpochMillis in range.startEpochMillis until range.endExclusiveEpochMillis }
+        val visible = state.selectedCategoryFilter?.let { categoryId ->
+            inRange.filter { it.categoryId == categoryId }
+        } ?: inRange
         val total = visible.sumOf { it.amount }
         val bars = buildMonthlyBars(visible, range)
         val slices = buildCategorySlices(
