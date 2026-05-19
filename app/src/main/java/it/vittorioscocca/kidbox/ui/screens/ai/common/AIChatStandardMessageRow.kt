@@ -76,30 +76,39 @@ fun AIChatStandardMessageRow(
         horizontalAlignment = alignment,
     ) {
         if (isUser) {
-            Box(
-                modifier = Modifier
-                    .widthIn(max = maxUserWidth)
-                    .clip(
-                        RoundedCornerShape(
-                            topStart = 16.dp,
-                            topEnd = 16.dp,
-                            bottomStart = 16.dp,
-                            bottomEnd = 4.dp,
-                        ),
-                    )
-                    .background(userBubbleColor)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            AIChatCopyableMessageContainer(
+                copyText = content,
+                modifier = Modifier.widthIn(max = maxUserWidth),
             ) {
-                Text(content, fontSize = 14.sp, color = userTextColor ?: kb.title)
+                Box(
+                    modifier = Modifier
+                        .clip(
+                            RoundedCornerShape(
+                                topStart = 16.dp,
+                                topEnd = 16.dp,
+                                bottomStart = 16.dp,
+                                bottomEnd = 4.dp,
+                            ),
+                        )
+                        .background(userBubbleColor)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Text(content, fontSize = 14.sp, color = userTextColor ?: kb.title)
+                }
             }
         } else {
-            TypewriterClaudeMarkdownText(
-                text = content,
-                streamReveal = isStreaming,
+            AIChatCopyableMessageContainer(
+                copyText = content,
                 modifier = Modifier.fillMaxWidth(),
-                onRevealTick = onStreamScrollTick,
-                onRevealComplete = onStreamingComplete,
-            )
+            ) {
+                TypewriterClaudeMarkdownText(
+                    text = content,
+                    streamReveal = isStreaming,
+                    modifier = Modifier.fillMaxWidth(),
+                    onRevealTick = onStreamScrollTick,
+                    onRevealComplete = onStreamingComplete,
+                )
+            }
         }
         Spacer(Modifier.height(2.dp))
         Text(

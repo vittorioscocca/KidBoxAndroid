@@ -86,6 +86,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
+import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatCopyableMessageContainer
 import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatListScrollEffect
 import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatStandardMessageRow
 import it.vittorioscocca.kidbox.ui.screens.ai.common.TypewriterClaudeMarkdownText
@@ -425,25 +426,34 @@ fun AIChatBubbleView(
             horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
         ) {
             if (isUser) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+                AIChatCopyableMessageContainer(
+                    copyText = message.content,
                     modifier = Modifier.widthIn(max = maxUserWidth),
-                    shape = RoundedCornerShape(16.dp),
                 ) {
-                    Text(
-                        message.content,
-                        modifier = Modifier.padding(12.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        Text(
+                            message.content,
+                            modifier = Modifier.padding(12.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    }
                 }
             } else {
-                TypewriterClaudeMarkdownText(
-                    text = message.content,
-                    streamReveal = isStreaming,
+                AIChatCopyableMessageContainer(
+                    copyText = message.content,
                     modifier = Modifier.fillMaxWidth(),
-                    onRevealTick = onStreamScrollTick,
-                    onRevealComplete = { onStreamingComplete(message.id) },
-                )
+                ) {
+                    TypewriterClaudeMarkdownText(
+                        text = message.content,
+                        streamReveal = isStreaming,
+                        modifier = Modifier.fillMaxWidth(),
+                        onRevealTick = onStreamScrollTick,
+                        onRevealComplete = { onStreamingComplete(message.id) },
+                    )
+                }
             }
             Text(
                 PlanningContextBuilder.formatTime(message.createdAtEpochMillis),

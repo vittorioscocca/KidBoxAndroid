@@ -1,6 +1,8 @@
 package it.vittorioscocca.kidbox.data.repository
 
 import it.vittorioscocca.kidbox.data.local.dao.KBAIConversationDao
+import it.vittorioscocca.kidbox.data.health.ai.HealthContextCompaction
+import it.vittorioscocca.kidbox.data.remote.ai.AIAskAIPayload
 import it.vittorioscocca.kidbox.data.local.dao.KBAIMessageDao
 import it.vittorioscocca.kidbox.data.local.entity.KBAIConversationEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBAIMessageEntity
@@ -20,6 +22,11 @@ data class HealthAISendResult(
     val reply: AiReply,
     val executionSummary: String?,
     val didAutoExecute: Boolean,
+)
+
+data class CompactPayloadEstimate(
+    val askUnits: Int,
+    val setupUnits: Int,
 )
 
 @Singleton
@@ -56,6 +63,7 @@ class HealthAIChatRepository @Inject constructor(
         conversation: KBAIConversation,
         userText: String,
         systemPrompt: String,
+        resolvedSystemPrompt: String? = null,
     ): Result<HealthAISendResult> = runCatching {
         val now = System.currentTimeMillis()
         val userMsg = KBAIMessageEntity(
@@ -73,9 +81,9 @@ class HealthAIChatRepository @Inject constructor(
 
         val allMessages = messageDao.getAllByConversationId(conv.id).map { it.toDomain() }
         val payloadMessages = buildPayloadMessages(conv, allMessages)
-        val finalSystemPrompt = buildFinalSystemPrompt(conv, systemPrompt)
+        val base = resolvedSystemPrompt ?: buildFinalSystemPrompt(conv, systemPrompt)
 
-        val reply = aiRepository.askAI(conv.familyId, finalSystemPrompt, payloadMessages)
+        val reply = aiRepository.askAI(conv.familyId, base, payloadMessages)
             .getOrElse { err ->
                 messageDao.deleteById(userMsg.id)
                 throw err
@@ -148,6 +156,86 @@ class HealthAIChatRepository @Inject constructor(
     fun observeMessages(conversationId: String): Flow<List<KBAIMessage>> =
         messageDao.observeByConversationId(conversationId).map { list -> list.map { it.toDomain() } }
 
+    fun estimatePayloadCost(
+        conversation: KBAIConversation,
+        baseSystemPrompt: String,
+        allMessages: List<KBAIMessage>,
+        pendingUserText: String = "",
+    ): Int {
+        val payload = buildPayloadMessages(conversation, allMessages)
+        val prompt = buildFinalSystemPrompt(conversation, baseSystemPrompt)
+        val total = AIAskAIPayload.totalChars(prompt, payload, pendingUserText)
+        return AIAskAIPayload.messageUnits(total)
+    }
+
+    fun estimateCompactPayloadCost(
+        conversation: KBAIConversation,
+        baseSystemPrompt: String,
+        allMessages: List<KBAIMessage>,
+        pendingUserText: String,
+        subjectName: String,
+        compactHealthSummary: String?,
+        healthContextFingerprint: Int,
+        cachedFingerprint: Int?,
+    ): CompactPayloadEstimate {
+        val payload = buildPayloadMessages(conversation, allMessages)
+        val hasCache = compactHealthSummary != null && cachedFingerprint == healthContextFingerprint
+        val summaryText = if (hasCache) {
+            compactHealthSummary!!
+        } else {
+            val estimatedLen = minOf(12_000, maxOf(4_000, baseSystemPrompt.length / 6))
+            "·".repeat(estimatedLen)
+        }
+        val prompt = compactSystemPrompt(summaryText, subjectName, conversation)
+        val askUnits = AIAskAIPayload.messageUnits(
+            AIAskAIPayload.totalChars(prompt, payload, pendingUserText),
+        )
+        val setupUnits = if (hasCache) {
+            0
+        } else {
+            AIAskAIPayload.messageUnits(
+                baseSystemPrompt.length +
+                    HealthContextCompaction.SUMMARIZATION_SYSTEM_PROMPT.length +
+                    256,
+            )
+        }
+        return CompactPayloadEstimate(askUnits = askUnits, setupUnits = setupUnits)
+    }
+
+    suspend fun summarizeHealthContext(
+        familyId: String,
+        fullSystemPrompt: String,
+    ): Result<String> = runCatching {
+        val messages = listOf(
+            KBAIMessage(
+                id = "health-context-input",
+                conversationId = "",
+                roleRaw = "user",
+                content = "Comprimi il seguente contesto sanitario:\n\n$fullSystemPrompt",
+                createdAtEpochMillis = System.currentTimeMillis(),
+            ),
+        )
+        val reply = aiRepository.askAI(
+            familyId,
+            HealthContextCompaction.SUMMARIZATION_SYSTEM_PROMPT,
+            messages,
+        ).getOrThrow()
+        reply.reply.trim().takeIf { it.isNotEmpty() }
+            ?: error("Impossibile riassumere il contesto sanitario.")
+    }
+
+    fun compactSystemPrompt(
+        healthSummary: String,
+        subjectName: String,
+        conversation: KBAIConversation,
+    ): String {
+        var prompt = HealthContextCompaction.buildCompactSystemPrompt(healthSummary, subjectName)
+        conversation.summary?.trim()?.takeIf { it.isNotEmpty() }?.let { s ->
+            prompt += "\n\nRIASSUNTO CONVERSAZIONE PRECEDENTE\n$s"
+        }
+        return prompt
+    }
+
     suspend fun clearConversation(conversation: KBAIConversation) {
         messageDao.deleteByConversationId(conversation.id)
         conversationDao.upsert(
@@ -180,7 +268,10 @@ class HealthAIChatRepository @Inject constructor(
         return (listOfNotNull(summaryMessage) + recent).take(7)
     }
 
-    private fun buildFinalSystemPrompt(conversation: KBAIConversation, baseSystemPrompt: String): String {
+    private fun buildFinalSystemPrompt(
+        conversation: KBAIConversation,
+        baseSystemPrompt: String,
+    ): String {
         val summary = conversation.summary?.takeIf { it.isNotBlank() } ?: return baseSystemPrompt
         return "$baseSystemPrompt\n\nRIASSUNTO CONVERSAZIONE PRECEDENTE\n$summary"
     }

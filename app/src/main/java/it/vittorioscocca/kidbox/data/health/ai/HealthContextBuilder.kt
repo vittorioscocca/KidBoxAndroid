@@ -112,7 +112,6 @@ REGOLE IMPORTANTI:
         val sortedVisits = visits
             .filter { !it.isDeleted }
             .sortedByDescending { it.dateEpochMillis }
-            .take(10)
         sb.appendLine()
         sb.appendLine("--- VISITE (${sortedVisits.size}) ---")
         sortedVisits.forEach { v ->

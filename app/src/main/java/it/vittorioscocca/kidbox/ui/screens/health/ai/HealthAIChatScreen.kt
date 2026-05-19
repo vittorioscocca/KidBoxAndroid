@@ -73,10 +73,18 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.data.ai.AISettingsStore
+import it.vittorioscocca.kidbox.data.health.ai.HealthContextSendMode
+import it.vittorioscocca.kidbox.data.remote.ai.AIAskAIPayload
+import it.vittorioscocca.kidbox.ui.screens.settings.HealthContextSendPreferenceSection
+import androidx.compose.material3.SnackbarDuration
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
 import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatListScrollEffect
 import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatStandardMessageRow
@@ -115,8 +123,25 @@ fun HealthAIChatScreen(
     val scope = rememberCoroutineScope()
     var showClearDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    var showHealthContextPreferenceSheet by remember { mutableStateOf(false) }
+    val aiSettingsStore = remember {
+        AISettingsStore(LocalContext.current.applicationContext)
+    }
+    var healthContextPreference by remember {
+        mutableStateOf(aiSettingsStore.getHealthContextSendPreference())
+    }
 
     LaunchedEffect(familyId, childId) { viewModel.bind(familyId, childId) }
+
+    LaunchedEffect(state.estimatedMessageUnits, state.isLoadingContext) {
+        if (viewModel.shouldShowLargeContextNotice()) {
+            viewModel.markLargeContextNoticeShown()
+            snackbarHostState.showSnackbar(
+                message = AIAskAIPayload.TRANSIENT_LARGE_CONTEXT_NOTICE,
+                duration = SnackbarDuration.Long,
+            )
+        }
+    }
 
     val (streamScrollTick, onStreamScrollTick) = rememberStreamScrollTick()
     AIChatListScrollEffect(
@@ -186,6 +211,14 @@ fun HealthAIChatScreen(
                                 },
                             )
                             DropdownMenuItem(
+                                text = { Text("Contesto chat Salute") },
+                                onClick = {
+                                    showMenu = false
+                                    healthContextPreference = aiSettingsStore.getHealthContextSendPreference()
+                                    showHealthContextPreferenceSheet = true
+                                },
+                            )
+                            DropdownMenuItem(
                                 text = { Text("Impostazioni AI") },
                                 onClick = {
                                     showMenu = false
@@ -198,13 +231,17 @@ fun HealthAIChatScreen(
             )
             // ── Content ──────────────────────────────────────────────────────
             when {
-                state.isLoadingContext -> {
+                state.isLoadingContext || state.isPreparingCompactContext -> {
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             CircularProgressIndicator(color = ORANGE)
                             Spacer(Modifier.height(12.dp))
                             Text(
-                                "Preparando il contesto sanitario...",
+                                if (state.isPreparingCompactContext) {
+                                    "Riassunto contesto sanitario..."
+                                } else {
+                                    "Preparando il contesto sanitario..."
+                                },
                                 fontSize = 14.sp,
                                 color = kb.subtitle,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -332,15 +369,28 @@ fun HealthAIChatScreen(
             // ── Usage bar ─────────────────────────────────────────────────────
             if (state.dailyLimit > 0) {
                 val usageColor = if (state.isNearLimit) ORANGE else kb.subtitle
-                Text(
-                    "${state.usageToday}/${state.dailyLimit}",
-                    fontSize = 11.sp,
-                    color = usageColor,
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 2.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
-                )
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (state.estimatedMessageUnits > 1) {
+                        Text(
+                            "Prossimo invio: ${state.estimatedMessageUnits} messaggi",
+                            fontSize = 11.sp,
+                            color = ORANGE,
+                        )
+                    } else {
+                        Spacer(Modifier.width(1.dp))
+                    }
+                    Text(
+                        "${state.usageToday}/${state.dailyLimit}",
+                        fontSize = 11.sp,
+                        color = usageColor,
+                    )
+                }
             }
 
             // ── Input bar ─────────────────────────────────────────────────────
@@ -394,6 +444,24 @@ fun HealthAIChatScreen(
         )
     }
 
+    if (showHealthContextPreferenceSheet) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { showHealthContextPreferenceSheet = false },
+            sheetState = sheetState,
+        ) {
+            HealthContextSendPreferenceSection(
+                selected = healthContextPreference,
+                onSelected = { pref ->
+                    healthContextPreference = pref
+                    aiSettingsStore.setHealthContextSendPreference(pref)
+                },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
@@ -409,6 +477,38 @@ fun HealthAIChatScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showClearDialog = false }) { Text("Annulla") }
+            },
+        )
+    }
+
+    if (state.showContextModeDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelPendingSend() },
+            title = { Text("Contesto sanitario ampio") },
+            text = {
+                Text(
+                    AIAskAIPayload.choiceDialogMessage(
+                        fullUnits = state.estimatedMessageUnits,
+                        compactAskUnits = state.estimatedCompactMessageUnits,
+                        compactSetupUnits = state.estimatedCompactSetupUnits,
+                        hasCompactCache = state.hasCompactHealthContextCache,
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.confirmSend(HealthContextSendMode.FULL_ACCURACY) }) {
+                    Text("Accurata (${state.estimatedMessageUnits})")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.confirmSend(HealthContextSendMode.COMPACT_SUMMARY) }) {
+                    Text(
+                        AIAskAIPayload.compactChoiceButtonLabel(
+                            askUnits = state.estimatedCompactMessageUnits,
+                            setupUnits = state.estimatedCompactSetupUnits,
+                        ),
+                    )
+                }
             },
         )
     }

@@ -10,6 +10,8 @@ data class AiReply(
     val reply: String,
     val usageToday: Int,
     val dailyLimit: Int,
+    val messageUnitsConsumed: Int = 1,
+    val isLargeContext: Boolean = false,
 )
 
 @Singleton
@@ -39,10 +41,13 @@ class AiRepository @Inject constructor() {
 
         @Suppress("UNCHECKED_CAST")
         val data = result.getData() as? Map<String, Any> ?: error("Risposta non valida dall'AI")
+        val units = (data["messageUnitsConsumed"] as? Number)?.toInt() ?: 1
         AiReply(
             reply = data["reply"] as? String ?: error("Campo reply mancante"),
             usageToday = (data["usageToday"] as? Number)?.toInt() ?: 0,
             dailyLimit = (data["dailyLimit"] as? Number)?.toInt() ?: 50,
+            messageUnitsConsumed = units,
+            isLargeContext = data["isLargeContext"] as? Boolean ?: (units > 1),
         )
     }
 }
