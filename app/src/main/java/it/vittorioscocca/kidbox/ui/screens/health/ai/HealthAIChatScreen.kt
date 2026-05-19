@@ -36,6 +36,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -96,10 +98,50 @@ import java.util.Date
 import java.util.Locale
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private val ORANGE = Color(0xFFFF6B00)
 private val DATE_SHORT = SimpleDateFormat("HH:mm", Locale.ITALIAN)
+
+@Composable
+private fun HealthContextNoticeBanner(
+    message: String,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(kb.card)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(
+            imageVector = Icons.Default.Info,
+            contentDescription = null,
+            tint = ORANGE,
+            modifier = Modifier.size(20.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = message,
+            fontSize = 12.sp,
+            color = kb.title,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Chiudi",
+                tint = kb.subtitle,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
 
 private val SUGGESTIONS = listOf(
     "Quali cure sta seguendo?",
@@ -124,8 +166,9 @@ fun HealthAIChatScreen(
     var showClearDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showHealthContextPreferenceSheet by remember { mutableStateOf(false) }
-    val aiSettingsStore = remember {
-        AISettingsStore(LocalContext.current.applicationContext)
+    val context = LocalContext.current.applicationContext
+    val aiSettingsStore = remember(context) {
+        AISettingsStore(context)
     }
     var healthContextPreference by remember {
         mutableStateOf(aiSettingsStore.getHealthContextSendPreference())
@@ -133,13 +176,11 @@ fun HealthAIChatScreen(
 
     LaunchedEffect(familyId, childId) { viewModel.bind(familyId, childId) }
 
-    LaunchedEffect(state.estimatedMessageUnits, state.isLoadingContext) {
-        if (viewModel.shouldShowLargeContextNotice()) {
-            viewModel.markLargeContextNoticeShown()
-            snackbarHostState.showSnackbar(
-                message = AIAskAIPayload.TRANSIENT_LARGE_CONTEXT_NOTICE,
-                duration = SnackbarDuration.Long,
-            )
+    LaunchedEffect(state.contextNoticeMessage) {
+        val notice = state.contextNoticeMessage ?: return@LaunchedEffect
+        delay(5_000)
+        if (state.contextNoticeMessage == notice) {
+            viewModel.dismissContextNotice()
         }
     }
 
@@ -438,6 +479,17 @@ fun HealthAIChatScreen(
             }
         }
 
+        state.contextNoticeMessage?.let { notice ->
+            HealthContextNoticeBanner(
+                message = notice,
+                onDismiss = viewModel::dismissContextNotice,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 56.dp, start = 12.dp, end = 12.dp),
+            )
+        }
+
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -454,7 +506,7 @@ fun HealthAIChatScreen(
                 selected = healthContextPreference,
                 onSelected = { pref ->
                     healthContextPreference = pref
-                    aiSettingsStore.setHealthContextSendPreference(pref)
+                    viewModel.setHealthContextSendPreference(pref)
                 },
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )

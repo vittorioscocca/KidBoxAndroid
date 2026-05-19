@@ -5,7 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.ai.AISettingsStore
+import it.vittorioscocca.kidbox.data.health.ai.HealthAiDocumentText
 import it.vittorioscocca.kidbox.data.health.ai.HealthContextBuilder
+import it.vittorioscocca.kidbox.data.remote.ai.AIAskAIPayload
+import it.vittorioscocca.kidbox.data.remote.ai.AIRemotePreferences
 import it.vittorioscocca.kidbox.data.health.ai.HealthContextSendMode
 import it.vittorioscocca.kidbox.data.health.ai.HealthContextSendPreference
 import it.vittorioscocca.kidbox.data.health.ai.computeScopeId
@@ -32,6 +35,7 @@ import it.vittorioscocca.kidbox.domain.model.KBVaccine
 import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatStreamingDelivery
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.FamilyMemoryPromptSection
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.FamilyMemoryService
+import android.util.Log
 import javax.inject.Inject
 import org.json.JSONArray
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -66,6 +70,7 @@ data class HealthAIChatState(
     val showContextModeDialog: Boolean = false,
     val pendingSendText: String = "",
     val isPreparingCompactContext: Boolean = false,
+    val contextNoticeMessage: String? = null,
 ) {
     val canSend: Boolean get() = !isLoading && !isLoadingContext && !isPreparingCompactContext && inputText.isNotBlank()
     val isNearLimit: Boolean get() = dailyLimit > 0 && usageToday >= (dailyLimit * 0.8).toInt()
@@ -85,6 +90,7 @@ class HealthAIChatViewModel @Inject constructor(
     private val healthAttachmentService: HealthAttachmentService,
     private val familyMemoryService: FamilyMemoryService,
     private val aiSettingsStore: AISettingsStore,
+    private val aiRemotePrefs: AIRemotePreferences,
 ) : ViewModel() {
     private val COMPACTION_THRESHOLD = 0.60
     private var lastCompactionStep: Int = 0
@@ -98,12 +104,17 @@ class HealthAIChatViewModel @Inject constructor(
     private var familyId = ""
     private var childId = ""
     private var subjectName = ""
-    private var systemPrompt = ""
+    private var standardSystemPrompt = ""
+    private var fullSystemPrompt = ""
     private var conversation: KBAIConversation? = null
     private var boundKey = ""
     private var lastExtractionEnsureKey = ""
     private var compactHealthContextCache: Pair<Int, String>? = null
     private var didShowLargeContextNotice = false
+
+    companion object {
+        private const val TAG = "HealthAIChatVM"
+    }
 
     fun bind(familyId: String, childId: String) {
         val key = "$familyId:$childId"
@@ -112,6 +123,7 @@ class HealthAIChatViewModel @Inject constructor(
         this.familyId = familyId
         this.childId = childId
         healthAttachmentService.enqueueBackfillHealthExtraction(familyId)
+        viewModelScope.launch { syncHealthContextSendPreferenceFromRemote() }
 
         viewModelScope.launch {
             subjectName = resolveSubjectName(childId)
@@ -193,7 +205,7 @@ class HealthAIChatViewModel @Inject constructor(
             val activeCareN = countActiveTreatments(activeTreatments)
             val vaccineN = data.vaccines.count { !it.isDeleted }
             val aggregateIntro = buildAggregateIntro(displayName, visitN, examN, activeCareN, vaccineN)
-            val contextBody = HealthContextBuilder.buildSystemPrompt(
+            val contextBodyStandard = HealthContextBuilder.buildSystemPrompt(
                 subjectName = resolvedName,
                 subjectId = childId,
                 exams = data.exams,
@@ -203,17 +215,32 @@ class HealthAIChatViewModel @Inject constructor(
                 documentsByExamId = docsByExamId,
                 documentsByVisitId = docsByVisitId,
                 documentsByTreatmentId = docsByTreatmentId,
+                refertoMaxChars = HealthAiDocumentText.STANDARD_REFERTO_MAX_CHARS,
+            )
+            val contextBodyFull = HealthContextBuilder.buildSystemPrompt(
+                subjectName = resolvedName,
+                subjectId = childId,
+                exams = data.exams,
+                visits = data.visits,
+                treatments = treatmentsForChild,
+                vaccines = data.vaccines,
+                documentsByExamId = docsByExamId,
+                documentsByVisitId = docsByVisitId,
+                documentsByTreatmentId = docsByTreatmentId,
+                refertoMaxChars = null,
             )
             val idAppendix = buildIdAppendixFromNavArgs()
-            val basePrompt = when {
-                idAppendix.isNotBlank() -> "$aggregateIntro\n\n$idAppendix\n\n$contextBody"
-                else -> "$aggregateIntro\n\n$contextBody"
+            val standardBase = when {
+                idAppendix.isNotBlank() -> "$aggregateIntro\n\n$idAppendix\n\n$contextBodyStandard"
+                else -> "$aggregateIntro\n\n$contextBodyStandard"
             }
-            systemPrompt = FamilyMemoryPromptSection.append(basePrompt, familyMemoryService, familyId)
-            refreshPayloadCostEstimate(
-                messages = _uiState.value.messages,
-                pendingUserText = _uiState.value.inputText,
-            )
+            val fullBase = when {
+                idAppendix.isNotBlank() -> "$aggregateIntro\n\n$idAppendix\n\n$contextBodyFull"
+                else -> "$aggregateIntro\n\n$contextBodyFull"
+            }
+            standardSystemPrompt = FamilyMemoryPromptSection.append(standardBase, familyMemoryService, familyId)
+            fullSystemPrompt = FamilyMemoryPromptSection.append(fullBase, familyMemoryService, familyId)
+                .ifBlank { standardSystemPrompt }
 
             if (!initialized) {
                 initialized = true
@@ -231,6 +258,16 @@ class HealthAIChatViewModel @Inject constructor(
                     }
                     .launchIn(viewModelScope)
             }
+
+            refreshPayloadCostEstimate(
+                messages = _uiState.value.messages,
+                pendingUserText = _uiState.value.inputText,
+            )
+            Log.i(
+                TAG,
+                "context ready standardChars=${standardSystemPrompt.length} " +
+                    "fullChars=${fullSystemPrompt.length} units=${_uiState.value.estimatedMessageUnits}",
+            )
 
             _uiState.value = _uiState.value.copy(isLoadingContext = false)
                 .copy(
@@ -287,8 +324,24 @@ class HealthAIChatViewModel @Inject constructor(
             showContextModeDialog = false,
         )
         if (text.isBlank()) return
-        aiSettingsStore.setHealthContextSendPreferenceFromMode(mode)
+        val preference = HealthContextSendPreference.fromSendMode(mode)
+        setHealthContextSendPreference(preference)
         performSend(text, mode)
+    }
+
+    fun setHealthContextSendPreference(preference: HealthContextSendPreference) {
+        aiSettingsStore.setHealthContextSendPreference(preference)
+        viewModelScope.launch {
+            runCatching { aiRemotePrefs.setHealthContextSendPreference(preference) }
+        }
+    }
+
+    private suspend fun syncHealthContextSendPreferenceFromRemote() {
+        val remote = aiRemotePrefs.fetch()?.healthContextSendPreference ?: return
+        if (aiSettingsStore.getHealthContextSendPreference() != remote) {
+            aiSettingsStore.setHealthContextSendPreference(remote)
+            Log.i(TAG, "synced healthContextSendPreference=${remote.storageValue}")
+        }
     }
 
     private fun performSend(text: String, mode: HealthContextSendMode) {
@@ -296,7 +349,7 @@ class HealthAIChatViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
 
         viewModelScope.launch {
-            val promptWithMemory = FamilyMemoryPromptSection.append(systemPrompt, familyMemoryService, familyId)
+            val promptWithMemory = fullSystemPrompt
             val resolvedPrompt = when (mode) {
                 HealthContextSendMode.FULL_ACCURACY -> null
                 HealthContextSendMode.COMPACT_SUMMARY -> {
@@ -358,7 +411,13 @@ class HealthAIChatViewModel @Inject constructor(
         }
     }
 
-    private fun healthContextFingerprint(): Int = systemPrompt.length
+    private fun healthContextFingerprint(): Int {
+        var hash = fullSystemPrompt.length
+        hash = 31 * hash + standardSystemPrompt.length
+        hash = 31 * hash + _uiState.value.visitsCount
+        hash = 31 * hash + _uiState.value.examsCount
+        return hash
+    }
 
     private fun syncCompactCacheValidity() {
         if (compactHealthContextCache?.first != healthContextFingerprint()) {
@@ -401,11 +460,15 @@ class HealthAIChatViewModel @Inject constructor(
         )
     }
 
+    fun dismissContextNotice() {
+        _uiState.value = _uiState.value.copy(contextNoticeMessage = null)
+    }
+
     private fun refreshPayloadCostEstimate(messages: List<KBAIMessage>, pendingUserText: String) {
         val conv = conversation ?: return
-        if (systemPrompt.isBlank()) return
+        if (fullSystemPrompt.isBlank()) return
         syncCompactCacheValidity()
-        val promptWithMemory = FamilyMemoryPromptSection.append(systemPrompt, familyMemoryService, familyId)
+        val promptWithMemory = fullSystemPrompt
         val units = chatRepository.estimatePayloadCost(
             conversation = conv,
             baseSystemPrompt = promptWithMemory,
@@ -427,6 +490,15 @@ class HealthAIChatViewModel @Inject constructor(
             estimatedCompactMessageUnits = compactEstimate.askUnits,
             estimatedCompactSetupUnits = compactEstimate.setupUnits,
             hasCompactHealthContextCache = compactHealthContextCache != null,
+        )
+        presentLargeContextNoticeIfNeeded(units)
+    }
+
+    private fun presentLargeContextNoticeIfNeeded(units: Int) {
+        if (units <= 1 || didShowLargeContextNotice || _uiState.value.isLoadingContext) return
+        didShowLargeContextNotice = true
+        _uiState.value = _uiState.value.copy(
+            contextNoticeMessage = AIAskAIPayload.TRANSIENT_LARGE_CONTEXT_NOTICE,
         )
     }
 
@@ -472,6 +544,11 @@ class HealthAIChatViewModel @Inject constructor(
                 messages = emptyList(),
                 streamingMessageId = null,
                 autoExecutedMessageIds = emptySet(),
+                contextNoticeMessage = null,
+            )
+            refreshPayloadCostEstimate(
+                messages = emptyList(),
+                pendingUserText = _uiState.value.inputText,
             )
         }
     }

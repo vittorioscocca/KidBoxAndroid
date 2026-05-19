@@ -49,7 +49,7 @@ enum class HealthContextSendPreference(val storageValue: String) {
 
 object HealthContextCompaction {
 
-    const val SUMMARIZATION_SYSTEM_PROMPT: String = """
+    val SUMMARIZATION_SYSTEM_PROMPT: String = """
 Sei un assistente che comprime dati sanitari per uso come contesto di un'altra AI.
 Riassumi fedelmente il testo seguente mantenendo:
 - cure attive e dosaggi

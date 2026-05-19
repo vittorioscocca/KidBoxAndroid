@@ -1,42 +1,61 @@
 package it.vittorioscocca.kidbox.data.remote.ai
 
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
+import it.vittorioscocca.kidbox.data.health.ai.HealthContextSendPreference
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
 
-data class AIRemotePrefs(
-    val aiEnabled: Boolean,
-    val usageToday: Int,
+/** Preferenze AI per utente su `users/{uid}` (parity iOS NotificationManager). */
+data class AIRemotePrefsSnapshot(
+    val aiEnabled: Boolean?,
+    val healthContextSendPreference: HealthContextSendPreference?,
 )
 
 @Singleton
-class AIRemotePreferences @Inject constructor(
-    private val auth: FirebaseAuth,
-) {
-    private val firestore get() = FirebaseFirestore.getInstance()
-    private val uid get() = auth.currentUser?.uid
+class AIRemotePreferences @Inject constructor() {
 
-    suspend fun fetch(): AIRemotePrefs? {
-        val u = uid ?: return null
+    private val auth get() = FirebaseAuth.getInstance()
+    private val db get() = FirebaseFirestore.getInstance()
+
+    suspend fun fetch(): AIRemotePrefsSnapshot? {
+        val uid = auth.currentUser?.uid ?: return null
         return runCatching {
-            val doc = firestore.collection("users").document(u).get().await()
-            val notifPrefs = doc.get("notificationPrefs") as? Map<*, *>
-            val aiEnabled = notifPrefs?.get("aiEnabled") as? Boolean ?: true
-            val aiUsage = doc.get("aiUsage") as? Map<*, *>
-            val usageToday = (aiUsage?.get("today") as? Number)?.toInt() ?: 0
-            AIRemotePrefs(aiEnabled = aiEnabled, usageToday = usageToday)
+            val snap = db.collection("users").document(uid).get().await()
+            val notificationPrefs = snap.get("notificationPrefs") as? Map<*, *>
+            val aiPrefs = snap.get("aiPrefs") as? Map<*, *>
+            AIRemotePrefsSnapshot(
+                aiEnabled = notificationPrefs?.get("aiEnabled") as? Boolean,
+                healthContextSendPreference = (aiPrefs?.get("healthContextSendPreference") as? String)
+                    ?.let { HealthContextSendPreference.fromStorage(it) },
+            )
         }.getOrNull()
     }
 
     suspend fun setAiEnabled(enabled: Boolean) {
-        val u = uid ?: return
-        runCatching {
-            firestore.collection("users").document(u)
-                .set(mapOf("notificationPrefs" to mapOf("aiEnabled" to enabled)), SetOptions.merge())
-                .await()
-        }
+        val uid = auth.currentUser?.uid ?: return
+        db.collection("users").document(uid)
+            .set(
+                mapOf("notificationPrefs" to mapOf("aiEnabled" to enabled)),
+                com.google.firebase.firestore.SetOptions.merge(),
+            )
+            .await()
+    }
+
+    suspend fun setHealthContextSendPreference(preference: HealthContextSendPreference) {
+        val uid = auth.currentUser?.uid ?: return
+        db.collection("users").document(uid)
+            .set(
+                mapOf(
+                    "aiPrefs" to mapOf(
+                        "healthContextSendPreference" to preference.storageValue,
+                        "healthContextSendPreferenceUpdatedAt" to FieldValue.serverTimestamp(),
+                    ),
+                ),
+                com.google.firebase.firestore.SetOptions.merge(),
+            )
+            .await()
     }
 }

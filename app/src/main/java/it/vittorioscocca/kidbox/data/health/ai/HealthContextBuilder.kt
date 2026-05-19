@@ -45,6 +45,7 @@ object HealthContextBuilder {
         documentsByExamId: Map<String, List<KBDocumentEntity>> = emptyMap(),
         documentsByVisitId: Map<String, List<KBDocumentEntity>> = emptyMap(),
         documentsByTreatmentId: Map<String, List<KBDocumentEntity>> = emptyMap(),
+        refertoMaxChars: Int? = HealthAiDocumentText.STANDARD_REFERTO_MAX_CHARS,
     ): String {
         val now = System.currentTimeMillis()
         val sb = StringBuilder()
@@ -80,14 +81,7 @@ REGOLE IMPORTANTI:
             val notesStr = if (!t.notes.isNullOrBlank()) " — ${t.notes}" else ""
             sb.appendLine("- ${t.drugName} — $dosageStr ${t.dosageUnit}, ${t.dailyFrequency}x/giorno, ${t.durationDays} giorni (fine: $endDate)$notesStr")
             documentsByTreatmentId[t.id]?.forEach { doc ->
-                val text = doc.extractedText?.takeIf { it.isNotBlank() }
-                if (text != null) {
-                    val prepared = HealthAiDocumentText.prepareExtractedTextForAi(text)
-                    if (prepared.isNotBlank()) {
-                        sb.appendLine("  Referto allegato (${doc.title}):")
-                        prepared.lines().forEach { line -> sb.appendLine("  $line") }
-                    }
-                }
+                appendReferto(sb, doc, refertoMaxChars, indent = "  ")
             }
         }
 
@@ -131,14 +125,7 @@ REGOLE IMPORTANTI:
                 sb.appendLine("  Prossima visita: $nextDateStr$nextReason")
             }
             documentsByVisitId[v.id]?.forEach { doc ->
-                val text = doc.extractedText?.takeIf { it.isNotBlank() }
-                if (text != null) {
-                    val prepared = HealthAiDocumentText.prepareExtractedTextForAi(text)
-                    if (prepared.isNotBlank()) {
-                        sb.appendLine("  Referto allegato (${doc.title}):")
-                        prepared.lines().forEach { line -> sb.appendLine("  $line") }
-                    }
-                }
+                appendReferto(sb, doc, refertoMaxChars, indent = "  ")
             }
         }
 
@@ -155,19 +142,12 @@ REGOLE IMPORTANTI:
             val urgentStr = if (e.isUrgent) " {URGENTE}" else ""
             val overdueStr = if (isOverdue) " ⚠️ SCADUTA" else ""
             val resultStr = e.resultText?.takeIf { it.isNotBlank() }?.let { raw ->
-                val clipped = HealthAiDocumentText.prepareExtractedTextForAi(raw)
+                val clipped = HealthAiDocumentText.prepareExtractedTextForAi(raw, refertoMaxChars)
                 if (clipped.isBlank()) "" else " — Risultato: $clipped"
             } ?: ""
             sb.appendLine("- ${e.name} [${e.statusRaw}]$urgentStr — $deadlineStr$overdueStr$resultStr")
             documentsByExamId[e.id]?.forEach { doc ->
-                val text = doc.extractedText?.takeIf { it.isNotBlank() }
-                if (text != null) {
-                    val prepared = HealthAiDocumentText.prepareExtractedTextForAi(text)
-                    if (prepared.isNotBlank()) {
-                        sb.appendLine("  Referto allegato (${doc.title}):")
-                        prepared.lines().forEach { line -> sb.appendLine("  $line") }
-                    }
-                }
+                appendReferto(sb, doc, refertoMaxChars, indent = "  ")
             }
         }
 
@@ -195,5 +175,19 @@ REGOLE IMPORTANTI:
         } catch (_: JSONException) {
             ""
         }
+    }
+
+    private fun appendReferto(
+        sb: StringBuilder,
+        doc: KBDocumentEntity,
+        refertoMaxChars: Int?,
+        indent: String,
+    ) {
+        if (doc.extractionStatusRaw != KBTextExtractionStatus.COMPLETED.rawValue) return
+        val text = doc.extractedText?.takeIf { it.isNotBlank() } ?: return
+        val prepared = HealthAiDocumentText.prepareExtractedTextForAi(text, refertoMaxChars)
+        if (prepared.isBlank()) return
+        sb.appendLine("${indent}Referto allegato (${doc.title}):")
+        prepared.lines().forEach { line -> sb.appendLine("$indent$line") }
     }
 }

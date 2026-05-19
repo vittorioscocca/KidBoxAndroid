@@ -30,7 +30,8 @@ class AISettingsStore @Inject constructor(
     }
 
     companion object {
-        private const val PREFS_NAME = "kidbox_ai_settings"
+        /** Stesso file prefs di [it.vittorioscocca.kidbox.ai.AiSettings] / parity iOS UserDefaults. */
+        private const val PREFS_NAME = "kidbox_prefs"
         private const val KEY_HEALTH_CONTEXT_SEND_PREFERENCE = "kb_ai_health_context_send_preference"
     }
 }

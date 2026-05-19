@@ -1,10 +1,12 @@
 package it.vittorioscocca.kidbox.data.health.ai
 
 /**
- * Normalizza il testo estratto da PDF/RTF/immagini prima di includerlo nel system prompt AI
- * (nessun troncamento: il contesto completo viene inviato; il contatore messaggi scala lato server).
+ * Normalizza il testo estratto da PDF/RTF/immagini prima di includerlo nel system prompt AI.
  */
 object HealthAiDocumentText {
+
+    /** Limite referto nel contesto standard; massima accuratezza usa testo intero. */
+    const val STANDARD_REFERTO_MAX_CHARS: Int = 4_000
 
     fun sanitizeExtractedText(text: String): String =
         text
@@ -15,8 +17,12 @@ object HealthAiDocumentText {
             .filter { it.isNotEmpty() }
             .joinToString("\n")
 
-    fun prepareExtractedTextForAi(raw: String?): String {
+    fun prepareExtractedTextForAi(raw: String?, maxChars: Int? = null): String {
         if (raw.isNullOrBlank()) return ""
-        return sanitizeExtractedText(raw)
+        val sanitized = sanitizeExtractedText(raw)
+        val limit = maxChars ?: return sanitized
+        if (sanitized.length <= limit) return sanitized
+        return sanitized.take(limit).trimEnd() +
+            "\n[… referto troncato nel contesto standard; usa “Massima accuratezza” per il testo completo]"
     }
 }

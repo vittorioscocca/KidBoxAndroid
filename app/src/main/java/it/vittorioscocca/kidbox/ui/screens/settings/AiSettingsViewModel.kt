@@ -7,6 +7,8 @@ import it.vittorioscocca.kidbox.ai.AiSettings
 import it.vittorioscocca.kidbox.ai.DailyBriefingPrefs
 import it.vittorioscocca.kidbox.ai.HealthPatternPrefs
 import it.vittorioscocca.kidbox.ai.WeeklySummaryPrefs
+import it.vittorioscocca.kidbox.data.ai.AISettingsStore
+import it.vittorioscocca.kidbox.data.health.ai.HealthContextSendPreference
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.remote.ai.AIService
@@ -32,6 +34,7 @@ data class AiSettingsUiState(
     val isWeeklySummaryEnabled: Boolean = true,
     val isDailyBriefingEnabled: Boolean = true,
     val isHealthPatternEnabled: Boolean = true,
+    val healthContextSendPreference: HealthContextSendPreference = HealthContextSendPreference.ASK_EACH_TIME,
     val pendingShowConsent: Boolean = false,
     val message: String? = null,
 )
@@ -48,6 +51,7 @@ class AiSettingsViewModel @Inject constructor(
     private val aiService: AIService,
     private val familySessionPreferences: FamilySessionPreferences,
     private val aiUsageTracker: AIUsageTracker,
+    private val aiSettingsStore: AISettingsStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -58,6 +62,7 @@ class AiSettingsViewModel @Inject constructor(
             isWeeklySummaryEnabled = weeklySummaryPrefs.isEnabled.value,
             isDailyBriefingEnabled = dailyBriefingPrefs.isEnabled.value,
             isHealthPatternEnabled = healthPatternPrefs.isEnabled.value,
+            healthContextSendPreference = aiSettingsStore.getHealthContextSendPreference(),
         ),
     )
     val uiState: StateFlow<AiSettingsUiState> = _uiState.asStateFlow()
@@ -82,12 +87,17 @@ class AiSettingsViewModel @Inject constructor(
         val usage = aiService.fetchUsage(familyId).getOrNull()
         val usageToday = usage?.usageToday ?: aiUsageTracker.state.value.usageToday
         usage?.let { aiUsageTracker.apply(it.usageToday, it.dailyLimit) }
+        remote?.healthContextSendPreference?.let { pref ->
+            aiSettingsStore.setHealthContextSendPreference(pref)
+        }
         _uiState.update {
             it.copy(
                 isLoading = false,
                 plan = plan,
                 isEnabled = remote?.aiEnabled ?: it.isEnabled,
                 aiUsageToday = usageToday,
+                healthContextSendPreference = remote?.healthContextSendPreference
+                    ?: aiSettingsStore.getHealthContextSendPreference(),
             )
         }
     }
@@ -170,5 +180,16 @@ class AiSettingsViewModel @Inject constructor(
 
     fun dismissMessage() {
         _uiState.update { it.copy(message = null) }
+    }
+
+    fun setHealthContextSendPreference(preference: HealthContextSendPreference) {
+        aiSettingsStore.setHealthContextSendPreference(preference)
+        _uiState.update { it.copy(healthContextSendPreference = preference) }
+        viewModelScope.launch {
+            runCatching { aiRemotePrefs.setHealthContextSendPreference(preference) }
+                .onFailure {
+                    _uiState.update { s -> s.copy(message = it.message ?: "Errore sincronizzazione preferenza") }
+                }
+        }
     }
 }
