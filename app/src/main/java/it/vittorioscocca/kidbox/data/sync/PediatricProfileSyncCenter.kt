@@ -85,6 +85,7 @@ class PediatricProfileSyncCenter @Inject constructor(
                     medicalNotes = dto.medicalNotes ?: local?.medicalNotes,
                     doctorName = dto.doctorName ?: local?.doctorName,
                     doctorPhone = dto.doctorPhone ?: local?.doctorPhone,
+                    doctorEmail = dto.doctorEmail ?: local?.doctorEmail,
                     doctorAddress = dto.doctorAddress ?: local?.doctorAddress,
                     doctorWebsite = dto.doctorWebsite ?: local?.doctorWebsite,
                     doctorOfficeHoursJson = dto.doctorOfficeHoursJson ?: local?.doctorOfficeHoursJson,

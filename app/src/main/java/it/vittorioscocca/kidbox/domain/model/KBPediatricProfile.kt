@@ -11,6 +11,7 @@ data class KBPediatricProfile(
     val medicalNotes: String?,
     val doctorName: String?,
     val doctorPhone: String?,
+    val doctorEmail: String?,
     val doctorAddress: String?,
     val doctorWebsite: String?,
     val doctorOfficeHoursJson: String?,

@@ -88,6 +88,7 @@ fun ReferenceDoctorFormScreen(
 ) {
     val kb = MaterialTheme.kidBoxColors
     var name by remember(initial) { mutableStateOf(initial.name) }
+    var email by remember(initial) { mutableStateOf(initial.email) }
     var address by remember(initial) { mutableStateOf(initial.address) }
     var website by remember(initial) { mutableStateOf(initial.website) }
     val officeHours = remember(initial) {
@@ -131,6 +132,7 @@ fun ReferenceDoctorFormScreen(
                         onSave(
                             ReferenceDoctorDraft(
                                 name = name.trim(),
+                                email = email.trim(),
                                 address = address.trim(),
                                 website = website.trim(),
                                 officeHours = officeHours.toList(),
@@ -157,6 +159,17 @@ fun ReferenceDoctorFormScreen(
                         value = name,
                         onValueChange = { name = it },
                         placeholder = "Nome e cognome",
+                    )
+                    FormDivider()
+                    FormCardTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        placeholder = "Email",
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Email,
+                            capitalization = KeyboardCapitalization.None,
+                            autoCorrect = false,
+                        ),
                     )
                     FormDivider()
                     FormCardTextField(

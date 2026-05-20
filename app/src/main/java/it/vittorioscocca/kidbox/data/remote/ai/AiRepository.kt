@@ -23,6 +23,7 @@ class AiRepository @Inject constructor() {
         familyId: String,
         systemPrompt: String,
         messages: List<KBAIMessage>,
+        purpose: String? = null,
     ): Result<AiReply> = runCatching {
         val payload = hashMapOf(
             "familyId" to familyId,
@@ -34,8 +35,14 @@ class AiRepository @Inject constructor() {
                 )
             },
         )
-        val result = functions
-            .getHttpsCallable("askAI")
+        if (!purpose.isNullOrBlank()) {
+            payload["purpose"] = purpose
+        }
+        val callable = functions.getHttpsCallable("askAI")
+        if (purpose == "clinicalRecord") {
+            callable.setTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
+        }
+        val result = callable
             .call(payload)
             .await()
 

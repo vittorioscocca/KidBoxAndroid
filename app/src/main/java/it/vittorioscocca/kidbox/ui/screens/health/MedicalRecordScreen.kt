@@ -10,6 +10,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +37,9 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -54,6 +58,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import java.text.SimpleDateFormat
+import java.util.Locale
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,6 +70,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.text.style.TextOverflow
@@ -212,6 +219,62 @@ fun MedicalRecordScreen(
                             },
                         )
                     }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+
+            // ── Età / data di nascita ───────────────────────────────────────────
+            SectionLabel("Età")
+            val birthMillis = state.linkedBirthDateEpochMillis ?: System.currentTimeMillis()
+            var showBirthDatePicker by remember { mutableStateOf(false) }
+            val birthDatePickerState = rememberDatePickerState(initialSelectedDateMillis = birthMillis)
+            val birthDateLabel = remember(birthMillis) {
+                SimpleDateFormat("d MMMM yyyy", Locale.ITALY).format(java.util.Date(birthMillis))
+            }
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showBirthDatePicker = true },
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Data di nascita", fontSize = 13.sp, color = kb.subtitle)
+                    Text(birthDateLabel, fontSize = 17.sp, color = kb.title, fontWeight = FontWeight.SemiBold)
+                    state.linkedAgeDescription?.let { age ->
+                        Text(
+                            "Età: $age",
+                            fontSize = 15.sp,
+                            color = kb.subtitle,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
+                    Text(
+                        if (state.hasHealthLink) {
+                            "Da App Salute — tocca per modificare"
+                        } else {
+                            "Tocca per impostare o correggere la data"
+                        },
+                        fontSize = 12.sp,
+                        color = kb.subtitle,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            }
+            if (showBirthDatePicker) {
+                DatePickerDialog(
+                    onDismissRequest = { showBirthDatePicker = false },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            birthDatePickerState.selectedDateMillis?.let { viewModel.setLinkedBirthDate(it) }
+                            showBirthDatePicker = false
+                        }) { Text("OK") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showBirthDatePicker = false }) { Text("Annulla") }
+                    },
+                ) {
+                    DatePicker(state = birthDatePickerState)
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -427,6 +490,9 @@ private fun ReferenceDoctorSummary(
     val kb = MaterialTheme.kidBoxColors
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(draft.name, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = kb.title)
+        if (draft.email.isNotBlank()) {
+            Text(draft.email, fontSize = 14.sp, color = Color(0xFF0A84FF), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
         if (draft.address.isNotBlank()) {
             Text(draft.address, fontSize = 14.sp, color = kb.subtitle, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }

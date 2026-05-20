@@ -938,6 +938,7 @@ private fun KBPediatricProfileEntity.toDomain() = KBPediatricProfile(
     medicalNotes = medicalNotes,
     doctorName = doctorName,
     doctorPhone = doctorPhone,
+    doctorEmail = doctorEmail,
     doctorAddress = doctorAddress,
     doctorWebsite = doctorWebsite,
     doctorOfficeHoursJson = doctorOfficeHoursJson,

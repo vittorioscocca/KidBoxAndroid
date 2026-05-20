@@ -47,7 +47,7 @@ object KBVisibilityScope {
         val uid = currentUid?.takeIf { it.isNotBlank() } ?: return false
         return when (normalized(scope)) {
             FAMILY -> true
-            MEMBERS -> memberIds.contains(uid)
+            MEMBERS -> createdBy == uid || memberIds.contains(uid)
             ONLY_CREATOR -> createdBy?.isNotBlank() == true && createdBy == uid
             else -> true
         }

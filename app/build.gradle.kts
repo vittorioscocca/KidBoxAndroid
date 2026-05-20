@@ -169,6 +169,8 @@ dependencies {
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("androidx.biometric:biometric-ktx:1.2.0-alpha05")
+    // 1.1.0 stable richiede compileSdk 36 + AGP 8.9.1 (fallisce checkDebugAarMetadata con compileSdk 35).
+    implementation("androidx.health.connect:connect-client:1.1.0-beta01")
     implementation("com.google.crypto.tink:tink-android:1.13.0")
 
     // WorkManager (wallet reminders)

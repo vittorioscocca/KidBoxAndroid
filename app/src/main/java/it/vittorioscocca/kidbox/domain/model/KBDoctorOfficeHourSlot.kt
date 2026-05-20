@@ -22,6 +22,7 @@ object KBItalianWeekdays {
 
 data class ReferenceDoctorDraft(
     val name: String = "",
+    val email: String = "",
     val address: String = "",
     val website: String = "",
     val officeHours: List<KBDoctorOfficeHourSlot> = emptyList(),

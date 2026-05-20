@@ -630,6 +630,12 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_31_32 = object : Migration(31, 32) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE kb_pediatric_profiles ADD COLUMN doctorEmail TEXT")
+        }
+    }
+
     private val MIGRATION_29_30 = object : Migration(29, 30) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(
@@ -1066,6 +1072,7 @@ object DatabaseModule {
         MIGRATION_28_29,
         MIGRATION_29_30,
         MIGRATION_30_31,
+        MIGRATION_31_32,
     )
         .fallbackToDestructiveMigration()
         .build()

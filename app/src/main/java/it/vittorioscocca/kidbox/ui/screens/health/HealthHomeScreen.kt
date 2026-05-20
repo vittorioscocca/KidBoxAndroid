@@ -127,11 +127,25 @@ fun HealthHomeScreen(
                 onClick = { onNavigate(AppDestination.MedicalExams.route(familyId, childId)) },
             ),
             HealthCard(
+                title = "App Salute",
+                subtitle = "Passi, cuore, pressione, O₂",
+                icon = Icons.Default.MonitorHeart,
+                tint = Color(0xFFFF5C7A),
+                onClick = { onNavigate(AppDestination.HealthConnectApp.route(familyId, childId)) },
+            ),
+            HealthCard(
                 title = "Scheda Medica",
                 subtitle = "Allergie, pediatra",
                 icon = Icons.Default.Description,
                 tint = Color(0xFF66BFA6),
                 onClick = { onNavigate(AppDestination.MedicalRecord.route(familyId, childId)) },
+            ),
+            HealthCard(
+                title = "Cartella clinica",
+                subtitle = "Riepilogo ed esporta PDF",
+                icon = Icons.Default.Folder,
+                tint = Color(0xFF738FE6),
+                onClick = { onNavigate(AppDestination.ClinicalRecord.route(familyId, childId)) },
             ),
             HealthCard(
                 title = "Storico Salute",

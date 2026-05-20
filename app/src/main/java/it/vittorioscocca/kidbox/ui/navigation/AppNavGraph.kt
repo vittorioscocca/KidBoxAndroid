@@ -70,6 +70,8 @@ import it.vittorioscocca.kidbox.ui.screens.todo.TodoHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoListScreen
 import it.vittorioscocca.kidbox.ui.screens.health.HealthSubjectSelectorScreen
 import it.vittorioscocca.kidbox.ui.screens.health.HealthHomeScreen
+import it.vittorioscocca.kidbox.ui.screens.health.HealthConnectAppScreen
+import it.vittorioscocca.kidbox.ui.screens.health.ClinicalRecordScreen
 import it.vittorioscocca.kidbox.ui.screens.health.MedicalRecordScreen
 import it.vittorioscocca.kidbox.ui.screens.health.visits.MedicalVisitsScreen
 import it.vittorioscocca.kidbox.ui.screens.health.visits.MedicalVisitFormScreen
@@ -621,6 +623,39 @@ fun AppNavGraph(
             val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
             val childId = backStackEntry.arguments?.getString("childId").orEmpty()
             MedicalRecordScreen(
+                familyId = familyId,
+                childId = childId,
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.ClinicalRecord.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            ClinicalRecordScreen(
+                familyId = familyId,
+                childId = childId,
+                subjectName = "",
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.HealthConnectApp.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            HealthConnectAppScreen(
                 familyId = familyId,
                 childId = childId,
                 onBack = { navController.popBackStack() },
