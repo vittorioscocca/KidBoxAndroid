@@ -1,7 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.ai.planning
 
 import android.content.Context
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
 import com.google.firebase.auth.FirebaseAuth
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -179,7 +179,7 @@ class PlanningAIChatViewModel @Inject constructor(
     fun loadOrCreateConversation(input: PlanningContextInput) {
         lastInput = input
         viewModelScope.launch {
-            Log.d("PlanningAIChatVM", "init")
+            KBLog.ai.debug("init", "PlanningAIChatVM")
             _uiState.update { it.copy(isLoadingContext = true, errorMessage = null) }
             val plan = if (effectiveFamilyId.isBlank()) {
                 null

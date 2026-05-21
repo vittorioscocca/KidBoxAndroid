@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.sync
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import com.google.firebase.firestore.ListenerRegistration
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTreatmentDao
@@ -31,7 +32,7 @@ class TreatmentSyncCenter @Inject constructor(
     fun start(familyId: String) {
         // Registra prima le cure: i dose log hanno FK su `kb_treatments` e il listener dose può arrivare subito.
         if (!listeners.containsKey(familyId)) {
-            Log.d(TAG, "start listener familyId=$familyId")
+            KBLog.sync.debug("start listener familyId=$familyId", TAG)
             listeners[familyId] = remote.listenAll(familyId) { dtos ->
                 scope.launch { applyInbound(dtos) }
             }
@@ -42,7 +43,7 @@ class TreatmentSyncCenter @Inject constructor(
     fun stop(familyId: String) {
         listeners.remove(familyId)?.remove()
         doseLogSyncCenter.stop(familyId)
-        Log.d(TAG, "stopped listener familyId=$familyId")
+        KBLog.sync.debug("stopped listener familyId=$familyId", TAG)
     }
 
     fun stopAll() {
@@ -70,7 +71,7 @@ class TreatmentSyncCenter @Inject constructor(
             val localSync = local?.syncStateRaw ?: 0
 
             if (local != null && localSync == 1 && localStamp > remoteStamp) {
-                Log.d(TAG, "skip anti-resurrect treatmentId=${dto.id}")
+                KBLog.sync.debug("skip anti-resurrect treatmentId=${dto.id}", TAG)
                 continue
             }
 

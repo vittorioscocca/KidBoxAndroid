@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.health
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.data.local.dao.KBDocumentCategoryDao
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentCategoryEntity
@@ -33,7 +34,7 @@ class HealthFolderResolver @Inject constructor(
         val salute = all.firstOrNull { !it.isDeleted && it.parentId == null && it.title == SALUTE_TITLE }
             ?: run {
                 val nextSort = (all.filter { it.parentId == null }.maxOfOrNull { it.sortOrder } ?: 0) + 1
-                Log.d(TAG, "Creating Salute root folder familyId=$familyId sortOrder=$nextSort")
+                KBLog.data.debug("Creating Salute root folder familyId=$familyId sortOrder=$nextSort", TAG)
                 documentRepository.createFolderLocal(
                     familyId = familyId,
                     title = SALUTE_TITLE,
@@ -45,7 +46,7 @@ class HealthFolderResolver @Inject constructor(
         val referti = all.firstOrNull { !it.isDeleted && it.parentId == salute.id && it.title == REFERTI_TITLE }
             ?: run {
                 val nextSort = (all.filter { it.parentId == salute.id }.maxOfOrNull { it.sortOrder } ?: 0) + 1
-                Log.d(TAG, "Creating Referti sub-folder saluteId=${salute.id} sortOrder=$nextSort")
+                KBLog.data.debug("Creating Referti sub-folder saluteId=${salute.id} sortOrder=$nextSort", TAG)
                 documentRepository.createFolderLocal(
                     familyId = familyId,
                     title = REFERTI_TITLE,

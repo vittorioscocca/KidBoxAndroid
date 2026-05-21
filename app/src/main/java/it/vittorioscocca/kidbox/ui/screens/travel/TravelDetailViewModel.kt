@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.travel
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -253,13 +254,13 @@ class TravelDetailViewModel @Inject constructor(
 
     fun regenerateDayPlan(day: TravelItineraryDay) {
         viewModelScope.launch {
-            Log.i(TAG, "regenerateDayPlan tapped dayIndex=${day.dayIndex} date=${day.dateString}")
+            KBLog.ui.info("regenerateDayPlan tapped dayIndex=${day.dayIndex} date=${day.dateString}", TAG)
             val tripEntity = trip.value ?: run {
-                Log.w(TAG, "regenerateDayPlan ABORT: trip is null")
+                KBLog.ui.warning("regenerateDayPlan ABORT: trip is null", TAG)
                 return@launch
             }
             val familyId = tripEntity.familyId.ifBlank {
-                Log.w(TAG, "regenerateDayPlan ABORT: no familyId")
+                KBLog.ui.warning("regenerateDayPlan ABORT: no familyId", TAG)
                 return@launch
             }
             _regeneratingDayId.value = day.id
@@ -286,10 +287,7 @@ class TravelDetailViewModel @Inject constructor(
                 .onSuccess { response ->
                     val newDayMap = TravelDayRegeneration.extractRegeneratedDay(response, day.dateString)
                         ?: run {
-                            Log.e(
-                                TAG,
-                                "regenerateDayPlan parse failed date=${day.dateString} narrativeLen=${response.narrativeText.length}",
-                            )
+                            KBLog.ui.error("regenerateDayPlan parse failed date=${day.dateString} narrativeLen=${response.narrativeText.length}", TAG)
                             _dayRegenerateError.value = "Rigenerazione giorno fallita: risposta AI non valida."
                             return@onSuccess
                         }
@@ -297,10 +295,7 @@ class TravelDetailViewModel @Inject constructor(
                     val afternoonStops = (newDayMap["afternoonStops"] as? List<*>)?.size ?: 0
                     val eveningStops = (newDayMap["eveningStops"] as? List<*>)?.size ?: 0
                     val firstStop = (newDayMap["morningStops"] as? List<*>)?.firstOrNull() as? Map<*, *>
-                    Log.i(
-                        TAG,
-                        "regenerateDayPlan success date=${day.dateString} morning=$morningStops afternoon=$afternoonStops evening=$eveningStops firstStopKeys=${firstStop?.keys}",
-                    )
+                    KBLog.ui.info("regenerateDayPlan success date=${day.dateString} morning=$morningStops afternoon=$afternoonStops evening=$eveningStops firstStopKeys=${firstStop?.keys}", TAG)
 
                     val currentDayPlan = dayPlans.value.firstOrNull { it.dateString == day.dateString }
                     if (currentDayPlan != null) {
@@ -324,10 +319,10 @@ class TravelDetailViewModel @Inject constructor(
                     tripDao.upsert(tripEntity.copy(aiProposalJson = newJson))
                     _dayRegenerateSuccess.value = "Giorno ${day.dayIndex} rigenerato"
                     tripRemoteStore.syncTrip(tripEntity.id)
-                    Log.i(TAG, "regenerateDayPlan synced tripId=${tripEntity.id}")
+                    KBLog.ui.info("regenerateDayPlan synced tripId=${tripEntity.id}", TAG)
                 }
                 .onFailure { err ->
-                    Log.e(TAG, "regenerateDayPlan failed", err)
+                    KBLog.ui.error("regenerateDayPlan failed", TAG, err)
                     _dayRegenerateError.value = err.message ?: "Rigenerazione giorno fallita."
                 }
             _regeneratingDayId.value = null

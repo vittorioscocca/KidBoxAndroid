@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.ai.planning
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import it.vittorioscocca.kidbox.ai.AiSettings
 import it.vittorioscocca.kidbox.data.local.dao.KBMemoryFactDao
 import it.vittorioscocca.kidbox.data.local.entity.KBMemoryFactEntity
@@ -34,18 +35,18 @@ class FamilyMemoryService @Inject constructor(
         transcriptMessages: List<KBAIMessage>,
     ) {
         if (!aiSettings.isEnabled.value) {
-            Log.d(TAG, "AI disabled, skip memory extract")
+            KBLog.ai.debug("AI disabled, skip memory extract", TAG)
             return
         }
         if (familyId.isBlank()) return
 
         val transcript = buildTranscript(transcriptMessages)
         if (transcript.isBlank()) {
-            Log.d(TAG, "empty transcript, skip")
+            KBLog.ai.debug("empty transcript, skip", TAG)
             return
         }
 
-        Log.i(TAG, "extract start familyId=$familyId conv=$conversationId")
+        KBLog.ai.info("extract start familyId=$familyId conv=$conversationId", TAG)
 
         val response = aiService.sendMessage(
             messages = listOf(
@@ -60,13 +61,13 @@ class FamilyMemoryService @Inject constructor(
             systemPrompt = EXTRACTION_SYSTEM_PROMPT,
             familyId = familyId,
         ).getOrElse { err ->
-            Log.e(TAG, "extract failed: ${err.message}")
+            KBLog.ai.error("extract failed: ${err.message}", TAG)
             return
         }
 
         val parsed = parseExtractedFacts(response.reply)
         if (parsed.isEmpty()) {
-            Log.d(TAG, "no facts parsed")
+            KBLog.ai.debug("no facts parsed", TAG)
             return
         }
 
@@ -82,7 +83,7 @@ class FamilyMemoryService @Inject constructor(
         }
 
         if (toInsert.isEmpty()) {
-            Log.d(TAG, "all facts deduped")
+            KBLog.ai.debug("all facts deduped", TAG)
             return
         }
 
@@ -102,7 +103,7 @@ class FamilyMemoryService @Inject constructor(
         }
         memoryFactDao.upsertAll(entities)
         syncEntitiesToFirestore(entities)
-        Log.i(TAG, "stored ${entities.size} facts for $familyId")
+        KBLog.ai.info("stored ${entities.size} facts for $familyId", TAG)
     }
 
     suspend fun fetchFactTexts(familyId: String): List<String> {
@@ -122,13 +123,13 @@ class FamilyMemoryService @Inject constructor(
             if (familyId in firestoreLoadedFamilyIds) return
         }
 
-        Log.i(TAG, "Firestore load start familyId=$familyId")
+        KBLog.ai.info("Firestore load start familyId=$familyId", TAG)
         val remote = memoryFactRemoteStore.fetchAll(familyId)
         synchronized(firestoreLoadedFamilyIds) {
             firestoreLoadedFamilyIds.add(familyId)
         }
         if (remote.isEmpty()) {
-            Log.i(TAG, "Firestore load empty familyId=$familyId")
+            KBLog.ai.info("Firestore load empty familyId=$familyId", TAG)
             return
         }
 
@@ -138,13 +139,13 @@ class FamilyMemoryService @Inject constructor(
             .map { dto -> dto.toEntity() }
 
         if (toInsert.isEmpty()) {
-            Log.i(TAG, "Firestore load OK familyId=$familyId inserted=0 remote=${remote.size}")
+            KBLog.ai.info("Firestore load OK familyId=$familyId inserted=0 remote=${remote.size}", TAG)
             return
         }
 
         trimOldestIfNeeded(familyId, additionalCount = toInsert.size)
         memoryFactDao.upsertAll(toInsert)
-        Log.i(TAG, "Firestore load OK familyId=$familyId inserted=${toInsert.size} remote=${remote.size}")
+        KBLog.ai.info("Firestore load OK familyId=$familyId inserted=${toInsert.size} remote=${remote.size}", TAG)
     }
 
     private fun syncEntitiesToFirestore(entities: List<KBMemoryFactEntity>) {
@@ -160,7 +161,7 @@ class FamilyMemoryService @Inject constructor(
         val overflow = existing.size + additionalCount - MAX_FACTS_PER_FAMILY
         if (overflow <= 0) return
         existing.take(overflow).forEach { memoryFactDao.deleteById(it.id) }
-        Log.d(TAG, "trimmed $overflow oldest facts")
+        KBLog.ai.debug("trimmed $overflow oldest facts", TAG)
     }
 
     private fun buildTranscript(messages: List<KBAIMessage>): String {

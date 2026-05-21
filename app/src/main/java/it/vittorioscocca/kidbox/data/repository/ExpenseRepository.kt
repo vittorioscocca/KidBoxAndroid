@@ -1,9 +1,10 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
-import android.util.Log
 import it.vittorioscocca.kidbox.data.local.dao.KBExpenseCategoryDao
 import it.vittorioscocca.kidbox.data.local.dao.KBExpenseDao
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
@@ -225,10 +226,7 @@ class ExpenseRepository @Inject constructor(
         if (desiredDocumentId != null && movedDocument == null) {
             error("Documento selezionato non disponibile per lo spostamento nella cartella spesa")
         }
-        Log.d(
-            TAG_EXP_REPO,
-            "attachExistingDocumentToExpense expenseId=${expense.id} title=${expense.title} docId=${movedDocument?.id} docCategoryId=${movedDocument?.categoryId}",
-        )
+        KBLog.data.debug("attachExistingDocumentToExpense expenseId=${expense.id} title=${expense.title} docId=${movedDocument?.id} docCategoryId=${movedDocument?.categoryId}", TAG_EXP_REPO)
         documentRepository.flushPending(expense.familyId)
         expenseDao.upsert(
             expense.copy(
@@ -269,10 +267,7 @@ class ExpenseRepository @Inject constructor(
             bytes = bytes,
             forcedId = docId,
         )
-        Log.d(
-            TAG_EXP_REPO,
-            "attachDocumentToExpense expenseId=${expense.id} title=${expense.title} folderId=${localDoc.categoryId} docId=$docId",
-        )
+        KBLog.data.debug("attachDocumentToExpense expenseId=${expense.id} title=${expense.title} folderId=${localDoc.categoryId} docId=$docId", TAG_EXP_REPO)
         documentRepository.flushPending(expense.familyId)
         expenseDao.upsert(
             expense.copy(

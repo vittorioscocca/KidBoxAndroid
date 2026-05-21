@@ -1,6 +1,6 @@
 package it.vittorioscocca.kidbox.data.sync
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
 import com.google.firebase.firestore.ListenerRegistration
 import it.vittorioscocca.kidbox.data.local.dao.KBPediatricProfileDao
 import it.vittorioscocca.kidbox.data.local.entity.KBPediatricProfileEntity
@@ -33,7 +33,7 @@ class PediatricProfileSyncCenter @Inject constructor(
     fun start(familyId: String, childId: String) {
         val key = "$familyId:$childId"
         if (listeners.containsKey(key)) return
-        Log.d(TAG, "start listener familyId=$familyId childId=$childId")
+        KBLog.sync.debug("start listener familyId=$familyId childId=$childId", TAG)
         listeners[key] = remote.listen(familyId, childId) { dto ->
             scope.launch { applyInbound(familyId, childId, dto) }
         }
@@ -42,7 +42,7 @@ class PediatricProfileSyncCenter @Inject constructor(
     fun stop(familyId: String, childId: String) {
         val key = "$familyId:$childId"
         listeners.remove(key)?.remove()
-        Log.d(TAG, "stopped listener familyId=$familyId childId=$childId")
+        KBLog.sync.debug("stopped listener familyId=$familyId childId=$childId", TAG)
     }
 
     fun stopAll() {
@@ -64,7 +64,7 @@ class PediatricProfileSyncCenter @Inject constructor(
 
         // Non sovrascrivere finché il push locale non è completato.
         if (local != null && localSync == 1) {
-            Log.d(TAG, "skip pending local childId=$childId")
+            KBLog.sync.debug("skip pending local childId=$childId", TAG)
             return
         }
 

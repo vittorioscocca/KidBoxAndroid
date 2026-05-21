@@ -1,9 +1,10 @@
 package it.vittorioscocca.kidbox.data.health
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
-import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.KBDocumentDao
@@ -155,14 +156,14 @@ class HealthAttachmentService @Inject constructor(
         val localFile = doc.localPath?.let { File(it) }
         if (localFile != null && localFile.exists()) {
             runCatching { localFile.delete() }
-                .onFailure { Log.w(TAG, "Failed to delete local file ${localFile.absolutePath}", it) }
+                .onFailure { KBLog.data.error("Failed to delete local file ${localFile.absolutePath}", TAG, it) }
         }
         documentRepository.deleteDocumentLocal(doc)
         runCatching { storageManager.delete(doc.storagePath) }
-            .onFailure { Log.w(TAG, "Failed to delete storage blob ${doc.storagePath}", it) }
+            .onFailure { KBLog.data.error("Failed to delete storage blob ${doc.storagePath}", TAG, it) }
         // Flush the soft-delete to Firestore
         runCatching { documentRepository.flushPending(doc.familyId) }
-            .onFailure { Log.w(TAG, "flushPending after delete failed", it) }
+            .onFailure { KBLog.data.error("flushPending after delete failed", TAG, it) }
     }
 
     suspend fun deleteAllGarageAttachmentsForVehicle(vehicleId: String, familyId: String) = withContext(Dispatchers.IO) {
@@ -173,7 +174,7 @@ class HealthAttachmentService @Inject constructor(
             try {
                 deleteAttachment(doc)
             } catch (e: Exception) {
-                Log.w(TAG, "deleteAllGarageAttachmentsForVehicle doc=${doc.id}", e)
+                KBLog.data.error("deleteAllGarageAttachmentsForVehicle doc=${doc.id}", TAG, e)
             }
         }
     }
@@ -186,7 +187,7 @@ class HealthAttachmentService @Inject constructor(
             try {
                 deleteAttachment(doc)
             } catch (e: Exception) {
-                Log.w(TAG, "deleteAllGarageAttachmentsForVehicleEvent doc=${doc.id}", e)
+                KBLog.data.error("deleteAllGarageAttachmentsForVehicleEvent doc=${doc.id}", TAG, e)
             }
         }
     }
@@ -199,7 +200,7 @@ class HealthAttachmentService @Inject constructor(
             try {
                 deleteAttachment(doc)
             } catch (e: Exception) {
-                Log.w(TAG, "deleteAllCasaAttachmentsForHomeItem doc=${doc.id}", e)
+                KBLog.data.error("deleteAllCasaAttachmentsForHomeItem doc=${doc.id}", TAG, e)
             }
         }
     }
@@ -212,7 +213,7 @@ class HealthAttachmentService @Inject constructor(
             try {
                 deleteAttachment(doc)
             } catch (e: Exception) {
-                Log.w(TAG, "deleteAllCasaAttachmentsForHousePayment doc=${doc.id}", e)
+                KBLog.data.error("deleteAllCasaAttachmentsForHousePayment doc=${doc.id}", TAG, e)
             }
         }
     }
@@ -255,7 +256,7 @@ class HealthAttachmentService @Inject constructor(
             extractAndPersistText(doc, uid)
         }
         runCatching { documentRepository.flushPending(familyId) }
-            .onFailure { Log.w(TAG, "ensureExamAttachmentsExtraction flushPending failed familyId=$familyId", it) }
+            .onFailure { KBLog.data.error("ensureExamAttachmentsExtraction flushPending failed familyId=$familyId", TAG, it) }
     }
 
     /** Ensures extracted text exists for visit attachments before building AI context. */
@@ -283,7 +284,7 @@ class HealthAttachmentService @Inject constructor(
             extractAndPersistText(doc, uid)
         }
         runCatching { documentRepository.flushPending(familyId) }
-            .onFailure { Log.w(TAG, "ensureVisitAttachmentsExtraction flushPending failed familyId=$familyId", it) }
+            .onFailure { KBLog.data.error("ensureVisitAttachmentsExtraction flushPending failed familyId=$familyId", TAG, it) }
     }
 
     /** Ensures extracted text exists for treatment attachments before building AI context. */
@@ -311,7 +312,7 @@ class HealthAttachmentService @Inject constructor(
             extractAndPersistText(doc, uid)
         }
         runCatching { documentRepository.flushPending(familyId) }
-            .onFailure { Log.w(TAG, "ensureTreatmentAttachmentsExtraction flushPending failed familyId=$familyId", it) }
+            .onFailure { KBLog.data.error("ensureTreatmentAttachmentsExtraction flushPending failed familyId=$familyId", TAG, it) }
     }
 
     /**
@@ -342,7 +343,7 @@ class HealthAttachmentService @Inject constructor(
             extractAndPersistText(doc, uid)
         }
         runCatching { documentRepository.flushPending(familyId) }
-            .onFailure { Log.w(TAG, "ensureLifeAreaAttachmentsForPlanning flushPending failed familyId=$familyId", it) }
+            .onFailure { KBLog.data.error("ensureLifeAreaAttachmentsForPlanning flushPending failed familyId=$familyId", TAG, it) }
     }
 
     // ── Private ──────────────────────────────────────────────────────────────────
@@ -379,7 +380,7 @@ class HealthAttachmentService @Inject constructor(
             val docId = UUID.randomUUID().toString()
             val safeFile = safeFileName(fileName)
             val storagePath = "families/$familyId/documents/$docId/$safeFile.kbenc"
-            Log.d(TAG, "Storage path (logical scope=$storageScopeSegment) -> $storagePath")
+            KBLog.data.debug("Storage path (logical scope=$storageScopeSegment) -> $storagePath", TAG)
 
             // 5. Target folder (Salute/Referti o Garage)
             val categoryId = resolveCategoryId()
@@ -419,7 +420,7 @@ class HealthAttachmentService @Inject constructor(
                 lastSyncError = null,
             )
             documentDao.upsert(entity)
-            Log.d(TAG, "Persisted pending entity docId=$docId tag=$tag")
+            KBLog.data.debug("Persisted pending entity docId=$docId tag=$tag", TAG)
 
             // 8. Encrypt + upload to health-specific path
             val downloadUrl = try {
@@ -443,11 +444,11 @@ class HealthAttachmentService @Inject constructor(
                 lastSyncError = null,
             )
             documentDao.upsert(uploaded)
-            Log.d(TAG, "Uploaded docId=$docId path=$storagePath")
+            KBLog.data.debug("Uploaded docId=$docId path=$storagePath", TAG)
 
             // 10. Push metadata to Firestore (skips re-upload since downloadURL is set)
             runCatching { documentRepository.flushPending(familyId) }
-                .onFailure { Log.w(TAG, "flushPending failed, will retry on next sync", it) }
+                .onFailure { KBLog.data.error("flushPending failed, will retry on next sync", TAG, it) }
 
             // 11. OCR in background (iOS-like): upload completes first, extraction status updates asynchronously.
             scope.launch {
@@ -455,7 +456,7 @@ class HealthAttachmentService @Inject constructor(
                     extractAndPersistText(uploaded, uid)
                     documentRepository.flushPending(familyId)
                 }.onFailure {
-                    Log.w(TAG, "background OCR update failed docId=$docId", it)
+                    KBLog.data.error("background OCR update failed docId=$docId", TAG, it)
                 }
             }
 
@@ -469,15 +470,15 @@ class HealthAttachmentService @Inject constructor(
         val lifeArea = documentDao.getLifeAreaDocumentsNeedingExtraction(familyId)
         val candidates = (health + lifeArea).distinctBy { it.id }
         if (candidates.isEmpty()) return
-        Log.i(TAG, "Backfill extraction start familyId=$familyId count=${candidates.size} (health+life)")
+        KBLog.data.info("Backfill extraction start familyId=$familyId count=${candidates.size} (health+life)", TAG)
 
         for (doc in candidates) {
             extractAndPersistText(doc, uid)
         }
 
         runCatching { documentRepository.flushPending(familyId) }
-            .onFailure { Log.w(TAG, "Backfill flushPending failed familyId=$familyId", it) }
-        Log.i(TAG, "Backfill extraction completed familyId=$familyId")
+            .onFailure { KBLog.data.error("Backfill flushPending failed familyId=$familyId", TAG, it) }
+        KBLog.data.info("Backfill extraction completed familyId=$familyId", TAG)
     }
 
     private suspend fun extractAndPersistText(doc: KBDocumentEntity, uid: String) {
@@ -493,7 +494,7 @@ class HealthAttachmentService @Inject constructor(
             ),
         )
         val previewFile = runCatching { documentRepository.preparePreviewFile(doc) }
-            .onFailure { Log.w(TAG, "Extraction skip docId=${doc.id}: preview unavailable", it) }
+            .onFailure { KBLog.data.error("Extraction skip docId=${doc.id}: preview unavailable", TAG, it) }
             .getOrNull()
         if (previewFile == null) {
             markExtractionFailed(doc, uid, "Anteprima non disponibile")
@@ -501,7 +502,7 @@ class HealthAttachmentService @Inject constructor(
         }
 
         val bytes = runCatching { previewFile.readBytes() }
-            .onFailure { Log.w(TAG, "Extraction readBytes failed docId=${doc.id}", it) }
+            .onFailure { KBLog.data.error("Extraction readBytes failed docId=${doc.id}", TAG, it) }
             .getOrNull()
         if (bytes == null) {
             markExtractionFailed(doc, uid, "Impossibile leggere il file")
@@ -520,7 +521,7 @@ class HealthAttachmentService @Inject constructor(
                 fileName = doc.fileName,
             )
         }.onFailure {
-            Log.w(TAG, "Extraction engine failed docId=${doc.id} mime=${doc.mimeType}", it)
+            KBLog.data.error("Extraction engine failed docId=${doc.id} mime=${doc.mimeType}", TAG, it)
         }.getOrDefault("")
 
         val sanitized = HealthAiDocumentText.sanitizeExtractedText(extracted)

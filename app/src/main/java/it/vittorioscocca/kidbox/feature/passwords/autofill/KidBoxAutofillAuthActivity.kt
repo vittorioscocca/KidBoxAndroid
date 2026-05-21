@@ -1,9 +1,10 @@
 package it.vittorioscocca.kidbox.feature.passwords.autofill
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import android.view.autofill.AutofillId
 import android.view.autofill.AutofillManager
 import android.view.autofill.AutofillValue
@@ -90,7 +91,7 @@ class KidBoxAutofillAuthActivity : FragmentActivity() {
             executor,
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    Log.w(TAG, "bio err $errorCode $errString")
+                    KBLog.security.warning("bio err $errorCode $errString", TAG)
                     finish()
                 }
 
@@ -111,7 +112,7 @@ class KidBoxAutofillAuthActivity : FragmentActivity() {
             .setAllowedAuthenticators(allowed)
             .build()
         runCatching { prompt.authenticate(info) }.onFailure {
-            Log.w(TAG, "bio failed ${it.message}")
+            KBLog.security.warning("bio failed ${it.message}", TAG)
             finish()
         }
     }

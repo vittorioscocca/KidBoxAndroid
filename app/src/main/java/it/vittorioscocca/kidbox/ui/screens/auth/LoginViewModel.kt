@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.auth
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import androidx.activity.ComponentActivity
 import android.content.ActivityNotFoundException
 import androidx.lifecycle.ViewModel
@@ -9,7 +11,6 @@ import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
-import android.util.Log
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
@@ -70,10 +71,7 @@ class LoginViewModel @Inject constructor(
             val hasFamily = if (user != null) checkHasFamily() else false
             val hasOnboarding = onboardingPreferences.hasSeenOnboarding()
 
-            Log.d(
-                "KidBoxDebug",
-                "user=${user?.uid} hasFamily=$hasFamily hasOnboarding=$hasOnboarding",
-            )
+            KBLog.auth.debug("user=${user?.uid} hasFamily=$hasFamily hasOnboarding=$hasOnboarding", "KidBoxDebug")
 
             _authCheckState.value = if (user == null) {
                 AuthCheckState.NotAuthenticated
@@ -218,9 +216,9 @@ class LoginViewModel @Inject constructor(
             FirebaseFirestore.getInstance().terminate().await()
             FirebaseFirestore.getInstance().clearPersistence().await()
             delay(250)
-            Log.d("KidBoxDebug", "resetFirestoreClientAfterAuthChange: OK")
+            KBLog.auth.debug("resetFirestoreClientAfterAuthChange: OK", "KidBoxDebug")
         } catch (e: Exception) {
-            Log.w("KidBoxDebug", "resetFirestoreClientAfterAuthChange: ${e.message}")
+            KBLog.auth.warning("resetFirestoreClientAfterAuthChange: ${e.message}", "KidBoxDebug")
         }
     }
 
@@ -229,28 +227,28 @@ class LoginViewModel @Inject constructor(
         runCatching { familyDao.hasAnyFamily() }
             .onSuccess { hasLocalFamily ->
                 if (hasLocalFamily) {
-                    Log.d("KidBoxDebug", "checkHasFamily: local family found -> true")
+                    KBLog.auth.debug("checkHasFamily: local family found -> true", "KidBoxDebug")
                     return true
                 }
             }
             .onFailure { err ->
-                Log.w("KidBoxDebug", "checkHasFamily local lookup failed: ${err.message}")
+                KBLog.auth.warning("checkHasFamily local lookup failed: ${err.message}", "KidBoxDebug")
             }
 
         return try {
             checkHasFamilyOnce()
         } catch (e: FirebaseFirestoreException) {
             if (e.code != FirebaseFirestoreException.Code.PERMISSION_DENIED) {
-                Log.e("KidBoxDebug", "checkHasFamily firestore error: ${e.message}")
+                KBLog.auth.error("checkHasFamily firestore error: ${e.message}", "KidBoxDebug")
                 return false
             }
-            Log.w("KidBoxDebug", "checkHasFamily: PERMISSION_DENIED, reset+retry")
+            KBLog.auth.warning("checkHasFamily: PERMISSION_DENIED, reset+retry", "KidBoxDebug")
             resetFirestoreClientAfterAuthChange()
             runCatching { checkHasFamilyOnce() }
-                .onFailure { t -> Log.e("KidBoxDebug", "checkHasFamily retry failed: ${t.message}") }
+                .onFailure { t -> KBLog.auth.error("checkHasFamily retry failed: ${t.message}", "KidBoxDebug") }
                 .getOrDefault(false)
         } catch (e: Exception) {
-            Log.e("KidBoxDebug", "checkHasFamily error: ${e.message}")
+            KBLog.auth.error("checkHasFamily error: ${e.message}", "KidBoxDebug")
             false
         }
     }
@@ -277,7 +275,7 @@ class LoginViewModel @Inject constructor(
         val resolvedFamilyIds = if (candidateFamilyIds.isNotEmpty()) {
             candidateFamilyIds
         } else {
-            Log.w("KidBoxDebug", "checkHasFamily: memberships vuote, fallback collectionGroup(members)")
+            KBLog.auth.warning("checkHasFamily: memberships vuote, fallback collectionGroup(members)", "KidBoxDebug")
             val memberDocs = FirebaseFirestore.getInstance()
                 .collectionGroup("members")
                 .whereEqualTo("uid", uid)
@@ -291,7 +289,7 @@ class LoginViewModel @Inject constructor(
         }
 
         if (resolvedFamilyIds.isEmpty()) {
-            Log.d("KidBoxDebug", "checkHasFamily: no family ids on server -> false")
+            KBLog.auth.debug("checkHasFamily: no family ids on server -> false", "KidBoxDebug")
             return false
         }
 
@@ -308,10 +306,7 @@ class LoginViewModel @Inject constructor(
             memberSnap.exists() && (memberSnap.data?.get("isDeleted") as? Boolean != true)
         }
 
-        Log.d(
-            "KidBoxDebug",
-            "checkHasFamily server candidates=${resolvedFamilyIds.size} hasValidMembership=$hasValidMembership",
-        )
+        KBLog.auth.debug("checkHasFamily server candidates=${resolvedFamilyIds.size} hasValidMembership=$hasValidMembership", "KidBoxDebug")
         return hasValidMembership
     }
 

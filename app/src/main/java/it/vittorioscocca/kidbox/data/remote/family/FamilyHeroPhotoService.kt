@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.remote.family
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -43,10 +44,10 @@ class FamilyHeroPhotoService @Inject constructor() {
 
         val path = "families/$familyId/hero/hero.jpg"
         val ref = storage.reference.child(path)
-        Log.d(TAG, "hero upload start familyId=$familyId bytes=${imageData.size}")
+        KBLog.data.debug("hero upload start familyId=$familyId bytes=${imageData.size}", TAG)
 
         val metadata = storageMetadata { contentType = "image/jpeg" }
-        Log.d(TAG, "hero upload attempting path=$path uid=${auth.currentUser?.uid} token=${auth.currentUser?.getIdToken(false)?.result?.token?.take(20)}")
+        KBLog.data.debug("hero upload attempting path=$path uid=${auth.currentUser?.uid} token=${auth.currentUser?.getIdToken(false)?.result?.token?.take(20)}", TAG)
         val url = try {
             prefetchAppCheckTokenForStorage()
             ref.putBytes(imageData, metadata).await()
@@ -54,7 +55,7 @@ class FamilyHeroPhotoService @Inject constructor() {
         } catch (e: Exception) {
             throw Exception(e.userMessageForFirebaseStorage(), e)
         }
-        Log.d(TAG, "hero upload OK familyId=$familyId url=$url")
+        KBLog.data.debug("hero upload OK familyId=$familyId url=$url", TAG)
 
         // Scrivi su Firestore — identico a iOS
         db.collection("families").document(familyId).set(
@@ -70,7 +71,7 @@ class FamilyHeroPhotoService @Inject constructor() {
             SetOptions.merge(),
         ).await()
 
-        Log.d(TAG, "hero Firestore updated familyId=$familyId")
+        KBLog.data.debug("hero Firestore updated familyId=$familyId", TAG)
         return url
     }
 

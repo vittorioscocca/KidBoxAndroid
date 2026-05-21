@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.data.remote.ai
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.Context
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.functions.FirebaseFunctions
@@ -127,10 +129,7 @@ class AIService @Inject constructor(
             if (request.regenerateSingleDay) {
                 payload["regenerateSingleDay"] = true
             }
-            android.util.Log.i(
-                "AIService",
-                "generateTravelPlan call familyId=$resolvedFamilyId single=${request.regenerateSingleDay} promptLen=${request.freeTextPrompt.length}",
-            )
+            KBLog.ai.info("generateTravelPlan call familyId=$resolvedFamilyId single=${request.regenerateSingleDay} promptLen=${request.freeTextPrompt.length}", "AIService")
             @Suppress("UNCHECKED_CAST")
             val data = functions.getHttpsCallable("generateTravelPlan")
                 .apply { setTimeout(150, TimeUnit.SECONDS) }
@@ -144,10 +143,7 @@ class AIService @Inject constructor(
             val travelPlanMap = data["travelPlan"].toTravelPlanMap()
             val dayPlanCount = (travelPlanMap?.get("dayPlans") as? List<*>)?.size ?: 0
             val narrativeText = data["narrativeText"] as? String ?: ""
-            android.util.Log.i(
-                "AIService",
-                "generateTravelPlan success usage=$usageToday/$dailyLimit dayPlans=$dayPlanCount narrativeLen=${narrativeText.length}",
-            )
+            KBLog.ai.info("generateTravelPlan success usage=$usageToday/$dailyLimit dayPlans=$dayPlanCount narrativeLen=${narrativeText.length}", "AIService")
             TravelPlanResponse(
                 travelPlan = travelPlanMap,
                 narrativeText = narrativeText,
@@ -155,7 +151,7 @@ class AIService @Inject constructor(
                 dailyLimit = dailyLimit,
             )
         }.onFailure { err ->
-            android.util.Log.e("AIService", "generateTravelPlan failed", err)
+            KBLog.ai.error("generateTravelPlan failed", "AIService", err)
         }.mapTravelCallableError()
     }
 

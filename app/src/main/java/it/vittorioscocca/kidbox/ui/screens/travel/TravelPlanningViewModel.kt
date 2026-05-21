@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.travel
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -644,13 +645,13 @@ class TravelPlanningViewModel @Inject constructor(
 
     fun regenerateDayPlan(day: TravelItineraryDay) {
         viewModelScope.launch {
-            Log.i(PLAN_TAG, "regenerateDayPlan tapped dayIndex=${day.dayIndex} date=${day.dateString}")
+            KBLog.ui.info("regenerateDayPlan tapped dayIndex=${day.dayIndex} date=${day.dateString}", PLAN_TAG)
             val plan = _proposalPlan.value ?: run {
-                Log.w(PLAN_TAG, "regenerateDayPlan ABORT: proposal plan null")
+                KBLog.ui.warning("regenerateDayPlan ABORT: proposal plan null", PLAN_TAG)
                 return@launch
             }
             val familyId = resolvedFamilyId().ifBlank {
-                Log.w(PLAN_TAG, "regenerateDayPlan ABORT: no familyId")
+                KBLog.ui.warning("regenerateDayPlan ABORT: no familyId", PLAN_TAG)
                 return@launch
             }
             _regeneratingDayIndex.value = day.dayIndex
@@ -701,27 +702,21 @@ class TravelPlanningViewModel @Inject constructor(
                 .onSuccess { response ->
                     val newDay = TravelDayRegeneration.extractRegeneratedDay(response, day.dateString)
                         ?: run {
-                            Log.e(
-                                PLAN_TAG,
-                                "regenerateDayPlan parse failed date=${day.dateString}",
-                            )
+                            KBLog.ui.error("regenerateDayPlan parse failed date=${day.dateString}", PLAN_TAG)
                             _error.value = "Rigenerazione giorno fallita: risposta AI non valida."
                             return@onSuccess
                         }
                     val morningStops = (newDay["morningStops"] as? List<*>)?.size ?: 0
                     val afternoonStops = (newDay["afternoonStops"] as? List<*>)?.size ?: 0
                     val eveningStops = (newDay["eveningStops"] as? List<*>)?.size ?: 0
-                    Log.i(
-                        PLAN_TAG,
-                        "regenerateDayPlan success date=${day.dateString} morning=$morningStops afternoon=$afternoonStops evening=$eveningStops",
-                    )
+                    KBLog.ui.info("regenerateDayPlan success date=${day.dateString} morning=$morningStops afternoon=$afternoonStops evening=$eveningStops", PLAN_TAG)
                     val current = _proposalPlan.value ?: return@onSuccess
                     _proposalPlan.value = TravelDayRegeneration.mergeDay(current, newDay, day.dateString)
                     _proposalRevision.value = _proposalRevision.value + 1
                     _error.value = null
                 }
                 .onFailure { err ->
-                    Log.e(PLAN_TAG, "regenerateDayPlan failed", err)
+                    KBLog.ui.error("regenerateDayPlan failed", PLAN_TAG, err)
                     _error.value = "Rigenerazione giorno fallita: ${err.message}"
                 }
 

@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.remote.ai
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
@@ -36,7 +37,7 @@ class MemoryFactRemoteStore @Inject constructor() {
             .await()
         snap.documents.mapNotNull { doc -> decode(doc.id, doc.data, familyId) }
     }.getOrElse { err ->
-        Log.w(TAG, "fetchAll failed familyId=$familyId: ${err.message}")
+        KBLog.ai.warning("fetchAll failed familyId=$familyId: ${err.message}", TAG)
         emptyList()
     }
 
@@ -63,7 +64,7 @@ class MemoryFactRemoteStore @Inject constructor() {
                 .set(payload, SetOptions.merge())
                 .await()
         }.onFailure { err ->
-            Log.w(TAG, "upsert failed factId=${fact.id}: ${err.message}")
+            KBLog.ai.warning("upsert failed factId=${fact.id}: ${err.message}", TAG)
         }
     }
 

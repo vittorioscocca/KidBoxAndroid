@@ -1,11 +1,12 @@
 package it.vittorioscocca.kidbox.notifications
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.mapper.scheduleTimesList
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
@@ -40,13 +41,13 @@ class TreatmentNotificationManager @Inject constructor(
         }
         cancelSentinel(treatmentId)
         removeAllEntries(treatmentId)
-        Log.d(TAG, "cancelled all alarms for treatmentId=$treatmentId (${entries.size} entries)")
+        KBLog.app.debug("cancelled all alarms for treatmentId=$treatmentId (${entries.size} entries)", TAG)
     }
 
     fun cancelSlot(treatmentId: String, dayOffset: Int, slotIndex: Int) {
         cancelAlarmIntent(treatmentId, dayOffset, slotIndex)
         removeSingleEntry(treatmentId, dayOffset, slotIndex)
-        Log.d(TAG, "cancelled slot treatmentId=$treatmentId day=$dayOffset slot=$slotIndex")
+        KBLog.app.debug("cancelled slot treatmentId=$treatmentId day=$dayOffset slot=$slotIndex", TAG)
     }
 
     fun rescheduleIfNeeded(treatment: KBTreatment, childName: String) {
@@ -67,7 +68,7 @@ class TreatmentNotificationManager @Inject constructor(
         // Real reschedule happens via TreatmentRepository observers in the UI.
         // This method is intentionally a no-op stub: the sync centers + ViewModel
         // cascade do the work when the family session is re-established.
-        Log.d(TAG, "rescheduleAllActive called (delegated to sync centers on session restore)")
+        KBLog.app.debug("rescheduleAllActive called (delegated to sync centers on session restore)", TAG)
     }
 
     private fun scheduleWindow(
@@ -145,7 +146,7 @@ class TreatmentNotificationManager @Inject constructor(
         if (lastFireMillis > 0L) {
             scheduleSentinel(treatment.id, lastFireMillis + 60_000L)
         }
-        Log.d(TAG, "scheduled window treatmentId=${treatment.id} start=$windowStartDay end=$endDay")
+        KBLog.app.debug("scheduled window treatmentId=${treatment.id} start=$windowStartDay end=$endDay", TAG)
     }
 
     private fun scheduleAlarm(

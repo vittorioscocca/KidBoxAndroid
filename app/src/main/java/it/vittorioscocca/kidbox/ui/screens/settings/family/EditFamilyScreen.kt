@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.settings.family
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -270,10 +272,7 @@ fun EditFamilyScreen(
                                 ?.toInstant()?.toEpochMilli(),
                         )
                     }
-                    android.util.Log.d(
-                        "EditFamilyScreen",
-                        "Salva: ${inputs.count { it.name.isNotBlank() }} figlio/i con nome su ${inputs.size} righe",
-                    )
+                    KBLog.ui.debug("Salva: ${inputs.count { it.name.isNotBlank() }} figlio/i con nome su ${inputs.size} righe", "EditFamilyScreen")
                     viewModel.saveFamilyWithChildren(
                         newName = familyName,
                         childrenInputs = inputs,

@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.health.ai
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import it.vittorioscocca.kidbox.domain.model.KBExamStatus
 import it.vittorioscocca.kidbox.domain.model.KBTextExtractionStatus
@@ -158,7 +159,7 @@ REGOLE IMPORTANTI:
         sb.appendLine(PlanningAIActionBlock.promptSection)
 
         val prompt = sb.toString()
-        Log.d(TAG, "buildSystemPrompt for $subjectName: ${prompt.take(200)}...")
+        KBLog.ai.debug("buildSystemPrompt for $subjectName: ${prompt.take(200)}...", TAG)
         return prompt
     }
 

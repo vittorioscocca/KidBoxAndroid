@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.settings.family
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -76,14 +77,14 @@ fun FamilySettingsScreen(
     var memberToRevoke by remember { mutableStateOf<KBFamilyMemberEntity?>(null) }
     LaunchedEffect(navigateAway) {
         if (navigateAway) {
-            Log.i(tag, "navigateAwayAfterLeave triggered -> calling onLeaveDone")
+            KBLog.ui.info("navigateAwayAfterLeave triggered -> calling onLeaveDone", tag)
             viewModel.resetNavigateAway()
             onLeaveDone()
         }
     }
     LaunchedEffect(state.error) {
         if (!state.error.isNullOrBlank()) {
-            Log.e(tag, "uiState.error=${state.error}")
+            KBLog.ui.error("uiState.error=${state.error}", tag)
         }
     }
 
@@ -273,7 +274,7 @@ fun FamilySettingsScreen(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .clickable {
-                            Log.d(tag, "tap leave card; forwarding to viewModel.onLeaveButtonTapped()")
+                            KBLog.ui.debug("tap leave card; forwarding to viewModel.onLeaveButtonTapped()", tag)
                             viewModel.onLeaveButtonTapped()
                         }
                         .padding(14.dp),
@@ -325,7 +326,7 @@ fun FamilySettingsScreen(
                 text = { Text("Confermi di voler uscire dalla famiglia?") },
                 confirmButton = {
                     TextButton(onClick = {
-                        Log.i(tag, "ConfirmLeave -> Esci clicked")
+                        KBLog.ui.info("ConfirmLeave -> Esci clicked", tag)
                         viewModel.leaveFamily()
                     }) {
                         Text("Esci", color = Color(0xFFE53E3E))
@@ -333,7 +334,7 @@ fun FamilySettingsScreen(
                 },
                 dismissButton = {
                     TextButton(onClick = {
-                        Log.d(tag, "ConfirmLeave -> Annulla clicked")
+                        KBLog.ui.debug("ConfirmLeave -> Annulla clicked", tag)
                         viewModel.dismissLeaveDialog()
                     }) { Text("Annulla") }
                 },
@@ -344,7 +345,7 @@ fun FamilySettingsScreen(
                 text = { Text("Sei l'unico membro. Devi eliminare la famiglia per uscire.") },
                 confirmButton = {
                     TextButton(onClick = {
-                        Log.i(tag, "OwnerAlone -> Elimina famiglia clicked")
+                        KBLog.ui.info("OwnerAlone -> Elimina famiglia clicked", tag)
                         viewModel.deleteFamily()
                     }) {
                         Text("Elimina famiglia", color = Color(0xFFE53E3E))
@@ -352,7 +353,7 @@ fun FamilySettingsScreen(
                 },
                 dismissButton = {
                     TextButton(onClick = {
-                        Log.d(tag, "OwnerAlone -> Annulla clicked")
+                        KBLog.ui.debug("OwnerAlone -> Annulla clicked", tag)
                         viewModel.dismissLeaveDialog()
                     }) { Text("Annulla") }
                 },
@@ -363,7 +364,7 @@ fun FamilySettingsScreen(
                 text = { Text("Prima di uscire puoi trasferire la ownership oppure eliminare la famiglia.") },
                 confirmButton = {
                     TextButton(onClick = {
-                        Log.i(tag, "OwnerWithMembers -> Trasferisci ownership clicked")
+                        KBLog.ui.info("OwnerWithMembers -> Trasferisci ownership clicked", tag)
                         viewModel.showTransferOwnershipDialog()
                     }) {
                         Text("Trasferisci ownership")
@@ -372,13 +373,13 @@ fun FamilySettingsScreen(
                 dismissButton = {
                     Row {
                         TextButton(onClick = {
-                            Log.i(tag, "OwnerWithMembers -> Elimina famiglia clicked")
+                            KBLog.ui.info("OwnerWithMembers -> Elimina famiglia clicked", tag)
                             viewModel.deleteFamily()
                         }) {
                             Text("Elimina famiglia", color = Color(0xFFE53E3E))
                         }
                         TextButton(onClick = {
-                            Log.d(tag, "OwnerWithMembers -> Annulla clicked")
+                            KBLog.ui.debug("OwnerWithMembers -> Annulla clicked", tag)
                             viewModel.dismissLeaveDialog()
                         }) { Text("Annulla") }
                     }
@@ -386,7 +387,7 @@ fun FamilySettingsScreen(
             )
             LeaveDialogState.TransferOwnership -> {
                 val candidates = (viewModel.checkLeaveScenario() as? LeaveScenario.OwnerWithMembers)?.otherMembers ?: emptyList()
-                Log.d(tag, "TransferOwnership candidates=${candidates.size}")
+                KBLog.ui.debug("TransferOwnership candidates=${candidates.size}", tag)
                 AlertDialog(
                     onDismissRequest = { viewModel.dismissLeaveDialog() },
                     title = { Text("Seleziona nuovo owner") },
@@ -401,7 +402,7 @@ fun FamilySettingsScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable {
-                                            Log.i(tag, "TransferOwnership -> selected uid=${member.userId} label=$label")
+                                            KBLog.ui.info("TransferOwnership -> selected uid=${member.userId} label=$label", tag)
                                             viewModel.transferOwnershipAndLeave(member.userId)
                                         }
                                         .padding(vertical = 8.dp),
@@ -413,7 +414,7 @@ fun FamilySettingsScreen(
                     confirmButton = {},
                     dismissButton = {
                         TextButton(onClick = {
-                            Log.d(tag, "TransferOwnership -> Annulla clicked")
+                            KBLog.ui.debug("TransferOwnership -> Annulla clicked", tag)
                             viewModel.dismissLeaveDialog()
                         }) { Text("Annulla") }
                     },

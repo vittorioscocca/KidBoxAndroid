@@ -1,10 +1,11 @@
 package it.vittorioscocca.kidbox.ui.screens.home
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.Manifest
 import android.app.Application
 import android.content.pm.PackageManager
 import android.location.Geocoder
-import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -223,7 +224,7 @@ class ProfileViewModel @Inject constructor(
                         ?.distinctBy { it.title.lowercase(Locale.getDefault()) }
                         .orEmpty()
                 }.getOrElse {
-                    Log.w(TAG, "autocomplete geocoder failed: ${it.message}")
+                    KBLog.ui.warning("autocomplete geocoder failed: ${it.message}", TAG)
                     emptyList()
                 }
             }

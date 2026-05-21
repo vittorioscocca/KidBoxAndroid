@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
@@ -113,6 +114,13 @@ fun SettingsScreen(
             icon = Icons.Filled.Notifications,
             showChevron = true,
             onClick = onNotifications,
+        ),
+        SettingRowItem(
+            title = "Privacy",
+            subtitle = "Report errori e log tecnici",
+            icon = Icons.Filled.Shield,
+            showChevron = true,
+            onClick = onPrivacySettings,
         ),
         SettingRowItem(
             title = "Utilizzo spazio",

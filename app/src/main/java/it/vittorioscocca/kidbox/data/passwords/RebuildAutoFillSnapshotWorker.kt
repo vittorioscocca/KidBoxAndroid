@@ -1,7 +1,8 @@
 package it.vittorioscocca.kidbox.data.passwords
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.Context
-import android.util.Log
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
@@ -43,7 +44,7 @@ class RebuildAutoFillSnapshotWorker @AssistedInject constructor(
             // Firebase Auth non ha ancora ripristinato la sessione. Cancellare qui causerebbe
             // un ciclo dove il servizio autofill vede snapshot null → schedula rebuild →
             // rebuild cancella snapshot → loop. Si cancella solo al logout esplicito.
-            Log.d(TAG, "skip rebuild: uid=${uid.isBlank()} familyId=${familyId.isBlank()}")
+            KBLog.security.debug("skip rebuild: uid=${uid.isBlank()} familyId=${familyId.isBlank()}", TAG)
             return Result.success()
         }
         val familyKey = FamilyKeyStore.loadFamilyKey(appContext, familyId, uid)
@@ -87,7 +88,7 @@ class RebuildAutoFillSnapshotWorker @AssistedInject constructor(
                             ),
                         )
                     }.onFailure { err ->
-                        Log.d(TAG, "skip entry id=${e.id}: ${err.message}")
+                        KBLog.security.debug("skip entry id=${e.id}: ${err.message}", TAG)
                     }
                 }
             }
@@ -98,7 +99,7 @@ class RebuildAutoFillSnapshotWorker @AssistedInject constructor(
             AutoFillSnapshotLoader.clearMemoryCache()
             Result.success()
         }.getOrElse { err ->
-            Log.w(TAG, "rebuild failed: ${err.message}")
+            KBLog.security.warning("rebuild failed: ${err.message}", TAG)
             Result.retry()
         }
     }

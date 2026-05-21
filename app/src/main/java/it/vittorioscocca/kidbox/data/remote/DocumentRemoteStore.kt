@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.remote
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentChange
@@ -111,10 +112,7 @@ class DocumentRemoteStore @Inject constructor(
                         DocumentChange.Type.MODIFIED,
                         -> {
                             if (isFromCache && doc.id.startsWith("exp-") && resolvedCategoryId.isNullOrBlank()) {
-                                Log.d(
-                                    TAG_DOC_SYNC,
-                                    "cache-guard skip document id=${doc.id} reason=fromCache_null_category",
-                                )
+                                KBLog.data.debug("cache-guard skip document id=${doc.id} reason=fromCache_null_category", TAG_DOC_SYNC)
                                 return@forEach
                             }
                             val dto = RemoteDocumentDto(
@@ -147,7 +145,7 @@ class DocumentRemoteStore @Inject constructor(
 
                         DocumentChange.Type.REMOVED -> {
                             if (isFromCache) {
-                                Log.d(TAG_DOC_SYNC, "cache-guard skip document removed id=${doc.id}")
+                                KBLog.data.debug("cache-guard skip document removed id=${doc.id}", TAG_DOC_SYNC)
                                 return@forEach
                             }
                             onChange(DocumentRemoteChange.RemoveDocument(doc.id, isFromCache = false))
@@ -156,10 +154,7 @@ class DocumentRemoteStore @Inject constructor(
                     }
                 }
                 if (upsertCount + removedCount > 0) {
-                    Log.d(
-                        TAG_DOC_SYNC,
-                        "Snapshot processed. Changes: $upsertCount added/modified, $removedCount removed. collection=documents isFromCache=$isFromCache",
-                    )
+                    KBLog.data.debug("Snapshot processed. Changes: $upsertCount added/modified, $removedCount removed. collection=documents isFromCache=$isFromCache", TAG_DOC_SYNC)
                 }
             },
         )
@@ -195,10 +190,7 @@ class DocumentRemoteStore @Inject constructor(
                                 !doc.id.startsWith("exp-root-") &&
                                 resolvedParentId.isNullOrBlank()
                             ) {
-                                Log.d(
-                                    TAG_DOC_SYNC,
-                                    "cache-guard skip category id=${doc.id} reason=fromCache_null_parent",
-                                )
+                                KBLog.data.debug("cache-guard skip category id=${doc.id} reason=fromCache_null_parent", TAG_DOC_SYNC)
                                 return@forEach
                             }
                             val dto = RemoteDocumentCategoryDto(
@@ -218,7 +210,7 @@ class DocumentRemoteStore @Inject constructor(
 
                         DocumentChange.Type.REMOVED -> {
                             if (isFromCache) {
-                                Log.d(TAG_DOC_SYNC, "cache-guard skip category removed id=${doc.id}")
+                                KBLog.data.debug("cache-guard skip category removed id=${doc.id}", TAG_DOC_SYNC)
                                 return@forEach
                             }
                             onChange(DocumentRemoteChange.RemoveCategory(doc.id, isFromCache = false))
@@ -227,10 +219,7 @@ class DocumentRemoteStore @Inject constructor(
                     }
                 }
                 if (upsertCount + removedCount > 0) {
-                    Log.d(
-                        TAG_DOC_SYNC,
-                        "Snapshot processed. Changes: $upsertCount added/modified, $removedCount removed. collection=documentCategories isFromCache=$isFromCache",
-                    )
+                    KBLog.data.debug("Snapshot processed. Changes: $upsertCount added/modified, $removedCount removed. collection=documentCategories isFromCache=$isFromCache", TAG_DOC_SYNC)
                 }
             },
         )
@@ -284,10 +273,7 @@ class DocumentRemoteStore @Inject constructor(
             ?.takeIf { it.isNotEmpty() }
             ?: inferredExpenseCategoryId
         if (entity.categoryId.isNullOrBlank() && !inferredExpenseCategoryId.isNullOrBlank()) {
-            Log.d(
-                TAG_DOC_SYNC,
-                "outbound document guard id=${entity.id} forcingCategory=$inferredExpenseCategoryId fromNotes=${entity.notes}",
-            )
+            KBLog.data.debug("outbound document guard id=${entity.id} forcingCategory=$inferredExpenseCategoryId fromNotes=${entity.notes}", TAG_DOC_SYNC)
         }
         val normalizedVis = KBVisibilityScope.normalized(entity.visibilityScope)
         val memberIdsOutbound = decodeStringList(entity.visibilityMemberIdsJson)
@@ -352,10 +338,7 @@ class DocumentRemoteStore @Inject constructor(
             else -> entity.parentId
         }
         if (enforcedParentId != entity.parentId) {
-            Log.d(
-                TAG_DOC_SYNC,
-                "outbound category guard id=${entity.id} forcingParent=$enforcedParentId originalParent=${entity.parentId}",
-            )
+            KBLog.data.debug("outbound category guard id=${entity.id} forcingParent=$enforcedParentId originalParent=${entity.parentId}", TAG_DOC_SYNC)
         }
         db.collection("families")
             .document(entity.familyId)

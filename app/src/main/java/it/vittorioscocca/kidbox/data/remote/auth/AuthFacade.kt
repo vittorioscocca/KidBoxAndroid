@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.remote.auth
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 /**
@@ -18,15 +19,15 @@ class AuthFacade(
         provider: AuthProvider,
         presentation: AuthPresentation,
     ): FirebaseUser {
-        Log.i(TAG, "Sign-in requested for provider: $provider")
+        KBLog.auth.info("Sign-in requested for provider: $provider", TAG)
         val service = services[provider]
             ?: run {
-                Log.e(TAG, "Auth provider not available: $provider")
+                KBLog.auth.error("Auth provider not available: $provider", TAG)
                 throw IllegalStateException("Auth provider not available: $provider")
             }
-        Log.d(TAG, "Delegating sign-in to provider: $provider")
+        KBLog.auth.debug("Delegating sign-in to provider: $provider", TAG)
         val user = service.signIn(presentation)
-        Log.i(TAG, "Sign-in completed for provider: $provider")
+        KBLog.auth.info("Sign-in completed for provider: $provider", TAG)
         return user
     }
 
@@ -34,12 +35,12 @@ class AuthFacade(
      * Sign-out globale Firebase (come `Auth.auth().signOut()` nel facade iOS).
      */
     fun signOut() {
-        Log.i(TAG, "Global sign-out requested")
+        KBLog.auth.info("Global sign-out requested", TAG)
         try {
             firebaseAuth.signOut()
-            Log.i(TAG, "Firebase sign-out successful")
+            KBLog.auth.info("Firebase sign-out successful", TAG)
         } catch (e: Exception) {
-            Log.e(TAG, "Firebase sign-out failed: ${e.message}")
+            KBLog.auth.error("Firebase sign-out failed: ${e.message}", TAG)
             throw e
         }
     }

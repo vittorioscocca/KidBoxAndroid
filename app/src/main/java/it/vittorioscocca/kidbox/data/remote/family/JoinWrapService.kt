@@ -1,7 +1,8 @@
 package it.vittorioscocca.kidbox.data.remote.family
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.Context
-import android.util.Log
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -35,7 +36,7 @@ class JoinWrapService(
             val trimmed = payload.trim()
             val uri = android.net.Uri.parse(trimmed)
             if (uri.scheme != "kidbox" || uri.host != "join") {
-                Log.d(TAG, "parse failed: wrong scheme/host")
+                KBLog.data.debug("parse failed: wrong scheme/host", TAG)
                 return null
             }
             val familyId = uri.getQueryParameter("familyId")?.takeIf { it.isNotBlank() }
@@ -47,10 +48,10 @@ class JoinWrapService(
             // Secret in Base64 URL-safe (no padding), decodifica allineata a iOS
             val secret = InviteCrypto.fromBase64Url(secretStr) ?: return null
 
-            Log.i(TAG, "parse OK familyId=$familyId inviteId=$inviteId")
+            KBLog.data.info("parse OK familyId=$familyId inviteId=$inviteId", TAG)
             ParsedPayload(familyId, inviteId, secret)
         } catch (e: Exception) {
-            Log.d(TAG, "parse exception: ${e.message}")
+            KBLog.data.debug("parse exception: ${e.message}", TAG)
             null
         }
     }
@@ -58,12 +59,12 @@ class JoinWrapService(
     suspend fun join(context: Context, qrPayload: String) {
         val uid = auth.currentUser?.uid
             ?: throw JoinInviteError.InvalidPayload.also {
-                Log.e(TAG, "join failed: not authenticated")
+                KBLog.data.error("join failed: not authenticated", TAG)
             }
 
         val parsed = parse(qrPayload)
             ?: throw JoinInviteError.InvalidPayload.also {
-                Log.e(TAG, "join failed: invalid payload")
+                KBLog.data.error("join failed: invalid payload", TAG)
             }
 
         val familyId = parsed.familyId
@@ -75,7 +76,7 @@ class JoinWrapService(
             .collection("invites")
             .document(inviteId)
 
-        Log.i(TAG, "join start familyId=$familyId inviteId=$inviteId")
+        KBLog.data.info("join start familyId=$familyId inviteId=$inviteId", TAG)
 
         var inviteData: Map<String, Any>? = null
         db.runTransaction { txn ->
@@ -121,26 +122,26 @@ class JoinWrapService(
         val familyKeyBytes = try {
             InviteCrypto.unwrapFamilyKey(cipher, nonce, tag, wrapKeyBytes)
         } catch (e: Exception) {
-            Log.e(TAG, "unwrap failed familyId=$familyId: ${e.message}")
+            KBLog.data.error("unwrap failed familyId=$familyId: ${e.message}", TAG)
             throw JoinInviteError.InvalidSecret
         }
 
         FamilyKeyStore.saveFamilyKey(context, familyKeyBytes, familyId, uid)
-        Log.i(TAG, "master key saved familyId=$familyId")
+        KBLog.data.info("master key saved familyId=$familyId", TAG)
 
         FamilyKeyEscrow.backupRawKey(familyKeyBytes, familyId, uid)
 
         try {
             docRef.delete().await()
-            Log.d(TAG, "invite deleted inviteId=$inviteId")
+            KBLog.data.debug("invite deleted inviteId=$inviteId", TAG)
         } catch (e: Exception) {
-            Log.d(TAG, "invite delete failed (best effort): ${e.message}")
+            KBLog.data.debug("invite delete failed (best effort): ${e.message}", TAG)
         }
 
         if (FamilyKeyStore.hasFamilyKey(context, familyId, uid)) {
-            Log.i(TAG, "keychain verify OK familyId=$familyId")
+            KBLog.data.info("keychain verify OK familyId=$familyId", TAG)
         } else {
-            Log.e(TAG, "keychain verify FAILED familyId=$familyId")
+            KBLog.data.error("keychain verify FAILED familyId=$familyId", TAG)
         }
     }
 

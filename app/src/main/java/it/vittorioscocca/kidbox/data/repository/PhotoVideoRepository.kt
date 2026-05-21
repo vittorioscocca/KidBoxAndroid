@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
@@ -7,7 +9,6 @@ import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
-import android.util.Log
 import android.util.Base64
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
@@ -541,10 +542,7 @@ class PhotoVideoRepository @Inject constructor(
         val resolvedCoverPhotoId = dto.coverPhotoId
             ?.takeIf { coverId -> photoDao.getById(coverId) != null }
         if (!dto.coverPhotoId.isNullOrBlank() && resolvedCoverPhotoId == null) {
-            Log.w(
-                PHOTO_INTEGRITY_TAG,
-                "Album ${dto.id}: coverPhotoId=${dto.coverPhotoId} not found locally, fallback to null",
-            )
+            KBLog.data.warning("Album ${dto.id}: coverPhotoId=${dto.coverPhotoId} not found locally, fallback to null", PHOTO_INTEGRITY_TAG)
         }
         albumDao.upsert(
             KBPhotoAlbumEntity(
@@ -573,10 +571,7 @@ class PhotoVideoRepository @Inject constructor(
         if (familyDao.getById(familyId) != null) return
         val now = System.currentTimeMillis()
         val actor = updatedBy?.takeIf { it.isNotBlank() } ?: auth.currentUser?.uid ?: "remote"
-        Log.w(
-            PHOTO_INTEGRITY_TAG,
-            "Missing family row for familyId=$familyId, creating placeholder before photo/album upsert",
-        )
+        KBLog.data.warning("Missing family row for familyId=$familyId, creating placeholder before photo/album upsert", PHOTO_INTEGRITY_TAG)
         familyDao.upsert(
             KBFamilyEntity(
                 id = familyId,

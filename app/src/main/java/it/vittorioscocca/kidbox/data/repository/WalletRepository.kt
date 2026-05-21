@@ -1,9 +1,10 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.Context
 import android.net.Uri
 import android.util.Base64
-import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
@@ -75,7 +76,7 @@ class WalletRepository @Inject constructor(
                         if (err is FirebaseFirestoreException && err.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
                             onPermissionDenied?.invoke()
                         } else {
-                            Log.w(TAG, "wallet listen error: ${err.message}")
+                            KBLog.data.warning("wallet listen error: ${err.message}", TAG)
                         }
                     },
                 )
@@ -160,7 +161,7 @@ class WalletRepository @Inject constructor(
         walletReminderScheduler.cancelTicket(ticketId)
         walletTicketDao.softDelete(ticketId)
         runCatching { remoteStore.softDelete(ticketId, familyId) }
-            .onFailure { Log.w(TAG, "remote softDelete failed: ${it.message}") }
+            .onFailure { KBLog.data.warning("remote softDelete failed: ${it.message}", TAG) }
     }
 
     suspend fun updateWalletTicketVisibility(
@@ -336,7 +337,7 @@ class WalletRepository @Inject constructor(
                 ?: dto.titlePlain?.trim()?.takeIf { it.isNotEmpty() }
             else -> dto.titlePlain?.trim()?.takeIf { it.isNotEmpty() }
         } ?: run {
-            Log.w(TAG, "ticket ${dto.id} missing/undecryptable title")
+            KBLog.data.warning("ticket ${dto.id} missing/undecryptable title", TAG)
             return null
         }
         return DecryptedWallet(

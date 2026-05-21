@@ -1,8 +1,9 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ListenerRegistration
-import android.util.Log
 import it.vittorioscocca.kidbox.data.local.dao.KBSharedLocationDao
 import it.vittorioscocca.kidbox.data.local.entity.KBSharedLocationEntity
 import it.vittorioscocca.kidbox.data.remote.location.LocationRemoteStore
@@ -60,7 +61,7 @@ class FamilyLocationRepository @Inject constructor(
                     listeningFamilyId = familyId
                     listener = registration
                 }.onFailure { err ->
-                    Log.e(TAG, "startRealtime listen attach failed familyId=$familyId: ${err.message}", err)
+                    KBLog.data.error("startRealtime listen attach failed familyId=$familyId: ${err.message}", TAG, err)
                     listeningFamilyId = null
                     listener = null
                     onError(err)

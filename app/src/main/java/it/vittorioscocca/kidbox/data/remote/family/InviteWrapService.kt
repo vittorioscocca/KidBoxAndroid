@@ -1,8 +1,9 @@
 package it.vittorioscocca.kidbox.data.remote.family
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.Context
 import android.util.Base64
-import android.util.Log
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -54,12 +55,12 @@ class InviteWrapService(
         val familyKeyBytes: ByteArray = FamilyKeyStore.loadFamilyKey(context, familyId, uid)
             ?: FamilyKeyEscrow.recover(familyId, uid)?.also { recovered ->
                 FamilyKeyStore.saveFamilyKey(context, recovered, familyId, uid)
-                Log.i(TAG, "Family master key recovered from escrow familyId=$familyId")
+                KBLog.data.info("Family master key recovered from escrow familyId=$familyId", TAG)
             }
             ?: run {
                 val newKey = InviteCrypto.generateFamilyKey()
                 FamilyKeyStore.saveFamilyKey(context, newKey, familyId, uid)
-                Log.i(TAG, "Family master key creata familyId=$familyId")
+                KBLog.data.info("Family master key creata familyId=$familyId", TAG)
                 newKey
             }
 
@@ -96,7 +97,7 @@ class InviteWrapService(
                 ),
             ).await()
 
-        Log.i(TAG, "Invite created inviteId=$inviteId familyId=$familyId")
+        KBLog.data.info("Invite created inviteId=$inviteId familyId=$familyId", TAG)
 
         FamilyKeyEscrow.backup(context, familyId, uid)
 

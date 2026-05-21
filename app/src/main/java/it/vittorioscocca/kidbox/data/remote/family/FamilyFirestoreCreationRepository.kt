@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.remote.family
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
@@ -104,7 +105,7 @@ class FamilyFirestoreCreationRepository @Inject constructor(
 
         val toSave = children.map { it.copy(name = it.name.trim()) }.filter { it.name.isNotEmpty() }
         for (child in toSave) {
-            Log.d("DEBUG_SAVE", "Inviando figlio ${child.name} con ID ${child.id}")
+            KBLog.data.debug("Inviando figlio ${child.name} con ID ${child.id}", "DEBUG_SAVE")
             val childData = mutableMapOf<String, Any>(
                 "name" to child.name,
                 "isDeleted" to false,
@@ -136,7 +137,7 @@ class FamilyFirestoreCreationRepository @Inject constructor(
             )
         }
 
-        Log.i(TAG, "createFamilyWithChildren OK familyId=$familyId childrenWritten=${toSave.size}")
+        KBLog.data.info("createFamilyWithChildren OK familyId=$familyId childrenWritten=${toSave.size}", TAG)
         return familyId
     }
 

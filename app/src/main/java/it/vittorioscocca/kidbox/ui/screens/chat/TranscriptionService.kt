@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.chat
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -8,7 +10,6 @@ import android.os.ParcelFileDescriptor
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -56,29 +57,26 @@ class TranscriptionService @Inject constructor(
         localeTag: String = "it-IT",
     ): String? {
         if (!file.exists() || file.length() == 0L) {
-            Log.w(tag, "skip: file missing/empty path=${file.absolutePath} size=${file.length()}")
+            KBLog.ui.warning("skip: file missing/empty path=${file.absolutePath} size=${file.length()}", tag)
             return null
         }
         if (!SpeechRecognizer.isRecognitionAvailable(appContext)) {
-            Log.w(tag, "skip: SpeechRecognizer unavailable on this device/service")
+            KBLog.ui.warning("skip: SpeechRecognizer unavailable on this device/service", tag)
             return null
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            Log.w(tag, "skip: file-based recognition requires API 33+, current=${Build.VERSION.SDK_INT}")
+            KBLog.ui.warning("skip: file-based recognition requires API 33+, current=${Build.VERSION.SDK_INT}", tag)
             return null
         }
 
-        Log.w(
-            tag,
-            "start: file=${file.name} size=${file.length()} locale=$localeTag api=${Build.VERSION.SDK_INT}",
-        )
+        KBLog.ui.warning("start: file=${file.name} size=${file.length()} locale=$localeTag api=${Build.VERSION.SDK_INT}", tag)
 
         // Convert input to WAV (RIFF header + 16 kHz mono 16-bit PCM).
         // WAV lets the engine detect format from the RIFF header — no need to send PCM extras.
         // If conversion fails fall back to the original file as a last resort.
         val wav = withContext(Dispatchers.IO) { prepareWavForRecognition(file) }
         val target = wav ?: file
-        Log.w(tag, "engine_input: file=${target.name} size=${target.length()} converted=${wav != null}")
+        KBLog.ui.warning("engine_input: file=${target.name} size=${target.length()} converted=${wav != null}", tag)
 
         val text = runRecognizer(target, localeTag)
 
@@ -113,16 +111,16 @@ class TranscriptionService @Inject constructor(
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                         SpeechRecognizer.isOnDeviceRecognitionAvailable(appContext)
                     ) {
-                        Log.w(tag, "recognizer: using createOnDeviceSpeechRecognizer")
+                        KBLog.ui.warning("recognizer: using createOnDeviceSpeechRecognizer", tag)
                         SpeechRecognizer.createOnDeviceSpeechRecognizer(appContext)
                     } else {
-                        Log.w(tag, "recognizer: using createSpeechRecognizer (fallback)")
+                        KBLog.ui.warning("recognizer: using createSpeechRecognizer (fallback)", tag)
                         SpeechRecognizer.createSpeechRecognizer(appContext)
                     }
                 }.getOrNull()
 
                 if (recognizer == null) {
-                    Log.e(tag, "fail: cannot create SpeechRecognizer")
+                    KBLog.ui.error("fail: cannot create SpeechRecognizer", tag)
                     continuation.resume(null)
                     return@suspendCancellableCoroutine
                 }
@@ -131,7 +129,7 @@ class TranscriptionService @Inject constructor(
                     ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
                 }.getOrNull()
                 if (pfd == null) {
-                    Log.e(tag, "fail: cannot open ParcelFileDescriptor for ${file.absolutePath}")
+                    KBLog.ui.error("fail: cannot open ParcelFileDescriptor for ${file.absolutePath}", tag)
                     runCatching { recognizer.destroy() }
                     continuation.resume(null)
                     return@suspendCancellableCoroutine
@@ -156,7 +154,7 @@ class TranscriptionService @Inject constructor(
                     override fun onEvent(eventType: Int, params: Bundle?) = Unit
 
                     override fun onError(error: Int) {
-                        Log.w(tag, "fail: recognizer error=$error (${speechErrorLabel(error)})")
+                        KBLog.ui.warning("fail: recognizer error=$error (${speechErrorLabel(error)})", tag)
                         complete(null)
                     }
 
@@ -165,10 +163,7 @@ class TranscriptionService @Inject constructor(
                             ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                             ?.map { it.trim() }
                             ?.filter { it.isNotBlank() }
-                        Log.w(
-                            tag,
-                            "results: candidates=${matches?.size ?: 0} first=${matches?.firstOrNull() ?: "<empty>"}",
-                        )
+                        KBLog.ui.warning("results: candidates=${matches?.size ?: 0} first=${matches?.firstOrNull() ?: "<empty>"}", tag)
                         complete(matches?.firstOrNull())
                     }
                 }
@@ -202,33 +197,33 @@ class TranscriptionService @Inject constructor(
                             putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, 1)
                             putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, 2) // AudioFormat.ENCODING_PCM_16BIT
                             putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, 16_000)
-                            Log.w(tag, "intent: raw PCM extras sent (16kHz mono 16-bit)")
+                            KBLog.ui.warning("intent: raw PCM extras sent (16kHz mono 16-bit)", tag)
                         }
                         isWav -> {
                             // WAV carries a RIFF header — the engine reads format and duration
                             // directly from it. Do NOT send PCM extras: they would override
                             // the engine's RIFF-header parsing and cause mis-interpretation.
-                            Log.w(tag, "intent: WAV format — no PCM extras sent")
+                            KBLog.ui.warning("intent: WAV format — no PCM extras sent", tag)
                         }
                         else -> {
                             // Unknown format — no extras; let the engine figure it out.
-                            Log.w(tag, "intent: unknown format, no PCM extras sent")
+                            KBLog.ui.warning("intent: unknown format, no PCM extras sent", tag)
                         }
                     }
                 }
 
                 runCatching { recognizer.startListening(intent) }
                     .onFailure {
-                        Log.e(tag, "fail: startListening threw ${it.javaClass.simpleName}: ${it.message}")
+                        KBLog.ui.error("fail: startListening threw ${it.javaClass.simpleName}: ${it.message}", tag)
                         complete(null)
                     }
             }
         }
     }.also { result ->
         if (result == null) {
-            Log.w(tag, "fail: no result (timeout or engine returned nothing) for file=${file.name}")
+            KBLog.ui.warning("fail: no result (timeout or engine returned nothing) for file=${file.name}", tag)
         } else {
-            Log.w(tag, "success: transcription acquired for file=${file.name}: \"$result\"")
+            KBLog.ui.warning("success: transcription acquired for file=${file.name}: \"$result\"", tag)
         }
     }
 

@@ -1,6 +1,6 @@
 package it.vittorioscocca.kidbox.ui.navigation
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -41,6 +41,7 @@ import it.vittorioscocca.kidbox.ui.screens.settings.NotificationSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.AIChatScreen
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.PlanningAIChatScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.AiSettingsScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.PrivacySettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.SettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.AutoFillSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.StorageUsageScreen
@@ -118,9 +119,9 @@ fun AppNavGraph(
             LoginScreen(
                 onLoginSuccess = { hasFamily ->
                     val hasSeenOnboarding = onboardingPreferences.hasSeenOnboarding()
-                    Log.d(
-                        "KidBoxDebug",
+                    KBLog.navigation.debug(
                         "onLoginSuccess hasFamily=$hasFamily hasSeenOnboarding=$hasSeenOnboarding",
+                        "KidBoxDebug",
                     )
                     when {
                         // Se non ho più una famiglia (es. revoca), devo rientrare nel wizard.
@@ -217,7 +218,12 @@ fun AppNavGraph(
                 onAiSettings = { navController.navigate(AppDestination.AiSettings.route) },
                 onStorageUsage = { navController.navigate(AppDestination.StorageUsage.route) },
                 onAutoFillSettings = { navController.navigate(AppDestination.AutoFillSettings.route) },
+                onPrivacySettings = { navController.navigate(AppDestination.PrivacySettings.route) },
             )
+        }
+
+        composable(AppDestination.PrivacySettings.route) {
+            PrivacySettingsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(AppDestination.AutoFillSettings.route) {
@@ -1703,7 +1709,7 @@ fun AppNavGraph(
                 onJoin = { navController.navigate(AppDestination.JoinFamily.route) },
                 onEditFamily = { navController.navigate(AppDestination.EditFamily.route) },
                 onLeaveDone = {
-                    Log.d("AppNavGraph", "onLeaveDone -> restart app")
+                    KBLog.navigation.debug("onLeaveDone -> restart app", "AppNavGraph")
                     val intent = (context as android.app.Activity).packageManager
                         .getLaunchIntentForPackage(context.packageName)!!
                         .apply {

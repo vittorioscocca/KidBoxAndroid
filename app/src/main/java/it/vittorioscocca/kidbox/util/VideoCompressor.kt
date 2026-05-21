@@ -1,12 +1,13 @@
 package it.vittorioscocca.kidbox.util
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.Context
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
-import android.util.Log
 import android.view.Surface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -66,11 +67,11 @@ internal object VideoCompressor {
                 val compressed = runCatching {
                     transcode(inputFile.absolutePath, outputFile.absolutePath)
                 }.onFailure {
-                    Log.w(TAG, "transcode failed: ${it.message}")
+                    KBLog.app.warning("transcode failed: ${it.message}", TAG)
                 }.getOrDefault(false)
 
                 if (compressed && outputFile.length() in 1 until bytes.size.toLong()) {
-                    Log.d(TAG, "Video ${bytes.size / 1024}KB → ${outputFile.length() / 1024}KB")
+                    KBLog.app.debug("Video ${bytes.size / 1024}KB → ${outputFile.length() / 1024}KB", TAG)
                     outputFile.readBytes()
                 } else {
                     bytes   // fallback: upload original

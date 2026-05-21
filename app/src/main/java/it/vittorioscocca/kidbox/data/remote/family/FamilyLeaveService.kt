@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.remote.family
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -42,12 +43,12 @@ class FamilyLeaveService @Inject constructor(
      */
     suspend fun leaveFamily(familyId: String) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: error("Not authenticated")
-        Log.i(TAG, "leaveFamily start familyId=$familyId uid=$uid")
+        KBLog.data.info("leaveFamily start familyId=$familyId uid=$uid", TAG)
 
         val familySnap = try {
             db.collection("families").document(familyId).get().await()
         } catch (e: Exception) {
-            Log.e(TAG, "leaveFamily: lettura famiglia fallita, abort per evitare rimozione errata memberships", e)
+            KBLog.data.error("leaveFamily: lettura famiglia fallita, abort per evitare rimozione errata memberships", TAG, e)
             throw e
         }
         if (familySnap.exists()) {
@@ -56,10 +57,7 @@ class FamilyLeaveService @Inject constructor(
             val createdBy = (data["createdBy"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
             val canonicalOwner = ownerUid ?: createdBy
             if (canonicalOwner != null && canonicalOwner == uid) {
-                Log.e(
-                    TAG,
-                    "leaveFamily BLOCCATO: uid è owner su Firestore (ownerUid=$ownerUid createdBy=$createdBy). Usa trasferimento o deleteFamily.",
-                )
+                KBLog.data.error("leaveFamily BLOCCATO: uid è owner su Firestore (ownerUid=$ownerUid createdBy=$createdBy). Usa trasferimento o deleteFamily.", TAG)
                 error(
                     "Il proprietario non può uscire con questa azione. Usa «Trasferisci proprietà» o elimina la famiglia.",
                 )
@@ -68,7 +66,7 @@ class FamilyLeaveService @Inject constructor(
 
         // Stop listeners before wipe (mirrors iOS stopFamilyBundleRealtime)
         familySyncCenter.stopSync()
-        Log.d(TAG, "leaveFamily sync stopped familyId=$familyId")
+        KBLog.data.debug("leaveFamily sync stopped familyId=$familyId", TAG)
 
         // Small delay to let pending snapshots settle (mirrors iOS Task.sleep 150ms)
         kotlinx.coroutines.delay(150)
@@ -92,14 +90,14 @@ class FamilyLeaveService @Inject constructor(
             val f = familyDao.deleteByFamilyId(familyId)
             val m = familyMemberDao.deleteByFamilyId(familyId)
             val c = childDao.deleteByFamilyId(familyId)
-            Log.i(TAG, "leaveFamily wipe rows: family=$f members=$m children=$c familyId=$familyId")
+            KBLog.data.info("leaveFamily wipe rows: family=$f members=$m children=$c familyId=$familyId", TAG)
         }
-        Log.i(TAG, "leaveFamily local data wiped familyId=$familyId uid=$uid")
+        KBLog.data.info("leaveFamily local data wiped familyId=$familyId uid=$uid", TAG)
     }
 
     suspend fun transferOwnershipAndLeave(familyId: String, newOwnerUid: String) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: error("Not authenticated")
-        Log.i(TAG, "transferOwnershipAndLeave start familyId=$familyId uid=$uid newOwnerUid=$newOwnerUid")
+        KBLog.data.info("transferOwnershipAndLeave start familyId=$familyId uid=$uid newOwnerUid=$newOwnerUid", TAG)
         val batch = db.batch()
         batch.update(
             db.collection("families").document(familyId),
@@ -128,7 +126,7 @@ class FamilyLeaveService @Inject constructor(
             ),
         )
         batch.commit().await()
-        Log.i(TAG, "transferOwnershipAndLeave batch committed familyId=$familyId uid=$uid newOwnerUid=$newOwnerUid")
+        KBLog.data.info("transferOwnershipAndLeave batch committed familyId=$familyId uid=$uid newOwnerUid=$newOwnerUid", TAG)
         leaveFamily(familyId)
     }
 
@@ -138,14 +136,11 @@ class FamilyLeaveService @Inject constructor(
      */
     suspend fun deleteFamily(familyId: String) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: error("Not authenticated")
-        Log.i(TAG, "deleteFamily start familyId=$familyId uid=$uid")
+        KBLog.data.info("deleteFamily start familyId=$familyId uid=$uid", TAG)
 
         val activeMembers = familyMemberDao.observeActiveByFamilyId(familyId).first()
         if (activeMembers.size > 1) {
-            Log.e(
-                TAG,
-                "deleteFamily BLOCCATO: ${activeMembers.size} membri attivi in Room (>1) — Cloud Function non invocata",
-            )
+            KBLog.data.error("deleteFamily BLOCCATO: ${activeMembers.size} membri attivi in Room (>1) — Cloud Function non invocata", TAG)
             error(
                 "Impossibile eliminare la famiglia: risultano ancora altri membri. Sincronizza e riprova.",
             )
@@ -153,7 +148,7 @@ class FamilyLeaveService @Inject constructor(
 
         // Stop listeners before wipe (mirrors iOS stopFamilyBundleRealtime)
         familySyncCenter.stopSync()
-        Log.d(TAG, "deleteFamily sync stopped familyId=$familyId")
+        KBLog.data.debug("deleteFamily sync stopped familyId=$familyId", TAG)
 
         // Small delay to let pending snapshots settle (mirrors iOS Task.sleep 150ms)
         kotlinx.coroutines.delay(150)
@@ -165,9 +160,9 @@ class FamilyLeaveService @Inject constructor(
                 functions.getHttpsCallable("deleteFamily")
                     .call(hashMapOf("familyId" to familyId))
                     .await()
-                Log.i(TAG, "deleteFamily CF OK familyId=$familyId")
+                KBLog.data.info("deleteFamily CF OK familyId=$familyId", TAG)
             } catch (e: Exception) {
-                Log.w(TAG, "deleteFamily CF failed (non-fatal): ${e.message}")
+                KBLog.data.warning("deleteFamily CF failed (non-fatal): ${e.message}", TAG)
             }
         }
 
@@ -187,8 +182,8 @@ class FamilyLeaveService @Inject constructor(
             val f = familyDao.deleteByFamilyId(familyId)
             val m = familyMemberDao.deleteByFamilyId(familyId)
             val c = childDao.deleteByFamilyId(familyId)
-            Log.i(TAG, "deleteFamily wipe rows: family=$f members=$m children=$c familyId=$familyId")
+            KBLog.data.info("deleteFamily wipe rows: family=$f members=$m children=$c familyId=$familyId", TAG)
         }
-        Log.i(TAG, "deleteFamily local data wiped familyId=$familyId uid=$uid")
+        KBLog.data.info("deleteFamily local data wiped familyId=$familyId uid=$uid", TAG)
     }
 }

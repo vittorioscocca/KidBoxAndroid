@@ -1,12 +1,13 @@
 package it.vittorioscocca.kidbox.feature.passwords.autofill
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.app.PendingIntent
 import android.app.assist.AssistStructure
 import android.app.assist.AssistStructure.ViewNode
 import android.content.Intent
 import android.os.Build
 import android.os.CancellationSignal
-import android.util.Log
 import android.service.autofill.AutofillService
 import android.service.autofill.Dataset
 import android.service.autofill.FillCallback
@@ -48,7 +49,7 @@ class KidBoxAutofillService : AutofillService() {
         }
         val parsed = AutofillHeuristics.findUsernamePassword(structure)
         if (parsed.passwordId == null) {
-            Log.d(TAG, "onFillRequest: no password field (pkg=$callerPkg)")
+            KBLog.security.debug("onFillRequest: no password field (pkg=$callerPkg)", TAG)
             callback.onSuccess(null)
             return
         }
@@ -60,18 +61,18 @@ class KidBoxAutofillService : AutofillService() {
             uid,
         ).orEmpty()
         if (uid.isBlank()) {
-            Log.d(TAG, "onFillRequest: no Firebase uid")
+            KBLog.security.debug("onFillRequest: no Firebase uid", TAG)
             callback.onSuccess(null)
             return
         }
         if (familyId.isBlank()) {
-            Log.d(TAG, "onFillRequest: no familyId (prefs + keychain scan empty)")
+            KBLog.security.debug("onFillRequest: no familyId (prefs + keychain scan empty)", TAG)
             callback.onSuccess(null)
             return
         }
         val snapshot = AutoFillSnapshotLoader.load(applicationContext, familyId, uid, deps.autoFillSnapshotEncryptedStore())
         if (snapshot == null || snapshot.items.isEmpty()) {
-            Log.d(TAG, "onFillRequest: snapshot empty or unreadable familyId=$familyId items=${snapshot?.items?.size ?: -1}")
+            KBLog.security.debug("onFillRequest: snapshot empty or unreadable familyId=$familyId items=${snapshot?.items?.size ?: -1}", TAG)
             deps.passwordsRepository().scheduleAutofillSnapshotRebuild()
             callback.onSuccess(null)
             return
@@ -129,10 +130,7 @@ class KidBoxAutofillService : AutofillService() {
         val saveInfoBuilder = SaveInfo.Builder(saveTypes, arrayOf(parsed.passwordId!!))
         parsed.usernameId?.let { saveInfoBuilder.setOptionalIds(arrayOf(it)) }
         responseBuilder.setSaveInfo(saveInfoBuilder.build())
-        Log.i(
-            TAG,
-            "onFillRequest: FillResponse pkg=$pkg host=${requestHost ?: "?"} datasets=${displayItems.size}",
-        )
+        KBLog.security.info("onFillRequest: FillResponse pkg=$pkg host=${requestHost ?: "?"} datasets=${displayItems.size}", TAG)
         callback.onSuccess(responseBuilder.build())
     }
 

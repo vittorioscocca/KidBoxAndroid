@@ -1,7 +1,8 @@
 package it.vittorioscocca.kidbox.data.remote.chat
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.os.Build
-import android.util.Log
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentChange
@@ -412,26 +413,26 @@ class ChatRemoteStore @Inject constructor(
 
         // ── Basic guards ─────────────────────────────────────────────────────
         if (currentUid.isBlank()) {
-            Log.w(tag, "skip: no current user id=${dto.id}")
+            KBLog.data.warning("skip: no current user id=${dto.id}", tag)
             return
         }
         if (ChatMessageType.fromRaw(dto.typeRaw) != ChatMessageType.AUDIO) return
         if (!messageSettingsPreferences.isAudioTranscriptionEnabled()) {
-            Log.w(tag, "skip: transcription disabled in settings id=${dto.id}")
+            KBLog.data.warning("skip: transcription disabled in settings id=${dto.id}", tag)
             return
         }
         if (dto.senderId == currentUid) {
-            Log.w(tag, "skip: own message id=${dto.id}")
+            KBLog.data.warning("skip: own message id=${dto.id}", tag)
             return
         }
         // Already has a successful transcript → done.
         if (!local.transcriptText.isNullOrBlank()) {
-            Log.w(tag, "skip: already transcribed id=${dto.id}")
+            KBLog.data.warning("skip: already transcribed id=${dto.id}", tag)
             return
         }
         // Another device is transcribing → don't race.
         if (local.transcriptStatusRaw == "processing") {
-            Log.w(tag, "skip: status=processing id=${dto.id}")
+            KBLog.data.warning("skip: status=processing id=${dto.id}", tag)
             return
         }
 
@@ -441,7 +442,7 @@ class ChatRemoteStore @Inject constructor(
         // shows "Trascrizione non disponibile" and we never retry.
         if (!transcriptionService.isRecognitionAvailable()) {
             if (local.transcriptStatusRaw != "failed") {
-                Log.w(tag, "device_unsupported: api=${Build.VERSION.SDK_INT} id=${dto.id}")
+                KBLog.data.warning("device_unsupported: api=${Build.VERSION.SDK_INT} id=${dto.id}", tag)
                 chatDao.upsert(
                     local.copy(
                         transcriptStatusRaw = "failed",
@@ -456,24 +457,24 @@ class ChatRemoteStore @Inject constructor(
         // Already permanently failed → don't retry (avoids loop on transient failures).
         // The only exception: if iOS set status="completed" with blank text, we do try once.
         if (local.transcriptStatusRaw == "failed") {
-            Log.w(tag, "skip: already failed id=${dto.id}")
+            KBLog.data.warning("skip: already failed id=${dto.id}", tag)
             return
         }
 
         // ── Audio file check ──────────────────────────────────────────────────
         val localPath = local.mediaLocalPath
         if (localPath.isNullOrBlank()) {
-            Log.w(tag, "skip: missing local path id=${dto.id}")
+            KBLog.data.warning("skip: missing local path id=${dto.id}", tag)
             return
         }
         val audioFile = java.io.File(localPath)
         if (!audioFile.exists() || audioFile.length() == 0L) {
-            Log.w(tag, "skip: file missing/empty id=${dto.id} path=$localPath")
+            KBLog.data.warning("skip: file missing/empty id=${dto.id} path=$localPath", tag)
             return
         }
 
         // ── Start recognition ─────────────────────────────────────────────────
-        Log.w(tag, "start: family=$familyId id=${dto.id} file=${audioFile.name} size=${audioFile.length()}")
+        KBLog.data.warning("start: family=$familyId id=${dto.id} file=${audioFile.name} size=${audioFile.length()}", tag)
 
         chatDao.upsert(
             local.copy(
@@ -486,13 +487,13 @@ class ChatRemoteStore @Inject constructor(
         val transcript = runCatching {
             transcriptionService.transcribeAudioBestEffort(audioFile)
         }.onFailure {
-            Log.e(tag, "threw ${it.javaClass.simpleName}: ${it.message}", it)
+            KBLog.data.error("threw ${it.javaClass.simpleName}: ${it.message}", tag, it)
         }.getOrNull()?.trim().orEmpty()
 
         val refreshed = chatDao.getById(dto.id) ?: return
 
         if (transcript.isNotBlank()) {
-            Log.w(tag, "complete: id=${dto.id} chars=${transcript.length}")
+            KBLog.data.warning("complete: id=${dto.id} chars=${transcript.length}", tag)
             chatDao.upsert(
                 refreshed.copy(
                     transcriptText = transcript,
@@ -505,7 +506,7 @@ class ChatRemoteStore @Inject constructor(
                 ),
             )
         } else {
-            Log.w(tag, "fail: blank result id=${dto.id}")
+            KBLog.data.warning("fail: blank result id=${dto.id}", tag)
             chatDao.upsert(
                 refreshed.copy(
                     transcriptStatusRaw = "failed",

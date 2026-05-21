@@ -1,8 +1,9 @@
 package it.vittorioscocca.kidbox.data.crypto
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.Context
 import android.util.Base64
-import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
@@ -32,7 +33,7 @@ object FamilyKeyStore {
         return synchronized(this) {
             fallbackPrefs ?: context.getSharedPreferences(PREFS_FILE_FALLBACK, Context.MODE_PRIVATE).also {
                 fallbackPrefs = it
-                Log.w(TAG, "Using FALLBACK shared preferences for family keys")
+                KBLog.crypto.warning("Using FALLBACK shared preferences for family keys", TAG)
             }
         }
     }
@@ -52,7 +53,7 @@ object FamilyKeyStore {
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
                 )
             }.onFailure { err ->
-                Log.e(TAG, "EncryptedSharedPreferences init failed: ${err.message}", err)
+                KBLog.crypto.error("EncryptedSharedPreferences init failed: ${err.message}", TAG, err)
             }.getOrNull()?.also {
                 prefs = it
             } ?: getFallbackPrefs(context)
@@ -65,14 +66,14 @@ object FamilyKeyStore {
         val encoded = Base64.encodeToString(keyBytes, Base64.NO_WRAP)
         runCatching {
             getPrefs(context).edit().putString(prefKey(familyId, userId), encoded).apply()
-            Log.d(TAG, "saveFamilyKey OK familyId=$familyId")
+            KBLog.crypto.debug("saveFamilyKey OK familyId=$familyId", TAG)
         }.onFailure { err ->
-            Log.e(TAG, "saveFamilyKey failed familyId=$familyId: ${err.message}", err)
+            KBLog.crypto.error("saveFamilyKey failed familyId=$familyId: ${err.message}", TAG, err)
             runCatching {
                 getFallbackPrefs(context).edit().putString(prefKey(familyId, userId), encoded).apply()
-                Log.w(TAG, "saveFamilyKey stored in fallback prefs familyId=$familyId")
+                KBLog.crypto.warning("saveFamilyKey stored in fallback prefs familyId=$familyId", TAG)
             }.onFailure {
-                Log.e(TAG, "saveFamilyKey fallback failed familyId=$familyId: ${it.message}", it)
+                KBLog.crypto.error("saveFamilyKey fallback failed familyId=$familyId: ${it.message}", TAG, it)
             }
         }
     }
@@ -89,7 +90,7 @@ object FamilyKeyStore {
         return try {
             Base64.decode(encoded, Base64.NO_WRAP)
         } catch (e: Exception) {
-            Log.e(TAG, "loadFamilyKey decode failed familyId=$familyId: ${e.message}")
+            KBLog.crypto.error("loadFamilyKey decode failed familyId=$familyId: ${e.message}", TAG)
             null
         }
     }
@@ -98,7 +99,7 @@ object FamilyKeyStore {
     fun deleteFamilyKey(context: Context, familyId: String, userId: String) {
         runCatching { getPrefs(context).edit().remove(prefKey(familyId, userId)).apply() }
         runCatching { getFallbackPrefs(context).edit().remove(prefKey(familyId, userId)).apply() }
-        Log.d(TAG, "deleteFamilyKey familyId=$familyId")
+        KBLog.crypto.debug("deleteFamilyKey familyId=$familyId", TAG)
     }
 
     /** Rimuove tutte le chiavi famiglia associate a questo utente (prefisso `fk_` + suffisso `_userId`). */
@@ -118,7 +119,7 @@ object FamilyKeyStore {
         }
         val removedEncrypted = runCatching { deleteFromPrefs(getPrefs(context)) }.getOrDefault(0)
         val removedFallback = runCatching { deleteFromPrefs(getFallbackPrefs(context)) }.getOrDefault(0)
-        Log.d(TAG, "deleteAllFamilyKeysForUser removed=${removedEncrypted + removedFallback} userId=$userId")
+        KBLog.crypto.debug("deleteAllFamilyKeysForUser removed=${removedEncrypted + removedFallback} userId=$userId", TAG)
     }
 
     /** Verifica la presenza della chiave senza restituirla (per log/debug). */

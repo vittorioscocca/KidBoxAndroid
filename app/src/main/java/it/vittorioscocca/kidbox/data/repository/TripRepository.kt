@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.repository
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
 import it.vittorioscocca.kidbox.data.local.entity.KBTripEntity
@@ -41,7 +42,7 @@ class TripRepository @Inject constructor(
                         ) {
                             onPermissionDenied?.invoke()
                         } else {
-                            Log.w(TAG, "Trip realtime error: ${err.message}")
+                            KBLog.data.warning("Trip realtime error: ${err.message}", TAG)
                         }
                     },
                 )

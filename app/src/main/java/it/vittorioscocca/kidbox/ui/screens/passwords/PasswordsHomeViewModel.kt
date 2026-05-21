@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.passwords
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -337,7 +338,7 @@ class PasswordsHomeViewModel @Inject constructor(
                 runCatching {
                     passwordsRepository.hydratePasswordRoomFromServer(familyId)
                 }.onFailure { e ->
-                    Log.w(TAG, "hydratePasswordRoomFromServer failed familyId=$familyId: ${e.message}")
+                    KBLog.security.warning("hydratePasswordRoomFromServer failed familyId=$familyId: ${e.message}", TAG)
                 }
             }
         }

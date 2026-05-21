@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.remote.travel
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.DocumentSnapshot
@@ -53,7 +54,7 @@ class TripRemoteStore @Inject constructor(
                     runCatching {
                         applyTripsSnapshot(familyId, snapshot)
                     }.onFailure { err ->
-                        Log.e(TAG, "Failed to apply trips snapshot", err)
+                        KBLog.data.error("Failed to apply trips snapshot", TAG, err)
                         onError(err)
                     }
                 }
@@ -104,7 +105,7 @@ class TripRemoteStore @Inject constructor(
         runCatching {
             deleteTripRemote(trip)
         }.onFailure { err ->
-            Log.e(TAG, "Trip remote delete failed tripId=${trip.id}", err)
+            KBLog.data.error("Trip remote delete failed tripId=${trip.id}", TAG, err)
         }
         deleteTripLocally(trip.id)
     }
@@ -237,10 +238,10 @@ class TripRemoteStore @Inject constructor(
         // Il listener osserva il documento trip e poi rilegge le subcollection:
         // scrivendo il root per ultimo evita di ricaricare dayPlans ancora vecchi.
         tripRef.set(tripDocumentPayload(trip), SetOptions.merge()).await()
-        Log.i(TAG, "Trip pushed familyId=${trip.familyId} tripId=${trip.id}")
+        KBLog.data.info("Trip pushed familyId=${trip.familyId} tripId=${trip.id}", TAG)
         tripDao.upsert(trip.copy(syncStateRaw = 0, lastSyncError = null))
     }.onFailure { err ->
-        Log.e(TAG, "Trip push sync failed familyId=${trip.familyId} tripId=${trip.id}", err)
+        KBLog.data.error("Trip push sync failed familyId=${trip.familyId} tripId=${trip.id}", TAG, err)
         tripDao.upsert(trip.copy(syncStateRaw = 1, lastSyncError = err.message))
     }
 

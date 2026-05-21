@@ -1,12 +1,13 @@
 package it.vittorioscocca.kidbox.ui.screens.home
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.widget.Toast
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -189,7 +190,7 @@ class HomeViewModel @Inject constructor(
                         membersSyncWarning = null,
                     )
                     if (familySessionPreferences.consumeSkipHomeBootstrapOnce()) {
-                        Log.i(TAG, "observeHomeData: skip Firestore bootstrap (leave / access revoked)")
+                        KBLog.ui.info("observeHomeData: skip Firestore bootstrap (leave / access revoked)", TAG)
                         _uiState.value = HomeUiState(isLoading = false, familyId = "")
                         return@collectLatest
                     }
@@ -202,7 +203,7 @@ class HomeViewModel @Inject constructor(
                             // After bootstrap, Room will emit again automatically via the Flow
                             return@collectLatest
                         } catch (e: Exception) {
-                            Log.w(TAG, "HomeViewModel bootstrap failed: ${e.message}")
+                            KBLog.ui.warning("HomeViewModel bootstrap failed: ${e.message}", TAG)
                         }
                     }
                     _uiState.value = HomeUiState(isLoading = false, familyId = "")
@@ -222,7 +223,7 @@ class HomeViewModel @Inject constructor(
                     syncedFamilyId = familyId
                     heroAbsentCacheKeys.clear()
                     initialSyncCompleted = false
-                    Log.i(MEMBERS_SYNC_TAG, "startSync familyId=$familyId")
+                    KBLog.ui.info("startSync familyId=$familyId", MEMBERS_SYNC_TAG)
                     _uiState.value = _uiState.value.copy(
                         isMembersSyncing = true,
                         membersSyncWarning = null,
@@ -264,10 +265,7 @@ class HomeViewModel @Inject constructor(
                     } else {
                         sharedUsers.any { it.id == currentUid }
                     }
-                    Log.d(
-                        MEMBERS_SYNC_TAG,
-                        "members update familyId=$familyId count=$memberCount initialDone=$initialSyncCompleted syncing=$shouldSyncMembers locationSharing=$isLocationSharing",
-                    )
+                    KBLog.ui.debug("members update familyId=$familyId count=$memberCount initialDone=$initialSyncCompleted syncing=$shouldSyncMembers locationSharing=$isLocationSharing", MEMBERS_SYNC_TAG)
                     val remoteUrl = fam?.heroPhotoURL
 
                     // File locale se esiste già su disco
@@ -374,14 +372,11 @@ class HomeViewModel @Inject constructor(
                 initialSyncCompleted = done
                 val isSyncing = !done || current.memberCount <= 0
                 if (current.isMembersSyncing != isSyncing) {
-                    Log.i(
-                        MEMBERS_SYNC_TAG,
-                        if (isSyncing) {
+                    KBLog.ui.info(if (isSyncing) {
                             "initial sync pending familyId=${current.familyId} count=${current.memberCount}"
                         } else {
                             "initial sync completed familyId=${current.familyId} count=${current.memberCount}"
-                        },
-                    )
+                        }, MEMBERS_SYNC_TAG)
                     _uiState.value = current.copy(
                         isMembersSyncing = isSyncing,
                         membersSyncWarning = if (current.memberCount > 0) null else current.membersSyncWarning,
@@ -403,10 +398,7 @@ class HomeViewModel @Inject constructor(
             delay(MEMBERS_SYNC_TIMEOUT_MS)
             val current = _uiState.value
             if (current.familyId != familyId || current.memberCount > 0 || !current.isMembersSyncing) return@launch
-            Log.w(
-                MEMBERS_SYNC_TAG,
-                "timeout familyId=$familyId after=${MEMBERS_SYNC_TIMEOUT_MS}ms, release loading with warning",
-            )
+            KBLog.ui.warning("timeout familyId=$familyId after=${MEMBERS_SYNC_TIMEOUT_MS}ms, release loading with warning", MEMBERS_SYNC_TAG)
             _uiState.value = current.copy(
                 isMembersSyncing = false,
                 membersSyncWarning = "Sincronizzazione membri lenta. Aggiorno appena disponibili.",
@@ -454,7 +446,7 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun bootstrapFromFirestore(uid: String) {
         try {
-            Log.i(TAG, "bootstrapFromFirestore start uid=$uid")
+            KBLog.ui.info("bootstrapFromFirestore start uid=$uid", TAG)
             val membershipDocs = db.collection("users")
                 .document(uid)
                 .collection("memberships")
@@ -472,7 +464,7 @@ class HomeViewModel @Inject constructor(
                 .forEach { candidateFamilyIds.add(it) }
 
             if (candidateFamilyIds.isEmpty()) {
-                Log.w(TAG, "bootstrapFromFirestore: memberships empty/incoerenti, fallback members collectionGroup")
+                KBLog.ui.warning("bootstrapFromFirestore: memberships empty/incoerenti, fallback members collectionGroup", TAG)
                 val memberDocs = db.collectionGroup("members")
                     .whereEqualTo("uid", uid)
                     .get()
@@ -489,7 +481,7 @@ class HomeViewModel @Inject constructor(
                 .distinct()
 
             if (distinctCandidates.isEmpty()) {
-                Log.w(TAG, "bootstrapFromFirestore: memberships empty uid=$uid")
+                KBLog.ui.warning("bootstrapFromFirestore: memberships empty uid=$uid", TAG)
                 _uiState.value = HomeUiState(isLoading = false, familyId = "")
                 return
             }
@@ -514,17 +506,17 @@ class HomeViewModel @Inject constructor(
                         .get()
                         .await()
                     if (!myMemberDoc.exists() || myMemberDoc.data?.get("isDeleted") as? Boolean == true) {
-                        Log.w(TAG, "bootstrapFromFirestore: skip familyId=$candidateId (member missing/deleted)")
+                        KBLog.ui.warning("bootstrapFromFirestore: skip familyId=$candidateId (member missing/deleted)", TAG)
                         continue
                     }
                     val familySnap = db.collection("families").document(candidateId).get().await()
                     if (!familySnap.exists()) {
-                        Log.w(TAG, "bootstrapFromFirestore: skip familyId=$candidateId (family missing)")
+                        KBLog.ui.warning("bootstrapFromFirestore: skip familyId=$candidateId (family missing)", TAG)
                         continue
                     }
                     val familyData = familySnap.data.orEmpty()
                     if (familyData["isDeleted"] as? Boolean == true) {
-                        Log.w(TAG, "bootstrapFromFirestore: skip familyId=$candidateId (family deleted)")
+                        KBLog.ui.warning("bootstrapFromFirestore: skip familyId=$candidateId (family deleted)", TAG)
                         continue
                     }
                     selectedFamilyId = candidateId
@@ -532,7 +524,7 @@ class HomeViewModel @Inject constructor(
                     break
                 } catch (e: FirebaseFirestoreException) {
                     if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
-                        Log.w(TAG, "bootstrapFromFirestore: skip familyId=$candidateId (PERMISSION_DENIED)")
+                        KBLog.ui.warning("bootstrapFromFirestore: skip familyId=$candidateId (PERMISSION_DENIED)", TAG)
                         continue
                     }
                     throw e
@@ -543,7 +535,7 @@ class HomeViewModel @Inject constructor(
                 _uiState.value = HomeUiState(isLoading = false, familyId = "")
                 return
             }
-            Log.i(TAG, "bootstrapFromFirestore: selected familyId=$familyId from candidates=${distinctCandidates.size}")
+            KBLog.ui.info("bootstrapFromFirestore: selected familyId=$familyId from candidates=${distinctCandidates.size}", TAG)
             val familyData = selectedFamilyData
             val now = System.currentTimeMillis()
             val createdBy = ownershipUidFromFamilyFirestore(familyData) ?: uid
@@ -564,7 +556,7 @@ class HomeViewModel @Inject constructor(
                 lastSyncError = null,
             )
             familyDao.upsert(family)
-            Log.i(TAG, "bootstrapFromFirestore: family upserted familyId=$familyId")
+            KBLog.ui.info("bootstrapFromFirestore: family upserted familyId=$familyId", TAG)
 
             val memberDocs = db.collection("families")
                 .document(familyId)
@@ -599,10 +591,10 @@ class HomeViewModel @Inject constructor(
                     )
                 }
             }
-            Log.i(TAG, "bootstrapFromFirestore: members upserted count=${memberDocs.size} familyId=$familyId")
+            KBLog.ui.info("bootstrapFromFirestore: members upserted count=${memberDocs.size} familyId=$familyId", TAG)
             familyMemoryService.loadFromFirestore(familyId)
         } catch (e: Exception) {
-            Log.w(TAG, "HomeViewModel bootstrap failed: ${e.message}")
+            KBLog.ui.warning("HomeViewModel bootstrap failed: ${e.message}", TAG)
             _uiState.value = HomeUiState(isLoading = false, familyId = "")
         } finally {
             if (_uiState.value.isLoading) {
@@ -640,7 +632,7 @@ class HomeViewModel @Inject constructor(
                 pendingHeroBytes = bytes
                 _pendingHeroUri.value = uri
             } catch (e: Exception) {
-                Log.e(TAG, "hero read failed: ${e.message}")
+                KBLog.ui.error("hero read failed: ${e.message}", TAG)
                 _uiState.value = _uiState.value.copy(errorMessage = "Impossibile leggere l'immagine")
             }
         }
@@ -656,7 +648,7 @@ class HomeViewModel @Inject constructor(
         if (familyId.isBlank()) return
 
         val bytes = pendingHeroBytes ?: run {
-            Log.e(TAG, "onHeroCropSaved: no pending bytes")
+            KBLog.ui.error("onHeroCropSaved: no pending bytes", TAG)
             _uiState.value = _uiState.value.copy(errorMessage = "Immagine non disponibile, riprova")
             return
         }
@@ -664,9 +656,9 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = _uiState.value.copy(isUploadingHero = true, errorMessage = null)
             try {
-                Log.d(TAG, "hero upload start familyId=$familyId bytes=${bytes.size}")
+                KBLog.ui.debug("hero upload start familyId=$familyId bytes=${bytes.size}", TAG)
                 val remoteUrl = heroPhotoService.setHeroPhoto(familyId, bytes, crop)
-                Log.d(TAG, "hero upload OK familyId=$familyId")
+                KBLog.ui.debug("hero upload OK familyId=$familyId", TAG)
 
                 val cacheFile = saveToLocalCache(familyId, bytes, context)
 
@@ -688,7 +680,7 @@ class HomeViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(isUploadingHero = false)
 
             } catch (e: Exception) {
-                Log.e(TAG, "hero upload failed: ${e.message}", e)
+                KBLog.ui.error("hero upload failed: ${e.message}", TAG, e)
                 _uiState.value = _uiState.value.copy(
                     isUploadingHero = false,
                     errorMessage = e.localizedMessage ?: "Errore upload foto",
@@ -712,10 +704,10 @@ class HomeViewModel @Inject constructor(
         return try {
             val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
             if (uid == null) {
-                Log.w(TAG, "downloadHeroToCache: not authenticated yet, skip")
+                KBLog.ui.warning("downloadHeroToCache: not authenticated yet, skip", TAG)
                 return HeroDownloadOutcome.Failed
             }
-            Log.d(TAG, "downloadHeroToCache start familyId=$familyId uid=$uid")
+            KBLog.ui.debug("downloadHeroToCache start familyId=$familyId uid=$uid", TAG)
             val ref = FirebaseStorage.getInstance()
                 .reference.child("families/$familyId/hero/hero.jpg")
             val bytes: ByteArray = ref.getBytes(5 * 1024 * 1024).await()
@@ -723,15 +715,15 @@ class HomeViewModel @Inject constructor(
             familyDao.getById(familyId)?.let { family ->
                 familyDao.upsert(family.copy(heroPhotoLocalPath = file.absolutePath))
             }
-            Log.d(TAG, "hero cached OK familyId=$familyId bytes=${bytes.size}")
+            KBLog.ui.debug("hero cached OK familyId=$familyId bytes=${bytes.size}", TAG)
             HeroDownloadOutcome.Ok(file.absolutePath)
         } catch (e: Exception) {
             val storageErr = e as? StorageException ?: (e.cause as? StorageException)
             if (storageErr?.errorCode == StorageException.ERROR_OBJECT_NOT_FOUND) {
-                Log.d(TAG, "downloadHeroToCache: nessun hero su Storage familyId=$familyId")
+                KBLog.ui.debug("downloadHeroToCache: nessun hero su Storage familyId=$familyId", TAG)
                 HeroDownloadOutcome.Absent
             } else {
-                Log.w(TAG, "hero download failed familyId=$familyId: ${e.message}")
+                KBLog.ui.warning("hero download failed familyId=$familyId: ${e.message}", TAG)
                 HeroDownloadOutcome.Failed
             }
         }

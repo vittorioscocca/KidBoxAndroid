@@ -1,7 +1,8 @@
 package it.vittorioscocca.kidbox.data.remote.family
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.net.Uri
-import android.util.Log
 
 private const val TAG = "JoinPayloadParser"
 
@@ -27,7 +28,7 @@ object JoinPayloadParser {
                 if (name.equals("code", ignoreCase = true)) {
                     val code = uri.getQueryParameter(name)?.takeIf { it.isNotBlank() }
                     if (code != null) {
-                        Log.i(TAG, "extractInviteCode: code from kidbox URL")
+                        KBLog.data.info("extractInviteCode: code from kidbox URL", TAG)
                         return code
                     }
                 }
@@ -38,11 +39,11 @@ object JoinPayloadParser {
             !trimmed.contains("://") &&
             !trimmed.contains('?')
         ) {
-            Log.i(TAG, "extractInviteCode: plain code")
+            KBLog.data.info("extractInviteCode: plain code", TAG)
             return trimmed
         }
 
-        Log.d(TAG, "extractInviteCode: no code found")
+        KBLog.data.debug("extractInviteCode: no code found", TAG)
         return null
     }
 }

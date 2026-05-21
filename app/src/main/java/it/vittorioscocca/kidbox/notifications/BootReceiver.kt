@@ -1,9 +1,10 @@
 package it.vittorioscocca.kidbox.notifications
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +27,7 @@ class BootReceiver : BroadcastReceiver() {
                 val familyId = appCtx.getSharedPreferences("kidbox_prefs", Context.MODE_PRIVATE)
                     .getString("active_family_id", null)
                 if (familyId.isNullOrBlank()) {
-                    Log.d("BootReceiver", "BOOT_COMPLETED — no active family, skip vehicle alarms")
+                    KBLog.app.debug("BOOT_COMPLETED — no active family, skip vehicle alarms", "BootReceiver")
                     return@launch
                 }
                 val ep = EntryPointAccessors.fromApplication(
@@ -40,7 +41,7 @@ class BootReceiver : BroadcastReceiver() {
                 val hpSched = ep.housePaymentReminderScheduler()
                 hpDao.listActiveByFamily(familyId).forEach { hpSched.syncPayment(it) }
                 AiScheduledNotificationsRestorer.restoreAfterBoot(appCtx)
-                Log.d("BootReceiver", "BOOT_COMPLETED — vehicle, house payment, AI briefing alarms refreshed")
+                KBLog.app.debug("BOOT_COMPLETED — vehicle, house payment, AI briefing alarms refreshed", "BootReceiver")
             } finally {
                 pendingResult.finish()
             }

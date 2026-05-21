@@ -16,6 +16,7 @@ sealed class AppDestination(val route: String) {
     data object StorageUsage : AppDestination("storage_usage")
     data object MessageSettings : AppDestination("message_settings")
     data object NotificationSettings : AppDestination("notification_settings")
+    data object PrivacySettings : AppDestination("privacy_settings")
     data object Theme : AppDestination("theme")
     data object InviteCode : AppDestination("invite_code")
     data object JoinFamily : AppDestination("join_family")

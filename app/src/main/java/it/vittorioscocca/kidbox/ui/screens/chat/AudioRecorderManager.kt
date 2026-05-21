@@ -1,8 +1,9 @@
 package it.vittorioscocca.kidbox.ui.screens.chat
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.Context
 import android.media.MediaRecorder
-import android.util.Log
 import androidx.annotation.RequiresPermission
 import java.io.File
 import kotlin.math.max
@@ -41,10 +42,10 @@ class AudioRecorderManager(
             outputFile = file
             startedAtMs = System.currentTimeMillis()
             paused = false
-            Log.w(tag, "recorder_start_ok path=${file.absolutePath}")
+            KBLog.ui.warning("recorder_start_ok path=${file.absolutePath}", tag)
             true
         }.getOrElse {
-            Log.e(tag, "recorder_start_fail ${it.javaClass.simpleName}: ${it.message}", it)
+            KBLog.ui.error("recorder_start_fail ${it.javaClass.simpleName}: ${it.message}", tag, it)
             mediaRecorder.reset()
             mediaRecorder.release()
             false
@@ -81,19 +82,19 @@ class AudioRecorderManager(
         paused = false
         val durationSec = max(((System.currentTimeMillis() - startedAtMs) / 1000L).toInt(), 1)
         runCatching { r.stop() }
-            .onFailure { Log.e(tag, "recorder_stop_fail ${it.javaClass.simpleName}: ${it.message}", it) }
+            .onFailure { KBLog.ui.error("recorder_stop_fail ${it.javaClass.simpleName}: ${it.message}", tag, it) }
         r.reset()
         r.release()
         if (!save) {
             file?.delete()
-            Log.w(tag, "recorder_stop_discarded")
+            KBLog.ui.warning("recorder_stop_discarded", tag)
             return null
         }
         if (file == null || !file.exists()) {
-            Log.w(tag, "recorder_stop_no_file")
+            KBLog.ui.warning("recorder_stop_no_file", tag)
             return null
         }
-        Log.w(tag, "recorder_stop_ok path=${file.absolutePath} size=${file.length()} durationSec=$durationSec")
+        KBLog.ui.warning("recorder_stop_ok path=${file.absolutePath} size=${file.length()} durationSec=$durationSec", tag)
         return RecordedAudio(file = file, durationSeconds = durationSec)
     }
 }

@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.remote
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
 import javax.inject.Inject
@@ -28,12 +29,12 @@ class DocumentStorageManager @Inject constructor(
         mimeType: String,
         plainBytes: ByteArray,
     ): DocumentUploadResult {
-        Log.i(TAG_DOC_STORAGE, "uploadEncrypted start docId=$docId bytes=${plainBytes.size} mime=$mimeType")
+        KBLog.data.info("uploadEncrypted start docId=$docId bytes=${plainBytes.size} mime=$mimeType", TAG_DOC_STORAGE)
         val safeName = if (fileName.isBlank()) "file.bin" else fileName
         val path = "families/$familyId/documents/$docId/$safeName.kbenc"
         val ref = storage.reference.child(path)
         val encrypted = cryptoManager.encrypt(plainBytes, familyId)
-        Log.d(TAG_DOC_STORAGE, "uploadEncrypted encrypted docId=$docId encryptedBytes=${encrypted.size}")
+        KBLog.data.debug("uploadEncrypted encrypted docId=$docId encryptedBytes=${encrypted.size}", TAG_DOC_STORAGE)
         val metadata = StorageMetadata.Builder()
             .setContentType("application/octet-stream")
             .setCustomMetadata("kb_encrypted", "1")
@@ -43,7 +44,7 @@ class DocumentStorageManager @Inject constructor(
             .build()
         ref.putBytes(encrypted, metadata).await()
         val downloadUrl = ref.downloadUrl.await().toString()
-        Log.i(TAG_DOC_STORAGE, "uploadEncrypted ok docId=$docId path=$path")
+        KBLog.data.info("uploadEncrypted ok docId=$docId path=$path", TAG_DOC_STORAGE)
         return DocumentUploadResult(storagePath = path, downloadUrl = downloadUrl)
     }
 
@@ -51,17 +52,17 @@ class DocumentStorageManager @Inject constructor(
         storagePath: String,
         familyId: String,
     ): ByteArray {
-        Log.i(TAG_DOC_STORAGE, "downloadDecrypted start path=$storagePath familyId=$familyId")
+        KBLog.data.info("downloadDecrypted start path=$storagePath familyId=$familyId", TAG_DOC_STORAGE)
         val encrypted = storage.reference.child(storagePath).getBytes(15L * 1024L * 1024L).await()
-        Log.d(TAG_DOC_STORAGE, "downloadDecrypted encrypted bytes=${encrypted.size}")
+        KBLog.data.debug("downloadDecrypted encrypted bytes=${encrypted.size}", TAG_DOC_STORAGE)
         val plain = cryptoManager.decrypt(encrypted, familyId)
-        Log.i(TAG_DOC_STORAGE, "downloadDecrypted ok path=$storagePath plainBytes=${plain.size} familyId=$familyId")
+        KBLog.data.info("downloadDecrypted ok path=$storagePath plainBytes=${plain.size} familyId=$familyId", TAG_DOC_STORAGE)
         return plain
     }
 
     /** Decripta byte letti dalla cache locale documenti (stesso formato del blob `.kbenc` su Storage). */
     fun decryptCachedDocumentBytes(combined: ByteArray, familyId: String): ByteArray {
-        Log.d(TAG_DOC_STORAGE, "decryptCachedDocumentBytes bytes=${combined.size} familyId=$familyId")
+        KBLog.data.debug("decryptCachedDocumentBytes bytes=${combined.size} familyId=$familyId", TAG_DOC_STORAGE)
         return cryptoManager.decrypt(combined, familyId)
     }
 
@@ -74,7 +75,7 @@ class DocumentStorageManager @Inject constructor(
         fileName: String,
         plainBytes: ByteArray,
     ): String {
-        Log.i(TAG_DOC_STORAGE, "uploadEncryptedToPath start path=$storagePath bytes=${plainBytes.size}")
+        KBLog.data.info("uploadEncryptedToPath start path=$storagePath bytes=${plainBytes.size}", TAG_DOC_STORAGE)
         val encrypted = cryptoManager.encrypt(plainBytes, familyId)
         val ref = storage.reference.child(storagePath)
         val metadata = StorageMetadata.Builder()
@@ -86,7 +87,7 @@ class DocumentStorageManager @Inject constructor(
             .build()
         ref.putBytes(encrypted, metadata).await()
         val downloadUrl = ref.downloadUrl.await().toString()
-        Log.i(TAG_DOC_STORAGE, "uploadEncryptedToPath ok path=$storagePath")
+        KBLog.data.info("uploadEncryptedToPath ok path=$storagePath", TAG_DOC_STORAGE)
         return downloadUrl
     }
 
@@ -97,7 +98,7 @@ class DocumentStorageManager @Inject constructor(
         mimeType: String,
         fileName: String,
     ): String {
-        Log.i(TAG_DOC_STORAGE, "uploadEncryptedBytes start path=$storagePath bytes=${encrypted.size}")
+        KBLog.data.info("uploadEncryptedBytes start path=$storagePath bytes=${encrypted.size}", TAG_DOC_STORAGE)
         val ref = storage.reference.child(storagePath)
         val metadata = StorageMetadata.Builder()
             .setContentType("application/octet-stream")
@@ -108,15 +109,15 @@ class DocumentStorageManager @Inject constructor(
             .build()
         ref.putBytes(encrypted, metadata).await()
         val downloadUrl = ref.downloadUrl.await().toString()
-        Log.i(TAG_DOC_STORAGE, "uploadEncryptedBytes ok path=$storagePath")
+        KBLog.data.info("uploadEncryptedBytes ok path=$storagePath", TAG_DOC_STORAGE)
         return downloadUrl
     }
 
     suspend fun delete(storagePath: String) {
         if (storagePath.isBlank()) return
-        Log.i(TAG_DOC_STORAGE, "delete start path=$storagePath")
+        KBLog.data.info("delete start path=$storagePath", TAG_DOC_STORAGE)
         runCatching { storage.reference.child(storagePath).delete().await() }
-            .onSuccess { Log.i(TAG_DOC_STORAGE, "delete ok path=$storagePath") }
-            .onFailure { Log.e(TAG_DOC_STORAGE, "delete failed path=$storagePath", it) }
+            .onSuccess { KBLog.data.info("delete ok path=$storagePath", TAG_DOC_STORAGE) }
+            .onFailure { KBLog.data.error("delete failed path=$storagePath", TAG_DOC_STORAGE, it) }
     }
 }

@@ -1,7 +1,8 @@
 package it.vittorioscocca.kidbox.data.remote
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.Context
-import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.crypto.FamilyKeyStore
@@ -25,7 +26,7 @@ class DocumentCryptoManager @Inject constructor(
         plainBytes: ByteArray,
         familyId: String,
     ): ByteArray {
-        Log.d(TAG_DOC_CRYPTO, "encrypt start bytes=${plainBytes.size} familyId=$familyId")
+        KBLog.data.debug("encrypt start bytes=${plainBytes.size} familyId=$familyId", TAG_DOC_CRYPTO)
         val cipher = Cipher.getInstance(transformation)
         cipher.init(Cipher.ENCRYPT_MODE, getFamilySecretKey(familyId))
         val encrypted = cipher.doFinal(plainBytes)
@@ -35,7 +36,7 @@ class DocumentCryptoManager @Inject constructor(
             .put(iv)
             .put(encrypted)
             .array()
-        Log.d(TAG_DOC_CRYPTO, "encrypt ok outBytes=${out.size} ivBytes=${iv.size} familyId=$familyId")
+        KBLog.data.debug("encrypt ok outBytes=${out.size} ivBytes=${iv.size} familyId=$familyId", TAG_DOC_CRYPTO)
         return out
     }
 
@@ -43,7 +44,7 @@ class DocumentCryptoManager @Inject constructor(
         combined: ByteArray,
         familyId: String,
     ): ByteArray {
-        Log.d(TAG_DOC_CRYPTO, "decrypt start combinedBytes=${combined.size} familyId=$familyId")
+        KBLog.data.debug("decrypt start combinedBytes=${combined.size} familyId=$familyId", TAG_DOC_CRYPTO)
         if (combined.size < 12 + 16) {
             throw IllegalArgumentException("Encrypted payload too small")
         }
@@ -64,12 +65,12 @@ class DocumentCryptoManager @Inject constructor(
             val encStart = ivStart + prefixedIvSize
             val ivBytes = combined.copyOfRange(ivStart, encStart)
             val encryptedBytes = combined.copyOfRange(encStart, combined.size)
-            Log.d(TAG_DOC_CRYPTO, "decrypt format=android_prefixed ivBytes=${ivBytes.size} encBytes=${encryptedBytes.size}")
+            KBLog.data.debug("decrypt format=android_prefixed ivBytes=${ivBytes.size} encBytes=${encryptedBytes.size}", TAG_DOC_CRYPTO)
             ivBytes to encryptedBytes
         } else {
             val ivBytes = combined.copyOfRange(0, 12)
             val encryptedBytes = combined.copyOfRange(12, combined.size)
-            Log.d(TAG_DOC_CRYPTO, "decrypt format=cryptokit_combined ivBytes=${ivBytes.size} encBytes=${encryptedBytes.size}")
+            KBLog.data.debug("decrypt format=cryptokit_combined ivBytes=${ivBytes.size} encBytes=${encryptedBytes.size}", TAG_DOC_CRYPTO)
             ivBytes to encryptedBytes
         }
 
@@ -77,7 +78,7 @@ class DocumentCryptoManager @Inject constructor(
         val spec = javax.crypto.spec.GCMParameterSpec(128, iv)
         cipher.init(Cipher.DECRYPT_MODE, getFamilySecretKey(familyId), spec)
         val plain = cipher.doFinal(encrypted)
-        Log.d(TAG_DOC_CRYPTO, "decrypt ok plainBytes=${plain.size} familyId=$familyId")
+        KBLog.data.debug("decrypt ok plainBytes=${plain.size} familyId=$familyId", TAG_DOC_CRYPTO)
         return plain
     }
 

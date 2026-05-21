@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.sync
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import com.google.firebase.firestore.ListenerRegistration
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBDoseLogDao
@@ -32,7 +33,7 @@ class DoseLogSyncCenter @Inject constructor(
 
     fun start(familyId: String) {
         if (listeners.containsKey(familyId)) return
-        Log.d(TAG, "start listener familyId=$familyId")
+        KBLog.sync.debug("start listener familyId=$familyId", TAG)
         listeners[familyId] = remote.listenAll(familyId) { dtos, removedIds ->
             scope.launch { applyInbound(familyId, dtos, removedIds) }
         }
@@ -40,7 +41,7 @@ class DoseLogSyncCenter @Inject constructor(
 
     fun stop(familyId: String) {
         listeners.remove(familyId)?.remove()
-        Log.d(TAG, "stopped listener familyId=$familyId")
+        KBLog.sync.debug("stopped listener familyId=$familyId", TAG)
     }
 
     fun stopAll() {
@@ -65,7 +66,7 @@ class DoseLogSyncCenter @Inject constructor(
                 val localPending = local?.syncStatus == 1
 
                 if (local != null && localPending && localStamp > remoteStamp) {
-                    Log.d(TAG, "skip anti-resurrect doseLogId=${dto.id}")
+                    KBLog.sync.debug("skip anti-resurrect doseLogId=${dto.id}", TAG)
                     continue
                 }
 
@@ -77,11 +78,8 @@ class DoseLogSyncCenter @Inject constructor(
                 if (remoteStamp >= localStamp) {
                     if (familyDao.getById(dto.familyId) == null || treatmentDao.getById(dto.treatmentId) == null) {
                         anyDeferred = true
-                        Log.d(
-                            TAG,
-                            "defer doseLog id=${dto.id} treatmentId=${dto.treatmentId} " +
-                                "(parent not local yet) attempt=$attempt familyId=$familyId",
-                        )
+                        KBLog.sync.debug("defer doseLog id=${dto.id} treatmentId=${dto.treatmentId} " +
+                                "(parent not local yet) attempt=$attempt familyId=$familyId", TAG)
                         continue
                     }
                     val unchanged =
@@ -103,7 +101,7 @@ class DoseLogSyncCenter @Inject constructor(
             if (attempt < INBOUND_PARENT_RETRY_ATTEMPTS - 1) {
                 delay(350L * (attempt + 1))
             } else {
-                Log.w(TAG, "orphan dose logs remain after retries familyId=$familyId (missing family/treatment rows)")
+                KBLog.sync.warning("orphan dose logs remain after retries familyId=$familyId (missing family/treatment rows)", TAG)
             }
         }
     }

@@ -1,11 +1,12 @@
 package it.vittorioscocca.kidbox.feature.passwords.autofill
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.app.PendingIntent
 import android.content.Intent
 import android.net.Uri
 import android.os.CancellationSignal
 import android.os.OutcomeReceiver
-import android.util.Log
 import androidx.credentials.exceptions.ClearCredentialException
 import androidx.credentials.provider.Action
 import androidx.credentials.provider.BeginCreateCredentialResponse
@@ -43,24 +44,24 @@ class KidBoxCredentialProviderService : CredentialProviderService() {
         if (uid.isBlank()) {
             // Firebase Auth non ancora ripristinato (cold start) oppure utente non loggato.
             // Mostriamo comunque l'Action così KidBox è visibile nel selettore di Chrome.
-            Log.d(TAG, "onBeginGetCredentialRequest: uid blank — returning fallback action")
+            KBLog.security.debug("onBeginGetCredentialRequest: uid blank — returning fallback action", TAG)
             callback.onResult(BeginGetCredentialResponse(emptyList(), listOf(openKidBoxAction()), emptyList(), null))
             return
         }
         if (familyId.isBlank()) {
-            Log.d(TAG, "onBeginGetCredentialRequest: no familyId — returning fallback action")
+            KBLog.security.debug("onBeginGetCredentialRequest: no familyId — returning fallback action", TAG)
             callback.onResult(BeginGetCredentialResponse(emptyList(), listOf(openKidBoxAction()), emptyList(), null))
             return
         }
         val snapshot = AutoFillSnapshotLoader.load(applicationContext, familyId, uid, deps.autoFillSnapshotEncryptedStore())
         if (snapshot == null) {
-            Log.d(TAG, "onBeginGetCredentialRequest: snapshot null familyId=$familyId — scheduling rebuild")
+            KBLog.security.debug("onBeginGetCredentialRequest: snapshot null familyId=$familyId — scheduling rebuild", TAG)
             deps.passwordsRepository().scheduleAutofillSnapshotRebuild()
             callback.onResult(BeginGetCredentialResponse(emptyList(), listOf(openKidBoxAction()), emptyList(), null))
             return
         }
         if (snapshot.items.isEmpty()) {
-            Log.d(TAG, "onBeginGetCredentialRequest: snapshot empty familyId=$familyId — scheduling rebuild")
+            KBLog.security.debug("onBeginGetCredentialRequest: snapshot empty familyId=$familyId — scheduling rebuild", TAG)
             deps.passwordsRepository().scheduleAutofillSnapshotRebuild()
             callback.onResult(BeginGetCredentialResponse(emptyList(), emptyList(), emptyList(), null))
             return
@@ -71,7 +72,7 @@ class KidBoxCredentialProviderService : CredentialProviderService() {
 
         for (option in request.beginGetCredentialOptions) {
             if (option is BeginGetPublicKeyCredentialOption) {
-                Log.d(TAG, "Ignoring passkey begin-get option (v2)")
+                KBLog.security.debug("Ignoring passkey begin-get option (v2)", TAG)
             }
         }
 
@@ -81,12 +82,9 @@ class KidBoxCredentialProviderService : CredentialProviderService() {
             // PasswordCredentialEntry richiede BeginGetPasswordOption, quindi non possiamo
             // creare voci password dirette. Restituiamo un'Action visibile nel selettore
             // così l'utente sa che KidBox è disponibile e può aprirlo per copiare la password.
-            Log.i(
-                TAG,
-                "onBeginGetCredentialRequest: no BeginGetPasswordOption — caller=${calling?.packageName} origin=${calling?.origin} types=${
+            KBLog.security.info("onBeginGetCredentialRequest: no BeginGetPasswordOption — caller=${calling?.packageName} origin=${calling?.origin} types=${
                     request.beginGetCredentialOptions.joinToString { it.type }
-                }",
-            )
+                }", TAG)
             callback.onResult(BeginGetCredentialResponse(emptyList(), listOf(openKidBoxAction()), emptyList(), null))
             return
         }

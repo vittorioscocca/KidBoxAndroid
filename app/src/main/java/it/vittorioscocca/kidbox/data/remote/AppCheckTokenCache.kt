@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.remote
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import com.google.firebase.appcheck.FirebaseAppCheck
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
@@ -102,14 +103,14 @@ object AppCheckTokenCache {
                 return cachedToken
             } catch (e: Throwable) {
                 if (e.isAppCheckHardFailure()) {
-                    Log.w(TAG, "App Check attestation / policy failure (no retry): ${e.message}")
+                    KBLog.data.warning("App Check attestation / policy failure (no retry): ${e.message}", TAG)
                     fetchCooldownUntilEpochMs = System.currentTimeMillis() + COOLDOWN_AFTER_HARD_FAIL_MS
                     return null
                 }
                 if (e.shouldBackoffForRateLimit() && attempt < 3) {
                     delay(1_000L shl attempt)
                 } else {
-                    Log.w(TAG, "Failed to get token: ${e.message}")
+                    KBLog.data.warning("Failed to get token: ${e.message}", TAG)
                     if (e.isTooManyAttempts()) {
                         fetchCooldownUntilEpochMs = System.currentTimeMillis() + COOLDOWN_AFTER_HARD_FAIL_MS
                     }

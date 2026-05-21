@@ -1,7 +1,8 @@
 package it.vittorioscocca.kidbox.data.passwords.security
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.Context
-import android.util.Log
 import android.util.LruCache
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.PwnedPrefixCacheDao
@@ -103,11 +104,11 @@ class PwnedChecker @Inject constructor(
             }.getOrElse { err ->
                 when (err) {
                     is IOException, is SocketTimeoutException -> {
-                        Log.w("PwnedChecker", "HIBP network error prefix=$prefix")
+                        KBLog.security.warning("HIBP network error prefix=$prefix", "PwnedChecker")
                         Result.Unknown
                     }
                     else -> {
-                        Log.w("PwnedChecker", "HIBP unknown error prefix=$prefix")
+                        KBLog.security.warning("HIBP unknown error prefix=$prefix", "PwnedChecker")
                         Result.Unknown
                     }
                 }

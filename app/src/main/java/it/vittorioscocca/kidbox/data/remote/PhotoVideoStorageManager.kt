@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.remote
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
 import javax.inject.Inject
@@ -35,11 +36,11 @@ class PhotoVideoStorageManager @Inject constructor(
             .setCustomMetadata("kb_alg", "AES-GCM")
             .setCustomMetadata("kb_orig_mime", mimeType)
             .build()
-        Log.d(TAG_PHOTO_STORAGE, "uploadEncrypted start photoId=$photoId bytes=${plainBytes.size}")
+        KBLog.data.debug("uploadEncrypted start photoId=$photoId bytes=${plainBytes.size}", TAG_PHOTO_STORAGE)
         val ref = storage.reference.child(path)
         ref.putBytes(encrypted, metadata).await()
         val downloadUrl = ref.downloadUrl.await().toString()
-        Log.d(TAG_PHOTO_STORAGE, "uploadEncrypted ok photoId=$photoId path=$path")
+        KBLog.data.debug("uploadEncrypted ok photoId=$photoId path=$path", TAG_PHOTO_STORAGE)
         return PhotoVideoUploadResult(storagePath = path, downloadUrl = downloadUrl)
     }
 
@@ -54,6 +55,6 @@ class PhotoVideoStorageManager @Inject constructor(
     suspend fun delete(storagePath: String) {
         if (storagePath.isBlank()) return
         runCatching { storage.reference.child(storagePath).delete().await() }
-            .onFailure { Log.w(TAG_PHOTO_STORAGE, "delete failed path=$storagePath ${it.message}") }
+            .onFailure { KBLog.data.warning("delete failed path=$storagePath ${it.message}", TAG_PHOTO_STORAGE) }
     }
 }

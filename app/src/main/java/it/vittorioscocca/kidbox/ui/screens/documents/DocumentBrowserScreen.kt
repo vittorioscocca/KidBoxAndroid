@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.documents
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Bitmap
@@ -8,7 +10,6 @@ import android.net.Uri
 import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -367,10 +368,7 @@ fun DocumentBrowserScreen(
                                     viewModel.toggleDocumentSelection(doc.id)
                                 } else {
                                     viewModel.clearHighlightedDocument()
-                                    Log.i(
-                                        TAG_DOC_OPEN,
-                                        "tap document id=${doc.id} mime=${doc.mimeType} hasLocal=${!doc.localPath.isNullOrBlank()} hasRemote=${!doc.storagePath.isBlank()}",
-                                    )
+                                    KBLog.ui.info("tap document id=${doc.id} mime=${doc.mimeType} hasLocal=${!doc.localPath.isNullOrBlank()} hasRemote=${!doc.storagePath.isBlank()}", TAG_DOC_OPEN)
                                     scope.launch {
                                         isOpeningDocument = true
                                         try {
@@ -415,10 +413,7 @@ fun DocumentBrowserScreen(
                                     viewModel.toggleDocumentSelection(doc.id)
                                 } else {
                                     viewModel.clearHighlightedDocument()
-                                    Log.i(
-                                        TAG_DOC_OPEN,
-                                        "tap document id=${doc.id} mime=${doc.mimeType} hasLocal=${!doc.localPath.isNullOrBlank()} hasRemote=${!doc.storagePath.isBlank()}",
-                                    )
+                                    KBLog.ui.info("tap document id=${doc.id} mime=${doc.mimeType} hasLocal=${!doc.localPath.isNullOrBlank()} hasRemote=${!doc.storagePath.isBlank()}", TAG_DOC_OPEN)
                                     scope.launch {
                                         isOpeningDocument = true
                                         try {
@@ -1694,38 +1689,38 @@ private suspend fun openDocument(
     document: KBDocumentEntity,
 ) {
     try {
-        Log.d(TAG_DOC_OPEN, "preparePreviewFile start docId=${document.id}")
+        KBLog.ui.debug("preparePreviewFile start docId=${document.id}", TAG_DOC_OPEN)
         val file = withTimeout(20_000L) { viewModel.preparePreviewFile(document) }
-        Log.d(TAG_DOC_OPEN, "preparePreviewFile ok docId=${document.id} path=${file.absolutePath} size=${file.length()}")
+        KBLog.ui.debug("preparePreviewFile ok docId=${document.id} path=${file.absolutePath} size=${file.length()}", TAG_DOC_OPEN)
         val uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
             file,
         )
-        Log.d(TAG_DOC_OPEN, "fileProvider uri generated docId=${document.id} uri=$uri")
+        KBLog.ui.debug("fileProvider uri generated docId=${document.id} uri=$uri", TAG_DOC_OPEN)
         val mime = document.mimeType.ifBlank { "*/*" }
         val intent = Intent(Intent.ACTION_VIEW)
             .setDataAndType(uri, mime)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        Log.i(TAG_DOC_OPEN, "startActivity viewer docId=${document.id} mime=$mime")
+        KBLog.ui.info("startActivity viewer docId=${document.id} mime=$mime", TAG_DOC_OPEN)
         context.startActivity(intent)
-        Log.i(TAG_DOC_OPEN, "startActivity success docId=${document.id}")
+        KBLog.ui.info("startActivity success docId=${document.id}", TAG_DOC_OPEN)
     } catch (_: ActivityNotFoundException) {
-        Log.e(TAG_DOC_OPEN, "no app found to open docId=${document.id} mime=${document.mimeType}")
+        KBLog.ui.error("no app found to open docId=${document.id} mime=${document.mimeType}", TAG_DOC_OPEN)
         Toast.makeText(context, "Nessuna app disponibile per aprire questo file", Toast.LENGTH_LONG).show()
     } catch (_: TimeoutCancellationException) {
-        Log.e(TAG_DOC_OPEN, "openDocument timeout docId=${document.id}")
+        KBLog.ui.error("openDocument timeout docId=${document.id}", TAG_DOC_OPEN)
         Toast.makeText(context, "Timeout apertura documento", Toast.LENGTH_LONG).show()
     } catch (e: Exception) {
-        Log.e(TAG_DOC_OPEN, "openDocument failed docId=${document.id}", e)
+        KBLog.ui.error("openDocument failed docId=${document.id}", TAG_DOC_OPEN, e)
         Toast.makeText(
             context,
             "Impossibile aprire il documento: ${e.localizedMessage ?: "errore sconosciuto"}",
             Toast.LENGTH_LONG,
         ).show()
     } catch (t: Throwable) {
-        Log.e(TAG_DOC_OPEN, "openDocument fatal docId=${document.id}", t)
+        KBLog.ui.error("openDocument fatal docId=${document.id}", TAG_DOC_OPEN, t)
         Toast.makeText(
             context,
             "Errore critico apertura documento",

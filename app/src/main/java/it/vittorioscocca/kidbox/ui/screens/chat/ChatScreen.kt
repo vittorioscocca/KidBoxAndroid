@@ -2,6 +2,8 @@
 
 package it.vittorioscocca.kidbox.ui.screens.chat
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ContentValues
@@ -11,7 +13,6 @@ import android.os.Build
 import android.os.Environment
 import android.provider.ContactsContract
 import android.provider.MediaStore
-import android.util.Log
 import android.widget.Toast
 import android.widget.VideoView
 import android.net.Uri
@@ -667,23 +668,23 @@ fun ChatScreen(
                 },
                 onOpenAttachments = { showAttachmentSheet = true },
                 onStartRecording = {
-                    Log.w("KB_Transcription", "ui_start_recording_tap")
+                    KBLog.ui.warning("ui_start_recording_tap", "KB_Transcription")
                     val permission = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
                     if (permission != PackageManager.PERMISSION_GRANTED) {
-                        Log.w("KB_Transcription", "ui_start_recording_permission_missing")
+                        KBLog.ui.warning("ui_start_recording_permission_missing", "KB_Transcription")
                         audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                         return@ReplyComposerBar
                     }
                     startRecordingSafely()
                 },
                 onStopRecording = {
-                    Log.w("KB_Transcription", "ui_stop_recording_tap")
+                    KBLog.ui.warning("ui_stop_recording_tap", "KB_Transcription")
                     val recorded = recorderManager.stop(save = true)
                     proximityManager.setRecordingActive(false)
                     inputBarViewModel.onRecordingStopped()
                     if (recorded != null) {
                         scope.launch {
-                            Log.w("KB_Transcription", "skip_send_side: transcription disabled for outgoing audio")
+                            KBLog.ui.warning("skip_send_side: transcription disabled for outgoing audio", "KB_Transcription")
                             val bytes = withContext(Dispatchers.IO) { recorded.file.readBytes() }
                             viewModel.sendAudioAttachment(
                                 fileName = recorded.file.name,
@@ -695,7 +696,7 @@ fun ChatScreen(
                             withContext(Dispatchers.IO) { recorded.file.delete() }
                         }
                     } else {
-                        Log.w("KB_Transcription", "skip: recorder returned null on stop(save=true)")
+                        KBLog.ui.warning("skip: recorder returned null on stop(save=true)", "KB_Transcription")
                         Toast.makeText(
                             context,
                             "Registrazione non valida: impossibile trascrivere",

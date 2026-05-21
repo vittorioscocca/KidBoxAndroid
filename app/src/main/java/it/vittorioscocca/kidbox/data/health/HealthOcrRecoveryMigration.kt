@@ -1,7 +1,8 @@
 package it.vittorioscocca.kidbox.data.health
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.Context
-import android.util.Log
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -19,17 +20,14 @@ class HealthOcrRecoveryMigration @Inject constructor(
         val activeFamilyId = prefs.getString("active_family_id", null)?.trim().orEmpty()
         val targetFamilyId = activeFamilyId
         if (targetFamilyId.isBlank()) {
-            Log.i(TAG_HEALTH_OCR_RECOVERY, "OCR recovery skipped: no family available yet")
+            KBLog.data.info("OCR recovery skipped: no family available yet", TAG_HEALTH_OCR_RECOVERY)
             return
         }
 
-        Log.i(
-            TAG_HEALTH_OCR_RECOVERY,
-            "Starting one-shot OCR recovery for familyId=$targetFamilyId",
-        )
+        KBLog.data.info("Starting one-shot OCR recovery for familyId=$targetFamilyId", TAG_HEALTH_OCR_RECOVERY)
         healthAttachmentService.enqueueBackfillHealthExtraction(targetFamilyId)
         prefs.edit().putBoolean(PREF_OCR_RECOVERY_V1_DONE, true).apply()
-        Log.i(TAG_HEALTH_OCR_RECOVERY, "One-shot OCR recovery marked as completed")
+        KBLog.data.info("One-shot OCR recovery marked as completed", TAG_HEALTH_OCR_RECOVERY)
     }
 
     companion object {

@@ -1,9 +1,10 @@
 package it.vittorioscocca.kidbox.feature.passwords.autofill
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
@@ -75,7 +76,7 @@ class KidBoxCredentialPasswordGetActivity : FragmentActivity() {
             executor,
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    Log.w(TAG, "biometric error $errorCode $errString")
+                    KBLog.security.warning("biometric error $errorCode $errString", TAG)
                     finish()
                 }
 
@@ -96,7 +97,7 @@ class KidBoxCredentialPasswordGetActivity : FragmentActivity() {
             .setAllowedAuthenticators(allowed)
             .build()
         runCatching { biometricPrompt.authenticate(info) }.onFailure {
-            Log.w(TAG, "biometric authenticate failed: ${it.message}")
+            KBLog.security.warning("biometric authenticate failed: ${it.message}", TAG)
             finish()
         }
     }

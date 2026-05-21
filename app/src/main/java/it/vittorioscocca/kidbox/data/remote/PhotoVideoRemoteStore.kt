@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.remote
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
@@ -106,10 +107,7 @@ class PhotoVideoRemoteStore @Inject constructor() {
                 }
             }
             if (upserts > 0 || removes > 0) {
-                Log.d(
-                    TAG_PHOTO_SYNC,
-                    "Snapshot processed. Changes: $upserts added/modified, $removes removed. collection=photos isFromCache=$isFromCache",
-                )
+                KBLog.data.debug("Snapshot processed. Changes: $upserts added/modified, $removes removed. collection=photos isFromCache=$isFromCache", TAG_PHOTO_SYNC)
             }
         }
 
@@ -147,10 +145,7 @@ class PhotoVideoRemoteStore @Inject constructor() {
                 }
             }
             if (upserts > 0 || removes > 0) {
-                Log.d(
-                    TAG_PHOTO_SYNC,
-                    "Snapshot processed. Changes: $upserts added/modified, $removes removed. collection=photoAlbums isFromCache=$isFromCache",
-                )
+                KBLog.data.debug("Snapshot processed. Changes: $upserts added/modified, $removes removed. collection=photoAlbums isFromCache=$isFromCache", TAG_PHOTO_SYNC)
             }
         }
 

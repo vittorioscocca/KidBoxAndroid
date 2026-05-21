@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.documents
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -28,7 +30,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import android.util.Log
 
 enum class DocumentsViewMode { GRID, LIST }
 enum class DocumentsSort { NAME, TYPE, DATE, SIZE }
@@ -513,7 +514,7 @@ class DocumentsViewModel @Inject constructor(
 
     suspend fun preparePreviewFile(document: KBDocumentEntity): File =
         withContext(Dispatchers.IO) {
-            Log.d(TAG_DOC_VM, "preparePreviewFile dispatch IO docId=${document.id}")
+            KBLog.ui.debug("preparePreviewFile dispatch IO docId=${document.id}", TAG_DOC_VM)
             repository.preparePreviewFile(document)
         }
 

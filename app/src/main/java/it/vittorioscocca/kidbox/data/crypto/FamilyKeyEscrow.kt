@@ -1,7 +1,8 @@
 package it.vittorioscocca.kidbox.data.crypto
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.Context
-import android.util.Log
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
@@ -25,23 +26,23 @@ object FamilyKeyEscrow {
     suspend fun ensureFamilyKeyAvailable(context: Context, familyId: String, userId: String): Boolean {
         if (familyId.isBlank() || userId.isBlank()) return false
         if (FamilyKeyStore.loadFamilyKey(context, familyId, userId) != null) return true
-        Log.i(TAG, "key missing locally, trying escrow recovery familyId=$familyId")
+        KBLog.crypto.info("key missing locally, trying escrow recovery familyId=$familyId", TAG)
         val recovered = recover(familyId, userId) ?: run {
-            Log.e(TAG, "escrow recovery failed (no backup or bad data) familyId=$familyId")
+            KBLog.crypto.error("escrow recovery failed (no backup or bad data) familyId=$familyId", TAG)
             return false
         }
         return try {
             FamilyKeyStore.saveFamilyKey(context, recovered, familyId, userId)
             val ok = FamilyKeyStore.loadFamilyKey(context, familyId, userId) != null
             if (ok) {
-                Log.i(TAG, "escrow recovery OK familyId=$familyId")
+                KBLog.crypto.info("escrow recovery OK familyId=$familyId", TAG)
                 backup(context, familyId, userId)
             } else {
-                Log.e(TAG, "escrow recovery save did not persist familyId=$familyId")
+                KBLog.crypto.error("escrow recovery save did not persist familyId=$familyId", TAG)
             }
             ok
         } catch (e: Exception) {
-            Log.e(TAG, "save after escrow failed familyId=$familyId: ${e.message}", e)
+            KBLog.crypto.error("save after escrow failed familyId=$familyId: ${e.message}", TAG, e)
             false
         }
     }
@@ -52,7 +53,7 @@ object FamilyKeyEscrow {
     suspend fun backup(context: Context, familyId: String, userId: String) {
         if (familyId.isBlank() || userId.isBlank()) return
         val keyBytes = FamilyKeyStore.loadFamilyKey(context, familyId, userId) ?: run {
-            Log.w(TAG, "backup skipped: no local family key familyId=$familyId")
+            KBLog.crypto.warning("backup skipped: no local family key familyId=$familyId", TAG)
             return
         }
         backupRawKey(keyBytes, familyId, userId)
@@ -75,9 +76,9 @@ object FamilyKeyEscrow {
                 .collection("memberKeyBackups").document(userId)
                 .set(data)
                 .await()
-            Log.i(TAG, "backup OK familyId=$familyId userId=$userId")
+            KBLog.crypto.info("backup OK familyId=$familyId userId=$userId", TAG)
         } catch (e: Exception) {
-            Log.e(TAG, "backup failed familyId=$familyId: ${e.message}", e)
+            KBLog.crypto.error("backup failed familyId=$familyId: ${e.message}", TAG, e)
         }
     }
 
@@ -89,7 +90,7 @@ object FamilyKeyEscrow {
                 .get()
                 .await()
             val d = snap.data ?: run {
-                Log.i(TAG, "recover: no backup doc familyId=$familyId")
+                KBLog.crypto.info("recover: no backup doc familyId=$familyId", TAG)
                 return null
             }
             val cipherB64 = d["cipher"] as? String
@@ -99,13 +100,13 @@ object FamilyKeyEscrow {
             val nonce = nonceB64?.let { InviteCrypto.fromBase64(it) }
             val tag = tagB64?.let { InviteCrypto.fromBase64(it) }
             if (cipher == null || nonce == null || tag == null) {
-                Log.i(TAG, "recover: malformed backup familyId=$familyId")
+                KBLog.crypto.info("recover: malformed backup familyId=$familyId", TAG)
                 return null
             }
             val escrowWrap = InviteCrypto.deriveEscrowWrapKey(userId, familyId)
             InviteCrypto.unwrapFamilyKey(cipher, nonce, tag, escrowWrap)
         } catch (e: Exception) {
-            Log.e(TAG, "recover failed familyId=$familyId: ${e.message}", e)
+            KBLog.crypto.error("recover failed familyId=$familyId: ${e.message}", TAG, e)
             null
         }
     }

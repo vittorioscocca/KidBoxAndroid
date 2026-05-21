@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.notifications
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
@@ -7,7 +9,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import android.util.Log
 
 /**
  * Schedula sveglie alle 8:00 con allarme esatto quando consentito (Android 12+),
@@ -50,7 +51,7 @@ object ExactAlarmScheduler {
                     )
                 }
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> {
-                    Log.i(TAG, "exact alarms not granted, using inexact RTC_WAKEUP")
+                    KBLog.app.info("exact alarms not granted, using inexact RTC_WAKEUP", TAG)
                     alarmManager.setAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP,
                         triggerAtMillis,
@@ -65,7 +66,7 @@ object ExactAlarmScheduler {
                 }
             }
         } catch (security: SecurityException) {
-            Log.w(TAG, "alarm schedule denied, inexact fallback", security)
+            KBLog.app.error("alarm schedule denied, inexact fallback", TAG, security)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,

@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.sync
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import com.google.firebase.firestore.ListenerRegistration
 import it.vittorioscocca.kidbox.data.local.dao.KBMedicalExamDao
 import it.vittorioscocca.kidbox.data.local.dao.KBMedicalVisitDao
@@ -34,7 +35,7 @@ class MedicalExamSyncCenter @Inject constructor(
 
     fun start(familyId: String) {
         if (listeners.containsKey(familyId)) return
-        Log.d(TAG, "start listener familyId=$familyId")
+        KBLog.sync.debug("start listener familyId=$familyId", TAG)
         listeners[familyId] = remote.listenAll(familyId) { dtos ->
             lastInboundDtosByFamily[familyId] = dtos
             scope.launch { applyInbound(familyId, dtos) }
@@ -54,7 +55,7 @@ class MedicalExamSyncCenter @Inject constructor(
 
     fun stop(familyId: String) {
         listeners.remove(familyId)?.remove()
-        Log.d(TAG, "stopped listener familyId=$familyId")
+        KBLog.sync.debug("stopped listener familyId=$familyId", TAG)
     }
 
     fun stopAll() {
@@ -72,7 +73,7 @@ class MedicalExamSyncCenter @Inject constructor(
                 val localSync = local?.syncStateRaw ?: 0
 
                 if (local != null && localSync == 1 && localStamp > remoteStamp) {
-                    Log.d(TAG, "skip anti-resurrect examId=${dto.id}")
+                    KBLog.sync.debug("skip anti-resurrect examId=${dto.id}", TAG)
                     continue
                 }
 
@@ -86,18 +87,12 @@ class MedicalExamSyncCenter @Inject constructor(
                     if (pv != null && visitDao.getById(pv) == null) {
                         if (attempt < INBOUND_PRESCRIBING_VISIT_RETRY_ATTEMPTS - 1) {
                             anyDeferred = true
-                            Log.d(
-                                TAG,
-                                "defer exam id=${dto.id} prescribingVisitId=$pv " +
-                                    "(visit not local yet) attempt=$attempt familyId=$familyId",
-                            )
+                            KBLog.sync.debug("defer exam id=${dto.id} prescribingVisitId=$pv " +
+                                    "(visit not local yet) attempt=$attempt familyId=$familyId", TAG)
                             continue
                         }
-                        Log.w(
-                            TAG,
-                            "exam id=${dto.id} prescribingVisitId=$pv visit still missing after retries — " +
-                                "upsert with prescribingVisitId=null (FK) familyId=$familyId",
-                        )
+                        KBLog.sync.warning("exam id=${dto.id} prescribingVisitId=$pv visit still missing after retries — " +
+                                "upsert with prescribingVisitId=null (FK) familyId=$familyId", TAG)
                         dao.upsert(dto.toEntity().copy(prescribingVisitId = null))
                         continue
                     }

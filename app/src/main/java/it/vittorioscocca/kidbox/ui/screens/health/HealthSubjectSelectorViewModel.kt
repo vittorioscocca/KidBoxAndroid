@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.health
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -53,7 +54,7 @@ class HealthSubjectSelectorViewModel @Inject constructor(
             try {
                 persistChildMetric(familyId, childId) { it.copy(weightKg = kg) }
             } catch (e: Exception) {
-                Log.e(TAG, "saveChildWeightKg: ${e.message}", e)
+                KBLog.ui.error("saveChildWeightKg: ${e.message}", TAG, e)
             }
         }
     }
@@ -63,7 +64,7 @@ class HealthSubjectSelectorViewModel @Inject constructor(
             try {
                 persistChildMetric(familyId, childId) { it.copy(heightCm = cm) }
             } catch (e: Exception) {
-                Log.e(TAG, "saveChildHeightCm: ${e.message}", e)
+                KBLog.ui.error("saveChildHeightCm: ${e.message}", TAG, e)
             }
         }
     }

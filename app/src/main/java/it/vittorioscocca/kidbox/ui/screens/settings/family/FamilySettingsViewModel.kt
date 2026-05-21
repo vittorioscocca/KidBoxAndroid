@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.settings.family
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -126,7 +127,7 @@ class FamilySettingsViewModel @Inject constructor(
             error = null,
         )
         _navigateAwayAfterLeave.value = true
-        Log.i(TAG, "handleAccessRevokedByRemote: stato resettato, navigateAwayAfterLeave=true")
+        KBLog.ui.info("handleAccessRevokedByRemote: stato resettato, navigateAwayAfterLeave=true", TAG)
     }
 
     private fun isPermissionDenied(t: Throwable): Boolean {
@@ -151,18 +152,18 @@ class FamilySettingsViewModel @Inject constructor(
         try {
             FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.await()
             tokenRefreshOk = true
-            Log.d(TAG, "refreshTokenThenResetFirestoreCache: token rinfrescato")
+            KBLog.ui.debug("refreshTokenThenResetFirestoreCache: token rinfrescato", TAG)
         } catch (e: Exception) {
-            Log.e(TAG, "refreshTokenThenResetFirestoreCache: errore rinfresco token", e)
+            KBLog.ui.error("refreshTokenThenResetFirestoreCache: errore rinfresco token", TAG, e)
         }
         delay(3000)
         try {
             FirebaseFirestore.getInstance().terminate().await()
             FirebaseFirestore.getInstance().clearPersistence().await()
-            Log.d(TAG, "refreshTokenThenResetFirestoreCache: terminate + clearPersistence OK")
+            KBLog.ui.debug("refreshTokenThenResetFirestoreCache: terminate + clearPersistence OK", TAG)
             delay(1000)
         } catch (e: Exception) {
-            Log.e(TAG, "refreshTokenThenResetFirestoreCache: terminate/clearPersistence fallito — continuo", e)
+            KBLog.ui.error("refreshTokenThenResetFirestoreCache: terminate/clearPersistence fallito — continuo", TAG, e)
         }
         return tokenRefreshOk
     }
@@ -281,7 +282,7 @@ class FamilySettingsViewModel @Inject constructor(
                 .forEach { candidateFamilyIds.add(it) }
 
             if (candidateFamilyIds.isEmpty()) {
-                Log.w(TAG, "bootstrapFromFirebase: memberships vuote/incoerenti, fallback members collectionGroup")
+                KBLog.ui.warning("bootstrapFromFirebase: memberships vuote/incoerenti, fallback members collectionGroup", TAG)
                 val memberDocs = db.collectionGroup("members")
                     .whereEqualTo("uid", uid)
                     .get()
@@ -309,14 +310,14 @@ class FamilySettingsViewModel @Inject constructor(
                         .get()
                         .await()
                     if (!myMemberSnap.exists() || myMemberSnap.data?.get("isDeleted") as? Boolean == true) {
-                        Log.w(TAG, "bootstrapFromFirebase: skip familyId=$candidateId (member missing/deleted)")
+                        KBLog.ui.warning("bootstrapFromFirebase: skip familyId=$candidateId (member missing/deleted)", TAG)
                         continue
                     }
                     val familySnap = db.collection("families").document(candidateId).get().await()
                     if (!familySnap.exists()) continue
                     val familyData = familySnap.data.orEmpty()
                     if (familyData["isDeleted"] as? Boolean == true) {
-                        Log.w(TAG, "bootstrapFromFirebase: skip familyId=$candidateId (family deleted)")
+                        KBLog.ui.warning("bootstrapFromFirebase: skip familyId=$candidateId (family deleted)", TAG)
                         continue
                     }
                     selectedFamilyId = candidateId
@@ -324,7 +325,7 @@ class FamilySettingsViewModel @Inject constructor(
                     break
                 } catch (e: FirebaseFirestoreException) {
                     if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
-                        Log.w(TAG, "bootstrapFromFirebase: skip familyId=$candidateId (PERMISSION_DENIED)")
+                        KBLog.ui.warning("bootstrapFromFirebase: skip familyId=$candidateId (PERMISSION_DENIED)", TAG)
                         continue
                     }
                     throw e
@@ -426,9 +427,9 @@ class FamilySettingsViewModel @Inject constructor(
             family
         } catch (e: Exception) {
             if (isPermissionDenied(e)) {
-                Log.w(TAG, "bootstrapFromFirebase: PERMISSION_DENIED — revoca accesso, nessun popup errore")
+                KBLog.ui.warning("bootstrapFromFirebase: PERMISSION_DENIED — revoca accesso, nessun popup errore", TAG)
                 if (allowRecoveryOnPermissionDenied) {
-                    Log.w(TAG, "bootstrapFromFirebase: tentativo recovery token/cache e retry")
+                    KBLog.ui.warning("bootstrapFromFirebase: tentativo recovery token/cache e retry", TAG)
                     refreshTokenThenResetFirestoreCache()
                     return bootstrapFromFirebase(
                         requestUid = requestUid,
@@ -452,12 +453,9 @@ class FamilySettingsViewModel @Inject constructor(
      */
     fun removeMember(member: KBFamilyMemberEntity) {
         val myUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-        Log.d(
-            "DEBUG_REVOCA",
-            "Operatore (Owner): $myUid, Target (Da rimuovere): ${member.userId}, docId=${member.id}",
-        )
+        KBLog.ui.debug("Operatore (Owner): $myUid, Target (Da rimuovere): ${member.userId}, docId=${member.id}", "DEBUG_REVOCA")
         if (member.userId == myUid || member.id == myUid) {
-            Log.w(TAG, "removeMember: rifiutato — target coincide con l'operatore")
+            KBLog.ui.warning("removeMember: rifiutato — target coincide con l'operatore", TAG)
             return
         }
         val familyId = _uiState.value.family?.id ?: return
@@ -476,15 +474,15 @@ class FamilySettingsViewModel @Inject constructor(
                 familyMemberDao.deleteById(member.id)
 
                 familySyncCenter.stopSync()
-                Log.d(TAG, "removeMember: stopSync dopo revoca familyId=$familyId")
+                KBLog.ui.debug("removeMember: stopSync dopo revoca familyId=$familyId", TAG)
                 refreshTokenThenResetFirestoreCache()
-                Log.d(TAG, "Reset Firestore completato con nuovo token. Riattivazione Sync.")
+                KBLog.ui.debug("Reset Firestore completato con nuovo token. Riattivazione Sync.", TAG)
                 familySyncCenter.startSync(familyId)
             } catch (e: Exception) {
                 if (!isPermissionDenied(e)) {
                     _uiState.value = _uiState.value.copy(error = e.localizedMessage)
                 } else {
-                    Log.w(TAG, "removeMember: PERMISSION_DENIED — ignorato (possibile revoca)")
+                    KBLog.ui.warning("removeMember: PERMISSION_DENIED — ignorato (possibile revoca)", TAG)
                 }
             }
         }
@@ -494,17 +492,17 @@ class FamilySettingsViewModel @Inject constructor(
         val familyId = _uiState.value.family?.id ?: return
         viewModelScope.launch {
             try {
-                Log.i(TAG, "leaveFamily start familyId=$familyId uid=${_uiState.value.currentUid}")
+                KBLog.ui.info("leaveFamily start familyId=$familyId uid=${_uiState.value.currentUid}", TAG)
                 leaveService.leaveFamily(familyId)
-                Log.d(TAG, "leaveFamily service completed familyId=$familyId")
+                KBLog.ui.debug("leaveFamily service completed familyId=$familyId", TAG)
                 observeJob?.cancel()
                 observeJob = null
                 observingFamilyId = null
-                Log.d(TAG, "leaveFamily observers cleared familyId=$familyId")
+                KBLog.ui.debug("leaveFamily observers cleared familyId=$familyId", TAG)
                 dismissLeaveDialog()
                 _navigateAwayAfterLeave.value = true
             } catch (e: Exception) {
-                Log.e(TAG, "leaveFamily failed familyId=$familyId err=${e.message}", e)
+                KBLog.ui.error("leaveFamily failed familyId=$familyId err=${e.message}", TAG, e)
                 if (!isPermissionDenied(e)) {
                     _uiState.value = _uiState.value.copy(error = e.localizedMessage)
                 }
@@ -519,31 +517,25 @@ class FamilySettingsViewModel @Inject constructor(
         val isOwnerFromFamily = state.family?.createdBy == currentUid
         val isOwner =
             currentMember?.role.equals("owner", ignoreCase = true) || isOwnerFromFamily
-        Log.d(TAG, "checkLeaveScenario: members=${state.members.size} isOwner=$isOwner")
+        KBLog.ui.debug("checkLeaveScenario: members=${state.members.size} isOwner=$isOwner", TAG)
         if (!isOwner) {
-            Log.d(TAG, "checkLeaveScenario -> MemberOnly uid=$currentUid members=${state.members.size}")
+            KBLog.ui.debug("checkLeaveScenario -> MemberOnly uid=$currentUid members=${state.members.size}", TAG)
             return LeaveScenario.MemberOnly
         }
         // Lista vuota (glitch sync post-revoca / permessi): mai OwnerAlone → la UI non deve proporre deleteFamily.
         if (state.members.isEmpty()) {
             if (isOwnerFromFamily) {
-                Log.d(
-                    TAG,
-                    "checkLeaveScenario: forzato scenario con membri per evitare eliminazione accidentale durante glitch",
-                )
+                KBLog.ui.debug("checkLeaveScenario: forzato scenario con membri per evitare eliminazione accidentale durante glitch", TAG)
             }
-            Log.w(
-                TAG,
-                "checkLeaveScenario -> OwnerWithMembers(empty) uid=$currentUid (lista vuota, mai OwnerAlone)",
-            )
+            KBLog.ui.warning("checkLeaveScenario -> OwnerWithMembers(empty) uid=$currentUid (lista vuota, mai OwnerAlone)", TAG)
             return LeaveScenario.OwnerWithMembers(emptyList())
         }
         val otherMembers = state.members.filter { it.userId != currentUid }
         if (otherMembers.isEmpty()) {
-            Log.d(TAG, "checkLeaveScenario -> OwnerAlone uid=$currentUid members=${state.members.size}")
+            KBLog.ui.debug("checkLeaveScenario -> OwnerAlone uid=$currentUid members=${state.members.size}", TAG)
             return LeaveScenario.OwnerAlone
         }
-        Log.d(TAG, "checkLeaveScenario -> OwnerWithMembers uid=$currentUid others=${otherMembers.size}")
+        KBLog.ui.debug("checkLeaveScenario -> OwnerWithMembers uid=$currentUid others=${otherMembers.size}", TAG)
         return LeaveScenario.OwnerWithMembers(otherMembers)
     }
 
@@ -551,18 +543,18 @@ class FamilySettingsViewModel @Inject constructor(
         val familyId = _uiState.value.family?.id ?: return
         viewModelScope.launch {
             try {
-                Log.i(TAG, "transferOwnershipAndLeave start familyId=$familyId uid=${_uiState.value.currentUid} newOwnerUid=$newOwnerUid")
+                KBLog.ui.info("transferOwnershipAndLeave start familyId=$familyId uid=${_uiState.value.currentUid} newOwnerUid=$newOwnerUid", TAG)
                 familySyncCenter.stopSync()
-                Log.d(TAG, "transferOwnershipAndLeave sync stopped familyId=$familyId")
+                KBLog.ui.debug("transferOwnershipAndLeave sync stopped familyId=$familyId", TAG)
                 leaveService.transferOwnershipAndLeave(familyId, newOwnerUid)
-                Log.d(TAG, "transferOwnershipAndLeave service completed familyId=$familyId")
+                KBLog.ui.debug("transferOwnershipAndLeave service completed familyId=$familyId", TAG)
                 observeJob?.cancel()
                 observeJob = null
                 observingFamilyId = null
                 dismissLeaveDialog()
                 _navigateAwayAfterLeave.value = true
             } catch (e: Exception) {
-                Log.e(TAG, "transferOwnershipAndLeave failed familyId=$familyId newOwnerUid=$newOwnerUid err=${e.message}", e)
+                KBLog.ui.error("transferOwnershipAndLeave failed familyId=$familyId newOwnerUid=$newOwnerUid err=${e.message}", TAG, e)
                 if (!isPermissionDenied(e)) {
                     _uiState.value = _uiState.value.copy(error = e.localizedMessage)
                 }
@@ -575,23 +567,20 @@ class FamilySettingsViewModel @Inject constructor(
         val familyId = state.family?.id ?: return
 
         if (state.members.filter { !it.isDeleted }.size > 1) {
-            Log.e(
-                TAG,
-                "SABOTAGGIO EVITATO: Tentativo di cancellare famiglia con membri attivi nello stato UI.",
-            )
+            KBLog.ui.error("SABOTAGGIO EVITATO: Tentativo di cancellare famiglia con membri attivi nello stato UI.", TAG)
             return
         }
 
         viewModelScope.launch {
-            Log.e(TAG, "!!! INVOCATA PROCEDURA DI ELIMINAZIONE TOTALE FAMIGLIA !!! ID: $familyId")
+            KBLog.ui.error("!!! INVOCATA PROCEDURA DI ELIMINAZIONE TOTALE FAMIGLIA !!! ID: $familyId", TAG)
             try {
                 val activeInDb = familyMemberDao.observeActiveByFamilyId(familyId).first()
                 if (activeInDb.size <= 1) {
-                    Log.i(TAG, "Cancellazione autorizzata: unico membro rimasto nel DB locale.")
-                    Log.i(TAG, "deleteFamily start familyId=$familyId uid=${_uiState.value.currentUid}")
+                    KBLog.ui.info("Cancellazione autorizzata: unico membro rimasto nel DB locale.", TAG)
+                    KBLog.ui.info("deleteFamily start familyId=$familyId uid=${_uiState.value.currentUid}", TAG)
                     leaveService.deleteFamily(familyId)
                     familyDao.deleteAll()
-                    Log.d(TAG, "deleteFamily service completed familyId=$familyId")
+                    KBLog.ui.debug("deleteFamily service completed familyId=$familyId", TAG)
                     observeJob?.cancel()
                     observeJob = null
                     observingFamilyId = null
@@ -602,16 +591,13 @@ class FamilySettingsViewModel @Inject constructor(
                     )
                     _navigateAwayAfterLeave.value = true
                 } else {
-                    Log.e(
-                        TAG,
-                        "ERRORE CRITICO: Il database locale dice che ci sono ancora ${activeInDb.size} membri. Cancellazione interrotta.",
-                    )
+                    KBLog.ui.error("ERRORE CRITICO: Il database locale dice che ci sono ancora ${activeInDb.size} membri. Cancellazione interrotta.", TAG)
                     _uiState.value = _uiState.value.copy(
                         error = "Impossibile eliminare: sincronizzazione incompleta.",
                     )
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Fallimento durante il controllo di sicurezza eliminazione", e)
+                KBLog.ui.error("Fallimento durante il controllo di sicurezza eliminazione", TAG, e)
                 if (!isPermissionDenied(e)) {
                     _uiState.value = _uiState.value.copy(error = e.localizedMessage)
                 }
@@ -621,7 +607,7 @@ class FamilySettingsViewModel @Inject constructor(
 
     fun onLeaveButtonTapped() {
         if (!familySyncCenter.initialSyncDone.value) {
-            Log.w(TAG, "onLeaveButtonTapped bloccato: sync in corso")
+            KBLog.ui.warning("onLeaveButtonTapped bloccato: sync in corso", TAG)
             return
         }
         val scenario = checkLeaveScenario()
@@ -631,30 +617,30 @@ class FamilySettingsViewModel @Inject constructor(
             is LeaveScenario.OwnerWithMembers -> LeaveDialogState.OwnerWithMembers(scenario.otherMembers)
         }
         _leaveDialogState.value = next
-        Log.d(TAG, "onLeaveButtonTapped scenario=$scenario dialogState=$next")
+        KBLog.ui.debug("onLeaveButtonTapped scenario=$scenario dialogState=$next", TAG)
     }
 
     fun dismissLeaveDialog() {
-        Log.d(TAG, "dismissLeaveDialog from=${_leaveDialogState.value}")
+        KBLog.ui.debug("dismissLeaveDialog from=${_leaveDialogState.value}", TAG)
         _leaveDialogState.value = LeaveDialogState.Hidden
     }
 
     fun showTransferOwnershipDialog() {
         if (_leaveDialogState.value is LeaveDialogState.OwnerWithMembers) {
             _leaveDialogState.value = LeaveDialogState.TransferOwnership
-            Log.d(TAG, "showTransferOwnershipDialog -> TransferOwnership")
+            KBLog.ui.debug("showTransferOwnershipDialog -> TransferOwnership", TAG)
         } else {
-            Log.w(TAG, "showTransferOwnershipDialog ignored from=${_leaveDialogState.value}")
+            KBLog.ui.warning("showTransferOwnershipDialog ignored from=${_leaveDialogState.value}", TAG)
         }
     }
 
     fun clearError() {
-        Log.d(TAG, "clearError previous=${_uiState.value.error}")
+        KBLog.ui.debug("clearError previous=${_uiState.value.error}", TAG)
         _uiState.value = _uiState.value.copy(error = null)
     }
 
     fun resetNavigateAway() {
-        Log.d(TAG, "resetNavigateAway")
+        KBLog.ui.debug("resetNavigateAway", TAG)
         _navigateAwayAfterLeave.value = false
     }
 
@@ -671,7 +657,7 @@ class FamilySettingsViewModel @Inject constructor(
                 if (!isPermissionDenied(e)) {
                     _uiState.value = _uiState.value.copy(error = e.localizedMessage)
                 } else {
-                    Log.w(TAG, "joinWithCode: PERMISSION_DENIED — ignorato")
+                    KBLog.ui.warning("joinWithCode: PERMISSION_DENIED — ignorato", TAG)
                 }
             }
         }
@@ -700,7 +686,7 @@ class FamilySettingsViewModel @Inject constructor(
                 if (!isPermissionDenied(e)) {
                     _uiState.value = _uiState.value.copy(error = e.localizedMessage)
                 } else {
-                    Log.w(TAG, "saveFamilyName: PERMISSION_DENIED — ignorato")
+                    KBLog.ui.warning("saveFamilyName: PERMISSION_DENIED — ignorato", TAG)
                 }
             }
         }
@@ -726,8 +712,8 @@ class FamilySettingsViewModel @Inject constructor(
         val existingIds = childDao.getChildrenByFamilyId(family.id).map { it.id }.toSet()
         childrenInputs.filter { it.name.isNotBlank() }.forEach { input ->
             val isExisting = input.id in existingIds
-            Log.d("DEBUG_SAVE", "Inviando figlio ${input.name.trim()} con ID ${input.id}")
-            Log.d(TAG, "saveFamilyWithChildren child id=${input.id} existing=$isExisting name=${input.name.trim()}")
+            KBLog.ui.debug("Inviando figlio ${input.name.trim()} con ID ${input.id}", "DEBUG_SAVE")
+            KBLog.ui.debug("saveFamilyWithChildren child id=${input.id} existing=$isExisting name=${input.name.trim()}", TAG)
             val entity = if (isExisting) {
                 (childDao.getById(input.id)?.copy(
                     name = input.name.trim(),
@@ -784,7 +770,7 @@ class FamilySettingsViewModel @Inject constructor(
             )
             try {
                 if (family == null) {
-                    Log.i(TAG, "Starting new family creation because state.family was null")
+                    KBLog.ui.info("Starting new family creation because state.family was null", TAG)
                     val list = childrenInputs
                         .filter { it.name.isNotBlank() }
                         .map {
@@ -794,11 +780,8 @@ class FamilySettingsViewModel @Inject constructor(
                                 birthDateMillis = it.birthDateEpochMillis,
                             )
                         }
-                    Log.d(
-                        TAG,
-                        "createFamilyWithChildren: ${list.size} figlio/i da salvare: " +
-                            list.joinToString { "${it.name}(${it.id.take(8)}…)" },
-                    )
+                    KBLog.ui.debug("createFamilyWithChildren: ${list.size} figlio/i da salvare: " +
+                            list.joinToString { "${it.name}(${it.id.take(8)}…)" }, TAG)
                     if (list.isEmpty()) {
                         _uiState.value = _uiState.value.copy(error = "Aggiungi almeno un figlio con nome.")
                         return@launch
@@ -811,10 +794,10 @@ class FamilySettingsViewModel @Inject constructor(
 
                 val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
                 val now = System.currentTimeMillis()
-                Log.i(TAG, "saveFamilyWithChildren start familyId=${family.id} children=${childrenInputs.size}")
+                KBLog.ui.info("saveFamilyWithChildren start familyId=${family.id} children=${childrenInputs.size}", TAG)
 
                 familySyncCenter.stopSync()
-                Log.d(TAG, "saveFamilyWithChildren stopSync done familyId=${family.id}")
+                KBLog.ui.debug("saveFamilyWithChildren stopSync done familyId=${family.id}", TAG)
 
                 val fs = FirebaseFirestore.getInstance()
                 for (attempt in 1..5) {
@@ -823,10 +806,7 @@ class FamilySettingsViewModel @Inject constructor(
                         break
                     } catch (e: Exception) {
                         if (isPermissionDenied(e) && attempt < 5) {
-                            Log.w(
-                                TAG,
-                                "saveFamilyWithChildren PERMISSION_DENIED attempt=$attempt/5, retry in 2000ms",
-                            )
+                            KBLog.ui.warning("saveFamilyWithChildren PERMISSION_DENIED attempt=$attempt/5, retry in 2000ms", TAG)
                             delay(2000)
                         } else {
                             throw e
@@ -834,18 +814,18 @@ class FamilySettingsViewModel @Inject constructor(
                     }
                 }
 
-                Log.i(TAG, "saveFamilyWithChildren write OK familyId=${family.id}")
+                KBLog.ui.info("saveFamilyWithChildren write OK familyId=${family.id}", TAG)
                 refreshTokenThenResetFirestoreCache()
-                Log.d(TAG, "Reset Firestore completato con nuovo token. Riattivazione Sync.")
+                KBLog.ui.debug("Reset Firestore completato con nuovo token. Riattivazione Sync.", TAG)
                 familySyncCenter.startSync(family.id)
                 onDone()
             } catch (e: Exception) {
-                Log.e(TAG, "saveFamilyWithChildren failed familyId=${family?.id} err=${e.message}", e)
+                KBLog.ui.error("saveFamilyWithChildren failed familyId=${family?.id} err=${e.message}", TAG, e)
                 val fid = family?.id
                 if (!fid.isNullOrEmpty()) {
                     runCatching { familySyncCenter.startSync(fid) }
                         .onFailure { t ->
-                            Log.e(TAG, "saveFamilyWithChildren: startSync dopo errore fallito", t)
+                            KBLog.ui.error("saveFamilyWithChildren: startSync dopo errore fallito", TAG, t)
                         }
                 }
                 val msg = when {
@@ -911,7 +891,7 @@ class FamilySettingsViewModel @Inject constructor(
             try {
                 val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
                 val now = System.currentTimeMillis()
-                Log.i(TAG, "saveChild start familyId=${family.id} childId=$childId")
+                KBLog.ui.info("saveChild start familyId=${family.id} childId=$childId", TAG)
                 val existing = childDao.getById(childId)
                 val updated = existing?.copy(
                     name = name.trim(),
@@ -946,10 +926,10 @@ class FamilySettingsViewModel @Inject constructor(
                         ),
                         com.google.firebase.firestore.SetOptions.merge()
                     ).await()
-                Log.i(TAG, "saveChild completed familyId=${family.id} childId=$childId")
+                KBLog.ui.info("saveChild completed familyId=${family.id} childId=$childId", TAG)
                 onDone()
             } catch (e: Exception) {
-                Log.e(TAG, "saveChild failed familyId=${family.id} childId=$childId err=${e.message}", e)
+                KBLog.ui.error("saveChild failed familyId=${family.id} childId=$childId err=${e.message}", TAG, e)
                 if (!isPermissionDenied(e)) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -981,7 +961,7 @@ class FamilySettingsViewModel @Inject constructor(
                 if (!isPermissionDenied(e)) {
                     _uiState.value = _uiState.value.copy(error = e.localizedMessage)
                 } else {
-                    Log.w(TAG, "deleteChild: PERMISSION_DENIED — ignorato")
+                    KBLog.ui.warning("deleteChild: PERMISSION_DENIED — ignorato", TAG)
                 }
             }
         }

@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.health.ai
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -35,7 +37,6 @@ import it.vittorioscocca.kidbox.domain.model.KBVaccine
 import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatStreamingDelivery
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.FamilyMemoryPromptSection
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.FamilyMemoryService
-import android.util.Log
 import javax.inject.Inject
 import org.json.JSONArray
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -263,11 +264,8 @@ class HealthAIChatViewModel @Inject constructor(
                 messages = _uiState.value.messages,
                 pendingUserText = _uiState.value.inputText,
             )
-            Log.i(
-                TAG,
-                "context ready standardChars=${standardSystemPrompt.length} " +
-                    "fullChars=${fullSystemPrompt.length} units=${_uiState.value.estimatedMessageUnits}",
-            )
+            KBLog.ai.info("context ready standardChars=${standardSystemPrompt.length} " +
+                    "fullChars=${fullSystemPrompt.length} units=${_uiState.value.estimatedMessageUnits}", TAG)
 
             _uiState.value = _uiState.value.copy(isLoadingContext = false)
                 .copy(
@@ -340,7 +338,7 @@ class HealthAIChatViewModel @Inject constructor(
         val remote = aiRemotePrefs.fetch()?.healthContextSendPreference ?: return
         if (aiSettingsStore.getHealthContextSendPreference() != remote) {
             aiSettingsStore.setHealthContextSendPreference(remote)
-            Log.i(TAG, "synced healthContextSendPreference=${remote.storageValue}")
+            KBLog.ai.info("synced healthContextSendPreference=${remote.storageValue}", TAG)
         }
     }
 

@@ -1,7 +1,8 @@
 package it.vittorioscocca.kidbox.data.sync
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.Context
-import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.DocumentSnapshot
@@ -101,11 +102,11 @@ class FamilySyncCenter @Inject constructor(
      */
     private suspend fun isLocalFamilyCreator(familyId: String, uid: String): Boolean {
         if (uid.isEmpty()) {
-            Log.d(TAG, "Bypass check: familyId=$familyId, isCreator=false (uid empty)")
+            KBLog.sync.debug("Bypass check: familyId=$familyId, isCreator=false (uid empty)", TAG)
             return false
         }
         if (currentFamilyId != null && familyId != currentFamilyId) {
-            Log.d(TAG, "Bypass check: familyId=$familyId, isCreator=false (family mismatch currentFamilyId=$currentFamilyId)")
+            KBLog.sync.debug("Bypass check: familyId=$familyId, isCreator=false (family mismatch currentFamilyId=$currentFamilyId)", TAG)
             return false
         }
         val localFamily = familyDao.getById(familyId)
@@ -117,11 +118,8 @@ class FamilySyncCenter @Inject constructor(
         // Creatore da Room: sempre owner per il bypass, anche se la riga membro / Firestore è incoerente
         val ownerRoleEffective = byCreated || byOwnerRoleFromMember
         val result = ownerRoleEffective
-        Log.d(
-            TAG,
-            "Bypass check: familyId=$familyId, currentFamilyId=$currentFamilyId, isCreator=$result " +
-                "(createdBy=$byCreated ownerRoleFromMember=$byOwnerRoleFromMember ownerRoleEffective=$ownerRoleEffective)",
-        )
+        KBLog.sync.debug("Bypass check: familyId=$familyId, currentFamilyId=$currentFamilyId, isCreator=$result " +
+                "(createdBy=$byCreated ownerRoleFromMember=$byOwnerRoleFromMember ownerRoleEffective=$ownerRoleEffective)", TAG)
         return result
     }
 
@@ -133,7 +131,7 @@ class FamilySyncCenter @Inject constructor(
         ownerSyncRecoveryJob?.cancel()
         ownerSyncRecoveryJob = scope.launch(Dispatchers.IO) {
             delay(delayMs)
-            Log.d(TAG, "restartSyncAfterDelay delayMs=$delayMs → startSync familyId=$syncFamilyId")
+            KBLog.sync.debug("restartSyncAfterDelay delayMs=$delayMs → startSync familyId=$syncFamilyId", TAG)
             startSync(syncFamilyId)
         }
     }
@@ -148,7 +146,7 @@ class FamilySyncCenter @Inject constructor(
             if (accessLostEmitted) return false
             accessLostEmitted = true
         }
-        Log.w(TAG, "Accesso revocato per l'utente corrente ($reason)")
+        KBLog.sync.warning("Accesso revocato per l'utente corrente ($reason)", TAG)
         stopSync()
         scope.launch(Dispatchers.IO) {
             try {
@@ -156,18 +154,18 @@ class FamilySyncCenter @Inject constructor(
                 sessionPrefs.markSkipHomeBootstrapOnce()
                 database.clearAllTables()
             } catch (e: Exception) {
-                Log.e(TAG, "access lost clearAllTables failed: ${e.message}", e)
+                KBLog.sync.error("access lost clearAllTables failed: ${e.message}", TAG, e)
             }
             try {
                 FamilyKeyStore.deleteAllFamilyKeysForUser(appContext, uid)
             } catch (e: Exception) {
-                Log.e(TAG, "access lost deleteAllFamilyKeysForUser failed: ${e.message}", e)
+                KBLog.sync.error("access lost deleteAllFamilyKeysForUser failed: ${e.message}", TAG, e)
             }
             try {
                 // kidbox_prefs + KidBoxPrefs legacy (active_family_id), vedi FamilySessionPreferences
                 sessionPrefs.clearActiveFamilyId()
             } catch (e: Exception) {
-                Log.e(TAG, "access lost clearActiveFamilyId failed: ${e.message}", e)
+                KBLog.sync.error("access lost clearActiveFamilyId failed: ${e.message}", TAG, e)
             }
             _accessLostEvent.emit(Unit)
         }
@@ -193,7 +191,7 @@ class FamilySyncCenter @Inject constructor(
         currentFamilyId = familyId
         sessionPrefs.setActiveFamilyId(familyId)
         _initialSyncDone.value = false
-        Log.d(TAG, "startSync familyId=$familyId")
+        KBLog.sync.debug("startSync familyId=$familyId", TAG)
         tripRepository.startRealtime(familyId)
 
         // Prefetch fire-and-forget: completa Room asincronamente quando la rete c'è,
@@ -203,13 +201,13 @@ class FamilySyncCenter @Inject constructor(
             try {
                 prefetchMembersAndChildren(familyId)
             } catch (e: Exception) {
-                Log.w(TAG, "prefetch (background) failed familyId=$familyId: ${e.message}")
+                KBLog.sync.warning("prefetch (background) failed familyId=$familyId: ${e.message}", TAG)
             }
         }
 
         scope.launch(Dispatchers.Main) {
             if (currentFamilyId != familyId) {
-                Log.w(TAG, "startSync: family changed before listeners, skip")
+                KBLog.sync.warning("startSync: family changed before listeners, skip", TAG)
                 return@launch
             }
 
@@ -227,7 +225,7 @@ class FamilySyncCenter @Inject constructor(
             fun checkAllFirstDone() {
                 if (accessLostEmitted) return
                 if (!(familyFirstDone && membersFirstDone && childrenFirstDone)) return
-                Log.d(TAG, "All first snapshots processed → initialSyncDone")
+                KBLog.sync.debug("All first snapshots processed → initialSyncDone", TAG)
                 _initialSyncDone.value = true
                 isJoining = false
             }
@@ -243,22 +241,19 @@ class FamilySyncCenter @Inject constructor(
                             val uid = auth.currentUser?.uid.orEmpty()
                             scope.launch {
                                 if (uid.isNotEmpty() && isLocalFamilyCreator(familyId, uid)) {
-                                    Log.w(
-                                        TAG,
-                                        "Permessi in aggiornamento, riprovo tra 8s (family listener, creator)",
-                                    )
+                                    KBLog.sync.warning("Permessi in aggiornamento, riprovo tra 8s (family listener, creator)", TAG)
                                     restartSyncAfterDelay(familyId, 8000L)
                                     _initialSyncDone.value = true
                                     isJoining = false
                                 } else {
-                                    Log.e(TAG, "familyListener PERMISSION_DENIED: ${err.message}")
+                                    KBLog.sync.error("familyListener PERMISSION_DENIED: ${err.message}", TAG)
                                 }
                                 familyFirstDone = true
                                 checkAllFirstDone()
                             }
                             return@addSnapshotListener
                         }
-                        Log.e(TAG, "familyListener error: ${err.message}")
+                        KBLog.sync.error("familyListener error: ${err.message}", TAG)
                         familyFirstDone = true; checkAllFirstDone(); return@addSnapshotListener
                     }
                     if (snap == null || !snap.exists()) {
@@ -311,11 +306,8 @@ class FamilySyncCenter @Inject constructor(
                             local != null
 
                         if (shouldMergeOwnershipOnly) {
-                            Log.d(
-                                TAG,
-                                "family ownership merge: remoteOwner=$remoteOwnershipUid localWas=$localOwnershipUid " +
-                                    "(solo createdBy Room, snapshot LWW ignorato)",
-                            )
+                            KBLog.sync.debug("family ownership merge: remoteOwner=$remoteOwnershipUid localWas=$localOwnershipUid " +
+                                    "(solo createdBy Room, snapshot LWW ignorato)", TAG)
                             familyDao.upsert(
                                 local.copy(
                                     createdBy = remoteOwnershipUid,
@@ -329,7 +321,7 @@ class FamilySyncCenter @Inject constructor(
 
                         if (shouldUpdate) {
                             val remoteName = (data["name"] as? String).orEmpty()
-                            Log.d(TAG, "family upsert: name='$remoteName' remoteTs=$remoteUpdatedAt localTs=$localUpdatedAt")
+                            KBLog.sync.debug("family upsert: name='$remoteName' remoteTs=$remoteUpdatedAt localTs=$localUpdatedAt", TAG)
                             familyDao.upsert(
                                 KBFamilyEntity(
                                     id = familyId,
@@ -350,9 +342,9 @@ class FamilySyncCenter @Inject constructor(
                                     lastSyncError = local?.lastSyncError,
                                 )
                             )
-                            Log.d(TAG, "family upserted id=$familyId name='$remoteName'")
+                            KBLog.sync.debug("family upserted id=$familyId name='$remoteName'", TAG)
                         } else {
-                            Log.d(TAG, "family skipped (local più recente): remoteTs=$remoteUpdatedAt localTs=$localUpdatedAt")
+                            KBLog.sync.debug("family skipped (local più recente): remoteTs=$remoteUpdatedAt localTs=$localUpdatedAt", TAG)
                         }
 
                         familyFirstDone = true
@@ -377,10 +369,7 @@ class FamilySyncCenter @Inject constructor(
                             // non espellere l'owner se in Room risulta creatore di questa famiglia.
                             scope.launch {
                                 if (isLocalFamilyCreator(familyId, uid)) {
-                                    Log.w(
-                                        TAG,
-                                        "Permessi in aggiornamento, riprovo tra 8s (members listener, creator)",
-                                    )
+                                    KBLog.sync.warning("Permessi in aggiornamento, riprovo tra 8s (members listener, creator)", TAG)
                                     restartSyncAfterDelay(familyId, 8000L)
                                     _initialSyncDone.value = true
                                     isJoining = false
@@ -388,7 +377,7 @@ class FamilySyncCenter @Inject constructor(
                                     checkAllFirstDone()
                                     return@launch
                                 }
-                                Log.w(TAG, "membersListener PERMISSION_DENIED — trattato come revoca accesso")
+                                KBLog.sync.warning("membersListener PERMISSION_DENIED — trattato come revoca accesso", TAG)
                                 triggerAccessLostIfEligible(
                                     familyId,
                                     uid,
@@ -397,7 +386,7 @@ class FamilySyncCenter @Inject constructor(
                             }
                             return@addSnapshotListener
                         }
-                        Log.e(TAG, "membersListener error: ${err.message}")
+                        KBLog.sync.error("membersListener error: ${err.message}", TAG)
                         membersFirstDone = true; checkAllFirstDone(); return@addSnapshotListener
                     }
                     if (snap == null) {
@@ -405,7 +394,7 @@ class FamilySyncCenter @Inject constructor(
                     }
                     lastMembersSnapshot = snap
 
-                    Log.d(TAG, "membersListener: totalDocs=${snap.documents.size} changes=${snap.documentChanges.size}")
+                    KBLog.sync.debug("membersListener: totalDocs=${snap.documents.size} changes=${snap.documentChanges.size}", TAG)
                     scope.launch {
                         if (accessLostEmitted) return@launch
                         val now = System.currentTimeMillis()
@@ -414,10 +403,7 @@ class FamilySyncCenter @Inject constructor(
                         // Solo se non ci sono né documenti né changelog: altrimenti con totalDocs=0 e
                         // documentChanges>0 (es. REMOVED per altri membri) dobbiamo applicare le modifiche.
                         if (snap.documents.isEmpty() && snap.documentChanges.isEmpty() && creatorBypass) {
-                            Log.w(
-                                TAG,
-                                "Snapshot vuoto senza cambiamenti (creator) — niente da applicare.",
-                            )
+                            KBLog.sync.warning("Snapshot vuoto senza cambiamenti (creator) — niente da applicare.", TAG)
                             membersFirstDone = true
                             checkAllFirstDone()
                             return@launch
@@ -425,19 +411,13 @@ class FamilySyncCenter @Inject constructor(
 
                         for (change in snap.documentChanges) {
                             val doc = change.document
-                            Log.d(
-                                TAG,
-                                "membersListener change: type=${change.type} id=${doc.id} isMe=${doc.id == myUid}",
-                            )
+                            KBLog.sync.debug("membersListener change: type=${change.type} id=${doc.id} isMe=${doc.id == myUid}", TAG)
                             if (myUid.isEmpty() || doc.id != myUid) continue
                             // Stesso scenario del PERMISSION_DENIED: rimuovendo un altro membro, Firestore può
                             // emettere REMOVED anche per il doc del creatore con totalDocs=0 (transitorio).
                             // iOS valuta sulla riga locale; qui non espelliamo il creator da eventi sul proprio uid.
                             if (creatorBypass) {
-                                Log.w(
-                                    TAG,
-                                    "membersListener: ignoro revoca sul proprio doc (creator locale, prob. snapshot transitorio)",
-                                )
+                                KBLog.sync.warning("membersListener: ignoro revoca sul proprio doc (creator locale, prob. snapshot transitorio)", TAG)
                                 continue
                             }
                             when (change.type) {
@@ -471,10 +451,7 @@ class FamilySyncCenter @Inject constructor(
                             if (change.type != DocumentChange.Type.REMOVED) continue
                             val doc = change.document
                             if (creatorBypass && doc.id == myUid) {
-                                Log.w(
-                                    TAG,
-                                    "membersListener: skip delete local row per proprio uid (creator, REMOVED spurio)",
-                                )
+                                KBLog.sync.warning("membersListener: skip delete local row per proprio uid (creator, REMOVED spurio)", TAG)
                                 continue
                             }
                             familyMemberDao.deleteById(doc.id)
@@ -483,10 +460,7 @@ class FamilySyncCenter @Inject constructor(
                         // Merge completo: su alcuni device/cache, documentChanges è vuoto mentre
                         // documents contiene tutti i membri → prima perdevamo l'upsert degli altri utenti.
                         if (snap.documentChanges.isEmpty() && snap.documents.isNotEmpty()) {
-                            Log.w(
-                                TAG,
-                                "membersListener: documentChanges vuoto, merge da snap.documents count=${snap.documents.size}",
-                            )
+                            KBLog.sync.warning("membersListener: documentChanges vuoto, merge da snap.documents count=${snap.documents.size}", TAG)
                         }
 
                         for (doc in snap.documents) {
@@ -494,10 +468,7 @@ class FamilySyncCenter @Inject constructor(
 
                             if (d["isDeleted"] as? Boolean == true) {
                                 if (creatorBypass && doc.id == myUid) {
-                                    Log.w(
-                                        TAG,
-                                        "membersListener: skip delete local row per proprio uid (creator, isDeleted spurio)",
-                                    )
+                                    KBLog.sync.warning("membersListener: skip delete local row per proprio uid (creator, isDeleted spurio)", TAG)
                                     continue
                                 }
                                 familyMemberDao.deleteById(doc.id)
@@ -517,7 +488,7 @@ class FamilySyncCenter @Inject constructor(
                                     || remoteUpdatedAt >= localUpdatedAt
 
                             if (!shouldUpdate) {
-                                Log.d(TAG, "member skipped (local più recente): id=${doc.id}")
+                                KBLog.sync.debug("member skipped (local più recente): id=${doc.id}", TAG)
                                 continue
                             }
 
@@ -561,9 +532,9 @@ class FamilySyncCenter @Inject constructor(
                                         isDeleted = false,
                                     )
                                 )
-                                Log.d(TAG, "member upserted id=${doc.id} name=$displayName")
+                                KBLog.sync.debug("member upserted id=${doc.id} name=$displayName", TAG)
                             } catch (e: Exception) {
-                                Log.e(TAG, "member upsert FAILED id=${doc.id}: ${e.message}")
+                                KBLog.sync.error("member upsert FAILED id=${doc.id}: ${e.message}", TAG)
                             }
                         }
                         membersFirstDone = true
@@ -584,18 +555,12 @@ class FamilySyncCenter @Inject constructor(
                                 val permDenied = (err as? FirebaseFirestoreException)?.code ==
                                     FirebaseFirestoreException.Code.PERMISSION_DENIED
                                 if (permDenied) {
-                                    Log.w(
-                                        TAG,
-                                        "Permessi in aggiornamento, riprovo tra 8s (children listener, creator)",
-                                    )
+                                    KBLog.sync.warning("Permessi in aggiornamento, riprovo tra 8s (children listener, creator)", TAG)
                                     restartSyncAfterDelay(familyId, 8000L)
                                     _initialSyncDone.value = true
                                     isJoining = false
                                 } else {
-                                    Log.w(
-                                        TAG,
-                                        "childrenListener error — Room figli invariato (creator), gate sync: ${err.message}",
-                                    )
+                                    KBLog.sync.warning("childrenListener error — Room figli invariato (creator), gate sync: ${err.message}", TAG)
                                 }
                                 childrenFirstDone = true
                                 checkAllFirstDone()
@@ -603,9 +568,9 @@ class FamilySyncCenter @Inject constructor(
                             }
                             val code = (err as? FirebaseFirestoreException)?.code
                             if (code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
-                                Log.e(TAG, "childrenListener PERMISSION_DENIED: ${err.message}")
+                                KBLog.sync.error("childrenListener PERMISSION_DENIED: ${err.message}", TAG)
                             } else {
-                                Log.e(TAG, "childrenListener error: ${err.message}")
+                                KBLog.sync.error("childrenListener error: ${err.message}", TAG)
                             }
                             childrenFirstDone = true
                             checkAllFirstDone()
@@ -616,28 +581,22 @@ class FamilySyncCenter @Inject constructor(
                         val uidNull = auth.currentUser?.uid.orEmpty()
                         scope.launch {
                             if (uidNull.isNotEmpty() && isLocalFamilyCreator(familyId, uidNull)) {
-                                Log.w(
-                                    TAG,
-                                    "childrenListener snap null — Room figli invariato (creator), gate sync",
-                                )
+                                KBLog.sync.warning("childrenListener snap null — Room figli invariato (creator), gate sync", TAG)
                             } else {
-                                Log.e(TAG, "childrenListener snap null")
+                                KBLog.sync.error("childrenListener snap null", TAG)
                             }
                             childrenFirstDone = true
                             checkAllFirstDone()
                         }
                         return@addSnapshotListener
                     }
-                    Log.d(TAG, "childrenListener: totalDocs=${snap.documents.size} changes=${snap.documentChanges.size}")
+                    KBLog.sync.debug("childrenListener: totalDocs=${snap.documents.size} changes=${snap.documentChanges.size}", TAG)
                     scope.launch {
                         val now = System.currentTimeMillis()
                         val myUid = auth.currentUser?.uid.orEmpty()
                         val creatorBypass = isLocalFamilyCreator(familyId, myUid)
                         if (snap.documents.isEmpty() && snap.documentChanges.isEmpty() && creatorBypass) {
-                            Log.w(
-                                TAG,
-                                "Snapshot vuoto senza cambiamenti (creator) — niente da applicare.",
-                            )
+                            KBLog.sync.warning("Snapshot vuoto senza cambiamenti (creator) — niente da applicare.", TAG)
                             childrenFirstDone = true
                             checkAllFirstDone()
                             return@launch
@@ -651,14 +610,11 @@ class FamilySyncCenter @Inject constructor(
                         for (change in snap.documentChanges) {
                             val doc = change.document
                             val d = doc.data.orEmpty()
-                            Log.d(TAG, "child change=${change.type} id=${doc.id} name=${d["name"]}")
+                            KBLog.sync.debug("child change=${change.type} id=${doc.id} name=${d["name"]}", TAG)
 
                             if (change.type == DocumentChange.Type.REMOVED) {
                                 if (skipChildDeletesOnEmptySnapshotGlitch) {
-                                    Log.w(
-                                        TAG,
-                                        "skip child REMOVED (vuoto+changelog, prob. glitch permessi) id=${doc.id}",
-                                    )
+                                    KBLog.sync.warning("skip child REMOVED (vuoto+changelog, prob. glitch permessi) id=${doc.id}", TAG)
                                     continue
                                 }
                                 childDao.deleteById(doc.id)
@@ -668,14 +624,11 @@ class FamilySyncCenter @Inject constructor(
                             // FIX #3: gestione isDeleted anche nei children
                             if (d["isDeleted"] as? Boolean == true) {
                                 if (skipChildDeletesOnEmptySnapshotGlitch) {
-                                    Log.w(
-                                        TAG,
-                                        "skip child isDeleted (vuoto+changelog, prob. glitch permessi) id=${doc.id}",
-                                    )
+                                    KBLog.sync.warning("skip child isDeleted (vuoto+changelog, prob. glitch permessi) id=${doc.id}", TAG)
                                     continue
                                 }
                                 childDao.deleteById(doc.id)
-                                Log.d(TAG, "child deleted (isDeleted=true) id=${doc.id}")
+                                KBLog.sync.debug("child deleted (isDeleted=true) id=${doc.id}", TAG)
                                 continue
                             }
 
@@ -709,7 +662,7 @@ class FamilySyncCenter @Inject constructor(
                                     || remoteUpdatedAt >= localUpdatedAt
 
                             if (!shouldUpdate) {
-                                Log.d(TAG, "child skipped (local più recente): id=${doc.id} remoteTs=$remoteUpdatedAt localTs=$localUpdatedAt")
+                                KBLog.sync.debug("child skipped (local più recente): id=${doc.id} remoteTs=$remoteUpdatedAt localTs=$localUpdatedAt", TAG)
                                 continue
                             }
 
@@ -728,16 +681,16 @@ class FamilySyncCenter @Inject constructor(
                             )
                             try {
                                 childDao.upsert(entity)
-                                Log.d(TAG, "child upserted id=${doc.id} name=$remoteName familyId=$familyId")
+                                KBLog.sync.debug("child upserted id=${doc.id} name=$remoteName familyId=$familyId", TAG)
                             } catch (e: Exception) {
-                                Log.e(TAG, "child upsert FAILED id=${doc.id}: ${e.message}")
+                                KBLog.sync.error("child upsert FAILED id=${doc.id}: ${e.message}", TAG)
                             }
                         }
                         childrenFirstDone = true
                         checkAllFirstDone()
 
                         val roomChildren = childDao.observeByFamilyId(familyId).first()
-                        Log.d(TAG, "After sync: Room has ${roomChildren.size} children")
+                        KBLog.sync.debug("After sync: Room has ${roomChildren.size} children", TAG)
                     }
                 }
         }
@@ -759,15 +712,15 @@ class FamilySyncCenter @Inject constructor(
             val memberDocs = try {
                 membersRef.get(Source.SERVER).await().documents
             } catch (e: Exception) {
-                Log.w(TAG, "prefetch members SERVER read failed, fallback cache: ${e.message}")
+                KBLog.sync.warning("prefetch members SERVER read failed, fallback cache: ${e.message}", TAG)
                 try {
                     membersRef.get(Source.CACHE).await().documents
                 } catch (cacheErr: Exception) {
-                    Log.w(TAG, "prefetch members CACHE read failed too: ${cacheErr.message}")
+                    KBLog.sync.warning("prefetch members CACHE read failed too: ${cacheErr.message}", TAG)
                     emptyList()
                 }
             }
-            Log.d(TAG, "prefetch members familyId=$familyId count=${memberDocs.size}")
+            KBLog.sync.debug("prefetch members familyId=$familyId count=${memberDocs.size}", TAG)
             for (doc in memberDocs) {
                 val d = doc.data.orEmpty()
                 if (d["isDeleted"] as? Boolean == true) {
@@ -826,18 +779,18 @@ class FamilySyncCenter @Inject constructor(
                             isDeleted = false,
                         ),
                     )
-                    Log.d(TAG, "prefetch member upserted id=${doc.id} name=$displayName")
+                    KBLog.sync.debug("prefetch member upserted id=${doc.id} name=$displayName", TAG)
                 } catch (e: Exception) {
-                    Log.e(TAG, "prefetch member upsert FAILED id=${doc.id}: ${e.message}")
+                    KBLog.sync.error("prefetch member upsert FAILED id=${doc.id}: ${e.message}", TAG)
                 }
             }
         } catch (e: Exception) {
             val code = (e as? FirebaseFirestoreException)?.code
             if (code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
                 // Lasciamo che sia il listener a gestire la revoca/recupero permessi
-                Log.w(TAG, "prefetch members PERMISSION_DENIED familyId=$familyId — delego al listener")
+                KBLog.sync.warning("prefetch members PERMISSION_DENIED familyId=$familyId — delego al listener", TAG)
             } else {
-                Log.w(TAG, "prefetch members failed familyId=$familyId: ${e.message}")
+                KBLog.sync.warning("prefetch members failed familyId=$familyId: ${e.message}", TAG)
             }
         }
 
@@ -848,15 +801,15 @@ class FamilySyncCenter @Inject constructor(
             val childDocs = try {
                 childrenRef.get(Source.SERVER).await().documents
             } catch (e: Exception) {
-                Log.w(TAG, "prefetch children SERVER read failed, fallback cache: ${e.message}")
+                KBLog.sync.warning("prefetch children SERVER read failed, fallback cache: ${e.message}", TAG)
                 try {
                     childrenRef.get(Source.CACHE).await().documents
                 } catch (cacheErr: Exception) {
-                    Log.w(TAG, "prefetch children CACHE read failed too: ${cacheErr.message}")
+                    KBLog.sync.warning("prefetch children CACHE read failed too: ${cacheErr.message}", TAG)
                     emptyList()
                 }
             }
-            Log.d(TAG, "prefetch children familyId=$familyId count=${childDocs.size}")
+            KBLog.sync.debug("prefetch children familyId=$familyId count=${childDocs.size}", TAG)
             for (doc in childDocs) {
                 val d = doc.data.orEmpty()
                 if (d["isDeleted"] as? Boolean == true) {
@@ -896,17 +849,17 @@ class FamilySyncCenter @Inject constructor(
                                 ?: local?.updatedAtEpochMillis ?: now,
                         ),
                     )
-                    Log.d(TAG, "prefetch child upserted id=${doc.id} name=$remoteName")
+                    KBLog.sync.debug("prefetch child upserted id=${doc.id} name=$remoteName", TAG)
                 } catch (e: Exception) {
-                    Log.e(TAG, "prefetch child upsert FAILED id=${doc.id}: ${e.message}")
+                    KBLog.sync.error("prefetch child upsert FAILED id=${doc.id}: ${e.message}", TAG)
                 }
             }
         } catch (e: Exception) {
             val code = (e as? FirebaseFirestoreException)?.code
             if (code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
-                Log.w(TAG, "prefetch children PERMISSION_DENIED familyId=$familyId — delego al listener")
+                KBLog.sync.warning("prefetch children PERMISSION_DENIED familyId=$familyId — delego al listener", TAG)
             } else {
-                Log.w(TAG, "prefetch children failed familyId=$familyId: ${e.message}")
+                KBLog.sync.warning("prefetch children failed familyId=$familyId: ${e.message}", TAG)
             }
         }
     }

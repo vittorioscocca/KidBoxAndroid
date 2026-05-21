@@ -1,8 +1,9 @@
 package it.vittorioscocca.kidbox.data.remote.auth
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.app.Activity
 import android.content.ActivityNotFoundException
-import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.OAuthProvider
@@ -36,18 +37,18 @@ class FirebaseAppleAuthService @Inject constructor(
             addCustomParameter("nonce", nonceHash)
         }.build()
 
-        Log.d(TAG, "Apple sign-in started")
+        KBLog.auth.debug("Apple sign-in started", TAG)
         return try {
             val result = providerStartSignIn(activity, oauthProvider)
             val credential = result.credential ?: throw AuthError.MissingToken
             val user = firebaseAuth.signInWithCredential(credential).await().user
                 ?: throw AuthError.Unknown
-            Log.i(TAG, "Apple sign-in completed uid=${user.uid}")
+            KBLog.auth.info("Apple sign-in completed uid=${user.uid}", TAG)
             user
         } catch (e: CancellationException) {
             throw e
         } catch (e: ActivityNotFoundException) {
-            Log.w(TAG, "Apple sign-in activity unavailable: ${e.message}")
+            KBLog.auth.warning("Apple sign-in activity unavailable: ${e.message}", TAG)
             throw e
         } catch (e: Exception) {
             val msg = e.message.orEmpty()
@@ -56,10 +57,10 @@ class FirebaseAppleAuthService @Inject constructor(
                 msg.contains("dismiss", ignoreCase = true) ||
                 msg.contains("closed", ignoreCase = true)
             ) {
-                Log.d(TAG, "Apple sign-in cancelled by user")
+                KBLog.auth.debug("Apple sign-in cancelled by user", TAG)
                 throw AuthError.Cancelled
             }
-            Log.e(TAG, "Apple sign-in failed: ${e.message}", e)
+            KBLog.auth.error("Apple sign-in failed: ${e.message}", TAG, e)
             throw e
         }
     }

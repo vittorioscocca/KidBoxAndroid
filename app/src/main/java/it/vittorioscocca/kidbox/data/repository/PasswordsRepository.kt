@@ -1,8 +1,9 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.Context
 import android.util.Base64
-import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
@@ -58,7 +59,7 @@ class PasswordsRepository @Inject constructor(
         if (familyId.isBlank() || uid.isEmpty()) return
         val ok = FamilyKeyEscrow.ensureFamilyKeyAvailable(appContext, familyId, uid)
         if (!ok) {
-            Log.w(TAG, "family key still missing after escrow familyId=$familyId")
+            KBLog.data.warning("family key still missing after escrow familyId=$familyId", TAG)
         }
     }
 
@@ -67,7 +68,7 @@ class PasswordsRepository @Inject constructor(
             if (err is FirebaseFirestoreException && err.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
                 onPermissionDenied?.invoke()
             } else {
-                Log.w(TAG, "passwords listen: ${err.message}")
+                KBLog.data.warning("passwords listen: ${err.message}", TAG)
             }
         }
         entryListener = remoteStore.listenPasswordEntries(
@@ -129,7 +130,7 @@ class PasswordsRepository @Inject constructor(
             try {
                 awaitForceRestartRealtime(familyId, onPermissionDenied)
             } catch (e: Exception) {
-                Log.e(TAG, "forceRestartRealtime: ${e.message}", e)
+                KBLog.data.error("forceRestartRealtime: ${e.message}", TAG, e)
             }
         }
     }

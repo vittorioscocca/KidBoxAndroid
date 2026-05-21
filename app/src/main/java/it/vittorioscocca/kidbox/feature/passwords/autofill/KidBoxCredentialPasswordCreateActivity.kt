@@ -1,8 +1,9 @@
 package it.vittorioscocca.kidbox.feature.passwords.autofill
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.credentials.CreatePasswordRequest
 import androidx.credentials.CreatePasswordResponse
@@ -88,7 +89,7 @@ class KidBoxCredentialPasswordCreateActivity : FragmentActivity() {
                     setResult(RESULT_OK, out)
                     finish()
                 }.onFailure { e ->
-                    Log.e(TAG, "save failed", e)
+                    KBLog.security.error("save failed", TAG, e)
                     cancelSave()
                 }
             }

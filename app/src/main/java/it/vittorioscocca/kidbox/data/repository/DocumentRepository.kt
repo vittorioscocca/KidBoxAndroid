@@ -1,7 +1,8 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.content.Context
-import android.util.Log
 import androidx.room.withTransaction
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
@@ -152,7 +153,7 @@ class DocumentRepository @Inject constructor(
                 if (hiddenSystemSignature != previousSystem) {
                     lastRootSystemHiddenSignatureByFamily[familyId] = hiddenSystemSignature
                     hiddenSystemNames.forEach { fileName ->
-                        Log.d(TAG_DOC_SYNC, "Hiding system-encoded file from Root: $fileName")
+                        KBLog.data.debug("Hiding system-encoded file from Root: $fileName", TAG_DOC_SYNC)
                     }
                 }
                 val rootFolders = categories
@@ -224,7 +225,7 @@ class DocumentRepository @Inject constructor(
         force: Boolean = false,
     ): Int {
         if (!force && healedFamiliesInSession.contains(familyId)) {
-            Log.d(TAG_DOC_SYNC, "healHierarchy skipped for familyId=$familyId (already healed this session)")
+            KBLog.data.debug("healHierarchy skipped for familyId=$familyId (already healed this session)", TAG_DOC_SYNC)
             return 0
         }
         val now = System.currentTimeMillis()
@@ -396,10 +397,7 @@ class DocumentRepository @Inject constructor(
                 val expense = expenseDao.getById(expenseId)
                 val targetCategoryId = expenseCategoryFolderId(expenseId)
                 if (expense == null) {
-                    Log.d(
-                        TAG_DOC_SYNC,
-                        "healHierarchy expense not local yet for doc=${doc.id} expenseId=$expenseId; reattaching to deterministic folder",
-                    )
+                    KBLog.data.debug("healHierarchy expense not local yet for doc=${doc.id} expenseId=$expenseId; reattaching to deterministic folder", TAG_DOC_SYNC)
                     val existingTargetCategory = categoryDao.getById(targetCategoryId)
                     if (existingTargetCategory == null) {
                         categoryDao.upsert(
@@ -519,9 +517,7 @@ class DocumentRepository @Inject constructor(
                 )
             }
 
-            Log.d(
-                TAG_DOC_SYNC,
-                """
+            KBLog.data.debug("""
                 --- 🛡️ Hierarchy Healing Report ---
                 FamilyId: $familyId
                 Root Node Status: ${if (rootExists) "VALID" else "REPAIRED/CREATED"}
@@ -529,9 +525,8 @@ class DocumentRepository @Inject constructor(
                 Orphaned Categories Fixed: $restoredCats
                 Result: Hierarchy integrity secured for Expense module.
                 ----------------------------------
-                """.trimIndent(),
-            )
-            Log.d(TAG_DOC_SYNC, "Hierarchy Healing executed. Restored $restoredCount orphaned expense items.")
+                """.trimIndent(), TAG_DOC_SYNC)
+            KBLog.data.debug("Hierarchy Healing executed. Restored $restoredCount orphaned expense items.", TAG_DOC_SYNC)
             restoredCount
         }
         healedFamiliesInSession += familyId
@@ -573,10 +568,7 @@ class DocumentRepository @Inject constructor(
                 //    agganciati al root per pochi ms (esperienza utente "file esplosi").
                 runCatching {
                     val categories = remoteStore.fetchCategoriesOnce(familyId)
-                    Log.d(
-                        TAG_DOC_SYNC,
-                        "prefetch categories familyId=$familyId count=${categories.size}",
-                    )
+                    KBLog.data.debug("prefetch categories familyId=$familyId count=${categories.size}", TAG_DOC_SYNC)
                     categories.forEach { dto ->
                         applyInboundChange(
                             familyId,
@@ -584,7 +576,7 @@ class DocumentRepository @Inject constructor(
                         )
                     }
                 }.onFailure { err ->
-                    Log.w(TAG_DOC_SYNC, "prefetch categories failed familyId=$familyId: ${err.message}")
+                    KBLog.data.warning("prefetch categories failed familyId=$familyId: ${err.message}", TAG_DOC_SYNC)
                     if (err is FirebaseFirestoreException && err.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
                         onPermissionDenied?.invoke()
                         return@withLock
@@ -690,10 +682,7 @@ class DocumentRepository @Inject constructor(
             forcedId = expenseCategoryFolderId(expenseId),
             sortOrder = 0,
         )
-        Log.d(
-            TAG_DOC_REPO,
-            "ensureExpenseFolders familyId=$familyId rootId=${root.id} expenseId=$expenseId expenseFolderId=${expenseFolder.id} parentId=${expenseFolder.parentId}",
-        )
+        KBLog.data.debug("ensureExpenseFolders familyId=$familyId rootId=${root.id} expenseId=$expenseId expenseFolderId=${expenseFolder.id} parentId=${expenseFolder.parentId}", TAG_DOC_REPO)
         return expenseFolder
     }
 
@@ -872,10 +861,7 @@ class DocumentRepository @Inject constructor(
                 lastSyncError = null,
             )
             documentDao.upsert(entity)
-            Log.d(
-                TAG_DOC_SYNC,
-                "Local hierarchy consolidated for expense folder $expenseFolderId",
-            )
+            KBLog.data.debug("Local hierarchy consolidated for expense folder $expenseFolderId", TAG_DOC_SYNC)
             entity
         }
     }
@@ -894,7 +880,7 @@ class DocumentRepository @Inject constructor(
 
     suspend fun deleteFolderLocal(folder: KBDocumentCategoryEntity) {
         if (folder.id.startsWith("exp-root-")) {
-            Log.d(TAG_DOC_SYNC, "Blocked delete on expense root folder id=${folder.id}")
+            KBLog.data.debug("Blocked delete on expense root folder id=${folder.id}", TAG_DOC_SYNC)
             return
         }
         val now = System.currentTimeMillis()
@@ -1174,15 +1160,12 @@ class DocumentRepository @Inject constructor(
     }
 
     suspend fun preparePreviewFile(document: KBDocumentEntity): File {
-        Log.d(
-            TAG_DOC_REPO,
-            "preparePreviewFile docId=${document.id} hasLocal=${!document.localPath.isNullOrBlank()} storagePath=${document.storagePath}",
-        )
+        KBLog.data.debug("preparePreviewFile docId=${document.id} hasLocal=${!document.localPath.isNullOrBlank()} storagePath=${document.storagePath}", TAG_DOC_REPO)
         val previewDir = File(context.cacheDir, "kb_documents_preview").apply { mkdirs() }
         val output = File(previewDir, "${document.id}_${safeFileName(document.fileName)}")
         val local = document.localPath?.let { File(it) }
         if (local != null && local.exists()) {
-            Log.d(TAG_DOC_REPO, "preparePreviewFile using local file docId=${document.id} localPath=${local.absolutePath}")
+            KBLog.data.debug("preparePreviewFile using local file docId=${document.id} localPath=${local.absolutePath}", TAG_DOC_REPO)
             val raw = local.readBytes()
             val plain = when {
                 isPlainChatDocument(document, local.absolutePath) -> raw
@@ -1190,10 +1173,10 @@ class DocumentRepository @Inject constructor(
                 else -> storageManager.decryptCachedDocumentBytes(raw, document.familyId)
             }
             output.writeBytes(plain)
-            Log.d(TAG_DOC_REPO, "preparePreviewFile local decrypt done docId=${document.id} out=${output.absolutePath} plainBytes=${plain.size}")
+            KBLog.data.debug("preparePreviewFile local decrypt done docId=${document.id} out=${output.absolutePath} plainBytes=${plain.size}", TAG_DOC_REPO)
             return output
         }
-        Log.d(TAG_DOC_REPO, "preparePreviewFile downloading docId=${document.id} chatPath=${isChatStoragePath(document.storagePath)}")
+        KBLog.data.debug("preparePreviewFile downloading docId=${document.id} chatPath=${isChatStoragePath(document.storagePath)}", TAG_DOC_REPO)
         val decrypted = if (isChatStoragePath(document.storagePath)) {
             chatStorageService.downloadDecrypted(
                 storagePath = document.storagePath,
@@ -1206,7 +1189,7 @@ class DocumentRepository @Inject constructor(
             )
         }
         output.writeBytes(decrypted)
-        Log.d(TAG_DOC_REPO, "preparePreviewFile download done docId=${document.id} outSize=${output.length()}")
+        KBLog.data.debug("preparePreviewFile download done docId=${document.id} outSize=${output.length()}", TAG_DOC_REPO)
         return output
     }
 
@@ -1303,13 +1286,10 @@ class DocumentRepository @Inject constructor(
         val local = categoryDao.getById(dto.id)
         val localSync = local?.let { KBSyncState.fromRaw(it.syncStateRaw) }
         val remoteUpdatedAt = dto.updatedAtEpochMillis ?: 0L
-        Log.d(
-            TAG_DOC_SYNC,
-            "inbound category id=${dto.id} parent=${dto.parentId} remoteUpdatedAt=$remoteUpdatedAt localUpdatedAt=${local?.updatedAtEpochMillis} isFromCache=$isFromCache",
-        )
+        KBLog.data.debug("inbound category id=${dto.id} parent=${dto.parentId} remoteUpdatedAt=$remoteUpdatedAt localUpdatedAt=${local?.updatedAtEpochMillis} isFromCache=$isFromCache", TAG_DOC_SYNC)
 
         if (localSync == KBSyncState.PENDING_UPSERT || localSync == KBSyncState.PENDING_DELETE) {
-            Log.d(TAG_DOC_SYNC, "Dropped: Local is Pending category id=${dto.id} state=$localSync")
+            KBLog.data.debug("Dropped: Local is Pending category id=${dto.id} state=$localSync", TAG_DOC_SYNC)
             return
         }
 
@@ -1318,16 +1298,13 @@ class DocumentRepository @Inject constructor(
             if (!linkedExpenseId.isNullOrBlank()) {
                 val linkedExpense = expenseDao.getById(linkedExpenseId)
                 if (linkedExpense != null && !linkedExpense.isDeleted && linkedExpense.familyId == familyId) {
-                    Log.d(
-                        TAG_DOC_SYNC,
-                        "Dropped category delete id=${dto.id} reason=linked_expense_still_active expenseId=$linkedExpenseId",
-                    )
+                    KBLog.data.debug("Dropped category delete id=${dto.id} reason=linked_expense_still_active expenseId=$linkedExpenseId", TAG_DOC_SYNC)
                     return
                 }
             }
             if (local == null) return
             if (remoteUpdatedAt <= local.updatedAtEpochMillis) {
-                Log.d(TAG_DOC_SYNC, "Dropped category delete id=${dto.id} reason=remote_not_newer")
+                KBLog.data.debug("Dropped category delete id=${dto.id} reason=remote_not_newer", TAG_DOC_SYNC)
                 return
             }
             categoryDao.upsert(
@@ -1339,7 +1316,7 @@ class DocumentRepository @Inject constructor(
                     lastSyncError = null,
                 ),
             )
-            Log.d(TAG_DOC_SYNC, "Applied category soft-delete id=${dto.id}")
+            KBLog.data.debug("Applied category soft-delete id=${dto.id}", TAG_DOC_SYNC)
             return
         }
 
@@ -1355,10 +1332,7 @@ class DocumentRepository @Inject constructor(
             categoryId = dto.id,
         )
         if (resolvedParentId.isNullOrBlank() && !expectedParentId.isNullOrBlank()) {
-            Log.d(
-                TAG_DOC_SYNC,
-                "guard category id=${dto.id} reason=missing_parent_for_deterministic_id forcingParent=$expectedParentId",
-            )
+            KBLog.data.debug("guard category id=${dto.id} reason=missing_parent_for_deterministic_id forcingParent=$expectedParentId", TAG_DOC_SYNC)
             resolvedParentId = expectedParentId
         }
         // Se il record locale è un placeholder appena creato (titolo generico),
@@ -1380,7 +1354,7 @@ class DocumentRepository @Inject constructor(
             (remoteUpdatedAt - local.updatedAtEpochMillis) < 5_000L
         if (preserveLocalHierarchy) {
             resolvedParentId = local.parentId
-            Log.d(TAG_DOC_SYNC, "Overriding LWW to preserve hierarchy for ID: ${dto.id}")
+            KBLog.data.debug("Overriding LWW to preserve hierarchy for ID: ${dto.id}", TAG_DOC_SYNC)
         }
         if (
             isFromCache &&
@@ -1390,18 +1364,18 @@ class DocumentRepository @Inject constructor(
             !dto.id.startsWith("exp-root-")
         ) {
             resolvedParentId = local.parentId
-            Log.d(TAG_DOC_SYNC, "Overriding LWW to preserve hierarchy for ID: ${dto.id}")
+            KBLog.data.debug("Overriding LWW to preserve hierarchy for ID: ${dto.id}", TAG_DOC_SYNC)
         }
         if (local != null && remoteUpdatedAt <= local.updatedAtEpochMillis && !shouldOverrideLwwForHierarchy) {
-            Log.d(TAG_DOC_SYNC, "Dropped category id=${dto.id} reason=remote_not_newer")
+            KBLog.data.debug("Dropped category id=${dto.id} reason=remote_not_newer", TAG_DOC_SYNC)
             return
         }
         if (shouldOverrideLwwForHierarchy) {
-            Log.d(TAG_DOC_SYNC, "Overriding LWW to preserve hierarchy for ID: ${dto.id}")
+            KBLog.data.debug("Overriding LWW to preserve hierarchy for ID: ${dto.id}", TAG_DOC_SYNC)
         }
 
         if (!resolvedParentId.isNullOrBlank() && categoryDao.getById(resolvedParentId) == null) {
-            Log.d(TAG_DOC_SYNC, "create placeholder parent category id=$resolvedParentId child=${dto.id}")
+            KBLog.data.debug("create placeholder parent category id=$resolvedParentId child=${dto.id}", TAG_DOC_SYNC)
             categoryDao.upsert(
                 KBDocumentCategoryEntity(
                     id = resolvedParentId,
@@ -1441,11 +1415,11 @@ class DocumentRepository @Inject constructor(
             local.updatedBy == targetCategory.updatedBy &&
             KBSyncState.fromRaw(local.syncStateRaw) == KBSyncState.SYNCED
         if (unchangedCategory) {
-            Log.d(TAG_DOC_SYNC, "Skipped category upsert id=${dto.id} reason=unchanged")
+            KBLog.data.debug("Skipped category upsert id=${dto.id} reason=unchanged", TAG_DOC_SYNC)
             return
         }
         categoryDao.upsert(targetCategory)
-        Log.d(TAG_DOC_SYNC, "Applied category id=${dto.id} parentResolved=$resolvedParentId")
+        KBLog.data.debug("Applied category id=${dto.id} parentResolved=$resolvedParentId", TAG_DOC_SYNC)
     }
 
     private suspend fun applyInboundDocument(
@@ -1457,20 +1431,17 @@ class DocumentRepository @Inject constructor(
         val local = documentDao.getById(dto.id)
         val localSync = local?.let { KBSyncState.fromRaw(it.syncStateRaw) }
         val remoteUpdatedAt = dto.updatedAtEpochMillis ?: 0L
-        Log.d(
-            TAG_DOC_SYNC,
-            "inbound document id=${dto.id} category=${dto.categoryId} remoteUpdatedAt=$remoteUpdatedAt localUpdatedAt=${local?.updatedAtEpochMillis} isFromCache=$isFromCache",
-        )
+        KBLog.data.debug("inbound document id=${dto.id} category=${dto.categoryId} remoteUpdatedAt=$remoteUpdatedAt localUpdatedAt=${local?.updatedAtEpochMillis} isFromCache=$isFromCache", TAG_DOC_SYNC)
 
         if (localSync == KBSyncState.PENDING_UPSERT || localSync == KBSyncState.PENDING_DELETE) {
-            Log.d(TAG_DOC_SYNC, "Dropped: Local is Pending document id=${dto.id} state=$localSync")
+            KBLog.data.debug("Dropped: Local is Pending document id=${dto.id} state=$localSync", TAG_DOC_SYNC)
             return
         }
 
         if (dto.isDeleted) {
             if (local == null) return
             if (remoteUpdatedAt <= local.updatedAtEpochMillis) {
-                Log.d(TAG_DOC_SYNC, "Dropped document delete id=${dto.id} reason=remote_not_newer")
+                KBLog.data.debug("Dropped document delete id=${dto.id} reason=remote_not_newer", TAG_DOC_SYNC)
                 return
             }
             documentDao.upsert(
@@ -1482,7 +1453,7 @@ class DocumentRepository @Inject constructor(
                     lastSyncError = null,
                 ),
             )
-            Log.d(TAG_DOC_SYNC, "Applied document soft-delete id=${dto.id}")
+            KBLog.data.debug("Applied document soft-delete id=${dto.id}", TAG_DOC_SYNC)
             return
         }
 
@@ -1492,18 +1463,12 @@ class DocumentRepository @Inject constructor(
             notes = dto.notes ?: local?.notes,
         )
         if (resolvedCategoryId.isNullOrBlank() && !expectedCategoryId.isNullOrBlank()) {
-            Log.d(
-                TAG_DOC_SYNC,
-                "guard document id=${dto.id} reason=missing_category_for_deterministic_payload forcingCategory=$expectedCategoryId",
-            )
+            KBLog.data.debug("guard document id=${dto.id} reason=missing_category_for_deterministic_payload forcingCategory=$expectedCategoryId", TAG_DOC_SYNC)
             resolvedCategoryId = expectedCategoryId
         }
         if (resolvedCategoryId.isNullOrBlank() && isExpenseLinkedDocument(dto.id, dto.notes ?: local?.notes)) {
             val fallbackRootId = expensesRootFolderId(familyId)
-            Log.d(
-                TAG_DOC_SYNC,
-                "guard document id=${dto.id} reason=expense_linked_null_category forcingRoot=$fallbackRootId",
-            )
+            KBLog.data.debug("guard document id=${dto.id} reason=expense_linked_null_category forcingRoot=$fallbackRootId", TAG_DOC_SYNC)
             resolvedCategoryId = fallbackRootId
         }
         val linkedExpenseId = parseExpenseIdFromNotes(dto.notes ?: local?.notes)
@@ -1526,35 +1491,23 @@ class DocumentRepository @Inject constructor(
             resolvedCategoryId = preferredExpenseCategoryId
             when {
                 expense == null -> {
-                    Log.d(
-                        TAG_DOC_SYNC,
-                        "expense not local yet for document id=${dto.id} expenseId=$linkedExpenseId; keeping deterministic folder=$preferredExpenseCategoryId",
-                    )
+                    KBLog.data.debug("expense not local yet for document id=${dto.id} expenseId=$linkedExpenseId; keeping deterministic folder=$preferredExpenseCategoryId", TAG_DOC_SYNC)
                 }
                 expense.isDeleted || expense.familyId != familyId -> {
                     val fallbackRootId = expensesRootFolderId(familyId)
-                    Log.d(
-                        TAG_DOC_SYNC,
-                        "guard document id=${dto.id} reason=linked_expense_missing_or_deleted expenseId=$linkedExpenseId forcingRoot=$fallbackRootId",
-                    )
+                    KBLog.data.debug("guard document id=${dto.id} reason=linked_expense_missing_or_deleted expenseId=$linkedExpenseId forcingRoot=$fallbackRootId", TAG_DOC_SYNC)
                     resolvedCategoryId = fallbackRootId
                 }
                 categoryDao.getById(deterministicExpenseFolderId)?.isDeleted == true -> {
                     // La sottocartella era stata soft-deleted: la riviviamo nel blocco
                     // "create/restore placeholder" più sotto, così non perdiamo gerarchia.
-                    Log.d(
-                        TAG_DOC_SYNC,
-                        "expense subfolder soft-deleted for document id=${dto.id} expenseId=$linkedExpenseId; will revive placeholder=$preferredExpenseCategoryId",
-                    )
+                    KBLog.data.debug("expense subfolder soft-deleted for document id=${dto.id} expenseId=$linkedExpenseId; will revive placeholder=$preferredExpenseCategoryId", TAG_DOC_SYNC)
                 }
             }
         }
         if (isFromCache && local != null && dto.categoryId == null && !local.categoryId.isNullOrBlank()) {
             resolvedCategoryId = local.categoryId
-            Log.d(
-                TAG_DOC_SYNC,
-                "Overriding LWW to preserve hierarchy for ID: ${dto.id} reason=cache_null_category_keep_local",
-            )
+            KBLog.data.debug("Overriding LWW to preserve hierarchy for ID: ${dto.id} reason=cache_null_category_keep_local", TAG_DOC_SYNC)
         }
         val preserveLocalHierarchy = local != null &&
             local.categoryId != null &&
@@ -1562,18 +1515,18 @@ class DocumentRepository @Inject constructor(
             (remoteUpdatedAt - local.updatedAtEpochMillis) < 5_000L
         if (preserveLocalHierarchy) {
             resolvedCategoryId = local.categoryId
-            Log.d(TAG_DOC_SYNC, "Overriding LWW to preserve hierarchy for ID: ${dto.id}")
+            KBLog.data.debug("Overriding LWW to preserve hierarchy for ID: ${dto.id}", TAG_DOC_SYNC)
         }
         val shouldOverrideLwwForHierarchy = local != null &&
             remoteUpdatedAt <= local.updatedAtEpochMillis &&
             local.categoryId.isNullOrBlank() &&
             !resolvedCategoryId.isNullOrBlank()
         if (local != null && remoteUpdatedAt <= local.updatedAtEpochMillis && !shouldOverrideLwwForHierarchy) {
-            Log.d(TAG_DOC_SYNC, "Dropped document id=${dto.id} reason=remote_not_newer")
+            KBLog.data.debug("Dropped document id=${dto.id} reason=remote_not_newer", TAG_DOC_SYNC)
             return
         }
         if (shouldOverrideLwwForHierarchy) {
-            Log.d(TAG_DOC_SYNC, "Overriding LWW to preserve hierarchy for ID: ${dto.id}")
+            KBLog.data.debug("Overriding LWW to preserve hierarchy for ID: ${dto.id}", TAG_DOC_SYNC)
         }
         if (!resolvedCategoryId.isNullOrBlank()) {
             val isExpenseDocument = isExpenseLinkedDocument(dto.id, dto.notes ?: local?.notes)
@@ -1583,7 +1536,7 @@ class DocumentRepository @Inject constructor(
                 // resolvedCategoryId puntare alla cartella deterministica (es.
                 // exp-cat-<expenseId>) e creiamo/ripristiniamo qui sotto il
                 // placeholder, così la gerarchia non viene "schiacciata" sulla root.
-                Log.d(TAG_DOC_SYNC, "create/restore placeholder category id=$resolvedCategoryId for document=${dto.id} isExpense=$isExpenseDocument")
+                KBLog.data.debug("create/restore placeholder category id=$resolvedCategoryId for document=${dto.id} isExpense=$isExpenseDocument", TAG_DOC_SYNC)
                 val expenseIdFromCategory = parseExpenseIdFromCategoryId(resolvedCategoryId)
                 val linkedExpense = expenseIdFromCategory?.let { expenseDao.getById(it) }
                 val placeholderTitle = when {
@@ -1672,7 +1625,7 @@ class DocumentRepository @Inject constructor(
             !local.isDeleted &&
             KBSyncState.fromRaw(local.syncStateRaw) == KBSyncState.SYNCED
         if (unchangedDocument) {
-            Log.d(TAG_DOC_SYNC, "Skipped document upsert id=${dto.id} reason=unchanged")
+            KBLog.data.debug("Skipped document upsert id=${dto.id} reason=unchanged", TAG_DOC_SYNC)
             return
         }
         val isInsert = local == null
@@ -1684,7 +1637,7 @@ class DocumentRepository @Inject constructor(
                 now = now,
             )
         }
-        Log.d(TAG_DOC_SYNC, "Applied document id=${dto.id} categoryResolved=$resolvedCategoryId")
+        KBLog.data.debug("Applied document id=${dto.id} categoryResolved=$resolvedCategoryId", TAG_DOC_SYNC)
     }
 
     private suspend fun applyInboundDocumentDelete(
@@ -1694,13 +1647,13 @@ class DocumentRepository @Inject constructor(
         isFromCache: Boolean,
     ) {
         if (isFromCache) {
-            Log.d(TAG_DOC_SYNC, "Dropped: cache remove document id=$id")
+            KBLog.data.debug("Dropped: cache remove document id=$id", TAG_DOC_SYNC)
             return
         }
         val local = documentDao.getById(id) ?: return
         val localSync = KBSyncState.fromRaw(local.syncStateRaw)
         if (localSync == KBSyncState.PENDING_UPSERT || localSync == KBSyncState.PENDING_DELETE) {
-            Log.d(TAG_DOC_SYNC, "Dropped: Local is Pending document delete id=$id state=$localSync")
+            KBLog.data.debug("Dropped: Local is Pending document delete id=$id state=$localSync", TAG_DOC_SYNC)
             return
         }
         documentDao.upsert(
@@ -1712,7 +1665,7 @@ class DocumentRepository @Inject constructor(
                 lastSyncError = null,
             ),
         )
-        Log.d(TAG_DOC_SYNC, "Applied document remove event as soft-delete id=$id familyId=$familyId")
+        KBLog.data.debug("Applied document remove event as soft-delete id=$id familyId=$familyId", TAG_DOC_SYNC)
     }
 
     private suspend fun applyInboundCategoryDelete(
@@ -1722,13 +1675,13 @@ class DocumentRepository @Inject constructor(
         isFromCache: Boolean,
     ) {
         if (isFromCache) {
-            Log.d(TAG_DOC_SYNC, "Dropped: cache remove category id=$id")
+            KBLog.data.debug("Dropped: cache remove category id=$id", TAG_DOC_SYNC)
             return
         }
         val local = categoryDao.getById(id) ?: return
         val localSync = KBSyncState.fromRaw(local.syncStateRaw)
         if (localSync == KBSyncState.PENDING_UPSERT || localSync == KBSyncState.PENDING_DELETE) {
-            Log.d(TAG_DOC_SYNC, "Dropped: Local is Pending category delete id=$id state=$localSync")
+            KBLog.data.debug("Dropped: Local is Pending category delete id=$id state=$localSync", TAG_DOC_SYNC)
             return
         }
         categoryDao.upsert(
@@ -1740,7 +1693,7 @@ class DocumentRepository @Inject constructor(
                 lastSyncError = null,
             ),
         )
-        Log.d(TAG_DOC_SYNC, "Applied category remove event as soft-delete id=$id familyId=$familyId")
+        KBLog.data.debug("Applied category remove event as soft-delete id=$id familyId=$familyId", TAG_DOC_SYNC)
     }
 
     private fun expectedParentForCategoryId(
@@ -1807,7 +1760,7 @@ class DocumentRepository @Inject constructor(
         var categoryId = doc.categoryId?.trim()?.takeIf { it.isNotEmpty() }
             ?: expectedCategoryForDocument(documentId = doc.id, notes = doc.notes)
         if (!categoryId.isNullOrBlank() && categoryDao.getById(categoryId) == null) {
-            Log.d(TAG_DOC_SYNC, "refresh insert create placeholder category id=$categoryId document=$documentId")
+            KBLog.data.debug("refresh insert create placeholder category id=$categoryId document=$documentId", TAG_DOC_SYNC)
             val expenseIdFromCategory = parseExpenseIdFromCategoryId(categoryId)
             val linkedExpense = expenseIdFromCategory?.let { expenseDao.getById(it) }
             val placeholderTitle = when {
@@ -1843,7 +1796,7 @@ class DocumentRepository @Inject constructor(
                     lastSyncError = null,
                 ),
             )
-            Log.d(TAG_DOC_SYNC, "refresh insert document=$documentId categoryRepaired=$categoryId")
+            KBLog.data.debug("refresh insert document=$documentId categoryRepaired=$categoryId", TAG_DOC_SYNC)
         }
     }
 

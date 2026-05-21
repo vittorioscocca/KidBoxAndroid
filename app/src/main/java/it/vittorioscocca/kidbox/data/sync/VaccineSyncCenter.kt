@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.sync
 
-import android.util.Log
+import it.vittorioscocca.kidbox.util.KBLog
+
 import com.google.firebase.firestore.ListenerRegistration
 import it.vittorioscocca.kidbox.data.local.dao.KBVaccineDao
 import it.vittorioscocca.kidbox.data.local.entity.KBVaccineEntity
@@ -29,7 +30,7 @@ class VaccineSyncCenter @Inject constructor(
 
     fun start(familyId: String) {
         if (listeners.containsKey(familyId)) return
-        Log.d(TAG, "start listener familyId=$familyId")
+        KBLog.sync.debug("start listener familyId=$familyId", TAG)
         listeners[familyId] = remote.listenAll(familyId) { dtos ->
             scope.launch { applyInbound(familyId, dtos) }
         }
@@ -37,7 +38,7 @@ class VaccineSyncCenter @Inject constructor(
 
     fun stop(familyId: String) {
         listeners.remove(familyId)?.remove()
-        Log.d(TAG, "stopped listener familyId=$familyId")
+        KBLog.sync.debug("stopped listener familyId=$familyId", TAG)
     }
 
     fun stopAll() {
@@ -54,7 +55,7 @@ class VaccineSyncCenter @Inject constructor(
 
             // Anti-resurrect: local pending write newer than remote wins.
             if (local != null && localSync == 1 && localStamp > remoteStamp) {
-                Log.d(TAG, "skip anti-resurrect vaccineId=${dto.id}")
+                KBLog.sync.debug("skip anti-resurrect vaccineId=${dto.id}", TAG)
                 continue
             }
 

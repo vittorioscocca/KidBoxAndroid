@@ -1,9 +1,10 @@
 package it.vittorioscocca.kidbox.ui.screens.chat
 
+import it.vittorioscocca.kidbox.util.KBLog
+
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
-import android.util.Log
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -39,7 +40,7 @@ internal object AudioPcmDecoder {
 
     private fun decode(input: File, output: File, writeWavHeader: Boolean): Boolean {
         if (!input.exists() || input.length() == 0L) {
-            Log.w(TAG, "decoder: skip missing/empty input ${input.absolutePath}")
+            KBLog.ui.warning("decoder: skip missing/empty input ${input.absolutePath}", TAG)
             return false
         }
 
@@ -51,7 +52,7 @@ internal object AudioPcmDecoder {
                 extractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
             }
             if (trackIndex == null) {
-                Log.w(TAG, "decoder: no audio track in ${input.name}")
+                KBLog.ui.warning("decoder: no audio track in ${input.name}", TAG)
                 return false
             }
             extractor.selectTrack(trackIndex)
@@ -64,7 +65,7 @@ internal object AudioPcmDecoder {
                 format.getInteger(MediaFormat.KEY_SAMPLE_RATE) else 44100
             val sourceChannels = if (format.containsKey(MediaFormat.KEY_CHANNEL_COUNT))
                 format.getInteger(MediaFormat.KEY_CHANNEL_COUNT).coerceAtLeast(1) else 1
-            Log.w(TAG, "decoder: input mime=$mime sr=$sourceSampleRate ch=$sourceChannels")
+            KBLog.ui.warning("decoder: input mime=$mime sr=$sourceSampleRate ch=$sourceChannels", TAG)
 
             codec = MediaCodec.createDecoderByType(mime)
             codec.configure(format, null, null, 0)
@@ -112,10 +113,10 @@ internal object AudioPcmDecoder {
 
             val rawPcm = pcm.toByteArray()
             if (rawPcm.isEmpty()) {
-                Log.w(TAG, "decoder: empty PCM after decode")
+                KBLog.ui.warning("decoder: empty PCM after decode", TAG)
                 return false
             }
-            Log.w(TAG, "decoder: raw pcm bytes=${rawPcm.size}")
+            KBLog.ui.warning("decoder: raw pcm bytes=${rawPcm.size}", TAG)
 
             val mono16k = downmixAndResample(rawPcm, sourceSampleRate, sourceChannels, 16_000)
             if (writeWavHeader) {
@@ -126,14 +127,14 @@ internal object AudioPcmDecoder {
                     channels = 1,
                     bitsPerSample = 16,
                 )
-                Log.w(TAG, "decoder: wrote wav=${output.absolutePath} size=${output.length()}")
+                KBLog.ui.warning("decoder: wrote wav=${output.absolutePath} size=${output.length()}", TAG)
             } else {
                 FileOutputStream(output).use { fos -> fos.write(mono16k) }
-                Log.w(TAG, "decoder: wrote pcm=${output.absolutePath} size=${output.length()}")
+                KBLog.ui.warning("decoder: wrote pcm=${output.absolutePath} size=${output.length()}", TAG)
             }
             return true
         } catch (t: Throwable) {
-            Log.e(TAG, "decoder: failed ${t.javaClass.simpleName}: ${t.message}", t)
+            KBLog.ui.error("decoder: failed ${t.javaClass.simpleName}: ${t.message}", TAG, t)
             return false
         } finally {
             runCatching { codec?.stop() }
