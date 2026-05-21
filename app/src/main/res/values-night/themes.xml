@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.KidBox" parent="Theme.KidBox.NoActionBar">
+        <item name="android:statusBarColor">@color/kidbox_background_dark</item>
+        <item name="android:navigationBarColor">@color/kidbox_navigation_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <style name="Theme.KidBox.NoActionBar" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/kidbox_background_dark</item>
+    </style>
+</resources>

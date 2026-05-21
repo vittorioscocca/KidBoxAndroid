@@ -56,8 +56,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.BuildConfig
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import it.vittorioscocca.kidbox.util.CrashReportPreferences
+import it.vittorioscocca.kidbox.util.KBLog
 import java.util.Calendar
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -97,7 +100,16 @@ fun NotesHomeScreen(
         }.map { it.id }
     }
 
-    LaunchedEffect(familyId) { viewModel.bind(familyId) }
+    LaunchedEffect(familyId) {
+        if (BuildConfig.DEBUG && NotesCrashLogTest.FORCE_CRASH_ON_OPEN) {
+            CrashReportPreferences.markPendingCrashReport(context)
+            KBLog.ui.crash(
+                "TEST: crash intenzionale all'apertura Note (verifica KBFileLogger / CrashAnalyzer)",
+            )
+            error("TEST: NotesHomeScreen crash")
+        }
+        viewModel.bind(familyId)
+    }
     LaunchedEffect(familyId) {
         pinnedIds = prefs.getStringSet("pinned_$familyId", emptySet()).orEmpty()
     }

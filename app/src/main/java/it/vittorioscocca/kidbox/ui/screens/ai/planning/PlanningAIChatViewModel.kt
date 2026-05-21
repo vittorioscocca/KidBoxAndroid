@@ -177,6 +177,7 @@ class PlanningAIChatViewModel @Inject constructor(
     private var dailyLimit = 0
 
     fun loadOrCreateConversation(input: PlanningContextInput) {
+        if (_uiState.value.isLoadingContext || _uiState.value.conversationReady) return
         lastInput = input
         viewModelScope.launch {
             KBLog.ai.debug("init", "PlanningAIChatVM")
@@ -209,16 +210,7 @@ class PlanningAIChatViewModel @Inject constructor(
                         _uiState.update { it.copy(messages = msgs) }
                     }
                 }
-                val pendingRecap = HealthPatternDraftStore.consume(context)
-                    ?: WeeklySummaryDraftStore.consume(context)
-                    ?: DailyBriefingDraftStore.consume(context)
-                if (!pendingRecap.isNullOrBlank()) {
-                    kbAIRepository.addMessage(
-                        conversationId = conversation!!.id,
-                        role = AIMessageRole.ASSISTANT,
-                        content = pendingRecap,
-                    )
-                }
+                injectPendingRecapFromStores()
                 _uiState.update {
                     it.copy(
                         isLoadingContext = false,
@@ -249,6 +241,23 @@ class PlanningAIChatViewModel @Inject constructor(
                 }
             }.onFailure { err ->
                 _uiState.update { it.copy(isLoadingContext = false, errorMessage = err.message ?: "Errore contesto") }
+            }
+        }
+    }
+
+    /** Inietta briefing/recap da tap notifica (anche se la chat era già aperta). */
+    fun injectPendingRecapFromStores() {
+        val conv = conversation ?: return
+        viewModelScope.launch {
+            val pendingRecap = HealthPatternDraftStore.consume(context)
+                ?: WeeklySummaryDraftStore.consume(context)
+                ?: DailyBriefingDraftStore.consume(context)
+            if (!pendingRecap.isNullOrBlank()) {
+                kbAIRepository.addMessage(
+                    conversationId = conv.id,
+                    role = AIMessageRole.ASSISTANT,
+                    content = pendingRecap,
+                )
             }
         }
     }

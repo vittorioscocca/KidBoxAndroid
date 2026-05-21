@@ -10,6 +10,7 @@ object CrashReportPreferences {
     private const val PREFS_NAME = "kidbox_crash_prefs"
     private const val KEY_REPORTING_ENABLED = "reporting_enabled"
     private const val KEY_REPORTING_ASKED = "reporting_asked"
+    private const val KEY_PENDING_CRASH = "kb_crash_report_pending"
     const val KEY_ANALYSIS_LAST_RUN = "kb_crash_analysis_last_run"
 
     private fun prefs(context: Context) =
@@ -40,5 +41,16 @@ object CrashReportPreferences {
 
     fun clearAnalysisThrottle(context: Context) {
         prefs(context).edit().remove(KEY_ANALYSIS_LAST_RUN).apply()
+    }
+
+    fun markPendingCrashReport(context: Context) {
+        prefs(context).edit().putBoolean(KEY_PENDING_CRASH, true).apply()
+    }
+
+    fun hasPendingCrashReport(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_PENDING_CRASH, false)
+
+    fun clearPendingCrashReport(context: Context) {
+        prefs(context).edit().remove(KEY_PENDING_CRASH).apply()
     }
 }

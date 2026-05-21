@@ -59,7 +59,10 @@ fun CrashReportSettingsRow(modifier: Modifier = Modifier) {
                         CrashReportPreferences.setHasBeenAsked(context, true)
                         CrashReportPreferences.clearAnalysisThrottle(context)
                         scope.launch {
-                            CrashAnalyzer.analyzeIfNeeded(context.applicationContext)
+                            CrashAnalyzer.analyzeIfNeeded(
+                                context.applicationContext,
+                                force = true,
+                            )
                         }
                     }
                 },

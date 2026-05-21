@@ -18,6 +18,9 @@ object KBCrashHandler {
             if (installed) return
             val previous = Thread.getDefaultUncaughtExceptionHandler()
             Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+                KidBoxApplicationHolder.applicationContext?.let { ctx ->
+                    CrashReportPreferences.markPendingCrashReport(ctx)
+                }
                 logUncaught(thread.name, throwable)
                 previous?.uncaughtException(thread, throwable)
             }

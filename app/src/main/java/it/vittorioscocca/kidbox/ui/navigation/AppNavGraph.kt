@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox.ui.navigation
 
 import it.vittorioscocca.kidbox.util.KBLog
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -15,7 +16,9 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
+import it.vittorioscocca.kidbox.notifications.NotificationDeepLinkRouter
 import it.vittorioscocca.kidbox.ui.screens.auth.LoginScreen
 import it.vittorioscocca.kidbox.ui.screens.grocery.GroceryListScreen
 import it.vittorioscocca.kidbox.ui.screens.homeitems.HomeItemDetailScreen
@@ -111,6 +114,17 @@ fun AppNavGraph(
     startDestination: String,
     onboardingPreferences: OnboardingPreferences,
 ) {
+    val pendingAiRoute by NotificationDeepLinkRouter.pendingRoute.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingAiRoute, navController.currentBackStackEntry) {
+        val route = pendingAiRoute ?: return@LaunchedEffect
+        val current = navController.currentDestination?.route ?: return@LaunchedEffect
+        if (current == AppDestination.Login.route || current == AppDestination.Onboarding.route) {
+            return@LaunchedEffect
+        }
+        navController.navigate(route) { launchSingleTop = true }
+        NotificationDeepLinkRouter.clear()
+    }
+
     NavHost(
         navController = navController,
         startDestination = startDestination,

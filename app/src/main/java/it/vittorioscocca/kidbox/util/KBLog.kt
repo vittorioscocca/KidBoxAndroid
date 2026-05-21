@@ -41,12 +41,28 @@ object KBLog {
             log(Log.WARN, "WARNING", message, tag, null)
         }
 
-        fun error(message: String, throwable: Throwable? = null) {
+        fun error(message: String, tag: String = "") {
+            log(Log.ERROR, "ERROR", message, tag, null)
+        }
+
+        fun error(message: String, throwable: Throwable) {
             log(Log.ERROR, "ERROR", message, "", throwable)
         }
 
-        fun crash(message: String, throwable: Throwable? = null) {
+        fun error(message: String, tag: String, throwable: Throwable) {
+            log(Log.ERROR, "ERROR", message, tag, throwable)
+        }
+
+        fun crash(message: String, tag: String = "") {
+            log(Log.ERROR, "CRASH", message, tag, null)
+        }
+
+        fun crash(message: String, throwable: Throwable) {
             log(Log.ERROR, "CRASH", message, "", throwable)
+        }
+
+        fun crash(message: String, tag: String, throwable: Throwable) {
+            log(Log.ERROR, "CRASH", message, tag, throwable)
         }
 
         private fun log(
@@ -78,8 +94,8 @@ object KBLog {
                     !frame.className.startsWith("java.lang.Thread") &&
                     !frame.className.contains("KBLog")
             } ?: return ""
-            val file = frame.fileName ?: "unknown"
-            return "[$file:${frame.methodName}():${frame.lineNumber}]"
+            val file = element.fileName ?: "unknown"
+            return "[$file:${element.methodName}():${element.lineNumber}]"
         }
     }
 }

@@ -68,6 +68,7 @@ fun SettingsScreen(
     onAiSettings: () -> Unit,
     onStorageUsage: () -> Unit,
     onAutoFillSettings: () -> Unit,
+    onPrivacySettings: () -> Unit,
     viewModel: ThemeViewModel = hiltViewModel(),
 ) {
     BackHandler { onBack() }

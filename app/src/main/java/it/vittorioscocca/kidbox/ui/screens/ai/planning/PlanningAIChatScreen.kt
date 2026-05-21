@@ -47,6 +47,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
@@ -86,6 +87,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
+import it.vittorioscocca.kidbox.notifications.NotificationDeepLinkRouter
 import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatCopyableMessageContainer
 import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatListScrollEffect
 import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatStandardMessageRow
@@ -104,6 +106,7 @@ fun PlanningAIChatScreen(
     onNavigateToUpgrade: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val recapTick by NotificationDeepLinkRouter.recapTick.collectAsStateWithLifecycle()
     val kb = MaterialTheme.kidBoxColors
     val listState = rememberLazyListState()
     val snackHost = remember { SnackbarHostState() }
@@ -150,6 +153,11 @@ fun PlanningAIChatScreen(
     }
 
     LaunchedEffect(Unit) { viewModel.loadOrCreateConversation(contextInput) }
+    LaunchedEffect(state.conversationReady, recapTick) {
+        if (state.conversationReady && recapTick > 0) {
+            viewModel.injectPendingRecapFromStores()
+        }
+    }
     val (streamScrollTick, onStreamScrollTick) = rememberStreamScrollTick()
     AIChatListScrollEffect(
         listState = listState,
@@ -356,6 +364,18 @@ fun PlanningAIChatScreen(
                         }
                         if (state.isLoading) item { AIChatTypingIndicator() }
                     }
+                }
+            }
+
+            if (state.isLoadingContext) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    CircularProgressIndicator()
+                    Spacer(Modifier.height(12.dp))
+                    Text("Preparazione contesto…", fontSize = 14.sp, color = kb.subtitle)
                 }
             }
 

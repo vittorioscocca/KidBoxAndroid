@@ -206,6 +206,9 @@ class WeeklySummaryBroadcastReceiver : BroadcastReceiver() {
         val familyId = intent.getStringExtra("familyId").orEmpty()
         val familyName = intent.getStringExtra("familyName").orEmpty().ifBlank { "la tua famiglia" }
         val fullText = intent.getStringExtra("fullText").orEmpty()
+        if (fullText.isNotBlank()) {
+            WeeklySummaryDraftStore.save(context, fullText)
+        }
         val firstLine = fullText.lineSequence().firstOrNull()?.take(100).orEmpty()
 
         val openIntent = Intent(context, MainActivity::class.java).apply {

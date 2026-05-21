@@ -177,10 +177,6 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
-    // Crash log analysis: Gemini Nano on-device + Generative AI SDK fallback types
-    implementation("com.google.ai.edge.aicore:aicore:0.0.1-exp01")
-    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
-
     debugImplementation("com.google.firebase:firebase-appcheck-debug")
     releaseImplementation("com.google.firebase:firebase-appcheck-playintegrity")
 

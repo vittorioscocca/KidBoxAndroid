@@ -1,7 +1,6 @@
 package it.vittorioscocca.kidbox.util
 
 import android.content.Context
-import it.vittorioscocca.kidbox.BuildConfig
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -9,8 +8,7 @@ import java.util.Locale
 import java.util.TimeZone
 
 /**
- * Persistenza su file dei log KidBox (solo build release).
- * In debug i log restano solo su Logcat.
+ * Persistenza su file dei log KidBox (Logcat + file, anche in debug per report crash).
  */
 object KBFileLogger {
 
@@ -41,7 +39,6 @@ object KBFileLogger {
     }
 
     fun appendSync(line: String) {
-        if (BuildConfig.DEBUG) return
         val file = logFile ?: return
         val sanitized = sanitizeMessage(line)
         if (sanitized.isEmpty()) return

@@ -8,6 +8,7 @@ import dagger.hilt.android.HiltAndroidApp
 import it.vittorioscocca.kidbox.util.CrashAnalyzer
 import it.vittorioscocca.kidbox.util.KBCrashHandler
 import it.vittorioscocca.kidbox.util.KBFileLogger
+import it.vittorioscocca.kidbox.util.KidBoxApplicationHolder
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +24,7 @@ class KidBoxApplication : Application(), Configuration.Provider {
     private val appInitScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
+        KidBoxApplicationHolder.applicationContext = applicationContext
         KBFileLogger.init(this)
         KBCrashHandler.install()
         super.onCreate()

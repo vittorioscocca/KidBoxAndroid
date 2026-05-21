@@ -201,6 +201,9 @@ class DailyBriefingBroadcastReceiver : BroadcastReceiver() {
         val familyId = intent.getStringExtra("familyId").orEmpty()
         val familyName = intent.getStringExtra("familyName").orEmpty().ifBlank { "la tua famiglia" }
         val fullText = intent.getStringExtra("fullText").orEmpty()
+        if (fullText.isNotBlank()) {
+            DailyBriefingDraftStore.save(context, fullText)
+        }
         val firstLine = fullText.lineSequence().firstOrNull { it.isNotBlank() }?.take(100).orEmpty()
 
         val openIntent = Intent(context, MainActivity::class.java).apply {

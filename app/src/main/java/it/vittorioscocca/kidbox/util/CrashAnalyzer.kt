@@ -2,8 +2,6 @@ package it.vittorioscocca.kidbox.util
 
 import android.content.Context
 import android.os.Build
-import com.google.ai.client.generativeai.GenerativeModel
-import com.google.ai.client.generativeai.type.GenerationConfig
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -23,7 +21,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * Analisi log (Gemini Nano on-device se disponibile, altrimenti Cloud Function)
+ * Analisi log via Cloud Function analyzeLogs e upload opzionale su Firestore.
  * e upload opzionale su Firestore collection "crash_reports".
  */
 object CrashAnalyzer {
@@ -63,31 +61,104 @@ object CrashAnalyzer {
     private val _showConsentDialog = MutableStateFlow(false)
     val showConsentDialog: StateFlow<Boolean> = _showConsentDialog.asStateFlow()
 
-    suspend fun analyzeIfNeeded(context: Context) {
-        if (FirebaseAuth.getInstance().currentUser == null) return
+    suspend fun analyzeIfNeeded(context: Context, force: Boolean = false) {
+        if (FirebaseAuth.getInstance().currentUser == null) {
+            KBLog.app.debug("CrashAnalyzer: skip (utente non autenticato)")
+            return
+        }
 
         val rawLogs = KBFileLogger.readLogs()
-        if (rawLogs.toByteArray(Charsets.UTF_8).size < MIN_LOG_BYTES) return
+        val logBytes = rawLogs.toByteArray(Charsets.UTF_8).size
+        if (logBytes < MIN_LOG_BYTES) {
+            KBLog.app.debug("CrashAnalyzer: skip (log file $logBytes B < $MIN_LOG_BYTES B)")
+            return
+        }
 
-        val lastRun = CrashReportPreferences.lastAnalysisRunMillis(context)
-        if (lastRun > 0 && System.currentTimeMillis() - lastRun < THROTTLE_MS) return
+        val crashInLogs = containsCrashMarkers(rawLogs)
+        val pending = CrashReportPreferences.hasPendingCrashReport(context)
+        val reporting = CrashReportPreferences.isReportingEnabled(context)
+        val shouldUploadCrash = (crashInLogs || pending) && reporting
+        val bypassThrottle = force || shouldUploadCrash
 
-        val parsed = when {
-            isGeminiNanoAvailable() -> analyzeWithNano(rawLogs)
-            else -> null
-        } ?: analyzeWithCloudFunction(rawLogs)
+        if (!bypassThrottle) {
+            val lastRun = CrashReportPreferences.lastAnalysisRunMillis(context)
+            if (lastRun > 0 && System.currentTimeMillis() - lastRun < THROTTLE_MS) {
+                KBLog.app.info(
+                    "CrashAnalyzer: skip throttle (pending=$pending, crashInLogs=$crashInLogs, reporting=$reporting)",
+                )
+                return
+            }
+        }
+
+        KBLog.app.info(
+            "CrashAnalyzer: avvio analisi ($logBytes B, reporting=$reporting, crashInLogs=$crashInLogs, pending=$pending)",
+        )
+
+        if (shouldUploadCrash) {
+            KBLog.app.info("CrashAnalyzer: crash pending → upload diretto")
+            val issues = if (crashInLogs) {
+                buildFallbackIssues(rawLogs)
+            } else {
+                listOf(pendingCrashIssue())
+            }
+            uploadToFirestore(context, issues, rawLogs)
+            return
+        }
+
+        val parsed = analyzeWithCloudFunction(truncateLogs(rawLogs, 32 * 1024))
 
         if (parsed == null) {
-            CrashReportPreferences.markAnalysisRun(context)
+            KBLog.app.warning("CrashAnalyzer: analisi non riuscita")
             return
         }
 
         if (!parsed.hasIssues || parsed.issues.isEmpty()) {
+            KBLog.app.info("CrashAnalyzer: nessun problema rilevato nei log")
             CrashReportPreferences.markAnalysisRun(context)
             return
         }
 
         handlePermissionAndUpload(context, parsed.issues, rawLogs)
+    }
+
+    private fun containsCrashMarkers(logs: String): Boolean =
+        logs.contains("[CRASH]") ||
+            logs.contains("TEST: crash") ||
+            logs.contains("RuntimeException") && logs.contains("NotesHomeScreen")
+
+    private fun pendingCrashIssue(): IssueReport = IssueReport(
+        type = "crash",
+        severity = "critical",
+        category = "ui",
+        affectedModule = "NotesHomeScreen",
+        summary = "Crash segnalato; log locali già troncati",
+        detail = "kb_crash_report_pending era attivo",
+        firstOccurrence = "",
+        occurrences = 1,
+    )
+
+    private fun buildFallbackIssues(rawLogs: String): List<IssueReport> {
+        val crashLines = rawLogs.lineSequence()
+            .filter { line ->
+                line.contains("[CRASH]") || line.contains("TEST: crash")
+            }
+            .toList()
+        val excerpt = crashLines.takeLast(5).joinToString(" | ")
+        val module = crashLines.lastOrNull()?.let { line ->
+            Regex("""\[([^:]+):""").find(line)?.groupValues?.getOrNull(1)
+        } ?: "NotesHomeScreen"
+        return listOf(
+            IssueReport(
+                type = "crash",
+                severity = "critical",
+                category = "ui",
+                affectedModule = module,
+                summary = "Crash rilevato nei log dell'app",
+                detail = excerpt.ifEmpty { "Segnale di crash presente nel file di log" },
+                firstOccurrence = "",
+                occurrences = maxOf(1, crashLines.size),
+            ),
+        )
     }
 
     fun dismissConsentPrompt() {
@@ -111,33 +182,6 @@ object CrashAnalyzer {
         dismissConsentPrompt()
         CrashReportPreferences.markAnalysisRun(context)
     }
-
-    private fun isGeminiNanoAvailable(): Boolean {
-        return try {
-            GenerativeModel(
-                modelName = "gemini-nano",
-                generationConfig = GenerationConfig.Builder().build(),
-            )
-            true
-        } catch (_: Exception) {
-            false
-        }
-    }
-
-    private suspend fun analyzeWithNano(rawLogs: String): AnalysisResponse? =
-        withContext(Dispatchers.Default) {
-            try {
-                val model = GenerativeModel(
-                    modelName = "gemini-nano",
-                    generationConfig = GenerationConfig.Builder().build(),
-                )
-                val response = model.generateContent(buildPrompt(rawLogs))
-                parseAnalysisResponse(response.text ?: return@withContext null)
-            } catch (e: Exception) {
-                KBLog.app.warning("CrashAnalyzer: Nano non disponibile: ${e.message}")
-                null
-            }
-        }
 
     private suspend fun analyzeWithCloudFunction(rawLogs: String): AnalysisResponse? =
         withContext(Dispatchers.IO) {
@@ -215,33 +259,12 @@ object CrashAnalyzer {
                 .await()
             KBFileLogger.clearLogs()
             CrashReportPreferences.markAnalysisRun(context)
+            CrashReportPreferences.clearPendingCrashReport(context)
             KBLog.app.info("Crash report inviato: ${issues.size} issues")
         } catch (e: Exception) {
             KBLog.app.error("CrashAnalyzer: upload Firestore fallito", e)
-            CrashReportPreferences.markAnalysisRun(context)
         }
     }
-
-    private fun buildPrompt(rawLogs: String): String = """
-        Sei un analizzatore di log per l'app KidBox Android.
-        Analizza i log e rispondi SOLO con JSON valido:
-        {
-          "hasIssues": true/false,
-          "issues": [
-            {
-              "type": "crash|error|malfunction|warning",
-              "severity": "critical|high|medium|low",
-              "category": "sync|auth|data|ui|ai|storage|navigation",
-              "affectedModule": "nome classe o funzione",
-              "summary": "descrizione breve max 120 caratteri in italiano",
-              "detail": "causa tecnica probabile",
-              "firstOccurrence": "timestamp",
-              "occurrences": numero
-            }
-          ]
-        }
-        Log: $rawLogs
-    """.trimIndent()
 
     private fun parseAnalysisResponse(text: String): AnalysisResponse? {
         return try {
