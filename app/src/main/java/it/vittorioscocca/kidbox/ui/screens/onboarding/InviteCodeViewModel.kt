@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.vittorioscocca.kidbox.data.local.ActiveFamilyResolver
+import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import com.google.firebase.firestore.FirebaseFirestore
 import it.vittorioscocca.kidbox.data.remote.family.InviteRemoteStore
@@ -24,6 +26,7 @@ import javax.inject.Inject
 class InviteCodeViewModel @Inject constructor(
     application: Application,
     private val familyDao: KBFamilyDao,
+    private val familySessionPreferences: FamilySessionPreferences,
 ) : AndroidViewModel(application) {
 
     private val remote = InviteRemoteStore()
@@ -98,10 +101,14 @@ class InviteCodeViewModel @Inject constructor(
         _currentInviteId.value = null
         viewModelScope.launch {
             try {
+                val families = familyDao.observeAll().first()
                 val familyId = preferredFamilyId
                     ?.trim()
                     ?.takeIf { it.isNotEmpty() }
-                    ?: familyDao.observeAll().first().firstOrNull()?.id
+                    ?: ActiveFamilyResolver.resolveFamilyId(
+                        families,
+                        familySessionPreferences.getActiveFamilyId(),
+                    ).ifBlank { null }
                     ?: error("Nessuna family trovata.")
 
                 // 1) Membership invite code (classico)

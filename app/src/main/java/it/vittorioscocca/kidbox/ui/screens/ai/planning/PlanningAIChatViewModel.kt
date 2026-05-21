@@ -14,6 +14,8 @@ import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBDocumentDao
 import it.vittorioscocca.kidbox.data.local.dao.KBExpenseCategoryDao
 import it.vittorioscocca.kidbox.data.local.dao.KBExpenseDao
+import it.vittorioscocca.kidbox.data.local.ActiveFamilyResolver
+import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.dao.KBGroceryItemDao
@@ -122,6 +124,7 @@ class PlanningAIChatViewModel @Inject constructor(
     private val aiService: AIService,
     private val subscriptionRepository: SubscriptionRepository,
     private val familyDao: KBFamilyDao,
+    private val familySessionPreferences: FamilySessionPreferences,
     private val familyMemberDao: KBFamilyMemberDao,
     private val childDao: KBChildDao,
     private val calendarEventDao: KBCalendarEventDao,
@@ -152,17 +155,14 @@ class PlanningAIChatViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    private val familyId: String = savedStateHandle["familyId"] ?: ""
-    private val effectiveFamilyId: String = familyId.ifBlank {
-        val prefs = context.getSharedPreferences("kidbox_prefs", Context.MODE_PRIVATE)
-        prefs.getString("active_family_id", null)
-            ?: prefs.getString("family_id", "")
-            ?: ""
+    private val routeFamilyId: String = savedStateHandle["familyId"] ?: ""
+    private var effectiveFamilyId: String = routeFamilyId.ifBlank {
+        familySessionPreferences.getActiveFamilyId().orEmpty()
     }
+    private var scopeId: String = "planning-agent-$effectiveFamilyId"
     private val familyName: String = savedStateHandle["familyName"] ?: ""
     private val memberNames: List<String> = savedStateHandle.get<ArrayList<String>>("memberNames")?.toList().orEmpty()
     private val horizonDays: Int = savedStateHandle["horizonDays"] ?: 14
-    private val scopeId = "planning-agent-$effectiveFamilyId"
 
     private val _uiState = MutableStateFlow(PlanningChatUiState())
     val uiState: StateFlow<PlanningChatUiState> = _uiState.asStateFlow()
@@ -175,6 +175,28 @@ class PlanningAIChatViewModel @Inject constructor(
     private var lastCompactionStep = 0
     private var messagesInSession = 0
     private var dailyLimit = 0
+
+    init {
+        viewModelScope.launch {
+            familyDao.observeAll().collectLatest { families ->
+                val resolved = ActiveFamilyResolver.resolveFamilyId(
+                    families,
+                    familySessionPreferences.getActiveFamilyId(),
+                ).ifBlank { routeFamilyId }
+                if (resolved.isBlank() || resolved == effectiveFamilyId) return@collectLatest
+                rebindActiveFamily(resolved)
+            }
+        }
+    }
+
+    private fun rebindActiveFamily(familyId: String) {
+        observeJob?.cancel()
+        conversation = null
+        effectiveFamilyId = familyId
+        scopeId = "planning-agent-$familyId"
+        _uiState.value = PlanningChatUiState()
+        loadOrCreateConversation(lastInput ?: emptyPlanningContext())
+    }
 
     fun loadOrCreateConversation(input: PlanningContextInput) {
         if (_uiState.value.isLoadingContext || _uiState.value.conversationReady) return

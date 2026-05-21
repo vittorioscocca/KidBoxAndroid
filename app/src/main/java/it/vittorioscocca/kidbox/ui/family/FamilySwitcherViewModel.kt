@@ -67,7 +67,13 @@ class FamilySwitcherViewModel @Inject constructor(
                     return@launch
                 }
                 familyRepository.createNewFamily(name.trim(), uid)
-                    .onSuccess { _events.emit(Event.FamilyCreated) }
+                    .onSuccess { familyId ->
+                        familySessionPreferences.setActiveFamilyId(familyId)
+                        familySyncCenter.stopSync()
+                        familySyncCenter.startSync(familyId)
+                        _activeFamilyId.value = familyId
+                        _events.emit(Event.FamilyCreated)
+                    }
                     .onFailure { err ->
                         _events.emit(Event.Error(err.message ?: "Errore durante la creazione"))
                     }

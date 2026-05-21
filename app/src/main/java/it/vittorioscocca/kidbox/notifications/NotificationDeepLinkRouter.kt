@@ -52,6 +52,15 @@ object NotificationDeepLinkRouter {
                 if (fullText.isNotBlank()) HealthPatternDraftStore.save(context, fullText)
                 queueAiChatRoute(familyId, resolvedType)
             }
+            "geofenceEvent" -> {
+                if (familyId.isNotBlank()) {
+                    _pendingRoute.value = AppDestination.FamilyLocation.createRoute(familyId)
+                    KBLog.app.info(
+                        "NotificationDeepLink: geofenceEvent → family_location/$familyId",
+                        "NotificationDeepLink",
+                    )
+                }
+            }
             else -> Unit
         }
         _recapTick.value += 1

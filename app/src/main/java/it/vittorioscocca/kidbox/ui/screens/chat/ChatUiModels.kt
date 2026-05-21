@@ -127,6 +127,20 @@ internal fun UiChatMessage.previewText(): String =
 internal fun messageBubbleColor(isOwn: Boolean): Color =
     if (isOwn) Color(0xFFFF6B00) else androidx.compose.material3.MaterialTheme.kidBoxColors.incomingBubble
 
+/** Colori fallback per iniziale avatar (allineati a iOS ChatBubble.avatarColor). */
+internal fun avatarColorForSender(senderId: String): Color {
+    val palette = listOf(
+        Color(0xFF007AFF),
+        Color(0xFF34C759),
+        Color(0xFFAF52DE),
+        Color(0xFFFF9500),
+        Color(0xFFFF2D55),
+        Color(0xFF5AC8FA),
+    )
+    if (senderId.isBlank()) return palette.first()
+    return palette[kotlin.math.abs(senderId.hashCode()) % palette.size]
+}
+
 private fun String?.toJsonStringList(): List<String> {
     if (this.isNullOrBlank()) return emptyList()
     val arr = JSONArray(this)

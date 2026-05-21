@@ -1,7 +1,10 @@
 package it.vittorioscocca.kidbox.ui.screens.location
 
 import android.Manifest
+import android.graphics.Color as AndroidColor
+import android.os.Build
 import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -29,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,6 +43,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -60,14 +65,17 @@ import coil.compose.AsyncImage
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
+import androidx.core.view.WindowCompat
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.entity.KBSharedLocationEntity
 import it.vittorioscocca.kidbox.data.repository.LocationShareMode
+import it.vittorioscocca.kidbox.ui.permissions.RuntimePermissions
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.runtime.rememberCoroutineScope
 import java.text.SimpleDateFormat
@@ -79,12 +87,14 @@ import kotlinx.coroutines.launch
 fun FamilyLocationScreen(
     familyId: String,
     onBack: () -> Unit,
+    onGeofences: () -> Unit = {},
     viewModel: FamilyLocationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val window = (context as? ComponentActivity)?.window
     val isDarkTheme = isSystemInDarkTheme()
-    val darkMapStyle = remember(isDarkTheme) {
+    val darkMapStyle = remember(isDarkTheme, context) {
         if (!isDarkTheme) {
             null
         } else {
@@ -95,12 +105,39 @@ fun FamilyLocationScreen(
     }
     val myUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
     val scope = rememberCoroutineScope()
+
+    // Mappa a tutto schermo sotto status/navigation bar (ripristina uscendo dalla schermata).
+    DisposableEffect(window, isDarkTheme) {
+        if (window == null) {
+            onDispose { }
+        } else {
+            val prevStatusColor = window.statusBarColor
+            val prevNavColor = window.navigationBarColor
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            window.statusBarColor = AndroidColor.TRANSPARENT
+            window.navigationBarColor = AndroidColor.TRANSPARENT
+            onDispose {
+                WindowCompat.setDecorFitsSystemWindows(window, true)
+                val restored = if (isDarkTheme) 0xFF1C1C1E.toInt() else 0xFFF5F3EE.toInt()
+                window.statusBarColor = prevStatusColor.takeIf { it != AndroidColor.TRANSPARENT } ?: restored
+                window.navigationBarColor = prevNavColor.takeIf { it != AndroidColor.TRANSPARENT } ?: restored
+            }
+        }
+    }
     var showShareOptions by remember { mutableStateOf(false) }
     var showTemporaryDialog by remember { mutableStateOf(false) }
     var temporaryHours by remember { mutableIntStateOf(2) }
     var followingUserId by remember { mutableStateOf<String?>(null) }
     var hasAutoCenteredOnDevice by remember(familyId) { mutableStateOf(false) }
     val cameraPositionState = rememberCameraPositionState()
+
+    var requestLocationForSharing by remember { mutableStateOf(false) }
+
+    val backgroundPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) {
+        showShareOptions = true
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
@@ -109,15 +146,38 @@ fun FamilyLocationScreen(
             grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         viewModel.setLocationPermissionGranted(granted)
         if (granted) {
-            showShareOptions = true
+            if (requestLocationForSharing) {
+                requestLocationForSharing = false
+                if (
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                    !RuntimePermissions.hasBackgroundLocationAccess(context)
+                ) {
+                    backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                } else {
+                    showShareOptions = true
+                }
+            }
         } else {
+            requestLocationForSharing = false
             Toast.makeText(context, "Permesso posizione necessario", Toast.LENGTH_LONG).show()
         }
     }
 
     LaunchedEffect(familyId) {
+        viewModel.startObservingActiveFamily(routeFamilyId = familyId)
         viewModel.bindFamily(familyId)
         viewModel.setLocationPermissionGranted(viewModel.hasLocationPermissionNow())
+    }
+    LaunchedEffect(Unit) {
+        if (!viewModel.hasLocationPermissionNow()) {
+            requestLocationForSharing = false
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                ),
+            )
+        }
     }
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let {
@@ -159,17 +219,18 @@ fun FamilyLocationScreen(
         )
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.kidBoxColors.background),
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
             properties = MapProperties(
                 isMyLocationEnabled = viewModel.hasLocationPermissionNow(),
                 mapStyleOptions = darkMapStyle,
+            ),
+            uiSettings = MapUiSettings(
+                myLocationButtonEnabled = false,
+                zoomControlsEnabled = false,
+                mapToolbarEnabled = false,
             ),
             onMapClick = {
                 followingUserId = null
@@ -213,52 +274,72 @@ fun FamilyLocationScreen(
             fontWeight = FontWeight.ExtraBold,
         )
 
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(top = 10.dp, end = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.End,
+        ) {
+            Card(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clickable(onClick = onGeofences),
+                shape = CircleShape,
+                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f)),
+            ) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Place,
+                        contentDescription = "Zone di arrivo",
+                        tint = Color(0xFFFF6B00),
+                    )
+                }
+            }
+            val currentFollowed = followingUserId?.let { followId ->
+                state.sharedUsers.firstOrNull { it.id == followId }
+            }
+            if (currentFollowed != null) {
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = Color.White.copy(alpha = 0.9f),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = Color(0xFF0A84FF),
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            text = "Seguo ${currentFollowed.name}",
+                            fontSize = 13.sp,
+                            color = Color.Black,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = null,
+                            tint = Color.Gray,
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clickable { followingUserId = null },
+                        )
+                    }
+                }
+            }
+        }
+
         if (state.isLoading) {
             CircularProgressIndicator(
                 modifier = Modifier.align(Alignment.Center),
                 color = Color(0xFFFF6B00),
             )
-        }
-
-        val currentFollowed = followingUserId?.let { followId ->
-            state.sharedUsers.firstOrNull { it.id == followId }
-        }
-        if (currentFollowed != null) {
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .statusBarsPadding()
-                    .padding(top = 12.dp, end = 14.dp),
-                shape = RoundedCornerShape(999.dp),
-                color = Color.White.copy(alpha = 0.9f),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = null,
-                        tint = Color(0xFF0A84FF),
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Text(
-                        text = "Seguo ${currentFollowed.name}",
-                        fontSize = 13.sp,
-                        color = Color.Black,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = null,
-                        tint = Color.Gray,
-                        modifier = Modifier
-                            .size(16.dp)
-                            .clickable { followingUserId = null },
-                    )
-                }
-            }
         }
 
         val otherUsers = state.sharedUsers.filter { it.id != myUid }
@@ -287,8 +368,17 @@ fun FamilyLocationScreen(
                 if (enabled) {
                     if (viewModel.hasLocationPermissionNow()) {
                         viewModel.setLocationPermissionGranted(true)
-                        showShareOptions = true
+                        requestLocationForSharing = true
+                        if (
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                            !RuntimePermissions.hasBackgroundLocationAccess(context)
+                        ) {
+                            backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                        } else {
+                            showShareOptions = true
+                        }
                     } else {
+                        requestLocationForSharing = true
                         permissionLauncher.launch(
                             arrayOf(
                                 Manifest.permission.ACCESS_FINE_LOCATION,

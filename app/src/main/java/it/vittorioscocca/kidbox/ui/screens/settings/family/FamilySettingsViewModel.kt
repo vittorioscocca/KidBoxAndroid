@@ -9,6 +9,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
@@ -81,6 +82,7 @@ class FamilySettingsViewModel @Inject constructor(
     private val familySyncCenter: FamilySyncCenter,
     private val userProfileRepository: UserProfileRepository,
     private val creationRepository: FamilyFirestoreCreationRepository,
+    private val familySessionPreferences: FamilySessionPreferences,
 ) : ViewModel() {
     companion object {
         private const val TAG = "FamilySettingsVM"
@@ -169,11 +171,6 @@ class FamilySettingsViewModel @Inject constructor(
     }
 
     fun startObserving() {
-        val currentFamilyId = observingFamilyId
-        if (currentFamilyId != null && observeJob?.isActive == true) {
-            familySyncCenter.startSync(currentFamilyId)
-            return
-        }
         observeJob?.cancel()
         observeJob = viewModelScope.launch {
             val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
@@ -182,30 +179,12 @@ class FamilySettingsViewModel @Inject constructor(
                 return@launch
             }
 
-            var family = familyDao.observeAll().first().firstOrNull()
-
-            if (family == null) {
-                try {
-                    family = bootstrapFromFirebase(uid)
-                } catch (_: Exception) {
-                    _uiState.value = FamilySettingsUiState(isLoading = false, currentUid = uid)
-                    return@launch
-                }
-                if (family == null) {
-                    try {
-                        kotlinx.coroutines.withTimeout(8000) {
-                            familySyncCenter.initialSyncDone.first { it }
-                        }
-                        family = familyDao.observeAll().first().firstOrNull()
-                    } catch (_: Exception) { }
-                    if (family == null) {
-                        _uiState.value = FamilySettingsUiState(isLoading = false, currentUid = uid)
-                        return@launch
-                    }
-                }
+            val family = resolveFamilyForSettings(uid) ?: run {
+                _uiState.value = FamilySettingsUiState(isLoading = false, currentUid = uid)
+                return@launch
             }
 
-            val fid = family!!.id
+            val fid = family.id
             observingFamilyId = fid
             familySyncCenter.startSync(fid)
 
@@ -224,10 +203,11 @@ class FamilySettingsViewModel @Inject constructor(
                     members.any { it.userId == uid && it.role.equals("owner", true) }
                 val isOwnerFromFamily = family?.createdBy == uid
                 val isOwner = isOwnerFromMembers || isOwnerFromFamily
+                val distinctMembers = members.distinctBy { it.userId }
                 FamilySettingsUiState(
                     isLoading = false,
                     family = family,
-                    members = members,
+                    members = distinctMembers,
                     children = children,
                     isOwner = isOwner,
                     currentUid = uid,
@@ -244,6 +224,30 @@ class FamilySettingsViewModel @Inject constructor(
     }
 
     fun load() = startObserving()
+
+    private suspend fun resolveFamilyForSettings(uid: String): KBFamilyEntity? {
+        familySessionPreferences.getActiveFamilyId()?.trim()?.takeIf { it.isNotEmpty() }?.let { activeId ->
+            familyDao.getById(activeId)?.let { return it }
+        }
+        var family = familyDao.observeAll().first().firstOrNull()
+        if (family == null) {
+            try {
+                family = bootstrapFromFirebase(uid)
+            } catch (_: Exception) {
+                return null
+            }
+            if (family == null) {
+                try {
+                    kotlinx.coroutines.withTimeout(8000) {
+                        familySyncCenter.initialSyncDone.first { it }
+                    }
+                    family = familyDao.observeAll().first().firstOrNull()
+                } catch (_: Exception) {
+                }
+            }
+        }
+        return family
+    }
 
     private var lastRefreshMs = 0L
     fun refreshSync() {
@@ -297,7 +301,14 @@ class FamilySettingsViewModel @Inject constructor(
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
                 .distinct()
+                .toMutableList()
             if (distinctCandidates.isEmpty()) return null
+
+            familySessionPreferences.getActiveFamilyId()?.trim()?.takeIf { it.isNotEmpty() }?.let { preferred ->
+                if (distinctCandidates.remove(preferred)) {
+                    distinctCandidates.add(0, preferred)
+                }
+            }
 
             var selectedFamilyId: String? = null
             var selectedFamilySnap: com.google.firebase.firestore.DocumentSnapshot? = null
@@ -787,7 +798,12 @@ class FamilySettingsViewModel @Inject constructor(
                         return@launch
                     }
                     val newFamilyId = creationRepository.createFamilyWithChildren(trimmedName, list)
+                    familySessionPreferences.setActiveFamilyId(newFamilyId)
+                    observingFamilyId = null
+                    observeJob?.cancel()
+                    observeJob = null
                     familySyncCenter.startSync(newFamilyId)
+                    startObserving()
                     onDone()
                     return@launch
                 }

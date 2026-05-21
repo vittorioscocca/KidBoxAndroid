@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.vittorioscocca.kidbox.data.local.ActiveFamilyResolver
+import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
@@ -23,6 +25,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class TodoHomeViewModel @Inject constructor(
     private val familyDao: KBFamilyDao,
+    private val familySessionPreferences: FamilySessionPreferences,
     private val childDao: KBChildDao,
     private val memberDao: KBFamilyMemberDao,
     private val todoRepository: TodoRepository,
@@ -33,22 +36,37 @@ class TodoHomeViewModel @Inject constructor(
     private val familyFlow = familyDao.observeAll()
     private val stateBacking = MutableStateFlow(TodoHomeUiState())
     private var observeJob: Job? = null
+    private var boundScopeKey: String? = null
     val uiState: StateFlow<TodoHomeUiState> = stateBacking
 
     init {
         viewModelScope.launch {
             familyFlow.collect { families ->
-                val familyId = families.firstOrNull()?.id.orEmpty()
+                val familyId = ActiveFamilyResolver.resolveFamilyId(
+                    families,
+                    familySessionPreferences.getActiveFamilyId(),
+                )
                 if (familyId.isBlank()) {
+                    boundScopeKey = null
+                    observeJob?.cancel()
+                    todoRepository.stopRealtime()
                     stateBacking.value = TodoHomeUiState(isLoading = false, errorMessage = "Nessuna famiglia attiva")
                     return@collect
                 }
                 val child = childDao.getChildrenByFamilyId(familyId).firstOrNull()
                 val childId = child?.id.orEmpty()
                 if (childId.isBlank()) {
+                    boundScopeKey = null
+                    observeJob?.cancel()
+                    todoRepository.stopRealtime()
                     stateBacking.value = TodoHomeUiState(familyId = familyId, isLoading = false, errorMessage = "Nessun profilo bambino trovato")
                     return@collect
                 }
+                val scopeKey = "$familyId-$childId"
+                if (boundScopeKey == scopeKey) return@collect
+                observeJob?.cancel()
+                todoRepository.stopRealtime()
+                boundScopeKey = scopeKey
                 observeFamilyTodo(familyId, childId)
             }
         }

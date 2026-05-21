@@ -17,6 +17,7 @@ import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.data.local.ActiveFamilyResolver
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
@@ -210,13 +211,15 @@ class HomeViewModel @Inject constructor(
                     return@collectLatest
                 }
 
-                val activeFamilyId = familySessionPreferences.getActiveFamilyId()
-                val selectedFamily = if (activeFamilyId != null) {
-                    families.firstOrNull { it.id == activeFamilyId } ?: families.first()
-                } else {
-                    families.first()
+                val familyId = ActiveFamilyResolver.resolveFamilyId(
+                    families,
+                    familySessionPreferences.getActiveFamilyId(),
+                )
+                if (familyId.isBlank()) {
+                    _uiState.value = HomeUiState(isLoading = false, familyId = "")
+                    return@collectLatest
                 }
-                val familyId = selectedFamily.id
+                val selectedFamily = families.firstOrNull { it.id == familyId } ?: families.first()
                 familySessionPreferences.setActiveFamilyId(familyId)
 
                 if (syncedFamilyId != familyId) {
@@ -346,12 +349,10 @@ class HomeViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(familyPlan = KBPlan.FREE)
                     return@collectLatest
                 }
-                val activeFamilyId = familySessionPreferences.getActiveFamilyId()
-                val familyId = if (activeFamilyId != null) {
-                    families.firstOrNull { it.id == activeFamilyId }?.id ?: families.first().id
-                } else {
-                    families.first().id
-                }
+                val familyId = ActiveFamilyResolver.resolveFamilyId(
+                    families,
+                    familySessionPreferences.getActiveFamilyId(),
+                )
                 val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
                 if (familyId.isBlank()) {
                     _uiState.value = _uiState.value.copy(familyPlan = KBPlan.FREE)

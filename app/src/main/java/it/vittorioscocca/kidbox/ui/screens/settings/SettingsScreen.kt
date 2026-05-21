@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -93,9 +94,9 @@ fun SettingsScreen(
             onClick = onTheme,
         ),
         SettingRowItem(
-            title = "Family settings",
+            title = "Impostazioni famiglia",
             icon = Icons.Filled.Groups,
-            showChevron = false,
+            showChevron = true,
             onClick = onFamilySettings,
         ),
         SettingRowItem(
@@ -208,9 +209,9 @@ private fun SettingRow(item: SettingRowItem) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp)
+            .heightIn(min = if (item.subtitle != null) 64.dp else 56.dp)
             .clickable(onClick = item.onClick)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 16.dp, vertical = if (item.subtitle != null) 10.dp else 0.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -225,7 +226,13 @@ private fun SettingRow(item: SettingRowItem) {
             Column(verticalArrangement = Arrangement.Center) {
                 Text(item.title, fontSize = 16.sp, color = MaterialTheme.kidBoxColors.title)
                 if (item.subtitle != null) {
-                    Text(item.subtitle, fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle)
+                    Text(
+                        item.subtitle,
+                        fontSize = 12.sp,
+                        lineHeight = 15.sp,
+                        color = MaterialTheme.kidBoxColors.subtitle,
+                        maxLines = 2,
+                    )
                 }
             }
         }

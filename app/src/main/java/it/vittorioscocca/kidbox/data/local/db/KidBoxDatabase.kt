@@ -30,6 +30,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBRoutineCheckDao
 import it.vittorioscocca.kidbox.data.local.dao.KBRoutineDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoItemDao
 import it.vittorioscocca.kidbox.data.local.dao.KBUserProfileDao
+import it.vittorioscocca.kidbox.data.local.dao.KBGeofenceDao
 import it.vittorioscocca.kidbox.data.local.dao.KBSharedLocationDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoListDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTreatmentDao
@@ -77,6 +78,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBRoutineCheckEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBRoutineEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoItemEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBUserProfileEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBGeofenceEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBSharedLocationEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoListEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTreatmentEntity
@@ -98,7 +100,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBTripExpenseEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTripLegEntity
 
 @Database(
-    version = 32,
+    version = 33,
     exportSchema = false,
     entities = [
         KBUserProfileEntity::class,
@@ -129,6 +131,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBTripLegEntity
         KBCustomDrugEntity::class,
         KBDoseLogEntity::class,
         KBSharedLocationEntity::class,
+        KBGeofenceEntity::class,
         KBAIConversationEntity::class,
         KBAIMessageEntity::class,
         KBWalletTicketEntity::class,
@@ -179,6 +182,7 @@ abstract class KidBoxDatabase : RoomDatabase() {
     abstract fun customDrugDao(): KBCustomDrugDao
     abstract fun doseLogDao(): KBDoseLogDao
     abstract fun sharedLocationDao(): KBSharedLocationDao
+    abstract fun geofenceDao(): KBGeofenceDao
     abstract fun aiConversationDao(): KBAIConversationDao
     abstract fun aiMessageDao(): KBAIMessageDao
     abstract fun walletTicketDao(): WalletTicketDao

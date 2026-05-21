@@ -4,6 +4,7 @@ import android.Manifest
 import android.graphics.BitmapFactory
 import android.net.Uri
 import it.vittorioscocca.kidbox.util.fixBitmapOrientationFromBytes
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -106,6 +107,10 @@ fun ProfileScreen(
     val deleteSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = androidx.compose.ui.platform.LocalContext.current
     val kb = MaterialTheme.kidBoxColors
+
+    BackHandler(enabled = onBack != null) {
+        onBack?.invoke()
+    }
 
     // URI of the image the user picked from the gallery — drives the crop overlay
     var avatarCropUri by remember { mutableStateOf<Uri?>(null) }

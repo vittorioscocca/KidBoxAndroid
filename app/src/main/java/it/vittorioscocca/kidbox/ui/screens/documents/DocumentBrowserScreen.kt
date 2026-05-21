@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.documents
 
+import it.vittorioscocca.kidbox.ui.permissions.rememberCameraPermissionRequester
 import it.vittorioscocca.kidbox.util.KBLog
 
 import android.content.ActivityNotFoundException
@@ -166,6 +167,7 @@ fun DocumentBrowserScreen(
     var uploadTargetFolderId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(familyId, initialHighlightDocumentId, initialFolderId) {
+        viewModel.startObservingActiveFamily(routeFamilyId = familyId)
         viewModel.bindFamily(familyId)
         if (!initialHighlightDocumentId.isNullOrBlank()) {
             viewModel.focusDocument(initialHighlightDocumentId)
@@ -196,6 +198,12 @@ fun DocumentBrowserScreen(
             targetFolderId = uploadTargetFolderId,
         )
     }
+    val requestDocumentCamera = rememberCameraPermissionRequester(
+        onDenied = {
+            Toast.makeText(context, "Permesso fotocamera necessario", Toast.LENGTH_SHORT).show()
+        },
+        onLaunchCamera = { cameraLauncher.launch(null) },
+    )
 
     val photoLibraryLauncher = rememberSingleImagePicker { uri ->
         uri?.let { u ->
@@ -760,7 +768,7 @@ fun DocumentBrowserScreen(
             },
             onCamera = {
                 showUploadSheet = false
-                cameraLauncher.launch(null)
+                requestDocumentCamera()
             },
             onPhotoLibrary = {
                 showUploadSheet = false

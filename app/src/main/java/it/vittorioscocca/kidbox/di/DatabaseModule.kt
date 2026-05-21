@@ -34,6 +34,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBExpenseCategoryDao
 import it.vittorioscocca.kidbox.data.local.dao.KBDocumentDao
 import it.vittorioscocca.kidbox.data.local.dao.KBDocumentCategoryDao
 import it.vittorioscocca.kidbox.data.local.dao.KBPhotoAlbumDao
+import it.vittorioscocca.kidbox.data.local.dao.KBGeofenceDao
 import it.vittorioscocca.kidbox.data.local.dao.KBSharedLocationDao
 import it.vittorioscocca.kidbox.data.local.dao.KBMedicalVisitDao
 import it.vittorioscocca.kidbox.data.local.dao.KBMedicalExamDao
@@ -636,6 +637,35 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_32_33 = object : Migration(32, 33) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS kb_geofences (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    emoji TEXT,
+                    latitude REAL NOT NULL,
+                    longitude REAL NOT NULL,
+                    radius REAL NOT NULL DEFAULT 200,
+                    notifyOnArrive INTEGER NOT NULL DEFAULT 1,
+                    notifyOnLeave INTEGER NOT NULL DEFAULT 0,
+                    notifyMembersJson TEXT NOT NULL DEFAULT '[]',
+                    monitoredMemberIdsJson TEXT NOT NULL DEFAULT '[]',
+                    isActive INTEGER NOT NULL DEFAULT 1,
+                    createdBy TEXT NOT NULL DEFAULT '',
+                    createdAtEpochMillis INTEGER NOT NULL,
+                    updatedAtEpochMillis INTEGER NOT NULL,
+                    isDeleted INTEGER NOT NULL DEFAULT 0,
+                    FOREIGN KEY(familyId) REFERENCES kb_families(id) ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_geofences_familyId ON kb_geofences(familyId)")
+        }
+    }
+
     private val MIGRATION_29_30 = object : Migration(29, 30) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(
@@ -1073,6 +1103,7 @@ object DatabaseModule {
         MIGRATION_29_30,
         MIGRATION_30_31,
         MIGRATION_31_32,
+        MIGRATION_32_33,
     )
         .fallbackToDestructiveMigration()
         .build()
@@ -1136,6 +1167,9 @@ object DatabaseModule {
 
     @Provides
     fun provideKBSharedLocationDao(database: KidBoxDatabase): KBSharedLocationDao = database.sharedLocationDao()
+
+    @Provides
+    fun provideKBGeofenceDao(database: KidBoxDatabase): KBGeofenceDao = database.geofenceDao()
 
     @Provides
     fun provideKBMedicalVisitDao(database: KidBoxDatabase): KBMedicalVisitDao =

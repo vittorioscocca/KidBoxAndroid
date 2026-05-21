@@ -65,6 +65,7 @@ import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerBottomSheet
 import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerMember
 import it.vittorioscocca.kidbox.ui.navigation.CONTENT_NO_LONGER_AVAILABLE_MESSAGE
+import it.vittorioscocca.kidbox.ui.permissions.RuntimePermissions
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.time.Instant
 import java.time.ZoneId
@@ -238,8 +239,7 @@ fun TodoListScreen(
             onDismiss = { showEditor = false },
             onSave = { form ->
                 val mustAskPermission = form.reminderEnabled &&
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                    context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                    !RuntimePermissions.hasNotificationPermission(context)
                 if (mustAskPermission) {
                     pendingSaveAfterPermission = form
                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)

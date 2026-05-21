@@ -337,12 +337,17 @@ fun HomeScreen(
                     stiffness = Spring.StiffnessLow,
                 )
             }
-            val featureGridCellMinHeight = 128.dp
+            val fontScale = density.fontScale.coerceIn(1f, 1.4f)
+            val featureGridCellMinHeight = (118 + ((fontScale - 1f) * 36f).toInt()).dp
             val featureGridRowSpacing = 12.dp
             val featureGridRows = (orderIds.size + 1) / 2
             val featureGridHeight =
-                if (orderIds.isEmpty()) 0.dp
-                else (featureGridRows * 128 + (featureGridRows - 1) * 12).dp
+                if (orderIds.isEmpty()) {
+                    0.dp
+                } else {
+                    featureGridCellMinHeight * featureGridRows +
+                        featureGridRowSpacing * (featureGridRows - 1).coerceAtLeast(0)
+                }
 
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
@@ -672,10 +677,29 @@ private fun FeatureCard(item: FeatureItem, modifier: Modifier = Modifier, onClic
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             colors = CardDefaults.cardColors(containerColor = containerColor),
         ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(item.icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(28.dp))
-                Text(item.title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = titleColor)
-                Text(item.subtitle, color = subtitleColor, fontSize = 12.sp)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(item.icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(26.dp))
+                Text(
+                    item.title,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    color = titleColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    item.subtitle,
+                    color = subtitleColor,
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
         if (item.locked) {

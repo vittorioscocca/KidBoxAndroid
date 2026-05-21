@@ -17,12 +17,17 @@ import com.google.android.gms.location.Priority
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.data.local.ActiveFamilyResolver
+import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBUserProfileDao
 import it.vittorioscocca.kidbox.data.local.entity.KBSharedLocationEntity
 import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.data.notification.CountersService
 import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
+import it.vittorioscocca.kidbox.data.location.GeofenceMonitorService
 import it.vittorioscocca.kidbox.data.repository.FamilyLocationRepository
+import it.vittorioscocca.kidbox.data.repository.GeofenceRepository
 import it.vittorioscocca.kidbox.data.repository.LocationShareMode
 import java.util.Locale
 import javax.inject.Inject
@@ -51,7 +56,11 @@ data class FamilyLocationUiState(
 
 @HiltViewModel
 class FamilyLocationViewModel @Inject constructor(
+    private val familyDao: KBFamilyDao,
+    private val familySessionPreferences: FamilySessionPreferences,
     private val repository: FamilyLocationRepository,
+    private val geofenceRepository: GeofenceRepository,
+    private val geofenceMonitor: GeofenceMonitorService,
     private val profileDao: KBUserProfileDao,
     private val countersService: CountersService,
     private val homeBadgeManager: HomeBadgeManager,
@@ -65,9 +74,26 @@ class FamilyLocationViewModel @Inject constructor(
     private var locationCallback: LocationCallback? = null
     private var expiryJob: Job? = null
     private var observeJob: Job? = null
+    private var geofenceObserveJob: Job? = null
+    private var cachedGeofences: List<it.vittorioscocca.kidbox.data.local.entity.KBGeofenceEntity> = emptyList()
     private var hasLocationPermission: Boolean = false
     private var currentDisplayName: String = "Utente"
     private var sharingRequestedLocal: Boolean = false
+    private var activeFamilyObserverStarted = false
+
+    fun startObservingActiveFamily(routeFamilyId: String = "") {
+        if (activeFamilyObserverStarted) return
+        activeFamilyObserverStarted = true
+        viewModelScope.launch {
+            familyDao.observeAll().collectLatest { families ->
+                val effective = ActiveFamilyResolver.resolveFamilyId(
+                    families,
+                    familySessionPreferences.getActiveFamilyId(),
+                ).ifBlank { routeFamilyId.trim() }
+                if (effective.isNotBlank()) bindFamily(effective)
+            }
+        }
+    }
 
     fun bindFamily(familyId: String) {
         if (familyId.isBlank()) {
@@ -79,6 +105,10 @@ class FamilyLocationViewModel @Inject constructor(
             return
         }
         if (_uiState.value.familyId == familyId && !_uiState.value.isLoading) return
+        observeJob?.cancel()
+        geofenceObserveJob?.cancel()
+        repository.stopRealtime()
+        geofenceRepository.stopRealtime()
         _uiState.value = _uiState.value.copy(familyId = familyId, isLoading = true, errorMessage = null)
         viewModelScope.launch { refreshDisplayName() }
         repository.startRealtime(
@@ -91,6 +121,18 @@ class FamilyLocationViewModel @Inject constructor(
         observeJob = viewModelScope.launch {
             repository.observeSharedUsers(familyId).collectLatest { users ->
                 applyUsers(users)
+            }
+        }
+        geofenceRepository.startRealtime(familyId) { err ->
+            _uiState.value = _uiState.value.copy(
+                errorMessage = err.localizedMessage ?: "Errore sincronizzazione zone",
+            )
+        }
+        geofenceObserveJob?.cancel()
+        geofenceObserveJob = viewModelScope.launch {
+            geofenceRepository.observeGeofences(familyId).collectLatest { list ->
+                cachedGeofences = list
+                syncGeofenceMonitor()
             }
         }
         onLocationOpened()
@@ -128,6 +170,7 @@ class FamilyLocationViewModel @Inject constructor(
                 )
             }.onSuccess {
                 if (hasLocationPermission) startLocationUpdatesIfNeeded()
+                syncGeofenceMonitor()
             }.onFailure { err ->
                 sharingRequestedLocal = false
                 _uiState.value = _uiState.value.copy(
@@ -136,6 +179,7 @@ class FamilyLocationViewModel @Inject constructor(
                     myExpiresAtEpochMillis = null,
                 )
                 _uiState.value = _uiState.value.copy(errorMessage = err.localizedMessage ?: "Errore avvio condivisione")
+                syncGeofenceMonitor()
             }
         }
     }
@@ -163,6 +207,7 @@ class FamilyLocationViewModel @Inject constructor(
                 )
             }.onSuccess {
                 if (hasLocationPermission) startLocationUpdatesIfNeeded()
+                syncGeofenceMonitor()
             }.onFailure { err ->
                 sharingRequestedLocal = false
                 expiryJob?.cancel()
@@ -172,6 +217,7 @@ class FamilyLocationViewModel @Inject constructor(
                     myExpiresAtEpochMillis = null,
                 )
                 _uiState.value = _uiState.value.copy(errorMessage = err.localizedMessage ?: "Errore condivisione temporanea")
+                syncGeofenceMonitor()
             }
         }
     }
@@ -194,6 +240,7 @@ class FamilyLocationViewModel @Inject constructor(
                 }
         }
         stopLocationUpdates()
+        syncGeofenceMonitor()
     }
 
     fun clearError() {
@@ -236,13 +283,40 @@ class FamilyLocationViewModel @Inject constructor(
             scheduleTemporaryExpiryStop(me)
         } else {
             if (sharingRequestedLocal) {
-                // Waiting for first remote location update after startSharing.
+                syncGeofenceMonitor()
                 return
             }
             expiryJob?.cancel()
             stopLocationUpdates()
             _uiState.value = _uiState.value.copy(myCurrentAddress = null)
         }
+        syncGeofenceMonitor()
+    }
+
+    private fun syncGeofenceMonitor() {
+        val familyId = _uiState.value.familyId
+        val uid = auth.currentUser?.uid.orEmpty()
+        if (familyId.isBlank() || uid.isBlank()) {
+            geofenceMonitor.removeAll()
+            return
+        }
+        val sharing = _uiState.value.isSharing || sharingRequestedLocal
+        geofenceMonitor.syncMonitoring(
+            familyId = familyId,
+            uid = uid,
+            displayName = currentDisplayName,
+            isSharing = sharing,
+            geofences = cachedGeofences,
+            hasBackgroundLocation = hasBackgroundLocationPermission(),
+        )
+    }
+
+    private fun hasBackgroundLocationPermission(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return hasLocationPermissionNow()
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun scheduleTemporaryExpiryStop(me: KBSharedLocationEntity) {
@@ -406,7 +480,10 @@ class FamilyLocationViewModel @Inject constructor(
         stopLocationUpdates()
         expiryJob?.cancel()
         observeJob?.cancel()
+        geofenceObserveJob?.cancel()
         repository.stopRealtime()
+        geofenceRepository.stopRealtime()
+        geofenceMonitor.removeAll()
         super.onCleared()
     }
 }

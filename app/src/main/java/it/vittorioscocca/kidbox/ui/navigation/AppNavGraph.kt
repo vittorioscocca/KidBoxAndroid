@@ -53,6 +53,8 @@ import it.vittorioscocca.kidbox.ui.subscription.PlansScreen
 import it.vittorioscocca.kidbox.ui.screens.calendar.CalendarScreen
 import it.vittorioscocca.kidbox.ui.screens.expenses.ExpensesHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.location.FamilyLocationScreen
+import it.vittorioscocca.kidbox.ui.screens.location.geofence.GeofenceEditScreen
+import it.vittorioscocca.kidbox.ui.screens.location.geofence.GeofenceListScreen
 import it.vittorioscocca.kidbox.ui.screens.wallet.WalletHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.wallet.WalletTicketDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.passwords.AddPasswordScreen
@@ -192,8 +194,11 @@ fun AppNavGraph(
             HomeScreen(
                 onNavigate = { route ->
                     navController.navigate(route) {
-                        if (route == AppDestination.Plans.route) {
-                            launchSingleTop = true
+                        when (route) {
+                            AppDestination.Profile.route,
+                            AppDestination.Settings.route,
+                            -> launchSingleTop = true
+                            AppDestination.Plans.route -> launchSingleTop = true
                         }
                     }
                 },
@@ -208,6 +213,7 @@ fun AppNavGraph(
 
         composable(AppDestination.Profile.route) {
             ProfileScreen(
+                onBack = { navController.popBackToHome() },
                 onLoggedOut = {
                     navController.navigate(AppDestination.Login.route) {
                         popUpTo(navController.graph.id) { inclusive = true }
@@ -224,7 +230,7 @@ fun AppNavGraph(
 
         composable(AppDestination.Settings.route) {
             SettingsScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popBackToHome() },
                 onTheme = { navController.navigate(AppDestination.Theme.route) },
                 onFamilySettings = { navController.navigate(AppDestination.FamilySettings.route) },
                 onMessageSettings = { navController.navigate(AppDestination.MessageSettings.route) },
@@ -1310,6 +1316,43 @@ fun AppNavGraph(
             FamilyLocationScreen(
                 familyId = familyId,
                 onBack = { navController.popBackStack() },
+                onGeofences = {
+                    navController.navigate(AppDestination.GeofenceList.createRoute(familyId))
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.GeofenceList.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            GeofenceListScreen(
+                familyId = familyId,
+                onBack = { navController.popBackStack() },
+                onAdd = {
+                    navController.navigate(AppDestination.GeofenceEdit.createRoute(familyId))
+                },
+                onEdit = { geofenceId ->
+                    navController.navigate(AppDestination.GeofenceEdit.createRoute(familyId, geofenceId))
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.GeofenceEdit.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("geofenceId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) {
+            GeofenceEditScreen(
+                onBack = { navController.popBackStack() },
+                onSaved = { navController.popBackStack() },
             )
         }
 

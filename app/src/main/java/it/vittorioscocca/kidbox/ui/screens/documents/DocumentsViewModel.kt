@@ -6,9 +6,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.vittorioscocca.kidbox.data.local.ActiveFamilyResolver
 import it.vittorioscocca.kidbox.data.local.DocumentsSavedSort
 import it.vittorioscocca.kidbox.data.local.DocumentsSavedViewMode
 import it.vittorioscocca.kidbox.data.local.DocumentsUiPreferences
+import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentCategoryEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
@@ -64,6 +67,8 @@ class DocumentsViewModel @Inject constructor(
     private val countersService: CountersService,
     private val homeBadgeManager: HomeBadgeManager,
     private val uiPreferences: DocumentsUiPreferences,
+    private val familyDao: KBFamilyDao,
+    private val familySessionPreferences: FamilySessionPreferences,
     private val familyMemberDao: KBFamilyMemberDao,
     private val auth: FirebaseAuth,
 ) : ViewModel() {
@@ -75,9 +80,27 @@ class DocumentsViewModel @Inject constructor(
     private val pendingUploadScope = MutableStateFlow(KBVisibilityScope.FAMILY)
     private val pendingMemberIds = MutableStateFlow<Set<String>>(emptySet())
     private var rootGateStartedAtMillis: Long = 0L
+    private var activeFamilyObserverStarted = false
+
+    /** Segue [FamilySessionPreferences] quando l'utente cambia famiglia con lo schermo aperto. */
+    fun startObservingActiveFamily(routeFamilyId: String = "") {
+        if (activeFamilyObserverStarted) return
+        activeFamilyObserverStarted = true
+        viewModelScope.launch {
+            familyDao.observeAll().collectLatest { families ->
+                val effective = ActiveFamilyResolver.resolveFamilyId(
+                    families,
+                    familySessionPreferences.getActiveFamilyId(),
+                ).ifBlank { routeFamilyId.trim() }
+                if (effective.isNotBlank()) bindFamily(effective)
+            }
+        }
+    }
 
     fun bindFamily(familyId: String) {
         if (familyId.isBlank() || _uiState.value.familyId == familyId) return
+        folderObservationJob?.cancel()
+        repository.stopRealtime()
         visibilityMembersJob?.cancel()
         resetPendingUploadVisibility()
         _uiState.value = DocumentsUiState(

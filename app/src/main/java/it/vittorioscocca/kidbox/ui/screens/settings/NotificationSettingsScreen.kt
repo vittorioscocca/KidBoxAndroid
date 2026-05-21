@@ -51,6 +51,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.notification.PushNotificationManager.PreferenceKeys
 import it.vittorioscocca.kidbox.notifications.KidBoxFirebaseMessagingService
+import it.vittorioscocca.kidbox.ui.permissions.RuntimePermissions
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
 @Composable
@@ -418,15 +419,10 @@ private fun updatePreferenceWithPermission(
         onSet(key, false, false)
         return
     }
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        val granted = context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        if (granted) {
-            onSet(key, true, true)
-        } else {
-            setPendingKey(key)
-            requestPermission()
-        }
-    } else {
+    if (RuntimePermissions.hasNotificationPermission(context)) {
         onSet(key, true, true)
+    } else {
+        setPendingKey(key)
+        requestPermission()
     }
 }

@@ -145,29 +145,51 @@ internal fun ChatBubble(
     val swipeThresholdPx = 86f
     val replyHintAlpha = (abs(dragOffsetX.value) / swipeThresholdPx).coerceIn(0f, 1f)
 
+    val avatarToBubbleGap = 6.dp
+    val incomingLeadingInset = 12.dp + 32.dp + avatarToBubbleGap
+
     Column(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 1.dp),
         horizontalAlignment = if (isOwn) Alignment.End else Alignment.Start,
     ) {
         Text(
             text = if (isOwn) "Tu" else message.senderName,
             color = MaterialTheme.kidBoxColors.subtitle,
             fontSize = 11.sp,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 1.dp),
+            modifier = Modifier.padding(
+                start = if (isOwn) 8.dp else incomingLeadingInset,
+                end = if (isOwn) 12.dp else 8.dp,
+                top = 1.dp,
+                bottom = 1.dp,
+            ),
         )
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = if (isOwn) 0.dp else 12.dp),
             horizontalArrangement = if (isOwn) Arrangement.End else Arrangement.Start,
+            verticalAlignment = Alignment.Top,
         ) {
             if (!isOwn) {
-                Icon(
-                    imageVector = Icons.Default.Reply,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = replyHintAlpha),
-                    modifier = Modifier
-                        .padding(horizontal = 2.dp, vertical = 12.dp)
-                        .size(18.dp),
+                SenderAvatarView(
+                    senderId = message.senderId,
+                    familyId = message.familyId,
+                    senderName = message.senderName,
+                    modifier = Modifier.padding(end = avatarToBubbleGap),
                 )
+                // Icona swipe-to-reply: solo durante il gesto, così non occupa spazio fisso tra avatar e bubble.
+                if (replyHintAlpha > 0.01f) {
+                    Icon(
+                        imageVector = Icons.Default.Reply,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = replyHintAlpha),
+                        modifier = Modifier
+                            .padding(start = 2.dp, top = 6.dp)
+                            .size(16.dp),
+                    )
+                }
             }
             // Photo / video / mediaGroup / location without a reply context render
             // edge-to-edge — the media IS the bubble, no surrounding background or
@@ -339,14 +361,14 @@ internal fun ChatBubble(
                     }
                 }
             }
-            if (isOwn) {
+            if (isOwn && replyHintAlpha > 0.01f) {
                 Icon(
                     imageVector = Icons.Default.Reply,
                     contentDescription = null,
-                    tint = Color.White.copy(alpha = replyHintAlpha),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = replyHintAlpha),
                     modifier = Modifier
-                        .padding(horizontal = 2.dp, vertical = 12.dp)
-                        .size(18.dp),
+                        .padding(start = 2.dp, top = 6.dp)
+                        .size(16.dp),
                 )
             }
         }
@@ -354,7 +376,12 @@ internal fun ChatBubble(
         if (message.reactions.isNotEmpty()) {
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.padding(
+                    start = if (isOwn) 12.dp else incomingLeadingInset,
+                    end = if (isOwn) 16.dp else 12.dp,
+                    top = 4.dp,
+                    bottom = 4.dp,
+                ),
             ) {
                 message.reactions.entries.sortedBy { it.key }.forEach { (emoji, users) ->
                     Text(

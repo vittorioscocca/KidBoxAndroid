@@ -17,6 +17,8 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.vittorioscocca.kidbox.data.local.ActiveFamilyResolver
+import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.data.remote.user.AvatarRemoteStore
@@ -73,6 +75,7 @@ class ProfileViewModel @Inject constructor(
     application: Application,
     private val userProfileRepository: UserProfileRepository,
     private val familyDao: KBFamilyDao,
+    private val familySessionPreferences: FamilySessionPreferences,
     private val subscriptionRepository: SubscriptionRepository,
     private val avatarRemoteStore: AvatarRemoteStore,
     private val auth: FirebaseAuth,
@@ -338,7 +341,10 @@ class ProfileViewModel @Inject constructor(
                 userProfileRepository.saveLocalProfile(s.firstName, s.lastName, s.familyAddress)
                 val uid = auth.currentUser?.uid
                 if (uid != null && s.pickedAvatar != null) {
-                    val familyId = familyDao.observeAll().first().firstOrNull()?.id
+                    val familyId = ActiveFamilyResolver.resolveFamilyId(
+                        familyDao.observeAll().first(),
+                        familySessionPreferences.getActiveFamilyId(),
+                    ).ifBlank { null }
                     val avatarUrl = avatarRemoteStore.uploadAvatar(uid, s.pickedAvatar, familyId)
                     db.collection("users").document(uid).set(
                         mapOf("avatarURL" to avatarUrl, "updatedAt" to FieldValue.serverTimestamp()),

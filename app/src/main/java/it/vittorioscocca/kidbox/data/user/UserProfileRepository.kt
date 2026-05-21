@@ -4,6 +4,8 @@ import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import it.vittorioscocca.kidbox.data.local.ActiveFamilyResolver
+import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.dao.KBUserProfileDao
@@ -20,6 +22,7 @@ import kotlinx.coroutines.tasks.await
 class UserProfileRepository @Inject constructor(
     private val userProfileDao: KBUserProfileDao,
     private val familyDao: KBFamilyDao,
+    private val familySessionPreferences: FamilySessionPreferences,
     private val familyMemberDao: KBFamilyMemberDao,
     private val auth: FirebaseAuth,
     private val memberProfileRemoteStore: FamilyMemberProfileRemoteStore,
@@ -107,7 +110,10 @@ class UserProfileRepository @Inject constructor(
         ).await()
 
         if (displayName != "Utente") {
-            val familyId = familyDao.observeAll().first().firstOrNull()?.id
+            val familyId = ActiveFamilyResolver.resolveFamilyId(
+                familyDao.observeAll().first(),
+                familySessionPreferences.getActiveFamilyId(),
+            ).ifBlank { null }
             if (familyId != null) {
                 memberProfileRemoteStore.upsertMyMemberProfileIfNeeded(familyId, displayName)
                 val member = familyMemberDao.getById(uid)

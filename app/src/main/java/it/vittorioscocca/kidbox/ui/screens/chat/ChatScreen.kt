@@ -2,6 +2,8 @@
 
 package it.vittorioscocca.kidbox.ui.screens.chat
 
+import it.vittorioscocca.kidbox.ui.permissions.RuntimePermissions
+import it.vittorioscocca.kidbox.ui.permissions.rememberCameraPermissionRequester
 import it.vittorioscocca.kidbox.util.KBLog
 
 import android.Manifest
@@ -375,6 +377,12 @@ fun ChatScreen(
             }
         }
     }
+    val requestCameraCapture = rememberCameraPermissionRequester(
+        onDenied = {
+            Toast.makeText(context, "Permesso fotocamera necessario", Toast.LENGTH_SHORT).show()
+        },
+        onLaunchCamera = { cameraPicker.launch(null) },
+    )
     val docPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             scope.launch {
@@ -561,7 +569,7 @@ fun ChatScreen(
                                 .weight(1f)
                                 .alpha(if (didInitialBottomScroll) 1f else 0f),
                             contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             itemsIndexed(
                                 items = reversedFlatItems,
@@ -832,7 +840,7 @@ fun ChatScreen(
             onDismiss = { showAttachmentSheet = false },
             onPickCamera = {
                 showAttachmentSheet = false
-                cameraPicker.launch(null)
+                requestCameraCapture()
             },
             onPickImage = {
                 showAttachmentSheet = false
@@ -852,12 +860,24 @@ fun ChatScreen(
             },
             onPickLocation = {
                 showAttachmentSheet = false
-                locationPermissionLauncher.launch(
-                    arrayOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION,
-                    ),
-                )
+                if (RuntimePermissions.hasLocationAccess(context)) {
+                    scope.launch {
+                        val location = getLastKnownLocation(locationClient)
+                        locationPickerLatLng = if (location != null) {
+                            LatLng(location.latitude, location.longitude)
+                        } else {
+                            LatLng(41.9028, 12.4964)
+                        }
+                        showLocationPicker = true
+                    }
+                } else {
+                    locationPermissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                        ),
+                    )
+                }
             },
             onPickContact = {
                 showAttachmentSheet = false

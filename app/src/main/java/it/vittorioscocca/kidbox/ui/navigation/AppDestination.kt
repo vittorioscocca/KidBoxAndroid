@@ -296,6 +296,15 @@ sealed class AppDestination(val route: String) {
     data object FamilyLocation : AppDestination("family_location/{familyId}") {
         fun createRoute(familyId: String): String = "family_location/$familyId"
     }
+    data object GeofenceList : AppDestination("geofence_list/{familyId}") {
+        fun createRoute(familyId: String): String = "geofence_list/$familyId"
+    }
+    data object GeofenceEdit : AppDestination("geofence_edit/{familyId}?geofenceId={geofenceId}") {
+        fun createRoute(familyId: String, geofenceId: String? = null): String {
+            val base = "geofence_edit/$familyId"
+            return if (geofenceId.isNullOrBlank()) base else "$base?geofenceId=$geofenceId"
+        }
+    }
     data object WalletHome : AppDestination("wallet_home/{familyId}") {
         fun createRoute(familyId: String): String = "wallet_home/$familyId"
     }

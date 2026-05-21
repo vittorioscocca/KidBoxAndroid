@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -48,10 +50,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.text.ClickableText
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -62,6 +73,63 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 private val BackgroundColor = Color(0xFFF2F0EB)
 private val BlackButton = Color(0xFF1A1A1A)
 private val OrangeAccent = Color(0xFFFF6B00)
+
+private enum class SocialProvider { APPLE, GOOGLE, FACEBOOK }
+
+/** Layout login adattato a larghezza schermo e dimensione testo di sistema. */
+private data class LoginScreenMetrics(
+    val horizontalPadding: Dp,
+    val buttonHeight: Dp,
+    val buttonContentPaddingHorizontal: Dp,
+    val labelFontSize: TextUnit,
+    val iconSize: Dp,
+    val iconGap: Dp,
+    val compactLabels: Boolean,
+)
+
+@Composable
+private fun rememberLoginScreenMetrics(): LoginScreenMetrics {
+    val widthDp = LocalConfiguration.current.screenWidthDp
+    val fontScale = LocalDensity.current.fontScale.coerceIn(1f, 2f)
+    return remember(widthDp, fontScale) {
+        // stress > 1 → schermo stretto e/o testo di sistema ingrandito (tipico su A12).
+        val stress = fontScale * (360f / widthDp.coerceAtLeast(320).toFloat())
+        val compactLabels = stress >= 1.05f || widthDp < 360
+        val tight = stress >= 1.22f || widthDp < 340
+        val labelSp = when {
+            tight -> 12.sp
+            compactLabels -> 13.sp
+            widthDp < 400 -> 14.sp
+            else -> 16.sp
+        }
+        LoginScreenMetrics(
+            horizontalPadding = when {
+                widthDp < 340 -> 16.dp
+                widthDp < 360 -> 20.dp
+                else -> 28.dp
+            },
+            buttonHeight = if (tight) 58.dp else 56.dp,
+            buttonContentPaddingHorizontal = when {
+                tight -> 10.dp
+                compactLabels -> 12.dp
+                else -> 16.dp
+            },
+            labelFontSize = labelSp,
+            iconSize = if (tight) 20.dp else 22.dp,
+            iconGap = if (tight) 8.dp else 10.dp,
+            compactLabels = compactLabels,
+        )
+    }
+}
+
+private fun socialLoginLabel(provider: SocialProvider, compact: Boolean): String = when (provider) {
+    SocialProvider.APPLE -> if (compact) "Apple" else "Continua con Apple"
+    SocialProvider.GOOGLE -> if (compact) "Google" else "Continua con Google"
+    SocialProvider.FACEBOOK -> if (compact) "Facebook" else "Continua con Facebook"
+}
+
+private fun emailLoginLabel(compact: Boolean): String =
+    if (compact) "Email" else "Continua con email"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,6 +149,7 @@ fun LoginScreen(
     var showEmailSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val uriHandler = LocalUriHandler.current
+    val metrics = rememberLoginScreenMetrics()
 
     LaunchedEffect(authCheckState) {
         when (val state = authCheckState) {
@@ -103,7 +172,7 @@ fun LoginScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 32.dp),
+                        .padding(horizontal = metrics.horizontalPadding),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Spacer(modifier = Modifier.height(96.dp))
@@ -140,81 +209,36 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(52.dp))
 
-            // Bottoni neri
+            // Bottoni neri (icone allineate a LoginView iOS)
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
+                SocialLoginButton(
+                    label = socialLoginLabel(SocialProvider.APPLE, metrics.compactLabels),
+                    enabled = !isBusy,
+                    metrics = metrics,
                     onClick = { viewModel.signInApple(activity) },
-                    enabled = !isBusy,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = BlackButton,
-                        contentColor = Color.White,
-                        disabledContainerColor = BlackButton.copy(alpha = 0.5f),
-                        disabledContentColor = Color.White.copy(alpha = 0.5f),
-                    ),
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_apple),
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(modifier = Modifier.size(8.dp))
-                        Text(
-                            "Continua con Apple",
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp,
-                        )
-                    }
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_apple),
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(metrics.iconSize - 4.dp),
+                    )
                 }
-
-                Button(
+                SocialLoginButton(
+                    label = socialLoginLabel(SocialProvider.GOOGLE, metrics.compactLabels),
+                    enabled = !isBusy,
+                    metrics = metrics,
                     onClick = { viewModel.signInGoogle(activity) },
-                    enabled = !isBusy,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = BlackButton,
-                        contentColor = Color.White,
-                        disabledContainerColor = BlackButton.copy(alpha = 0.5f),
-                        disabledContentColor = Color.White.copy(alpha = 0.5f),
-                    ),
                 ) {
-                    Text(
-                        "Continua con Google",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
-                    )
+                    GoogleLoginIcon(iconSize = metrics.iconSize)
                 }
-
-                Button(
-                    onClick = { viewModel.signInFacebook(activity) },
+                SocialLoginButton(
+                    label = socialLoginLabel(SocialProvider.FACEBOOK, metrics.compactLabels),
                     enabled = !isBusy,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = BlackButton,
-                        contentColor = Color.White,
-                        disabledContainerColor = BlackButton.copy(alpha = 0.5f),
-                        disabledContentColor = Color.White.copy(alpha = 0.5f),
-                    ),
+                    metrics = metrics,
+                    onClick = { viewModel.signInFacebook(activity) },
                 ) {
-                    Text(
-                        "Continua con Facebook",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
-                    )
+                    FacebookLoginIcon(iconSize = metrics.iconSize)
                 }
             }
 
@@ -248,7 +272,7 @@ fun LoginScreen(
                 enabled = !isBusy,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
+                    .height(metrics.buttonHeight)
                     .border(
                         width = 1.dp,
                         color = Color(0xFFCCCCCC),
@@ -263,9 +287,10 @@ fun LoginScreen(
                 ),
             ) {
                 Text(
-                    "Continua con email",
+                    text = emailLoginLabel(metrics.compactLabels),
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp,
+                    fontSize = metrics.labelFontSize,
+                    maxLines = 1,
                 )
             }
 
@@ -291,50 +316,10 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Footer con link cliccabili
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        "Continuando, accetti i ",
-                        fontSize = 12.sp,
-                        color = Color(0xFF888888),
-                    )
-                    Text(
-                        "Termini di Servizio",
-                        fontSize = 12.sp,
-                        color = OrangeAccent,
-                        modifier = Modifier.clickable {
-                            uriHandler.openUri("https://vittorioscocca.github.io/KidBox/terms/")
-                        },
-                    )
-                    Text(
-                        " e la ",
-                        fontSize = 12.sp,
-                        color = Color(0xFF888888),
-                    )
-                    Text(
-                        "Privacy Policy",
-                        fontSize = 12.sp,
-                        color = OrangeAccent,
-                        maxLines = 1,
-                        softWrap = false,
-                        modifier = Modifier.clickable {
-                            uriHandler.openUri("https://vittorioscocca.github.io/KidBox/privacy/")
-                        },
-                    )
-                }
-                Text(
-                    "di KidBox.",
-                    fontSize = 12.sp,
-                    color = Color(0xFF888888),
-                )
-            }
+            LoginTermsFooter(
+                onTermsClick = { uriHandler.openUri("https://vittorioscocca.github.io/KidBox/terms/") },
+                onPrivacyClick = { uriHandler.openUri("https://vittorioscocca.github.io/KidBox/privacy/") },
+            )
 
             Spacer(modifier = Modifier.height(40.dp))
                 }
@@ -395,6 +380,138 @@ fun LoginScreen(
             }
         }
     }
+}
+
+@Composable
+private fun SocialLoginButton(
+    label: String,
+    enabled: Boolean,
+    metrics: LoginScreenMetrics,
+    onClick: () -> Unit,
+    icon: @Composable () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(metrics.buttonHeight),
+        shape = RoundedCornerShape(28.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = BlackButton,
+            contentColor = Color.White,
+            disabledContainerColor = BlackButton.copy(alpha = 0.5f),
+            disabledContentColor = Color.White.copy(alpha = 0.5f),
+        ),
+        contentPadding = PaddingValues(
+            horizontal = metrics.buttonContentPaddingHorizontal,
+            vertical = 10.dp,
+        ),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Box(
+                modifier = Modifier.size(metrics.iconSize),
+                contentAlignment = Alignment.Center,
+            ) {
+                icon()
+            }
+            Spacer(modifier = Modifier.size(metrics.iconGap))
+            Text(
+                text = label,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = metrics.labelFontSize,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
+    }
+}
+
+/** Cerchio bianco + G blu — come `GoogleIcon` su iOS. */
+@Composable
+private fun GoogleLoginIcon(iconSize: Dp) {
+    val letterSp = (iconSize.value * 0.64f).sp
+    Box(
+        modifier = Modifier
+            .size(iconSize)
+            .background(Color.White, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "G",
+            color = Color(0xFF4285F4),
+            fontSize = letterSp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+/** Cerchio blu + f bianca — come `FacebookIcon` su iOS (tema chiaro). */
+@Composable
+private fun FacebookLoginIcon(iconSize: Dp) {
+    val letterSp = (iconSize.value * 0.68f).sp
+    Box(
+        modifier = Modifier
+            .size(iconSize)
+            .background(Color(0xFF3B5A99), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "f",
+            color = Color.White,
+            fontSize = letterSp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+private const val TERMS_TAG = "terms"
+private const val PRIVACY_TAG = "privacy"
+
+@Composable
+private fun LoginTermsFooter(
+    onTermsClick: () -> Unit,
+    onPrivacyClick: () -> Unit,
+) {
+    val footerText = buildAnnotatedString {
+        append("Continuando, accetti i ")
+        pushStringAnnotation(tag = TERMS_TAG, annotation = TERMS_TAG)
+        withStyle(SpanStyle(color = OrangeAccent)) {
+            append("Termini di Servizio")
+        }
+        pop()
+        append(" e la ")
+        pushStringAnnotation(tag = PRIVACY_TAG, annotation = PRIVACY_TAG)
+        withStyle(SpanStyle(color = OrangeAccent)) {
+            append("Privacy Policy")
+        }
+        pop()
+        append(" di KidBox.")
+    }
+    ClickableText(
+        text = footerText,
+        style = MaterialTheme.typography.bodySmall.copy(
+            fontSize = 12.sp,
+            color = Color(0xFF888888),
+            textAlign = TextAlign.Center,
+            lineHeight = 18.sp,
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+        onClick = { offset ->
+            footerText.getStringAnnotations(TERMS_TAG, offset, offset).firstOrNull()?.let {
+                onTermsClick()
+                return@ClickableText
+            }
+            footerText.getStringAnnotations(PRIVACY_TAG, offset, offset).firstOrNull()?.let {
+                onPrivacyClick()
+            }
+        },
+    )
 }
 
 @Composable

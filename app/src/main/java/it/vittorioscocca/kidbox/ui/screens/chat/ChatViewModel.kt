@@ -7,6 +7,8 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.ListenerRegistration
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.chat.model.ChatMessageType
+import it.vittorioscocca.kidbox.data.local.ActiveFamilyResolver
+import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.MessageSettingsPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.notification.CounterField
@@ -46,6 +48,7 @@ data class ChatUiState(
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val familyDao: KBFamilyDao,
+    private val familySessionPreferences: FamilySessionPreferences,
     private val chatRepository: ChatRepository,
     private val badgeManager: HomeBadgeManager,
     private val auth: FirebaseAuth,
@@ -114,9 +117,13 @@ class ChatViewModel @Inject constructor(
     private fun observeFamily() {
         viewModelScope.launch {
             familyDao.observeAll().collectLatest { families ->
-                val familyId = families.firstOrNull()?.id.orEmpty()
+                val familyId = ActiveFamilyResolver.resolveFamilyId(
+                    families,
+                    familySessionPreferences.getActiveFamilyId(),
+                )
                 if (familyId.isBlank()) {
                     stopRealtime()
+                    hasBoundFamily = false
                     _uiState.value = ChatUiState(
                         isLoading = false,
                         currentUid = auth.currentUser?.uid.orEmpty(),
@@ -124,7 +131,12 @@ class ChatViewModel @Inject constructor(
                     )
                     return@collectLatest
                 }
-                if (hasBoundFamily && _uiState.value.familyId == familyId) return@collectLatest
+                val previousId = _uiState.value.familyId
+                if (hasBoundFamily && previousId == familyId) return@collectLatest
+                if (hasBoundFamily && previousId != familyId) {
+                    stopRealtime()
+                    hasBoundFamily = false
+                }
                 hasBoundFamily = true
                 bindFamily(familyId)
             }
