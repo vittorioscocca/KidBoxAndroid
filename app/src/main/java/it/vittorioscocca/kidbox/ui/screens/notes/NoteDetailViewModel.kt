@@ -121,11 +121,21 @@ class NoteDetailViewModel @Inject constructor(
     }
 
     fun updateTitle(value: String) {
-        _uiState.value = _uiState.value.copy(title = value, isDirty = true)
+        val current = _uiState.value
+        // No-op se il valore non è cambiato: evita che echi programmatici
+        // del TextField (es. recompose dopo save con titolo normalizzato)
+        // rialzino isDirty e facciano ricomparire il bottone "Salva".
+        if (current.title == value) return
+        _uiState.value = current.copy(title = value, isDirty = true)
     }
 
     fun updateBody(value: String) {
-        _uiState.value = _uiState.value.copy(body = value, isDirty = true)
+        val current = _uiState.value
+        // Vedi updateTitle: lo stesso vale per il corpo, dove il setText
+        // programmatico nell'AndroidView del RichNoteEditor farebbe scattare
+        // il TextWatcher con il body trimEnd() arrivato dall'observer.
+        if (current.body == value) return
+        _uiState.value = current.copy(body = value, isDirty = true)
     }
 
     fun setVisibilityConfirmed(
@@ -146,27 +156,38 @@ class NoteDetailViewModel @Inject constructor(
     ) {
         val current = _uiState.value
         if (current.familyId.isBlank() || current.noteId.isBlank()) return
-        _uiState.value = current.copy(isSaving = true)
+        val normalizedTitle = current.title.htmlToPlainText().trim()
+        val normalizedBody = current.body.trimEnd()
+        // Aggiornamento ottimistico: nascondi subito il bottone "Salva"
+        // mettendo isDirty=false PRIMA che la rete risponda. Allineiamo
+        // anche title/body alla forma normalizzata così l'eco dell'observer
+        // non innesca un setText programmatico che rialzerebbe isDirty.
+        _uiState.value = current.copy(
+            title = normalizedTitle,
+            body = normalizedBody,
+            isSaving = true,
+            isDirty = false,
+            errorMessage = null,
+        )
         viewModelScope.launch {
             runCatching {
                 noteRepository.upsertNote(
                     familyId = current.familyId,
                     noteId = current.noteId,
-                    title = current.title.htmlToPlainText().trim(),
-                    body = current.body.trimEnd(),
+                    title = normalizedTitle,
+                    body = normalizedBody,
                     visibilityScope = current.visibilityScope,
                     visibilityMemberIds = current.visibilityMemberIds,
                 )
             }.onSuccess {
-                _uiState.value = _uiState.value.copy(
-                    isSaving = false,
-                    isDirty = false,
-                    errorMessage = null,
-                )
+                _uiState.value = _uiState.value.copy(isSaving = false)
                 onDone()
             }.onFailure { err ->
+                // Se il salvataggio fallisce, ripristina lo stato "dirty"
+                // così il bottone ricompare e l'utente può riprovare.
                 _uiState.value = _uiState.value.copy(
                     isSaving = false,
+                    isDirty = true,
                     errorMessage = err.message ?: "Errore salvataggio",
                 )
             }
@@ -176,18 +197,24 @@ class NoteDetailViewModel @Inject constructor(
     fun saveSilently() {
         val current = _uiState.value
         if (current.familyId.isBlank() || current.noteId.isBlank() || !current.isDirty) return
+        val normalizedTitle = current.title.htmlToPlainText().trim()
+        val normalizedBody = current.body.trimEnd()
         viewModelScope.launch {
             runCatching {
                 noteRepository.upsertNote(
                     familyId = current.familyId,
                     noteId = current.noteId,
-                    title = current.title.htmlToPlainText().trim(),
-                    body = current.body.trimEnd(),
+                    title = normalizedTitle,
+                    body = normalizedBody,
                     visibilityScope = current.visibilityScope,
                     visibilityMemberIds = current.visibilityMemberIds,
                 )
             }.onSuccess {
-                _uiState.value = _uiState.value.copy(isDirty = false)
+                _uiState.value = _uiState.value.copy(
+                    title = normalizedTitle,
+                    body = normalizedBody,
+                    isDirty = false,
+                )
             }
         }
     }

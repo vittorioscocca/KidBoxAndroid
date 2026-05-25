@@ -728,6 +728,7 @@ fun ChatScreen(
                     recorderManager.resume()
                     inputBarViewModel.onResumeRecording()
                 },
+                onMentionPicked = viewModel::registerMention,
                 replyPreview = state.replyingToId?.let { id -> state.messages.firstOrNull { it.id == id } },
             )
         }
@@ -1117,6 +1118,7 @@ private fun ReplyComposerBar(
     onLockRecording: () -> Unit,
     onPauseRecording: () -> Unit,
     onResumeRecording: () -> Unit,
+    onMentionPicked: (ChatMentionCandidate) -> Unit,
     replyPreview: UiChatMessage?,
 ) {
     val context = LocalContext.current
@@ -1303,6 +1305,10 @@ private fun ReplyComposerBar(
             )
         }
 
+        // Mostriamo il picker delle menzioni solo se la chat ha più di due
+        // partecipanti, altrimenti non ha senso suggerire nulla.
+        val mentionCandidates = if (state.canMention) state.mentionCandidates else emptyList()
+
         ChatInputBar(
             text = state.inputText,
             isSending = state.isSending,
@@ -1318,6 +1324,8 @@ private fun ReplyComposerBar(
             onLockRecording = onLockRecording,
             onPauseRecording = onPauseRecording,
             onResumeRecording = onResumeRecording,
+            mentionCandidates = mentionCandidates,
+            onMentionPicked = onMentionPicked,
         )
     }
 }

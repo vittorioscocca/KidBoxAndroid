@@ -13,6 +13,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBGeofenceDao
 import it.vittorioscocca.kidbox.data.local.entity.KBGeofenceEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
 import it.vittorioscocca.kidbox.data.repository.GeofenceRepository
+import it.vittorioscocca.kidbox.data.sync.FamilySyncCenter
 import it.vittorioscocca.kidbox.util.decodeStringList
 import it.vittorioscocca.kidbox.util.encodeStringList
 import java.util.Locale
@@ -69,6 +70,7 @@ class GeofenceEditViewModel @Inject constructor(
     private val geofenceDao: KBGeofenceDao,
     private val familyDao: KBFamilyDao,
     private val familyMemberDao: KBFamilyMemberDao,
+    private val familySyncCenter: FamilySyncCenter,
     private val auth: FirebaseAuth,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(GeofenceEditUiState())
@@ -87,30 +89,39 @@ class GeofenceEditViewModel @Inject constructor(
     }
 
     private fun load(familyId: String, geofenceId: String?) {
+        // Refresh one-shot dei membri da Firestore: garantisce che Room sia aggiornato
+        // anche quando questa schermata viene aperta direttamente (deeplink) senza passare
+        // per la Home, che è l'unica che avvia FamilySyncCenter.startSync.
+        familySyncCenter.refreshMembersOnce(familyId)
+        // Avvia l'osservazione dei membri INDIPENDENTEMENTE dalla coroutine di caricamento:
+        // evita la race condition in cui _uiState.value = GeofenceEditUiState(...)
+        // sovrascriveva l'intero stato (incluso `members`) già popolato dall'osservatore,
+        // e il Flow Room non riemetteva perché la DB non era cambiata.
+        viewModelScope.launch {
+            familyMemberDao.observeActiveByFamilyId(familyId).collectLatest { list ->
+                _uiState.update { it.copy(members = list) }
+            }
+        }
         viewModelScope.launch {
             val uid = auth.currentUser?.uid.orEmpty()
             val family = familyDao.getById(familyId)
             val member = familyMemberDao.getActiveByFamilyAndUser(familyId, uid)
             val isOwner = member?.role.equals("owner", ignoreCase = true) || family?.createdBy == uid
-            viewModelScope.launch {
-                familyMemberDao.observeActiveByFamilyId(familyId).collectLatest { list ->
-                    _uiState.update { it.copy(members = list) }
-                }
-            }
             if (geofenceId != null) {
                 val entity = geofenceDao.getById(geofenceId)
                 if (entity == null) {
-                    _uiState.value = GeofenceEditUiState(
+                    // Usa update { copy } per preservare `members` già caricati dall'osservatore
+                    _uiState.update { it.copy(
                         familyId = familyId,
                         isOwner = isOwner,
                         isLoading = false,
                         errorMessage = "Zona non trovata",
-                    )
+                    ) }
                     return@launch
                 }
                 val monitored = decodeStringList(entity.monitoredMemberIdsJson)
                 val notify = decodeStringList(entity.notifyMembersJson)
-                _uiState.value = GeofenceEditUiState(
+                _uiState.update { it.copy(
                     familyId = familyId,
                     geofenceId = entity.id,
                     isOwner = isOwner,
@@ -126,13 +137,13 @@ class GeofenceEditViewModel @Inject constructor(
                     monitoredUserIds = monitored.toSet(),
                     notifyAllMembers = notify.isEmpty(),
                     notifyUserIds = notify.toSet(),
-                )
+                ) }
             } else {
-                _uiState.value = GeofenceEditUiState(
+                _uiState.update { it.copy(
                     familyId = familyId,
                     isOwner = isOwner,
                     isLoading = false,
-                )
+                ) }
             }
         }
     }

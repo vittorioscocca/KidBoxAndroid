@@ -182,6 +182,21 @@ class FamilySyncCenter @Inject constructor(
      * Il costo è minimo: Firestore re-invia lo snapshot corrente come primo evento.
      */
     fun startSync(familyId: String) {
+        // Guard: se i listener sono già attivi per questa famiglia, non li riattiviamo.
+        // Questo evita che FamilySettingsViewModel (che chiama startSync in autonomia)
+        // stacchi i listener avviati da HomeViewModel causando un breve gap in Room
+        // (i Flow che osservano la DB non riemettono finché Room non cambia,
+        // quindi il gap si traduce in lista membri vuota sulle schermate che avevano
+        // già ricevuto l'emissione).
+        if (familyId == currentFamilyId && familyListener != null && membersListener != null && !accessLostEmitted) {
+            KBLog.sync.debug("startSync: listener già attivi per familyId=$familyId, skip restart", TAG)
+            sessionPrefs.setActiveFamilyId(familyId)
+            // Segnala subito done se il sync precedente era già completato
+            if (!_initialSyncDone.value) {
+                // Il listener è vivo: aspettiamo la sua emissione naturale
+            }
+            return
+        }
         ownerSyncRecoveryJob?.cancel()
         ownerSyncRecoveryJob = null
         isJoining = true
@@ -860,6 +875,75 @@ class FamilySyncCenter @Inject constructor(
                 KBLog.sync.warning("prefetch children PERMISSION_DENIED familyId=$familyId — delego al listener", TAG)
             } else {
                 KBLog.sync.warning("prefetch children failed familyId=$familyId: ${e.message}", TAG)
+            }
+        }
+    }
+
+    /**
+     * One-shot refresh dei soli membri da server, senza toccare i listener attivi.
+     * Chiamato da ViewModel secondari (es. GeofenceEditViewModel) che leggono Room ma
+     * non gestiscono il ciclo di vita completo del sync, per garantire che Room sia
+     * aggiornato anche quando il listener non è ancora partito o era temporaneamente
+     * offline.
+     */
+    fun refreshMembersOnce(familyId: String) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                val myUid = auth.currentUser?.uid.orEmpty()
+                val membersRef = db.collection("families").document(familyId).collection("members")
+                val docs = try {
+                    membersRef.get(com.google.firebase.firestore.Source.SERVER).await().documents
+                } catch (e: Exception) {
+                    KBLog.sync.warning("refreshMembersOnce SERVER failed, fallback cache familyId=$familyId: ${e.message}", TAG)
+                    try {
+                        membersRef.get(com.google.firebase.firestore.Source.CACHE).await().documents
+                    } catch (ce: Exception) {
+                        KBLog.sync.warning("refreshMembersOnce CACHE failed familyId=$familyId: ${ce.message}", TAG)
+                        return@launch
+                    }
+                }
+                val now = System.currentTimeMillis()
+                for (doc in docs) {
+                    val d = doc.data.orEmpty()
+                    if (d["isDeleted"] as? Boolean == true) {
+                        familyMemberDao.deleteById(doc.id)
+                        continue
+                    }
+                    val memberUid = (d["uid"] as? String) ?: doc.id
+                    val local = familyMemberDao.getById(doc.id)
+                    val remoteUpdatedAt = (d["updatedAt"] as? com.google.firebase.Timestamp)?.toDate()?.time
+                    val shouldUpdate = local == null || remoteUpdatedAt == null || remoteUpdatedAt >= (local.updatedAtEpochMillis)
+                    if (!shouldUpdate) continue
+                    val isMe = memberUid == myUid
+                    var displayName: String? = if (isMe) userProfileDao.getByUid(memberUid)?.canonicalMemberDisplayName() else null
+                    if (displayName.isNullOrBlank()) {
+                        displayName = d.firstNonBlankString("displayName", "name", "fullName") ?: d.firstNonBlankString("email")
+                    }
+                    if (displayName.isNullOrBlank()) displayName = "Membro"
+                    runCatching {
+                        familyMemberDao.upsert(
+                            KBFamilyMemberEntity(
+                                id = doc.id,
+                                familyId = familyId,
+                                userId = memberUid,
+                                role = (d["role"] as? String) ?: "member",
+                                displayName = displayName,
+                                email = d.firstNonBlankString("email"),
+                                photoURL = d["photoURL"] as? String,
+                                createdAtEpochMillis = (d["createdAt"] as? com.google.firebase.Timestamp)?.toDate()?.time ?: local?.createdAtEpochMillis ?: now,
+                                updatedAtEpochMillis = remoteUpdatedAt ?: local?.updatedAtEpochMillis ?: now,
+                                updatedBy = (d["updatedBy"] as? String) ?: doc.id,
+                                isDeleted = false,
+                            ),
+                        )
+                        KBLog.sync.debug("refreshMembersOnce upserted id=${doc.id} name=$displayName", TAG)
+                    }.onFailure { e ->
+                        KBLog.sync.error("refreshMembersOnce upsert FAILED id=${doc.id}: ${e.message}", TAG)
+                    }
+                }
+                KBLog.sync.info("refreshMembersOnce done familyId=$familyId count=${docs.size}", TAG)
+            } catch (e: Exception) {
+                KBLog.sync.warning("refreshMembersOnce failed familyId=$familyId: ${e.message}", TAG)
             }
         }
     }

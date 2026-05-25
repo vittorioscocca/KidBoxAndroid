@@ -4,7 +4,9 @@ import android.text.format.DateUtils
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import it.vittorioscocca.kidbox.data.chat.model.ChatMention
 import it.vittorioscocca.kidbox.data.chat.model.ChatMessageType
+import it.vittorioscocca.kidbox.data.chat.model.toChatMentions
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import it.vittorioscocca.kidbox.data.chat.model.ContactPayload
 import it.vittorioscocca.kidbox.data.chat.model.LabeledStringValue
@@ -42,6 +44,7 @@ data class UiChatMessage(
     val contactPayload: ContactPayload?,
     val reactions: Map<String, List<String>>,
     val readBy: List<String>,
+    val mentions: List<ChatMention>,
     val createdAtMillis: Long,
     val editedAtMillis: Long?,
     val isDeleted: Boolean,
@@ -84,6 +87,7 @@ internal fun KBChatMessage.toUi(): UiChatMessage {
         contactPayload = contactPayloadJSON.toContactPayload(),
         reactions = reactionsJSON.toReactionsMap(),
         readBy = readByJSON.toJsonStringList(),
+        mentions = mentionsJSON.toChatMentions(),
         createdAtMillis = createdAtEpochMillis,
         editedAtMillis = editedAtEpochMillis,
         isDeleted = isDeleted,

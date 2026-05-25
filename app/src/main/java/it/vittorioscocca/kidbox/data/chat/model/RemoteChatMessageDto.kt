@@ -41,4 +41,6 @@ data class RemoteChatMessageDto(
     val transcriptIsFinal: Boolean?,
     val transcriptUpdatedAtEpochMillis: Long?,
     val transcriptErrorMessage: String?,
+    /** JSON `[{"uid":"...","displayName":"..."}]`. Null se il messaggio non ha menzioni. */
+    val mentionsJSON: String? = null,
 )

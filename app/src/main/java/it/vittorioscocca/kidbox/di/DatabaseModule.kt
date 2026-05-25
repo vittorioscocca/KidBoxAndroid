@@ -637,6 +637,17 @@ object DatabaseModule {
         }
     }
 
+    /**
+     * Aggiunge `mentionsJSON` a `kb_chat_messages` per supportare le @menzioni
+     * nelle chat di famiglia. Il campo è nullable e default `NULL`, così i
+     * messaggi esistenti non hanno bisogno di backfill.
+     */
+    private val MIGRATION_33_34 = object : Migration(33, 34) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE kb_chat_messages ADD COLUMN mentionsJSON TEXT")
+        }
+    }
+
     private val MIGRATION_32_33 = object : Migration(32, 33) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(
@@ -1104,6 +1115,7 @@ object DatabaseModule {
         MIGRATION_30_31,
         MIGRATION_31_32,
         MIGRATION_32_33,
+        MIGRATION_33_34,
     )
         .fallbackToDestructiveMigration()
         .build()

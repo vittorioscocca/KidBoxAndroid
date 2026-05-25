@@ -33,6 +33,7 @@ import it.vittorioscocca.kidbox.data.repository.WalletRepository
 import it.vittorioscocca.kidbox.domain.family.ownershipUidFromFamilyFirestore
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.data.sync.FamilySyncCenter
+import it.vittorioscocca.kidbox.data.sync.MembershipSyncService
 import it.vittorioscocca.kidbox.domain.auth.LogoutUseCase
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.FamilyMemoryService
 import it.vittorioscocca.kidbox.ui.screens.home.HeroCrop
@@ -120,6 +121,7 @@ class HomeViewModel @Inject constructor(
     private val sharedLocationDao: KBSharedLocationDao,
     private val heroPhotoService: FamilyHeroPhotoService,
     private val familySyncCenter: FamilySyncCenter,
+    private val membershipSyncService: MembershipSyncService,
     private val familySessionPreferences: FamilySessionPreferences,
     private val homeBadgeManager: HomeBadgeManager,
     private val walletRepository: WalletRepository,
@@ -152,9 +154,11 @@ class HomeViewModel @Inject constructor(
         observeFamilyPlanFromFirestore()
         observeBadges()
         observeInitialSyncState()
+        startMembershipListenerIfAuthenticated()
         viewModelScope.launch { refreshAvatarUrl() }
         viewModelScope.launch {
             familySyncCenter.accessLostEvent.collect {
+                membershipSyncService.stop()
                 _uiState.value = HomeUiState(isLoading = false, familyId = "")
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
@@ -767,9 +771,25 @@ class HomeViewModel @Inject constructor(
 
     fun logout(onComplete: () -> Unit) {
         viewModelScope.launch {
+            membershipSyncService.stop()
             logoutUseCase.logout()
             onComplete()
         }
+    }
+
+    /**
+     * Avvia [MembershipSyncService] (listener real-time su `users/{uid}/memberships`)
+     * non appena `HomeViewModel` viene creato. Garantisce che le famiglie create
+     * su un altro device (es. nuova famiglia creata su iOS) compaiano in Room
+     * entro pochi secondi senza dover ri-loggare o riavviare l'app.
+     */
+    private fun startMembershipListenerIfAuthenticated() {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        if (uid.isEmpty()) {
+            KBLog.ui.debug("startMembershipListener skipped (no uid)", TAG)
+            return
+        }
+        membershipSyncService.start(uid)
     }
 
     private fun compressJpeg(context: Context, uri: Uri): ByteArray {

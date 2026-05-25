@@ -50,7 +50,16 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
             ?: remoteMessage.data["deep_link"]
             ?: remoteMessage.data["route"]
             ?: ""
-        val title = remoteMessage.notification?.title ?: "KidBox"
+        // Le menzioni hanno la stessa forma di un new_chat_message ma con un
+        // titolo dedicato per dare priorità visiva al messaggio diretto.
+        val senderName = remoteMessage.data["senderName"].orEmpty()
+        val rawTitle = remoteMessage.notification?.title
+        val title = when {
+            type == "chat_mention" && senderName.isNotBlank() -> "$senderName ti ha menzionato"
+            type == "chat_mention" -> "Sei stato menzionato"
+            !rawTitle.isNullOrBlank() -> rawTitle
+            else -> "KidBox"
+        }
         val body = remoteMessage.notification?.body ?: "Nuova notifica"
         showNotification(title, body, remoteMessage.data, type)
     }
@@ -74,8 +83,14 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
             putExtra("push_doc_id", data["docId"])
             putExtra("push_note_id", data["noteId"])
             putExtra("push_expense_id", data["expenseId"])
+            putExtra("push_event_id", data["eventId"])
+            putExtra("push_visit_id", data["visitId"])
+            putExtra("push_treatment_id", data["treatmentId"])
+            putExtra("push_exam_id", data["examId"])
+            putExtra("push_entry_id", data["entryId"])
             putExtra("ticketId", data["ticketId"])
             putExtra("push_deep_link", data["deep_link"] ?: data["route"])
+            putExtra("push_message_id", data["messageId"])
         }
         val pendingIntent = PendingIntent.getActivity(
             this,
@@ -83,6 +98,11 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
             deepLinkIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        val publicVersion = NotificationCompat.Builder(this, CHANNEL_ID_FAMILY_UPDATES)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(title)
+            .setContentText(body)
+            .build()
         val notification = NotificationCompat.Builder(this, CHANNEL_ID_FAMILY_UPDATES)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
@@ -93,39 +113,47 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
             .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setPublicVersion(publicVersion)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()
         NotificationManagerCompat.from(this).notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), notification)
     }
 
-    private fun ensureChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (manager.getNotificationChannel(CHANNEL_ID_FAMILY_UPDATES) != null) return
-        manager.createNotificationChannel(
-            NotificationChannel(
-                CHANNEL_ID_FAMILY_UPDATES,
-                "Aggiornamenti Famiglia",
-                NotificationManager.IMPORTANCE_HIGH,
-            ).apply {
-                description = "Notifiche su lista spesa e aggiornamenti condivisi"
-                setShowBadge(true)
-                enableLights(true)
-                enableVibration(true)
-                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
-                setSound(
-                    Settings.System.DEFAULT_NOTIFICATION_URI,
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build(),
-                )
-            },
-        )
-    }
+    private fun ensureChannel() = createNotificationChannels(this)
 
     companion object {
-        const val CHANNEL_ID_FAMILY_UPDATES = "family_updates"
+        const val CHANNEL_ID_FAMILY_UPDATES = "family_updates_v2"
+        private const val CHANNEL_ID_LEGACY = "family_updates"
+
+        fun createNotificationChannels(context: Context) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            // Rimuovi il vecchio canale che potrebbe avere lockscreenVisibility errata
+            if (manager.getNotificationChannel(CHANNEL_ID_LEGACY) != null) {
+                manager.deleteNotificationChannel(CHANNEL_ID_LEGACY)
+            }
+            if (manager.getNotificationChannel(CHANNEL_ID_FAMILY_UPDATES) != null) return
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_ID_FAMILY_UPDATES,
+                    "Aggiornamenti Famiglia",
+                    NotificationManager.IMPORTANCE_HIGH,
+                ).apply {
+                    description = "Notifiche su lista spesa e aggiornamenti condivisi"
+                    setShowBadge(true)
+                    enableLights(true)
+                    enableVibration(true)
+                    lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                    setSound(
+                        Settings.System.DEFAULT_NOTIFICATION_URI,
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build(),
+                    )
+                },
+            )
+        }
     }
 }

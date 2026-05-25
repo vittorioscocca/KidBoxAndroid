@@ -138,10 +138,15 @@ class FamilyLocationRepository @Inject constructor(
                 expiresAt != null &&
                 expiresAt <= now
             val hasCoordinates = dto.latitude != null && dto.longitude != null
-            if (!dto.isSharing || !hasCoordinates || isExpiredTemporary) {
+            // Rimuovi solo se esplicitamente non condivide o scaduto.
+            // Se isSharing=true ma non ci sono ancora coordinate (primo fix GPS),
+            // saltiamo l'upsert ma NON cancelliamo: l'entry potrebbe già essere in DB
+            // con coordinate precedenti, o arriverà presto il primo aggiornamento.
+            if (!dto.isSharing || isExpiredTemporary) {
                 sharedLocationDao.deleteById(dto.id)
                 return@forEach
             }
+            if (!hasCoordinates) return@forEach  // in attesa del primo fix GPS
             sharedLocationDao.upsert(
                 KBSharedLocationEntity(
                     id = dto.id,

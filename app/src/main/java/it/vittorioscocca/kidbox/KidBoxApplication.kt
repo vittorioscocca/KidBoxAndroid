@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.WorkManager
 import dagger.hilt.android.HiltAndroidApp
+import it.vittorioscocca.kidbox.notifications.KidBoxFirebaseMessagingService
 import it.vittorioscocca.kidbox.util.CrashAnalyzer
 import it.vittorioscocca.kidbox.util.KBCrashHandler
 import it.vittorioscocca.kidbox.util.KBFileLogger
@@ -29,6 +30,7 @@ class KidBoxApplication : Application(), Configuration.Provider {
         KBCrashHandler.install()
         super.onCreate()
         WorkManager.initialize(this, workManagerConfiguration)
+        KidBoxFirebaseMessagingService.createNotificationChannels(this)
         appInitScope.launch {
             CrashAnalyzer.analyzeIfNeeded(this@KidBoxApplication)
         }

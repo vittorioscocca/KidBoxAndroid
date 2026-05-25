@@ -23,6 +23,8 @@ data class KBChatMessage(
     val reactionsJSON: String?,
     val readByJSON: String?,
     val deletedForJSON: String?,
+    /** JSON `[{"uid":"...","displayName":"..."}]` con i membri citati nel testo. */
+    val mentionsJSON: String? = null,
     val transcriptText: String?,
     val transcriptStatusRaw: String,
     val transcriptSourceRaw: String?,

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
@@ -70,6 +71,7 @@ fun SettingsScreen(
     onStorageUsage: () -> Unit,
     onAutoFillSettings: () -> Unit,
     onPrivacySettings: () -> Unit,
+    onSupportChat: () -> Unit,
     viewModel: ThemeViewModel = hiltViewModel(),
 ) {
     BackHandler { onBack() }
@@ -136,6 +138,13 @@ fun SettingsScreen(
             icon = Icons.Filled.Key,
             showChevron = true,
             onClick = onAutoFillSettings,
+        ),
+        SettingRowItem(
+            title = "Assistente & Supporto",
+            subtitle = "Domande, problemi e suggerimenti",
+            icon = Icons.Filled.SupportAgent,
+            showChevron = true,
+            onClick = onSupportChat,
         ),
     )
 

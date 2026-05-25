@@ -35,14 +35,31 @@ class AIService @Inject constructor(
         messages: List<KBAIMessage>,
         systemPrompt: String,
         familyId: String,
+        purpose: String? = null,
+    ): Result<AIResponse> = sendMessages(
+        messages = messages.map { AIMessagePayload(role = it.roleRaw, content = it.content) },
+        systemPrompt = systemPrompt,
+        familyId = familyId,
+        purpose = purpose,
+    )
+
+    /**
+     * Chiamata askAI con content String o Array multimodale (vision).
+     */
+    suspend fun sendMessages(
+        messages: List<AIMessagePayload>,
+        systemPrompt: String,
+        familyId: String,
+        purpose: String? = null,
     ): Result<AIResponse> = withContext(Dispatchers.IO) {
         runCatching {
             val resolvedFamilyId = resolveFamilyId(familyId)
-            val payload = hashMapOf(
-                "messages" to messages.map { mapOf("role" to it.roleRaw, "content" to it.content) },
+            val payload = hashMapOf<String, Any>(
+                "messages" to messages.map { mapOf("role" to it.role, "content" to it.content) },
                 "systemPrompt" to systemPrompt,
                 "familyId" to resolvedFamilyId,
             )
+            purpose?.trim()?.takeIf { it.isNotEmpty() }?.let { payload["purpose"] = it }
             @Suppress("UNCHECKED_CAST")
             val data = functions.getHttpsCallable("askAI").call(payload).await().getData() as? Map<String, Any?>
                 ?: error("Risposta AI non valida")
@@ -236,3 +253,9 @@ private fun Result<AIResponse>.mapError(): Result<AIResponse> =
     )
 
 class AIServiceException(val serviceError: AIServiceError) : Exception()
+
+/** Messaggio askAI: [content] può essere String o List di blocchi Anthropic (vision). */
+data class AIMessagePayload(
+    val role: String,
+    val content: Any,
+)

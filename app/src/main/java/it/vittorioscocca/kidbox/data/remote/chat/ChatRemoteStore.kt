@@ -16,6 +16,8 @@ import com.google.firebase.firestore.SetOptions
 import it.vittorioscocca.kidbox.data.chat.crypto.ChatCryptoService
 import it.vittorioscocca.kidbox.data.chat.model.ChatMessageType
 import it.vittorioscocca.kidbox.data.chat.model.RemoteChatMessageDto
+import it.vittorioscocca.kidbox.data.chat.model.parseMentionsFromFirestore
+import it.vittorioscocca.kidbox.data.chat.model.toChatMentions
 import it.vittorioscocca.kidbox.data.local.MessageSettingsPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBChatMessageDao
 import it.vittorioscocca.kidbox.data.local.entity.KBChatMessageEntity
@@ -84,6 +86,20 @@ class ChatRemoteStore @Inject constructor(
         local.contactPayloadJSON?.let { payload["contactPayloadJSON"] = it }
         local.deletedForJSON?.toStringListOrNull()?.let {
             payload["deletedFor"] = it
+        }
+        // Menzioni: salvate come array di mappe `{uid, displayName}` + array piatto
+        // `mentionedUids` per consentire alle Cloud Functions di filtrare facilmente
+        // i destinatari. Se il messaggio non contiene menzioni, cancelliamo
+        // esplicitamente entrambi i campi per non lasciare residui da edit precedenti.
+        val parsedMentions = local.mentionsJSON.toChatMentions()
+        if (parsedMentions.isNotEmpty()) {
+            payload["mentions"] = parsedMentions.map {
+                mapOf("uid" to it.uid, "displayName" to it.displayName)
+            }
+            payload["mentionedUids"] = parsedMentions.map { it.uid }
+        } else {
+            payload["mentions"] = FieldValue.delete()
+            payload["mentionedUids"] = FieldValue.delete()
         }
 
         val exists = ref.get().await().exists()
@@ -554,6 +570,7 @@ class ChatRemoteStore @Inject constructor(
             transcriptIsFinal = data["transcriptIsFinal"] as? Boolean,
             transcriptUpdatedAtEpochMillis = (data["transcriptUpdatedAt"] as? Timestamp)?.toDate()?.time,
             transcriptErrorMessage = data["transcriptErrorMessage"] as? String,
+            mentionsJSON = parseMentionsFromFirestore(data["mentions"] as? List<*>),
         )
     }
 
@@ -587,6 +604,7 @@ class ChatRemoteStore @Inject constructor(
             reactionsJSON = reactionsJSON,
             readByJSON = readByJSON,
             deletedForJSON = deletedFor.toJsonOrNull(),
+            mentionsJSON = mentionsJSON,
             // Preserve local transcript fields when remote payload does not contain them.
             transcriptText = transcriptText ?: local?.transcriptText,
             transcriptStatusRaw = transcriptStatusRaw ?: local?.transcriptStatusRaw ?: "none",

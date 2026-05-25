@@ -5,41 +5,82 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
+import androidx.room.Update
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * NOTA: DAO implementato come `abstract class` (non interface) per poter definire
+ * il metodo `upsert` con `@Transaction` in modo sicuro rispetto alle Foreign Key.
+ *
+ * Il vecchio `@Insert(onConflict = REPLACE)` eseguiva in SQLite un `DELETE + INSERT`
+ * quando la primary key conflittava, triggherando il `ON DELETE CASCADE` definito su
+ * `kb_family_members.familyId`. Questo cancellava TUTTI i membri della famiglia ogni
+ * volta che il record famiglia veniva aggiornato (es. da `familyListener` di
+ * `FamilySyncCenter`), e il `membersListener` non rifuoriva perché Firestore non era
+ * cambiato → i membri (incluso l'owner) sparivano in modo permanente.
+ *
+ * Il nuovo `upsert` usa `UPDATE` per aggiornare la riga esistente (nessuna cascata)
+ * e `INSERT OR IGNORE` solo quando la riga non esiste ancora.
+ */
 @Dao
-interface KBFamilyDao {
+abstract class KBFamilyDao {
+
     @Query("SELECT * FROM kb_families WHERE id = :id LIMIT 1")
-    suspend fun getById(id: String): KBFamilyEntity?
+    abstract suspend fun getById(id: String): KBFamilyEntity?
 
     @Query("SELECT * FROM kb_families ORDER BY updatedAtEpochMillis DESC")
-    fun observeAll(): Flow<List<KBFamilyEntity>>
+    abstract fun observeAll(): Flow<List<KBFamilyEntity>>
 
     @Query("SELECT * FROM kb_families WHERE id = :familyId LIMIT 1")
-    fun observeById(familyId: String): Flow<KBFamilyEntity?>
-    
+    abstract fun observeById(familyId: String): Flow<KBFamilyEntity?>
+
     @Query("SELECT EXISTS(SELECT 1 FROM kb_families LIMIT 1)")
-    suspend fun hasAnyFamily(): Boolean
+    abstract suspend fun hasAnyFamily(): Boolean
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(entity: KBFamilyEntity)
+    // ── Internal primitives (non chiamare direttamente dall'esterno) ────────────
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertAll(entities: List<KBFamilyEntity>)
+    @Update
+    protected abstract suspend fun updateInternal(entity: KBFamilyEntity): Int
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    protected abstract suspend fun insertIgnore(entity: KBFamilyEntity): Long
+
+    // ── Upsert sicuro: UPDATE se esiste, INSERT se nuovo ───────────────────────
+
+    /**
+     * Aggiorna la riga se esiste già (via @Update, che genera un SQL UPDATE),
+     * altrimenti la inserisce (via INSERT OR IGNORE).
+     *
+     * Mai DELETE + INSERT → nessuna cascata su kb_family_members.
+     */
+    @Transaction
+    open suspend fun upsert(entity: KBFamilyEntity) {
+        if (updateInternal(entity) == 0) {
+            insertIgnore(entity)
+        }
+    }
+
+    @Transaction
+    open suspend fun upsertAll(entities: List<KBFamilyEntity>) {
+        entities.forEach { upsert(it) }
+    }
+
+    // ── Delete ──────────────────────────────────────────────────────────────────
 
     @Delete
-    suspend fun delete(entity: KBFamilyEntity)
+    abstract suspend fun delete(entity: KBFamilyEntity)
 
     @Query("DELETE FROM kb_families WHERE id = :id")
-    suspend fun deleteById(id: String)
+    abstract suspend fun deleteById(id: String)
 
     @Query("DELETE FROM kb_families WHERE id = :familyId")
-    suspend fun deleteByFamilyId(familyId: String): Int
+    abstract suspend fun deleteByFamilyId(familyId: String): Int
 
     @Query("DELETE FROM kb_families")
-    suspend fun deleteAll()
+    abstract suspend fun deleteAll()
 
     @Query("SELECT id FROM kb_families LIMIT 1")
-    suspend fun peekAnyFamilyId(): String?
+    abstract suspend fun peekAnyFamilyId(): String?
 }

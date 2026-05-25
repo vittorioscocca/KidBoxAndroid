@@ -39,6 +39,8 @@ data class KBChatMessageEntity(
     val reactionsJSON: String?,
     val readByJSON: String?,
     val deletedForJSON: String?,
+    /** JSON `[{"uid":"...","displayName":"..."}]`. Null se il messaggio non ha menzioni. */
+    val mentionsJSON: String? = null,
     val transcriptText: String?,
     val transcriptStatusRaw: String,
     val transcriptSourceRaw: String?,

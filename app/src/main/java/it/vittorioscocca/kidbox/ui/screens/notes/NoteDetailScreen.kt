@@ -35,8 +35,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import android.content.Context
+import android.view.inputmethod.InputMethodManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -55,8 +57,8 @@ fun NoteDetailScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val kb = MaterialTheme.kidBoxColors
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
+    val view = LocalView.current
     var showVisibilityPick by remember { mutableStateOf(false) }
     var showVisibilityLocked by remember { mutableStateOf(false) }
 
@@ -96,15 +98,24 @@ fun NoteDetailScreen(
                 fontWeight = FontWeight.Bold,
                 fontSize = 22.sp,
             )
-            IconButton(
-                onClick = {
-                    viewModel.save(onDone = {})
-                    focusManager.clearFocus(force = true)
-                    keyboardController?.hide()
-                },
-                enabled = !state.isSaving,
+            // Slot a larghezza fissa per non far saltare il titolo "Nota"
+            // quando la spunta scompare (la Row usa SpaceBetween).
+            Box(
+                modifier = Modifier.size(48.dp),
+                contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Default.Check, contentDescription = "Salva", tint = kb.title)
+                if (state.isDirty) {
+                    IconButton(
+                        onClick = {
+                            viewModel.save(onDone = {})
+                            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                            imm.hideSoftInputFromWindow(view.windowToken, 0)
+                        },
+                        enabled = !state.isSaving,
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = "Salva", tint = kb.title)
+                    }
+                }
             }
         }
         Spacer(Modifier.height(8.dp))

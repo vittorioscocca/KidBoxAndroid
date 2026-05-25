@@ -326,7 +326,7 @@ internal fun ChatBubble(
                         )
                     } else {
                         when (message.type) {
-                            ChatMessageType.TEXT -> TextContent(message, textColor, subtitleColor, isOwn)
+                            ChatMessageType.TEXT -> TextContent(message, textColor, subtitleColor, isOwn, currentUid)
                             ChatMessageType.PHOTO -> MediaContent(message, isVideo = false, onMediaTap = onMediaTap, onLongPress = { onLongPress(message) })
                             ChatMessageType.VIDEO -> MediaContent(message, isVideo = true, onMediaTap = onMediaTap, onLongPress = { onLongPress(message) })
                             ChatMessageType.MEDIA_GROUP -> MediaGroupContent(message, onMediaGroupTap = onMediaGroupTap, onLongPress = { onLongPress(message) })
@@ -453,34 +453,89 @@ private fun TextContent(
     textColor: Color,
     subtitleColor: Color,
     isOwn: Boolean,
+    currentUid: String = "",
 ) {
     val rawText = message.text.orEmpty()
     val context = LocalContext.current
     val urls = remember(rawText) { extractUrls(rawText) }
     val linkColor = if (isOwn) Color.White else Color(0xFF1A73E8)
+    // Colore d'accento condiviso con iOS (KBTheme.bubbleTint).
+    val mentionColor = if (isOwn) Color.White else Color(0xFFFF6B00)
+    val mentions = message.mentions
 
-    // Build AnnotatedString with URL spans highlighted
-    val annotated = remember(rawText, linkColor) {
+    // Build AnnotatedString with URL + mention spans highlighted.
+    // Strategia: applichiamo gli stili in due passate non sovrapposte. Le menzioni
+    // sono token "@DisplayName" che non contengono URL, quindi le rileviamo prima
+    // (matchando il displayName più lungo per evitare collisioni "Mario" vs
+    // "Mario Rossi") e poi gli URL nel resto del testo.
+    val annotated = remember(rawText, linkColor, mentionColor, mentions, currentUid) {
         buildAnnotatedString {
-            var cursor = 0
-            val matcher = android.util.Patterns.WEB_URL.matcher(rawText)
-            while (matcher.find()) {
-                val start = matcher.start()
-                val end = matcher.end()
-                // Text before this URL
-                if (cursor < start) append(rawText, cursor, start)
-                // The URL itself — annotated + styled
-                val url = matcher.group() ?: continue
-                val resolved = if (url.startsWith("http")) url else "https://$url"
-                pushStringAnnotation(tag = "URL", annotation = resolved)
-                withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) {
-                    append(url)
+            // 1) Trova tutte le occorrenze "@displayName" da evidenziare.
+            data class MentionRange(val start: Int, val end: Int, val mentionsMe: Boolean)
+            val mentionRanges = mutableListOf<MentionRange>()
+            mentions.sortedByDescending { it.displayName.length }.forEach { mention ->
+                val token = "@${mention.displayName}"
+                if (token.isBlank()) return@forEach
+                var searchFrom = 0
+                while (true) {
+                    val idx = rawText.indexOf(token, startIndex = searchFrom)
+                    if (idx < 0) break
+                    val end = idx + token.length
+                    val overlap = mentionRanges.any { it.start < end && idx < it.end }
+                    if (!overlap) {
+                        mentionRanges.add(
+                            MentionRange(
+                                start = idx,
+                                end = end,
+                                mentionsMe = currentUid.isNotBlank() && mention.uid == currentUid,
+                            ),
+                        )
+                    }
+                    searchFrom = end
                 }
-                pop()
-                cursor = end
             }
-            // Remaining plain text
-            if (cursor < rawText.length) append(rawText, cursor, rawText.length)
+            mentionRanges.sortBy { it.start }
+
+            // 2) Walk del testo: ogni segmento "fra menzioni" cerca URL al suo
+            // interno per evidenziarli senza interferire con i token @menzione.
+            var cursor = 0
+            fun appendWithUrls(from: Int, to: Int) {
+                if (from >= to) return
+                val segment = rawText.substring(from, to)
+                val matcher = android.util.Patterns.WEB_URL.matcher(segment)
+                var segCursor = 0
+                while (matcher.find()) {
+                    val s = matcher.start()
+                    val e = matcher.end()
+                    if (segCursor < s) append(segment, segCursor, s)
+                    val url = matcher.group() ?: continue
+                    val resolved = if (url.startsWith("http")) url else "https://$url"
+                    pushStringAnnotation(tag = "URL", annotation = resolved)
+                    withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) {
+                        append(url)
+                    }
+                    pop()
+                    segCursor = e
+                }
+                if (segCursor < segment.length) append(segment, segCursor, segment.length)
+            }
+            for (m in mentionRanges) {
+                appendWithUrls(cursor, m.start)
+                val style = if (m.mentionsMe) {
+                    SpanStyle(
+                        color = mentionColor,
+                        fontWeight = FontWeight.SemiBold,
+                        background = mentionColor.copy(alpha = if (isOwn) 0.25f else 0.18f),
+                    )
+                } else {
+                    SpanStyle(color = mentionColor, fontWeight = FontWeight.SemiBold)
+                }
+                withStyle(style) {
+                    append(rawText, m.start, m.end)
+                }
+                cursor = m.end
+            }
+            appendWithUrls(cursor, rawText.length)
         }
     }
 

@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -67,6 +68,7 @@ fun FamilySwitcherBottomSheet(
     snackbarHostState: SnackbarHostState,
     onDismiss: () -> Unit,
     onSwitchComplete: () -> Unit,
+    onJoinFamily: () -> Unit,
     viewModel: FamilySwitcherViewModel = hiltViewModel(),
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -152,6 +154,40 @@ fun FamilySwitcherBottomSheet(
                 Spacer(Modifier.width(8.dp))
                 Text("Crea nuova famiglia")
             }
+
+            Spacer(Modifier.height(8.dp))
+
+            OutlinedButton(
+                onClick = {
+                    onDismiss()
+                    onJoinFamily()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, kb.divider),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = kb.card,
+                    contentColor = Color(0xFF30B0C7),
+                ),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.QrCodeScanner,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = Color(0xFF30B0C7),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Entra in una famiglia")
+            }
+
+            Text(
+                text = "Scansiona il QR di chi vuole invitarti o inserisci il codice a 6 cifre.",
+                style = MaterialTheme.typography.bodySmall,
+                color = kb.subtitle,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 4.dp),
+            )
         }
     }
 

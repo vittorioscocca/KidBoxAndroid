@@ -4,6 +4,7 @@ import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
+import it.vittorioscocca.kidbox.data.sync.MembershipSyncService
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.FamilyMemoryService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -16,6 +17,7 @@ class LogoutUseCase @Inject constructor(
     private val familySessionPreferences: FamilySessionPreferences,
     private val onboardingPreferences: OnboardingPreferences,
     private val familyMemoryService: FamilyMemoryService,
+    private val membershipSyncService: MembershipSyncService,
 ) {
     /**
      * Logout standard (allineato iOS): sign-out + wipe locale,
@@ -23,6 +25,7 @@ class LogoutUseCase @Inject constructor(
      * I dati vengono poi ricaricati da Firebase al login successivo.
      */
     suspend fun logout() {
+        membershipSyncService.stop()
         FirebaseAuth.getInstance().signOut()
         withContext(Dispatchers.IO) {
             database.clearAllTables()

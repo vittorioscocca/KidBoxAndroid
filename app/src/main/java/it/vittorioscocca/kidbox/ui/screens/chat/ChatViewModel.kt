@@ -6,11 +6,14 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.ListenerRegistration
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.vittorioscocca.kidbox.data.chat.model.ChatMention
 import it.vittorioscocca.kidbox.data.chat.model.ChatMessageType
+import it.vittorioscocca.kidbox.data.chat.model.toMentionsJsonOrNull
 import it.vittorioscocca.kidbox.data.local.ActiveFamilyResolver
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.MessageSettingsPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
 import it.vittorioscocca.kidbox.data.repository.ChatRepository
@@ -26,6 +29,20 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/**
+ * Membri della famiglia disponibili come destinatari di una @menzione nella chat.
+ *
+ * Lo stato è esposto dal ViewModel come lista di [ChatMentionCandidate]:
+ * il composer mostra il picker solo quando ce ne sono almeno due (i.e. la chat
+ * ha più di due partecipanti, sender incluso). La lista è sempre escluso il
+ * `currentUid` perché citarsi da soli non ha senso.
+ */
+data class ChatMentionCandidate(
+    val uid: String,
+    val displayName: String,
+    val photoURL: String?,
+)
 
 data class ChatUiState(
     val isLoading: Boolean = true,
@@ -43,11 +60,16 @@ data class ChatUiState(
     val errorText: String? = null,
     val isSearchActive: Boolean = false,
     val searchQuery: String = "",
-)
+    val mentionCandidates: List<ChatMentionCandidate> = emptyList(),
+) {
+    /** `true` se la chat ha più di due partecipanti (sender incluso). */
+    val canMention: Boolean get() = mentionCandidates.size >= 2
+}
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val familyDao: KBFamilyDao,
+    private val familyMemberDao: KBFamilyMemberDao,
     private val familySessionPreferences: FamilySessionPreferences,
     private val chatRepository: ChatRepository,
     private val badgeManager: HomeBadgeManager,
@@ -62,6 +84,10 @@ class ChatViewModel @Inject constructor(
     private var hasBoundFamily = false
     private var typingJob: Job? = null
     private var activeSendCount: Int = 0
+    /** Job che osserva i family member per la famiglia attiva (per il picker @menzioni). */
+    private var mentionsJob: Job? = null
+    /** Candidati confermati dall'utente nel composer, in attesa di essere inviati. */
+    private val pendingMentions = mutableListOf<ChatMentionCandidate>()
 
     init {
         _uiState.value = _uiState.value.copy(
@@ -181,6 +207,31 @@ class ChatViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(typingUsers = names)
         }
 
+        // Osserva i membri attivi della famiglia per popolare i candidati delle
+        // @menzioni (escluso l'utente corrente). Quando la lista cambia (es. un
+        // membro si unisce/lascia la famiglia) aggiorniamo lo stato UI.
+        mentionsJob?.cancel()
+        mentionsJob = viewModelScope.launch {
+            familyMemberDao.observeActiveByFamilyId(familyId).collectLatest { members ->
+                val myUid = auth.currentUser?.uid.orEmpty()
+                val candidates = members
+                    .asSequence()
+                    .filter { it.userId.isNotBlank() && it.userId != myUid }
+                    .mapNotNull { member ->
+                        val name = member.displayName?.trim().orEmpty()
+                        if (name.isBlank()) return@mapNotNull null
+                        ChatMentionCandidate(
+                            uid = member.userId,
+                            displayName = name,
+                            photoURL = member.photoURL,
+                        )
+                    }
+                    .sortedBy { it.displayName.lowercase() }
+                    .toList()
+                _uiState.value = _uiState.value.copy(mentionCandidates = candidates)
+            }
+        }
+
         viewModelScope.launch {
             chatRepository.observeMessages(familyId)
                 // Mapping KBChatMessage → UiChatMessage is CPU-only (JSON parsing, string ops)
@@ -218,6 +269,9 @@ class ChatViewModel @Inject constructor(
         if (familyId.isBlank() || text.isBlank()) return
 
         val replyToId = state.replyingToId
+        val mentions = resolveMentionsFor(text, state.mentionCandidates)
+        val mentionsJson = mentions.toMentionsJsonOrNull()
+        pendingMentions.clear()
         _uiState.value = state.copy(inputText = "", replyingToId = null)
 
         viewModelScope.launch {
@@ -228,6 +282,7 @@ class ChatViewModel @Inject constructor(
                     type = ChatMessageType.TEXT,
                     text = text,
                     replyToId = replyToId,
+                    mentionsJSON = mentionsJson,
                 )
                 chatRepository.setTyping(familyId, false)
             }.onFailure { err ->
@@ -236,6 +291,44 @@ class ChatViewModel @Inject constructor(
                 setSending(false)
             }
         }
+    }
+
+    /**
+     * Registra un candidato selezionato dall'utente nel picker @menzioni del
+     * composer. Verrà consumato al successivo invio del messaggio (sendText).
+     */
+    fun registerMention(candidate: ChatMentionCandidate) {
+        if (pendingMentions.none { it.uid == candidate.uid && it.displayName == candidate.displayName }) {
+            pendingMentions.add(candidate)
+        }
+    }
+
+    /**
+     * Calcola la lista finale di menzioni da scrivere sul messaggio:
+     *  1. I candidati confermati nel composer che compaiono ancora come
+     *     `@<displayName>` nel testo (l'utente potrebbe averli cancellati).
+     *  2. Eventuali `@DisplayName` digitati a mano che corrispondono a un
+     *     membro presente in [candidates]. I displayName più lunghi vengono
+     *     valutati prima per evitare collisioni "Mario" vs "Mario Rossi".
+     */
+    private fun resolveMentionsFor(
+        text: String,
+        candidates: List<ChatMentionCandidate>,
+    ): List<ChatMention> {
+        val resolved = LinkedHashMap<String, ChatMention>()
+        pendingMentions.forEach { cand ->
+            val token = "@${cand.displayName}"
+            if (text.contains(token) && !resolved.containsKey(cand.uid)) {
+                resolved[cand.uid] = ChatMention(uid = cand.uid, displayName = cand.displayName)
+            }
+        }
+        candidates.sortedByDescending { it.displayName.length }.forEach { cand ->
+            val token = "@${cand.displayName}"
+            if (text.contains(token) && !resolved.containsKey(cand.uid)) {
+                resolved[cand.uid] = ChatMention(uid = cand.uid, displayName = cand.displayName)
+            }
+        }
+        return resolved.values.toList()
     }
 
     fun sendMediaAttachment(bytes: ByteArray, isVideo: Boolean) {
@@ -527,6 +620,8 @@ class ChatViewModel @Inject constructor(
 
     private fun stopRealtime() {
         typingJob?.cancel()
+        mentionsJob?.cancel()
+        mentionsJob = null
         typingRegistration?.remove()
         typingRegistration = null
         chatRepository.stopRealtime()

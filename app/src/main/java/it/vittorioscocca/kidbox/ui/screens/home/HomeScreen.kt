@@ -503,6 +503,7 @@ fun HomeScreen(
                 showFamilySwitcher = false
                 onReloadHome()
             },
+            onJoinFamily = { onNavigate(AppDestination.JoinFamily.route) },
         )
     }
 }

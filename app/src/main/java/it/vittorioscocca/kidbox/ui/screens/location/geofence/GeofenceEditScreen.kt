@@ -25,6 +25,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -53,6 +54,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.Circle as MapCircle
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
@@ -181,9 +183,11 @@ fun GeofenceEditScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(220.dp),
+                    .height(260.dp),
                 shape = RoundedCornerShape(12.dp),
             ) {
+                val pin = LatLng(state.latitude, state.longitude)
+                val accent = MaterialTheme.colorScheme.primary
                 GoogleMap(
                     modifier = Modifier.fillMaxSize(),
                     cameraPositionState = cameraPositionState,
@@ -192,8 +196,15 @@ fun GeofenceEditScreen(
                     },
                 ) {
                     Marker(
-                        state = MarkerState(LatLng(state.latitude, state.longitude)),
+                        state = MarkerState(pin),
                         title = state.name.ifBlank { "Zona" },
+                    )
+                    MapCircle(
+                        center = pin,
+                        radius = state.radius.toDouble(),
+                        strokeColor = accent,
+                        strokeWidth = 3f,
+                        fillColor = accent.copy(alpha = 0.18f),
                     )
                 }
             }
@@ -206,12 +217,22 @@ fun GeofenceEditScreen(
             )
             SettingsRow(
                 title = "Applica la zona a",
-                subtitle = if (state.monitorAllMembers) "Tutti chi condividono la posizione" else "${state.monitoredUserIds.size} membri",
+                subtitle = memberSummary(
+                    useAll = state.monitorAllMembers,
+                    selectedIds = state.monitoredUserIds,
+                    members = state.members,
+                    fallbackEmpty = "Seleziona membri…",
+                ),
                 onClick = { showMonitorPicker = true },
             )
             SettingsRow(
                 title = "Avvisa",
-                subtitle = if (state.notifyAllMembers) "Tutta la famiglia" else "${state.notifyUserIds.size} membri",
+                subtitle = memberSummary(
+                    useAll = state.notifyAllMembers,
+                    selectedIds = state.notifyUserIds,
+                    members = state.members,
+                    fallbackEmpty = "Seleziona destinatari…",
+                ),
                 onClick = { showNotifyPicker = true },
             )
             Text("Quando avvisare", fontWeight = FontWeight.SemiBold)
@@ -260,47 +281,112 @@ private fun GeofenceMemberPickerSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .verticalScroll(rememberScrollState()),
+        ) {
             Text(title, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Spacer(Modifier.height(8.dp))
-            ToggleRow("Tutti i membri", useAll, onUseAllChange)
-            if (useAll) {
-                Text(
-                    "Tocca un membro sotto per scegliere solo alcune persone.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 13.sp,
+            Spacer(Modifier.height(12.dp))
+
+            // ── Sezione "Tutti i membri" ────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        if (!useAll) onUseAllChange(true)
+                    }
+                    .padding(vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Tutti i membri")
+                Icon(
+                    imageVector = if (useAll) Icons.Default.Check else Icons.Outlined.Circle,
+                    contentDescription = null,
+                    tint = if (useAll) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                 )
             }
-            members.forEach { member ->
-                val label = member.displayName?.takeIf { it.isNotBlank() } ?: member.email ?: member.userId
-                val selected = !useAll && selectedIds.contains(member.userId)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            onUseAllChange(false)
-                            onToggle(member.userId)
-                        }
-                        .padding(vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(label, color = MaterialTheme.colorScheme.onSurface)
-                    Icon(
-                        imageVector = if (selected) Icons.Default.Check else Icons.Outlined.Circle,
-                        contentDescription = null,
-                        tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                    )
+            Text(
+                text = footer,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(top = 2.dp, bottom = 12.dp),
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(8.dp))
+
+            // ── Sezione "Membri" (selezione singola) ────────────────────
+            Text(
+                "Membri",
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
+            )
+            if (members.isEmpty()) {
+                Text(
+                    "Nessun membro disponibile",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(vertical = 12.dp),
+                )
+            } else {
+                members.forEach { member ->
+                    val label = member.displayName?.takeIf { it.isNotBlank() }
+                        ?: member.email
+                        ?: member.userId
+                    val selected = !useAll && selectedIds.contains(member.userId)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onToggle(member.userId) }
+                            .padding(vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(label, color = MaterialTheme.colorScheme.onSurface)
+                        Icon(
+                            imageVector = if (selected) Icons.Default.Check else Icons.Outlined.Circle,
+                            contentDescription = null,
+                            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                        )
+                    }
                 }
             }
-            Text(footer, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-            Spacer(Modifier.height(8.dp))
+            if (useAll) {
+                Text(
+                    "Tocca un membro per scegliere solo alcune persone.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
             TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
                 Text("Fine")
             }
             Spacer(Modifier.height(24.dp))
         }
     }
+}
+
+private fun memberSummary(
+    useAll: Boolean,
+    selectedIds: Set<String>,
+    members: List<KBFamilyMemberEntity>,
+    fallbackEmpty: String,
+): String {
+    if (useAll) return "Tutti i membri"
+    val names = members
+        .filter { selectedIds.contains(it.userId) }
+        .mapNotNull { m ->
+            m.displayName?.trim()?.takeIf { it.isNotEmpty() }
+                ?: m.email?.trim()?.takeIf { it.isNotEmpty() }
+        }
+    return if (names.isEmpty()) fallbackEmpty else names.joinToString(", ")
 }
 
 @Composable

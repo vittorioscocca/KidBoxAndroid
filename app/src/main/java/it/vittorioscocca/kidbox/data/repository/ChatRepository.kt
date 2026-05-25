@@ -101,6 +101,7 @@ class ChatRepository @Inject constructor(
         latitude: Double? = null,
         longitude: Double? = null,
         replyToId: String? = null,
+        mentionsJSON: String? = null,
     ): String {
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
         val senderName = auth.currentUser?.displayName.orEmpty()
@@ -129,6 +130,7 @@ class ChatRepository @Inject constructor(
             reactionsJSON = null,
             readByJSON = null,
             deletedForJSON = null,
+            mentionsJSON = mentionsJSON,
             transcriptText = null,
             transcriptStatusRaw = "none",
             transcriptSourceRaw = null,
@@ -248,6 +250,7 @@ class ChatRepository @Inject constructor(
             mediaGroupURLsJSON = urlsJson, mediaGroupTypesJSON = typesJson,
             contactPayloadJSON = null, reactionsJSON = null,
             readByJSON = null, deletedForJSON = null,
+            mentionsJSON = null,
             transcriptText = null, transcriptStatusRaw = "none",
             transcriptSourceRaw = null, transcriptLocaleIdentifier = null,
             transcriptIsFinal = false, transcriptUpdatedAtEpochMillis = null,
@@ -584,6 +587,7 @@ private fun KBChatMessageEntity.toDomain(): KBChatMessage =
         reactionsJSON = reactionsJSON,
         readByJSON = readByJSON,
         deletedForJSON = deletedForJSON,
+        mentionsJSON = mentionsJSON,
         transcriptText = transcriptText,
         transcriptStatusRaw = transcriptStatusRaw,
         transcriptSourceRaw = transcriptSourceRaw,

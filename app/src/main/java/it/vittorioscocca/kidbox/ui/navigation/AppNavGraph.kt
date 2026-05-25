@@ -19,6 +19,7 @@ import androidx.navigation.navArgument
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
 import it.vittorioscocca.kidbox.notifications.NotificationDeepLinkRouter
+import it.vittorioscocca.kidbox.ui.family.FamilySwitcherViewModel
 import it.vittorioscocca.kidbox.ui.screens.auth.LoginScreen
 import it.vittorioscocca.kidbox.ui.screens.grocery.GroceryListScreen
 import it.vittorioscocca.kidbox.ui.screens.homeitems.HomeItemDetailScreen
@@ -46,6 +47,7 @@ import it.vittorioscocca.kidbox.ui.screens.ai.planning.PlanningAIChatScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.AiSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.PrivacySettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.SettingsScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.support.SupportChatScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.AutoFillSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.StorageUsageScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.ThemeScreen
@@ -117,10 +119,22 @@ fun AppNavGraph(
     onboardingPreferences: OnboardingPreferences,
 ) {
     val pendingAiRoute by NotificationDeepLinkRouter.pendingRoute.collectAsStateWithLifecycle()
-    LaunchedEffect(pendingAiRoute, navController.currentBackStackEntry) {
+    val pendingFamilyId by NotificationDeepLinkRouter.pendingFamilyId.collectAsStateWithLifecycle()
+    val familySwitcherVm: FamilySwitcherViewModel = hiltViewModel()
+    val activeFamilyId by familySwitcherVm.activeFamilyId.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingAiRoute, pendingFamilyId, activeFamilyId, navController.currentBackStackEntry) {
         val route = pendingAiRoute ?: return@LaunchedEffect
         val current = navController.currentDestination?.route ?: return@LaunchedEffect
         if (current == AppDestination.Login.route || current == AppDestination.Onboarding.route) {
+            return@LaunchedEffect
+        }
+        val targetFamilyId = pendingFamilyId
+        if (!targetFamilyId.isNullOrBlank() && targetFamilyId != activeFamilyId) {
+            KBLog.navigation.info(
+                "DeepLink: family switch required ${activeFamilyId ?: "nil"} → $targetFamilyId, deferring navigate",
+                "NotificationDeepLink",
+            )
+            familySwitcherVm.switchToFamily(targetFamilyId)
             return@LaunchedEffect
         }
         navController.navigate(route) { launchSingleTop = true }
@@ -239,6 +253,17 @@ fun AppNavGraph(
                 onStorageUsage = { navController.navigate(AppDestination.StorageUsage.route) },
                 onAutoFillSettings = { navController.navigate(AppDestination.AutoFillSettings.route) },
                 onPrivacySettings = { navController.navigate(AppDestination.PrivacySettings.route) },
+                onSupportChat = {
+                    navController.navigate(AppDestination.SupportChat.route) {
+                        launchSingleTop = true
+                    }
+                },
+            )
+        }
+
+        composable(AppDestination.SupportChat.route) {
+            SupportChatScreen(
+                onBack = { navController.popBackStack() },
             )
         }
 
@@ -1220,12 +1245,20 @@ fun AppNavGraph(
             )
         }
 
-        composable(AppDestination.Chat.route) {
+        composable(AppDestination.Chat.route) { backStackEntry ->
+            val chatViewModel: ChatViewModel = hiltViewModel(backStackEntry)
+            val pendingMsgId by NotificationDeepLinkRouter.pendingChatMessageId.collectAsStateWithLifecycle()
+            LaunchedEffect(pendingMsgId) {
+                val id = pendingMsgId ?: return@LaunchedEffect
+                chatViewModel.highlightMessage(id)
+                NotificationDeepLinkRouter.clearChatMessageId()
+            }
             ChatScreen(
                 onBack = { navController.popBackStack() },
                 onNavigateToGallery = { familyId ->
                     navController.navigate(AppDestination.ChatMediaGallery.createRoute(familyId))
                 },
+                viewModel = chatViewModel,
             )
         }
 

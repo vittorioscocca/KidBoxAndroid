@@ -39,7 +39,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
 
 data class FamilyLocationUiState(
     val familyId: String = "",
@@ -270,12 +272,16 @@ class FamilyLocationViewModel @Inject constructor(
             LocationShareMode.TEMPORARY.raw -> LocationShareMode.TEMPORARY
             else -> null
         }
+        // Se `me` non è ancora in DB (es. Firestore ha scritto isSharing=true ma il primo
+        // fix GPS non è ancora arrivato), rispettiamo `sharingRequestedLocal` per non
+        // resettare l'UI a "non condivido" prima ancora che il GPS risponda.
+        val effectiveSharing = me != null || sharingRequestedLocal
         _uiState.value = _uiState.value.copy(
             sharedUsers = filtered,
             isLoading = false,
-            isSharing = me != null,
-            myMode = mode,
-            myExpiresAtEpochMillis = me?.expiresAtEpochMillis,
+            isSharing = effectiveSharing,
+            myMode = if (me != null) mode else _uiState.value.myMode,
+            myExpiresAtEpochMillis = if (me != null) me.expiresAtEpochMillis else _uiState.value.myExpiresAtEpochMillis,
         )
         if (me != null) {
             sharingRequestedLocal = true
@@ -283,6 +289,9 @@ class FamilyLocationViewModel @Inject constructor(
             scheduleTemporaryExpiryStop(me)
         } else {
             if (sharingRequestedLocal) {
+                // Stiamo aspettando il primo fix GPS: avvia comunque gli aggiornamenti
+                // in modo che possano produrre le prime coordinate.
+                if (hasLocationPermission) startLocationUpdatesIfNeeded()
                 syncGeofenceMonitor()
                 return
             }
@@ -455,17 +464,25 @@ class FamilyLocationViewModel @Inject constructor(
         lat: Double,
         lon: Double,
     ) {
+        val fallback = "$lat, $lon"
         val address = withContext(Dispatchers.IO) {
             runCatching {
                 val geocoder = Geocoder(context, Locale.ITALY)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    "$lat, $lon"
+                    // API async introdotta in Android 13
+                    kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+                        geocoder.getFromLocation(lat, lon, 1) { addresses ->
+                            cont.resume(
+                                addresses.firstOrNull()?.getAddressLine(0) ?: fallback,
+                            )
+                        }
+                    }
                 } else {
                     @Suppress("DEPRECATION")
                     val line = geocoder.getFromLocation(lat, lon, 1)?.firstOrNull()?.getAddressLine(0)
-                    line ?: "$lat, $lon"
+                    line ?: fallback
                 }
-            }.getOrDefault("$lat, $lon")
+            }.getOrDefault(fallback)
         }
         _uiState.value = _uiState.value.copy(myCurrentAddress = address)
     }
