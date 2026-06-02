@@ -92,7 +92,6 @@ import java.util.concurrent.Executors
 import kotlinx.coroutines.delay
 
 private val PasswordsAccentPurple = Color(0xFF9973D9)
-private val PasswordDetailBackground = Color(0xFFF2F2F7)
 
 @Composable
 fun PasswordDetailScreen(
@@ -131,7 +130,7 @@ fun PasswordDetailScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(PasswordDetailBackground),
+                .background(kb.background),
             contentAlignment = Alignment.Center,
         ) {
             Text("Caricamento...", color = kb.subtitle)
@@ -143,7 +142,7 @@ fun PasswordDetailScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(PasswordDetailBackground),
+                .background(kb.background),
             contentAlignment = Alignment.Center,
         ) {
             Text("Password non trovata", color = kb.subtitle)
@@ -154,7 +153,7 @@ fun PasswordDetailScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(PasswordDetailBackground)
+            .background(kb.background)
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
     ) {
@@ -163,20 +162,21 @@ fun PasswordDetailScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Surface(shape = CircleShape, color = Color.White, shadowElevation = 1.dp) {
+            Surface(shape = CircleShape, color = kb.card, shadowElevation = 1.dp) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro", tint = kb.title)
                 }
             }
             Text(
                 text = state.title.ifBlank { "Password" },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
+                color = kb.title,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            Surface(shape = CircleShape, color = Color.White, shadowElevation = 1.dp) {
+            Surface(shape = CircleShape, color = kb.card, shadowElevation = 1.dp) {
                 IconButton(onClick = viewModel::toggleFavorite) {
                     Icon(
                         if (state.isFavorite) Icons.Filled.Star else Icons.Filled.StarBorder,
@@ -185,21 +185,21 @@ fun PasswordDetailScreen(
                     )
                 }
             }
-            Surface(shape = CircleShape, color = Color.White, shadowElevation = 1.dp) {
+            Surface(shape = CircleShape, color = kb.card, shadowElevation = 1.dp) {
                 IconButton(
                     onClick = {
                         if (state.canManage && onChangePassword != null) onChangePassword.invoke()
                         else showCreatorOnlyMessage()
                     },
                 ) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Modifica")
+                    Icon(Icons.Filled.Edit, contentDescription = "Modifica", tint = kb.title)
                 }
             }
-            Surface(shape = CircleShape, color = Color.White, shadowElevation = 1.dp) {
+            Surface(shape = CircleShape, color = kb.card, shadowElevation = 1.dp) {
                 IconButton(
                     onClick = { showActionsDialog = true },
                 ) {
-                    Icon(Icons.Filled.MoreHoriz, contentDescription = "Altro")
+                    Icon(Icons.Filled.MoreHoriz, contentDescription = "Altro", tint = kb.title)
                 }
             }
         }
@@ -252,7 +252,7 @@ fun PasswordDetailScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
         InfoCard {
-            Text("Sicurezza password", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("Sicurezza password", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = kb.title)
             Spacer(modifier = Modifier.height(8.dp))
             SecurityLine(
                 title = "Controllo fughe (HIBP)",
@@ -264,7 +264,7 @@ fun PasswordDetailScreen(
                 footer = if (state.pwnedCheckedAtLabel.isBlank()) "" else "Ultimo controllo: ${state.pwnedCheckedAtLabel}",
                 warning = (state.pwnedCount ?: 0) > 0,
             )
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFEDEDED))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = kb.divider)
             SecurityLine(
                 title = "Password duplicata",
                 body = if (state.hasDuplicate) {
@@ -284,7 +284,7 @@ fun PasswordDetailScreen(
                     .padding(top = 8.dp)
                     .height(6.dp),
                 color = PasswordsAccentPurple,
-                trackColor = Color(0xFFEDEDED),
+                trackColor = kb.divider,
             )
             Row(modifier = Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(state.strengthLabel, color = Color(0xFFFF8A00), fontWeight = FontWeight.SemiBold)
@@ -483,6 +483,7 @@ private fun OtpSection(
     config: OtpConfig,
     onCopy: (String) -> Unit,
 ) {
+    val kb = MaterialTheme.kidBoxColors
     val tick by produceState(initialValue = 0L, key1 = config) {
         while (true) {
             value = System.currentTimeMillis()
@@ -497,21 +498,21 @@ private fun OtpSection(
     val formatted = remember(code) { code?.chunked(3)?.joinToString(" ") ?: "------" }
 
     InfoCard {
-        Text("OTP", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text("OTP", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = kb.title)
         Spacer(modifier = Modifier.height(8.dp))
-        Text(formatted, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(formatted, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = kb.title)
         Spacer(modifier = Modifier.height(8.dp))
         LinearProgressIndicator(
             progress = { progress.coerceIn(0f, 1f) },
             modifier = Modifier.fillMaxWidth().height(6.dp),
             color = PasswordsAccentPurple,
-            trackColor = Color(0xFFEDEDED),
+            trackColor = kb.divider,
         )
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("${remainingSeconds}s", color = Color(0xFF6B7280))
+            Text("${remainingSeconds}s", color = kb.subtitle)
             Spacer(modifier = Modifier.weight(1f))
             Button(onClick = { if (code != null) onCopy(formatted) }, enabled = code != null) {
                 Text("Copia")
@@ -637,6 +638,7 @@ private fun HeaderCard(iconUrl: String?, title: String) {
                 text = title.ifBlank { "Password" },
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
+                color = kb.title,
             )
         }
     }
@@ -651,16 +653,17 @@ private fun ActionPill(
     isPrimary: Boolean = false,
     enabled: Boolean = true,
 ) {
+    val kb = MaterialTheme.kidBoxColors
     Button(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.height(72.dp),
         shape = RoundedCornerShape(999.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (isPrimary) PasswordsAccentPurple else Color(0xFFEDEDED),
-            contentColor = if (isPrimary) Color.White else Color(0xFF1D1D1F),
-            disabledContainerColor = Color(0xFFEDEDED),
-            disabledContentColor = Color(0xFF8E8E93),
+            containerColor = if (isPrimary) PasswordsAccentPurple else kb.divider,
+            contentColor = if (isPrimary) Color.White else kb.title,
+            disabledContainerColor = kb.divider,
+            disabledContentColor = kb.subtitle,
         ),
     ) {
         Column(
@@ -683,9 +686,10 @@ private fun ActionPill(
 
 @Composable
 private fun InfoCard(content: @Composable ColumnScope.() -> Unit) {
+    val kb = MaterialTheme.kidBoxColors
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = Color.White,
+        color = kb.card,
         modifier = Modifier.fillMaxWidth(),
         shadowElevation = 1.dp,
     ) {

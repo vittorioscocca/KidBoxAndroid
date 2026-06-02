@@ -1,8 +1,12 @@
 package it.vittorioscocca.kidbox.data.location
 
+import android.Manifest
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.content.ContextCompat
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingClient
 import com.google.android.gms.location.GeofencingRequest
@@ -36,19 +40,25 @@ class GeofenceMonitorService @Inject constructor(
         )
     }
 
+    /**
+     * Registra/aggiorna le geofence di sistema per [uid] nella famiglia [familyId].
+     *
+     * Il monitoraggio è INDIPENDENTE dalla condivisione posizione live: una zona
+     * "applicata" a una persona deve generare gli eventi arrivo/partenza anche quando
+     * la condivisione live è spenta. Richiede solo ACCESS_BACKGROUND_LOCATION (verificato
+     * qui internamente) perché il trigger arriva via broadcast ad app in background/chiusa.
+     */
     fun syncMonitoring(
         familyId: String,
         uid: String,
         displayName: String,
-        isSharing: Boolean,
         geofences: List<KBGeofenceEntity>,
-        hasBackgroundLocation: Boolean,
     ) {
-        if (!isSharing || familyId.isBlank() || uid.isBlank()) {
+        if (familyId.isBlank() || uid.isBlank()) {
             removeAll()
             return
         }
-        if (!hasBackgroundLocation) {
+        if (!hasBackgroundLocationPermission()) {
             KBLog.app.warning(
                 "GeofenceMonitor: ACCESS_BACKGROUND_LOCATION required for geofence monitoring",
                 TAG,
@@ -93,6 +103,24 @@ class GeofenceMonitorService @Inject constructor(
     fun removeAll() {
         GeofenceMonitorState.clear(context)
         geofencingClient.removeGeofences(pendingIntent)
+    }
+
+    private fun hasBackgroundLocationPermission(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            val fine = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION,
+            ) == PackageManager.PERMISSION_GRANTED
+            val coarse = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+            ) == PackageManager.PERMISSION_GRANTED
+            return fine || coarse
+        }
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun geofenceAppliesToUser(geofence: KBGeofenceEntity, uid: String): Boolean {

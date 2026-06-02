@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.WorkManager
 import dagger.hilt.android.HiltAndroidApp
+import it.vittorioscocca.kidbox.data.location.GeofenceMonitorRestorer
 import it.vittorioscocca.kidbox.notifications.KidBoxFirebaseMessagingService
 import it.vittorioscocca.kidbox.util.CrashAnalyzer
 import it.vittorioscocca.kidbox.util.KBCrashHandler
@@ -22,6 +23,9 @@ class KidBoxApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
+    @Inject
+    lateinit var geofenceMonitorRestorer: GeofenceMonitorRestorer
+
     private val appInitScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
@@ -33,6 +37,9 @@ class KidBoxApplication : Application(), Configuration.Provider {
         KidBoxFirebaseMessagingService.createNotificationChannels(this)
         appInitScope.launch {
             CrashAnalyzer.analyzeIfNeeded(this@KidBoxApplication)
+        }
+        appInitScope.launch {
+            runCatching { geofenceMonitorRestorer.restore() }
         }
     }
 

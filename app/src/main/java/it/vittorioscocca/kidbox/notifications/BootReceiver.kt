@@ -9,6 +9,7 @@ import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import it.vittorioscocca.kidbox.data.location.GeofenceMonitorEntryPoint
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.AiScheduledNotificationsRestorer
 import kotlinx.coroutines.launch
 
@@ -41,7 +42,13 @@ class BootReceiver : BroadcastReceiver() {
                 val hpSched = ep.housePaymentReminderScheduler()
                 hpDao.listActiveByFamily(familyId).forEach { hpSched.syncPayment(it) }
                 AiScheduledNotificationsRestorer.restoreAfterBoot(appCtx)
-                KBLog.app.debug("BOOT_COMPLETED — vehicle, house payment, AI briefing alarms refreshed", "BootReceiver")
+                // Le geofence di sistema vengono azzerate dall'OS al reboot: ri-registrale da Room.
+                runCatching {
+                    EntryPointAccessors.fromApplication(appCtx, GeofenceMonitorEntryPoint::class.java)
+                        .geofenceMonitorRestorer()
+                        .restore()
+                }
+                KBLog.app.debug("BOOT_COMPLETED — vehicle, house payment, AI briefing, geofence refreshed", "BootReceiver")
             } finally {
                 pendingResult.finish()
             }

@@ -74,7 +74,6 @@ import java.util.Calendar
 import java.util.Locale
 import kotlinx.coroutines.launch
 
-private val IosFormBackgroundLight = Color(0xFFF2F2F7)
 private val PasswordsAccentPurple = Color(0xFF9973D9)
 
 @Composable
@@ -157,8 +156,8 @@ fun AddPasswordScreen(
     val strength = remember(password) { PasswordStrength.evaluate(password) }
     val canSave = title.isNotBlank() && password.isNotEmpty()
 
-    val pageBg = IosFormBackgroundLight
-    val cardBg = Color.White
+    val pageBg = kb.background
+    val cardBg = kb.card
     val sectionMuted = kb.subtitle
 
     fun submit() {
@@ -208,6 +207,7 @@ fun AddPasswordScreen(
                         if (isEditMode) "Modifica password" else "Nuova password",
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 17.sp,
+                        color = kb.title,
                     )
                 },
                 navigationIcon = {
@@ -224,7 +224,7 @@ fun AddPasswordScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.White),
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = kb.background),
             )
         },
     ) { pad ->

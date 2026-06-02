@@ -60,9 +60,12 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MergeType
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.DriveFileMove
 import androidx.compose.material.icons.filled.Menu
@@ -154,11 +157,15 @@ fun DocumentBrowserScreen(
     var showMoveSheet by remember { mutableStateOf(false) }
     var showCopySheet by remember { mutableStateOf(false) }
     var showMergeSheet by remember { mutableStateOf(false) }
+    var showUnlockSheet by remember { mutableStateOf(false) }
     var folderName by remember { mutableStateOf("") }
     var isOpeningDocument by remember { mutableStateOf(false) }
     var isMergingPdfs by remember { mutableStateOf(false) }
+    var isUnlockingPdf by remember { mutableStateOf(false) }
     var mergeNameDraft by remember { mutableStateOf("") }
     var mergeCandidates by remember { mutableStateOf<List<KBDocumentEntity>>(emptyList()) }
+    var unlockTarget by remember { mutableStateOf<KBDocumentEntity?>(null) }
+    var unlockNameDraft by remember { mutableStateOf("") }
     var renameText by remember { mutableStateOf("") }
     var renameTarget by remember { mutableStateOf<ContextMenuTarget?>(null) }
     var contextMenuTarget by remember { mutableStateOf<ContextMenuTarget?>(null) }
@@ -441,20 +448,39 @@ fun DocumentBrowserScreen(
         }
 
         if (state.isSelecting) {
+            val selectedPdfDocsForActions = remember(state.selectedDocumentIds, state.documents) {
+                viewModel.selectedDocuments().filter {
+                    it.mimeType.contains("pdf", ignoreCase = true) ||
+                        it.fileName.endsWith(".pdf", ignoreCase = true)
+                }
+            }
+            val canMergeNow = selectedPdfDocsForActions.size >= 2 &&
+                selectedPdfDocsForActions.size == state.selectedDocumentIds.size
+            val canUnlockNow = selectedPdfDocsForActions.size == 1 &&
+                state.selectedDocumentIds.size == 1
             SelectionBottomBar(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth(),
                 onMove = { showMoveSheet = true; singleMoveTarget = null },
                 onMerge = {
-                    val selected = viewModel.selectedDocuments()
-                        .filter { it.mimeType.contains("pdf", ignoreCase = true) || it.fileName.endsWith(".pdf", ignoreCase = true) }
+                    val selected = selectedPdfDocsForActions
                     if (selected.size < 2) {
                         Toast.makeText(context, "Seleziona almeno 2 PDF", Toast.LENGTH_SHORT).show()
                     } else {
                         mergeCandidates = selected
                         mergeNameDraft = buildMergedPdfTitle(selected)
                         showMergeSheet = true
+                    }
+                },
+                onUnlock = {
+                    val target = selectedPdfDocsForActions.firstOrNull()
+                    if (target == null || state.selectedDocumentIds.size != 1) {
+                        Toast.makeText(context, "Seleziona un singolo PDF", Toast.LENGTH_SHORT).show()
+                    } else {
+                        unlockTarget = target
+                        unlockNameDraft = buildUnlockedPdfDefaultName(target)
+                        showUnlockSheet = true
                     }
                 },
                 onShare = {
@@ -477,13 +503,14 @@ fun DocumentBrowserScreen(
                 },
                 onDelete = { viewModel.deleteSelected() },
                 shareEnabled = state.selectedDocumentIds.isNotEmpty(),
-                mergeEnabled = state.selectedDocumentIds.size >= 2,
+                mergeEnabled = canMergeNow,
+                unlockEnabled = canUnlockNow,
                 hasSelection = selectedCount > 0,
                 chatEnabled = state.selectedDocumentIds.isNotEmpty(),
             )
         }
 
-        if (isOpeningDocument || isMergingPdfs) {
+        if (isOpeningDocument || isMergingPdfs || isUnlockingPdf) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -504,7 +531,11 @@ fun DocumentBrowserScreen(
                             strokeWidth = 2.dp,
                         )
                         Text(
-                            text = if (isMergingPdfs) "Unisco PDF..." else "Apro documento...",
+                            text = when {
+                                isMergingPdfs -> "Unisco PDF..."
+                                isUnlockingPdf -> "Sblocco PDF..."
+                                else -> "Apro documento..."
+                            },
                             modifier = Modifier.padding(start = 12.dp),
                             color = MaterialTheme.kidBoxColors.title,
                             fontWeight = FontWeight.SemiBold,
@@ -621,6 +652,58 @@ fun DocumentBrowserScreen(
                 }
             },
         )
+    }
+
+    if (showUnlockSheet) {
+        val target = unlockTarget
+        if (target == null) {
+            showUnlockSheet = false
+        } else {
+            UnlockPdfBottomSheet(
+                document = target,
+                nameDraft = unlockNameDraft,
+                onNameChange = { unlockNameDraft = it },
+                onDismiss = {
+                    showUnlockSheet = false
+                    unlockTarget = null
+                },
+                onConfirm = { password ->
+                    val source = unlockTarget ?: return@UnlockPdfBottomSheet
+                    showUnlockSheet = false
+                    val nameDraftAtConfirm = unlockNameDraft
+                    scope.launch {
+                        isUnlockingPdf = true
+                        try {
+                            val file = viewModel.preparePreviewFile(source)
+                            val unlockedBytes = unlockPdfFile(context, file, password)
+                            val unlockedFileName = buildUnlockedPdfFileName(nameDraftAtConfirm, source)
+                            viewModel.importDocument(
+                                fileName = unlockedFileName,
+                                mimeType = "application/pdf",
+                                bytes = unlockedBytes,
+                                targetFolderId = state.breadcrumbs.lastOrNull()?.id,
+                            )
+                            viewModel.clearSelection()
+                            Toast.makeText(context, "PDF sbloccato con successo", Toast.LENGTH_SHORT).show()
+                        } catch (e: IllegalArgumentException) {
+                            // Distinta password errata: non chiudo lo sheet così
+                            // l'utente può riprovare? Per ora chiudo sempre e
+                            // mostro toast: l'utente può riaprire.
+                            Toast.makeText(context, e.message ?: "Password errata", Toast.LENGTH_LONG).show()
+                        } catch (e: Exception) {
+                            Toast.makeText(
+                                context,
+                                "Errore sblocco PDF: ${e.localizedMessage ?: "sconosciuto"}",
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        } finally {
+                            isUnlockingPdf = false
+                            unlockTarget = null
+                        }
+                    }
+                },
+            )
+        }
     }
 
     if (showUploadVisibilityGate) {
@@ -1321,11 +1404,13 @@ private fun SelectionBottomBar(
     modifier: Modifier = Modifier,
     onMove: () -> Unit,
     onMerge: () -> Unit,
+    onUnlock: () -> Unit,
     onShare: () -> Unit,
     onChat: () -> Unit,
     onDelete: () -> Unit,
     shareEnabled: Boolean,
     mergeEnabled: Boolean,
+    unlockEnabled: Boolean,
     chatEnabled: Boolean,
     hasSelection: Boolean,
 ) {
@@ -1343,6 +1428,7 @@ private fun SelectionBottomBar(
         ) {
             BottomAction("Sposta", Icons.Default.DriveFileMove, onMove, hasSelection)
             BottomAction("Unisci", Icons.Default.MergeType, onMerge, mergeEnabled)
+            BottomAction("Sblocca", Icons.Default.LockOpen, onUnlock, unlockEnabled)
             BottomAction("Condividi", Icons.Default.Share, onShare, shareEnabled)
             BottomAction("In chat", Icons.AutoMirrored.Filled.Chat, onChat, chatEnabled)
             BottomAction("Elimina", Icons.Default.Delete, onDelete, hasSelection, tint = Color(0xFFE35156))
@@ -1601,6 +1687,167 @@ private fun CapsuleActionButton(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun UnlockPdfBottomSheet(
+    document: KBDocumentEntity,
+    nameDraft: String,
+    onNameChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: (password: String) -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var password by remember { mutableStateOf("") }
+    var showPassword by remember { mutableStateOf(false) }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = MaterialTheme.kidBoxColors.background,
+        dragHandle = null,
+        modifier = Modifier.imePadding(),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CapsuleActionButton(
+                    label = "Annulla",
+                    onClick = onDismiss,
+                    enabled = true,
+                    modifier = Modifier.width(92.dp),
+                )
+                Text(
+                    text = "Sblocca PDF",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 28.sp,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 10.dp),
+                )
+                CapsuleActionButton(
+                    label = "Sblocca",
+                    onClick = { onConfirm(password) },
+                    enabled = password.isNotEmpty() && nameDraft.isNotBlank(),
+                    modifier = Modifier.width(92.dp),
+                )
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // ── Documento di origine ─────────────────────────────────────
+            Text(
+                text = "PDF da sbloccare",
+                color = MaterialTheme.kidBoxColors.subtitle,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+                tonalElevation = 0.dp,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PictureAsPdf,
+                        contentDescription = null,
+                        tint = Color(0xFFE35156),
+                        modifier = Modifier.size(28.dp),
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = document.title.ifBlank { document.fileName },
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.kidBoxColors.title,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = formatFileSize(document.fileSize),
+                            color = MaterialTheme.kidBoxColors.subtitle,
+                            fontSize = 12.sp,
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // ── Password ─────────────────────────────────────────────────
+            Text(
+                text = "Password del PDF",
+                color = MaterialTheme.kidBoxColors.subtitle,
+                fontWeight = FontWeight.SemiBold,
+            )
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp),
+                placeholder = { Text("Inserisci la password") },
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                visualTransformation = if (showPassword) {
+                    androidx.compose.ui.text.input.VisualTransformation.None
+                } else {
+                    androidx.compose.ui.text.input.PasswordVisualTransformation()
+                },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                    autoCorrect = false,
+                ),
+                trailingIcon = {
+                    androidx.compose.material3.IconButton(onClick = { showPassword = !showPassword }) {
+                        Icon(
+                            imageVector = if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = if (showPassword) "Nascondi password" else "Mostra password",
+                            tint = MaterialTheme.kidBoxColors.subtitle,
+                        )
+                    }
+                },
+            )
+            Text(
+                text = "Verrà creata una copia non protetta nella stessa cartella; l'originale resta invariato.",
+                color = MaterialTheme.kidBoxColors.subtitle,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // ── Nome del nuovo PDF ───────────────────────────────────────
+            Text(
+                text = "Nome del nuovo PDF",
+                color = MaterialTheme.kidBoxColors.subtitle,
+                fontWeight = FontWeight.SemiBold,
+            )
+            OutlinedTextField(
+                value = nameDraft,
+                onValueChange = onNameChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp),
+                placeholder = { Text("Documento sbloccato") },
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+            )
+
+            Spacer(modifier = Modifier.height(18.dp))
+        }
+    }
+}
+
 @Composable
 private fun MergePdfRow(
     index: Int,
@@ -1825,6 +2072,60 @@ private fun formatRelativeTime(epochMillis: Long): String {
         minutes < 60 * 24 * 7 -> "Modificata ${minutes / (60 * 24)} giorni fa"
         else -> "Modificata ${minutes / (60 * 24 * 7)} settimane fa"
     }
+}
+
+/**
+ * Rimuove la password protezione da un singolo PDF e restituisce i byte
+ * della copia non protetta.
+ *
+ * Usa PDFBox (già in dipendenza per `WalletPdfParser`) perché `PdfRenderer`
+ * di Android non supporta i PDF cifrati. Se la password è errata
+ * `PDDocument.load(...)` lancia `InvalidPasswordException`: viene rilanciata
+ * con un messaggio italiano user-friendly.
+ *
+ * - Se il PDF non è cifrato il metodo restituisce comunque una copia
+ *   normalizzata: in questo modo eventuali permessi (no-print, no-copy)
+ *   posti dall'owner password vengono rimossi.
+ */
+private suspend fun unlockPdfFile(
+    context: android.content.Context,
+    file: File,
+    password: String,
+): ByteArray = withContext(Dispatchers.IO) {
+    com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(context)
+    val document = try {
+        com.tom_roush.pdfbox.pdmodel.PDDocument.load(file, password)
+    } catch (_: com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException) {
+        throw IllegalArgumentException("Password errata")
+    }
+    try {
+        if (document.isEncrypted) {
+            // Toglie sia user-password che owner-password (e i permessi associati).
+            document.setAllSecurityToBeRemoved(true)
+        }
+        val out = ByteArrayOutputStream()
+        try {
+            document.save(out)
+            out.toByteArray()
+        } finally {
+            out.close()
+        }
+    } finally {
+        document.close()
+    }
+}
+
+private fun buildUnlockedPdfFileName(nameDraft: String, source: KBDocumentEntity): String {
+    val base = nameDraft.trim().ifBlank {
+        val title = source.title.trim().ifBlank { source.fileName.removeSuffix(".pdf") }
+        "$title (sbloccato)"
+    }
+    return if (base.endsWith(".pdf", ignoreCase = true)) base else "$base.pdf"
+}
+
+private fun buildUnlockedPdfDefaultName(source: KBDocumentEntity): String {
+    val base = source.title.trim().ifBlank { source.fileName.removeSuffix(".pdf") }
+    return "$base (sbloccato)"
 }
 
 private suspend fun mergePdfFiles(files: List<File>): ByteArray = withContext(Dispatchers.IO) {

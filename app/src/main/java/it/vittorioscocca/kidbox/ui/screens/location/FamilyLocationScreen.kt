@@ -132,6 +132,10 @@ fun FamilyLocationScreen(
     val cameraPositionState = rememberCameraPositionState()
 
     var requestLocationForSharing by remember { mutableStateOf(false) }
+    // Prominent disclosure obbligatorio (Google Play User Data policy) prima di
+    // richiedere ACCESS_BACKGROUND_LOCATION: l'utente deve sapere che la posizione
+    // viene raccolta anche in background per la condivisione famiglia e le zone (geofence).
+    var showBackgroundDisclosure by remember { mutableStateOf(false) }
 
     val backgroundPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -152,7 +156,7 @@ fun FamilyLocationScreen(
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
                     !RuntimePermissions.hasBackgroundLocationAccess(context)
                 ) {
-                    backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                    showBackgroundDisclosure = true
                 } else {
                     showShareOptions = true
                 }
@@ -373,7 +377,7 @@ fun FamilyLocationScreen(
                             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
                             !RuntimePermissions.hasBackgroundLocationAccess(context)
                         ) {
-                            backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                            showBackgroundDisclosure = true
                         } else {
                             showShareOptions = true
                         }
@@ -406,6 +410,20 @@ fun FamilyLocationScreen(
                 .navigationBarsPadding()
                 .padding(horizontal = 12.dp, vertical = 10.dp),
         )
+
+        if (showBackgroundDisclosure) {
+            BackgroundLocationDisclosureOverlay(
+                onAccept = {
+                    showBackgroundDisclosure = false
+                    backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                },
+                onDecline = {
+                    showBackgroundDisclosure = false
+                    // L'utente può comunque condividere in primo piano: niente background.
+                    showShareOptions = true
+                },
+            )
+        }
 
         if (showShareOptions) {
             ShareModeOverlay(
@@ -641,6 +659,68 @@ private fun LocationBottomCard(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BackgroundLocationDisclosureOverlay(
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+) {
+    val isDarkTheme = isSystemInDarkTheme()
+    val dialogColor = if (isDarkTheme) Color(0xE6212B36) else Color(0xFFE7F6D8)
+    val scrim = if (isDarkTheme) Color.Black.copy(alpha = 0.42f) else Color.Black.copy(alpha = 0.28f)
+    val titleColor = if (isDarkTheme) Color(0xFFEAF0F7) else Color.Black
+    val bodyColor = if (isDarkTheme) Color(0xFFC3CCD8) else Color(0xFF3A3A3A)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(scrim),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = dialogColor,
+            modifier = Modifier
+                .padding(horizontal = 28.dp)
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {},
+                ),
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = "Accesso alla posizione in background",
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = titleColor,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "Per condividere la tua posizione con la tua famiglia e per le " +
+                        "notifiche delle zone (geofence) di arrivo/partenza, KidBox ha bisogno " +
+                        "di accedere alla tua posizione anche quando l'app è chiusa o non in uso " +
+                        "(in background).\n\n" +
+                        "La posizione viene usata solo per mostrarla ai membri della tua famiglia " +
+                        "e per le zone che configuri. Puoi interrompere la condivisione in " +
+                        "qualsiasi momento dall'app.\n\n" +
+                        "Nella schermata successiva seleziona \"Consenti sempre\" per attivare " +
+                        "questa funzione.",
+                    fontSize = 14.sp,
+                    color = bodyColor,
+                    lineHeight = 20.sp,
+                )
+                ShareActionButton(label = "Accetto", onClick = onAccept, isDarkTheme = isDarkTheme)
+                ShareActionButton(label = "No, grazie", onClick = onDecline, isDarkTheme = isDarkTheme)
             }
         }
     }

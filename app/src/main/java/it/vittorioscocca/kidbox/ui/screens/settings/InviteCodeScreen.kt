@@ -32,6 +32,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.screens.onboarding.InviteCodeViewModel
 import it.vittorioscocca.kidbox.ui.screens.onboarding.QRCodeView
+import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
 @Composable
 fun InviteCodeScreen(
@@ -52,20 +53,25 @@ fun InviteCodeScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF2F0EB))
+                .background(MaterialTheme.kidBoxColors.background)
                 .statusBarsPadding()
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Text("Invita", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
+            Text(
+                "Invita",
+                fontSize = 34.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.kidBoxColors.title,
+            )
             Spacer(modifier = Modifier.size(16.dp))
             when {
                 isBusy -> CircularProgressIndicator()
                 qrPayload != null -> {
                     QRCodeView(payload = qrPayload.orEmpty(), modifier = Modifier.size(220.dp))
                     Spacer(modifier = Modifier.size(8.dp))
-                    Text("Codice: ${code.orEmpty()}")
+                    Text("Codice: ${code.orEmpty()}", color = MaterialTheme.kidBoxColors.title)
                     if (errorMessage != null) {
                         Spacer(modifier = Modifier.size(8.dp))
                         Text(errorMessage.orEmpty(), color = Color(0xFFE53E3E))

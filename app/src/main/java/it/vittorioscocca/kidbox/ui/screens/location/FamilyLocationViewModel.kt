@@ -26,6 +26,7 @@ import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.data.notification.CountersService
 import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
 import it.vittorioscocca.kidbox.data.location.GeofenceMonitorService
+import it.vittorioscocca.kidbox.data.location.LocationSharingService
 import it.vittorioscocca.kidbox.data.repository.FamilyLocationRepository
 import it.vittorioscocca.kidbox.data.repository.GeofenceRepository
 import it.vittorioscocca.kidbox.data.repository.LocationShareMode
@@ -242,6 +243,7 @@ class FamilyLocationViewModel @Inject constructor(
                 }
         }
         stopLocationUpdates()
+        stopSharingService()
         syncGeofenceMonitor()
     }
 
@@ -297,6 +299,7 @@ class FamilyLocationViewModel @Inject constructor(
             }
             expiryJob?.cancel()
             stopLocationUpdates()
+            stopSharingService()
             _uiState.value = _uiState.value.copy(myCurrentAddress = null)
         }
         syncGeofenceMonitor()
@@ -309,23 +312,13 @@ class FamilyLocationViewModel @Inject constructor(
             geofenceMonitor.removeAll()
             return
         }
-        val sharing = _uiState.value.isSharing || sharingRequestedLocal
+        // Indipendente da isSharing: le zone vanno monitorate sempre (vedi GeofenceMonitorService).
         geofenceMonitor.syncMonitoring(
             familyId = familyId,
             uid = uid,
             displayName = currentDisplayName,
-            isSharing = sharing,
             geofences = cachedGeofences,
-            hasBackgroundLocation = hasBackgroundLocationPermission(),
         )
-    }
-
-    private fun hasBackgroundLocationPermission(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return hasLocationPermissionNow()
-        return ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_BACKGROUND_LOCATION,
-        ) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun scheduleTemporaryExpiryStop(me: KBSharedLocationEntity) {
@@ -368,22 +361,17 @@ class FamilyLocationViewModel @Inject constructor(
 
     @SuppressLint("MissingPermission")
     private fun startLocationUpdatesIfNeeded() {
-        if (!hasLocationPermission || !_uiState.value.isSharing || locationCallback != null) return
+        if (!hasLocationPermission || !_uiState.value.isSharing) return
+        // Il foreground service è il writer autoritativo verso Firestore: continua a
+        // inviare la posizione anche quando l'app è in background o chiusa.
+        startSharingService()
+        // Lo stream interno al ViewModel serve solo ad aggiornare la UI (marker + indirizzo)
+        // mentre la schermata è aperta; non scrive su Firestore per evitare doppi writer.
+        if (locationCallback != null) return
         val callback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 val last = result.lastLocation ?: return
-                val familyId = _uiState.value.familyId
-                if (familyId.isBlank()) return
                 viewModelScope.launch {
-                    runCatching {
-                        repository.updateMyLocation(
-                            familyId = familyId,
-                            latitude = last.latitude,
-                            longitude = last.longitude,
-                            accuracy = last.accuracy.toDouble(),
-                            displayName = currentDisplayName,
-                        )
-                    }
                     _uiState.value = _uiState.value.copy(
                         deviceLatitude = last.latitude,
                         deviceLongitude = last.longitude,
@@ -397,42 +385,32 @@ class FamilyLocationViewModel @Inject constructor(
             .build()
         locationCallback = callback
         runCatching {
-            fusedClient.lastLocation.addOnSuccessListener { last ->
-                if (last != null) {
-                    viewModelScope.launch {
-                        val familyId = _uiState.value.familyId
-                        if (familyId.isNotBlank()) {
-                            runCatching {
-                                repository.updateMyLocation(
-                                    familyId = familyId,
-                                    latitude = last.latitude,
-                                    longitude = last.longitude,
-                                    accuracy = last.accuracy.toDouble(),
-                                    displayName = currentDisplayName,
-                                )
-                            }
-                            _uiState.value = _uiState.value.copy(
-                                deviceLatitude = last.latitude,
-                                deviceLongitude = last.longitude,
-                            )
-                            updateAddress(last.latitude, last.longitude)
-                        }
-                    }
-                }
-            }
-        }
-        runCatching {
             fusedClient.requestLocationUpdates(request, callback, context.mainLooper)
                 .addOnFailureListener {
                     locationCallback = null
-                    _uiState.value = _uiState.value.copy(errorMessage = "Impossibile avviare aggiornamento posizione")
                 }
         }.onFailure {
             locationCallback = null
-            _uiState.value = _uiState.value.copy(errorMessage = "Impossibile avviare aggiornamento posizione")
         }
     }
 
+    private fun startSharingService() {
+        val familyId = _uiState.value.familyId
+        if (familyId.isBlank()) return
+        runCatching {
+            LocationSharingService.start(context, familyId, currentDisplayName)
+        }.onFailure { err ->
+            _uiState.value = _uiState.value.copy(
+                errorMessage = err.localizedMessage ?: "Impossibile avviare la condivisione in background",
+            )
+        }
+    }
+
+    private fun stopSharingService() {
+        runCatching { LocationSharingService.stop(context) }
+    }
+
+    /** Ferma solo lo stream UI interno al ViewModel; il foreground service resta attivo. */
     private fun stopLocationUpdates() {
         val callback = locationCallback ?: return
         runCatching { fusedClient.removeLocationUpdates(callback) }

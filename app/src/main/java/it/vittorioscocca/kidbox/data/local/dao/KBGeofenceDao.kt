@@ -12,6 +12,9 @@ interface KBGeofenceDao {
     @Query("SELECT * FROM kb_geofences WHERE familyId = :familyId AND isDeleted = 0 ORDER BY name ASC")
     fun observeByFamily(familyId: String): Flow<List<KBGeofenceEntity>>
 
+    @Query("SELECT * FROM kb_geofences WHERE familyId = :familyId AND isDeleted = 0 ORDER BY name ASC")
+    suspend fun listByFamily(familyId: String): List<KBGeofenceEntity>
+
     @Query("SELECT * FROM kb_geofences WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): KBGeofenceEntity?
 

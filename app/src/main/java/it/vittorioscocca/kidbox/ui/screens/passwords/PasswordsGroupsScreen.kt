@@ -44,8 +44,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
-private val PasswordsIosBackgroundLight = Color(0xFFF2F2F7)
-
 @Composable
 fun PasswordsGroupsScreen(
     familyId: String,
@@ -64,7 +62,7 @@ fun PasswordsGroupsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(PasswordsIosBackgroundLight)
+            .background(kb.background)
             .statusBarsPadding()
             .padding(horizontal = 16.dp),
     ) {
@@ -74,15 +72,15 @@ fun PasswordsGroupsScreen(
                 .padding(top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Surface(shape = androidx.compose.foundation.shape.CircleShape, color = Color.White, shadowElevation = 1.dp) {
+            Surface(shape = androidx.compose.foundation.shape.CircleShape, color = kb.card, shadowElevation = 1.dp) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro", tint = kb.title)
                 }
             }
             Spacer(modifier = Modifier.weight(1f))
-            Surface(shape = androidx.compose.foundation.shape.CircleShape, color = Color.White, shadowElevation = 1.dp) {
+            Surface(shape = androidx.compose.foundation.shape.CircleShape, color = kb.card, shadowElevation = 1.dp) {
                 IconButton(onClick = onOpenCreateGroup) {
-                    Icon(Icons.Filled.Add, contentDescription = "Nuovo gruppo")
+                    Icon(Icons.Filled.Add, contentDescription = "Nuovo gruppo", tint = kb.title)
                 }
             }
         }
@@ -112,7 +110,7 @@ fun PasswordsGroupsScreen(
         } else {
             Surface(
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-                color = Color.White,
+                color = kb.card,
                 shadowElevation = 1.dp,
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -121,7 +119,7 @@ fun PasswordsGroupsScreen(
                         GroupRow(row = row, onOpenGroup = onOpenGroup)
                         if (index < state.rows.lastIndex) {
                             HorizontalDivider(
-                                color = Color(0xFFEDEDED),
+                                color = kb.divider,
                                 thickness = 0.5.dp,
                                 modifier = Modifier.padding(start = 68.dp, end = 12.dp),
                             )

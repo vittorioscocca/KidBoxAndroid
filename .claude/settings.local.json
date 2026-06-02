@@ -15,7 +15,23 @@
       "Bash(find /Users/vscocca/KidBox -name \"firestore.rules\" 2>/dev/null | head -5)",
       "Bash(find /Users/vscocca/KidBoxAndroid -name \"TravelAllTripsScreen.kt\" 2>/dev/null | head -5)",
       "Bash(./gradlew :app:compileDebugKotlin)",
-      "Bash(find /Users/vscocca/KidBox -name \"*.js\" -o -name \"*.ts\" 2>/dev/null | grep -i \"function\\\\|cloud\\\\|trigger\" | grep -v \".claude\\\\|node_modules\" | head -10)"
+      "Bash(find /Users/vscocca/KidBox -name \"*.js\" -o -name \"*.ts\" 2>/dev/null | grep -i \"function\\\\|cloud\\\\|trigger\" | grep -v \".claude\\\\|node_modules\" | head -10)",
+      "Bash(./gradlew :app:compileDebugKotlin -q)",
+      "Bash(ls -d functions 2>/dev/null; find . -maxdepth 3 -name \"*.js\" -path \"*functions*\" 2>/dev/null | grep -v node_modules | head; find . -maxdepth 3 -name \"index.ts\" 2>/dev/null | grep -v node_modules | head; ls .. 2>/dev/null | head -30)",
+      "Bash(export JAVA_HOME=\"/Applications/Android Studio.app/Contents/jbr/Contents/Home\")",
+      "Bash(./gradlew :app:bundleRelease)",
+      "WebFetch(domain:kidbox-landing.web.app)",
+      "Bash(awk '/exports.deleteAccount/,/^}\\);/' /Users/vscocca/KidBox/functions/index.js)",
+      "Bash('/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java' -version)",
+      "Bash(./gradlew :app:processDebugMainManifest -q)",
+      "Bash(cd /Users/vscocca; find . -maxdepth 4 -type d \\\\\\( -iname \"functions\" -o -iname \"*cloud*function*\" \\\\\\) 2>/dev/null | grep -vi node_modules | head; echo \"---firebase.json---\"; find . -maxdepth 4 -name \"firebase.json\" 2>/dev/null | grep -vi node_modules | head; echo \"---geofenceEvents refs---\"; grep -rln \"geofenceEvents\" /Users/vscocca --include=\"*.ts\" --include=\"*.js\" 2>/dev/null | grep -vi node_modules | head)",
+      "Bash(xcodebuild -list -project KidBox.xcodeproj)",
+      "Bash(xcodebuild -list)",
+      "Bash(sed -n '335,360p' KidBox/Features/AIAgent/PlanningAIChatView.swift)",
+      "Bash(sed -n '475,490p' KidBox/Features/Home/HomeView.swift)",
+      "Bash(sed -n '900,915p' KidBox/Features/Home/HomeView.swift)",
+      "Bash(awk 'NR>=460 && NR<=508 && /func |familyId/' KidBox/Features/AIAgent/HealthPatternAnalyzerService.swift)",
+      "Bash(sed -n '470,488p' KidBox/Features/AIAgent/HealthPatternAnalyzerService.swift)"
     ]
   }
 }
