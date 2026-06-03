@@ -118,6 +118,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import android.view.WindowManager
 import androidx.core.content.FileProvider
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -2050,10 +2051,22 @@ internal fun PhotosFullscreenMediaViewer(
     ) {
         val dialogView = LocalView.current
         SideEffect {
-            (dialogView.parent as? DialogWindowProvider)?.window?.setLayout(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT,
-            )
+            (dialogView.parent as? DialogWindowProvider)?.window?.apply {
+                // Edge-to-edge fullscreen: la dialog deve coprire l'intero
+                // schermo inclusa la gesture/navigation bar area.
+                // 1. WindowCompat.setDecorFitsSystemWindows è l'API ufficiale
+                //    per estendere la window dietro le system bars.
+                // 2. setLayout(MATCH_PARENT) rimuove il cap di dimensione.
+                // 3. FLAG_LAYOUT_NO_LIMITS permette l'estensione oltre i bordi.
+                // 4. Background trasparente rimuove il padding nine-patch del Dialog.
+                WindowCompat.setDecorFitsSystemWindows(this, false)
+                setLayout(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                )
+                addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+                setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+            }
         }
         FullscreenSystemBarsEffect()
         Box(

@@ -117,6 +117,7 @@ import androidx.compose.ui.window.DialogWindowProvider
 import android.app.Activity
 import android.content.ContextWrapper
 import android.view.WindowManager
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.ui.Alignment
@@ -1621,10 +1622,15 @@ private fun MediaGroupGalleryDialog(
         // (whose parent is a DialogWindowProvider), not the activity's root view.
         val dialogView = LocalView.current
         SideEffect {
-            (dialogView.parent as? DialogWindowProvider)?.window?.setLayout(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT,
-            )
+            (dialogView.parent as? DialogWindowProvider)?.window?.apply {
+                WindowCompat.setDecorFitsSystemWindows(this, false)
+                setLayout(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                )
+                addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+                setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+            }
         }
 
         // Hide status + navigation bars while the gallery is open, restore on dismiss.
