@@ -79,6 +79,11 @@ class LocationRemoteStore @Inject constructor() {
         } else {
             data["expiresAt"] = FieldValue.delete()
         }
+        // Allega l'avatar dell'utente al documento locations/{uid} così che gli altri
+        // dispositivi (Android e iOS) possano mostrarlo nel cerchio. iOS scrive avatarURL
+        // qui in fase di upload foto (AvatarRemoteStore.uploadAvatar); su Android l'URL
+        // vive solo in users/{uid}, quindi lo riportiamo qui all'avvio della condivisione.
+        fetchUserAvatarUrl(uid)?.let { data["avatarURL"] = it }
         firestore.collection("families")
             .document(familyId)
             .collection("locations")
@@ -148,6 +153,15 @@ class LocationRemoteStore @Inject constructor() {
             )
             .await()
     }
+
+    private suspend fun fetchUserAvatarUrl(uid: String): String? = runCatching {
+        firestore.collection("users")
+            .document(uid)
+            .get()
+            .await()
+            .getString("avatarURL")
+            ?.takeIf { it.isNotBlank() }
+    }.getOrNull()
 
     private fun Map<String, Any>.numberOrNull(key: String): Number? = this[key] as? Number
 

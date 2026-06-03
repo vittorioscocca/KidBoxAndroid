@@ -40,7 +40,7 @@ KidBox è un'app di organizzazione famigliare multi-piattaforma che mette in un 
 
 ### 1.4 Manifest, servizi, capability (`app/src/main/AndroidManifest.xml`)
 
-**Permessi runtime principali**: `INTERNET`, `POST_NOTIFICATIONS`, `CAMERA`, `RECORD_AUDIO`, `READ_CONTACTS`, `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`, `ACCESS_BACKGROUND_LOCATION`, `SCHEDULE_EXACT_ALARM`, `USE_EXACT_ALARM`, `RECEIVE_BOOT_COMPLETED`, e i permessi Health Connect (`health.READ_HEART_RATE`, `READ_STEPS`, `READ_WEIGHT`, `READ_ACTIVE_CALORIES_BURNED`, `READ_EXERCISE`). Vengono **rimossi** con `tools:node="remove"` `READ_MEDIA_IMAGES` / `READ_MEDIA_VIDEO` (accesso foto/video tramite Photo Picker). `<queries>` dichiara `com.google.android.apps.healthdata`.
+**Permessi runtime principali**: `INTERNET`, `POST_NOTIFICATIONS`, `CAMERA`, `RECORD_AUDIO`, `READ_CONTACTS`, `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`, `ACCESS_BACKGROUND_LOCATION`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION` (Android 14+, per la condivisione posizione live in background via foreground service), `SCHEDULE_EXACT_ALARM`, `USE_EXACT_ALARM`, `RECEIVE_BOOT_COMPLETED`, e i permessi Health Connect (`health.READ_HEART_RATE`, `READ_STEPS`, `READ_WEIGHT`, `READ_ACTIVE_CALORIES_BURNED`, `READ_EXERCISE`). Vengono **rimossi** con `tools:node="remove"` `READ_MEDIA_IMAGES` / `READ_MEDIA_VIDEO` (accesso foto/video tramite Photo Picker). `<queries>` dichiara `com.google.android.apps.healthdata`.
 
 **Application class**: `.KidBoxApplication` (vedi §3.4):
 - `@HiltAndroidApp`, implementa `Configuration.Provider` per WorkManager con `HiltWorkerFactory` iniettato
@@ -53,6 +53,7 @@ KidBox è un'app di organizzazione famigliare multi-piattaforma che mette in un 
 
 **Servizi**:
 - `.notifications.KidBoxFirebaseMessagingService` (FCM)
+- `.data.location.LocationSharingService` (`foregroundServiceType="location"`) — foreground service che invia la posizione live a Firestore anche con app in background/chiusa
 - `.feature.passwords.autofill.KidBoxCredentialProviderService` (Credential Manager, permission `BIND_CREDENTIAL_PROVIDER_SERVICE`)
 - `.feature.passwords.autofill.KidBoxAutofillService` (autofill legacy, permission `BIND_AUTOFILL_SERVICE`)
 
@@ -110,7 +111,9 @@ KidBoxApplication.kt, MainActivity.kt   (root)
 
 - **`data/notification/`** — `CountersService.kt`, `HomeBadgeManager.kt`, `PushNotificationManager.kt`, `TodoReminderScheduler.kt`
 
-- **`data/location/`** — `GeofenceMonitorService.kt`, `GeofenceMonitorState.kt`, `GeofenceTransitionReceiver.kt`
+- **`data/location/`** — `GeofenceMonitorService.kt`, `GeofenceMonitorState.kt`, `GeofenceTransitionReceiver.kt`, `LocationSharingService.kt` (foreground service condivisione live), `GeofenceMonitorRestorer.kt` + `GeofenceMonitorEntryPoint.kt` (ri-registrazione geofence all'avvio app e dopo il boot)
+  - **Condivisione live in background**: gestita da `LocationSharingService` (foreground service di tipo `location`, notifica persistente), avviato/fermato da `FamilyLocationViewModel`; è il writer autoritativo verso Firestore. Lo stream interno al ViewModel serve solo alla UI mentre la schermata è aperta.
+  - **Monitoraggio geofence**: `GeofenceMonitorService.syncMonitoring(...)` è **indipendente** dalla condivisione live (non più gated su `isSharing`); richiede solo `ACCESS_BACKGROUND_LOCATION`, verificato internamente. Le geofence di sistema persistono via `GeofencingClient`; `GeofenceMonitorRestorer` le ri-registra dalla cache Room all'avvio app (`KidBoxApplication`) e dopo il `BOOT_COMPLETED` (l'OS le azzera al reboot).
 
 - **`data/passwords/`** — `AutoFillSnapshot.kt`, `AutoFillSnapshotEncryptedStore.kt`, `FaviconResolver.kt`, `RebuildAutoFillSnapshotWorker.kt`, + `otp/` e `security/` (pwned-password / breach check)
 

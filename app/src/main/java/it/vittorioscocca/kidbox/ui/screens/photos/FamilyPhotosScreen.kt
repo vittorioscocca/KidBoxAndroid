@@ -22,13 +22,21 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,12 +45,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -59,13 +70,10 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RemoveCircleOutline
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -78,31 +86,44 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import android.view.WindowManager
 import androidx.core.content.FileProvider
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import it.vittorioscocca.kidbox.data.local.PhotoPreviewCache
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyPhotoEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBPhotoAlbumEntity
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
@@ -122,7 +143,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private enum class PhotosTab { LIBRARY, ALBUMS }
-private enum class PhotoGroupMode { DAY, MONTH, YEAR }
+private enum class PhotoGrouping(val label: String) {
+    YEAR("Anni"), MONTH("Mesi"), DAY("Giorni"), ALL("Tutto")
+}
 
 @Composable
 fun FamilyPhotosScreen(
@@ -144,7 +167,14 @@ fun FamilyPhotosScreen(
     var pendingCaptureUri by remember { mutableStateOf<Uri?>(null) }
     var longPressMenuPhoto by remember { mutableStateOf<KBFamilyPhotoEntity?>(null) }
     var longPressMenuAlbum by remember { mutableStateOf<KBPhotoAlbumEntity?>(null) }
-    var groupMode by remember { mutableStateOf(PhotoGroupMode.DAY) }
+    var grouping by remember { mutableStateOf(PhotoGrouping.ALL) }
+    var thumbTarget by remember { mutableFloatStateOf(124f) }
+    var pendingScrollKey by remember { mutableStateOf<String?>(null) }
+
+    // Mantieni la cache anteprime hi-res entro il budget all'apertura (come iOS).
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) { PhotoPreviewCache.trim(context) }
+    }
 
     val multiMediaPicker = rememberMultiMediaPicker(maxItems = 30) { uris: List<Uri> ->
         if (uris.isNotEmpty()) viewModel.importMediaBatch(uris, state.selectedAlbumId)
@@ -209,7 +239,6 @@ fun FamilyPhotosScreen(
                 isSelectionMode = isSelectionMode,
                 isAlbumSelectionMode = isAlbumSelectionMode,
                 hasAlbums = state.albums.isNotEmpty(),
-                groupMode = groupMode,
                 onBack = onBack,
                 onToggleSelection = {
                     if (isSelectionMode) {
@@ -227,7 +256,6 @@ fun FamilyPhotosScreen(
                         isAlbumSelectionMode = true
                     }
                 },
-                onGroupModeSelected = { groupMode = it },
                 onCamera = {
                     val uri = photosCreateCaptureUri(context) ?: run {
                         Toast.makeText(context, "Impossibile aprire la fotocamera", Toast.LENGTH_LONG).show()
@@ -333,10 +361,21 @@ fun FamilyPhotosScreen(
                     LibraryContent(
                         isLoading = state.isLoading,
                         photos = state.filteredPhotos,
-                        groupMode = groupMode,
+                        grouping = grouping,
+                        onGroupingChange = { grouping = it },
+                        thumbTarget = thumbTarget,
+                        onThumbTargetChange = { thumbTarget = it },
+                        pendingScrollKey = pendingScrollKey,
+                        onScrollConsumed = { pendingScrollKey = null },
+                        onRequestYearScroll = { monthKey ->
+                            pendingScrollKey = monthKey
+                            grouping = PhotoGrouping.MONTH
+                        },
                         isSelectionMode = isSelectionMode,
                         selectedPhotoIds = selectedPhotoIds,
                         uploadingPhotoIds = state.uploadingPhotoIds,
+                        familyId = state.familyId,
+                        loadPreview = viewModel::previewBitmap,
                         onEmptyPick = {
                             multiMediaPicker.launch(imageAndVideoRequest())
                         },
@@ -362,6 +401,10 @@ fun FamilyPhotosScreen(
                         },
                         onPhotoLongPress = { photo ->
                             longPressMenuPhoto = photo
+                        },
+                        onSetSelected = { id, sel ->
+                            selectedPhotoIds = if (sel) selectedPhotoIds + id else selectedPhotoIds - id
+                            if (selectedPhotoIds.isEmpty()) isSelectionMode = false
                         },
                     )
                 }
@@ -551,15 +594,12 @@ private fun TopHeader(
     isSelectionMode: Boolean,
     isAlbumSelectionMode: Boolean,
     hasAlbums: Boolean,
-    groupMode: PhotoGroupMode,
     onBack: () -> Unit,
     onToggleSelection: () -> Unit,
     onToggleAlbumSelection: () -> Unit,
-    onGroupModeSelected: (PhotoGroupMode) -> Unit,
     onCamera: () -> Unit,
     onPlus: () -> Unit,
 ) {
-    var showGroupingMenu by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -572,44 +612,6 @@ private fun TopHeader(
                     icon = if (isSelectionMode) Icons.Default.Done else Icons.Default.DoneAll,
                     onClick = onToggleSelection,
                 )
-                Box {
-                    HeaderCircleButton(icon = Icons.Default.Tune, onClick = { showGroupingMenu = true })
-                    DropdownMenu(
-                        expanded = showGroupingMenu,
-                        onDismissRequest = { showGroupingMenu = false },
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Giorno") },
-                            onClick = {
-                                onGroupModeSelected(PhotoGroupMode.DAY)
-                                showGroupingMenu = false
-                            },
-                            leadingIcon = if (groupMode == PhotoGroupMode.DAY) {
-                                { Icon(Icons.Default.Done, contentDescription = null) }
-                            } else null,
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Mese") },
-                            onClick = {
-                                onGroupModeSelected(PhotoGroupMode.MONTH)
-                                showGroupingMenu = false
-                            },
-                            leadingIcon = if (groupMode == PhotoGroupMode.MONTH) {
-                                { Icon(Icons.Default.Done, contentDescription = null) }
-                            } else null,
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Anno") },
-                            onClick = {
-                                onGroupModeSelected(PhotoGroupMode.YEAR)
-                                showGroupingMenu = false
-                            },
-                            leadingIcon = if (groupMode == PhotoGroupMode.YEAR) {
-                                { Icon(Icons.Default.Done, contentDescription = null) }
-                            } else null,
-                        )
-                    }
-                }
                 HeaderCircleButton(icon = Icons.Default.CameraAlt, onClick = onCamera)
                 HeaderCircleButton(icon = Icons.Default.Add, onClick = onPlus)
             }
@@ -676,14 +678,23 @@ private fun TabSwitcher(
 private fun LibraryContent(
     isLoading: Boolean,
     photos: List<KBFamilyPhotoEntity>,
-    groupMode: PhotoGroupMode,
+    grouping: PhotoGrouping,
+    onGroupingChange: (PhotoGrouping) -> Unit,
+    thumbTarget: Float,
+    onThumbTargetChange: (Float) -> Unit,
+    pendingScrollKey: String?,
+    onScrollConsumed: () -> Unit,
+    onRequestYearScroll: (String) -> Unit,
     isSelectionMode: Boolean,
     selectedPhotoIds: Set<String>,
     uploadingPhotoIds: Set<String>,
+    familyId: String,
+    loadPreview: suspend (KBFamilyPhotoEntity, Int) -> Bitmap?,
     onEmptyPick: () -> Unit,
     onEmptyCamera: () -> Unit,
     onPhotoTap: (KBFamilyPhotoEntity) -> Unit,
     onPhotoLongPress: (KBFamilyPhotoEntity) -> Unit,
+    onSetSelected: (String, Boolean) -> Unit,
 ) {
     if (isLoading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -698,39 +709,704 @@ private fun LibraryContent(
         )
         return
     }
-    val sections = remember(photos, groupMode) { buildPhotoSections(photos, groupMode) }
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
-        modifier = Modifier.fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        sections.forEach { section ->
-            items(
-                items = listOf(section),
-                key = { "header_${it.title}" },
-                span = { GridItemSpan(maxLineSpan) },
-            ) {
-                Text(
-                    text = it.title,
-                    color = MaterialTheme.kidBoxColors.title,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp),
-                )
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        // Larghezza effettiva: piena su telefono, limitata e centrata su schermi larghi
+        // (evita tessere "giganti", come iOS).
+        val layoutWidth = minOf(maxWidth, 720.dp)
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            Box(modifier = Modifier.width(layoutWidth).fillMaxHeight()) {
+                if (isSelectionMode) {
+                    DensePhotoGrid(
+                        photos = remember(photos) { photos.sortedByDescending { it.takenAtEpochMillis } },
+                        layoutWidth = layoutWidth,
+                        thumbTarget = thumbTarget,
+                        onThumbTargetChange = onThumbTargetChange,
+                        enablePinch = false,
+                        isSelectionMode = true,
+                        selectedPhotoIds = selectedPhotoIds,
+                        uploadingPhotoIds = uploadingPhotoIds,
+                        familyId = familyId,
+                        loadPreview = loadPreview,
+                        onPhotoTap = onPhotoTap,
+                        onPhotoLongPress = onPhotoLongPress,
+                        onSetSelected = onSetSelected,
+                    )
+                } else {
+                    when (grouping) {
+                        PhotoGrouping.ALL -> DensePhotoGrid(
+                            photos = remember(photos) { photos.sortedByDescending { it.takenAtEpochMillis } },
+                            layoutWidth = layoutWidth,
+                            thumbTarget = thumbTarget,
+                            onThumbTargetChange = onThumbTargetChange,
+                            enablePinch = true,
+                            isSelectionMode = false,
+                            selectedPhotoIds = selectedPhotoIds,
+                            uploadingPhotoIds = uploadingPhotoIds,
+                            familyId = familyId,
+                            loadPreview = loadPreview,
+                            onPhotoTap = onPhotoTap,
+                            onPhotoLongPress = onPhotoLongPress,
+                            onSetSelected = onSetSelected,
+                        )
+                        PhotoGrouping.YEAR -> YearsLayout(
+                            groups = remember(photos) { groupPhotos(photos, PhotoGrouping.YEAR) },
+                            layoutWidth = layoutWidth,
+                            familyId = familyId,
+                            loadPreview = loadPreview,
+                            onYearTap = { group ->
+                                val first = group.photos.firstOrNull() ?: return@YearsLayout
+                                onRequestYearScroll(monthKeyOf(first))
+                            },
+                            onPhotoLongPress = onPhotoLongPress,
+                        )
+                        PhotoGrouping.MONTH -> MosaicSections(
+                            groups = remember(photos) { groupPhotos(photos, PhotoGrouping.MONTH) },
+                            layoutWidth = layoutWidth,
+                            pendingScrollKey = pendingScrollKey,
+                            onScrollConsumed = onScrollConsumed,
+                            familyId = familyId,
+                            loadPreview = loadPreview,
+                            uploadingPhotoIds = uploadingPhotoIds,
+                            onPhotoTap = onPhotoTap,
+                            onPhotoLongPress = onPhotoLongPress,
+                        )
+                        PhotoGrouping.DAY -> MosaicSections(
+                            groups = remember(photos) { groupPhotos(photos, PhotoGrouping.DAY) },
+                            layoutWidth = layoutWidth,
+                            pendingScrollKey = pendingScrollKey,
+                            onScrollConsumed = onScrollConsumed,
+                            familyId = familyId,
+                            loadPreview = loadPreview,
+                            uploadingPhotoIds = uploadingPhotoIds,
+                            onPhotoTap = onPhotoTap,
+                            onPhotoLongPress = onPhotoLongPress,
+                        )
+                    }
+                }
             }
-            items(section.photos, key = { it.id }) { photo ->
-                PhotoGridItem(
-                    photo = photo,
-                    isSelectionMode = isSelectionMode,
-                    isSelected = selectedPhotoIds.contains(photo.id),
-                    isUploading = uploadingPhotoIds.contains(photo.id) || KBSyncState.fromRaw(photo.syncStateRaw) == KBSyncState.PENDING_UPSERT,
-                    onOpen = { onPhotoTap(photo) },
-                    onLongPress = { onPhotoLongPress(photo) },
+        }
+        if (!isSelectionMode) {
+            GroupingBar(
+                grouping = grouping,
+                onSelect = onGroupingChange,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 14.dp),
+            )
+        }
+    }
+}
+
+// MARK: - Floating grouping bar (Anni · Mesi · Giorni · Tutto)
+
+@Composable
+private fun GroupingBar(
+    grouping: PhotoGrouping,
+    onSelect: (PhotoGrouping) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = MaterialTheme.kidBoxColors.card.copy(alpha = 0.96f),
+        shadowElevation = 8.dp,
+        modifier = modifier,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            listOf(PhotoGrouping.YEAR, PhotoGrouping.MONTH, PhotoGrouping.DAY, PhotoGrouping.ALL).forEach { g ->
+                val selected = g == grouping
+                Surface(
+                    onClick = { onSelect(g) },
+                    shape = RoundedCornerShape(999.dp),
+                    color = if (selected) MaterialTheme.kidBoxColors.title.copy(alpha = 0.12f) else Color.Transparent,
+                ) {
+                    Text(
+                        text = g.label,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
+                        color = if (selected) MaterialTheme.kidBoxColors.title else MaterialTheme.kidBoxColors.subtitle,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                    )
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Years layout (una grande copertina per anno)
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun YearsLayout(
+    groups: List<PhotoGroup>,
+    layoutWidth: Dp,
+    familyId: String,
+    loadPreview: suspend (KBFamilyPhotoEntity, Int) -> Bitmap?,
+    onYearTap: (PhotoGroup) -> Unit,
+    onPhotoLongPress: (KBFamilyPhotoEntity) -> Unit,
+) {
+    val cardW = layoutWidth - 24.dp
+    val cardH = cardW * 0.62f
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 86.dp),
+    ) {
+        items(groups, key = { it.key }) { group ->
+            val cover = group.photos.firstOrNull()
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier
+                        .width(cardW)
+                        .height(cardH)
+                        .clip(RoundedCornerShape(18.dp))
+                        .combinedClickable(
+                            onClick = { onYearTap(group) },
+                            onLongClick = { cover?.let(onPhotoLongPress) },
+                        ),
+                ) {
+                    if (cover != null) {
+                        PhotoThumbnailCell(
+                            photo = cover,
+                            displaySize = cardW,
+                            loadPreview = loadPreview,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.kidBoxColors.rowBackground))
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)),
+                                ),
+                            ),
+                    )
+                    Text(
+                        text = group.title,
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(18.dp),
+                        color = Color.White,
+                        fontSize = 30.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Mosaic sections (Mesi / Giorni)
+
+private sealed interface MosaicItem {
+    data class Header(val key: String, val title: String) : MosaicItem
+    data class BlockRow(val key: String, val block: MosaicBlock) : MosaicItem
+}
+
+private fun buildMosaicItems(groups: List<PhotoGroup>): List<MosaicItem> {
+    val rows = mutableListOf<MosaicItem>()
+    groups.forEach { group ->
+        rows.add(MosaicItem.Header(group.key, group.title))
+        mosaicBlocks(group.photos).forEachIndexed { idx, block ->
+            rows.add(MosaicItem.BlockRow("${group.key}_$idx", block))
+        }
+    }
+    return rows
+}
+
+@Composable
+private fun MosaicSections(
+    groups: List<PhotoGroup>,
+    layoutWidth: Dp,
+    pendingScrollKey: String?,
+    onScrollConsumed: () -> Unit,
+    familyId: String,
+    loadPreview: suspend (KBFamilyPhotoEntity, Int) -> Bitmap?,
+    uploadingPhotoIds: Set<String>,
+    onPhotoTap: (KBFamilyPhotoEntity) -> Unit,
+    onPhotoLongPress: (KBFamilyPhotoEntity) -> Unit,
+) {
+    val rows = remember(groups) { buildMosaicItems(groups) }
+    val listState = rememberLazyListState()
+    LaunchedEffect(pendingScrollKey, rows) {
+        val key = pendingScrollKey ?: return@LaunchedEffect
+        val idx = rows.indexOfFirst { it is MosaicItem.Header && it.key == key }
+        if (idx >= 0) listState.animateScrollToItem(idx)
+        onScrollConsumed()
+    }
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 86.dp),
+    ) {
+        items(
+            items = rows,
+            key = { row ->
+                when (row) {
+                    is MosaicItem.Header -> "h_${row.key}"
+                    is MosaicItem.BlockRow -> "b_${row.key}"
+                }
+            },
+        ) { row ->
+            when (row) {
+                is MosaicItem.Header -> Text(
+                    text = row.title,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.kidBoxColors.background.copy(alpha = 0.95f))
+                        .padding(horizontal = 6.dp, vertical = 8.dp),
+                    color = MaterialTheme.kidBoxColors.title,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                is MosaicItem.BlockRow -> MosaicBlockRow(
+                    block = row.block,
+                    layoutWidth = layoutWidth,
+                    familyId = familyId,
+                    loadPreview = loadPreview,
+                    uploadingPhotoIds = uploadingPhotoIds,
+                    onPhotoTap = onPhotoTap,
+                    onPhotoLongPress = onPhotoLongPress,
                 )
             }
         }
     }
+}
+
+@Composable
+private fun MosaicBlockRow(
+    block: MosaicBlock,
+    layoutWidth: Dp,
+    familyId: String,
+    loadPreview: suspend (KBFamilyPhotoEntity, Int) -> Bitmap?,
+    uploadingPhotoIds: Set<String>,
+    onPhotoTap: (KBFamilyPhotoEntity) -> Unit,
+    onPhotoLongPress: (KBFamilyPhotoEntity) -> Unit,
+) {
+    val s = 2.dp
+    val w = layoutWidth - s * 2
+    val tile: @Composable (KBFamilyPhotoEntity, Dp, Dp) -> Unit = { photo, tw, th ->
+        MediaTile(
+            photo = photo,
+            width = tw,
+            height = th,
+            familyId = familyId,
+            loadPreview = loadPreview,
+            isUploading = uploadingPhotoIds.contains(photo.id) ||
+                KBSyncState.fromRaw(photo.syncStateRaw) == KBSyncState.PENDING_UPSERT,
+            onTap = { onPhotoTap(photo) },
+            onLongPress = { onPhotoLongPress(photo) },
+        )
+    }
+    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = s, vertical = s / 2)) {
+        when (block.kind) {
+            MosaicKind.FEATURE_LEFT, MosaicKind.FEATURE_RIGHT -> {
+                val leftW = (w - s) * 0.64f
+                val rightW = w - s - leftW
+                val h = leftW
+                val smallH = (h - s) / 2f
+                Row(horizontalArrangement = Arrangement.spacedBy(s)) {
+                    val stack: @Composable () -> Unit = {
+                        Column(verticalArrangement = Arrangement.spacedBy(s)) {
+                            block.photos.drop(1).take(2).forEach { p -> tile(p, rightW, smallH) }
+                        }
+                    }
+                    if (block.kind == MosaicKind.FEATURE_RIGHT) {
+                        stack()
+                        block.photos.firstOrNull()?.let { tile(it, leftW, h) }
+                    } else {
+                        block.photos.firstOrNull()?.let { tile(it, leftW, h) }
+                        stack()
+                    }
+                }
+            }
+            MosaicKind.PAIR -> {
+                val cw = (w - s) / 2f
+                val h = cw * 0.78f
+                Row(horizontalArrangement = Arrangement.spacedBy(s)) {
+                    block.photos.forEach { p -> tile(p, cw, h) }
+                }
+            }
+            MosaicKind.TRIPLE -> {
+                val cw = (w - s * 2) / 3f
+                Row(horizontalArrangement = Arrangement.spacedBy(s)) {
+                    block.photos.forEach { p -> tile(p, cw, cw) }
+                }
+            }
+            MosaicKind.SINGLE -> {
+                block.photos.firstOrNull()?.let { tile(it, w, w * 0.66f) }
+            }
+        }
+    }
+}
+
+// MARK: - Dense grid (Tutto / selezione)
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun DensePhotoGrid(
+    photos: List<KBFamilyPhotoEntity>,
+    layoutWidth: Dp,
+    thumbTarget: Float,
+    onThumbTargetChange: (Float) -> Unit,
+    enablePinch: Boolean,
+    isSelectionMode: Boolean,
+    selectedPhotoIds: Set<String>,
+    uploadingPhotoIds: Set<String>,
+    familyId: String,
+    loadPreview: suspend (KBFamilyPhotoEntity, Int) -> Bitmap?,
+    onPhotoTap: (KBFamilyPhotoEntity) -> Unit,
+    onPhotoLongPress: (KBFamilyPhotoEntity) -> Unit,
+    onSetSelected: (String, Boolean) -> Unit,
+) {
+    val spacing = 2.dp
+    val columns = maxOf(3, (layoutWidth.value / thumbTarget).roundToInt())
+    val cellSize = ((layoutWidth.value - 2f * (columns - 1)) / columns).dp
+    val gridState = rememberLazyGridState()
+    val finalModifier = if (isSelectionMode) {
+        Modifier
+            .fillMaxSize()
+            .dragSelect(gridState, photos, onSetSelected) { id -> selectedPhotoIds.contains(id) }
+    } else if (enablePinch) {
+        Modifier.fillMaxSize().pinchZoom { zoom ->
+            onThumbTargetChange((thumbTarget * zoom).coerceIn(84f, 220f))
+        }
+    } else {
+        Modifier.fillMaxSize()
+    }
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(columns),
+        state = gridState,
+        modifier = finalModifier,
+        horizontalArrangement = Arrangement.spacedBy(spacing),
+        verticalArrangement = Arrangement.spacedBy(spacing),
+        contentPadding = PaddingValues(bottom = 86.dp),
+    ) {
+        items(photos, key = { it.id }) { photo ->
+            val selected = selectedPhotoIds.contains(photo.id)
+            MediaTile(
+                photo = photo,
+                width = cellSize,
+                height = cellSize,
+                familyId = familyId,
+                loadPreview = loadPreview,
+                isSelectionMode = isSelectionMode,
+                isSelected = selected,
+                isUploading = uploadingPhotoIds.contains(photo.id) ||
+                    KBSyncState.fromRaw(photo.syncStateRaw) == KBSyncState.PENDING_UPSERT,
+                onTap = {
+                    if (isSelectionMode) onSetSelected(photo.id, !selected) else onPhotoTap(photo)
+                },
+                onLongPress = if (isSelectionMode) null else { -> onPhotoLongPress(photo) },
+            )
+        }
+    }
+}
+
+// MARK: - Drag-select & pinch gestures
+
+private fun Modifier.dragSelect(
+    gridState: LazyGridState,
+    photos: List<KBFamilyPhotoEntity>,
+    onSetSelected: (String, Boolean) -> Unit,
+    isSelected: (String) -> Boolean,
+): Modifier = composed {
+    val currentPhotos by rememberUpdatedState(photos)
+    val currentIsSelected by rememberUpdatedState(isSelected)
+    val currentOnSet by rememberUpdatedState(onSetSelected)
+    pointerInput(Unit) {
+        var paint = true
+        var lastIndex = -1
+        detectDragGesturesAfterLongPress(
+            onDragStart = { offset ->
+                val idx = gridState.itemIndexAt(offset)
+                if (idx != null && idx in currentPhotos.indices) {
+                    val id = currentPhotos[idx].id
+                    paint = !currentIsSelected(id)
+                    currentOnSet(id, paint)
+                    lastIndex = idx
+                }
+            },
+            onDrag = { change, _ ->
+                val idx = gridState.itemIndexAt(change.position)
+                if (idx != null && idx in currentPhotos.indices && idx != lastIndex) {
+                    currentOnSet(currentPhotos[idx].id, paint)
+                    lastIndex = idx
+                }
+            },
+            onDragEnd = { lastIndex = -1 },
+            onDragCancel = { lastIndex = -1 },
+        )
+    }
+}
+
+private fun LazyGridState.itemIndexAt(pos: Offset): Int? {
+    val item = layoutInfo.visibleItemsInfo.firstOrNull {
+        pos.x >= it.offset.x && pos.x <= it.offset.x + it.size.width &&
+            pos.y >= it.offset.y && pos.y <= it.offset.y + it.size.height
+    }
+    return item?.index
+}
+
+private fun Modifier.pinchZoom(onZoom: (Float) -> Unit): Modifier = this.pointerInput(Unit) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false)
+        do {
+            val event = awaitPointerEvent()
+            if (event.changes.size >= 2) {
+                val zoom = event.calculateZoom()
+                if (zoom != 1f) {
+                    onZoom(zoom)
+                    event.changes.forEach { it.consume() }
+                }
+            }
+        } while (event.changes.any { it.pressed })
+    }
+}
+
+// MARK: - Media tile + thumbnail cell
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun MediaTile(
+    photo: KBFamilyPhotoEntity,
+    width: Dp,
+    height: Dp,
+    familyId: String,
+    loadPreview: suspend (KBFamilyPhotoEntity, Int) -> Bitmap?,
+    isSelectionMode: Boolean = false,
+    isSelected: Boolean = false,
+    isUploading: Boolean = false,
+    onTap: () -> Unit,
+    onLongPress: (() -> Unit)? = null,
+    displaySize: Dp = maxOf(width, height),
+) {
+    Box(
+        modifier = Modifier
+            .width(width)
+            .height(height)
+            .combinedClickable(onClick = onTap, onLongClick = onLongPress),
+    ) {
+        PhotoThumbnailCell(
+            photo = photo,
+            displaySize = displaySize,
+            loadPreview = loadPreview,
+            modifier = Modifier.fillMaxSize(),
+        )
+
+        if (photo.mimeType.startsWith("video/")) {
+            Surface(
+                color = Color.Black.copy(alpha = 0.55f),
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(4.dp),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(11.dp),
+                    )
+                    Spacer(Modifier.width(2.dp))
+                    Text(
+                        text = photosFormatDuration(photo.videoDurationSeconds),
+                        color = Color.White,
+                        fontSize = 10.sp,
+                    )
+                }
+            }
+        }
+
+        if (isUploading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.24f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = Color.White,
+                )
+            }
+        }
+
+        if (isSelectionMode) {
+            if (!isSelected) {
+                Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.28f)))
+            }
+            Surface(
+                color = if (isSelected) Color(0xFF1E88E5) else Color.Black.copy(alpha = 0.35f),
+                shape = RoundedCornerShape(999.dp),
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, Color.White),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(5.dp)
+                    .size(22.dp),
+            ) {
+                if (isSelected) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Done,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Tessera immagine: mostra subito il thumbnail base64 (pochi KB) e, per le tessere grandi
+ * (Anni, feature del mosaico), carica on-demand un'anteprima più nitida (cache su disco).
+ */
+@Composable
+private fun PhotoThumbnailCell(
+    photo: KBFamilyPhotoEntity,
+    displaySize: Dp,
+    loadPreview: suspend (KBFamilyPhotoEntity, Int) -> Bitmap?,
+    modifier: Modifier = Modifier,
+) {
+    val density = LocalDensity.current.density
+    val bucket = remember(photo.id, displaySize, photo.storagePath, photo.localPath, photo.mimeType) {
+        previewBucketFor(photo, displaySize.value, density)
+    }
+    var hiRes by remember(photo.id) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(photo.id, bucket) {
+        hiRes = null
+        if (bucket > 0) {
+            hiRes = withContext(Dispatchers.IO) { loadPreview(photo, bucket) }
+        }
+    }
+    val thumbBytes = remember(photo.thumbnailBase64) {
+        photo.thumbnailBase64?.let { runCatching { Base64.decode(it, Base64.DEFAULT) }.getOrNull() }
+    }
+    Box(modifier = modifier.background(MaterialTheme.kidBoxColors.rowBackground)) {
+        val hi = hiRes
+        when {
+            hi != null -> Image(
+                bitmap = hi.asImageBitmap(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            thumbBytes != null -> AsyncImage(
+                model = thumbBytes,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            else -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Image, contentDescription = null, tint = MaterialTheme.kidBoxColors.subtitle)
+            }
+        }
+    }
+}
+
+private fun previewBucketFor(photo: KBFamilyPhotoEntity, displaySizeDp: Float, density: Float): Int {
+    if (photo.mimeType.startsWith("video/")) return 0
+    if (displaySizeDp < 150f) return 0
+    if (photo.storagePath.isBlank() && photo.localPath == null) return 0
+    val px = displaySizeDp * density
+    return when {
+        px <= 280f -> 0
+        px <= 520f -> 512
+        px <= 820f -> 800
+        else -> 1200
+    }
+}
+
+// MARK: - Grouping helpers
+
+private data class PhotoGroup(
+    val key: String,
+    val title: String,
+    val photos: List<KBFamilyPhotoEntity>,
+)
+
+private fun monthKeyOf(photo: KBFamilyPhotoEntity): String =
+    SimpleDateFormat("yyyy-MM", Locale.ITALIAN).format(Date(photo.takenAtEpochMillis))
+
+private fun groupPhotos(photos: List<KBFamilyPhotoEntity>, grouping: PhotoGrouping): List<PhotoGroup> {
+    val sorted = photos.sortedByDescending { it.takenAtEpochMillis }
+    if (grouping == PhotoGrouping.ALL) {
+        return listOf(PhotoGroup("all", "Tutto", sorted))
+    }
+    val locale = Locale.ITALIAN
+    val keyFormat = when (grouping) {
+        PhotoGrouping.DAY -> SimpleDateFormat("yyyy-MM-dd", locale)
+        PhotoGrouping.MONTH -> SimpleDateFormat("yyyy-MM", locale)
+        else -> SimpleDateFormat("yyyy", locale)
+    }
+    val titleFormat = when (grouping) {
+        PhotoGrouping.DAY -> SimpleDateFormat("EEEE d MMMM yyyy", locale)
+        PhotoGrouping.MONTH -> SimpleDateFormat("MMMM yyyy", locale)
+        else -> SimpleDateFormat("yyyy", locale)
+    }
+    val grouped = LinkedHashMap<String, MutableList<KBFamilyPhotoEntity>>()
+    sorted.forEach { photo ->
+        val key = keyFormat.format(Date(photo.takenAtEpochMillis))
+        grouped.getOrPut(key) { mutableListOf() }.add(photo)
+    }
+    return grouped.map { (key, list) ->
+        val date = Date(list.first().takenAtEpochMillis)
+        PhotoGroup(
+            key = key,
+            title = titleFormat.format(date).replaceFirstChar { ch ->
+                if (ch.isLowerCase()) ch.titlecase(locale) else ch.toString()
+            },
+            photos = list,
+        )
+    }
+}
+
+// MARK: - Mosaic blocks
+
+private enum class MosaicKind { FEATURE_LEFT, FEATURE_RIGHT, PAIR, TRIPLE, SINGLE }
+
+private data class MosaicBlock(val kind: MosaicKind, val photos: List<KBFamilyPhotoEntity>)
+
+/** Suddivide una lista di foto in blocchi mosaico ciclando alcune forme (porting iOS). */
+private fun mosaicBlocks(items: List<KBFamilyPhotoEntity>): List<MosaicBlock> {
+    val pattern = listOf(
+        MosaicKind.FEATURE_LEFT to 3,
+        MosaicKind.PAIR to 2,
+        MosaicKind.TRIPLE to 3,
+        MosaicKind.FEATURE_RIGHT to 3,
+        MosaicKind.PAIR to 2,
+    )
+    val blocks = mutableListOf<MosaicBlock>()
+    var i = 0
+    var p = 0
+    while (i < items.size) {
+        val remaining = items.size - i
+        val (kind, count) = pattern[p % pattern.size]
+        if (remaining >= count) {
+            blocks.add(MosaicBlock(kind, items.subList(i, i + count).toList()))
+            i += count
+        } else {
+            // Coda più corta della forma successiva: render pulito senza buchi.
+            val tailKind = if (remaining == 1) MosaicKind.SINGLE else MosaicKind.PAIR
+            blocks.add(MosaicBlock(tailKind, items.subList(i, items.size).toList()))
+            i = items.size
+        }
+        p++
+    }
+    return blocks
 }
 
 @Composable
@@ -778,7 +1454,7 @@ private fun AlbumsContent(
         }
 
         LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
+            columns = GridCells.Adaptive(minSize = 150.dp),
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = if (isSelectionMode) 8.dp else 56.dp),
@@ -995,44 +1671,6 @@ private fun TabPill(
     }
 }
 
-private data class PhotoSection(
-    val title: String,
-    val photos: List<KBFamilyPhotoEntity>,
-)
-
-private fun buildPhotoSections(
-    photos: List<KBFamilyPhotoEntity>,
-    mode: PhotoGroupMode,
-): List<PhotoSection> {
-    if (photos.isEmpty()) return emptyList()
-    val locale = Locale.ITALIAN
-    val keyFormat = when (mode) {
-        PhotoGroupMode.DAY -> SimpleDateFormat("yyyy-MM-dd", locale)
-        PhotoGroupMode.MONTH -> SimpleDateFormat("yyyy-MM", locale)
-        PhotoGroupMode.YEAR -> SimpleDateFormat("yyyy", locale)
-    }
-    val titleFormat = when (mode) {
-        PhotoGroupMode.DAY -> SimpleDateFormat("EEEE d MMMM yyyy", locale)
-        PhotoGroupMode.MONTH -> SimpleDateFormat("MMMM yyyy", locale)
-        PhotoGroupMode.YEAR -> SimpleDateFormat("yyyy", locale)
-    }
-    val grouped = LinkedHashMap<String, MutableList<KBFamilyPhotoEntity>>()
-    photos.forEach { photo ->
-        val date = Date(photo.takenAtEpochMillis)
-        val key = keyFormat.format(date)
-        grouped.getOrPut(key) { mutableListOf() }.add(photo)
-    }
-    return grouped.entries.map { (key, list) ->
-        val titleDate = keyFormat.parse(key) ?: Date(list.first().takenAtEpochMillis)
-        PhotoSection(
-            title = titleFormat.format(titleDate).replaceFirstChar { ch ->
-                if (ch.isLowerCase()) ch.titlecase(locale) else ch.toString()
-            },
-            photos = list,
-        )
-    }
-}
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AlbumCard(
@@ -1056,7 +1694,7 @@ private fun AlbumCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(140.dp),
+                .aspectRatio(1f),
             contentAlignment = Alignment.Center,
         ) {
             val thumbBytes = coverPhoto?.thumbnailBase64?.let { runCatching { Base64.decode(it, Base64.DEFAULT) }.getOrNull() }
@@ -1144,113 +1782,6 @@ private fun CreateAlbumCard(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun PhotoGridItem(
-    photo: KBFamilyPhotoEntity,
-    isSelectionMode: Boolean,
-    isSelected: Boolean,
-    isUploading: Boolean,
-    onOpen: () -> Unit,
-    onLongPress: () -> Unit,
-) {
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(118.dp)
-            .combinedClickable(
-                onClick = onOpen,
-                onLongClick = onLongPress,
-            ),
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            val thumbBytes = remember(photo.thumbnailBase64) {
-                photo.thumbnailBase64?.let { runCatching { Base64.decode(it, Base64.DEFAULT) }.getOrNull() }
-            }
-            if (thumbBytes != null) {
-                AsyncImage(
-                    model = thumbBytes,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.kidBoxColors.rowBackground),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Default.Image, contentDescription = null, tint = MaterialTheme.kidBoxColors.subtitle)
-                }
-            }
-
-            if (photo.mimeType.startsWith("video/")) {
-                Surface(
-                    color = Color.Black.copy(alpha = 0.55f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(6.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(12.dp),
-                        )
-                        Spacer(Modifier.width(2.dp))
-                        Text(
-                            text = photosFormatDuration(photo.videoDurationSeconds),
-                            color = Color.White,
-                            fontSize = 10.sp,
-                        )
-                    }
-                }
-            }
-
-            if (isUploading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.24f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
-                        color = Color.White,
-                    )
-                }
-            }
-
-            if (isSelectionMode) {
-                Surface(
-                    color = Color.Black.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(999.dp),
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp),
-                ) {
-                    Text(
-                        text = if (isSelected) "✓" else "",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .size(22.dp)
-                            .padding(top = 1.dp),
-                    )
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun AlbumLongPressMenuDialog(
@@ -1498,7 +2029,6 @@ internal fun PhotosFullscreenMediaViewer(
     onSaveEditedCopy: (KBFamilyPhotoEntity, ByteArray) -> Unit,
     prepareFile: suspend (KBFamilyPhotoEntity) -> File,
 ) {
-    FullscreenSystemBarsEffect()
     val pagerState = rememberPagerState(
         initialPage = startIndex.coerceIn(0, (photos.size - 1).coerceAtLeast(0)),
         pageCount = { photos.size },
@@ -1518,6 +2048,14 @@ internal fun PhotosFullscreenMediaViewer(
             decorFitsSystemWindows = false,
         ),
     ) {
+        val dialogView = LocalView.current
+        SideEffect {
+            (dialogView.parent as? DialogWindowProvider)?.window?.setLayout(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+            )
+        }
+        FullscreenSystemBarsEffect()
         Box(
             modifier = Modifier
                 .fillMaxSize()

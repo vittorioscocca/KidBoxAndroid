@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.photos
 
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -324,6 +325,10 @@ class FamilyPhotosViewModel @Inject constructor(
 
     suspend fun preparePreviewFile(photo: KBFamilyPhotoEntity): File =
         repository.preparePreviewFile(photo)
+
+    /** Anteprima hi-res on-demand per tessere grandi; `null` per video / bucket nullo. */
+    suspend fun previewBitmap(photo: KBFamilyPhotoEntity, bucketPx: Int): Bitmap? =
+        repository.loadPreviewBitmap(photo, bucketPx)
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)

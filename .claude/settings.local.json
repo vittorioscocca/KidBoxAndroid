@@ -31,7 +31,18 @@
       "Bash(sed -n '475,490p' KidBox/Features/Home/HomeView.swift)",
       "Bash(sed -n '900,915p' KidBox/Features/Home/HomeView.swift)",
       "Bash(awk 'NR>=460 && NR<=508 && /func |familyId/' KidBox/Features/AIAgent/HealthPatternAnalyzerService.swift)",
-      "Bash(sed -n '470,488p' KidBox/Features/AIAgent/HealthPatternAnalyzerService.swift)"
+      "Bash(sed -n '470,488p' KidBox/Features/AIAgent/HealthPatternAnalyzerService.swift)",
+      "Bash(grep -nE \"^#{1,4} .*\\(ocation|eofence|otific|eep|assword|ialog|Dark|tema\\)\" KidBox/KidBoxAndroid/ARCHITECTURE.md)",
+      "Bash(grep -nE \"^#{1,4} .*\\(ocation|eofence|otific|eep|assword|uickLook|rient|review\\)\" KidBox/KidBox/ARCHITECTURE.md)",
+      "Bash(grep -nE \"^#{1,4} \" KidBoxAndroid/ARCHITECTURE.md)",
+      "Bash(grep -nE \"^#{1,4} \" KidBox/ARCHITECTURE.md)",
+      "Bash(sed -n '52,66p' ARCHITECTURE.md)",
+      "Bash(sed -n '110,116p' ARCHITECTURE.md)",
+      "Bash(sed -n '150,165p' ARCHITECTURE.md)",
+      "Bash(JAVA_HOME=\"/Applications/Android Studio.app/Contents/jbr/Contents/Home\" ./gradlew :app:compileDebugKotlin -q)",
+      "Bash(JAVA_HOME=\"/Applications/Android Studio.app/Contents/jbr/Contents/Home\" ./gradlew :app:compileDebugKotlin)",
+      "Bash(python3 -)",
+      "Bash(JAVA_HOME=\"/Applications/Android Studio.app/Contents/jbr/Contents/Home\" ./gradlew :app:assembleDebug)"
     ]
   }
 }

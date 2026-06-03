@@ -126,11 +126,12 @@ fun GeofenceEditScreen(
         }
         if (!state.isOwner) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("Solo il proprietario può modificare le zone")
+                Text("Solo il proprietario può modificare le zone", color = MaterialTheme.kidBoxColors.title)
             }
             return@Scaffold
         }
 
+        val kb = MaterialTheme.kidBoxColors
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -146,7 +147,7 @@ fun GeofenceEditScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
-            Text("Emoji", fontWeight = FontWeight.SemiBold)
+            Text("Emoji", fontWeight = FontWeight.SemiBold, color = kb.title)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 presetEmojis.forEach { emoji ->
                     Text(
@@ -156,7 +157,7 @@ fun GeofenceEditScreen(
                             .clickable { viewModel.updateEmoji(emoji) }
                             .background(
                                 if (state.selectedEmoji == emoji) MaterialTheme.colorScheme.primaryContainer
-                                else MaterialTheme.colorScheme.surface,
+                                else kb.card,
                                 RoundedCornerShape(8.dp),
                             )
                             .padding(8.dp),
@@ -177,7 +178,7 @@ fun GeofenceEditScreen(
                         .fillMaxWidth()
                         .clickable { viewModel.selectSuggestion(s) }
                         .padding(vertical = 6.dp),
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.primary, // colore semantico, ok in entrambi i temi
                 )
             }
             Card(
@@ -208,7 +209,7 @@ fun GeofenceEditScreen(
                     )
                 }
             }
-            Text("Raggio: ${state.radius.toInt()} m", fontWeight = FontWeight.SemiBold)
+            Text("Raggio: ${state.radius.toInt()} m", fontWeight = FontWeight.SemiBold, color = kb.title)
             Slider(
                 value = state.radius,
                 onValueChange = viewModel::updateRadius,
@@ -235,7 +236,7 @@ fun GeofenceEditScreen(
                 ),
                 onClick = { showNotifyPicker = true },
             )
-            Text("Quando avvisare", fontWeight = FontWeight.SemiBold)
+            Text("Quando avvisare", fontWeight = FontWeight.SemiBold, color = kb.title)
             ToggleRow("All'arrivo", state.notifyOnArrive, viewModel::updateNotifyOnArrive)
             ToggleRow("Alla partenza", state.notifyOnLeave, viewModel::updateNotifyOnLeave)
         }
@@ -391,15 +392,16 @@ private fun memberSummary(
 
 @Composable
 private fun SettingsRow(title: String, subtitle: String, onClick: () -> Unit) {
+    val kb = MaterialTheme.kidBoxColors
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = kb.card),
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text(title, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+            Text(title, fontWeight = FontWeight.SemiBold, color = kb.title)
+            Text(subtitle, color = kb.subtitle, fontSize = 13.sp)
         }
     }
 }
@@ -411,7 +413,7 @@ private fun ToggleRow(title: String, checked: Boolean, onCheckedChange: (Boolean
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title)
+        Text(title, color = MaterialTheme.kidBoxColors.title)
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }

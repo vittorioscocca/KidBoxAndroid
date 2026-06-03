@@ -62,7 +62,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import coil.compose.AsyncImage
+import coil.ImageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
 import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.BitmapDescriptor
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
 import androidx.core.view.WindowCompat
@@ -241,10 +246,13 @@ fun FamilyLocationScreen(
             },
         ) {
             state.sharedUsers.forEach { user ->
+                val avatarDescriptor = rememberAvatarMarkerDescriptor(user.avatarUrl)
                 Marker(
                     state = MarkerState(position = LatLng(user.latitude, user.longitude)),
                     title = user.name,
                     snippet = user.statusSnippet(),
+                    icon = avatarDescriptor,
+                    anchor = if (avatarDescriptor != null) androidx.compose.ui.geometry.Offset(0.5f, 0.5f) else androidx.compose.ui.geometry.Offset(0.5f, 1.0f),
                     onClick = {
                         followingUserId = user.id
                         false
@@ -451,6 +459,61 @@ fun FamilyLocationScreen(
             )
         }
     }
+}
+
+/**
+ * Carica l'avatar dell'utente e lo rende come icona circolare per il marker sulla mappa,
+ * come fa iOS (AvatarMarker). Ritorna `null` finché l'immagine non è pronta o se non c'è
+ * un avatar: in quel caso il marker usa il pin di default.
+ */
+@Composable
+private fun rememberAvatarMarkerDescriptor(avatarUrl: String?): BitmapDescriptor? {
+    val context = LocalContext.current
+    var descriptor by remember(avatarUrl) { mutableStateOf<BitmapDescriptor?>(null) }
+    LaunchedEffect(avatarUrl) {
+        descriptor = null
+        val url = avatarUrl?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        val sizePx = (44 * context.resources.displayMetrics.density).toInt()
+        val loader = ImageLoader(context)
+        val request = ImageRequest.Builder(context)
+            .data(url)
+            .allowHardware(false)
+            .size(sizePx)
+            .build()
+        val result = (loader.execute(request) as? SuccessResult)?.drawable ?: return@LaunchedEffect
+        val source = (result as? android.graphics.drawable.BitmapDrawable)?.bitmap ?: return@LaunchedEffect
+        val circular = circularAvatarBitmap(source, sizePx)
+        descriptor = BitmapDescriptorFactory.fromBitmap(circular)
+    }
+    return descriptor
+}
+
+/** Crea un bitmap circolare con bordo bianco, dimensione `sizePx`. */
+private fun circularAvatarBitmap(source: android.graphics.Bitmap, sizePx: Int): android.graphics.Bitmap {
+    val borderPx = sizePx * 0.08f
+    val output = android.graphics.Bitmap.createBitmap(sizePx, sizePx, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(output)
+    val radius = sizePx / 2f
+    // Bordo bianco
+    val borderPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+    }
+    canvas.drawCircle(radius, radius, radius, borderPaint)
+    // Avatar ritagliato in cerchio, scalato a riempire l'area interna
+    val inner = (sizePx - 2 * borderPx).toInt().coerceAtLeast(1)
+    val scaled = android.graphics.Bitmap.createScaledBitmap(source, inner, inner, true)
+    val shader = android.graphics.BitmapShader(
+        scaled,
+        android.graphics.Shader.TileMode.CLAMP,
+        android.graphics.Shader.TileMode.CLAMP,
+    )
+    val matrix = android.graphics.Matrix().apply { postTranslate(borderPx, borderPx) }
+    shader.setLocalMatrix(matrix)
+    val avatarPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        this.shader = shader
+    }
+    canvas.drawCircle(radius, radius, radius - borderPx, avatarPaint)
+    return output
 }
 
 @Composable

@@ -2,10 +2,13 @@ package it.vittorioscocca.kidbox.data.remote.family
 
 import it.vittorioscocca.kidbox.util.KBLog
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
+import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.data.local.PhotoPreviewCache
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
@@ -26,6 +29,7 @@ class FamilyLeaveService @Inject constructor(
     private val childDao: KBChildDao,
     private val familySyncCenter: it.vittorioscocca.kidbox.data.sync.FamilySyncCenter,
     private val housePaymentReminderScheduler: HousePaymentReminderScheduler,
+    @ApplicationContext private val context: Context,
 ) {
     companion object {
         private const val TAG = "FamilyLeaveService"
@@ -93,6 +97,7 @@ class FamilyLeaveService @Inject constructor(
             val c = childDao.deleteByFamilyId(familyId)
             KBLog.data.info("leaveFamily wipe rows: family=$f members=$m children=$c familyId=$familyId", TAG)
         }
+        PhotoPreviewCache.clearAll(context)
         KBLog.data.info("leaveFamily local data wiped familyId=$familyId uid=$uid", TAG)
     }
 
@@ -186,6 +191,7 @@ class FamilyLeaveService @Inject constructor(
             val c = childDao.deleteByFamilyId(familyId)
             KBLog.data.info("deleteFamily wipe rows: family=$f members=$m children=$c familyId=$familyId", TAG)
         }
+        PhotoPreviewCache.clearAll(context)
         KBLog.data.info("deleteFamily local data wiped familyId=$familyId uid=$uid", TAG)
     }
 }

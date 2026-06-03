@@ -4,6 +4,7 @@ import it.vittorioscocca.kidbox.util.KBLog
 
 import androidx.activity.ComponentActivity
 import android.content.ActivityNotFoundException
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -12,6 +13,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.data.local.PhotoPreviewCache
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
 import it.vittorioscocca.kidbox.data.user.UserProfileRepository
@@ -37,6 +40,7 @@ class LoginViewModel @Inject constructor(
     private val onboardingPreferences: OnboardingPreferences,
     private val userProfileRepository: UserProfileRepository,
     private val familyDao: KBFamilyDao,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     sealed class AuthCheckState {
@@ -191,6 +195,7 @@ class LoginViewModel @Inject constructor(
     fun signOut() {
         try {
             auth.signOut()
+            PhotoPreviewCache.clearAll(appContext)
         } catch (e: Exception) {
             // log only — come su iOS non esponiamo errore UI per signOut
         }

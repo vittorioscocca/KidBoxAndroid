@@ -350,6 +350,16 @@ class ProfileViewModel @Inject constructor(
                         mapOf("avatarURL" to avatarUrl, "updatedAt" to FieldValue.serverTimestamp()),
                         com.google.firebase.firestore.SetOptions.merge(),
                     ).await()
+                    // Propaga l'avatar al documento locations/{uid} (parità con iOS) così che
+                    // il cerchio utente sulla mappa si aggiorni anche se sta già condividendo.
+                    if (familyId != null) {
+                        db.collection("families").document(familyId)
+                            .collection("locations").document(uid)
+                            .set(
+                                mapOf("avatarURL" to avatarUrl),
+                                com.google.firebase.firestore.SetOptions.merge(),
+                            ).await()
+                    }
                     _uiState.update { it.copy(avatarUrl = avatarUrl, pickedAvatar = null) }
                 }
                 savedSnapshot = SavedSnapshot(

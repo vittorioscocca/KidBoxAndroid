@@ -14,6 +14,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
 import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.data.local.PhotoPreviewCache
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyPhotoDao
 import it.vittorioscocca.kidbox.data.local.dao.KBPhotoAlbumDao
@@ -351,6 +352,38 @@ class PhotoVideoRepository @Inject constructor(
         FileOutputStream(out).use { it.write(bytes) }
         photoDao.upsert(photo.copy(localPath = out.absolutePath))
         return out
+    }
+
+    /**
+     * Anteprima a risoluzione media on-demand per le tessere grandi (Anni, feature del
+     * mosaico, zoom). Porting di `PhotoThumbnailCell.loadHiResIfNeeded` iOS: legge dalla
+     * cache su disco [PhotoPreviewCache], altrimenti decifra l'originale una sola volta
+     * (riusando [preparePreviewFile]), lo riduce a `bucketPx` e lo memorizza in cache.
+     * Ritorna `null` per i video o se `bucketPx <= 0`.
+     */
+    suspend fun loadPreviewBitmap(photo: KBFamilyPhotoEntity, bucketPx: Int): Bitmap? {
+        if (bucketPx <= 0 || photo.mimeType.startsWith("video/")) return null
+        PhotoPreviewCache.load(context, photo.id, bucketPx)?.let { return it }
+        return runCatching {
+            val file = preparePreviewFile(photo)
+            val bytes = file.readBytes()
+            val decoded = decodeSampledBitmap(bytes, bucketPx, bucketPx)
+                .let { fixBitmapOrientationFromBytes(it, bytes) }
+            val scaled = scaleToMaxDimension(decoded, bucketPx)
+            val out = java.io.ByteArrayOutputStream()
+            scaled.compress(Bitmap.CompressFormat.JPEG, 85, out)
+            PhotoPreviewCache.store(context, out.toByteArray(), photo.id, bucketPx)
+            scaled
+        }.getOrNull()
+    }
+
+    private fun scaleToMaxDimension(src: Bitmap, maxDim: Int): Bitmap {
+        val largest = maxOf(src.width, src.height)
+        if (largest <= maxDim || largest == 0) return src
+        val scale = maxDim.toFloat() / largest
+        val w = (src.width * scale).toInt().coerceAtLeast(1)
+        val h = (src.height * scale).toInt().coerceAtLeast(1)
+        return Bitmap.createScaledBitmap(src, w, h, true)
     }
 
     suspend fun flushPending(familyId: String) {
