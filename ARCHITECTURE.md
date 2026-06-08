@@ -21,7 +21,7 @@ KidBox è un'app di organizzazione famigliare multi-piattaforma che mette in un 
 - `namespace = "it.vittorioscocca.kidbox"`
 - `applicationId = "it.vittorioscocca.kidbox"`
 - `compileSdk = 35`, `minSdk = 26`, `targetSdk = 35`
-- `versionCode = 14`, `versionName = "1.0.0"`
+- `versionCode = 16`, `versionName = "1.0.0"`
 - `sourceCompatibility = JavaVersion.VERSION_17`, `jvmTarget = "17"`
 - `buildFeatures { compose = true; buildConfig = true }`
 - `buildConfigField`: `MAPS_API_KEY` (da `local.properties` — fail-fast se mancante) e `AI_ENABLED = true`
