@@ -69,7 +69,8 @@ object ClinicalRecordAISynthesizer {
         val user = buildUserContent(nativeReport, healthContext)
         val total = AIAskAIPayload.totalChars(systemPrompt, listOf(aiUserMessage(user))) +
             SERVER_RULES_OVERHEAD
-        val units = AIAskAIPayload.messageUnits(total)
+        // Cartella clinica: minimo fisso (Sonnet ~3× Haiku), parity server.
+        val units = AIAskAIPayload.clinicalRecordMessageUnits(total)
         return PayloadEstimate(total, units, AIAskAIPayload.isLargeContext(total))
     }
 

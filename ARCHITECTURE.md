@@ -661,6 +661,26 @@ fun provideFirebaseFunctions(): FirebaseFunctions =
 | `deleteFamily` | `FamilyLeaveService` | Cancellazione famiglia |
 | `updatePlan` | `SubscriptionRepositoryImpl` | Aggiornamento subscription post-purchase |
 
+#### Sistema messaggi / token AI
+
+KidBox astrae i token Anthropic dietro un'unità chiamata **"messaggio"**. L'utente vede un budget giornaliero (Pro 30, Max 100, Free 0); il server traduce ogni richiesta in N unità e le scala dal contatore famiglia `ai_usage/family_{fid}/daily/{day}.count`.
+
+Le unità si basano sui **caratteri del payload**, non sui token reali (`data/remote/ai/AIAskAIPayload.kt`):
+
+| Costante | Valore | Significato |
+|---|---|---|
+| `STANDARD_CHARS` | 50.000 | 1 unità = 50k caratteri (system + storico + nuovo testo) |
+| `ABSOLUTE_MAX_CHARS` | 500.000 | hard limit anti-abuso |
+| `CLINICAL_RECORD_MIN_UNITS` | 3 | minimo fisso cartella clinica (Sonnet ~3× Haiku, no caching) |
+
+`messageUnits(totalChars) = max(1, ceil(totalChars / 50.000))`; cartella clinica → `clinicalRecordMessageUnits = max(3, messageUnits)`.
+
+**Flusso**: il client pre-stima le unità (`ClinicalRecordAISynthesizer.estimatePayload` → `ClinicalRecordOrchestrator.estimateAIMessageUnits`; chat: `HealthAIChatViewModel`) e blocca prima dell'invio se eccedono il rimanente. Il server (`functions/index.js` `askAI`, **condiviso con iOS**) ricalcola e incrementa atomicamente; scrive il costo USD reale su `ai_costs`.
+
+**Modelli per purpose**: `clinicalRecord` → **Sonnet 4.5** (min 3 unità); `support` (`SupportViewModel`, `PURPOSE_SUPPORT = "support"`), chat salute/visite/esami e default → **Haiku 4.5**.
+
+> ⚠️ **Parity obbligatoria**: `STANDARD_CHARS` (50k), `CLINICAL_RECORD_MIN_UNITS` (3), `ABSOLUTE_MAX_CHARS` (500k) sono duplicati in Android (`AIAskAIPayload.kt`), iOS (`AIAskAIPayload.swift`) e server (`functions/index.js`). Cambiando un valore, **allinea tutti e tre**.
+
 ### 6.10 Firebase Storage
 
 #### Layout dei path
@@ -968,7 +988,7 @@ Pattern uniforme: ogni `RemoteStore` definisce una **sealed interface `*RemoteCh
 **Payload veri e propri**:
 - `data/remote/support/SupportTicketSubmitDto.kt` — DTO `support_tickets`: `id`, `familyId`, `uid`, `userEmail`, `type` (`question`/`bug`/`suggestion`), `title`, `summary`, `conversation`, `imagesBase64` (max 5, ≤ 5 MB ognuna), `appVersion`, `osVersion`, `device`, `rawLogs?`
 - `data/remote/support/SupportTicketFirestorePayload.kt` — costruzione e shrinking per stare nel limite Firestore 1 MiB (max 1_048_576 bytes, margine 64 KB, log max 48 KB, immagini JPEG 720px @ q78)
-- `data/remote/ai/AIAskAIPayload.kt` — `STANDARD_CHARS = 50_000`, `ABSOLUTE_MAX_CHARS = 500_000`; helper `messageUnits(totalChars)` per metering AI
+- `data/remote/ai/AIAskAIPayload.kt` — `STANDARD_CHARS = 50_000`, `ABSOLUTE_MAX_CHARS = 500_000`, `CLINICAL_RECORD_MIN_UNITS = 3`; helper `messageUnits(totalChars)` e `clinicalRecordMessageUnits(totalChars)` per il metering AI (vedi §6.9 «Sistema messaggi / token AI»)
 
 ### 8.4 Mapper — `data/local/mapper/`
 
@@ -1437,6 +1457,16 @@ Nota: la chat **non passa dall'outbox `KBSyncOp`** (assente su Android — vedi 
 3. **Import**: `HealthConnectGateway.kt` legge dati ultimi 90 giorni → costruisce `HealthImportSnapshot` (con `restingHeartRateAvg90d`, `vo2Max`, `hrvSdnnMsAvg90d`, `recentWorkouts`, `recentECGs`, …)
 4. **AI analysis** (background): `HealthPatternAnalyzerService.kt` (`@HiltWorker`) gira settimanalmente (via WorkManager). Costruisce un prompt con `HealthImportSnapshot` + storia clinica famiglia, chiama `AIService.askAI(purpose="healthPattern")` su Cloud Function. Salva risultato come `KBHealthInsightEntity` con `monthKey`, `isRead = false`
 5. **Notifica**: al completamento, `HealthReminderReceiver` (locale via `AlarmManager`) o push remota (via `HealthPatternBroadcastReceiver`) → `NotificationDeepLinkRouter` → `AppDestination.AiChat` con `fullText` salvato in `HealthPatternDraftStore` per essere mostrato direttamente nella chat AI
+
+#### Chat AI Salute — integrazione Health Connect nel contesto
+
+**`HealthAIChatViewModel.kt`** carica lo snapshot persistito (`healthLinkStore.load(childId)`) e lo passa a **`HealthContextBuilder.buildSystemPrompt(…, healthSnapshot = …)`** — sia per il prompt standard (referti troncati) che per quello full.
+
+**`HealthContextBuilder.kt`** (`data/health/ai/`) accetta ora il parametro opzionale `healthSnapshot: HealthImportSnapshot?`. Se non null, appende la sezione wearable tramite `ClinicalRecordAppleHealthNarrative.analyze(snapshot, null, emptyList())` (FC a riposo, VO₂ max, passi, workout, ECG) prima del footer `--- FINE CONTESTO SALUTE ---`.
+
+> ⚠️ `ClinicalRecordAppleHealthNarrative.analyze()` accetta `List<KBMedicalVisitEntity>` per il hint FC cardiologica, ma `HealthContextBuilder` lavora con domain model `KBMedicalVisit`. Si passa `emptyList()` — il contesto wearable principale è indipendente dalle visite.
+
+`HealthLinkStore` è injected via Hilt nel costruttore di `HealthAIChatViewModel`. Lo snapshot è null se l'utente non ha collegato Health Connect → la sezione viene semplicemente omessa.
 
 ---
 

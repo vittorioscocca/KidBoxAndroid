@@ -8,6 +8,10 @@ object AIAskAIPayload {
     const val STANDARD_CHARS: Int = 50_000
     const val ABSOLUTE_MAX_CHARS: Int = 500_000
 
+    /** Unità minime per la cartella clinica (Sonnet ~3× Haiku + niente caching).
+     *  Parity con `CLINICAL_RECORD_MIN_UNITS` in `functions/index.js`. */
+    const val CLINICAL_RECORD_MIN_UNITS: Int = 3
+
     fun totalChars(systemPrompt: String, messages: List<KBAIMessage>, pendingUserText: String = ""): Int {
         val history = messages.sumOf { it.content.length }
         val pending = pendingUserText.trim().length
@@ -20,6 +24,11 @@ object AIAskAIPayload {
     }
 
     fun isLargeContext(totalChars: Int): Boolean = messageUnits(totalChars) > 1
+
+    /** Unità per la cartella clinica: minimo fisso [CLINICAL_RECORD_MIN_UNITS],
+     *  oppure le unità del payload se il contesto è molto grande. */
+    fun clinicalRecordMessageUnits(totalChars: Int): Int =
+        maxOf(CLINICAL_RECORD_MIN_UNITS, messageUnits(totalChars))
 
     const val TRANSIENT_LARGE_CONTEXT_NOTICE: String =
         "Contesto sanitario ampio: alla prossima domanda potrai scegliere tra risposta accurata o contesto riassunto."

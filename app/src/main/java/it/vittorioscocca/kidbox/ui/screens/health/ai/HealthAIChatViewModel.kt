@@ -16,6 +16,7 @@ import it.vittorioscocca.kidbox.data.health.ai.HealthContextSendPreference
 import it.vittorioscocca.kidbox.data.health.ai.computeScopeId
 import it.vittorioscocca.kidbox.data.health.ExamAttachmentTag
 import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
+import it.vittorioscocca.kidbox.data.health.HealthLinkStore
 import it.vittorioscocca.kidbox.data.health.TreatmentAttachmentTag
 import it.vittorioscocca.kidbox.data.health.VisitAttachmentTag
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
@@ -89,6 +90,7 @@ class HealthAIChatViewModel @Inject constructor(
     private val childDao: KBChildDao,
     private val memberDao: KBFamilyMemberDao,
     private val healthAttachmentService: HealthAttachmentService,
+    private val healthLinkStore: HealthLinkStore,
     private val familyMemoryService: FamilyMemoryService,
     private val aiSettingsStore: AISettingsStore,
     private val aiRemotePrefs: AIRemotePreferences,
@@ -206,6 +208,9 @@ class HealthAIChatViewModel @Inject constructor(
             val activeCareN = countActiveTreatments(activeTreatments)
             val vaccineN = data.vaccines.count { !it.isDeleted }
             val aggregateIntro = buildAggregateIntro(displayName, visitN, examN, activeCareN, vaccineN)
+            // Carica lo snapshot Health Connect persistito (null se non collegato o non importato).
+            val healthSnapshot = healthLinkStore.load(childId)
+
             val contextBodyStandard = HealthContextBuilder.buildSystemPrompt(
                 subjectName = resolvedName,
                 subjectId = childId,
@@ -217,6 +222,7 @@ class HealthAIChatViewModel @Inject constructor(
                 documentsByVisitId = docsByVisitId,
                 documentsByTreatmentId = docsByTreatmentId,
                 refertoMaxChars = HealthAiDocumentText.STANDARD_REFERTO_MAX_CHARS,
+                healthSnapshot = healthSnapshot,
             )
             val contextBodyFull = HealthContextBuilder.buildSystemPrompt(
                 subjectName = resolvedName,
@@ -229,6 +235,7 @@ class HealthAIChatViewModel @Inject constructor(
                 documentsByVisitId = docsByVisitId,
                 documentsByTreatmentId = docsByTreatmentId,
                 refertoMaxChars = null,
+                healthSnapshot = healthSnapshot,
             )
             val idAppendix = buildIdAppendixFromNavArgs()
             val standardBase = when {

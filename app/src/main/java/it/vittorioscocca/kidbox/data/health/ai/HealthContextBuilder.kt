@@ -3,6 +3,8 @@ package it.vittorioscocca.kidbox.data.health.ai
 import it.vittorioscocca.kidbox.util.KBLog
 
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
+import it.vittorioscocca.kidbox.data.health.clinical.ClinicalRecordAppleHealthNarrative
+import it.vittorioscocca.kidbox.domain.model.HealthImportSnapshot
 import it.vittorioscocca.kidbox.domain.model.KBExamStatus
 import it.vittorioscocca.kidbox.domain.model.KBTextExtractionStatus
 import it.vittorioscocca.kidbox.domain.model.KBMedicalExam
@@ -47,6 +49,7 @@ object HealthContextBuilder {
         documentsByVisitId: Map<String, List<KBDocumentEntity>> = emptyMap(),
         documentsByTreatmentId: Map<String, List<KBDocumentEntity>> = emptyMap(),
         refertoMaxChars: Int? = HealthAiDocumentText.STANDARD_REFERTO_MAX_CHARS,
+        healthSnapshot: HealthImportSnapshot? = null,
     ): String {
         val now = System.currentTimeMillis()
         val sb = StringBuilder()
@@ -150,6 +153,19 @@ REGOLE IMPORTANTI:
             documentsByExamId[e.id]?.forEach { doc ->
                 appendReferto(sb, doc, refertoMaxChars, indent = "  ")
             }
+        }
+
+        // ── Health Connect / wearable ────────────────────────────────────────────
+        // Nota: analyze() accetta KBMedicalVisitEntity per il hint FC cardiologica;
+        // qui passiamo emptyList() perché il builder lavora con domain model KBMedicalVisit.
+        // Il contesto wearable principale (FC a riposo, VO₂, passi, ecc.) è indipendente.
+        healthSnapshot?.let { snapshot ->
+            ClinicalRecordAppleHealthNarrative.analyze(snapshot, null, emptyList())
+                ?.let { analysis ->
+                    sb.appendLine()
+                    sb.appendLine("--- HEALTH CONNECT / WEARABLE ---")
+                    sb.appendLine(analysis.narrative)
+                }
         }
 
         sb.appendLine()
