@@ -29,17 +29,18 @@ class GeofenceMonitorRestorer @Inject constructor(
         const val TAG = "GeofenceRestorer"
     }
 
-    suspend fun restore() {
+    /** @return true se almeno una geofence è stata (ri)registrata. */
+    suspend fun restore(): Boolean {
         val familyId = familySessionPreferences.getActiveFamilyId().orEmpty()
         val uid = auth.currentUser?.uid.orEmpty()
         if (familyId.isBlank() || uid.isBlank()) {
             KBLog.app.debug("GeofenceRestorer: no active family/uid, skip", TAG)
-            return
+            return false
         }
         val geofences = runCatching { geofenceDao.listByFamily(familyId) }.getOrDefault(emptyList())
         if (geofences.isEmpty()) {
             geofenceMonitor.removeAll()
-            return
+            return false
         }
         val displayName = profileDao.getByUid(uid)
             ?.displayName?.trim()?.takeIf { it.isNotBlank() } ?: "Utente"
@@ -50,5 +51,6 @@ class GeofenceMonitorRestorer @Inject constructor(
             displayName = displayName,
             geofences = geofences,
         )
+        return true
     }
 }

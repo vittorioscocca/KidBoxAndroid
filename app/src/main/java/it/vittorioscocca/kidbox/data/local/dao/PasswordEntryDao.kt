@@ -18,7 +18,7 @@ interface PasswordEntryDao {
         WHERE familyId = :familyId
           AND (
             visibility = 'family'
-            OR (LENGTH(:currentUid) > 0 AND visibility = 'members' AND visibilityMemberIdsJson LIKE '%"' || :currentUid || '"%')
+            OR (LENGTH(:currentUid) > 0 AND visibility = 'members' AND (createdBy = :currentUid OR visibilityMemberIdsJson LIKE '%"' || :currentUid || '"%'))
             OR (LENGTH(:currentUid) > 0 AND visibility = 'private' AND createdBy = :currentUid)
           )
         ORDER BY updatedAtEpochMillis DESC
@@ -39,7 +39,7 @@ interface PasswordEntryDao {
           AND deletedAtEpochMillis IS NULL
           AND (
             visibility = 'family'
-            OR (LENGTH(:currentUid) > 0 AND visibility = 'members' AND visibilityMemberIdsJson LIKE '%"' || :currentUid || '"%')
+            OR (LENGTH(:currentUid) > 0 AND visibility = 'members' AND (createdBy = :currentUid OR visibilityMemberIdsJson LIKE '%"' || :currentUid || '"%'))
             OR (LENGTH(:currentUid) > 0 AND visibility = 'private' AND createdBy = :currentUid)
           )
         ORDER BY updatedAtEpochMillis DESC

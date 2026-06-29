@@ -213,8 +213,9 @@ fun GeofenceEditScreen(
             Slider(
                 value = state.radius,
                 onValueChange = viewModel::updateRadius,
-                valueRange = 50f..2000f,
-                steps = 38,
+                valueRange = GEOFENCE_MIN_RADIUS_METERS..GEOFENCE_MAX_RADIUS_METERS,
+                steps = 37, // incrementi da 50 m: (2000-100)/50 = 38 intervalli → 37 step
+
             )
             SettingsRow(
                 title = "Applica la zona a",

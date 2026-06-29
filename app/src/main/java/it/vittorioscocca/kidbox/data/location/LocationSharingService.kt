@@ -61,6 +61,10 @@ class LocationSharingService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
+                // L'utente ha premuto "Interrompi": azzera lo stato persistito e ferma il
+                // watchdog, così non riavvia il service.
+                LocationSharingStateStore.markInactive(this)
+                LocationSharingWatchdogWorker.cancel(this)
                 // Se l'intent è arrivato via startForegroundService, il sistema PRETENDE
                 // una startForeground() entro pochi secondi: la chiamiamo e poi ci fermiamo,
                 // così evitiamo ForegroundServiceDidNotStartInTimeException.

@@ -4,8 +4,6 @@ import it.vittorioscocca.kidbox.util.KBLog
 
 import android.content.Context
 import android.util.Base64
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 
 private const val TAG = "FamilyKeyStore"
 private const val PREFS_FILE = "kidbox_family_keys"
@@ -41,20 +39,7 @@ object FamilyKeyStore {
     private fun getPrefs(context: Context): android.content.SharedPreferences {
         prefs?.let { return it }
         return synchronized(this) {
-            prefs ?: runCatching {
-                val masterKey = MasterKey.Builder(context)
-                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                    .build()
-                EncryptedSharedPreferences.create(
-                    context,
-                    PREFS_FILE,
-                    masterKey,
-                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-                )
-            }.onFailure { err ->
-                KBLog.crypto.error("EncryptedSharedPreferences init failed: ${err.message}", TAG, err)
-            }.getOrNull()?.also {
+            prefs ?: EncryptedPrefs.createOrNull(context, PREFS_FILE)?.also {
                 prefs = it
             } ?: getFallbackPrefs(context)
         }

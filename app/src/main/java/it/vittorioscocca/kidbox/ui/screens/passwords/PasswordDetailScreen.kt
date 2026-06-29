@@ -248,6 +248,9 @@ fun PasswordDetailScreen(
             if (state.notes.isNotBlank()) {
                 InfoRow(label = "Note", value = state.notes)
             }
+            if (state.visibilityLabel.isNotBlank()) {
+                InfoRow(label = "Visibilità", value = state.visibilityLabel)
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))

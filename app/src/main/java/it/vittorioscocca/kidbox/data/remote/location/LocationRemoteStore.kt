@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.data.remote.location
 
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -23,7 +24,9 @@ data class RemoteSharedLocationDto(
 )
 
 @Singleton
-class LocationRemoteStore @Inject constructor() {
+class LocationRemoteStore @Inject constructor(
+    private val auth: FirebaseAuth,
+) {
     private val firestore get() = FirebaseFirestore.getInstance()
 
     fun listen(
@@ -154,14 +157,23 @@ class LocationRemoteStore @Inject constructor() {
             .await()
     }
 
-    private suspend fun fetchUserAvatarUrl(uid: String): String? = runCatching {
-        firestore.collection("users")
-            .document(uid)
-            .get()
-            .await()
-            .getString("avatarURL")
-            ?.takeIf { it.isNotBlank() }
-    }.getOrNull()
+    private suspend fun fetchUserAvatarUrl(uid: String): String? {
+        // Avatar custom caricato dall'utente (users/{uid}.avatarURL).
+        runCatching {
+            firestore.collection("users")
+                .document(uid)
+                .get()
+                .await()
+                .getString("avatarURL")
+                ?.takeIf { it.isNotBlank() }
+        }.getOrNull()?.let { return it }
+        // Fallback: foto dell'account (es. login Google). Chi non ha mai caricato un
+        // avatar custom non ha users/{uid}.avatarURL ma ha FirebaseAuth.photoUrl: senza
+        // questo fallback il suo cerchio sulla mappa resterebbe il pin di default.
+        return auth.currentUser
+            ?.takeIf { it.uid == uid }
+            ?.photoUrl?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+    }
 
     private fun Map<String, Any>.numberOrNull(key: String): Number? = this[key] as? Number
 

@@ -78,8 +78,12 @@ class GeofenceMonitorService @Inject constructor(
             return
         }
         GeofenceMonitorState.save(context, familyId, uid, displayName)
+        // initialTrigger = 0: NON generare un ENTER sintetico se l'utente è già dentro
+        // la zona al momento della registrazione. Senza questo, ogni ri-registrazione
+        // (apertura schermata, update Firestore, watchdog ogni 15 min) faceva ripartire
+        // un "è arrivato" per chi è fermo dentro la zona. Vogliamo solo gli attraversamenti reali.
         val request = GeofencingRequest.Builder()
-            .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
+            .setInitialTrigger(0)
             .addGeofences(geofenceList)
             .build()
         geofencingClient.removeGeofences(pendingIntent).addOnCompleteListener {

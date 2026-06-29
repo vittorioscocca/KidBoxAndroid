@@ -10,6 +10,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import it.vittorioscocca.kidbox.data.location.GeofenceMonitorEntryPoint
+import it.vittorioscocca.kidbox.data.location.LocationSharingService
+import it.vittorioscocca.kidbox.data.location.LocationSharingStateStore
+import it.vittorioscocca.kidbox.data.location.LocationSharingWatchdogWorker
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.AiScheduledNotificationsRestorer
 import kotlinx.coroutines.launch
 
@@ -30,6 +33,19 @@ class BootReceiver : BroadcastReceiver() {
                 if (familyId.isNullOrBlank()) {
                     KBLog.app.debug("BOOT_COMPLETED — no active family, skip vehicle alarms", "BootReceiver")
                     return@launch
+                }
+                // Il foreground service muore al reboot: se la condivisione posizione
+                // era attiva, riavviala (BOOT_COMPLETED è esente dalle restrizioni di
+                // avvio FGS da background) e ri-arma il watchdog.
+                runCatching {
+                    if (LocationSharingStateStore.shouldBeActive(appCtx)) {
+                        LocationSharingService.start(
+                            appCtx,
+                            familyId,
+                            LocationSharingStateStore.displayName(appCtx),
+                        )
+                        LocationSharingWatchdogWorker.enqueue(appCtx)
+                    }
                 }
                 val ep = EntryPointAccessors.fromApplication(
                     appCtx,

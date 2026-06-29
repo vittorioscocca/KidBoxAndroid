@@ -62,6 +62,14 @@ data class GeofenceEditUiState(
     val saveSucceeded: Boolean = false,
 )
 
+/**
+ * Raggio minimo di una zona. Google raccomanda ≥100-150 m per il geofencing: sotto
+ * questa soglia le transizioni arrivo/partenza diventano inaffidabili (falsi trigger
+ * ed eventi mancati). Condiviso tra ViewModel (clamp) e schermata (slider).
+ */
+const val GEOFENCE_MIN_RADIUS_METERS = 100f
+const val GEOFENCE_MAX_RADIUS_METERS = 2000f
+
 @HiltViewModel
 class GeofenceEditViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -130,7 +138,7 @@ class GeofenceEditViewModel @Inject constructor(
                     selectedEmoji = entity.emoji?.takeIf { it.isNotBlank() } ?: "📍",
                     latitude = entity.latitude,
                     longitude = entity.longitude,
-                    radius = entity.radius.toFloat().coerceIn(50f, 2000f),
+                    radius = entity.radius.toFloat().coerceIn(GEOFENCE_MIN_RADIUS_METERS, GEOFENCE_MAX_RADIUS_METERS),
                     notifyOnArrive = entity.notifyOnArrive,
                     notifyOnLeave = entity.notifyOnLeave,
                     monitorAllMembers = monitored.isEmpty(),

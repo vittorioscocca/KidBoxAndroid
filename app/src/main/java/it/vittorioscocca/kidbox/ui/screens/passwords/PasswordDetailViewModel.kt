@@ -5,8 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.crypto.PasswordCypher
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.dao.PasswordEntryDao
 import it.vittorioscocca.kidbox.data.local.entity.PasswordEntryEntity
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
+import org.json.JSONArray
 import it.vittorioscocca.kidbox.data.passwords.otp.OtpConfig
 import it.vittorioscocca.kidbox.data.passwords.otp.OtpSecureStore
 import it.vittorioscocca.kidbox.data.passwords.security.DuplicateDetector
@@ -45,6 +48,7 @@ data class PasswordDetailUiState(
     val createdBy: String = "",
     val currentUid: String = "",
     val canManage: Boolean = false,
+    val visibilityLabel: String = "",
     val otpConfig: OtpConfig? = null,
 )
 
@@ -56,6 +60,7 @@ class PasswordDetailViewModel @Inject constructor(
     private val repository: PasswordsRepository,
     private val duplicateDetector: DuplicateDetector,
     private val otpStore: OtpSecureStore,
+    private val familyMemberDao: KBFamilyMemberDao,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PasswordDetailUiState())
@@ -71,8 +76,48 @@ class PasswordDetailViewModel @Inject constructor(
             val uid = auth.currentUser?.uid.orEmpty()
             val duplicates = duplicateDetector.duplicates(entry)
             val otpConfig = otpStore.loadOtpConfig(entry.id)
-            _uiState.value = entry.toUiState(uid, passwordCypher, duplicates.isNotEmpty(), otpConfig)
+            val visibilityLabel = buildVisibilityLabel(entry, uid)
+            _uiState.value = entry
+                .toUiState(uid, passwordCypher, duplicates.isNotEmpty(), otpConfig)
+                .copy(visibilityLabel = visibilityLabel)
         }
+    }
+
+    private suspend fun buildVisibilityLabel(entry: PasswordEntryEntity, currentUid: String): String =
+        when (KBVisibilityScope.normalizedPassword(entry.visibility)) {
+            KBVisibilityScope.ONLY_CREATOR -> "🔒 Solo io"
+            KBVisibilityScope.MEMBERS -> {
+                if (entry.createdBy == currentUid) {
+                    // Sono il creatore: mostro con chi ho condiviso.
+                    val names = parseMemberIds(entry.visibilityMemberIdsJson).mapNotNull { memberId ->
+                        familyMemberDao.getActiveByFamilyAndUser(entry.familyId, memberId)
+                            ?.displayName?.takeIf { it.isNotBlank() }
+                    }
+                    if (names.isNotEmpty()) {
+                        "👥 Condiviso con ${names.joinToString(", ")}"
+                    } else {
+                        "👥 Condiviso con membri della famiglia"
+                    }
+                } else {
+                    // Sono un destinatario: mostro chi me l'ha condivisa.
+                    val creatorName = familyMemberDao.getActiveByFamilyAndUser(entry.familyId, entry.createdBy)
+                        ?.displayName?.takeIf { it.isNotBlank() }
+                    if (creatorName != null) {
+                        "👥 Condiviso da $creatorName"
+                    } else {
+                        "👥 Condiviso da un membro della famiglia"
+                    }
+                }
+            }
+            else -> "👨‍👩‍👧 Condiviso in famiglia"
+        }
+
+    private fun parseMemberIds(json: String?): List<String> {
+        if (json.isNullOrBlank()) return emptyList()
+        return runCatching {
+            val arr = JSONArray(json)
+            (0 until arr.length()).mapNotNull { arr.optString(it, null)?.takeIf { s -> s.isNotBlank() } }
+        }.getOrDefault(emptyList())
     }
 
     fun toggleFavorite() {

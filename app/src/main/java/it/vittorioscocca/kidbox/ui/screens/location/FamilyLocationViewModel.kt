@@ -27,6 +27,8 @@ import it.vittorioscocca.kidbox.data.notification.CountersService
 import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
 import it.vittorioscocca.kidbox.data.location.GeofenceMonitorService
 import it.vittorioscocca.kidbox.data.location.LocationSharingService
+import it.vittorioscocca.kidbox.data.location.LocationSharingStateStore
+import it.vittorioscocca.kidbox.data.location.LocationSharingWatchdogWorker
 import it.vittorioscocca.kidbox.data.repository.FamilyLocationRepository
 import it.vittorioscocca.kidbox.data.repository.GeofenceRepository
 import it.vittorioscocca.kidbox.data.repository.LocationShareMode
@@ -172,6 +174,8 @@ class FamilyLocationViewModel @Inject constructor(
                     mode = LocationShareMode.REALTIME,
                 )
             }.onSuccess {
+                LocationSharingStateStore.markActive(context, currentDisplayName, expiresAtEpochMillis = 0L)
+                LocationSharingWatchdogWorker.enqueue(context)
                 if (hasLocationPermission) startLocationUpdatesIfNeeded()
                 syncGeofenceMonitor()
             }.onFailure { err ->
@@ -209,6 +213,8 @@ class FamilyLocationViewModel @Inject constructor(
                     expiresAtEpochMillis = expiresAt,
                 )
             }.onSuccess {
+                LocationSharingStateStore.markActive(context, currentDisplayName, expiresAtEpochMillis = expiresAt)
+                LocationSharingWatchdogWorker.enqueue(context)
                 if (hasLocationPermission) startLocationUpdatesIfNeeded()
                 syncGeofenceMonitor()
             }.onFailure { err ->
@@ -407,6 +413,8 @@ class FamilyLocationViewModel @Inject constructor(
     }
 
     private fun stopSharingService() {
+        LocationSharingStateStore.markInactive(context)
+        LocationSharingWatchdogWorker.cancel(context)
         runCatching { LocationSharingService.stop(context) }
     }
 

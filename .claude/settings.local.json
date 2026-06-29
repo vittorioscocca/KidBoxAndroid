@@ -42,7 +42,24 @@
       "Bash(JAVA_HOME=\"/Applications/Android Studio.app/Contents/jbr/Contents/Home\" ./gradlew :app:compileDebugKotlin -q)",
       "Bash(JAVA_HOME=\"/Applications/Android Studio.app/Contents/jbr/Contents/Home\" ./gradlew :app:compileDebugKotlin)",
       "Bash(python3 -)",
-      "Bash(JAVA_HOME=\"/Applications/Android Studio.app/Contents/jbr/Contents/Home\" ./gradlew :app:assembleDebug)"
+      "Bash(JAVA_HOME=\"/Applications/Android Studio.app/Contents/jbr/Contents/Home\" ./gradlew :app:assembleDebug)",
+      "Read(//Library/Java/JavaVirtualMachines/**)",
+      "Bash(/usr/libexec/java_home -V)",
+      "Bash(ls \"/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java\" 2>/dev/null && echo FOUND; cat gradle.properties 2>/dev/null | grep -i java.home)",
+      "Bash(xcrun --find xcodebuild)",
+      "Bash(xcrun simctl *)",
+      "Bash(xcodebuild build *)",
+      "Bash(adb devices *)",
+      "Bash(sed -n '14,18p' app/src/main/java/it/vittorioscocca/kidbox/data/passwords/otp/OtpSecureStore.kt)",
+      "Bash(./gradlew :app:assembleDebug -q)",
+      "WebFetch(domain:checks.google.com)",
+      "Bash(firebase deploy *)",
+      "Bash(python3)",
+      "Read(//Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/**)",
+      "Read(//Users/vscocca/.gradle/**)",
+      "Bash(node -c index.js)",
+      "Bash(npx eslint *)",
+      "Bash(cd /Users/vscocca/KidBox; echo \"=== onGeofenceEvent body after targets \\(1009-1090\\) ===\"; sed -n '1009,1095p' functions/index.js; echo \"=== how counters get incremented \\(search\\) ===\"; grep -nE \"counters|location:|increment|FieldValue.increment|\\\\.location\\\\b\" functions/index.js | head -40)"
     ]
   }
 }
