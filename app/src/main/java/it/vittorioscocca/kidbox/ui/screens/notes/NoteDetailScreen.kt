@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
+import it.vittorioscocca.kidbox.ui.components.KidBoxChip
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
 @Composable
@@ -123,24 +124,16 @@ fun NoteDetailScreen(
             modifier = Modifier.fillMaxWidth(),
             contentAlignment = Alignment.CenterStart,
         ) {
-            Card(
-                modifier = Modifier.clickable {
+            KidBoxChip(
+                label = KBVisibilityScope.chipLabel(state.visibilityScope),
+                onClick = {
                     if (state.canEditVisibility) {
                         showVisibilityPick = true
                     } else {
                         showVisibilityLocked = true
                     }
                 },
-                shape = RoundedCornerShape(100.dp),
-                colors = CardDefaults.cardColors(containerColor = kb.visibilityChipBackground),
-            ) {
-                Text(
-                    KBVisibilityScope.chipLabel(state.visibilityScope),
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    fontSize = 14.sp,
-                    color = kb.visibilityChipForeground,
-                )
-            }
+            )
         }
         Spacer(Modifier.height(12.dp))
         RichNoteEditor(

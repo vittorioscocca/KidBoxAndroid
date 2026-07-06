@@ -42,6 +42,11 @@ class UserProfileRepository @Inject constructor(
         val user = auth.currentUser ?: return
         val uid = user.uid
         val now = System.currentTimeMillis()
+
+        db.collection("users").document(uid)
+            .set(mapOf("platform" to "android"), SetOptions.merge())
+            .await()
+
         val existing = userProfileDao.getByUid(uid)
         if (existing == null) {
             userProfileDao.upsert(

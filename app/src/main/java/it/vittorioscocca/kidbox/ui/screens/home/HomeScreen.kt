@@ -115,6 +115,7 @@ import java.io.File
 import kotlin.math.sqrt
 import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.domain.model.KBPlan
+import it.vittorioscocca.kidbox.ui.components.KidBoxAvatar
 import it.vittorioscocca.kidbox.ui.family.FamilySwitcherBottomSheet
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.theme.KidBoxDarkColorScheme
@@ -195,27 +196,16 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(
+                KidBoxAvatar(
+                    imageUrl = state.avatarUrl,
+                    name = "",
+                    size = 44.dp,
                     modifier = Modifier
-                        .size(44.dp)
                         .shadow(6.dp, CircleShape)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.kidBoxColors.card)
                         .border(2.dp, MaterialTheme.kidBoxColors.card, CircleShape)
                         .clip(CircleShape)
                         .clickable { onNavigate(AppDestination.Profile.route) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (state.avatarUrl != null) {
-                        AsyncImage(
-                            model = state.avatarUrl,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
-                        Icon(Icons.Filled.Person, contentDescription = null, tint = MaterialTheme.kidBoxColors.subtitle)
-                    }
-                }
+                )
                 IconButton(onClick = { onNavigate(AppDestination.Settings.route) }) {
                     Icon(Icons.Filled.Settings, contentDescription = null, tint = MaterialTheme.kidBoxColors.title)
                 }
