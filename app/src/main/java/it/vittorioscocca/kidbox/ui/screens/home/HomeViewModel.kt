@@ -91,6 +91,8 @@ data class HomeUiState(
     val badgePasswords: Int = 0,
     /** Piano abbonamento famiglia (Firestore); aggiorna card Assistente e paywall come iOS. */
     val familyPlan: KBPlan = KBPlan.FREE,
+    /** Conteggio utilizzi per feature-id (tutte le categorie Home), per le Scorciatoie. */
+    val featureUsage: Map<String, Int> = emptyMap(),
 )
 
 private sealed class HeroDownloadOutcome {
@@ -337,6 +339,7 @@ class HomeViewModel @Inject constructor(
                                 .currentUser?.photoUrl?.toString(),
                         topQuickActions = topQuickActions(),
                         featureOrder = loadFeatureOrder(),
+                        featureUsage = featureUsage(),
                     )
                     if (!shouldSyncMembers || memberCount > 0) {
                         cancelMembersSyncTimeout()
@@ -749,6 +752,19 @@ class HomeViewModel @Inject constructor(
         prefs.edit().putInt(key, prefs.getInt(key, 0) + 1).apply()
         _uiState.value = _uiState.value.copy(topQuickActions = topQuickActions())
     }
+
+    /** Registra l'apertura di una categoria Home (per feature-id) — alimenta le Scorciatoie
+     *  su TUTTE le voci, non solo il set limitato di [HomeQuickAction]. */
+    fun recordFeatureUsage(featureId: String) {
+        val key = "feat_usage_$featureId"
+        prefs.edit().putInt(key, prefs.getInt(key, 0) + 1).apply()
+        _uiState.value = _uiState.value.copy(featureUsage = featureUsage())
+    }
+
+    private fun featureUsage(): Map<String, Int> =
+        prefs.all.entries
+            .filter { it.key.startsWith("feat_usage_") && it.value is Int }
+            .associate { it.key.removePrefix("feat_usage_") to (it.value as Int) }
 
     fun saveFeatureOrder(order: List<String>) {
         val normalized = order

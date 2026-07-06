@@ -311,7 +311,7 @@ fun HomeScreen(
                 state = state,
                 onNavigate = onNavigate,
                 onFeatureOpened = { field -> viewModel.onFeatureOpened(field) },
-                onRecordQuickAction = { action -> viewModel.recordQuickAction(action) },
+                onRecordFeatureUsage = { id -> viewModel.recordFeatureUsage(id) },
             )
             // Evita che l’ultima riga resti sotto al FAB (overlay in basso a destra).
             Spacer(Modifier.height(88.dp))
@@ -694,26 +694,12 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
 
 // ── Variante C: scorciatoie + gruppi tematici ────────────────────────────────
 
-private fun quickActionFeatureId(action: HomeQuickAction): String = when (action) {
-    HomeQuickAction.EXPENSE -> "expenses"
-    HomeQuickAction.EVENT -> "calendar"
-    HomeQuickAction.TODO -> "todo"
-    HomeQuickAction.NOTE -> "notes"
-    HomeQuickAction.SHOPPING_LIST -> "shopping"
-    HomeQuickAction.MESSAGE -> "chat"
-    HomeQuickAction.HEALTH -> "health"
-    HomeQuickAction.DOCUMENTS -> "documents"
-    HomeQuickAction.PETS -> "pets"
-    HomeQuickAction.HOME_ITEMS -> "home_items"
-    HomeQuickAction.VEHICLES -> "vehicles"
-}
-
 @Composable
 private fun HomeCategorySection(
     state: HomeUiState,
     onNavigate: (String) -> Unit,
     onFeatureOpened: (CounterField?) -> Unit,
-    onRecordQuickAction: (HomeQuickAction) -> Unit,
+    onRecordFeatureUsage: (String) -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
     val features = featureItems(state.familyId, state)
@@ -727,21 +713,29 @@ private fun HomeCategorySection(
         "Vita quotidiana" to listOf("location", "photos", "travel", "pets", "home_items", "vehicles"),
     )
 
+    // Scorciatoie: top-4 per utilizzo su TUTTE le categorie (ordinamento stabile → a parità
+    // conta l'ordine naturale di featureItems). "ai" escluso: è il FAB.
+    val shortcuts = remember(features, state.featureUsage) {
+        features
+            .filter { it.id != "ai" }
+            .sortedByDescending { state.featureUsage[it.id] ?: 0 }
+            .take(4)
+    }
+
+    val openFeature: (FeatureItem) -> Unit = { feat ->
+        onRecordFeatureUsage(feat.id)
+        onFeatureOpened(feat.counterField)
+        onNavigate(feat.route)
+    }
+
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Eyebrow("Scorciatoie")
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            state.topQuickActions.take(4).forEach { action ->
-                val feat = byId[quickActionFeatureId(action)]
-                if (feat != null) {
-                    ShortcutItem(feat) {
-                        onRecordQuickAction(action)
-                        onFeatureOpened(feat.counterField)
-                        onNavigate(feat.route)
-                    }
-                }
+            shortcuts.forEach { feat ->
+                ShortcutItem(feat) { openFeature(feat) }
             }
         }
 
@@ -756,15 +750,7 @@ private fun HomeCategorySection(
                     Column {
                         val items = ids.mapNotNull { byId[it] }
                         items.forEachIndexed { index, feat ->
-                            GroupRow(feat) {
-                                onFeatureOpened(feat.counterField)
-                                when (feat.id) {
-                                    "pets" -> onRecordQuickAction(HomeQuickAction.PETS)
-                                    "home_items" -> onRecordQuickAction(HomeQuickAction.HOME_ITEMS)
-                                    "vehicles" -> onRecordQuickAction(HomeQuickAction.VEHICLES)
-                                }
-                                onNavigate(feat.route)
-                            }
+                            GroupRow(feat) { openFeature(feat) }
                             if (index != items.lastIndex) {
                                 Box(
                                     Modifier

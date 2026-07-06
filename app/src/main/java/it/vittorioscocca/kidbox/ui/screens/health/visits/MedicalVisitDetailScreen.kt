@@ -33,6 +33,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DirectionsWalk
@@ -48,6 +49,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -65,7 +67,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -296,7 +300,15 @@ fun MedicalVisitDetailScreen(
                     val hasDiagnosis = !visit.diagnosis.isNullOrBlank()
                     val hasRecommendations = !visit.recommendations.isNullOrBlank()
                     if (hasDiagnosis || hasRecommendations) {
-                        DetailSectionCard(title = "Esito della Visita", titleAllCaps = false) {
+                        val outcomeCopyText = buildList {
+                            if (hasDiagnosis) add("Diagnosi:\n${visit.diagnosis}")
+                            if (hasRecommendations) add("Raccomandazioni:\n${visit.recommendations}")
+                        }.joinToString("\n\n")
+                        DetailSectionCard(
+                            title = "Esito della Visita",
+                            titleAllCaps = false,
+                            copyText = outcomeCopyText,
+                        ) {
                             if (hasDiagnosis) {
                                 DetailBlock("Diagnosi", visit.diagnosis!!)
                             }
@@ -669,22 +681,44 @@ private fun NextAppointmentCard(visit: KBMedicalVisit, kb: KidBoxColorScheme) {
 private fun DetailSectionCard(
     title: String,
     titleAllCaps: Boolean = true,
+    copyText: String? = null,
     content: @Composable () -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
     Card(
         colors = CardDefaults.cardColors(containerColor = kb.card),
         shape = RoundedCornerShape(14.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = if (titleAllCaps) title.uppercase() else title,
-                fontWeight = FontWeight.Bold,
-                fontSize = if (titleAllCaps) 11.sp else 14.sp,
-                color = if (titleAllCaps) kb.subtitle else kb.title,
-                letterSpacing = if (titleAllCaps) 0.8.sp else 0.sp,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = if (titleAllCaps) title.uppercase() else title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = if (titleAllCaps) 11.sp else 14.sp,
+                    color = if (titleAllCaps) kb.subtitle else kb.title,
+                    letterSpacing = if (titleAllCaps) 0.8.sp else 0.sp,
+                )
+                if (copyText != null) {
+                    Spacer(Modifier.weight(1f))
+                    IconButton(
+                        onClick = {
+                            clipboard.setText(AnnotatedString(copyText))
+                            Toast.makeText(context, "Esito copiato", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.size(28.dp),
+                    ) {
+                        Icon(
+                            Icons.Filled.ContentCopy,
+                            contentDescription = "Copia esito della visita",
+                            tint = kb.subtitle,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.height(8.dp))
             content()
         }
