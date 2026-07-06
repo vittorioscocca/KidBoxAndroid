@@ -12,6 +12,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.border
@@ -47,7 +48,9 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocalGroceryStore
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Lock
+import it.vittorioscocca.kidbox.ai.AskAiButton
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -304,176 +307,24 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.size(16.dp))
 
-            val allFeatures = featureItems(state.familyId, state)
-            val featureById = remember(allFeatures) { allFeatures.associateBy { it.id } }
-            val orderIds = remember { mutableStateListOf<String>() }
-            LaunchedEffect(state.featureOrder, allFeatures.map { it.id }) {
-                val preferred = if (state.featureOrder.isEmpty()) allFeatures.map { it.id } else state.featureOrder
-                val normalized = preferred.filter { it in featureById.keys }.toMutableList()
-                allFeatures.map { it.id }.forEach { if (it !in normalized) normalized.add(it) }
-                orderIds.clear()
-                orderIds.addAll(normalized)
-            }
-            val itemBounds = remember { mutableStateMapOf<String, Rect>() }
-            var draggingId by remember { mutableStateOf<String?>(null) }
-            var dragOffset by remember { mutableStateOf(Offset.Zero) }
-            /** Centro card (root) al long-press: ghost = anchor + dragOffset, stabile durante gli swap. */
-            var dragAnchorCenter by remember { mutableStateOf(Offset.Zero) }
-            val swapSlopPx = with(density) { 22.dp.toPx() }
-
-            val placementSpring = remember {
-                spring<Float>(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessLow,
-                )
-            }
-            val fontScale = density.fontScale.coerceIn(1f, 1.4f)
-            val featureGridCellMinHeight = (118 + ((fontScale - 1f) * 36f).toInt()).dp
-            val featureGridRowSpacing = 12.dp
-            val featureGridRows = (orderIds.size + 1) / 2
-            val featureGridHeight =
-                if (orderIds.isEmpty()) {
-                    0.dp
-                } else {
-                    featureGridCellMinHeight * featureGridRows +
-                        featureGridRowSpacing * (featureGridRows - 1).coerceAtLeast(0)
-                }
-
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(featureGridHeight),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(featureGridRowSpacing),
-                userScrollEnabled = false,
-            ) {
-                items(
-                    count = orderIds.size,
-                    key = { orderIds[it] },
-                ) { index ->
-                    val item = featureById[orderIds[index]] ?: return@items
-                    val isDragging = draggingId == item.id
-                    val scale by animateFloatAsState(
-                        targetValue = if (isDragging) 1.05f else 1f,
-                        animationSpec = placementSpring,
-                        label = "home_feature_scale",
-                    )
-                    FeatureCard(
-                        item = item,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(featureGridCellMinHeight)
-                            .zIndex(if (isDragging) 20f else 0f)
-                            .onGloballyPositioned { coordinates ->
-                                itemBounds[item.id] = coordinates.boundsInRoot()
-                            }
-                            .graphicsLayer {
-                                scaleX = scale
-                                scaleY = scale
-                                if (isDragging) {
-                                    translationX = dragOffset.x
-                                    translationY = dragOffset.y
-                                }
-                            }
-                            .then(
-                                if (isDragging) {
-                                    Modifier.shadow(
-                                        elevation = 14.dp,
-                                        shape = RoundedCornerShape(16.dp),
-                                        ambientColor = Color.Black.copy(alpha = 0.12f),
-                                        spotColor = Color.Black.copy(alpha = 0.18f),
-                                    )
-                                } else {
-                                    Modifier
-                                },
-                            )
-                            .pointerInput(item.id) {
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = {
-                                        dragAnchorCenter = itemBounds[item.id]?.center ?: Offset.Zero
-                                        draggingId = item.id
-                                        dragOffset = Offset.Zero
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    },
-                                    onDrag = { change, amount ->
-                                        change.consume()
-                                        if (draggingId != item.id) return@detectDragGesturesAfterLongPress
-                                        dragOffset += amount
-                                        val currentId = draggingId ?: return@detectDragGesturesAfterLongPress
-                                        val fromIdx = orderIds.indexOf(currentId)
-                                        if (fromIdx < 0) return@detectDragGesturesAfterLongPress
-                                        val ghostCenter = dragAnchorCenter + dragOffset
-                                        var nearestIdx = fromIdx
-                                        var nearestDist = Float.POSITIVE_INFINITY
-                                        for (i in orderIds.indices) {
-                                            val oid = orderIds[i]
-                                            val r = itemBounds[oid] ?: continue
-                                            val dx = r.center.x - ghostCenter.x
-                                            val dy = r.center.y - ghostCenter.y
-                                            val d = dx * dx + dy * dy
-                                            if (d < nearestDist) {
-                                                nearestDist = d
-                                                nearestIdx = i
-                                            }
-                                        }
-                                        val occupiedCenter = itemBounds[currentId]?.center ?: dragAnchorCenter
-                                        val distOccupiedSq = run {
-                                            val ox = ghostCenter.x - occupiedCenter.x
-                                            val oy = ghostCenter.y - occupiedCenter.y
-                                            ox * ox + oy * oy
-                                        }
-                                        val distOcc = sqrt(distOccupiedSq)
-                                        val distNear = sqrt(nearestDist)
-                                        if (nearestIdx != fromIdx && distNear + swapSlopPx < distOcc) {
-                                            orderIds.removeAt(fromIdx)
-                                            orderIds.add(nearestIdx, currentId)
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        }
-                                    },
-                                    onDragEnd = {
-                                        draggingId = null
-                                        dragOffset = Offset.Zero
-                                        dragAnchorCenter = Offset.Zero
-                                        viewModel.saveFeatureOrder(orderIds.toList())
-                                    },
-                                    onDragCancel = {
-                                        draggingId = null
-                                        dragOffset = Offset.Zero
-                                        dragAnchorCenter = Offset.Zero
-                                    },
-                                )
-                            },
-                        onClick = {
-                            if (draggingId == null) {
-                                viewModel.onFeatureOpened(item.counterField)
-                                when (item.id) {
-                                    "pets" -> viewModel.recordQuickAction(HomeQuickAction.PETS)
-                                    "home_items" -> viewModel.recordQuickAction(HomeQuickAction.HOME_ITEMS)
-                                    "vehicles" -> viewModel.recordQuickAction(HomeQuickAction.VEHICLES)
-                                }
-                                onNavigate(item.route)
-                            }
-                        },
-                    )
-                }
-            }
+            HomeCategorySection(
+                state = state,
+                onNavigate = onNavigate,
+                onFeatureOpened = { field -> viewModel.onFeatureOpened(field) },
+                onRecordQuickAction = { action -> viewModel.recordQuickAction(action) },
+            )
             // Evita che l’ultima riga resti sotto al FAB (overlay in basso a destra).
             Spacer(Modifier.height(88.dp))
         }
 
-        HomeFab(
-            expanded = state.isFabExpanded,
-            actions = state.topQuickActions,
-            onToggle = viewModel::toggleFab,
-            onAction = { action ->
-                viewModel.recordQuickAction(action)
-                viewModel.closeFab()
-                onNavigate(quickActionRoute(action, state.familyId))
-            },
+        // Stesso pulsante AI della card Salute (AskAiButton condiviso).
+        AskAiButton(
+            isEnabled = state.familyPlan != KBPlan.FREE,
+            contentDescription = "Assistente AI",
+            onTap = { onNavigate(AppDestination.AiChat.createRoute(state.familyId)) },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(16.dp),
+                .padding(end = 16.dp, bottom = 16.dp),
         )
 
         SnackbarHost(
@@ -730,63 +581,6 @@ private fun FeatureCard(item: FeatureItem, modifier: Modifier = Modifier, onClic
     }
 }
 
-@Composable
-private fun HomeFab(
-    expanded: Boolean,
-    actions: List<HomeQuickAction>,
-    onToggle: () -> Unit,
-    onAction: (HomeQuickAction) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val rotation by animateFloatAsState(if (expanded) 45f else 0f, label = "fab_rotation")
-    Column(
-        modifier = modifier.wrapContentSize(),
-        horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        if (expanded) {
-            actions.forEach { action ->
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.kidBoxColors.card) {
-                        Text(
-                            action.label,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            color = MaterialTheme.kidBoxColors.title,
-                        )
-                    }
-                    Surface(
-                        shape = CircleShape,
-                        color = Color(0xFFFFBF40),
-                        modifier = Modifier.size(40.dp).clickable { onAction(action) },
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(actionIcon(action), contentDescription = null, tint = Color.White)
-                        }
-                    }
-                }
-            }
-        }
-        FloatingActionButton(
-            onClick = onToggle,
-            containerColor = Color(0xFFFF6B00),
-            shape = CircleShape,
-            modifier = Modifier.size(56.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        brush = Brush.linearGradient(listOf(Color(0xFFFFBF40), Color(0xFFF26118))),
-                        shape = CircleShape,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White, modifier = Modifier.rotate(rotation))
-            }
-        }
-    }
-}
-
 private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem> = listOf(
     FeatureItem("notes", "Note", "Appunti veloci", AppDestination.NotesHome.createRoute(familyId), Icons.AutoMirrored.Filled.Note, Color(0xFFFFF9E6), Color(0xFFF5A623), state.badgeNotes, CounterField.NOTES),
     FeatureItem("todo", "To-Do", "Lista condivisa", AppDestination.Todo.route, Icons.Filled.CheckCircle, Color(0xFFEBF3FF), Color(0xFF2E86FF), state.badgeTodos, CounterField.TODOS),
@@ -898,6 +692,179 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
     FeatureItem("family", "Family", "Gestisci famiglia", AppDestination.FamilySettings.route, Icons.Filled.Person, Color(0xFFFFF3E6), Color(0xFFFF6B00)),
 )
 
+// ── Variante C: scorciatoie + gruppi tematici ────────────────────────────────
+
+private fun quickActionFeatureId(action: HomeQuickAction): String = when (action) {
+    HomeQuickAction.EXPENSE -> "expenses"
+    HomeQuickAction.EVENT -> "calendar"
+    HomeQuickAction.TODO -> "todo"
+    HomeQuickAction.NOTE -> "notes"
+    HomeQuickAction.SHOPPING_LIST -> "shopping"
+    HomeQuickAction.MESSAGE -> "chat"
+    HomeQuickAction.HEALTH -> "health"
+    HomeQuickAction.DOCUMENTS -> "documents"
+    HomeQuickAction.PETS -> "pets"
+    HomeQuickAction.HOME_ITEMS -> "home_items"
+    HomeQuickAction.VEHICLES -> "vehicles"
+}
+
+@Composable
+private fun HomeCategorySection(
+    state: HomeUiState,
+    onNavigate: (String) -> Unit,
+    onFeatureOpened: (CounterField?) -> Unit,
+    onRecordQuickAction: (HomeQuickAction) -> Unit,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    val features = featureItems(state.familyId, state)
+    val byId = remember(features) { features.associateBy { it.id } }
+
+    // Assistente ("ai") escluso: è il bottone AI flottante.
+    val groups = listOf(
+        "Organizzazione" to listOf("notes", "todo", "shopping", "calendar"),
+        "Famiglia & Salute" to listOf("health", "family", "chat"),
+        "Documenti & Denaro" to listOf("documents", "expenses", "wallet", "passwords"),
+        "Vita quotidiana" to listOf("location", "photos", "travel", "pets", "home_items", "vehicles"),
+    )
+
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Eyebrow("Scorciatoie")
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            state.topQuickActions.take(4).forEach { action ->
+                val feat = byId[quickActionFeatureId(action)]
+                if (feat != null) {
+                    ShortcutItem(feat) {
+                        onRecordQuickAction(action)
+                        onFeatureOpened(feat.counterField)
+                        onNavigate(feat.route)
+                    }
+                }
+            }
+        }
+
+        groups.forEach { (name, ids) ->
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Eyebrow(name)
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = kb.card,
+                    border = BorderStroke(1.dp, kb.divider),
+                ) {
+                    Column {
+                        val items = ids.mapNotNull { byId[it] }
+                        items.forEachIndexed { index, feat ->
+                            GroupRow(feat) {
+                                onFeatureOpened(feat.counterField)
+                                when (feat.id) {
+                                    "pets" -> onRecordQuickAction(HomeQuickAction.PETS)
+                                    "home_items" -> onRecordQuickAction(HomeQuickAction.HOME_ITEMS)
+                                    "vehicles" -> onRecordQuickAction(HomeQuickAction.VEHICLES)
+                                }
+                                onNavigate(feat.route)
+                            }
+                            if (index != items.lastIndex) {
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 48.dp)
+                                        .height(1.dp)
+                                        .background(kb.divider),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Eyebrow(text: String) {
+    Text(
+        text.uppercase(),
+        fontSize = 11.sp,
+        fontWeight = FontWeight.ExtraBold,
+        letterSpacing = 0.8.sp,
+        color = MaterialTheme.kidBoxColors.subtitle,
+        modifier = Modifier.padding(horizontal = 2.dp),
+    )
+}
+
+@Composable
+private fun ShortcutItem(item: FeatureItem, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.clickable(onClick = onClick),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .clip(CircleShape)
+                .background(item.iconColor.copy(alpha = 0.14f))
+                .border(1.dp, item.iconColor.copy(alpha = 0.24f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(item.icon, contentDescription = null, tint = item.iconColor, modifier = Modifier.size(22.dp))
+        }
+        Text(
+            item.title,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.kidBoxColors.title,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun GroupRow(item: FeatureItem, onClick: () -> Unit) {
+    val kb = MaterialTheme.kidBoxColors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            if (item.locked) Icons.Filled.Lock else item.icon,
+            contentDescription = null,
+            tint = if (item.locked) Color(0xFF9CA3AF) else item.iconColor,
+            modifier = Modifier.size(22.dp),
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            item.title,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = kb.title,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (item.isPulsing) {
+            LocationPulseIndicator()
+            Spacer(Modifier.width(8.dp))
+        }
+        if (item.badgeCount > 0) {
+            HomeCardBadge(count = item.badgeCount)
+            Spacer(Modifier.width(8.dp))
+        }
+        Icon(
+            Icons.Filled.ChevronRight,
+            contentDescription = null,
+            tint = kb.subtitle,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
 @Composable
 private fun LocationPulseIndicator(modifier: Modifier = Modifier) {
     val transition = rememberInfiniteTransition(label = "home_location_pulse")
@@ -968,30 +935,3 @@ private fun HomeCardBadge(
     }
 }
 
-private fun actionIcon(action: HomeQuickAction): ImageVector = when (action) {
-    HomeQuickAction.EXPENSE -> Icons.Filled.Euro
-    HomeQuickAction.EVENT -> Icons.Filled.CalendarMonth
-    HomeQuickAction.TODO -> Icons.Filled.CheckCircle
-    HomeQuickAction.NOTE -> Icons.AutoMirrored.Filled.Note
-    HomeQuickAction.SHOPPING_LIST -> Icons.Filled.LocalGroceryStore
-    HomeQuickAction.MESSAGE -> Icons.AutoMirrored.Filled.Chat
-    HomeQuickAction.HEALTH -> Icons.Filled.Favorite
-    HomeQuickAction.DOCUMENTS -> Icons.Filled.Description
-    HomeQuickAction.PETS -> Icons.Filled.Pets
-    HomeQuickAction.HOME_ITEMS -> Icons.Filled.Home
-    HomeQuickAction.VEHICLES -> Icons.Filled.DirectionsCar
-}
-
-private fun quickActionRoute(action: HomeQuickAction, familyId: String): String = when (action) {
-    HomeQuickAction.EXPENSE -> AppDestination.ExpensesHome.createRoute(familyId)
-    HomeQuickAction.EVENT -> AppDestination.Calendar.createRoute(familyId)
-    HomeQuickAction.TODO -> AppDestination.Todo.route
-    HomeQuickAction.NOTE -> AppDestination.NotesHome.createRoute(familyId)
-    HomeQuickAction.SHOPPING_LIST -> AppDestination.ShoppingList.createRoute(familyId)
-    HomeQuickAction.MESSAGE -> AppDestination.Chat.route
-    HomeQuickAction.HEALTH -> AppDestination.PediatricChildSelector.createRoute(familyId)
-    HomeQuickAction.DOCUMENTS -> AppDestination.DocumentsHome.createRoute(familyId)
-    HomeQuickAction.PETS -> AppDestination.Pets.createRoute(familyId)
-    HomeQuickAction.HOME_ITEMS -> AppDestination.HomeItems.createRoute(familyId)
-    HomeQuickAction.VEHICLES -> AppDestination.Vehicles.createRoute(familyId)
-}
