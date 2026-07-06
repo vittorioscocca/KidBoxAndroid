@@ -70,6 +70,7 @@ class LoginViewModel @Inject constructor(
             val user = FirebaseAuth.getInstance().currentUser
             if (user != null) {
                 userProfileRepository.ensureSeededFromAuth()
+                writePlatformToFirestore(user.uid)
                 resetFirestoreClientAfterAuthChange()
             }
             val hasFamily = if (user != null) checkHasFamily() else false
@@ -202,12 +203,18 @@ class LoginViewModel @Inject constructor(
     }
 
     private suspend fun onSignedInSuccessfully() {
-        if (FirebaseAuth.getInstance().currentUser != null) {
-            userProfileRepository.ensureSeededFromAuth()
-            resetFirestoreClientAfterAuthChange()
-            _authCheckState.value =
-                AuthCheckState.Authenticated(checkHasFamily())
-        }
+        val user = FirebaseAuth.getInstance().currentUser ?: return
+        userProfileRepository.ensureSeededFromAuth()
+        writePlatformToFirestore(user.uid)
+        resetFirestoreClientAfterAuthChange()
+        _authCheckState.value = AuthCheckState.Authenticated(checkHasFamily())
+    }
+
+    private fun writePlatformToFirestore(uid: String) {
+        FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(uid)
+            .set(mapOf("platform" to "android"), com.google.firebase.firestore.SetOptions.merge())
     }
 
     /**
