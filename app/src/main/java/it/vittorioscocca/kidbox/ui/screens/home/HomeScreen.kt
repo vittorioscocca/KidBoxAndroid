@@ -626,7 +626,7 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
     ),
     FeatureItem(
         "pets",
-        "Animali",
+        "Animali domestici",
         "Cure e promemoria",
         AppDestination.Pets.createRoute(familyId),
         Icons.Filled.Pets,

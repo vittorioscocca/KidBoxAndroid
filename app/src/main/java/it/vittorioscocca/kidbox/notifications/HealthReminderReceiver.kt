@@ -90,6 +90,32 @@ class HealthReminderReceiver : BroadcastReceiver() {
                     .build()
                 runCatching { NotificationManagerCompat.from(context).notify(notifId, notification) }
             }
+            TYPE_WALLET_DOCUMENT_REMINDER -> {
+                val documentId = intent.getStringExtra(EXTRA_WALLET_DOCUMENT_ID).orEmpty()
+                val familyId = intent.getStringExtra(EXTRA_FAMILY_ID).orEmpty()
+                val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
+                val body = intent.getStringExtra(EXTRA_BODY).orEmpty()
+                val deepLink = Intent(context, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    putExtra("push_type", "wallet_document_reminder")
+                    putExtra("push_family_id", familyId)
+                    putExtra("documentId", documentId)
+                }
+                val notifId = documentId.hashCode()
+                val pendingIntent = PendingIntent.getActivity(
+                    context, notifId, deepLink,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+                val notification = NotificationCompat.Builder(context, CHANNEL_ID_HEALTH_REMINDERS)
+                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setContentTitle(title.ifBlank { "Documento in scadenza" })
+                    .setContentText(body.ifBlank { "Controlla il Wallet" })
+                    .setAutoCancel(true)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setContentIntent(pendingIntent)
+                    .build()
+                runCatching { NotificationManagerCompat.from(context).notify(notifId, notification) }
+            }
             TYPE_VACCINE_REMINDER -> {
                 val vaccineId = intent.getStringExtra(EXTRA_VACCINE_ID).orEmpty()
                 val familyId = intent.getStringExtra(EXTRA_FAMILY_ID).orEmpty()
@@ -289,6 +315,8 @@ class HealthReminderReceiver : BroadcastReceiver() {
         const val TYPE_VACCINE_REMINDER = "vaccine_reminder"
         const val TYPE_WALLET_REMINDER = "wallet_reminder"
         const val EXTRA_WALLET_TICKET_ID = "extra_wallet_ticket_id"
+        const val TYPE_WALLET_DOCUMENT_REMINDER = "wallet_document_reminder"
+        const val EXTRA_WALLET_DOCUMENT_ID = "extra_wallet_document_id"
         const val TYPE_VEHICLE_DEADLINE = "vehicle_deadline_reminder"
         const val TYPE_HOUSE_PAYMENT = "house_payment_reminder"
         const val EXTRA_HOUSE_PAYMENT_ID = "extra_house_payment_id"

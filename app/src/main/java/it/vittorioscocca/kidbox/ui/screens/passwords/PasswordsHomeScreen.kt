@@ -87,8 +87,6 @@ import kotlinx.coroutines.launch
 /** Tint allineato a iOS `KBTheme` per chip attivi e FAB password. */
 private val PasswordsAccentPurple = Color(0xFF9973D9)
 
-private val PasswordsIosBackgroundLight = Color(0xFFF2F2F7)
-
 /** FAB 56dp + margine: senza questo il + copre l’ultima riga in fondo alla lista. */
 private val PasswordsHomeListFabClearance = 72.dp
 
@@ -111,7 +109,7 @@ fun PasswordsHomeScreen(
     val scope = rememberCoroutineScope()
     val kb = MaterialTheme.kidBoxColors
     val isLight = !isSystemInDarkTheme()
-    val pageBg = if (isLight) PasswordsIosBackgroundLight else kb.background
+    val pageBg = kb.background
     val surfaceCard = if (isLight) Color.White else kb.card
     val chipBorder = if (isLight) Color(0xFFE5E5EA) else kb.divider
     val rowDivider = if (isLight) Color(0xFFE5E5EA) else kb.divider

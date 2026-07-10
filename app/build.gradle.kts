@@ -31,8 +31,8 @@ android {
         applicationId = "it.vittorioscocca.kidbox"
         minSdk = 26
         targetSdk = 35
-        versionCode = 23
-        versionName = "1.0.3"
+        versionCode = 24
+        versionName = "2.0.0"
         manifestPlaceholders["googleMapsApiKey"] = mapsApiKey
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
         buildConfigField("Boolean", "AI_ENABLED", "true")
@@ -168,6 +168,9 @@ dependencies {
     // ML Kit barcode scanning (used by WalletPdfParser to scan barcodes from rendered PDF pages)
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("com.google.mlkit:text-recognition:16.0.1")
+    // ML Kit Document Scanner (Wallet → Documenti d'identità): equivalente VisionKit,
+    // rilevamento bordi automatico + multi-pagina, restituisce sia JPEG che PDF pronto.
+    implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0-beta1")
     implementation("androidx.biometric:biometric-ktx:1.2.0-alpha05")
     // 1.1.0 stable richiede compileSdk 36 + AGP 8.9.1 (fallisce checkDebugAarMetadata con compileSdk 35).
     implementation("androidx.health.connect:connect-client:1.1.0-beta01")

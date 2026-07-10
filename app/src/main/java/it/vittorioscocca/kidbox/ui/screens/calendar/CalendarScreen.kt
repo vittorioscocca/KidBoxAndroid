@@ -152,7 +152,7 @@ fun CalendarScreen(
                 }
             }
         },
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = MaterialTheme.kidBoxColors.background,
     ) { padding ->
         Column(
             modifier = Modifier

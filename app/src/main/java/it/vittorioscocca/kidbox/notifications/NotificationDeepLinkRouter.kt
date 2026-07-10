@@ -201,6 +201,16 @@ object NotificationDeepLinkRouter {
                     AppDestination.WalletDetail.createRoute(familyId = fid, ticketId = ticketId)
                 }
             }
+            "wallet_document_reminder" -> {
+                val documentId = intent.getStringExtra("documentId")
+                if (documentId.isNullOrBlank()) {
+                    KBLog.app.warning("NotificationDeepLink: documentId mancante", TAG)
+                    return
+                }
+                queueFamilyAwareRoute(resolvedType, familyId) { fid ->
+                    AppDestination.WalletDocumentDetail.createRoute(familyId = fid, documentId = documentId)
+                }
+            }
             "password_expiry_reminder" -> {
                 val entryId = intent.getStringExtra("push_entry_id") ?: intent.getStringExtra("entryId")
                 if (entryId.isNullOrBlank()) {

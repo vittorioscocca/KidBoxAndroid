@@ -1400,6 +1400,10 @@ fun AppNavGraph(
                 onTicketClick = { ticketId ->
                     navController.navigate(AppDestination.WalletDetail.createRoute(familyId, ticketId))
                 },
+                onDocumentClick = { documentId ->
+                    navController.navigate(AppDestination.WalletDocumentDetail.createRoute(familyId, documentId))
+                },
+                onUpgrade = { navController.navigate(AppDestination.Plans.route) },
             )
         }
 
@@ -1416,6 +1420,23 @@ fun AppNavGraph(
                 familyId = familyId,
                 ticketId = ticketId,
                 onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.WalletDocumentDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("documentId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val documentId = backStackEntry.arguments?.getString("documentId").orEmpty()
+            it.vittorioscocca.kidbox.ui.screens.wallet.documents.WalletDocumentDetailScreen(
+                familyId = familyId,
+                documentId = documentId,
+                onBack = { navController.popBackStack() },
+                onUpgrade = { navController.navigate(AppDestination.Plans.route) },
             )
         }
 

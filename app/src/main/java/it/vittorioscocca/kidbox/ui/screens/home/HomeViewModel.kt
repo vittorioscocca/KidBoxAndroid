@@ -110,7 +110,7 @@ enum class HomeQuickAction(val key: String, val label: String) {
     MESSAGE("message", "Messaggio"),
     HEALTH("health", "Salute"),
     DOCUMENTS("documents", "Documenti"),
-    PETS("pets", "Animali"),
+    PETS("pets", "Animali domestici"),
     HOME_ITEMS("home_items", "Casa"),
     VEHICLES("vehicles", "Garage"),
 }

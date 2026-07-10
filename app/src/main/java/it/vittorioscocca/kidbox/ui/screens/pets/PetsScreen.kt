@@ -72,7 +72,7 @@ fun PetsScreen(
         containerColor = kb.background,
         topBar = {
             TopAppBar(
-                title = { Text("Animali", color = kb.title) },
+                title = { Text("Animali domestici", color = kb.title) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = kb.title)

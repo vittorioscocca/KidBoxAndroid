@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsBoat
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.Flight
@@ -33,22 +34,30 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Museum
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Train
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import it.vittorioscocca.kidbox.ui.screens.wallet.documents.WalletDocumentsSectionContent
+import it.vittorioscocca.kidbox.ui.screens.wallet.documents.WalletDocumentsViewModel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,11 +84,20 @@ fun WalletHomeScreen(
     familyId: String,
     onBack: () -> Unit,
     onTicketClick: (ticketId: String) -> Unit,
+    onDocumentClick: (documentId: String) -> Unit = {},
+    onUpgrade: () -> Unit = {},
     viewModel: WalletViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var showAddSheet by remember { mutableStateOf(false) }
+    var selectedTab by rememberSaveable { mutableStateOf(0) }
+
+    val documentsViewModel: WalletDocumentsViewModel = hiltViewModel()
+    val docsState by documentsViewModel.uiState.collectAsStateWithLifecycle()
+    var showDocAddChoice by remember { mutableStateOf(false) }
+    var showDocAddSheet by remember { mutableStateOf(false) }
+    var showDocLinkSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(familyId) {
         viewModel.bind(familyId)
@@ -99,34 +117,96 @@ fun WalletHomeScreen(
         )
     }
 
+    if (showDocAddChoice) {
+        AlertDialog(
+            onDismissRequest = { showDocAddChoice = false },
+            title = { Text("Nuovo documento", fontWeight = FontWeight.SemiBold) },
+            text = { Text("Come vuoi aggiungerlo?") },
+            confirmButton = {
+                TextButton(onClick = { showDocAddChoice = false; showDocAddSheet = true }) { Text("Scansiona nuovo documento") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDocAddChoice = false; showDocLinkSheet = true }) { Text("Collega documento già in Documenti") }
+            },
+        )
+    }
+
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.kidBoxColors.background),
+        containerColor = MaterialTheme.kidBoxColors.background,
         topBar = {
-            TopAppBar(
-                modifier = Modifier.statusBarsPadding(),
-                title = {
-                    Text(
-                        "Wallet",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { showAddSheet = true }) {
-                        Icon(Icons.Filled.Add, contentDescription = "Aggiungi biglietto")
-                    }
-                },
-            )
+            Column {
+                TopAppBar(
+                    modifier = Modifier.statusBarsPadding(),
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.kidBoxColors.background,
+                    ),
+                    title = {
+                        Text(
+                            "Wallet",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                        }
+                    },
+                    actions = {
+                        if (selectedTab == 0) {
+                            IconButton(onClick = { showAddSheet = true }) {
+                                Icon(Icons.Filled.Add, contentDescription = "Aggiungi biglietto")
+                            }
+                        } else {
+                            if (docsState.isSelecting) {
+                                TextButton(onClick = { documentsViewModel.exitSelectionMode() }) { Text("Annulla") }
+                                IconButton(
+                                    onClick = { documentsViewModel.deleteSelected() },
+                                    enabled = docsState.selectedIds.isNotEmpty() && !docsState.isDeleting,
+                                ) {
+                                    Icon(Icons.Filled.Delete, contentDescription = "Elimina selezionati", tint = MaterialTheme.colorScheme.error)
+                                }
+                            } else {
+                                if (docsState.items.isNotEmpty()) {
+                                    TextButton(onClick = { documentsViewModel.enterSelectionMode() }) { Text("Seleziona") }
+                                }
+                                IconButton(onClick = { showDocAddChoice = true }) {
+                                    Icon(Icons.Filled.Add, contentDescription = "Aggiungi documento")
+                                }
+                            }
+                        }
+                    },
+                )
+                PrimaryTabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = MaterialTheme.kidBoxColors.background,
+                ) {
+                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Biglietti") })
+                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Documenti") })
+                }
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
+        if (selectedTab == 1) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                WalletDocumentsSectionContent(
+                    familyId = familyId,
+                    onDocumentClick = onDocumentClick,
+                    onUpgrade = onUpgrade,
+                    showAddSheet = showDocAddSheet,
+                    onShowAddSheetChange = { showDocAddSheet = it },
+                    showLinkSheet = showDocLinkSheet,
+                    onShowLinkSheetChange = { showDocLinkSheet = it },
+                    viewModel = documentsViewModel,
+                )
+            }
+            return@Scaffold
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -207,7 +287,7 @@ fun WalletHomeScreen(
                     itemsIndexed(state.tickets, key = { _, t -> t.id }) { index, ticket ->
                         WalletTicketCard(
                             ticket = ticket,
-                            modifier = Modifier.zIndex((state.tickets.size - index).toFloat()),
+                            modifier = Modifier.zIndex(index.toFloat()),
                             onClick = { onTicketClick(ticket.id) },
                         )
                     }
