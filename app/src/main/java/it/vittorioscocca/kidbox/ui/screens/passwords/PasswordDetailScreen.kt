@@ -499,23 +499,35 @@ private fun OtpSection(
     val remainingSeconds = (period - ((tick / 1000L) % period).toInt()).coerceAtLeast(0)
     val progress = remainingSeconds.toFloat() / period.toFloat()
     val formatted = remember(code) { code?.chunked(3)?.joinToString(" ") ?: "------" }
+    // Sotto i 10 secondi evidenzia la scadenza imminente in rosso.
+    val isExpiring = remainingSeconds in 1..10
+    val expiringRed = Color(0xFFE53935)
 
     InfoCard {
         Text("OTP", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = kb.title)
         Spacer(modifier = Modifier.height(8.dp))
-        Text(formatted, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = kb.title)
+        Text(
+            formatted,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = if (isExpiring) expiringRed else kb.title,
+        )
         Spacer(modifier = Modifier.height(8.dp))
         LinearProgressIndicator(
             progress = { progress.coerceIn(0f, 1f) },
             modifier = Modifier.fillMaxWidth().height(6.dp),
-            color = PasswordsAccentPurple,
+            color = if (isExpiring) expiringRed else PasswordsAccentPurple,
             trackColor = kb.divider,
         )
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("${remainingSeconds}s", color = kb.subtitle)
+            Text(
+                "${remainingSeconds}s",
+                color = if (isExpiring) expiringRed else kb.subtitle,
+                fontWeight = if (isExpiring) FontWeight.SemiBold else FontWeight.Normal,
+            )
             Spacer(modifier = Modifier.weight(1f))
             Button(onClick = { if (code != null) onCopy(formatted) }, enabled = code != null) {
                 Text("Copia")

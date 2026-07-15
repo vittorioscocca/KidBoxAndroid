@@ -59,7 +59,9 @@
       "Read(//Users/vscocca/.gradle/**)",
       "Bash(node -c index.js)",
       "Bash(npx eslint *)",
-      "Bash(cd /Users/vscocca/KidBox; echo \"=== onGeofenceEvent body after targets \\(1009-1090\\) ===\"; sed -n '1009,1095p' functions/index.js; echo \"=== how counters get incremented \\(search\\) ===\"; grep -nE \"counters|location:|increment|FieldValue.increment|\\\\.location\\\\b\" functions/index.js | head -40)"
+      "Bash(cd /Users/vscocca/KidBox; echo \"=== onGeofenceEvent body after targets \\(1009-1090\\) ===\"; sed -n '1009,1095p' functions/index.js; echo \"=== how counters get incremented \\(search\\) ===\"; grep -nE \"counters|location:|increment|FieldValue.increment|\\\\.location\\\\b\" functions/index.js | head -40)",
+      "Bash(./gradlew :app:assembleRelease --console=plain)",
+      "Bash(/usr/libexec/java_home -V 2>&1; echo \"---\"; ls /Library/Java/JavaVirtualMachines/ 2>/dev/null; ls ~/Library/Java/JavaVirtualMachines/ 2>/dev/null; echo \"--- studio jbr ---\"; ls \"/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java\" 2>/dev/null)"
     ]
   }
 }

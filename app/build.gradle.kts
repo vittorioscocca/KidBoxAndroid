@@ -41,11 +41,17 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            // Simboli di debug nativi nell'AAB: risolve l'avviso Play sui crash
+            // nativi (.so di CameraX/ML Kit/Tink…) e li rende leggibili in Vitals.
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
         }
     }
 
