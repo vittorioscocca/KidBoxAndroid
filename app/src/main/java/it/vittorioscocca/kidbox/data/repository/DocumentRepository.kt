@@ -16,6 +16,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBDocumentCategoryEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
 import it.vittorioscocca.kidbox.data.local.mapper.encodeStringList
+import it.vittorioscocca.kidbox.data.support.DocumentImageCompressor
 import it.vittorioscocca.kidbox.data.remote.DocumentRemoteChange
 import it.vittorioscocca.kidbox.data.remote.DocumentRemoteStore
 import it.vittorioscocca.kidbox.data.remote.RemoteDocumentDto
@@ -739,18 +740,23 @@ class DocumentRepository @Inject constructor(
         }
         val storedCreatedBy = (createdBy?.takeIf { it.isNotBlank() } ?: uid).ifBlank { "local" }
         val id = forcedId ?: UUID.randomUUID().toString()
-        val localPath = persistPendingPlainFile(id, fileName, bytes).absolutePath
-        val placeholderStoragePath = "families/$familyId/documents/$id/${safeFileName(fileName)}.kbenc"
+        // Comprimi le immagini ad alta risoluzione prima di persistere/caricare.
+        val compressed = DocumentImageCompressor.compressIfNeeded(bytes, fileName, mimeType)
+        val uploadBytes = compressed.bytes
+        val uploadFileName = compressed.fileName
+        val uploadMime = compressed.mimeType
+        val localPath = persistPendingPlainFile(id, uploadFileName, uploadBytes).absolutePath
+        val placeholderStoragePath = "families/$familyId/documents/$id/${safeFileName(uploadFileName)}.kbenc"
         val entity = KBDocumentEntity(
             id = id,
             familyId = familyId,
             childId = null,
             categoryId = parentFolderId,
             localPath = localPath,
-            title = titleFromFileName(fileName),
-            fileName = fileName,
-            mimeType = mimeType,
-            fileSize = bytes.size.toLong(),
+            title = titleFromFileName(uploadFileName),
+            fileName = uploadFileName,
+            mimeType = uploadMime,
+            fileSize = uploadBytes.size.toLong(),
             storagePath = placeholderStoragePath,
             downloadURL = null,
             notes = notes,
@@ -785,8 +791,13 @@ class DocumentRepository @Inject constructor(
         val docId = forcedId ?: UUID.randomUUID().toString()
         val rootId = expensesRootFolderId(familyId)
         val expenseFolderId = expenseCategoryFolderId(expenseId)
-        val localPath = persistPendingPlainFile(docId, fileName, bytes).absolutePath
-        val placeholderStoragePath = "families/$familyId/documents/$docId/${safeFileName(fileName)}.kbenc"
+        // Comprimi le immagini ad alta risoluzione prima di persistere/caricare.
+        val compressed = DocumentImageCompressor.compressIfNeeded(bytes, fileName, mimeType)
+        val uploadBytes = compressed.bytes
+        val uploadFileName = compressed.fileName
+        val uploadMime = compressed.mimeType
+        val localPath = persistPendingPlainFile(docId, uploadFileName, uploadBytes).absolutePath
+        val placeholderStoragePath = "families/$familyId/documents/$docId/${safeFileName(uploadFileName)}.kbenc"
         return database.withTransaction {
             val root = categoryDao.getById(rootId)?.copy(
                 title = "Spese",
@@ -839,10 +850,10 @@ class DocumentRepository @Inject constructor(
                 childId = null,
                 categoryId = expenseFolderId,
                 localPath = localPath,
-                title = titleFromFileName(fileName),
-                fileName = fileName,
-                mimeType = mimeType,
-                fileSize = bytes.size.toLong(),
+                title = titleFromFileName(uploadFileName),
+                fileName = uploadFileName,
+                mimeType = uploadMime,
+                fileSize = uploadBytes.size.toLong(),
                 storagePath = placeholderStoragePath,
                 downloadURL = null,
                 notes = "expense:$expenseId",

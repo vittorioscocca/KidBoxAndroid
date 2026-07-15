@@ -8,6 +8,7 @@ import android.provider.OpenableColumns
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.KBDocumentDao
+import it.vittorioscocca.kidbox.data.support.DocumentImageCompressor
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import it.vittorioscocca.kidbox.data.local.mapper.encodeStringList
 import it.vittorioscocca.kidbox.data.health.ai.HealthAiDocumentText
@@ -369,9 +370,15 @@ class HealthAttachmentService @Inject constructor(
             if (bytes.isEmpty()) throw IOException("Il file è vuoto")
 
             // 3. Resolve metadata
-            val mimeType = cr.getType(uri)?.takeIf { it.isNotBlank() }
+            val originalMime = cr.getType(uri)?.takeIf { it.isNotBlank() }
                 ?: mimeFromExtension(fileNameFromUri(uri))
-            val fileName = fileNameFromUri(uri).ifBlank { "attachment_${System.currentTimeMillis()}" }
+            val originalFileName = fileNameFromUri(uri).ifBlank { "attachment_${System.currentTimeMillis()}" }
+
+            // Comprimi le immagini ad alta risoluzione prima di cifrare/caricare.
+            val compressed = DocumentImageCompressor.compressIfNeeded(bytes, originalFileName, originalMime)
+            val uploadBytes = compressed.bytes
+            val fileName = compressed.fileName
+            val mimeType = compressed.mimeType
             val title = titleFromFileName(fileName)
 
             // 4. docId + paths — MUST use `documents/` (same as DocumentStorageManager.uploadEncrypted
@@ -386,7 +393,7 @@ class HealthAttachmentService @Inject constructor(
             val categoryId = resolveCategoryId()
 
             // 6. Write plaintext to local cache
-            val localPath = writePendingFile(docId, fileName, bytes)
+            val localPath = writePendingFile(docId, fileName, uploadBytes)
 
             val uid = auth.currentUser?.uid ?: "local"
             val now = System.currentTimeMillis()
@@ -401,7 +408,7 @@ class HealthAttachmentService @Inject constructor(
                 title = title,
                 fileName = fileName,
                 mimeType = mimeType,
-                fileSize = bytes.size.toLong(),
+                fileSize = uploadBytes.size.toLong(),
                 storagePath = storagePath,
                 downloadURL = null,
                 notes = tag,
@@ -429,7 +436,7 @@ class HealthAttachmentService @Inject constructor(
                     familyId = familyId,
                     mimeType = mimeType,
                     fileName = fileName,
-                    plainBytes = bytes,
+                    plainBytes = uploadBytes,
                 )
             } catch (e: Exception) {
                 documentDao.upsert(entity.copy(lastSyncError = e.message))
