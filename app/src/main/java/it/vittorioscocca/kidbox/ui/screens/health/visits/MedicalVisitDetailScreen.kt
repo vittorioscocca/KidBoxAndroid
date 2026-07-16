@@ -89,6 +89,9 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
+import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
+import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
 
 private val DATE_LONG_FMT = SimpleDateFormat("d MMMM yyyy · HH:mm", Locale.ITALIAN)
 private val NEXT_VISIT_DATE_FMT = SimpleDateFormat("EEEE d MMMM yyyy", Locale.ITALIAN)
@@ -123,6 +126,16 @@ fun MedicalVisitDetailScreen(
     var showAiChat by remember { mutableStateOf(false) }
 
     LaunchedEffect(familyId, childId, visitId) { viewModel.bind(familyId, childId, visitId) }
+
+    LaunchedEffect(state.visit?.id) {
+        val v = state.visit ?: return@LaunchedEffect
+        KBAnalytics.logRetrieval(
+            feature = KBAnalyticsFeature.HEALTH,
+            uploaderUid = v.createdBy,
+            createdAtEpochMillis = v.createdAtEpochMillis,
+            entryPoint = KBAnalyticsOrigin.consume(),
+        )
+    }
     LaunchedEffect(state.deleted) { if (state.deleted) onBack() }
     LaunchedEffect(state.uploadError) {
         state.uploadError?.let { err ->

@@ -142,6 +142,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
+import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
+import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
 
 private enum class PhotosTab { LIBRARY, ALBUMS }
 private enum class PhotoGrouping(val label: String) {
@@ -201,6 +204,19 @@ fun FamilyPhotosScreen(
         if (state.filteredPhotos.none { it.id == selectedId }) {
             viewerPhotoId = null
         }
+    }
+
+    // Aprire una foto a schermo intero è il recupero: la griglia è solo sfoglio.
+    // `viewerPhotoId` non nullo = viewer aperto.
+    LaunchedEffect(viewerPhotoId) {
+        val id = viewerPhotoId ?: return@LaunchedEffect
+        val photo = state.filteredPhotos.firstOrNull { it.id == id } ?: return@LaunchedEffect
+        KBAnalytics.logRetrieval(
+            feature = KBAnalyticsFeature.PHOTO_VIDEO,
+            uploaderUid = photo.createdBy,
+            createdAtEpochMillis = photo.createdAtEpochMillis,
+            entryPoint = KBAnalyticsOrigin.consume(),
+        )
     }
     LaunchedEffect(state.filteredPhotos, currentTab) {
         if (currentTab != PhotosTab.LIBRARY) {

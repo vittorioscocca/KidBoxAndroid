@@ -2,6 +2,8 @@ package it.vittorioscocca.kidbox.ui.screens.documents
 
 import it.vittorioscocca.kidbox.ui.permissions.rememberCameraPermissionRequester
 import it.vittorioscocca.kidbox.util.KBLog
+import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
+import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -125,6 +127,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
+import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
 
 private const val TAG_DOC_OPEN = "KB_Doc_Open"
 private sealed interface ContextMenuTarget {
@@ -1943,6 +1946,14 @@ private suspend fun openDocument(
     viewModel: DocumentsViewModel,
     document: KBDocumentEntity,
 ) {
+    // Il valore del documento è che sia a portata di click per la famiglia:
+    // questa apertura è la prova, e il server non la vede (nessuna scrittura).
+    KBAnalytics.logRetrieval(
+        feature = KBAnalyticsFeature.DOCUMENTS,
+        uploaderUid = document.createdBy,
+        createdAtEpochMillis = document.createdAtEpochMillis,
+        entryPoint = KBAnalyticsOrigin.consume(),
+    )
     try {
         KBLog.ui.debug("preparePreviewFile start docId=${document.id}", TAG_DOC_OPEN)
         val file = withTimeout(20_000L) { viewModel.preparePreviewFile(document) }

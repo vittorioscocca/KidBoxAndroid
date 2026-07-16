@@ -83,6 +83,8 @@ import coil.compose.SubcomposeAsyncImage
 import it.vittorioscocca.kidbox.ui.theme.KidBoxColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import kotlinx.coroutines.launch
+import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsEntryPoint
+import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
 
 /** Tint allineato a iOS `KBTheme` per chip attivi e FAB password. */
 private val PasswordsAccentPurple = Color(0xFF9973D9)
@@ -325,7 +327,21 @@ fun PasswordsHomeScreen(
                                     selectedIds = state.selectedIds,
                                     onToggleSelected = viewModel::toggleSelected,
                                     onToggleSectionExpanded = viewModel::toggleSectionExpanded,
-                                    onOpenPassword = onOpenPassword,
+                                    // Distingue "trovato cercando" da "trovato
+                                    // sfogliando": è la sola differenza che dice
+                                    // se il contenuto è davvero a portata di click.
+                                    onOpenPassword = onOpenPassword?.let { open ->
+                                        { id: String ->
+                                            KBAnalyticsOrigin.set(
+                                                if (state.searchQuery.isBlank()) {
+                                                    KBAnalyticsEntryPoint.LIST
+                                                } else {
+                                                    KBAnalyticsEntryPoint.SEARCH
+                                                }
+                                            )
+                                            open(id)
+                                        }
+                                    },
                                 )
                             }
                         }

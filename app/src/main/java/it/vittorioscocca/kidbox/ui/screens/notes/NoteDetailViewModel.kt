@@ -27,6 +27,7 @@ data class NoteDetailUiState(
     val pickerMembersExcludingSelf: List<VisibilityPickerMember> = emptyList(),
     /** Creatore: solo lui può cambiare visibilità (anche dopo il primo salvataggio). */
     val noteCreatedBy: String = "",
+    val noteCreatedAtEpochMillis: Long? = null,
     val currentUid: String = "",
     val isNewRoute: Boolean = false,
     val isLoading: Boolean = true,
@@ -101,6 +102,7 @@ class NoteDetailViewModel @Inject constructor(
                             isLoading = false,
                             pickerMembersExcludingSelf = pickerMembers,
                             noteCreatedBy = note.createdBy,
+                            noteCreatedAtEpochMillis = note.createdAtEpochMillis,
                         )
                         return@collect
                     }
@@ -112,6 +114,7 @@ class NoteDetailViewModel @Inject constructor(
                         visibilityMemberIds = note.visibilityMemberIds,
                         pickerMembersExcludingSelf = pickerMembers,
                         noteCreatedBy = note.createdBy,
+                            noteCreatedAtEpochMillis = note.createdAtEpochMillis,
                         isLoading = false,
                         isDirty = false,
                     )

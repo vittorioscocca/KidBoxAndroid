@@ -84,6 +84,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
+import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
+import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
+import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
 
 @Composable
 fun WalletTicketDetailScreen(
@@ -95,6 +98,18 @@ fun WalletTicketDetailScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val ticket = state.tickets.firstOrNull { it.id == ticketId }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Aprire il dettaglio è il recupero vero: è per questo che il biglietto è
+    // stato caricato. Non produce scritture, quindi il server non lo vede.
+    LaunchedEffect(ticket?.id) {
+        val t = ticket ?: return@LaunchedEffect
+        KBAnalytics.logRetrieval(
+            feature = KBAnalyticsFeature.WALLET,
+            uploaderUid = t.createdBy,
+            createdAtEpochMillis = t.createdAtEpochMillis,
+            entryPoint = KBAnalyticsOrigin.consume(),
+        )
+    }
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     var showDeleteDialog by remember { mutableStateOf(false) }

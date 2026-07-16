@@ -10,6 +10,8 @@ import it.vittorioscocca.kidbox.util.KBLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsEntryPoint
+import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
 
 /**
  * Router unico per i deep link da notifiche push e locali.
@@ -95,6 +97,10 @@ object NotificationDeepLinkRouter {
                 }
             }
             "new_document" -> {
+                // Solo i casi che aprono davvero un contenuto: `daily_briefing` &
+                // co. portano in Home, e marcarli colorerebbe di ".notification"
+                // il primo dettaglio aperto poi sfogliando.
+                KBAnalyticsOrigin.set(KBAnalyticsEntryPoint.NOTIFICATION)
                 val docId = intent.getStringExtra("push_doc_id")
                     ?: intent.getStringExtra("docId")
                 queueFamilyAwareRoute(resolvedType, familyId) { fid ->
@@ -133,6 +139,7 @@ object NotificationDeepLinkRouter {
                 }
             }
             "new_note" -> {
+                KBAnalyticsOrigin.set(KBAnalyticsEntryPoint.NOTIFICATION)
                 val noteId = intent.getStringExtra("push_note_id") ?: intent.getStringExtra("noteId")
                 if (noteId.isNullOrBlank()) {
                     KBLog.app.warning("NotificationDeepLink: noteId mancante", TAG)
@@ -192,6 +199,7 @@ object NotificationDeepLinkRouter {
             }
             "new_wallet_ticket",
             "wallet_ticket_reminder" -> {
+                KBAnalyticsOrigin.set(KBAnalyticsEntryPoint.NOTIFICATION)
                 val ticketId = intent.getStringExtra("ticketId")
                 if (ticketId.isNullOrBlank()) {
                     KBLog.app.warning("NotificationDeepLink: ticketId mancante", TAG)

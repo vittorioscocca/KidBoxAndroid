@@ -47,6 +47,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.ui.components.KidBoxChip
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
+import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
+import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
 
 @Composable
 fun NoteDetailScreen(
@@ -65,6 +68,17 @@ fun NoteDetailScreen(
 
     LaunchedEffect(familyId, noteId, isNewNote) {
         viewModel.bind(familyId, noteId, isNewRoute = isNewNote)
+    }
+
+    // Solo per note esistenti: aprire il form di una nota nuova non è una lettura.
+    LaunchedEffect(state.noteId, state.isNewRoute, state.noteCreatedBy) {
+        if (state.isNewRoute || state.noteId.isBlank()) return@LaunchedEffect
+        KBAnalytics.logRetrieval(
+            feature = KBAnalyticsFeature.NOTE,
+            uploaderUid = state.noteCreatedBy,
+            createdAtEpochMillis = state.noteCreatedAtEpochMillis,
+            entryPoint = KBAnalyticsOrigin.consume(),
+        )
     }
 
     BackHandler {

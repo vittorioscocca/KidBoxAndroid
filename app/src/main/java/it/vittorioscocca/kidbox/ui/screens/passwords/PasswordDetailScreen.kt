@@ -90,6 +90,9 @@ import it.vittorioscocca.kidbox.data.passwords.otp.TotpGenerator
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.util.concurrent.Executors
 import kotlinx.coroutines.delay
+import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
+import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
+import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
 
 private val PasswordsAccentPurple = Color(0xFF9973D9)
 
@@ -110,6 +113,9 @@ fun PasswordDetailScreen(
     var showOtpDeleteDialog by remember { mutableStateOf(false) }
     var showOtpScanner by remember { mutableStateOf(false) }
     var otpInput by remember { mutableStateOf("") }
+    // Catturata una volta: la copia può avvenire più volte, ma l'origine resta
+    // quella dell'arrivo. `consume()` azzera, quindi va letta una sola volta.
+    val retrievalOrigin = remember { KBAnalyticsOrigin.consume() }
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     val kb = MaterialTheme.kidBoxColors
@@ -219,7 +225,15 @@ fun PasswordDetailScreen(
                 label = "Copia password",
                 icon = Icons.Filled.Key,
                 isPrimary = true,
-                onClick = { clipboard.setText(AnnotatedString(state.password)) },
+                onClick = {
+                    clipboard.setText(AnnotatedString(state.password))
+                    KBAnalytics.logRetrieval(
+                        feature = KBAnalyticsFeature.PASSWORDS,
+                        uploaderUid = state.createdBy,
+                        createdAtEpochMillis = state.createdAtEpochMillis,
+                        entryPoint = retrievalOrigin,
+                    )
+                },
                 modifier = Modifier.weight(1f),
             )
             ActionPill(

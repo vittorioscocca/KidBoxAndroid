@@ -87,6 +87,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
+import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
+import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
+import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
 
 @Composable
 fun FamilyLocationScreen(
@@ -170,6 +173,17 @@ fun FamilyLocationScreen(
             requestLocationForSharing = false
             Toast.makeText(context, "Permesso posizione necessario", Toast.LENGTH_LONG).show()
         }
+    }
+
+    // Guardare dov'è un familiare è cross-member per definizione: non c'è un
+    // `createdBy` da confrontare, si sta guardando la posizione altrui.
+    LaunchedEffect(Unit) {
+        KBAnalytics.logRetrieval(
+            feature = KBAnalyticsFeature.FAMILY_LOCATION,
+            uploaderIsSelf = false,
+            createdAtEpochMillis = null,
+            entryPoint = KBAnalyticsOrigin.consume(),
+        )
     }
 
     LaunchedEffect(familyId) {
