@@ -11,7 +11,7 @@ package it.vittorioscocca.kidbox.util.analytics
  * Chi naviga la imposta, il dettaglio la consuma. **Consumare azzera**: senza, una
  * notifica colorerebbe tutte le aperture successive fatte sfogliando.
  *
- * Design: docs/analytics-active-users.md
+ * Design: internal/analytics-active-users.md
  */
 object KBAnalyticsOrigin {
 

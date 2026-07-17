@@ -64,7 +64,12 @@
       "Bash(/usr/libexec/java_home -V 2>&1; echo \"---\"; ls /Library/Java/JavaVirtualMachines/ 2>/dev/null; ls ~/Library/Java/JavaVirtualMachines/ 2>/dev/null; echo \"--- studio jbr ---\"; ls \"/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java\" 2>/dev/null)",
       "Bash(unzip -l app/release/app-release.aab)",
       "Bash(grep \"\\\\.so$\")",
-      "Bash(cd /Users/vscocca/KidBox/KidBoxAndroid; echo \"=== ndkVersion nel build? ===\"; grep -rn \"ndkVersion\\\\|externalNativeBuild\\\\|ndkPath\" app/build.gradle.kts build.gradle.kts 2>/dev/null || echo \"nessun ndkVersion/externalNativeBuild\"; echo; echo \"=== NDK installato? ===\"; ls \"$HOME/Library/Android/sdk/ndk\" 2>/dev/null && echo \"NDK presente\" || echo \"NESSUN NDK in ~/Library/Android/sdk/ndk\"; echo; echo \"=== local.properties ndk.dir ===\"; grep -i \"ndk\" local.properties 2>/dev/null || echo \"nessun ndk.dir\")"
+      "Bash(cd /Users/vscocca/KidBox/KidBoxAndroid; echo \"=== ndkVersion nel build? ===\"; grep -rn \"ndkVersion\\\\|externalNativeBuild\\\\|ndkPath\" app/build.gradle.kts build.gradle.kts 2>/dev/null || echo \"nessun ndkVersion/externalNativeBuild\"; echo; echo \"=== NDK installato? ===\"; ls \"$HOME/Library/Android/sdk/ndk\" 2>/dev/null && echo \"NDK presente\" || echo \"NESSUN NDK in ~/Library/Android/sdk/ndk\"; echo; echo \"=== local.properties ndk.dir ===\"; grep -i \"ndk\" local.properties 2>/dev/null || echo \"nessun ndk.dir\")",
+      "Bash(timeout 570 ./gradlew :app:minifyReleaseWithR8)",
+      "Bash(./gradlew :app:minifyReleaseWithR8)",
+      "Bash(curl -s \"https://itunes.apple.com/lookup?bundleId=it.vittorioscocca.KidBox&country=IT\")",
+      "Bash(python3 -m json.tool)",
+      "Bash(xcodebuild -project KidBox.xcodeproj -scheme KidBox -destination 'platform=iOS Simulator,id=5C81C804-7567-46EC-8F78-F6E2D265297A' -configuration Debug build)"
     ]
   }
 }

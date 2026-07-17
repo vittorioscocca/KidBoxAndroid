@@ -31,7 +31,7 @@ android {
         applicationId = "it.vittorioscocca.kidbox"
         minSdk = 26
         targetSdk = 35
-        versionCode = 27
+        versionCode = 28
         versionName = "2.0.3"
         manifestPlaceholders["googleMapsApiKey"] = mapsApiKey
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
@@ -151,6 +151,10 @@ dependencies {
     implementation(libs.camerax.camera2)
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.view)
+
+    // Play In-App Updates: chiede a Play se esiste un versionCode più recente
+    // sul canale a cui l'utente è idoneo (rispetta i rollout graduali).
+    implementation(libs.app.update.ktx)
 
     // ML Kit barcode (legge QR dalla camera)
     implementation(libs.mlkit.barcode)

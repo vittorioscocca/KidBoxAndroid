@@ -40,7 +40,7 @@ import java.util.concurrent.TimeUnit
  * accumulano in memoria e partono in un unico batch quando l'app va in
  * background.
  *
- * Design: docs/analytics-active-users.md
+ * Design: internal/analytics-active-users.md
  */
 object KBAnalytics {
 

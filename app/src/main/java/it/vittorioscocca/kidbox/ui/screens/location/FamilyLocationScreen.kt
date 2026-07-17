@@ -140,9 +140,10 @@ fun FamilyLocationScreen(
     val cameraPositionState = rememberCameraPositionState()
 
     var requestLocationForSharing by remember { mutableStateOf(false) }
-    // Prominent disclosure obbligatorio (Google Play User Data policy) prima di
-    // richiedere ACCESS_BACKGROUND_LOCATION: l'utente deve sapere che la posizione
-    // viene raccolta anche in background per la condivisione famiglia e le zone (geofence).
+    // Prominent disclosure obbligatorio (Google Play User Data policy): deve precedere
+    // immediatamente ogni richiesta di permesso posizione, sia in primo piano sia in
+    // background. L'utente deve sapere che la posizione viene raccolta e per farci cosa.
+    var showForegroundDisclosure by remember { mutableStateOf(false) }
     var showBackgroundDisclosure by remember { mutableStateOf(false) }
 
     val backgroundPermissionLauncher = rememberLauncherForActivityResult(
@@ -194,12 +195,7 @@ fun FamilyLocationScreen(
     LaunchedEffect(Unit) {
         if (!viewModel.hasLocationPermissionNow()) {
             requestLocationForSharing = false
-            permissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION,
-                ),
-            )
+            showForegroundDisclosure = true
         }
     }
     LaunchedEffect(state.errorMessage) {
@@ -405,12 +401,7 @@ fun FamilyLocationScreen(
                         }
                     } else {
                         requestLocationForSharing = true
-                        permissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION,
-                            ),
-                        )
+                        showForegroundDisclosure = true
                     }
                 } else {
                     viewModel.stopSharing()
@@ -432,6 +423,24 @@ fun FamilyLocationScreen(
                 .navigationBarsPadding()
                 .padding(horizontal = 12.dp, vertical = 10.dp),
         )
+
+        if (showForegroundDisclosure) {
+            ForegroundLocationDisclosureOverlay(
+                onAccept = {
+                    showForegroundDisclosure = false
+                    permissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                        ),
+                    )
+                },
+                onDecline = {
+                    showForegroundDisclosure = false
+                    requestLocationForSharing = false
+                },
+            )
+        }
 
         if (showBackgroundDisclosure) {
             BackgroundLocationDisclosureOverlay(
@@ -736,6 +745,68 @@ private fun LocationBottomCard(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ForegroundLocationDisclosureOverlay(
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+) {
+    val isDarkTheme = isSystemInDarkTheme()
+    val dialogColor = if (isDarkTheme) Color(0xE6212B36) else Color(0xFFE7F6D8)
+    val scrim = if (isDarkTheme) Color.Black.copy(alpha = 0.42f) else Color.Black.copy(alpha = 0.28f)
+    val titleColor = if (isDarkTheme) Color(0xFFEAF0F7) else Color.Black
+    val bodyColor = if (isDarkTheme) Color(0xFFC3CCD8) else Color(0xFF3A3A3A)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(scrim),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = dialogColor,
+            modifier = Modifier
+                .padding(horizontal = 28.dp)
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {},
+                ),
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = "KidBox usa la tua posizione",
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = titleColor,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "KidBox raccoglie i dati di posizione del tuo dispositivo per " +
+                        "mostrarti sulla mappa della famiglia e per condividere la tua " +
+                        "posizione con i membri della tua famiglia che scegli tu.\n\n" +
+                        "La posizione viene raccolta solo quando attivi la condivisione e " +
+                        "viene usata esclusivamente per questa funzione: non la vendiamo e " +
+                        "non la usiamo per pubblicità. Puoi interrompere la condivisione in " +
+                        "qualsiasi momento dall'app.\n\n" +
+                        "Nella schermata successiva Android ti chiederà di consentire " +
+                        "l'accesso alla posizione.",
+                    fontSize = 14.sp,
+                    color = bodyColor,
+                    lineHeight = 20.sp,
+                )
+                ShareActionButton(label = "Continua", onClick = onAccept, isDarkTheme = isDarkTheme)
+                ShareActionButton(label = "No, grazie", onClick = onDecline, isDarkTheme = isDarkTheme)
             }
         }
     }

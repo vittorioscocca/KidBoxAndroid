@@ -8,7 +8,11 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
@@ -19,7 +23,9 @@ import dagger.hilt.android.AndroidEntryPoint
 import it.vittorioscocca.kidbox.data.local.AppTheme
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
 import it.vittorioscocca.kidbox.data.local.ThemePreference
+import it.vittorioscocca.kidbox.data.update.AppUpdateChecker
 import it.vittorioscocca.kidbox.ui.CrashReportConsentDialog
+import it.vittorioscocca.kidbox.ui.UpdateAvailableDialog
 import android.content.Intent
 import it.vittorioscocca.kidbox.notifications.NotificationDeepLinkRouter
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
@@ -33,6 +39,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var themePreference: ThemePreference
+
+    @Inject
+    lateinit var appUpdateChecker: AppUpdateChecker
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -61,6 +70,11 @@ class MainActivity : ComponentActivity() {
                 val showConsent by CrashAnalyzer.showConsentDialog.collectAsStateWithLifecycle()
                 val consentPrompt by CrashAnalyzer.consentPrompt.collectAsStateWithLifecycle()
 
+                var updateVersionCode by remember { mutableStateOf<Int?>(null) }
+                LaunchedEffect(Unit) {
+                    updateVersionCode = appUpdateChecker.checkForUpdate()
+                }
+
                 Box(modifier = Modifier.fillMaxSize()) {
                     AppNavGraph(
                         navController = navController,
@@ -70,6 +84,17 @@ class MainActivity : ComponentActivity() {
                     CrashReportConsentDialog(
                         visible = showConsent,
                         issueCount = consentPrompt?.issueCount ?: 0,
+                    )
+                    UpdateAvailableDialog(
+                        visible = updateVersionCode != null,
+                        onUpdate = {
+                            appUpdateChecker.openPlayStore()
+                            updateVersionCode = null
+                        },
+                        onDismiss = {
+                            updateVersionCode?.let { appUpdateChecker.snooze(it) }
+                            updateVersionCode = null
+                        },
                     )
                 }
             }

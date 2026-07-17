@@ -36,7 +36,7 @@ class KidBoxApplication : Application(), Configuration.Provider {
         super.onCreate()
         WorkManager.initialize(this, workManagerConfiguration)
         KidBoxFirebaseMessagingService.createNotificationChannels(this)
-        // Analytics utenti attivi — docs/analytics-active-users.md
+        // Analytics utenti attivi — internal/analytics-active-users.md
         registerActivityLifecycleCallbacks(KBAnalyticsLifecycleObserver())
         appInitScope.launch {
             CrashAnalyzer.analyzeIfNeeded(this@KidBoxApplication)

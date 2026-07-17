@@ -2,6 +2,7 @@
 
 package it.vittorioscocca.kidbox.ui.screens.chat
 
+import it.vittorioscocca.kidbox.ui.permissions.LocationDisclosureDialog
 import it.vittorioscocca.kidbox.ui.permissions.RuntimePermissions
 import it.vittorioscocca.kidbox.ui.permissions.rememberCameraPermissionRequester
 import it.vittorioscocca.kidbox.util.KBLog
@@ -336,6 +337,10 @@ fun ChatScreen(
             )
         }
     }
+
+    // Prominent disclosure obbligatoria (Google Play User Data policy): il permesso di
+    // sistema può partire solo dopo che l'utente ha letto a cosa serve la posizione.
+    var showLocationDisclosure by remember { mutableStateOf(false) }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -873,12 +878,7 @@ fun ChatScreen(
                         showLocationPicker = true
                     }
                 } else {
-                    locationPermissionLauncher.launch(
-                        arrayOf(
-                            Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION,
-                        ),
-                    )
+                    showLocationDisclosure = true
                 }
             },
             onPickContact = {
@@ -910,6 +910,23 @@ fun ChatScreen(
             },
         )
     }
+
+    LocationDisclosureDialog(
+        visible = showLocationDisclosure,
+        purpose = "KidBox raccoglie i dati di posizione del tuo dispositivo per allegarla " +
+            "al messaggio che stai per inviare, così i membri della tua famiglia possono " +
+            "vedere dove ti trovi.",
+        onAccept = {
+            showLocationDisclosure = false
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                ),
+            )
+        },
+        onDecline = { showLocationDisclosure = false },
+    )
 }
 
 @Composable

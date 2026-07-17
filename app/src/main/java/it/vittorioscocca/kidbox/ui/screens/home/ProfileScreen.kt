@@ -82,6 +82,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.ui.permissions.LocationDisclosureDialog
 import it.vittorioscocca.kidbox.ui.screens.settings.toStorageString
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import it.vittorioscocca.kidbox.ui.util.rememberSingleImagePicker
@@ -133,13 +134,28 @@ fun ProfileScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    // Prominent disclosure obbligatoria (Google Play User Data policy): il permesso di
+    // sistema può partire solo dopo che l'utente ha letto a cosa serve la posizione.
+    var showLocationDisclosure by remember { mutableStateOf(false) }
+
     if (requestLocationPermission) {
         DisposableEffect(Unit) {
-            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            showLocationDisclosure = true
             viewModel.consumeLocationPermissionRequest()
             onDispose { }
         }
     }
+
+    LocationDisclosureDialog(
+        visible = showLocationDisclosure,
+        purpose = "KidBox raccoglie i dati di posizione del tuo dispositivo per ricavare " +
+            "il tuo indirizzo e compilare automaticamente il campo indirizzo del profilo.",
+        onAccept = {
+            showLocationDisclosure = false
+            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        },
+        onDecline = { showLocationDisclosure = false },
+    )
 
     if (showDeleteSheet) {
         ModalBottomSheet(

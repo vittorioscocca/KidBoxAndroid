@@ -24,6 +24,7 @@ security-crypto = "1.1.0-alpha06"
 playServicesLocation = "21.3.0"
 playServicesMaps = "18.2.0"
 mapsCompose = "2.11.4"
+appUpdate = "2.1.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -68,6 +69,7 @@ camerax-lifecycle = { group = "androidx.camera", name = "camera-lifecycle",  ver
 camerax-view      = { group = "androidx.camera", name = "camera-view",       version.ref = "camerax" }
 mlkit-barcode     = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkit-barcode" }
 security-crypto   = { group = "androidx.security", name = "security-crypto", version.ref = "security-crypto" }
+app-update-ktx = { group = "com.google.android.play", name = "app-update-ktx", version.ref = "appUpdate" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 play-services-maps = { group = "com.google.android.gms", name = "play-services-maps", version.ref = "playServicesMaps" }
 maps-compose = { group = "com.google.maps.android", name = "maps-compose", version.ref = "mapsCompose" }
