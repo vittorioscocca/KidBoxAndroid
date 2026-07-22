@@ -55,6 +55,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import kotlin.math.roundToInt
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private val PlaceAccent = Color(0xFFF2611A)
 
@@ -154,7 +156,7 @@ private fun PlaceDetailContent(
         DirectionsButton(onDirections)
         if (place.about.isNotBlank()) {
             Column(Modifier.padding(horizontal = 16.dp)) {
-                Text("INFO", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = kb.subtitle)
+                Text(stringResource(R.string.travel_info_up), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = kb.subtitle)
                 Text(place.about, modifier = Modifier.padding(top = 8.dp), color = kb.title)
             }
         }
@@ -174,7 +176,7 @@ private fun PlaceDetailContent(
         }
         if (place.reviews.isNotEmpty()) {
             Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("RECENSIONI", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = kb.subtitle)
+                Text(stringResource(R.string.travel_reviews_up), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = kb.subtitle)
                 place.reviews.forEach { review ->
                     ReviewCard(review)
                 }
@@ -274,13 +276,13 @@ private fun ScheduleCard(context: TravelItineraryStopContext) {
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("IN PROGRAMMA", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.7f))
+                Text(stringResource(R.string.travel_scheduled), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.7f))
                 Text(context.scheduleBadge, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = 0.85f))
             }
             Row(Modifier.fillMaxWidth()) {
-                ScheduleColumn("ARRIVO", context.time.ifBlank { "—" }, Modifier.weight(1f))
-                ScheduleColumn("PERMANENZA", context.staySummary.ifBlank { "—" }, Modifier.weight(1f))
-                ScheduleColumn("STIMA", context.costSummary.ifBlank { "—" }, Modifier.weight(1f))
+                ScheduleColumn(stringResource(R.string.travel_arrival_up), context.time.ifBlank { "—" }, Modifier.weight(1f))
+                ScheduleColumn(stringResource(R.string.travel_stay_up), context.staySummary.ifBlank { "—" }, Modifier.weight(1f))
+                ScheduleColumn(stringResource(R.string.travel_estimate_up), context.costSummary.ifBlank { "—" }, Modifier.weight(1f))
             }
             context.nextStopTitle?.takeIf { it.isNotBlank() }?.let { next ->
                 Text("→ $next", fontSize = 12.sp, color = Color.White.copy(alpha = 0.9f), maxLines = 1)
@@ -308,7 +310,7 @@ private fun DirectionsButton(onClick: () -> Unit) {
         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A1A1A)),
     ) {
         Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.White)
-        Text("Indicazioni", modifier = Modifier.padding(start = 8.dp), fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.travel_directions), modifier = Modifier.padding(start = 8.dp), fontWeight = FontWeight.Bold)
     }
 }
 

@@ -39,6 +39,8 @@ import androidx.credentials.CredentialManager
 import it.vittorioscocca.kidbox.data.passwords.AutoFillSnapshotLoader
 import it.vittorioscocca.kidbox.feature.passwords.autofill.autofillEntryPoint
 import it.vittorioscocca.kidbox.feature.passwords.autofill.resolveAutofillFamilyId
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private data class AutofillDiag(
     val loggedIn: Boolean,
@@ -86,10 +88,10 @@ fun AutoFillSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("AutoFill") },
+                title = { Text(stringResource(R.string.settings_autofill_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.settings_common_back))
                     }
                 },
             )
@@ -104,18 +106,18 @@ fun AutoFillSettingsScreen(
         ) {
             val currentDiag = diag
             val serviceLine = buildString {
-                append(if (autofillKidBoxPreferred == true) "KidBox è il servizio preferito" else "KidBox non è preferito")
+                append(if (autofillKidBoxPreferred == true) stringResource(R.string.settings_autofill_preferred) else stringResource(R.string.settings_autofill_not_preferred))
                 append(" · ")
-                append(if (autofillAnyEnabled) "autofill attivo" else "autofill spento")
+                append(if (autofillAnyEnabled) stringResource(R.string.settings_autofill_on) else stringResource(R.string.settings_autofill_off))
             }
             Text(serviceLine, style = MaterialTheme.typography.bodyLarge)
             Text(
                 when {
-                    currentDiag == null -> "Verifica…"
-                    !currentDiag.loggedIn -> "Accedi a KidBox"
-                    currentDiag.familyId.isNullOrBlank() -> "Apri Home e scegli una famiglia"
-                    !currentDiag.snapshotHasItems -> "Apri Password nell’app per aggiornare i suggerimenti"
-                    else -> "Suggerimenti pronti"
+                    currentDiag == null -> stringResource(R.string.settings_autofill_checking)
+                    !currentDiag.loggedIn -> stringResource(R.string.settings_autofill_sign_in)
+                    currentDiag.familyId.isNullOrBlank() -> stringResource(R.string.settings_autofill_open_home)
+                    !currentDiag.snapshotHasItems -> stringResource(R.string.settings_autofill_open_passwords)
+                    else -> stringResource(R.string.settings_autofill_ready)
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -129,18 +131,18 @@ fun AutoFillSettingsScreen(
                     act.startActivity(intent)
                 },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Imposta servizio autofill") }
+            ) { Text(stringResource(R.string.settings_autofill_set_service)) }
             if (Build.VERSION.SDK_INT >= 34) {
                 Button(
                     onClick = {
                         val act = context as? Activity ?: return@Button
                         act.startSettingsIntentSafe(
                             Intent(Settings.ACTION_CREDENTIAL_PROVIDER),
-                            "Questo dispositivo non apre la schermata dedicata. Cerca \"Password\" o \"Credenziali\" nelle impostazioni di sistema.",
+                            context.getString(R.string.settings_autofill_manual_hint),
                         )
                     },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Password di sistema") }
+                ) { Text(stringResource(R.string.settings_autofill_system_passwords)) }
                 Button(
                     onClick = {
                         val act = context as? Activity ?: return@Button
@@ -151,12 +153,12 @@ fun AutoFillSettingsScreen(
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Credential Manager") }
+                ) { Text(stringResource(R.string.settings_autofill_credential_manager)) }
             }
             Spacer(Modifier.height(8.dp))
-            Text("Biometria per autofill", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_autofill_biometrics), style = MaterialTheme.typography.titleMedium)
             Text(
-                "Se disattivata: meno passaggi, meno sicuro.",
+                stringResource(R.string.settings_autofill_biometrics_sub),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

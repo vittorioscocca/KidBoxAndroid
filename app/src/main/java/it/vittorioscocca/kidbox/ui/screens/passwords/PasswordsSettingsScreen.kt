@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.passwords
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -40,10 +42,10 @@ fun PasswordsSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Impostazioni") },
+                title = { Text(stringResource(R.string.passwords_settings_menu_label)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.location_back_content_description))
                     }
                 },
             )
@@ -59,13 +61,12 @@ fun PasswordsSettingsScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "Controlli avanzati (password deboli, duplicate, leak noti) saranno disponibili anche su Android, in linea con la schermata iOS.",
+                stringResource(R.string.passwords_advanced_controls_info),
                 style = MaterialTheme.typography.bodyMedium,
                 color = kb.title,
             )
             Text(
-                "Privacy check HIBP: la password in chiaro non lascia mai il dispositivo; " +
-                    "KidBox invia solo i primi 5 caratteri dell'hash SHA-1 con modello k-anonymity.",
+                stringResource(R.string.passwords_hibp_privacy_info),
                 style = MaterialTheme.typography.bodySmall,
                 color = kb.subtitle,
             )
@@ -73,15 +74,15 @@ fun PasswordsSettingsScreen(
                 onClick = onOpenAutoFillSettings,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Apri impostazioni compilazione automatica")
+                Text(stringResource(R.string.passwords_open_autofill_settings_button))
             }
                 RowToggle(
-                    label = "Scansione settimanale automatica",
+                    label = stringResource(R.string.passwords_weekly_scan_label),
                     checked = state.weeklyEnabled,
                     onCheckedChange = viewModel::setWeeklyEnabled,
                 )
                 RowToggle(
-                    label = "Avvisi push per nuove password compromesse",
+                    label = stringResource(R.string.passwords_push_alerts_label),
                     checked = state.pushEnabled,
                     onCheckedChange = viewModel::setPushEnabled,
                 )
@@ -89,7 +90,7 @@ fun PasswordsSettingsScreen(
                     onClick = viewModel::runScanNow,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Ultima scansione: ${state.lastScanLabel}")
+                    Text(stringResource(R.string.passwords_last_scan_button, state.lastScanLabel))
                 }
             Spacer(modifier = Modifier.height(24.dp))
         }

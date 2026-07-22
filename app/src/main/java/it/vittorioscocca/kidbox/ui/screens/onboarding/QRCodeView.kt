@@ -16,6 +16,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun QRCodeView(payload: String, modifier: Modifier = Modifier) {
@@ -40,7 +42,7 @@ fun QRCodeView(payload: String, modifier: Modifier = Modifier) {
         bitmap != null -> {
             Image(
                 bitmap = bitmap.asImageBitmap(),
-                contentDescription = "Codice QR",
+                contentDescription = stringResource(R.string.onboarding_qr_code),
                 contentScale = ContentScale.FillBounds,
                 modifier = modifier
                     .size(220.dp)
@@ -55,7 +57,7 @@ fun QRCodeView(payload: String, modifier: Modifier = Modifier) {
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "QR non disponibile",
+                    text = stringResource(R.string.onboarding_qr_unavailable),
                     color = Color(0xFF666666),
                     textAlign = TextAlign.Center,
                 )

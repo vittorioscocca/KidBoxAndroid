@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 class TravelDiscoverViewModel @Inject constructor(
     private val aiService: AIService,
     private val travelProfilePreferences: TravelProfilePreferences,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
 ) : ViewModel() {
 
     private val _destinations = MutableStateFlow<List<TravelDestination>>(emptyList())
@@ -39,7 +40,7 @@ class TravelDiscoverViewModel @Inject constructor(
         val summary = _profileSummary.value
         if (summary.isNotBlank()) return summary
         val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-        return travelProfilePreferences.loadProfile(uid)?.discoverSubtitle().orEmpty()
+        return travelProfilePreferences.loadProfile(uid)?.discoverSubtitle(appContext).orEmpty()
     }
 
     fun destinationById(id: String): TravelDestination? =

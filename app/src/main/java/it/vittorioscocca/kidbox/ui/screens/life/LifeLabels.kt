@@ -1,5 +1,27 @@
 package it.vittorioscocca.kidbox.ui.screens.life
 
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
+
+/**
+ * Etichetta specie localizzata, per la UI.
+ *
+ * Le funzioni `*LabelIt` sotto restano in italiano di proposito: sono usate anche da
+ * [it.vittorioscocca.kidbox.ui.screens.ai.planning.PlanningContextBuilder] per comporre
+ * il prompt inviato al modello, dove il testo non è UI e non va tradotto.
+ */
+@Composable
+fun speciesLabel(species: String): String = when (species.lowercase()) {
+    "cane" -> stringResource(R.string.life_pet_species_dog)
+    "gatto" -> stringResource(R.string.life_pet_species_cat)
+    "coniglio" -> stringResource(R.string.life_pet_species_rabbit)
+    "criceto" -> stringResource(R.string.life_pet_species_hamster)
+    "uccello" -> stringResource(R.string.life_pet_species_bird)
+    "altro" -> stringResource(R.string.life_pet_species_other)
+    else -> species
+}
+
 fun speciesEmoji(species: String): String = when (species.lowercase()) {
     "cane" -> "🐕"
     "gatto" -> "🐈"

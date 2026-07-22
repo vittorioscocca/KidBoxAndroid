@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.expenses
 
+import it.vittorioscocca.kidbox.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,16 +27,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import it.vittorioscocca.kidbox.util.KBLocale
 
 enum class ExpensePeriod(
-    val label: String,
+    @androidx.annotation.StringRes val labelRes: Int,
     val months: Long?,
 ) {
-    ONE_MONTH("1 mese", 1),
-    THREE_MONTHS("3 mesi", 3),
-    SIX_MONTHS("6 mesi", 6),
-    ONE_YEAR("1 anno", 12),
-    CUSTOM("Personalizzato", null),
+    ONE_MONTH(R.string.expenses_period_one_month, 1),
+    THREE_MONTHS(R.string.expenses_period_three_months, 3),
+    SIX_MONTHS(R.string.expenses_period_six_months, 6),
+    ONE_YEAR(R.string.expenses_period_one_year, 12),
+    CUSTOM(R.string.expenses_period_custom, null),
 }
 
 data class MonthlyExpenseBar(
@@ -352,7 +354,7 @@ private fun buildMonthlyBars(
     expenses: List<KBExpenseEntity>,
     range: EpochRange,
 ): List<MonthlyExpenseBar> {
-    val formatter = DateTimeFormatter.ofPattern("MMM ''yy", Locale.ITALIAN)
+    val formatter = DateTimeFormatter.ofPattern("MMM ''yy", KBLocale.current())
     val zone = ZoneId.systemDefault()
     val totalsByMonth = expenses.groupBy {
         val date = Instant.ofEpochMilli(it.dateEpochMillis).atZone(zone).toLocalDate()

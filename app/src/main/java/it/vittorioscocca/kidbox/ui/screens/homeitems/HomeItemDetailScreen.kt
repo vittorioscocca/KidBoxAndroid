@@ -89,6 +89,8 @@ import it.vittorioscocca.kidbox.ui.screens.health.attachments.KidBoxDocumentPick
 import it.vittorioscocca.kidbox.ui.theme.KidBoxColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.io.File
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private fun homeCategoryIcon(cat: String): ImageVector = when (cat) {
     "appliance" -> Icons.Filled.Kitchen
@@ -146,7 +148,7 @@ fun HomeItemDetailScreen(
         if (ok) item?.let { viewModel.uploadHomeItemAttachment(camUri) }
     }
     val camPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { g ->
-        if (g) takePicture.launch(camUri) else Toast.makeText(context, "Permesso fotocamera negato", Toast.LENGTH_SHORT).show()
+        if (g) takePicture.launch(camUri) else Toast.makeText(context, context.getString(R.string.life_camera_denied), Toast.LENGTH_SHORT).show()
     }
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { u ->
         u?.let { viewModel.uploadHomeItemAttachment(it) }
@@ -159,7 +161,7 @@ fun HomeItemDetailScreen(
         containerColor = kb.background,
         topBar = {
             TopAppBar(
-                title = { Text(item?.name ?: "Dettaglio", color = kb.title) },
+                title = { Text(item?.name ?: stringResource(R.string.life_detail), color = kb.title) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = kb.title)
@@ -168,10 +170,10 @@ fun HomeItemDetailScreen(
                 actions = {
                     if (item != null) {
                         IconButton(onClick = { editing = true }) {
-                            Icon(Icons.Filled.Edit, contentDescription = "Modifica", tint = kb.title)
+                            Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.life_edit), tint = kb.title)
                         }
                         IconButton(onClick = { confirmDelete = true }) {
-                            Icon(Icons.Filled.Delete, contentDescription = "Elimina", tint = kb.title)
+                            Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.life_delete), tint = kb.title)
                         }
                     }
                 },
@@ -199,24 +201,24 @@ fun HomeItemDetailScreen(
         ) {
             HomeItemHeaderCard(itm, kb)
             Text(
-                "SCADENZE",
+                stringResource(R.string.section_deadlines),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = kb.subtitle,
                 modifier = Modifier.padding(horizontal = 4.dp),
             )
             HomeDeadlineCard(
-                title = "Garanzia",
+                title = stringResource(R.string.home_items_warranty),
                 dateMillis = itm.warrantyExpiryDate,
                 kb = kb,
             )
             HomeDeadlineCard(
-                title = "Prossima manutenzione",
+                title = stringResource(R.string.home_items_next_maintenance),
                 dateMillis = itm.nextServiceDate,
                 kb = kb,
             )
             Text(
-                "ALLEGATI",
+                stringResource(R.string.section_attachments),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = kb.subtitle,
@@ -283,8 +285,8 @@ fun HomeItemDetailScreen(
     if (confirmDelete && item != null) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Eliminare questo elemento?") },
-            text = { Text("Verrà rimosso per tutta la famiglia.") },
+            title = { Text(stringResource(R.string.home_items_delete_q)) },
+            text = { Text(stringResource(R.string.home_items_removed_family)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -292,9 +294,9 @@ fun HomeItemDetailScreen(
                         confirmDelete = false
                         onNavigateBack()
                     },
-                ) { Text("Elimina", color = Color(0xFFE53935)) }
+                ) { Text(stringResource(R.string.life_delete), color = Color(0xFFE53935)) }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Annulla") } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.life_cancel)) } },
         )
     }
 
@@ -302,17 +304,17 @@ fun HomeItemDetailScreen(
         AlertDialog(
             onDismissRequest = { toast = null },
             confirmButton = { TextButton(onClick = { toast = null }) { Text("OK") } },
-            title = { Text("Errore") },
+            title = { Text(stringResource(R.string.life_error)) },
             text = { Text(msg) },
         )
     }
 }
 
-private fun homeCategoryPickerLabel(raw: String): String = when (raw) {
-    "appliance" -> "Elettrodomestico"
-    "system" -> "Impianto"
-    "contract" -> "Contratto"
-    "other" -> "Altro"
+private fun homeCategoryPickerLabel(context: android.content.Context, raw: String): String = when (raw) {
+    "appliance" -> context.getString(R.string.home_items_cat_appliance)
+    "system" -> context.getString(R.string.home_items_cat_system)
+    "contract" -> context.getString(R.string.home_items_cat_contract)
+    "other" -> context.getString(R.string.home_items_cat_other)
     else -> raw
 }
 
@@ -330,6 +332,7 @@ private fun EditHomeItemDialog(
     onDismiss: () -> Unit,
     onConfirm: (HomeItemEntity) -> Unit,
 ) {
+    val context = LocalContext.current
     val cats = listOf("appliance", "system", "contract", "other")
     var name by remember(initial.id) { mutableStateOf(initial.name) }
     var category by remember(initial.id) { mutableStateOf(initial.category) }
@@ -364,7 +367,7 @@ private fun EditHomeItemDialog(
         ) {
             Column(Modifier.fillMaxSize()) {
                 KidBoxIosFormTopBar(
-                    title = "Modifica",
+                    title = stringResource(R.string.life_edit),
                     onCancel = onDismiss,
                     onSave = {
                         if (canSave) {
@@ -400,7 +403,7 @@ private fun EditHomeItemDialog(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     IosGroupedCard(kb) {
-                        IosPlainTextFieldRow(name, { name = it }, "Nome", kb = kb)
+                        IosPlainTextFieldRow(name, { name = it }, stringResource(R.string.life_name), kb = kb)
                         IosFormDivider(kb)
                         Box(Modifier.fillMaxWidth()) {
                             Row(
@@ -411,12 +414,12 @@ private fun EditHomeItemDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Categoria", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.life_category), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Text(homeCategoryPickerLabel(category), color = kb.subtitle)
+                                    Text(homeCategoryPickerLabel(context, category), color = kb.subtitle)
                                     Icon(
                                         Icons.Filled.KeyboardArrowDown,
                                         contentDescription = null,
@@ -431,7 +434,7 @@ private fun EditHomeItemDialog(
                             ) {
                                 cats.forEach { c ->
                                     DropdownMenuItem(
-                                        text = { Text(homeCategoryPickerLabel(c)) },
+                                        text = { Text(homeCategoryPickerLabel(context, c)) },
                                         onClick = {
                                             category = c
                                             categoryMenuOpen = false
@@ -441,11 +444,11 @@ private fun EditHomeItemDialog(
                             }
                         }
                         IosFormDivider(kb)
-                        IosPlainTextFieldRow(brand, { brand = it }, "Marca", kb = kb)
+                        IosPlainTextFieldRow(brand, { brand = it }, stringResource(R.string.home_items_brand), kb = kb)
                         IosFormDivider(kb)
-                        IosPlainTextFieldRow(model, { model = it }, "Modello", kb = kb)
+                        IosPlainTextFieldRow(model, { model = it }, stringResource(R.string.home_items_model), kb = kb)
                         IosFormDivider(kb)
-                        IosPlainTextFieldRow(serialNumber, { serialNumber = it }, "Numero di serie", kb = kb)
+                        IosPlainTextFieldRow(serialNumber, { serialNumber = it }, stringResource(R.string.home_items_serial), kb = kb)
                     }
 
                     IosGroupedCard(kb) {
@@ -456,7 +459,7 @@ private fun EditHomeItemDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("Data acquisto", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Text(stringResource(R.string.home_items_purchase_date), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                             Switch(
                                 checked = hasPurchase,
                                 onCheckedChange = { on ->
@@ -479,7 +482,7 @@ private fun EditHomeItemDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Acquisto", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.home_items_purchase), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Text(
                                     formatItDateMedium(purchaseDate),
                                     color = accentOrange,
@@ -495,7 +498,7 @@ private fun EditHomeItemDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("Scadenza garanzia", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Text(stringResource(R.string.home_items_warranty_expiry), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                             Switch(
                                 checked = hasWarranty,
                                 onCheckedChange = { on ->
@@ -518,7 +521,7 @@ private fun EditHomeItemDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Garanzia", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.home_items_warranty), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Text(
                                     formatItDateMedium(warrantyDate),
                                     color = accentOrange,
@@ -534,7 +537,7 @@ private fun EditHomeItemDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("Prossima manutenzione", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Text(stringResource(R.string.home_items_next_maintenance), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                             Switch(
                                 checked = hasService,
                                 onCheckedChange = { on ->
@@ -557,7 +560,7 @@ private fun EditHomeItemDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Manutenzione", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.home_items_maintenance), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Text(
                                     formatItDateMedium(serviceDate),
                                     color = accentOrange,
@@ -572,7 +575,7 @@ private fun EditHomeItemDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Periodicità (mesi)", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.home_items_period_months), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Switch(
                                     checked = hasPeriod,
                                     onCheckedChange = { hasPeriod = it },
@@ -610,7 +613,7 @@ private fun EditHomeItemDialog(
                     }
 
                     Text(
-                        "Note",
+                        stringResource(R.string.life_notes),
                         style = MaterialTheme.typography.labelLarge,
                         color = kb.subtitle,
                         modifier = Modifier.padding(start = 4.dp),
@@ -623,7 +626,7 @@ private fun EditHomeItemDialog(
                                 .fillMaxWidth()
                                 .heightIn(min = 120.dp)
                                 .padding(16.dp),
-                            placeholder = { Text("Note", color = kb.subtitle) },
+                            placeholder = { Text(stringResource(R.string.life_notes), color = kb.subtitle) },
                             singleLine = false,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
@@ -640,7 +643,7 @@ private fun EditHomeItemDialog(
                         )
                     }
                     Text(
-                        "Allegati",
+                        stringResource(R.string.life_attachments),
                         style = MaterialTheme.typography.labelLarge,
                         color = kb.subtitle,
                         fontWeight = FontWeight.SemiBold,
@@ -700,19 +703,19 @@ private fun HomeItemHeaderCard(it: HomeItemEntity, kb: KidBoxColorScheme) {
                 color = kb.subtitle,
             )
             it.brand?.takeIf { it.isNotBlank() }?.let { b ->
-                HomeItemDetailLineRow(label = "Marca", value = b, kb = kb)
+                HomeItemDetailLineRow(label = stringResource(R.string.home_items_brand), value = b, kb = kb)
             }
             it.model?.takeIf { it.isNotBlank() }?.let { m ->
-                HomeItemDetailLineRow(label = "Modello", value = m, kb = kb)
+                HomeItemDetailLineRow(label = stringResource(R.string.home_items_model), value = m, kb = kb)
             }
             it.serialNumber?.takeIf { it.isNotBlank() }?.let { s ->
-                HomeItemDetailLineRow(label = "Serie", value = s, kb = kb)
+                HomeItemDetailLineRow(label = stringResource(R.string.home_items_serial_short), value = s, kb = kb)
             }
             it.purchaseDate?.let { p ->
-                HomeItemDetailLineRow(label = "Acquisto", value = formatItDateMedium(p), kb = kb)
+                HomeItemDetailLineRow(label = stringResource(R.string.home_items_purchase), value = formatItDateMedium(p), kb = kb)
             }
             it.servicePeriodMonths?.let { m ->
-                HomeItemDetailLineRow(label = "Periodicità", value = "$m mesi", kb = kb)
+                HomeItemDetailLineRow(label = stringResource(R.string.home_items_period), value = "$m mesi", kb = kb)
             }
             it.notes?.takeIf { it.isNotBlank() }?.let { n ->
                 Text(n, style = MaterialTheme.typography.bodySmall, color = kb.subtitle)

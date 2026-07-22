@@ -22,12 +22,12 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 /** Allineato a iOS [ExamTimeFilter]. */
-enum class ExamTimeFilter(val displayLabel: String) {
-    ALL("Tutti"),
-    MONTHS_3("Ultimi 3 mesi"),
-    MONTHS_6("Ultimi 6 mesi"),
-    YEAR_1("Ultimo anno"),
-    CUSTOM("Personalizzato"),
+enum class ExamTimeFilter(@androidx.annotation.StringRes val displayLabelRes: Int) {
+    ALL(it.vittorioscocca.kidbox.R.string.health_all_m),
+    MONTHS_3(it.vittorioscocca.kidbox.R.string.health_filter_3m),
+    MONTHS_6(it.vittorioscocca.kidbox.R.string.health_filter_6m),
+    YEAR_1(it.vittorioscocca.kidbox.R.string.health_filter_1y),
+    CUSTOM(it.vittorioscocca.kidbox.R.string.health_custom),
 }
 
 data class MedicalExamsState(

@@ -97,6 +97,8 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.flow.flowOf
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private fun categoryIcon(cat: String): ImageVector = when (cat) {
     "appliance" -> Icons.Filled.Kitchen
@@ -106,11 +108,11 @@ private fun categoryIcon(cat: String): ImageVector = when (cat) {
 }
 
 /** Etichetta categoria singolare (picker), allineata a iOS. */
-private fun casaCategoryPickerLabel(raw: String): String = when (raw) {
-    "appliance" -> "Elettrodomestico"
-    "system" -> "Impianto"
-    "contract" -> "Contratto"
-    "other" -> "Altro"
+private fun casaCategoryPickerLabel(context: android.content.Context, raw: String): String = when (raw) {
+    "appliance" -> context.getString(R.string.home_items_cat_appliance)
+    "system" -> context.getString(R.string.home_items_cat_system)
+    "contract" -> context.getString(R.string.home_items_cat_contract)
+    "other" -> context.getString(R.string.home_items_cat_other)
     else -> raw
 }
 
@@ -130,6 +132,7 @@ fun HomeItemsScreen(
     onOpenHousePayment: (String) -> Unit,
     viewModel: HomeItemsViewModel = hiltViewModel(),
 ) {
+    val deadlinesHeader = stringResource(R.string.home_items_deadlines_payments)
     val context = LocalContext.current
     val items by viewModel.homeItems.collectAsStateWithLifecycle()
     val housePayments by viewModel.housePayments.collectAsStateWithLifecycle()
@@ -180,7 +183,7 @@ fun HomeItemsScreen(
         if (ok) homeAddDraftId?.let { viewModel.uploadDraftHomeItemAttachment(camUriHomeAdd, it) }
     }
     val camPermHomeAdd = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { g ->
-        if (g) takePictureHomeAdd.launch(camUriHomeAdd) else Toast.makeText(context, "Permesso fotocamera negato", Toast.LENGTH_SHORT).show()
+        if (g) takePictureHomeAdd.launch(camUriHomeAdd) else Toast.makeText(context, context.getString(R.string.life_camera_denied), Toast.LENGTH_SHORT).show()
     }
     val pickPhotoHomeAdd = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { u ->
         val id = homeAddDraftId
@@ -195,7 +198,7 @@ fun HomeItemsScreen(
         if (ok) paymentAddDraftId?.let { viewModel.uploadDraftHousePaymentAttachment(camUriPaymentAdd, it) }
     }
     val camPermPaymentAdd = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { g ->
-        if (g) takePicturePaymentAdd.launch(camUriPaymentAdd) else Toast.makeText(context, "Permesso fotocamera negato", Toast.LENGTH_SHORT).show()
+        if (g) takePicturePaymentAdd.launch(camUriPaymentAdd) else Toast.makeText(context, context.getString(R.string.life_camera_denied), Toast.LENGTH_SHORT).show()
     }
     val pickPhotoPaymentAdd = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { u ->
         val id = paymentAddDraftId
@@ -241,7 +244,7 @@ fun HomeItemsScreen(
                 }
             }
             if (sortedPayments.isNotEmpty()) {
-                add(CasaListRow.SectionHeader("Scadenze & Pagamenti"))
+                add(CasaListRow.SectionHeader(deadlinesHeader))
                 sortedPayments.forEach { add(CasaListRow.HousePaymentRow(it)) }
             }
             val other = grouped["other"].orEmpty()
@@ -264,7 +267,7 @@ fun HomeItemsScreen(
         containerColor = kb.background,
         topBar = {
             TopAppBar(
-                title = { Text("Casa", color = kb.title) },
+                title = { Text(stringResource(R.string.home_items_house), color = kb.title) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = kb.title)
@@ -272,11 +275,11 @@ fun HomeItemsScreen(
                 },
                 actions = {
                     IconButton(onClick = { topMenuOpen = true }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = "Altro", tint = kb.title)
+                        Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.home_items_cat_other), tint = kb.title)
                     }
                     DropdownMenu(expanded = topMenuOpen, onDismissRequest = { topMenuOpen = false }) {
                         DropdownMenuItem(
-                            text = { Text("Nuovo elemento casa") },
+                            text = { Text(stringResource(R.string.home_items_new_item_house)) },
                             onClick = {
                                 topMenuOpen = false
                                 homeAddDraftId = UUID.randomUUID().toString()
@@ -284,7 +287,7 @@ fun HomeItemsScreen(
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("Nuova scadenza o pagamento") },
+                            text = { Text(stringResource(R.string.home_items_new_deadline_payment)) },
                             onClick = {
                                 topMenuOpen = false
                                 paymentAddDraftId = UUID.randomUUID().toString()
@@ -319,7 +322,7 @@ fun HomeItemsScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Icon(Icons.Filled.Home, contentDescription = null, tint = Color(0xFF8B6914))
-                        Text("Nessun elemento ancora", color = kb.title, style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.home_items_none_yet), color = kb.title, style = MaterialTheme.typography.titleMedium)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Surface(
                                 onClick = {
@@ -330,7 +333,7 @@ fun HomeItemsScreen(
                                 shape = RoundedCornerShape(999.dp),
                             ) {
                                 Text(
-                                    "Elemento casa",
+                                    stringResource(R.string.home_items_item),
                                     color = Color.White,
                                     fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
@@ -345,7 +348,7 @@ fun HomeItemsScreen(
                                 shape = RoundedCornerShape(999.dp),
                             ) {
                                 Text(
-                                    "Scadenza",
+                                    stringResource(R.string.home_items_deadline),
                                     color = Color.White,
                                     fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
@@ -555,9 +558,9 @@ fun HomeItemsScreen(
                 TextButton(onClick = {
                     viewModel.deleteHomeItem(target) { err -> toast = err }
                     toDelete = null
-                }) { Text("Elimina", color = Color(0xFFE53935)) }
+                }) { Text(stringResource(R.string.life_delete), color = Color(0xFFE53935)) }
             },
-            dismissButton = { TextButton(onClick = { toDelete = null }) { Text("Annulla") } },
+            dismissButton = { TextButton(onClick = { toDelete = null }) { Text(stringResource(R.string.life_cancel)) } },
         )
     }
 
@@ -565,7 +568,7 @@ fun HomeItemsScreen(
         AlertDialog(
             onDismissRequest = { toast = null },
             confirmButton = { TextButton(onClick = { toast = null }) { Text("OK") } },
-            title = { Text("Errore") },
+            title = { Text(stringResource(R.string.life_error)) },
             text = { Text(msg) },
         )
     }
@@ -596,6 +599,7 @@ private fun AddHomeItemDialog(
         reminder: Boolean,
     ) -> Unit,
 ) {
+    val context = LocalContext.current
     var name by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("appliance") }
     var brand by remember { mutableStateOf("") }
@@ -631,7 +635,7 @@ private fun AddHomeItemDialog(
         ) {
             Column(Modifier.fillMaxSize()) {
                 KidBoxIosFormTopBar(
-                    title = "Nuovo elemento",
+                    title = stringResource(R.string.home_items_new_item),
                     onCancel = onDismiss,
                     onSave = {
                         if (canSave) {
@@ -665,7 +669,7 @@ private fun AddHomeItemDialog(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     IosGroupedCard(kb) {
-                        IosPlainTextFieldRow(name, { name = it }, "Nome", kb = kb)
+                        IosPlainTextFieldRow(name, { name = it }, stringResource(R.string.life_name), kb = kb)
                         IosFormDivider(kb)
                         Box(Modifier.fillMaxWidth()) {
                             Row(
@@ -676,12 +680,12 @@ private fun AddHomeItemDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Categoria", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.life_category), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Text(casaCategoryPickerLabel(category), color = kb.subtitle)
+                                    Text(casaCategoryPickerLabel(context, category), color = kb.subtitle)
                                     Icon(
                                         Icons.Filled.KeyboardArrowDown,
                                         contentDescription = null,
@@ -696,7 +700,7 @@ private fun AddHomeItemDialog(
                             ) {
                                 cats.forEach { c ->
                                     DropdownMenuItem(
-                                        text = { Text(casaCategoryPickerLabel(c)) },
+                                        text = { Text(casaCategoryPickerLabel(context, c)) },
                                         onClick = {
                                             category = c
                                             categoryMenuOpen = false
@@ -706,11 +710,11 @@ private fun AddHomeItemDialog(
                             }
                         }
                         IosFormDivider(kb)
-                        IosPlainTextFieldRow(brand, { brand = it }, "Marca", kb = kb)
+                        IosPlainTextFieldRow(brand, { brand = it }, stringResource(R.string.home_items_brand), kb = kb)
                         IosFormDivider(kb)
-                        IosPlainTextFieldRow(model, { model = it }, "Modello", kb = kb)
+                        IosPlainTextFieldRow(model, { model = it }, stringResource(R.string.home_items_model), kb = kb)
                         IosFormDivider(kb)
-                        IosPlainTextFieldRow(serialNumber, { serialNumber = it }, "Numero di serie", kb = kb)
+                        IosPlainTextFieldRow(serialNumber, { serialNumber = it }, stringResource(R.string.home_items_serial), kb = kb)
                     }
 
                     IosGroupedCard(kb) {
@@ -721,7 +725,7 @@ private fun AddHomeItemDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("Data acquisto", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Text(stringResource(R.string.home_items_purchase_date), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                             Switch(
                                 checked = hasPurchase,
                                 onCheckedChange = { on ->
@@ -744,7 +748,7 @@ private fun AddHomeItemDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Acquisto", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.home_items_purchase), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Text(
                                     formatItDate(purchaseDate),
                                     color = orange,
@@ -760,7 +764,7 @@ private fun AddHomeItemDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("Scadenza garanzia", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Text(stringResource(R.string.home_items_warranty_expiry), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                             Switch(
                                 checked = hasWarranty,
                                 onCheckedChange = { on ->
@@ -783,7 +787,7 @@ private fun AddHomeItemDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Garanzia", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.home_items_warranty), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Text(
                                     formatItDate(warrantyDate),
                                     color = orange,
@@ -799,7 +803,7 @@ private fun AddHomeItemDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("Prossima manutenzione", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Text(stringResource(R.string.home_items_next_maintenance), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                             Switch(
                                 checked = hasService,
                                 onCheckedChange = { on ->
@@ -822,7 +826,7 @@ private fun AddHomeItemDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Manutenzione", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.home_items_maintenance), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Text(
                                     formatItDate(serviceDate),
                                     color = orange,
@@ -837,7 +841,7 @@ private fun AddHomeItemDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Periodicità (mesi)", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.home_items_period_months), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Switch(
                                     checked = hasPeriod,
                                     onCheckedChange = { hasPeriod = it },
@@ -875,7 +879,7 @@ private fun AddHomeItemDialog(
                     }
 
                     Text(
-                        "Note",
+                        stringResource(R.string.life_notes),
                         style = MaterialTheme.typography.labelLarge,
                         color = kb.subtitle,
                         modifier = Modifier.padding(start = 4.dp),
@@ -888,7 +892,7 @@ private fun AddHomeItemDialog(
                                 .fillMaxWidth()
                                 .heightIn(min = 120.dp)
                                 .padding(16.dp),
-                            placeholder = { Text("Note", color = kb.subtitle) },
+                            placeholder = { Text(stringResource(R.string.life_notes), color = kb.subtitle) },
                             singleLine = false,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
@@ -905,7 +909,7 @@ private fun AddHomeItemDialog(
                         )
                     }
                     Text(
-                        "Allegati",
+                        stringResource(R.string.life_attachments),
                         style = MaterialTheme.typography.labelLarge,
                         color = kb.subtitle,
                         fontWeight = FontWeight.SemiBold,

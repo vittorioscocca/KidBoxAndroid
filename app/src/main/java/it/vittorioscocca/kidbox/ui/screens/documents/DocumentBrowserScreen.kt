@@ -98,6 +98,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -109,6 +110,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentCategoryEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
@@ -175,6 +177,8 @@ fun DocumentBrowserScreen(
     var singleMoveTarget by remember { mutableStateOf<ContextMenuTarget?>(null) }
     var singleCopyTarget by remember { mutableStateOf<ContextMenuTarget?>(null) }
     var uploadTargetFolderId by remember { mutableStateOf<String?>(null) }
+    val msgReportedTodo = stringResource(R.string.documents_reported_todo)
+    val shareFolderChooserTitle = stringResource(R.string.documents_share_folder_chooser)
 
     LaunchedEffect(familyId, initialHighlightDocumentId, initialFolderId) {
         viewModel.startObservingActiveFamily(routeFamilyId = familyId)
@@ -210,7 +214,7 @@ fun DocumentBrowserScreen(
     }
     val requestDocumentCamera = rememberCameraPermissionRequester(
         onDenied = {
-            Toast.makeText(context, "Permesso fotocamera necessario", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.documents_camera_permission_required), Toast.LENGTH_SHORT).show()
         },
         onLaunchCamera = { cameraLauncher.launch(null) },
     )
@@ -294,7 +298,12 @@ fun DocumentBrowserScreen(
             }
             Spacer(Modifier.height(12.dp))
             Text(
-                text = state.breadcrumbs.lastOrNull()?.title ?: "Documenti",
+                // La radice (id == null) usa sempre l'etichetta tradotta: il titolo nel
+                // breadcrumb è un default italiano cablato nel ViewModel.
+                text = state.breadcrumbs.lastOrNull()
+                    ?.takeIf { it.id != null }
+                    ?.title
+                    ?: stringResource(R.string.documents_default_title),
                 modifier = Modifier.fillMaxWidth(),
                 fontWeight = FontWeight.Bold,
                 fontSize = 38.sp,
@@ -330,25 +339,25 @@ fun DocumentBrowserScreen(
             Spacer(Modifier.height(8.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SortChip(
-                    label = "Nome",
+                    label = stringResource(R.string.documents_sort_name),
                     selected = state.sort == DocumentsSort.NAME,
                     ascending = state.sortAscending,
                     onClick = { viewModel.setSort(DocumentsSort.NAME) },
                 )
                 SortChip(
-                    label = "Tipo di file",
+                    label = stringResource(R.string.documents_sort_type),
                     selected = state.sort == DocumentsSort.TYPE,
                     ascending = state.sortAscending,
                     onClick = { viewModel.setSort(DocumentsSort.TYPE) },
                 )
                 SortChip(
-                    label = "Data modifica",
+                    label = stringResource(R.string.documents_sort_date),
                     selected = state.sort == DocumentsSort.DATE,
                     ascending = state.sortAscending,
                     onClick = { viewModel.setSort(DocumentsSort.DATE) },
                 )
                 SortChip(
-                    label = "Dimensione",
+                    label = stringResource(R.string.documents_sort_size),
                     selected = state.sort == DocumentsSort.SIZE,
                     ascending = state.sortAscending,
                     onClick = { viewModel.setSort(DocumentsSort.SIZE) },
@@ -461,6 +470,12 @@ fun DocumentBrowserScreen(
                 selectedPdfDocsForActions.size == state.selectedDocumentIds.size
             val canUnlockNow = selectedPdfDocsForActions.size == 1 &&
                 state.selectedDocumentIds.size == 1
+            val msgSelectAtLeast2Pdfs = stringResource(R.string.documents_select_at_least_2_pdfs)
+            val msgSelectSinglePdf = stringResource(R.string.documents_select_single_pdf)
+            val msgSelectAtLeastOneFile = stringResource(R.string.documents_select_at_least_one_file)
+            val msgMergeSuccess = stringResource(R.string.documents_merge_success)
+            val msgWrongPassword = stringResource(R.string.documents_wrong_password)
+            val msgUnlockSuccess = stringResource(R.string.documents_unlock_success)
             SelectionBottomBar(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -469,7 +484,7 @@ fun DocumentBrowserScreen(
                 onMerge = {
                     val selected = selectedPdfDocsForActions
                     if (selected.size < 2) {
-                        Toast.makeText(context, "Seleziona almeno 2 PDF", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, msgSelectAtLeast2Pdfs, Toast.LENGTH_SHORT).show()
                     } else {
                         mergeCandidates = selected
                         mergeNameDraft = buildMergedPdfTitle(selected)
@@ -479,7 +494,7 @@ fun DocumentBrowserScreen(
                 onUnlock = {
                     val target = selectedPdfDocsForActions.firstOrNull()
                     if (target == null || state.selectedDocumentIds.size != 1) {
-                        Toast.makeText(context, "Seleziona un singolo PDF", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, msgSelectSinglePdf, Toast.LENGTH_SHORT).show()
                     } else {
                         unlockTarget = target
                         unlockNameDraft = buildUnlockedPdfDefaultName(target)
@@ -490,7 +505,7 @@ fun DocumentBrowserScreen(
                     scope.launch {
                         val docs = viewModel.selectedDocuments()
                         if (docs.isEmpty()) {
-                            Toast.makeText(context, "Seleziona almeno un file", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, msgSelectAtLeastOneFile, Toast.LENGTH_SHORT).show()
                             return@launch
                         }
                         shareDocuments(context, viewModel, docs)
@@ -501,7 +516,7 @@ fun DocumentBrowserScreen(
                         viewModel.clearSelection()
                         onNavigate(AppDestination.Chat.route)
                     } else {
-                        Toast.makeText(context, "Seleziona almeno un file", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, msgSelectAtLeastOneFile, Toast.LENGTH_SHORT).show()
                     }
                 },
                 onDelete = { viewModel.deleteSelected() },
@@ -535,9 +550,9 @@ fun DocumentBrowserScreen(
                         )
                         Text(
                             text = when {
-                                isMergingPdfs -> "Unisco PDF..."
-                                isUnlockingPdf -> "Sblocco PDF..."
-                                else -> "Apro documento..."
+                                isMergingPdfs -> stringResource(R.string.documents_merging_pdf)
+                                isUnlockingPdf -> stringResource(R.string.documents_unlocking_pdf)
+                                else -> stringResource(R.string.documents_opening_document)
                             },
                             modifier = Modifier.padding(start = 12.dp),
                             color = MaterialTheme.kidBoxColors.title,
@@ -569,7 +584,7 @@ fun DocumentBrowserScreen(
                             strokeWidth = 2.dp,
                         )
                         Text(
-                            text = "Aggiorno struttura cartelle...",
+                            text = stringResource(R.string.documents_stabilizing_hierarchy),
                             modifier = Modifier.padding(start = 12.dp),
                             color = MaterialTheme.kidBoxColors.title,
                             fontWeight = FontWeight.SemiBold,
@@ -599,7 +614,7 @@ fun DocumentBrowserScreen(
     if (showCopySheet) {
         MoveSelectionBottomSheet(
             folders = state.folders,
-            title = "Copia elementi",
+            title = stringResource(R.string.documents_copy_items_title),
             onDismiss = { showCopySheet = false },
             onMoveTo = { destination ->
                 showCopySheet = false
@@ -642,11 +657,11 @@ fun DocumentBrowserScreen(
                             targetFolderId = state.breadcrumbs.lastOrNull()?.id,
                         )
                         viewModel.clearSelection()
-                        Toast.makeText(context, "PDF uniti con successo", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.documents_merge_success), Toast.LENGTH_SHORT).show()
                     } catch (e: Exception) {
                         Toast.makeText(
                             context,
-                            "Errore unione PDF: ${e.localizedMessage ?: "sconosciuto"}",
+                            context.getString(R.string.documents_merge_error_prefix, e.localizedMessage ?: "sconosciuto"),
                             Toast.LENGTH_LONG,
                         ).show()
                     } finally {
@@ -687,16 +702,16 @@ fun DocumentBrowserScreen(
                                 targetFolderId = state.breadcrumbs.lastOrNull()?.id,
                             )
                             viewModel.clearSelection()
-                            Toast.makeText(context, "PDF sbloccato con successo", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.documents_unlock_success), Toast.LENGTH_SHORT).show()
                         } catch (e: IllegalArgumentException) {
                             // Distinta password errata: non chiudo lo sheet così
                             // l'utente può riprovare? Per ora chiudo sempre e
                             // mostro toast: l'utente può riaprire.
-                            Toast.makeText(context, e.message ?: "Password errata", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, e.message ?: context.getString(R.string.documents_wrong_password), Toast.LENGTH_LONG).show()
                         } catch (e: Exception) {
                             Toast.makeText(
                                 context,
-                                "Errore sblocco PDF: ${e.localizedMessage ?: "sconosciuto"}",
+                                context.getString(R.string.documents_unlock_error_prefix, e.localizedMessage ?: "sconosciuto"),
                                 Toast.LENGTH_LONG,
                             ).show()
                         } finally {
@@ -715,11 +730,11 @@ fun DocumentBrowserScreen(
                 showUploadVisibilityPicker = false
                 showUploadVisibilityGate = false
             },
-            title = { Text("Visibilità del documento") },
+            title = { Text(stringResource(R.string.documents_upload_visibility_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "Scegli chi può vedere questo file prima di caricarlo. Potrai modificarla in seguito dalle informazioni sul documento.",
+                        stringResource(R.string.documents_upload_visibility_description),
                         color = MaterialTheme.kidBoxColors.subtitle,
                     )
                     Surface(
@@ -746,7 +761,7 @@ fun DocumentBrowserScreen(
                         showUploadVisibilityGate = false
                         showUploadSheet = true
                     },
-                ) { Text("Continua") }
+                ) { Text(stringResource(R.string.documents_continue)) }
             },
             dismissButton = {
                 TextButton(
@@ -754,7 +769,7 @@ fun DocumentBrowserScreen(
                         showUploadVisibilityPicker = false
                         showUploadVisibilityGate = false
                     },
-                ) { Text("Annulla") }
+                ) { Text(stringResource(R.string.documents_cancel)) }
             },
         )
     }
@@ -762,7 +777,7 @@ fun DocumentBrowserScreen(
     if (showUploadVisibilityPicker && showUploadVisibilityGate) {
         VisibilityPickerFullscreenDialog(
             currentUid = currentUid,
-            scopeSectionTitle = "Chi può vedere questo documento?",
+            scopeSectionTitle = stringResource(R.string.documents_visibility_who_can_see),
             membersExcludingSelf = state.visibilityMembers,
             initialScope = draftUploadScope,
             initialMemberIds = draftUploadMemberIds.toList(),
@@ -785,7 +800,7 @@ fun DocumentBrowserScreen(
             title = { Text(docInfo.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Visibilità", fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.title)
+                    Text(stringResource(R.string.documents_visibility_label), fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.title)
                     Surface(
                         onClick = { showDocumentDetailVisibilityPicker = true },
                         shape = RoundedCornerShape(14.dp),
@@ -812,7 +827,7 @@ fun DocumentBrowserScreen(
                         }
                     }
                     Text(
-                        "Tocca il riquadro per modificare chi può vedere questo documento.",
+                        stringResource(R.string.documents_visibility_tap_hint),
                         fontSize = 12.sp,
                         color = MaterialTheme.kidBoxColors.subtitle,
                     )
@@ -824,7 +839,7 @@ fun DocumentBrowserScreen(
                         documentInfoForDialog = null
                         showDocumentDetailVisibilityPicker = false
                     },
-                ) { Text("Chiudi") }
+                ) { Text(stringResource(R.string.documents_close)) }
             },
         )
     }
@@ -833,7 +848,7 @@ fun DocumentBrowserScreen(
         val d = documentInfoForDialog!!
         VisibilityPickerFullscreenDialog(
             currentUid = currentUid,
-            scopeSectionTitle = "Chi può vedere questo documento?",
+            scopeSectionTitle = stringResource(R.string.documents_visibility_who_can_see),
             membersExcludingSelf = state.visibilityMembers,
             initialScope = KBVisibilityScope.normalized(d.visibilityScope),
             initialMemberIds = decodeStringList(d.visibilityMemberIdsJson),
@@ -877,12 +892,12 @@ fun DocumentBrowserScreen(
                 showCreateFolderDialog = false
                 folderName = ""
             },
-            title = { Text("Nuova cartella") },
+            title = { Text(stringResource(R.string.documents_new_folder_title)) },
             text = {
                 OutlinedTextField(
                     value = folderName,
                     onValueChange = { folderName = it },
-                    placeholder = { Text("Nome cartella") },
+                    placeholder = { Text(stringResource(R.string.documents_folder_name_placeholder)) },
                     singleLine = true,
                 )
             },
@@ -891,13 +906,13 @@ fun DocumentBrowserScreen(
                     viewModel.createFolder(folderName)
                     folderName = ""
                     showCreateFolderDialog = false
-                }) { Text("Crea") }
+                }) { Text(stringResource(R.string.documents_create)) }
             },
             dismissButton = {
                 TextButton(onClick = {
                     folderName = ""
                     showCreateFolderDialog = false
-                }) { Text("Annulla") }
+                }) { Text(stringResource(R.string.documents_cancel)) }
             },
         )
     }
@@ -908,12 +923,12 @@ fun DocumentBrowserScreen(
                 renameTarget = null
                 renameText = ""
             },
-            title = { Text("Rinomina") },
+            title = { Text(stringResource(R.string.documents_rename_dialog_title)) },
             text = {
                 OutlinedTextField(
                     value = renameText,
                     onValueChange = { renameText = it },
-                    placeholder = { Text("Nuovo nome") },
+                    placeholder = { Text(stringResource(R.string.documents_new_name_placeholder)) },
                     singleLine = true,
                 )
             },
@@ -928,13 +943,13 @@ fun DocumentBrowserScreen(
                     }
                     renameTarget = null
                     renameText = ""
-                }) { Text("Salva") }
+                }) { Text(stringResource(R.string.documents_save)) }
             },
             dismissButton = {
                 TextButton(onClick = {
                     renameTarget = null
                     renameText = ""
-                }) { Text("Annulla") }
+                }) { Text(stringResource(R.string.documents_cancel)) }
             },
         )
     }
@@ -989,7 +1004,7 @@ fun DocumentBrowserScreen(
                                 putExtra(Intent.EXTRA_TEXT, target.value.title)
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
-                            context.startActivity(Intent.createChooser(send, "Condividi cartella"))
+                            context.startActivity(Intent.createChooser(send, shareFolderChooserTitle))
                         }
                         null -> Unit
                     }
@@ -1002,7 +1017,7 @@ fun DocumentBrowserScreen(
             },
             onReportTodo = {
                 onNavigate(AppDestination.Todo.route)
-                Toast.makeText(context, "Documento segnalato in To-Do", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, msgReportedTodo, Toast.LENGTH_SHORT).show()
                 contextMenuTarget = null
             },
             onDelete = {
@@ -1040,11 +1055,11 @@ private fun DocumentUploadBottomSheet(
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("Aggiungi documento", fontWeight = FontWeight.Bold, fontSize = 20.sp)
-            SheetAction("Scatta foto", icon = Icons.Default.Image, onClick = onCamera)
-            SheetAction("Carica foto", icon = Icons.Default.Image, onClick = onPhotoLibrary)
-            SheetAction("Carica file", icon = Icons.Default.Description, onClick = onFile)
-            SheetAction("Crea cartella", icon = Icons.Default.Folder, onClick = onCreateFolder)
+            Text(stringResource(R.string.documents_add_document_title), fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            SheetAction(stringResource(R.string.documents_take_photo), icon = Icons.Default.Image, onClick = onCamera)
+            SheetAction(stringResource(R.string.documents_upload_photo), icon = Icons.Default.Image, onClick = onPhotoLibrary)
+            SheetAction(stringResource(R.string.documents_upload_file), icon = Icons.Default.Description, onClick = onFile)
+            SheetAction(stringResource(R.string.documents_create_folder), icon = Icons.Default.Folder, onClick = onCreateFolder)
             Spacer(modifier = Modifier.height(8.dp))
         }
     }
@@ -1377,7 +1392,15 @@ private fun SelectionHeaderPill(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = if (selecting) "Fine${if (selectedCount > 0) " ($selectedCount)" else ""}" else "Seleziona",
+                text = if (selecting) {
+                    if (selectedCount > 0) {
+                        stringResource(R.string.documents_selection_done_with_count, selectedCount)
+                    } else {
+                        stringResource(R.string.documents_selection_done)
+                    }
+                } else {
+                    stringResource(R.string.documents_selection_select)
+                },
                 modifier = Modifier
                     .clickable(onClick = onToggleSelection)
                     .padding(horizontal = 14.dp, vertical = 9.dp),
@@ -1392,7 +1415,7 @@ private fun SelectionHeaderPill(
             )
             Icon(
                 imageVector = Icons.Default.Add,
-                contentDescription = "Aggiungi",
+                contentDescription = stringResource(R.string.documents_add_content_description),
                 tint = if (selecting) MaterialTheme.kidBoxColors.subtitle else MaterialTheme.kidBoxColors.title,
                 modifier = Modifier
                     .clickable(enabled = !selecting, onClick = onAdd)
@@ -1429,12 +1452,12 @@ private fun SelectionBottomBar(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            BottomAction("Sposta", Icons.Default.DriveFileMove, onMove, hasSelection)
-            BottomAction("Unisci", Icons.Default.MergeType, onMerge, mergeEnabled)
-            BottomAction("Sblocca", Icons.Default.LockOpen, onUnlock, unlockEnabled)
-            BottomAction("Condividi", Icons.Default.Share, onShare, shareEnabled)
-            BottomAction("In chat", Icons.AutoMirrored.Filled.Chat, onChat, chatEnabled)
-            BottomAction("Elimina", Icons.Default.Delete, onDelete, hasSelection, tint = Color(0xFFE35156))
+            BottomAction(stringResource(R.string.documents_action_move), Icons.Default.DriveFileMove, onMove, hasSelection)
+            BottomAction(stringResource(R.string.documents_action_merge), Icons.Default.MergeType, onMerge, mergeEnabled)
+            BottomAction(stringResource(R.string.documents_action_unlock), Icons.Default.LockOpen, onUnlock, unlockEnabled)
+            BottomAction(stringResource(R.string.documents_action_share), Icons.Default.Share, onShare, shareEnabled)
+            BottomAction(stringResource(R.string.documents_action_chat), Icons.AutoMirrored.Filled.Chat, onChat, chatEnabled)
+            BottomAction(stringResource(R.string.documents_action_delete), Icons.Default.Delete, onDelete, hasSelection, tint = Color(0xFFE35156))
         }
     }
 }
@@ -1464,7 +1487,7 @@ private fun BottomAction(
         Text(
             text = label,
             fontSize = 12.sp,
-            color = if (enabled) (if (label == "Elimina") Color(0xFFE35156) else Color(0xFFE09A3D)) else Color(0xFFBDBDBD),
+            color = if (enabled) tint else Color(0xFFBDBDBD),
         )
     }
 }
@@ -1499,16 +1522,16 @@ private fun ContextActionBottomSheet(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (showDocumentInfo) {
-                SheetAction("Informazioni", icon = Icons.Default.Info, onClick = onDocumentInfo)
+                SheetAction(stringResource(R.string.documents_menu_info), icon = Icons.Default.Info, onClick = onDocumentInfo)
             }
-            SheetAction("Rinomina", icon = Icons.Default.Edit, onClick = onRename)
-            SheetAction("Sposta in...", icon = Icons.Default.DriveFileMove, onClick = onMove)
-            SheetAction("Copia in...", icon = Icons.Default.ContentCopy, onClick = onCopy)
-            SheetAction("Duplica", icon = Icons.Default.FileCopy, onClick = onDuplicate)
-            SheetAction("Condividi", icon = Icons.Default.Share, onClick = onShare)
-            SheetAction("In chat", icon = Icons.AutoMirrored.Filled.Chat, onClick = onChat)
-            SheetAction("Segnala come todo", icon = Icons.Default.TaskAlt, onClick = onReportTodo)
-            SheetAction("Elimina", icon = Icons.Default.Delete, onClick = onDelete)
+            SheetAction(stringResource(R.string.documents_menu_rename), icon = Icons.Default.Edit, onClick = onRename)
+            SheetAction(stringResource(R.string.documents_menu_move_to), icon = Icons.Default.DriveFileMove, onClick = onMove)
+            SheetAction(stringResource(R.string.documents_menu_copy_to), icon = Icons.Default.ContentCopy, onClick = onCopy)
+            SheetAction(stringResource(R.string.documents_menu_duplicate), icon = Icons.Default.FileCopy, onClick = onDuplicate)
+            SheetAction(stringResource(R.string.documents_menu_share), icon = Icons.Default.Share, onClick = onShare)
+            SheetAction(stringResource(R.string.documents_menu_chat), icon = Icons.AutoMirrored.Filled.Chat, onClick = onChat)
+            SheetAction(stringResource(R.string.documents_menu_report_todo), icon = Icons.Default.TaskAlt, onClick = onReportTodo)
+            SheetAction(stringResource(R.string.documents_menu_delete), icon = Icons.Default.Delete, onClick = onDelete)
             Spacer(modifier = Modifier.height(8.dp))
         }
     }
@@ -1518,7 +1541,7 @@ private fun ContextActionBottomSheet(
 @Composable
 private fun MoveSelectionBottomSheet(
     folders: List<KBDocumentCategoryEntity>,
-    title: String = "Sposta elementi",
+    title: String? = null,
     onDismiss: () -> Unit,
     onMoveTo: (String?) -> Unit,
 ) {
@@ -1536,8 +1559,8 @@ private fun MoveSelectionBottomSheet(
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(title, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-            SheetAction("Root Documenti", icon = Icons.Default.Folder, onClick = { onMoveTo(null) })
+            Text(title ?: stringResource(R.string.documents_move_items_title), fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            SheetAction(stringResource(R.string.documents_root_folder), icon = Icons.Default.Folder, onClick = { onMoveTo(null) })
             folders.forEach { folder ->
                 SheetAction(folder.title, icon = Icons.Default.Folder, onClick = { onMoveTo(folder.id) })
             }
@@ -1576,19 +1599,19 @@ private fun MergePdfBottomSheet(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 CapsuleActionButton(
-                    label = "Annulla",
+                    label = stringResource(R.string.documents_cancel),
                     onClick = onDismiss,
                     enabled = true,
                     modifier = Modifier.width(92.dp),
                 )
                 Text(
-                    text = "Unisci PDF",
+                    text = stringResource(R.string.documents_merge_pdf_title),
                     fontWeight = FontWeight.Bold,
                     fontSize = 28.sp,
                     modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
                 )
                 CapsuleActionButton(
-                    label = "Unisci",
+                    label = stringResource(R.string.documents_action_merge),
                     onClick = onConfirm,
                     enabled = documents.size >= 2 && nameDraft.isNotBlank(),
                     modifier = Modifier.width(92.dp),
@@ -1596,7 +1619,7 @@ private fun MergePdfBottomSheet(
             }
             Spacer(modifier = Modifier.height(14.dp))
             Text(
-                text = "Nome del PDF unito",
+                text = stringResource(R.string.documents_merged_pdf_name_label),
                 color = MaterialTheme.kidBoxColors.subtitle,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -1606,7 +1629,7 @@ private fun MergePdfBottomSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 6.dp),
-                placeholder = { Text("Documento unito") },
+                placeholder = { Text(stringResource(R.string.documents_merged_pdf_name_placeholder)) },
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp),
             )
@@ -1616,7 +1639,7 @@ private fun MergePdfBottomSheet(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "Ordine pagine (${documents.size} file)",
+                    text = stringResource(R.string.documents_pages_order_label, documents.size),
                     color = MaterialTheme.kidBoxColors.subtitle,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
@@ -1628,7 +1651,7 @@ private fun MergePdfBottomSheet(
                     modifier = Modifier.size(15.dp),
                 )
                 Text(
-                    text = "Trascina per riordinare",
+                    text = stringResource(R.string.documents_drag_to_reorder),
                     color = Color(0xFFB8B8B8),
                     fontSize = 12.sp,
                     modifier = Modifier.padding(start = 4.dp),
@@ -2107,7 +2130,7 @@ private suspend fun unlockPdfFile(
     val document = try {
         com.tom_roush.pdfbox.pdmodel.PDDocument.load(file, password)
     } catch (_: com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException) {
-        throw IllegalArgumentException("Password errata")
+        throw IllegalArgumentException(context.getString(R.string.documents_wrong_password))
     }
     try {
         if (document.isEncrypted) {

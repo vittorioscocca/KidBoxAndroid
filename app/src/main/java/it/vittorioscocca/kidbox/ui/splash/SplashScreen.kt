@@ -58,6 +58,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 import kotlin.math.sin
 import kotlinx.coroutines.coroutineScope
@@ -351,7 +352,7 @@ fun KidBoxSplashScreen(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "La tua famiglia, in un'unica app.",
+                    text = stringResource(R.string.splash_tagline),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                     color = Color.White.copy(alpha = 0.80f),

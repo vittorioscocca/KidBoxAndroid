@@ -134,6 +134,9 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private val VISIT_TINT = Color(0xFF5599D9)
 /** Sfondo contenitori testo «Esito visita», allineato a iOS grouped secondary. */
@@ -142,10 +145,10 @@ private val VISIT_OUTCOME_FIELD_SURFACE = Color(0xFFF2F2F7)
 private val AS_NEEDED_SHEET_BG = Color(0xFFF2F2F7)
 /** Traccia segmenti unità dosaggio. */
 private val AS_NEEDED_UNIT_TRACK = Color(0xFFE5E5EA)
-private val DATE_COMPACT = SimpleDateFormat("d MMM yyyy", Locale.ITALIAN)
-private val TIME_COMPACT = SimpleDateFormat("HH:mm", Locale.ITALIAN)
-private val SUMMARY_DT = SimpleDateFormat("d MMMM yyyy 'alle ore' HH:mm", Locale.ITALIAN)
-private val NEXT_DATE_FMT = SimpleDateFormat("EEEE d MMMM yyyy", Locale.ITALIAN)
+private fun DATE_COMPACT() = SimpleDateFormat("d MMM yyyy", KBLocale.current())
+private fun TIME_COMPACT() = SimpleDateFormat("HH:mm", KBLocale.current())
+private fun SUMMARY_DT() = SimpleDateFormat("d MMMM yyyy · HH:mm", KBLocale.current())
+private fun NEXT_DATE_FMT() = SimpleDateFormat("EEEE d MMMM yyyy", KBLocale.current())
 private val AS_NEEDED_UNITS = listOf("ml", "mg", "g", "cp", "bust")
 
 @Composable
@@ -165,7 +168,7 @@ fun MedicalVisitFormScreen(
 
     LaunchedEffect(state.saved) {
         if (state.saved) {
-            Toast.makeText(context, "Visita salvata", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.health_visit_saved), Toast.LENGTH_SHORT).show()
             viewModel.consumeSaved()
             onSaved()
         }
@@ -203,7 +206,7 @@ fun MedicalVisitFormScreen(
         if (granted) {
             takePictureLauncher.launch(cameraUri)
         } else {
-            Toast.makeText(context, "Permesso fotocamera negato", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.health_camera_denied), Toast.LENGTH_SHORT).show()
         }
     }
     val pickPhotoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -351,9 +354,9 @@ fun MedicalVisitFormScreen(
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(onClick = onBack) { Text("Annulla", color = kb.title) }
+            TextButton(onClick = onBack) { Text(stringResource(R.string.health_cancel), color = kb.title) }
             Text(
-                if (visitId != null) "Modifica Visita" else "Visita Medica",
+                if (visitId != null) stringResource(R.string.health_edit_visit) else stringResource(R.string.health_visit_medical),
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.Bold,
@@ -435,7 +438,7 @@ fun MedicalVisitFormScreen(
                 ) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = kb.title)
                     Spacer(Modifier.width(4.dp))
-                    Text("Indietro", color = kb.title)
+                    Text(stringResource(R.string.health_back), color = kb.title)
                 }
             }
             if (state.currentStep < state.totalSteps - 1) {
@@ -449,7 +452,7 @@ fun MedicalVisitFormScreen(
                         disabledContainerColor = VISIT_TINT.copy(alpha = 0.35f),
                     ),
                 ) {
-                    Text("Avanti", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.health_next), color = Color.White, fontWeight = FontWeight.SemiBold)
                 }
             } else {
                 Button(
@@ -462,7 +465,7 @@ fun MedicalVisitFormScreen(
                     if (state.isSaving) {
                         CircularProgressIndicator(Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
                     } else {
-                        Text("Salva ✓", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.health_save_check), color = Color.White, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -478,13 +481,13 @@ private fun Step1InfoVisit(
     kb: KidBoxColorScheme,
     onPickDate: () -> Unit,
 ) {
-    Text("Tipo di Visita", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = kb.title)
-    Text("Es. Visita Urologica, Controllo Pediatrico...", fontSize = 12.sp, color = kb.subtitle)
+    Text(stringResource(R.string.health_visit_type), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = kb.title)
+    Text(stringResource(R.string.health_visit_type_hint), fontSize = 12.sp, color = kb.subtitle)
     Spacer(Modifier.height(6.dp))
     OutlinedTextField(
         value = state.reason,
         onValueChange = vm::setReason,
-        placeholder = { Text("Visita...") },
+        placeholder = { Text(stringResource(R.string.health_visit_ellipsis)) },
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         singleLine = true,
@@ -493,7 +496,7 @@ private fun Step1InfoVisit(
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.Person, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(8.dp))
-        Text("Medico", fontWeight = FontWeight.Bold, color = kb.title)
+        Text(stringResource(R.string.health_doctor_label), fontWeight = FontWeight.Bold, color = kb.title)
     }
     Spacer(Modifier.height(8.dp))
     if (state.selectedDoctorName.isNotBlank() && !state.showNewDoctorForm) {
@@ -521,7 +524,7 @@ private fun Step1InfoVisit(
                         Text(it.rawValue, fontSize = 12.sp, color = kb.subtitle)
                     }
                 }
-                TextButton(onClick = { vm.clearSelectedDoctor() }) { Text("Cambia", color = tint) }
+                TextButton(onClick = { vm.clearSelectedDoctor() }) { Text(stringResource(R.string.health_change), color = tint) }
             }
         }
     } else {
@@ -529,13 +532,13 @@ private fun Step1InfoVisit(
             value = state.doctorSearchText,
             onValueChange = vm::setDoctorSearchText,
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            placeholder = { Text("Cerca medico...") },
+            placeholder = { Text(stringResource(R.string.health_search_doctor)) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             singleLine = true,
         )
         Spacer(Modifier.height(8.dp))
-        Text("Medici Recenti", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = kb.subtitle)
+        Text(stringResource(R.string.health_recent_doctors), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = kb.subtitle)
         state.recentDoctors.forEach { (name, spec) ->
             Row(
                 modifier = Modifier
@@ -562,8 +565,8 @@ private fun Step1InfoVisit(
             Icon(Icons.Default.Add, contentDescription = null, tint = tint, modifier = Modifier.size(28.dp))
             Spacer(Modifier.width(8.dp))
             Column {
-                Text("Nuovo Medico", fontWeight = FontWeight.SemiBold, color = kb.title)
-                Text("es. Pediatra, Dermatologo", fontSize = 12.sp, color = kb.subtitle)
+                Text(stringResource(R.string.health_new_doctor), fontWeight = FontWeight.SemiBold, color = kb.title)
+                Text(stringResource(R.string.health_doctor_spec_hint), fontSize = 12.sp, color = kb.subtitle)
             }
         }
         if (state.showNewDoctorForm) {
@@ -571,7 +574,7 @@ private fun Step1InfoVisit(
             OutlinedTextField(
                 value = state.selectedDoctorName,
                 onValueChange = vm::setSelectedDoctorName,
-                placeholder = { Text("es. Dott. Rossi") },
+                placeholder = { Text(stringResource(R.string.health_doctor_name_hint)) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
             )
@@ -598,22 +601,22 @@ private fun Step1InfoVisit(
                 onClick = { vm.confirmNewDoctorForm() },
                 enabled = state.selectedDoctorName.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = tint),
-            ) { Text("Conferma", color = Color.White) }
+            ) { Text(stringResource(R.string.health_confirm), color = Color.White) }
         }
     }
     Spacer(Modifier.height(18.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(8.dp))
-        Text("Data Visita", fontWeight = FontWeight.Bold, color = kb.title)
+        Text(stringResource(R.string.health_visit_date), fontWeight = FontWeight.Bold, color = kb.title)
     }
     Spacer(Modifier.height(8.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick = onPickDate, shape = RoundedCornerShape(10.dp)) {
-            Text(DATE_COMPACT.format(Date(state.dateMillis)))
+            Text(DATE_COMPACT().format(Date(state.dateMillis)))
         }
         OutlinedButton(onClick = onPickDate, shape = RoundedCornerShape(10.dp)) {
-            Text(TIME_COMPACT.format(Date(state.dateMillis)))
+            Text(TIME_COMPACT().format(Date(state.dateMillis)))
         }
     }
     Spacer(Modifier.height(12.dp))
@@ -625,8 +628,8 @@ private fun Step1InfoVisit(
         )
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
-            Text("Promemoria il giorno prima", fontSize = 14.sp, color = kb.title)
-            Text("Notifica alle 09:00", fontSize = 11.sp, color = kb.subtitle)
+            Text(stringResource(R.string.health_reminder_day_before), fontSize = 14.sp, color = kb.title)
+            Text(stringResource(R.string.health_notify_at_9), fontSize = 11.sp, color = kb.subtitle)
         }
         Switch(
             checked = state.visitReminderOn,
@@ -638,7 +641,7 @@ private fun Step1InfoVisit(
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.Flag, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(8.dp))
-        Text("Stato Visita", fontWeight = FontWeight.Bold, color = kb.title)
+        Text(stringResource(R.string.health_visit_status), fontWeight = FontWeight.Bold, color = kb.title)
     }
     Spacer(Modifier.height(8.dp))
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -662,7 +665,7 @@ private fun Step1InfoVisit(
                 ) {
                     Icon(icon, contentDescription = null, tint = if (sel) Color.White else kb.title, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text(st.wizardChipLabel, fontSize = 13.sp, color = if (sel) Color.White else kb.title)
+                    Text(stringResource(st.wizardChipLabelRes), fontSize = 13.sp, color = if (sel) Color.White else kb.title)
                 }
             }
         }
@@ -671,23 +674,23 @@ private fun Step1InfoVisit(
 
 @Composable
 private fun Step2Outcome(state: MedicalVisitFormState, vm: MedicalVisitFormViewModel, kb: KidBoxColorScheme) {
-    Text("Esito della Visita", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = kb.title)
+    Text(stringResource(R.string.health_visit_outcome), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = kb.title)
     Spacer(Modifier.height(12.dp))
     VisitOutcomeTextBlock(
         icon = Icons.Default.Medication,
-        title = "Diagnosi",
+        title = stringResource(R.string.health_diagnosis),
         value = state.diagnosis,
         onValueChange = vm::setDiagnosis,
-        placeholder = "Diagnosi o conclusioni del medico",
+        placeholder = stringResource(R.string.health_diagnosis_hint),
         kb = kb,
     )
     Spacer(Modifier.height(12.dp))
     VisitOutcomeTextBlock(
         icon = Icons.Default.Lightbulb,
-        title = "Raccomandazioni",
+        title = stringResource(R.string.health_recommendations),
         value = state.recommendations,
         onValueChange = vm::setRecommendations,
-        placeholder = "Consigli generali del medico",
+        placeholder = stringResource(R.string.health_recommendations_hint),
         kb = kb,
     )
 }
@@ -764,7 +767,7 @@ private fun Step3Prescriptions(
     onEditAsNeeded: (KBAsNeededDrug) -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("Prescrizioni", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = kb.title, modifier = Modifier.weight(1f))
+        Text(stringResource(R.string.health_prescriptions), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = kb.title, modifier = Modifier.weight(1f))
         if (state.prescriptionsBadgeCount > 0) {
             Box(
                 modifier = Modifier
@@ -780,10 +783,10 @@ private fun Step3Prescriptions(
     Spacer(Modifier.height(10.dp))
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         val tabs = listOf(
-            Triple(0, Icons.Default.Medication, "Farmaci"),
-            Triple(1, Icons.Default.Vaccines, "Al bisogno"),
-            Triple(2, Icons.Default.DirectionsWalk, "Tipo di Terapia"),
-            Triple(3, Icons.Default.Science, "Esami"),
+            Triple(0, Icons.Default.Medication, stringResource(R.string.health_medications)),
+            Triple(1, Icons.Default.Vaccines, stringResource(R.string.health_as_needed)),
+            Triple(2, Icons.Default.DirectionsWalk, stringResource(R.string.health_therapy_type)),
+            Triple(3, Icons.Default.Science, stringResource(R.string.health_exams_label)),
         )
         tabs.forEach { (idx, icon, label) ->
             val sel = state.prescriptionsTab == idx
@@ -841,13 +844,13 @@ private fun Step3Prescriptions(
     Spacer(Modifier.height(14.dp))
     when (state.prescriptionsTab) {
         0 -> {
-            Text("Farmaci Programmati", fontWeight = FontWeight.Bold, color = kb.title)
-            Text("Farmaci con orari programmati da assumere regolarmente", fontSize = 12.sp, color = kb.subtitle)
+            Text(stringResource(R.string.health_scheduled_meds), fontWeight = FontWeight.Bold, color = kb.title)
+            Text(stringResource(R.string.health_scheduled_meds_hint), fontSize = 12.sp, color = kb.subtitle)
             Spacer(Modifier.height(8.dp))
             if (state.linkedTreatmentIds.isEmpty()) {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.Medication, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(40.dp))
-                    Text("Nessun farmaco programmato", color = kb.subtitle)
+                    Text(stringResource(R.string.health_no_scheduled_meds), color = kb.subtitle)
                 }
             } else {
                 state.linkedTreatmentIds.forEach { id ->
@@ -874,21 +877,21 @@ private fun Step3Prescriptions(
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, tint = tint)
                 Spacer(Modifier.width(6.dp))
-                Text("+ Aggiungi Cura")
+                Text(stringResource(R.string.health_add_treatment))
             }
             Spacer(Modifier.height(8.dp))
             TextButton(
                 onClick = { viewModel.setCurrentStep(state.currentStep + 1) },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Salta le prescrizioni", color = kb.subtitle) }
+            ) { Text(stringResource(R.string.health_skip_prescriptions), color = kb.subtitle) }
         }
         1 -> {
-            Text("Al bisogno", fontWeight = FontWeight.Bold, color = kb.title)
+            Text(stringResource(R.string.health_as_needed), fontWeight = FontWeight.Bold, color = kb.title)
             Spacer(Modifier.height(8.dp))
             if (state.asNeededDrugs.isEmpty()) {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.Vaccines, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(40.dp))
-                    Text("Nessun farmaco al bisogno", color = kb.subtitle)
+                    Text(stringResource(R.string.health_no_prn_meds), color = kb.subtitle)
                 }
             } else {
                 state.asNeededDrugs.forEach { d ->
@@ -926,11 +929,11 @@ private fun Step3Prescriptions(
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = tint),
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, tint = tint)
-                Text("+ Aggiungi Farmaco")
+                Text(stringResource(R.string.health_add_medication))
             }
         }
         2 -> {
-            Text("Tipo di Terapia", fontWeight = FontWeight.Bold, color = kb.title)
+            Text(stringResource(R.string.health_therapy_type), fontWeight = FontWeight.Bold, color = kb.title)
             Spacer(Modifier.height(10.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 KBTherapyType.entries.forEach { tt ->
@@ -950,18 +953,18 @@ private fun Step3Prescriptions(
             }
         }
         else -> {
-            Text("Esami Prescritti", fontWeight = FontWeight.Bold, color = kb.title)
-            Text("Esami del sangue, ecografie e altri controlli prescritti", fontSize = 12.sp, color = kb.subtitle)
+            Text(stringResource(R.string.health_prescribed_exams), fontWeight = FontWeight.Bold, color = kb.title)
+            Text(stringResource(R.string.health_prescribed_exams_hint), fontSize = 12.sp, color = kb.subtitle)
             Spacer(Modifier.height(8.dp))
             if (state.linkedExamIds.isEmpty()) {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.Science, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(40.dp))
-                    Text("Nessun esame prescritto", color = kb.subtitle)
+                    Text(stringResource(R.string.health_no_prescribed_exams), color = kb.subtitle)
                 }
             } else {
                 state.linkedExamIds.forEach { id ->
                     val meta = state.linkedExamSummaries[id]
-                    val title = meta?.name?.takeIf { it.isNotBlank() } ?: "Esame in sincronizzazione"
+                    val title = meta?.name?.takeIf { it.isNotBlank() } ?: stringResource(R.string.health_exam_syncing)
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -969,7 +972,7 @@ private fun Step3Prescriptions(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(title, modifier = Modifier.weight(1f), color = kb.title)
-                        if (meta?.isUrgent == true) Text("Urgente", fontSize = 11.sp, color = Color(0xFFFF6B00))
+                        if (meta?.isUrgent == true) Text(stringResource(R.string.health_urgent), fontSize = 11.sp, color = Color(0xFFFF6B00))
                         IconButton(onClick = { viewModel.removeLinkedExamId(id) }) {
                             Icon(Icons.Default.Delete, contentDescription = null, tint = kb.subtitle)
                         }
@@ -983,7 +986,7 @@ private fun Step3Prescriptions(
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = tint),
             ) {
-                Text("+ Aggiungi un esame")
+                Text(stringResource(R.string.health_add_exam))
             }
         }
     }
@@ -1049,7 +1052,7 @@ private fun VisitPendingAttachmentThumb(
             ) {
                 Icon(
                     Icons.Default.Close,
-                    contentDescription = "Rimuovi",
+                    contentDescription = stringResource(R.string.health_remove),
                     tint = Color.White,
                     modifier = Modifier.size(14.dp),
                 )
@@ -1066,8 +1069,9 @@ private fun Step4AttachmentsNotes(
     kb: KidBoxColorScheme,
     onAddAttachment: () -> Unit,
 ) {
+    val context = LocalContext.current
     if (state.navigationVisitId != null && state.visitAttachments.isNotEmpty()) {
-        Text("Allegati salvati", fontWeight = FontWeight.Bold, color = kb.title)
+        Text(stringResource(R.string.health_attachments_saved), fontWeight = FontWeight.Bold, color = kb.title)
         state.visitAttachments.forEach { doc ->
             Row(
                 Modifier
@@ -1079,7 +1083,7 @@ private fun Step4AttachmentsNotes(
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
                     Text(doc.title, color = kb.title, maxLines = 1)
-                    Text(extractionStatusLabel(doc.extractionStatusRaw), fontSize = 11.sp, color = kb.subtitle)
+                    Text(extractionStatusLabel(context, doc.extractionStatusRaw), fontSize = 11.sp, color = kb.subtitle)
                 }
                 IconButton(onClick = { vm.deleteVisitAttachment(doc) }) {
                     Icon(Icons.Default.Delete, contentDescription = null, tint = kb.subtitle)
@@ -1099,12 +1103,12 @@ private fun Step4AttachmentsNotes(
                         modifier = Modifier.size(20.dp),
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("Allegati della Visita", fontWeight = FontWeight.Bold, color = tint, fontSize = 14.sp)
+                    Text(stringResource(R.string.health_visit_attachments), fontWeight = FontWeight.Bold, color = tint, fontSize = 14.sp)
                 }
                 Text("${state.pendingAttachmentUris.size}/5", fontSize = 12.sp, color = kb.subtitle)
             }
             Spacer(Modifier.height(6.dp))
-            Text("Aggiungi ricette, referti, esami o foto della visita", fontSize = 12.sp, color = kb.subtitle)
+            Text(stringResource(R.string.health_visit_attachments_hint), fontSize = 12.sp, color = kb.subtitle)
             Spacer(Modifier.height(10.dp))
             if (state.pendingAttachmentUris.isNotEmpty()) {
                 LazyRow(
@@ -1128,7 +1132,7 @@ private fun Step4AttachmentsNotes(
                 }
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "I referti allegati verranno letti dall'AI dopo il salvataggio della visita.",
+                    stringResource(R.string.health_attachments_ai_note),
                     fontSize = 11.sp,
                     color = kb.subtitle,
                 )
@@ -1167,7 +1171,7 @@ private fun Step4AttachmentsNotes(
                     }
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        "Aggiungi allegato",
+                        stringResource(R.string.health_add_attachment),
                         color = addContentColor,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 16.sp,
@@ -1197,7 +1201,7 @@ private fun Step4AttachmentsNotes(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Edit, contentDescription = null, tint = kb.title, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Appunti della Visita", fontWeight = FontWeight.Bold, color = kb.title, fontSize = 14.sp)
+                Text(stringResource(R.string.health_visit_notes), fontWeight = FontWeight.Bold, color = kb.title, fontSize = 14.sp)
             }
             Spacer(Modifier.height(10.dp))
             TextField(
@@ -1206,7 +1210,7 @@ private fun Step4AttachmentsNotes(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 2.dp),
-                placeholder = { Text("Aggiungi note sulla visita...", fontSize = 15.sp) },
+                placeholder = { Text(stringResource(R.string.health_visit_notes_hint), fontSize = 15.sp) },
                 minLines = 4,
                 maxLines = 8,
                 colors = notesFieldColors,
@@ -1216,10 +1220,10 @@ private fun Step4AttachmentsNotes(
     }
 }
 
-private fun extractionStatusLabel(raw: Int): String = when (KBTextExtractionStatus.fromRaw(raw)) {
-    KBTextExtractionStatus.COMPLETED -> "Leggibile dall'AI ✓"
+private fun extractionStatusLabel(context: android.content.Context, raw: Int): String = when (KBTextExtractionStatus.fromRaw(raw)) {
+    KBTextExtractionStatus.COMPLETED -> context.getString(R.string.health_ai_readable)
     KBTextExtractionStatus.FAILED -> "fallita"
-    KBTextExtractionStatus.PROCESSING, KBTextExtractionStatus.PENDING -> "in corso"
+    KBTextExtractionStatus.PROCESSING, KBTextExtractionStatus.PENDING -> context.getString(R.string.health_in_progress)
     else -> "—"
 }
 
@@ -1232,13 +1236,13 @@ private fun Step5Summary(
     visitIdParam: String?,
     onPickNextDate: () -> Unit,
 ) {
-    Text("Riepilogo Visita", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = kb.title)
+    Text(stringResource(R.string.health_visit_summary), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = kb.title)
     Spacer(Modifier.height(10.dp))
     summaryCard(kb) {
         Icon(Icons.Default.Medication, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
         Column {
-            Text("Tipo di Visita", fontSize = 11.sp, color = kb.subtitle)
+            Text(stringResource(R.string.health_visit_type), fontSize = 11.sp, color = kb.subtitle)
             Text(state.reason, fontWeight = FontWeight.Bold, color = kb.title)
         }
     }
@@ -1247,7 +1251,7 @@ private fun Step5Summary(
             Icon(Icons.Default.Person, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Column {
-                Text("Nome Medico", fontSize = 11.sp, color = kb.subtitle)
+                Text(stringResource(R.string.health_doctor_name), fontSize = 11.sp, color = kb.subtitle)
                 Text(state.selectedDoctorName, fontWeight = FontWeight.Bold, color = kb.title)
                 state.selectedSpec?.let { Text(it.rawValue, fontSize = 12.sp, color = kb.subtitle) }
             }
@@ -1257,8 +1261,8 @@ private fun Step5Summary(
         Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
         Column {
-            Text("Data e Ora Visita", fontSize = 11.sp, color = kb.subtitle)
-            Text(SUMMARY_DT.format(Date(state.dateMillis)), fontWeight = FontWeight.Bold, color = kb.title)
+            Text(stringResource(R.string.health_visit_datetime), fontSize = 11.sp, color = kb.subtitle)
+            Text(SUMMARY_DT().format(Date(state.dateMillis)), fontWeight = FontWeight.Bold, color = kb.title)
         }
     }
     if (state.diagnosis.isNotBlank()) {
@@ -1266,7 +1270,7 @@ private fun Step5Summary(
             Icon(Icons.Default.Medication, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Column {
-                Text("Diagnosi", fontSize = 11.sp, color = kb.subtitle)
+                Text(stringResource(R.string.health_diagnosis), fontSize = 11.sp, color = kb.subtitle)
                 Text(state.diagnosis, color = kb.title)
             }
         }
@@ -1276,7 +1280,7 @@ private fun Step5Summary(
             Icon(Icons.Default.Lightbulb, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Column {
-                Text("Raccomandazioni", fontSize = 11.sp, color = kb.subtitle)
+                Text(stringResource(R.string.health_recommendations), fontSize = 11.sp, color = kb.subtitle)
                 Text(state.recommendations, color = kb.title)
             }
         }
@@ -1355,7 +1359,7 @@ private fun Step5Summary(
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.DateRange, contentDescription = null, tint = tint)
                 Spacer(Modifier.width(8.dp))
-                Text("Prossimo Appuntamento", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.health_next_appointment), fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 Switch(
                     checked = state.hasNextVisit,
                     onCheckedChange = vm::setHasNextVisit,
@@ -1364,7 +1368,7 @@ private fun Step5Summary(
             }
             if (state.hasNextVisit) {
                 OutlinedButton(onClick = onPickNextDate, modifier = Modifier.fillMaxWidth()) {
-                    Text(NEXT_DATE_FMT.format(Date(state.nextVisitDateMillis)))
+                    Text(NEXT_DATE_FMT().format(Date(state.nextVisitDateMillis)))
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -1375,8 +1379,8 @@ private fun Step5Summary(
                     )
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Promemoria il giorno prima", fontSize = 14.sp)
-                        Text("Notifica alle 09:00", fontSize = 11.sp, color = kb.subtitle)
+                        Text(stringResource(R.string.health_reminder_day_before), fontSize = 14.sp)
+                        Text(stringResource(R.string.health_notify_at_9), fontSize = 11.sp, color = kb.subtitle)
                     }
                     Switch(
                         checked = state.nextVisitReminder,
@@ -1617,7 +1621,7 @@ private fun AsNeededDrugSheet(
                     modifier = Modifier.clickable(onClick = onDismiss),
                 ) {
                     Text(
-                        "Annulla",
+                        stringResource(R.string.health_cancel),
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 16.sp,
@@ -1625,7 +1629,7 @@ private fun AsNeededDrugSheet(
                     )
                 }
                 Text(
-                    if (initial == null) "Farmaco al bisogno" else "Modifica farmaco",
+                    if (initial == null) stringResource(R.string.health_prn_medication) else stringResource(R.string.health_edit_medication),
                     modifier = Modifier
                         .weight(1f)
                         .padding(horizontal = 8.dp),
@@ -1640,7 +1644,7 @@ private fun AsNeededDrugSheet(
                     modifier = Modifier.clickable(enabled = canSave, onClick = { commitSave() }),
                 ) {
                     Text(
-                        "Salva",
+                        stringResource(R.string.health_save),
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 16.sp,
@@ -1650,7 +1654,7 @@ private fun AsNeededDrugSheet(
             }
             Spacer(Modifier.height(22.dp))
             Text(
-                "Farmaco",
+                stringResource(R.string.health_medication),
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 14.sp,
                 color = kb.subtitle,
@@ -1659,7 +1663,7 @@ private fun AsNeededDrugSheet(
             AsNeededPillTextField(
                 value = drugName,
                 onValueChange = { drugName = it },
-                placeholder = "Nome farmaco",
+                placeholder = stringResource(R.string.health_medication_name),
                 kb = kb,
             )
             if (catalogHits.isNotEmpty()) {
@@ -1689,7 +1693,7 @@ private fun AsNeededDrugSheet(
             }
             Spacer(Modifier.height(20.dp))
             Text(
-                "Dosaggio",
+                stringResource(R.string.health_dosage),
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 14.sp,
                 color = kb.subtitle,
@@ -1704,7 +1708,7 @@ private fun AsNeededDrugSheet(
             )
             Spacer(Modifier.height(20.dp))
             Text(
-                "Istruzioni",
+                stringResource(R.string.health_instructions),
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 14.sp,
                 color = kb.subtitle,
@@ -1713,7 +1717,7 @@ private fun AsNeededDrugSheet(
             AsNeededPillTextField(
                 value = instructions,
                 onValueChange = { instructions = it },
-                placeholder = "Es: In caso di febbre > 38°",
+                placeholder = stringResource(R.string.health_instructions_hint),
                 singleLine = false,
                 minLines = 3,
                 maxLines = 6,
@@ -1731,7 +1735,7 @@ private fun VisitDatePickerDialog(initialMillis: Long, onDismiss: () -> Unit, on
         confirmButton = {
             TextButton(onClick = { state.selectedDateMillis?.let { onConfirm(it) } ?: onDismiss() }) { Text("OK") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Annulla") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.health_cancel)) } },
     ) { DatePicker(state = state) }
 }
 
@@ -1744,10 +1748,10 @@ private fun VisitTimePickerDialog(initialMillis: Long, onDismiss: () -> Unit, on
     )
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Ora") },
+        title = { Text(stringResource(R.string.health_time)) },
         text = { TimePicker(state = timeState) },
         confirmButton = { TextButton(onClick = { onConfirm(timeState.hour, timeState.minute) }) { Text("OK") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Annulla") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.health_cancel)) } },
     )
 }
 

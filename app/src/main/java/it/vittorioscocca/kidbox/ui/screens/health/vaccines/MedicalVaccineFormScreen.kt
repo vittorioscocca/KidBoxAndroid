@@ -78,14 +78,17 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.mapper.KBVaccineType
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private val Salmon = Color(0xFFF38B75)
 private val GreenStatus = Color(0xFF2E7D32)
 private val BlueStatus = Color(0xFF1565C0)
 private val OrangeStatus = Color(0xFFE65100)
 
-private val administrationSites = listOf(
-    "Braccio sinistro", "Braccio destro", "Coscia sinistra", "Coscia destra", "Orale", "Nasale", "Altro",
+@Composable
+private fun administrationSites() = listOf(
+    stringResource(R.string.health_left_arm), stringResource(R.string.health_right_arm), stringResource(R.string.health_left_thigh), stringResource(R.string.health_right_thigh), stringResource(R.string.health_oral), stringResource(R.string.health_nasal), stringResource(R.string.health_other),
 )
 
 @Composable
@@ -105,7 +108,7 @@ fun MedicalVaccineFormScreen(
     LaunchedEffect(familyId, childId, vaccineId) { viewModel.bind(familyId, childId, vaccineId) }
     LaunchedEffect(state.saved) {
         if (state.saved) {
-            Toast.makeText(context, "Vaccino salvato", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.health_vaccine_saved), Toast.LENGTH_SHORT).show()
             onSaved()
         }
     }
@@ -124,12 +127,12 @@ fun MedicalVaccineFormScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        if (isEditing) "Modifica Vaccino" else "Nuovo Vaccino",
+                        if (isEditing) stringResource(R.string.health_edit_vaccine) else stringResource(R.string.health_new_vaccine),
                         fontWeight = FontWeight.SemiBold,
                     )
                 },
                 navigationIcon = {
-                    TextButton(onClick = onBack) { Text("Annulla", color = kb.subtitle) }
+                    TextButton(onClick = onBack) { Text(stringResource(R.string.health_cancel), color = kb.subtitle) }
                 },
             )
         },
@@ -154,7 +157,7 @@ fun MedicalVaccineFormScreen(
                         Spacer(Modifier.width(10.dp))
                     }
                     Text(
-                        if (isEditing) "Salva modifiche" else "Aggiungi vaccino",
+                        if (isEditing) stringResource(R.string.health_save_changes) else stringResource(R.string.health_add_vaccine),
                         color = Color.White,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 16.sp,
@@ -177,11 +180,11 @@ fun MedicalVaccineFormScreen(
             }
 
             VaccineFormCard(cardBg) {
-                FormSectionLabel(Icons.Default.Verified, "Stato vaccino")
+                FormSectionLabel(Icons.Default.Verified, stringResource(R.string.health_vaccine_status))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                     StatusChip(
                         selected = state.formStatus == VaccineFormStatus.ADMINISTERED,
-                        label = "Somministrato",
+                        label = stringResource(R.string.health_administered),
                         icon = Icons.Default.CheckCircle,
                         accent = GreenStatus,
                         fieldBg = fieldBg,
@@ -189,7 +192,7 @@ fun MedicalVaccineFormScreen(
                     ) { viewModel.setFormStatus(VaccineFormStatus.ADMINISTERED) }
                     StatusChip(
                         selected = state.formStatus == VaccineFormStatus.SCHEDULED,
-                        label = "Appuntamento",
+                        label = stringResource(R.string.health_appointment),
                         icon = Icons.Default.Event,
                         accent = BlueStatus,
                         fieldBg = fieldBg,
@@ -197,7 +200,7 @@ fun MedicalVaccineFormScreen(
                     ) { viewModel.setFormStatus(VaccineFormStatus.SCHEDULED) }
                     StatusChip(
                         selected = state.formStatus == VaccineFormStatus.PLANNED,
-                        label = "Da programmare",
+                        label = stringResource(R.string.health_to_schedule),
                         icon = Icons.Default.HelpOutline,
                         accent = OrangeStatus,
                         fieldBg = fieldBg,
@@ -207,7 +210,7 @@ fun MedicalVaccineFormScreen(
             }
 
             VaccineFormCard(cardBg) {
-                FormSectionLabel(Icons.Default.Vaccines, "Tipo di Vaccino")
+                FormSectionLabel(Icons.Default.Vaccines, stringResource(R.string.health_vaccine_type))
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -230,20 +233,20 @@ fun MedicalVaccineFormScreen(
                 VaccineFilledField(
                     value = state.commercialName,
                     onValueChange = viewModel::setCommercialName,
-                    placeholder = "Nome commerciale (opzionale)",
+                    placeholder = stringResource(R.string.health_brand_optional),
                     fieldBg = fieldBg,
                 )
             }
 
             VaccineFormCard(cardBg) {
-                FormSectionLabel(Icons.Outlined.Tag, "Informazioni Dose")
+                FormSectionLabel(Icons.Outlined.Tag, stringResource(R.string.health_dose_info))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.Top,
                 ) {
                     DoseStepper(
-                        label = "Dose N°",
+                        label = stringResource(R.string.health_dose_number),
                         value = state.doseNumber,
                         onChange = viewModel::setDoseNumber,
                         salmon = Salmon,
@@ -256,7 +259,7 @@ fun MedicalVaccineFormScreen(
                             .background(kb.subtitle.copy(alpha = 0.2f)),
                     )
                     DoseStepper(
-                        label = "Dosi totali",
+                        label = stringResource(R.string.health_total_doses),
                         value = state.totalDoses,
                         onChange = viewModel::setTotalDoses,
                         salmon = Salmon,
@@ -269,15 +272,15 @@ fun MedicalVaccineFormScreen(
                 FormSectionLabel(
                     Icons.Default.CalendarMonth,
                     when (state.formStatus) {
-                        VaccineFormStatus.ADMINISTERED -> "Data Somministrazione"
-                        VaccineFormStatus.SCHEDULED -> "Data Appuntamento"
-                        VaccineFormStatus.PLANNED -> "Data"
+                        VaccineFormStatus.ADMINISTERED -> stringResource(R.string.health_admin_date)
+                        VaccineFormStatus.SCHEDULED -> stringResource(R.string.health_appointment_date)
+                        VaccineFormStatus.PLANNED -> stringResource(R.string.health_date)
                     },
                 )
                 when (state.formStatus) {
                     VaccineFormStatus.PLANNED -> {
                         Text(
-                            "Nessuna data da impostare per vaccini da programmare",
+                            stringResource(R.string.health_no_date_needed),
                             fontSize = 12.sp,
                             color = kb.subtitle,
                         )
@@ -315,7 +318,7 @@ fun MedicalVaccineFormScreen(
 
             if (state.formStatus == VaccineFormStatus.PLANNED) {
                 VaccineFormCard(cardBg) {
-                    FormSectionLabel(Icons.Default.Notifications, "Promemoria")
+                    FormSectionLabel(Icons.Default.Notifications, stringResource(R.string.health_reminder))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -323,13 +326,13 @@ fun MedicalVaccineFormScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "Avviso il giorno prima",
+                                stringResource(R.string.health_notice_day_before),
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = kb.title,
                             )
                             Text(
-                                "Solo per vaccini da programmare: imposta la data prevista del richiamo.",
+                                stringResource(R.string.health_booster_hint),
                                 fontSize = 11.sp,
                                 color = kb.subtitle,
                             )
@@ -341,7 +344,7 @@ fun MedicalVaccineFormScreen(
                     }
                     if (state.reminderOn) {
                         Spacer(Modifier.height(8.dp))
-                        Text("Data prevista prossima dose", fontSize = 12.sp, color = kb.subtitle)
+                        Text(stringResource(R.string.health_next_dose_date), fontSize = 12.sp, color = kb.subtitle)
                         Spacer(Modifier.height(6.dp))
                         key(state.nextDoseDateEpochMillis) {
                             val nd = state.nextDoseDateEpochMillis ?: System.currentTimeMillis()
@@ -360,22 +363,22 @@ fun MedicalVaccineFormScreen(
 
             if (state.formStatus == VaccineFormStatus.ADMINISTERED) {
                 VaccineFormCard(cardBg) {
-                    FormSectionLabel(Icons.Default.Info, "Dettagli (opzionali)")
+                    FormSectionLabel(Icons.Default.Info, stringResource(R.string.health_details_optional))
                     VaccineFilledField(
                         value = state.lotNumber,
                         onValueChange = viewModel::setLotNumber,
-                        placeholder = "Numero lotto",
+                        placeholder = stringResource(R.string.health_batch_number),
                         fieldBg = fieldBg,
                     )
                     Spacer(Modifier.height(10.dp))
                     VaccineFilledField(
                         value = state.administeredBy,
                         onValueChange = viewModel::setAdministeredBy,
-                        placeholder = "Somministrato da",
+                        placeholder = stringResource(R.string.health_administered_by),
                         fieldBg = fieldBg,
                     )
                     Spacer(Modifier.height(10.dp))
-                    Text("Sito somministrazione", fontSize = 12.sp, color = kb.subtitle)
+                    Text(stringResource(R.string.health_admin_site), fontSize = 12.sp, color = kb.subtitle)
                     Spacer(Modifier.height(6.dp))
                     val chipScroll = rememberScrollState()
                     Row(
@@ -384,7 +387,7 @@ fun MedicalVaccineFormScreen(
                             .horizontalScroll(chipScroll),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        administrationSites.forEach { site ->
+                        administrationSites().forEach { site ->
                             val sel = state.administrationSite == site
                             Text(
                                 site,
@@ -402,11 +405,11 @@ fun MedicalVaccineFormScreen(
             }
 
             VaccineFormCard(cardBg) {
-                FormSectionLabel(Icons.Default.EditNote, "Note")
+                FormSectionLabel(Icons.Default.EditNote, stringResource(R.string.health_notes))
                 OutlinedTextField(
                     value = state.notes,
                     onValueChange = viewModel::setNotes,
-                    placeholder = { Text("Note aggiuntive", color = kb.subtitle) },
+                    placeholder = { Text(stringResource(R.string.health_extra_notes), color = kb.subtitle) },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3,
                     shape = RoundedCornerShape(12.dp),
@@ -542,7 +545,7 @@ private fun DoseStepper(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Icon(
                 Icons.Default.Remove,
-                contentDescription = "Meno",
+                contentDescription = stringResource(R.string.health_less),
                 tint = if (value > 1) salmon else Color.Gray,
                 modifier = Modifier
                     .size(28.dp)
@@ -551,7 +554,7 @@ private fun DoseStepper(
             Text("$value", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Icon(
                 Icons.Default.Add,
-                contentDescription = "Più",
+                contentDescription = stringResource(R.string.health_more),
                 tint = if (value < 10) salmon else Color.Gray,
                 modifier = Modifier
                     .size(28.dp)

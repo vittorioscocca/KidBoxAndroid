@@ -66,6 +66,10 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.platform.LocalContext
 
 private data class PendingChildMetric(val childId: String, val isWeight: Boolean)
 
@@ -80,6 +84,7 @@ fun HealthSubjectSelectorScreen(
     onSelect: (childId: String) -> Unit,
     viewModel: HealthSubjectSelectorViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var pendingMetric by remember { mutableStateOf<PendingChildMetric?>(null) }
@@ -123,13 +128,13 @@ fun HealthSubjectSelectorScreen(
             ) {
                 KidBoxHeaderCircleButton(
                     icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Indietro",
+                    contentDescription = stringResource(R.string.health_back),
                     onClick = onBack,
                 )
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                "Salute",
+                stringResource(R.string.health_title),
                 fontSize = 40.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = kb.title,
@@ -153,7 +158,7 @@ fun HealthSubjectSelectorScreen(
                     val adults = state.subjects.filter { !it.isChild }
 
                     if (children.isNotEmpty()) {
-                        SectionHeader("Bambini")
+                        SectionHeader(stringResource(R.string.health_children))
                         for (s in children) {
                             ChildSubjectCard(
                                 subject = s,
@@ -166,7 +171,7 @@ fun HealthSubjectSelectorScreen(
                         Spacer(Modifier.height(12.dp))
                     }
                     if (adults.isNotEmpty()) {
-                        SectionHeader("Adulti")
+                        SectionHeader(stringResource(R.string.health_adults))
                         for (s in adults) {
                             AdultSubjectCard(subject = s, onClick = { onSelect(s.id) })
                             Spacer(Modifier.height(10.dp))
@@ -219,14 +224,14 @@ private fun ChildMeasurementSheet(
     onSave: (Double) -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
-    val title = if (isWeight) "Peso" else "Altezza"
-    val unitLabel = if (isWeight) "Peso (kg)" else "Altezza (cm)"
+    val title = if (isWeight) stringResource(R.string.health_weight) else stringResource(R.string.health_height)
+    val unitLabel = if (isWeight) stringResource(R.string.health_weight_kg) else stringResource(R.string.health_height_cm)
     val placeholder = if (isWeight) "es. 12.5" else "es. 90"
     val seedText = remember(isWeight, initialKg, initialCm) {
         if (isWeight) {
-            initialKg?.let { String.format(Locale.ITALY, "%.1f", it) } ?: ""
+            initialKg?.let { String.format(KBLocale.current(), "%.1f", it) } ?: ""
         } else {
-            initialCm?.let { String.format(Locale.ITALY, "%.0f", it) } ?: ""
+            initialCm?.let { String.format(KBLocale.current(), "%.0f", it) } ?: ""
         }
     }
     var text by remember(isWeight, initialKg, initialCm) { mutableStateOf(seedText) }
@@ -245,7 +250,7 @@ private fun ChildMeasurementSheet(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SheetPillButton(onClick = onDismiss, label = "Annulla")
+            SheetPillButton(onClick = onDismiss, label = stringResource(R.string.health_cancel))
             Text(
                 title,
                 modifier = Modifier.weight(1f),
@@ -256,7 +261,7 @@ private fun ChildMeasurementSheet(
             )
             SheetPillButton(
                 onClick = { parsed?.let(onSave) },
-                label = "Salva",
+                label = stringResource(R.string.health_save),
                 enabled = canSave,
             )
         }
@@ -350,6 +355,7 @@ private fun ChildSubjectCard(
     onWeightChip: () -> Unit,
     onHeightChip: () -> Unit,
 ) {
+    val context = LocalContext.current
     val kb = MaterialTheme.kidBoxColors
     val orange = Color(0xFFFF6B00)
     Surface(
@@ -393,7 +399,7 @@ private fun ChildSubjectCard(
                             color = kb.title,
                         )
                         val ageLine = remember(subject.birthDateEpochMillis) {
-                            childAgeSummaryItalian(subject.birthDateEpochMillis)
+                            childAgeSummaryItalian(context, subject.birthDateEpochMillis)
                         }
                         if (ageLine != null) {
                             Spacer(Modifier.height(4.dp))
@@ -410,7 +416,7 @@ private fun ChildSubjectCard(
                     modifier = Modifier.padding(start = 58.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    val wText = subject.weightKg?.let { String.format(Locale.ITALY, "%.1f kg", it) } ?: "Peso?"
+                    val wText = subject.weightKg?.let { String.format(KBLocale.current(), "%.1f kg", it) } ?: stringResource(R.string.health_weight_q)
                     val wFilled = subject.weightKg != null
                     ChildMetricChip(
                         icon = Icons.Default.MonitorWeight,
@@ -420,7 +426,7 @@ private fun ChildSubjectCard(
                         muted = kb.subtitle,
                         onClick = onWeightChip,
                     )
-                    val hText = subject.heightCm?.let { String.format(Locale.ITALY, "%.0f cm", it) } ?: "Altezza?"
+                    val hText = subject.heightCm?.let { String.format(KBLocale.current(), "%.0f cm", it) } ?: stringResource(R.string.health_height_q)
                     val hFilled = subject.heightCm != null
                     ChildMetricChip(
                         icon = Icons.Default.Straighten,
@@ -529,7 +535,8 @@ private fun ChildMetricChip(
 
 @Composable
 private fun MemberRoleBadge(role: String?) {
-    val label = memberRoleLabelItalian(role)
+    val context = LocalContext.current
+    val label = memberRoleLabelItalian(context, role)
     val color = memberRoleColor(role)
     Surface(
         shape = RoundedCornerShape(50),
@@ -556,11 +563,11 @@ private fun MemberRoleBadge(role: String?) {
     }
 }
 
-private fun memberRoleLabelItalian(role: String?): String =
+private fun memberRoleLabelItalian(context: android.content.Context, role: String?): String =
     when (role?.lowercase()) {
-        "owner" -> "Proprietario"
-        "admin" -> "Amministratore"
-        else -> "Membro"
+        "owner" -> context.getString(R.string.health_role_owner)
+        "admin" -> context.getString(R.string.health_role_admin)
+        else -> context.getString(R.string.health_role_member)
     }
 
 private fun memberRoleColor(role: String?): Color =
@@ -570,18 +577,18 @@ private fun memberRoleColor(role: String?): Color =
         else -> Color(0xFF009688)
     }
 
-private fun childAgeSummaryItalian(birthMillis: Long?): String? {
+private fun childAgeSummaryItalian(context: android.content.Context, birthMillis: Long?): String? {
     if (birthMillis == null) return null
     val birth = Instant.ofEpochMilli(birthMillis).atZone(ZoneId.systemDefault()).toLocalDate()
     val today = LocalDate.now()
     if (birth.isAfter(today)) return null
     val years = ChronoUnit.YEARS.between(birth, today).toInt()
     if (years >= 1) {
-        return if (years == 1) "1 anno" else "$years anni"
+        return if (years == 1) context.getString(R.string.health_1_year) else "$years anni"
     }
     val months = ChronoUnit.MONTHS.between(birth, today).toInt().coerceAtLeast(0)
     return when {
-        months <= 0 -> "Neonato"
+        months <= 0 -> context.getString(R.string.health_newborn)
         months == 1 -> "1 mese"
         else -> "$months mesi"
     }
@@ -597,14 +604,14 @@ private fun EmptySubjects() {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            "Nessun profilo disponibile",
+            stringResource(R.string.health_no_profiles),
             fontSize = 18.sp,
             fontWeight = FontWeight.SemiBold,
             color = kb.title,
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            "Aggiungi figli o verifica i membri nelle impostazioni famiglia.",
+            stringResource(R.string.health_no_profiles_hint),
             fontSize = 14.sp,
             color = kb.subtitle,
         )

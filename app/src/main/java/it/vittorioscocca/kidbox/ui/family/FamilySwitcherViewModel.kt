@@ -1,8 +1,11 @@
 package it.vittorioscocca.kidbox.ui.family
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
@@ -22,6 +25,7 @@ import kotlinx.coroutines.launch
 
 @HiltViewModel
 class FamilySwitcherViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val familyDao: KBFamilyDao,
     private val familySyncCenter: FamilySyncCenter,
     private val familySessionPreferences: FamilySessionPreferences,
@@ -63,7 +67,7 @@ class FamilySwitcherViewModel @Inject constructor(
             try {
                 val uid = authRepository.currentUid
                 if (uid.isNullOrBlank()) {
-                    _events.emit(Event.Error("Utente non autenticato"))
+                    _events.emit(Event.Error(appContext.getString(R.string.family_switcher_error_not_authenticated)))
                     return@launch
                 }
                 familyRepository.createNewFamily(name.trim(), uid)
@@ -75,7 +79,7 @@ class FamilySwitcherViewModel @Inject constructor(
                         _events.emit(Event.FamilyCreated)
                     }
                     .onFailure { err ->
-                        _events.emit(Event.Error(err.message ?: "Errore durante la creazione"))
+                        _events.emit(Event.Error(err.message ?: appContext.getString(R.string.family_switcher_error_create_failed)))
                     }
             } finally {
                 _isCreating.value = false

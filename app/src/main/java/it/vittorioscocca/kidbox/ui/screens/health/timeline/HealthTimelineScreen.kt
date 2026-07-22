@@ -83,6 +83,9 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun HealthTimelineScreen(
@@ -122,20 +125,20 @@ fun HealthTimelineScreen(
             ) {
                 KidBoxHeaderCircleButton(
                     icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Indietro",
+                    contentDescription = stringResource(R.string.health_back),
                     onClick = onBack,
                 )
                 Spacer(Modifier.weight(1f))
                 KidBoxHeaderCircleButton(
                     icon = Icons.Default.Search,
-                    contentDescription = "Cerca",
+                    contentDescription = stringResource(R.string.health_search),
                     onClick = { isSearchVisible = !isSearchVisible },
                 )
                 Spacer(Modifier.width(6.dp))
                 if (isSearchVisible) {
                     KidBoxHeaderCircleButton(
                         icon = Icons.Default.Close,
-                        contentDescription = "Chiudi ricerca",
+                        contentDescription = stringResource(R.string.health_close_search),
                         onClick = {
                             isSearchVisible = false
                             viewModel.setSearchQuery("")
@@ -147,7 +150,7 @@ fun HealthTimelineScreen(
             // Title + subject name
             Column(modifier = Modifier.padding(horizontal = 18.dp)) {
                 Text(
-                    "Storico",
+                    stringResource(R.string.health_history_short),
                     fontSize = 32.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = kb.title,
@@ -166,7 +169,7 @@ fun HealthTimelineScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 18.dp),
                     singleLine = true,
-                    placeholder = { Text("Cerca visite, esami, cure...") },
+                    placeholder = { Text(stringResource(R.string.health_search_placeholder)) },
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = kb.card,
@@ -208,14 +211,14 @@ fun HealthTimelineScreen(
                             )
                             Spacer(Modifier.height(16.dp))
                             Text(
-                                "Nessun evento trovato",
+                                stringResource(R.string.health_no_events),
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = kb.title,
                             )
                             Spacer(Modifier.height(6.dp))
                             Text(
-                                "Le tue visite, esami, cure e vaccini appariranno qui",
+                                stringResource(R.string.health_no_events_hint),
                                 fontSize = 13.sp,
                                 color = kb.subtitle,
                             )
@@ -347,7 +350,7 @@ private fun FilterBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         FilterChip(
-            label = selectedYear?.toString() ?: "Anno",
+            label = selectedYear?.toString() ?: stringResource(R.string.health_year),
             leading = if (selectedYear == null) Icons.Default.CalendarMonth else Icons.Default.Check,
             trailing = Icons.Default.ExpandMore,
             active = selectedYear != null,
@@ -431,7 +434,7 @@ private fun TimelineEventCard(
     val tintColor = Color(event.kind.tintColorArgb)
     val isNavigable = event.kind != HealthTimelineEventKind.VACCINE
     val dateText = remember(event.dateEpochMillis) {
-        SimpleDateFormat("dd MMM yyyy", Locale.ITALIAN).format(Date(event.dateEpochMillis))
+        SimpleDateFormat("dd MMM yyyy", KBLocale.current()).format(Date(event.dateEpochMillis))
     }
 
     Row(
@@ -560,13 +563,13 @@ private fun YearFilterSheet(
                 .padding(bottom = 8.dp),
         ) {
             Text(
-                "Filtra per anno",
+                stringResource(R.string.health_filter_by_year),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
             )
             YearFilterRow(
-                text = "Tutti gli anni",
+                text = stringResource(R.string.health_all_years),
                 selected = selectedYear == null,
                 trailingText = null,
                 onClick = { onSelectYear(null) },
@@ -589,7 +592,7 @@ private fun YearFilterSheet(
                     .align(Alignment.End)
                     .padding(horizontal = 12.dp),
             ) {
-                Text("Chiudi")
+                Text(stringResource(R.string.health_close))
             }
             Spacer(Modifier.height(8.dp))
         }
@@ -628,7 +631,7 @@ private fun monthLabel(month: Int): String {
     val calendar = Calendar.getInstance().apply {
         set(Calendar.MONTH, month - 1)
     }
-    return SimpleDateFormat("MMMM", Locale.ITALIAN).format(calendar.time)
+    return SimpleDateFormat("MMMM", KBLocale.current()).format(calendar.time)
 }
 
 private fun HealthTimelineEventKind.iconImageVector(): ImageVector = when (iconKey) {

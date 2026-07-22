@@ -34,6 +34,8 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 import java.util.UUID
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 
 object DailyBriefingService {
     private const val PREFS_NAME = "kidbox_prefs"
@@ -50,7 +52,7 @@ object DailyBriefingService {
         if (!prefs.getBoolean(DailyBriefingPrefs.WORKER_KEY_ENABLED, true)) return
         if (prefs.getString(PREF_LAST_ISO_DATE, null) == todayIsoDate()) return
 
-        val familyName = prefs.getString("active_family_name", "la tua famiglia") ?: "la tua famiglia"
+        val familyName = prefs.getString("active_family_name", context.getString(R.string.ai_your_family)) ?: context.getString(R.string.ai_your_family)
         val request = OneTimeWorkRequestBuilder<DailyBriefingWorker>()
             .setInputData(
                 Data.Builder()
@@ -123,10 +125,10 @@ object DailyBriefingService {
         manager.createNotificationChannel(
             NotificationChannel(
                 DailyBriefingBroadcastReceiver.CHANNEL_ID,
-                "Briefing quotidiano",
+                context.getString(R.string.ai_daily_briefing),
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "Briefing mattutino AI della famiglia"
+                description = context.getString(R.string.ai_daily_briefing_sub)
             },
         )
     }
@@ -146,7 +148,7 @@ object DailyBriefingService {
             if (!aiSettings.isEnabled.value) return Result.success()
 
             val familyId = inputData.getString(KEY_FAMILY_ID) ?: return Result.failure()
-            val familyName = inputData.getString(KEY_FAMILY_NAME) ?: "la tua famiglia"
+            val familyName = inputData.getString(KEY_FAMILY_NAME) ?: applicationContext.getString(R.string.ai_your_family)
             val today = todayIsoDate()
             val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             if (prefs.getString(PREF_LAST_ISO_DATE, null) == today) return Result.success()
@@ -160,8 +162,8 @@ object DailyBriefingService {
                 - Ogni punto: max 12 parole.
                 - Zero intestazioni, zero markdown, zero intro.
                 - Includi solo: eventi oggi/domani con orario, dosi medicine oggi, todo in scadenza oggi, scadenze critiche nelle prossime 48h.
-                - Termina SEMPRE con una riga vuota e poi: "Cosa vuoi organizzare oggi?"
-                - Se non c'è nulla di rilevante: "Giornata libera da impegni. Buona giornata!"
+                - Termina SEMPRE con una riga vuota e poi: context.getString(R.string.ai_what_organize)
+                - Se non c'è nulla di rilevante: context.getString(R.string.ai_free_day)
             """.trimIndent()
 
             val userMessage = dailyDataMessageBuilder.buildDailyDataMessage(familyId)
@@ -199,7 +201,7 @@ object DailyBriefingService {
 class DailyBriefingBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val familyId = intent.getStringExtra("familyId").orEmpty()
-        val familyName = intent.getStringExtra("familyName").orEmpty().ifBlank { "la tua famiglia" }
+        val familyName = intent.getStringExtra("familyName").orEmpty().ifBlank { context.getString(R.string.ai_your_family) }
         val fullText = intent.getStringExtra("fullText").orEmpty()
         if (fullText.isNotBlank()) {
             DailyBriefingDraftStore.save(context, fullText)
@@ -224,7 +226,7 @@ class DailyBriefingBroadcastReceiver : BroadcastReceiver() {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_kidbox)
             .setContentTitle("☀️ Buongiorno, $familyName")
-            .setContentText(firstLine.ifBlank { "Il tuo briefing del giorno è pronto." })
+            .setContentText(firstLine.ifBlank { context.getString(R.string.ai_briefing_ready) })
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pending)

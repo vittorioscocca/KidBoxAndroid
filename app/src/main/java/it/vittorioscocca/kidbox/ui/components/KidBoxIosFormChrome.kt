@@ -16,6 +16,8 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -39,7 +41,7 @@ fun KidBoxIosFormTopBar(
             .padding(horizontal = 4.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TextButton(onClick = onCancel) { Text("Annulla", color = kb.title) }
+        TextButton(onClick = onCancel) { Text(stringResource(R.string.components_ios_form_cancel), color = kb.title) }
         Text(
             title,
             modifier = Modifier.weight(1f),
@@ -50,7 +52,7 @@ fun KidBoxIosFormTopBar(
         )
         TextButton(onClick = onSave, enabled = saveEnabled) {
             Text(
-                "Salva",
+                stringResource(R.string.components_ios_form_save),
                 color = if (saveEnabled) orange else kb.subtitle,
                 fontWeight = FontWeight.SemiBold,
             )

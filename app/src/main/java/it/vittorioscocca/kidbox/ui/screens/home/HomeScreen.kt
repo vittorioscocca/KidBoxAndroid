@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox.ui.screens.home
 
 import it.vittorioscocca.kidbox.util.KBLog
 
+import android.content.Context
 import android.net.Uri
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -57,9 +58,12 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.Luggage
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -100,6 +104,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -116,6 +121,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import java.io.File
 import kotlin.math.sqrt
+import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.util.KBLocale
 import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.ui.components.KidBoxAvatar
@@ -134,6 +141,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val homeViewMode by viewModel.homeViewMode.collectAsStateWithLifecycle()
     var showFamilySwitcher by remember { mutableStateOf(false) }
     val familySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val snackbarHostState = remember { SnackbarHostState() }
@@ -209,8 +217,17 @@ fun HomeScreen(
                         .clip(CircleShape)
                         .clickable { onNavigate(AppDestination.Profile.route) },
                 )
-                IconButton(onClick = { onNavigate(AppDestination.Settings.route) }) {
-                    Icon(Icons.Filled.Settings, contentDescription = null, tint = MaterialTheme.kidBoxColors.title)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { onNavigate(AppDestination.Suggestions.route) }) {
+                        Icon(
+                            imageVector = Icons.Filled.Lightbulb,
+                            contentDescription = null,
+                            tint = MaterialTheme.kidBoxColors.title,
+                        )
+                    }
+                    IconButton(onClick = { onNavigate(AppDestination.Settings.route) }) {
+                        Icon(Icons.Filled.Settings, contentDescription = null, tint = MaterialTheme.kidBoxColors.title)
+                    }
                 }
             }
 
@@ -239,31 +256,19 @@ fun HomeScreen(
                         )
                     }
                 }
-                IconButton(
-                    onClick = { showFamilySwitcher = true },
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.SwapHoriz,
-                        contentDescription = "Cambia famiglia",
-                        tint = MaterialTheme.kidBoxColors.title,
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
+                HomeHeaderControls(
+                    viewMode = homeViewMode,
+                    onViewModeChange = { viewModel.setHomeViewMode(it) },
+                    onSwitchFamily = { showFamilySwitcher = true },
+                )
             }
 
             Spacer(modifier = Modifier.size(16.dp))
 
-            FamilyHeroCard(
-                familyName = state.familyName.ifBlank { "La tua famiglia" },
-                dateLabel = state.todayLabel,
-                members = state.memberCount,
-                photoLocalPath = state.heroPhotoLocalPath,
-                photoUrl = state.heroPhotoUrl,
-                heroScale = state.heroPhotoScale,
-                heroOffsetX = state.heroPhotoOffsetX,
-                heroOffsetY = state.heroPhotoOffsetY,
-                onChangePhoto = {
+            HomeHeroCarousel(
+                state = state,
+                onNavigate = onNavigate,
+                onChangeHeroPhoto = {
                     photoPicker.launch(singleImageRequest())
                 },
             )
@@ -282,7 +287,7 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Sincronizzazione membri...",
+                        text = stringResource(R.string.home_members_syncing),
                         color = MaterialTheme.kidBoxColors.subtitle,
                         fontSize = 12.sp,
                     )
@@ -307,12 +312,23 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.size(16.dp))
 
-            HomeCategorySection(
-                state = state,
-                onNavigate = onNavigate,
-                onFeatureOpened = { field -> viewModel.onFeatureOpened(field) },
-                onRecordFeatureUsage = { id -> viewModel.recordFeatureUsage(id) },
-            )
+            if (homeViewMode == it.vittorioscocca.kidbox.data.local.HomeViewMode.GRID) {
+                HomeFreeGridSection(
+                    state = state,
+                    onNavigate = onNavigate,
+                    onFeatureOpened = { field -> viewModel.onFeatureOpened(field) },
+                    onRecordFeatureUsage = { id -> viewModel.recordFeatureUsage(id) },
+                    initialOrder = viewModel.getGridOrder(),
+                    onOrderChanged = { ids -> viewModel.setGridOrder(ids) },
+                )
+            } else {
+                HomeCategorySection(
+                    state = state,
+                    onNavigate = onNavigate,
+                    onFeatureOpened = { field -> viewModel.onFeatureOpened(field) },
+                    onRecordFeatureUsage = { id -> viewModel.recordFeatureUsage(id) },
+                )
+            }
             // Evita che l’ultima riga resti sotto al FAB (overlay in basso a destra).
             Spacer(Modifier.height(88.dp))
         }
@@ -320,7 +336,7 @@ fun HomeScreen(
         // Stesso pulsante AI della card Salute (AskAiButton condiviso).
         AskAiButton(
             isEnabled = state.familyPlan != KBPlan.FREE,
-            contentDescription = "Assistente AI",
+            contentDescription = stringResource(R.string.home_ai_assistant_desc),
             onTap = { onNavigate(AppDestination.AiChat.createRoute(state.familyId)) },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -349,6 +365,87 @@ fun HomeScreen(
     }
 }
 
+// ── HomeHeaderControls ────────────────────────────────────────────────────────
+// Lista/griglia sono un vero switch segmentato (una sola pillola, due stati
+// mutuamente esclusivi). Il cambio famiglia è un'azione diversa, quindi resta un
+// pulsante separato, staccato dallo switch.
+
+@Composable
+private fun HomeHeaderControls(
+    viewMode: it.vittorioscocca.kidbox.data.local.HomeViewMode,
+    onViewModeChange: (it.vittorioscocca.kidbox.data.local.HomeViewMode) -> Unit,
+    onSwitchFamily: () -> Unit,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    val listMode = it.vittorioscocca.kidbox.data.local.HomeViewMode.LIST
+    val gridMode = it.vittorioscocca.kidbox.data.local.HomeViewMode.GRID
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Surface(
+            shape = RoundedCornerShape(999.dp),
+            color = kb.card,
+            border = BorderStroke(1.dp, kb.divider),
+        ) {
+            Row(
+                modifier = Modifier.height(36.dp).padding(3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SegmentIcon(
+                    icon = Icons.AutoMirrored.Filled.List,
+                    selected = viewMode == listMode,
+                    contentDescription = stringResource(R.string.home_view_mode_list_desc),
+                    onClick = { onViewModeChange(listMode) },
+                )
+                SegmentIcon(
+                    icon = Icons.Filled.GridView,
+                    selected = viewMode == gridMode,
+                    contentDescription = stringResource(R.string.home_view_mode_grid_desc),
+                    onClick = { onViewModeChange(gridMode) },
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        IconButton(
+            onClick = onSwitchFamily,
+            modifier = Modifier.size(36.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.SwapHoriz,
+                contentDescription = stringResource(R.string.home_change_family_desc),
+                tint = kb.title,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SegmentIcon(
+    icon: ImageVector,
+    selected: Boolean,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    Box(
+        modifier = Modifier
+            .size(30.dp)
+            .clip(CircleShape)
+            .background(if (selected) Color(0xFFFF6B00) else Color.Transparent)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = if (selected) Color.White else kb.subtitle,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
 // ── FamilyHeroCard ─────────────────────────────────────────────────────────────
 // Ora applica scale/offset dal crop — identico alla logica di HomeHeroCard iOS
 
@@ -367,8 +464,8 @@ private fun FamilyHeroCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(220.dp),
-        shape = RoundedCornerShape(20.dp),
+            .height(300.dp),
+        shape = RoundedCornerShape(18.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
     ) {
@@ -418,7 +515,7 @@ private fun FamilyHeroCard(
                     shape = RoundedCornerShape(20.dp),
                 ) {
                     Text(
-                        "$members membri",
+                        stringResource(R.string.home_hero_members_count, members),
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         color = Color.White,
                         fontSize = 12.sp,
@@ -455,7 +552,10 @@ private fun FamilyHeroCard(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            if (photoUrl != null) "Cambia foto" else "Aggiungi foto",
+                            stringResource(
+                                if (photoUrl != null) R.string.home_hero_change_photo
+                                else R.string.home_hero_add_photo,
+                            ),
                             color = Color.White,
                             fontSize = 11.sp,
                         )
@@ -466,9 +566,224 @@ private fun FamilyHeroCard(
     }
 }
 
+// ── HomeHeroCarousel: foto famiglia + slide promozionali circolari ───────────
+// Slide 1 = FamilyHeroCard esistente (upload/tap invariato). Slide 2-10 = promo,
+// mostrate solo se la famiglia esiste già. Loop infinito con la tecnica delle
+// pagine duplicate ai bordi: [ultima] + reali + [prima], correzione silenziosa
+// dell'indice quando l'utente atterra su una delle due copie.
+
+private data class PromoSlideSpec(
+    val imageRes: Int,
+    val titleRes: Int,
+    val subtitleRes: Int? = null,
+    val onClick: () -> Unit,
+)
+
+@Composable
+private fun HomeHeroCarousel(
+    state: HomeUiState,
+    onNavigate: (String) -> Unit,
+    onChangeHeroPhoto: () -> Unit,
+) {
+    val familyId = state.familyId
+    val hasFamily = familyId.isNotBlank()
+    val defaultFamilyName = stringResource(R.string.home_hero_default_family_name)
+
+    // La data va formattata qui, non nel ViewModel: il ViewModel sopravvive alla
+    // ricreazione dell'Activity, quindi un'etichetta calcolata lì resterebbe nella
+    // lingua iniziale dopo un cambio lingua. Il key su LocalConfiguration la
+    // ricalcola a ogni cambio di configurazione (locale incluso).
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val todayLabel = remember(configuration) {
+        java.text.SimpleDateFormat("EEEE, d MMMM", KBLocale.current())
+            .format(java.util.Date())
+    }
+
+    val photoSlide: @Composable () -> Unit = {
+        FamilyHeroCard(
+            familyName = state.familyName.ifBlank { defaultFamilyName },
+            dateLabel = todayLabel,
+            members = state.memberCount,
+            photoLocalPath = state.heroPhotoLocalPath,
+            photoUrl = state.heroPhotoUrl,
+            heroScale = state.heroPhotoScale,
+            heroOffsetX = state.heroPhotoOffsetX,
+            heroOffsetY = state.heroPhotoOffsetY,
+            onChangePhoto = onChangeHeroPhoto,
+        )
+    }
+
+    if (!hasFamily) {
+        photoSlide()
+        return
+    }
+
+    val promoSlides = remember(familyId) {
+        listOf(
+            PromoSlideSpec(
+                imageRes = it.vittorioscocca.kidbox.R.drawable.home_promo_invite,
+                titleRes = R.string.home_promo_invite_title,
+                onClick = { onNavigate(AppDestination.InviteCode.route) },
+            ),
+            PromoSlideSpec(
+                imageRes = it.vittorioscocca.kidbox.R.drawable.home_promo_password,
+                titleRes = R.string.home_promo_password_title,
+                subtitleRes = R.string.home_promo_password_subtitle,
+                onClick = { onNavigate(AppDestination.PasswordsHome.createRoute(familyId)) },
+            ),
+            PromoSlideSpec(
+                imageRes = it.vittorioscocca.kidbox.R.drawable.home_promo_ai,
+                titleRes = R.string.home_promo_ai_title,
+                subtitleRes = R.string.home_promo_ai_subtitle,
+                onClick = { onNavigate(AppDestination.AiChat.createRoute(familyId)) },
+            ),
+            PromoSlideSpec(
+                imageRes = it.vittorioscocca.kidbox.R.drawable.home_promo_grocery,
+                titleRes = R.string.home_promo_grocery_title,
+                subtitleRes = R.string.home_promo_grocery_subtitle,
+                onClick = { onNavigate(AppDestination.ShoppingList.createRoute(familyId)) },
+            ),
+            PromoSlideSpec(
+                imageRes = it.vittorioscocca.kidbox.R.drawable.home_promo_calendar,
+                titleRes = R.string.home_promo_calendar_title,
+                onClick = { onNavigate(AppDestination.Calendar.createRoute(familyId)) },
+            ),
+            PromoSlideSpec(
+                imageRes = it.vittorioscocca.kidbox.R.drawable.home_promo_expenses,
+                titleRes = R.string.home_promo_expenses_title,
+                subtitleRes = R.string.home_promo_expenses_subtitle,
+                onClick = { onNavigate(AppDestination.ExpensesHome.createRoute(familyId)) },
+            ),
+            PromoSlideSpec(
+                imageRes = it.vittorioscocca.kidbox.R.drawable.home_promo_documents1,
+                titleRes = R.string.home_promo_documents1_title,
+                subtitleRes = R.string.home_promo_documents1_subtitle,
+                onClick = { onNavigate(AppDestination.DocumentsHome.createRoute(familyId)) },
+            ),
+            PromoSlideSpec(
+                imageRes = it.vittorioscocca.kidbox.R.drawable.home_promo_documents2,
+                titleRes = R.string.home_promo_documents2_title,
+                subtitleRes = R.string.home_promo_documents2_subtitle,
+                onClick = { onNavigate(AppDestination.DocumentsHome.createRoute(familyId)) },
+            ),
+            PromoSlideSpec(
+                imageRes = it.vittorioscocca.kidbox.R.drawable.home_promo_health,
+                titleRes = R.string.home_promo_health_title,
+                subtitleRes = R.string.home_promo_health_subtitle,
+                onClick = { onNavigate(AppDestination.PediatricChildSelector.createRoute(familyId)) },
+            ),
+        )
+    }
+
+    val slideCount = 1 + promoSlides.size
+    val pagerCount = slideCount + 2
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(initialPage = 1) { pagerCount }
+
+    LaunchedEffect(pagerState, slideCount) {
+        androidx.compose.runtime.snapshotFlow { pagerState.isScrollInProgress }
+            .collect { scrolling ->
+                if (!scrolling) {
+                    when (pagerState.currentPage) {
+                        0 -> pagerState.scrollToPage(slideCount)
+                        pagerCount - 1 -> pagerState.scrollToPage(1)
+                    }
+                }
+            }
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        androidx.compose.foundation.pager.HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth(),
+        ) { page ->
+            val realIndex = (((page - 1) % slideCount) + slideCount) % slideCount
+            if (realIndex == 0) {
+                photoSlide()
+            } else {
+                PromoSlide(promoSlides[realIndex - 1])
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        val activeDot = (((pagerState.currentPage - 1) % slideCount) + slideCount) % slideCount
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            repeat(slideCount) { index ->
+                val isActive = index == activeDot
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 3.dp)
+                        .size(if (isActive) 7.dp else 6.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (isActive) Color(0xFFFF6B00) else MaterialTheme.kidBoxColors.divider,
+                        ),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PromoSlide(spec: PromoSlideSpec) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(300.dp)
+            .clickable { spec.onClick() },
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            AsyncImage(
+                model = spec.imageRes,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0f to Color.Transparent,
+                                0.55f to Color.Transparent,
+                                1f to Color.Black.copy(alpha = 0.55f),
+                            ),
+                        ),
+                    ),
+            )
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(16.dp),
+            ) {
+                Text(
+                    text = stringResource(spec.titleRes),
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 19.sp,
+                )
+                spec.subtitleRes?.let { subtitleRes ->
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = stringResource(subtitleRes),
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 13.sp,
+                    )
+                }
+            }
+        }
+    }
+}
+
 // ── FeatureCard, HomeFab, helpers ─────────────────────────────────────────────
 
-private data class FeatureItem(
+internal data class FeatureItem(
     val id: String,
     val title: String,
     val subtitle: String,
@@ -581,19 +896,19 @@ private fun FeatureCard(item: FeatureItem, modifier: Modifier = Modifier, onClic
     }
 }
 
-private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem> = listOf(
-    FeatureItem("notes", "Note", "Appunti veloci", AppDestination.NotesHome.createRoute(familyId), Icons.AutoMirrored.Filled.Note, Color(0xFFFFF9E6), Color(0xFFF5A623), state.badgeNotes, CounterField.NOTES),
-    FeatureItem("todo", "To-Do", "Lista condivisa", AppDestination.Todo.route, Icons.Filled.CheckCircle, Color(0xFFEBF3FF), Color(0xFF2E86FF), state.badgeTodos, CounterField.TODOS),
-    FeatureItem("shopping", "Lista Spesa", "Lista condivisa", AppDestination.ShoppingList.createRoute(familyId), Icons.Filled.LocalGroceryStore, Color(0xFFEDFAF3), Color(0xFF27AE60), state.badgeShopping, CounterField.SHOPPING),
-    FeatureItem("calendar", "Calendario", "Eventi e affidamenti", AppDestination.Calendar.createRoute(familyId), Icons.Filled.CalendarMonth, Color(0xFFF3EEFF), Color(0xFF8B5CF6), state.badgeCalendar, CounterField.CALENDAR),
-    FeatureItem("health", "Salute", "Health tracker", AppDestination.PediatricChildSelector.createRoute(familyId), Icons.Filled.Favorite, Color(0xFFFFEAEA), Color(0xFFE53E3E)),
-    FeatureItem("chat", "Chat", "Messaggi famiglia", AppDestination.Chat.route, Icons.AutoMirrored.Filled.Chat, Color(0xFFEDFAF3), Color(0xFF27AE60), state.badgeChat, CounterField.CHAT),
-    FeatureItem("expenses", "Spese", "Rette, visite, extra", AppDestination.ExpensesHome.createRoute(familyId), Icons.Filled.Euro, Color(0xFFFFF3E6), Color(0xFFFF6B00), state.badgeExpenses, CounterField.EXPENSES),
-    FeatureItem("documents", "Documenti", "Carte importanti", AppDestination.DocumentsHome.createRoute(familyId), Icons.Filled.Description, Color(0xFFEBF3FF), Color(0xFF2E86FF), state.badgeDocuments, CounterField.DOCUMENTS),
+internal fun featureItems(context: Context, familyId: String, state: HomeUiState): List<FeatureItem> = listOf(
+    FeatureItem("notes", context.getString(R.string.home_feature_notes_title), context.getString(R.string.home_feature_notes_subtitle), AppDestination.NotesHome.createRoute(familyId), Icons.AutoMirrored.Filled.Note, Color(0xFFFFF9E6), Color(0xFFF5A623), state.badgeNotes, CounterField.NOTES),
+    FeatureItem("todo", context.getString(R.string.home_feature_todo_title), context.getString(R.string.home_feature_todo_subtitle), AppDestination.Todo.route, Icons.Filled.CheckCircle, Color(0xFFEBF3FF), Color(0xFF2E86FF), state.badgeTodos, CounterField.TODOS),
+    FeatureItem("shopping", context.getString(R.string.home_feature_shopping_title), context.getString(R.string.home_feature_shopping_subtitle), AppDestination.ShoppingList.createRoute(familyId), Icons.Filled.LocalGroceryStore, Color(0xFFEDFAF3), Color(0xFF27AE60), state.badgeShopping, CounterField.SHOPPING),
+    FeatureItem("calendar", context.getString(R.string.home_feature_calendar_title), context.getString(R.string.home_feature_calendar_subtitle), AppDestination.Calendar.createRoute(familyId), Icons.Filled.CalendarMonth, Color(0xFFF3EEFF), Color(0xFF8B5CF6), state.badgeCalendar, CounterField.CALENDAR),
+    FeatureItem("health", context.getString(R.string.home_feature_health_title), context.getString(R.string.home_feature_health_subtitle), AppDestination.PediatricChildSelector.createRoute(familyId), Icons.Filled.Favorite, Color(0xFFFFEAEA), Color(0xFFE53E3E)),
+    FeatureItem("chat", context.getString(R.string.home_feature_chat_title), context.getString(R.string.home_feature_chat_subtitle), AppDestination.Chat.route, Icons.AutoMirrored.Filled.Chat, Color(0xFFEDFAF3), Color(0xFF27AE60), state.badgeChat, CounterField.CHAT),
+    FeatureItem("expenses", context.getString(R.string.home_feature_expenses_title), context.getString(R.string.home_feature_expenses_subtitle), AppDestination.ExpensesHome.createRoute(familyId), Icons.Filled.Euro, Color(0xFFFFF3E6), Color(0xFFFF6B00), state.badgeExpenses, CounterField.EXPENSES),
+    FeatureItem("documents", context.getString(R.string.home_feature_documents_title), context.getString(R.string.home_feature_documents_subtitle), AppDestination.DocumentsHome.createRoute(familyId), Icons.Filled.Description, Color(0xFFEBF3FF), Color(0xFF2E86FF), state.badgeDocuments, CounterField.DOCUMENTS),
     FeatureItem(
         "wallet",
-        "Wallet",
-        "Biglietti e PDF",
+        context.getString(R.string.home_feature_wallet_title),
+        context.getString(R.string.home_feature_wallet_subtitle),
         AppDestination.WalletHome.createRoute(familyId),
         Icons.Filled.ConfirmationNumber,
         Color(0xFFE8F4FF),
@@ -603,8 +918,8 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
     ),
     FeatureItem(
         "location",
-        "Posizione",
-        "Dove sono tutti",
+        context.getString(R.string.home_feature_location_title),
+        context.getString(R.string.home_feature_location_subtitle),
         AppDestination.FamilyLocation.createRoute(familyId),
         Icons.Filled.Place,
         Color(0xFFE6FAF8),
@@ -615,8 +930,8 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
     ),
     FeatureItem(
         "photos",
-        "Foto e Video",
-        "Ricordi famiglia",
+        context.getString(R.string.home_feature_photos_title),
+        context.getString(R.string.home_feature_photos_subtitle),
         AppDestination.FamilyPhotos.createRoute(familyId),
         Icons.Filled.PhotoLibrary,
         Color(0xFFFFF0F5),
@@ -626,8 +941,8 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
     ),
     FeatureItem(
         "pets",
-        "Animali domestici",
-        "Cure e promemoria",
+        context.getString(R.string.home_feature_pets_title),
+        context.getString(R.string.home_feature_pets_subtitle),
         AppDestination.Pets.createRoute(familyId),
         Icons.Filled.Pets,
         Color(0xFFFFF6ED),
@@ -635,8 +950,8 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
     ),
     FeatureItem(
         "home_items",
-        "Casa",
-        "Garanzie e manutenzioni",
+        context.getString(R.string.home_feature_home_items_title),
+        context.getString(R.string.home_feature_home_items_subtitle),
         AppDestination.HomeItems.createRoute(familyId),
         Icons.Filled.Home,
         Color(0xFFF8F3E6),
@@ -644,8 +959,8 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
     ),
     FeatureItem(
         "vehicles",
-        "Garage",
-        "Auto e scadenze",
+        context.getString(R.string.home_feature_vehicles_title),
+        context.getString(R.string.home_feature_vehicles_subtitle),
         AppDestination.Vehicles.createRoute(familyId),
         Icons.Filled.DirectionsCar,
         Color(0xFFF0F0F0),
@@ -653,11 +968,11 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
     ),
     FeatureItem(
         id = "travel",
-        title = "Viaggi",
+        title = context.getString(R.string.home_feature_travel_title),
         subtitle = if (state.familyPlan == KBPlan.FREE) {
-            "Piano Pro o Max per l'AI"
+            context.getString(R.string.home_feature_travel_subtitle_locked)
         } else {
-            "Pianifica con l'AI"
+            context.getString(R.string.home_feature_travel_subtitle_unlocked)
         },
         route = AppDestination.TravelList.createRoute(familyId),
         icon = if (state.familyPlan == KBPlan.FREE) Icons.Filled.Lock else Icons.Filled.Luggage,
@@ -667,8 +982,16 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
     ),
     FeatureItem(
         id = "ai",
-        title = if (state.familyPlan == KBPlan.FREE) "Assistente" else "Assistente AI",
-        subtitle = if (state.familyPlan == KBPlan.FREE) "Disponibile con Pro o Max" else "Chiedi aiuto",
+        title = if (state.familyPlan == KBPlan.FREE) {
+            context.getString(R.string.home_feature_ai_title_locked)
+        } else {
+            context.getString(R.string.home_feature_ai_title_unlocked)
+        },
+        subtitle = if (state.familyPlan == KBPlan.FREE) {
+            context.getString(R.string.home_feature_ai_subtitle_locked)
+        } else {
+            context.getString(R.string.home_feature_ai_subtitle_unlocked)
+        },
         route = if (state.familyPlan == KBPlan.FREE) {
             AppDestination.Plans.route
         } else {
@@ -681,15 +1004,15 @@ private fun featureItems(familyId: String, state: HomeUiState): List<FeatureItem
     ),
     FeatureItem(
         "passwords",
-        "Password",
-        "Credenziali di famiglia",
+        context.getString(R.string.home_feature_passwords_title),
+        context.getString(R.string.home_feature_passwords_subtitle),
         AppDestination.PasswordsHome.createRoute(familyId),
         Icons.Filled.Lock,
         Color(0xFFEFF6FF),
         Color(0xFF2563EB),
         state.badgePasswords,
     ),
-    FeatureItem("family", "Family", "Gestisci famiglia", AppDestination.FamilySettings.route, Icons.Filled.Person, Color(0xFFFFF3E6), Color(0xFFFF6B00)),
+    FeatureItem("family", context.getString(R.string.home_feature_family_title), context.getString(R.string.home_feature_family_subtitle), AppDestination.FamilySettings.route, Icons.Filled.Person, Color(0xFFFFF3E6), Color(0xFFFF6B00)),
 )
 
 // ── Variante C: scorciatoie + gruppi tematici ────────────────────────────────
@@ -702,15 +1025,16 @@ private fun HomeCategorySection(
     onRecordFeatureUsage: (String) -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
-    val features = featureItems(state.familyId, state)
+    val context = LocalContext.current
+    val features = featureItems(context, state.familyId, state)
     val byId = remember(features) { features.associateBy { it.id } }
 
     // Assistente ("ai") escluso: è il bottone AI flottante.
     val groups = listOf(
-        "Organizzazione" to listOf("notes", "todo", "shopping", "calendar"),
-        "Famiglia & Salute" to listOf("health", "family", "chat"),
-        "Documenti & Denaro" to listOf("documents", "expenses", "wallet", "passwords"),
-        "Vita quotidiana" to listOf("location", "photos", "travel", "pets", "home_items", "vehicles"),
+        stringResource(R.string.home_group_organization) to listOf("notes", "todo", "shopping", "calendar"),
+        stringResource(R.string.home_group_family_health) to listOf("health", "family", "chat"),
+        stringResource(R.string.home_group_documents_money) to listOf("documents", "expenses", "wallet", "passwords"),
+        stringResource(R.string.home_group_daily_life) to listOf("location", "photos", "travel", "pets", "home_items", "vehicles"),
     )
 
     // Scorciatoie: top-4 per utilizzo su TUTTE le categorie (ordinamento stabile → a parità
@@ -729,7 +1053,7 @@ private fun HomeCategorySection(
     }
 
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Eyebrow("Scorciatoie")
+        Eyebrow(stringResource(R.string.home_shortcuts_eyebrow))
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -762,6 +1086,127 @@ private fun HomeCategorySection(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+// ── Griglia libera con drag&drop (Home in modalità GRID) ─────────────────────
+// Nessun gruppo/scorciatoia: solo le card riordinabili a piacere (tranne "ai",
+// che resta il FAB). L'ordine è persistito per-device via HomeViewModePreference.
+
+@Composable
+private fun HomeFreeGridSection(
+    state: HomeUiState,
+    onNavigate: (String) -> Unit,
+    onFeatureOpened: (CounterField?) -> Unit,
+    onRecordFeatureUsage: (String) -> Unit,
+    initialOrder: List<String>?,
+    onOrderChanged: (List<String>) -> Unit,
+) {
+    val context = LocalContext.current
+    val features = remember(context, state.familyId, state) {
+        featureItems(context, state.familyId, state).filter { it.id != "ai" }
+    }
+    val byId = remember(features) { features.associateBy { it.id } }
+
+    var orderedIds by remember(features) {
+        val saved = initialOrder?.filter { byId.containsKey(it) }.orEmpty()
+        val missing = features.map { it.id }.filterNot { it in saved }
+        mutableStateOf(saved + missing)
+    }
+
+    val itemBounds = remember { mutableStateMapOf<String, Rect>() }
+    var draggedId by remember { mutableStateOf<String?>(null) }
+    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    val haptic = LocalHapticFeedback.current
+
+    val openFeature: (FeatureItem) -> Unit = { feat ->
+        onRecordFeatureUsage(feat.id)
+        onFeatureOpened(feat.counterField)
+        onNavigate(feat.route)
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        orderedIds.chunked(2).forEach { rowIds ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                rowIds.forEach { id ->
+                    val feat = byId[id] ?: return@forEach
+                    val isDragged = id == draggedId
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(110.dp)
+                            .zIndex(if (isDragged) 20f else 0f)
+                            .graphicsLayer {
+                                if (isDragged) {
+                                    translationX = dragOffset.x
+                                    translationY = dragOffset.y
+                                    scaleX = 1.05f
+                                    scaleY = 1.05f
+                                    shadowElevation = 12f
+                                }
+                            }
+                            .onGloballyPositioned { coords ->
+                                itemBounds[id] = coords.boundsInRoot()
+                            }
+                            .pointerInput(id, orderedIds) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        draggedId = id
+                                        dragOffset = Offset.Zero
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    },
+                                    onDrag = { change, amount ->
+                                        change.consume()
+                                        dragOffset += amount
+                                    },
+                                    onDragEnd = {
+                                        val origin = itemBounds[id]
+                                        if (origin != null) {
+                                            val dragCenter = Offset(
+                                                origin.center.x + dragOffset.x,
+                                                origin.center.y + dragOffset.y,
+                                            )
+                                            val targetId = itemBounds.entries
+                                                .minByOrNull { (_, rect) ->
+                                                    (rect.center - dragCenter).getDistanceSquared()
+                                                }
+                                                ?.key
+                                            if (targetId != null && targetId != id) {
+                                                val fromIndex = orderedIds.indexOf(id)
+                                                val toIndex = orderedIds.indexOf(targetId)
+                                                if (fromIndex != -1 && toIndex != -1) {
+                                                    val mutable = orderedIds.toMutableList()
+                                                    mutable.removeAt(fromIndex)
+                                                    mutable.add(toIndex, id)
+                                                    orderedIds = mutable
+                                                    onOrderChanged(mutable)
+                                                }
+                                            }
+                                        }
+                                        draggedId = null
+                                        dragOffset = Offset.Zero
+                                    },
+                                    onDragCancel = {
+                                        draggedId = null
+                                        dragOffset = Offset.Zero
+                                    },
+                                )
+                            },
+                    ) {
+                        FeatureCard(item = feat, modifier = Modifier.fillMaxSize()) { openFeature(feat) }
+                    }
+                }
+                if (rowIds.size == 1) {
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
         }

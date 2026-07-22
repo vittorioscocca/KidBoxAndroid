@@ -35,6 +35,8 @@ import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private val CategoryAccent = Color(0xFFF2611A)
 
@@ -59,9 +61,9 @@ fun TravelCategoryResultsScreen(
     val kb = MaterialTheme.kidBoxColors
 
     val title = when (kind) {
-        "hotels" -> "Hotel"
-        "activities" -> "Attività"
-        else -> "Ristoranti"
+        "hotels" -> stringResource(R.string.travel_hotels)
+        "activities" -> stringResource(R.string.travel_activities)
+        else -> stringResource(R.string.travel_restaurants)
     }
     val emoji = when (kind) {
         "hotels" -> "🛏️"
@@ -109,9 +111,9 @@ fun TravelCategoryResultsScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("Nessun risultato", fontWeight = FontWeight.Bold, color = kb.title)
+                Text(stringResource(R.string.travel_no_results), fontWeight = FontWeight.Bold, color = kb.title)
                 Text(
-                    "Non abbiamo trovato suggerimenti in questo itinerario.",
+                    stringResource(R.string.travel_no_suggestions),
                     color = kb.subtitle,
                     modifier = Modifier.padding(top = 8.dp),
                 )

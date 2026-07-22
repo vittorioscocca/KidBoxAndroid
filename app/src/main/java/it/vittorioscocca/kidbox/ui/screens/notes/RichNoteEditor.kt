@@ -54,6 +54,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -174,7 +176,7 @@ fun RichNoteEditor(
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                     placeholder = {
                         Text(
-                            "Titolo",
+                            stringResource(R.string.notes_editor_title_placeholder),
                             color = kb.subtitle,
                             fontSize = 22.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -239,7 +241,7 @@ fun RichNoteEditor(
                             includeFontPadding = false
                             isVerticalScrollBarEnabled = true
                             setPadding(20, 12, 20, 20)
-                            hint = "Testo"
+                            hint = context.getString(R.string.notes_editor_body_placeholder)
                             setTextColor(kb.title.toArgb())
                             setHintTextColor(kb.subtitle.toArgb())
                             textSize = 16f

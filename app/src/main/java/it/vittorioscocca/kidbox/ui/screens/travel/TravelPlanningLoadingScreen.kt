@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import kotlinx.coroutines.delay
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private val TravelAccent = Color(0xFFF2611A)
 private val RingSize = 156.dp
@@ -104,7 +106,7 @@ fun TravelPlanningLoadingScreen(
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Text(
-                        "CIRCA",
+                        stringResource(R.string.travel_about),
                         fontSize = 10.sp,
                         letterSpacing = 1.sp,
                         color = kb.subtitle,
@@ -118,7 +120,7 @@ fun TravelPlanningLoadingScreen(
                         modifier = Modifier.padding(vertical = 2.dp),
                     )
                     Text(
-                        "RIMASTI",
+                        stringResource(R.string.travel_remaining),
                         fontSize = 10.sp,
                         letterSpacing = 1.sp,
                         color = kb.subtitle,
@@ -163,7 +165,7 @@ fun TravelPlanningLoadingScreen(
                 Text(tip.title.uppercase(), color = TravelAccent, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 Text(tip.body, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
                 Text(
-                    "Consiglio utile mentre l'AI lavora.",
+                    stringResource(R.string.travel_tip_while_ai),
                     fontSize = 12.sp,
                     color = kb.subtitle,
                     modifier = Modifier.padding(top = 6.dp),

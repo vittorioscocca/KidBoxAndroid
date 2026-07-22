@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.passwords
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -65,8 +67,8 @@ fun PasswordsImportExportScreen(
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        ContextCompat.startActivity(ctx, Intent.createChooser(send, "Condividi export password"), null)
-        snackbarHostState?.showSnackbar("Export completato")
+        ContextCompat.startActivity(ctx, Intent.createChooser(send, ctx.getString(R.string.passwords_share_export_chooser_title)), null)
+        snackbarHostState?.showSnackbar(ctx.getString(R.string.passwords_export_completed_snackbar))
         viewModel.clearExportUri()
     }
     LaunchedEffect(state.error) {
@@ -76,7 +78,7 @@ fun PasswordsImportExportScreen(
         }
     }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Importa/Esporta password") }) }) { pad ->
+    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.passwords_import_export_title)) }) }) { pad ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -86,9 +88,9 @@ fun PasswordsImportExportScreen(
         ) {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Esporta")
+                    Text(stringResource(R.string.passwords_export_label))
                     androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Cifra con passphrase")
+                        Text(stringResource(R.string.passwords_encrypt_passphrase_label))
                         Switch(checked = encrypt, onCheckedChange = { encrypt = it })
                     }
                     if (encrypt) {
@@ -96,7 +98,7 @@ fun PasswordsImportExportScreen(
                             value = passphrase,
                             onValueChange = { passphrase = it },
                             modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Passphrase") },
+                            label = { Text(stringResource(R.string.passwords_passphrase_label)) },
                             visualTransformation = PasswordVisualTransformation(),
                         )
                     }
@@ -108,22 +110,22 @@ fun PasswordsImportExportScreen(
                                 viewModel.export(familyId, familyName, passphrase.ifBlank { null })
                             }
                         }
-                    }) { Text("Esporta password") }
+                    }) { Text(stringResource(R.string.passwords_export_password_button)) }
                 }
             }
 
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Importa")
+                    Text(stringResource(R.string.passwords_import_label))
                     OutlinedTextField(
                         value = passphrase,
                         onValueChange = { passphrase = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Passphrase (se cifrato)") },
+                        label = { Text(stringResource(R.string.passwords_passphrase_optional_label)) },
                         visualTransformation = PasswordVisualTransformation(),
                     )
                     Button(onClick = { importLauncher.launch(arrayOf("text/plain", "application/octet-stream")) }) {
-                        Text("Seleziona file")
+                        Text(stringResource(R.string.passwords_select_file_button))
                     }
                 }
             }
@@ -135,30 +137,30 @@ fun PasswordsImportExportScreen(
     if (showPlainAlert) {
         AlertDialog(
             onDismissRequest = { showPlainAlert = false },
-            title = { Text("Attenzione") },
-            text = { Text("⚠️ Il file conterrà tutte le tue password in chiaro. Conservalo solo in luoghi affidabili.") },
+            title = { Text(stringResource(R.string.passwords_warning_dialog_title)) },
+            text = { Text(stringResource(R.string.passwords_plain_export_warning_message)) },
             confirmButton = {
                 TextButton(onClick = {
                     showPlainAlert = false
                     biometricThenExport(ctx as FragmentActivity) {
                         viewModel.export(familyId, familyName, null)
                     }
-                }) { Text("Continua") }
+                }) { Text(stringResource(R.string.location_continue_button)) }
             },
-            dismissButton = { TextButton(onClick = { showPlainAlert = false }) { Text("Annulla") } },
+            dismissButton = { TextButton(onClick = { showPlainAlert = false }) { Text(stringResource(R.string.location_cancel_button)) } },
         )
     }
 
     state.preview?.let { preview ->
         ModalBottomSheet(onDismissRequest = { viewModel.clearPreview() }) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Import totali: ${preview.total}")
-                Text("Conflitti: ${preview.conflicts.size}")
-                Text("Nuovi gruppi: ${preview.newGroups.size}")
-                Text("Errori: ${preview.errors.size}")
+                Text(stringResource(R.string.passwords_import_total_label, preview.total))
+                Text(stringResource(R.string.passwords_import_conflicts_label, preview.conflicts.size))
+                Text(stringResource(R.string.passwords_import_new_groups_label, preview.newGroups.size))
+                Text(stringResource(R.string.passwords_import_errors_label, preview.errors.size))
                 if (preview.legacyAmbiguousRecordIndices.isNotEmpty()) {
                     val refs = preview.legacyAmbiguousRecordIndices.joinToString(", ") { "N$it" }
-                    Text("Trovato testo ambiguo in ${preview.legacyAmbiguousRecordIndices.size} note — verifica i record $refs")
+                    Text(stringResource(R.string.passwords_import_ambiguous_text_warning, preview.legacyAmbiguousRecordIndices.size, refs))
                 }
                 MergeStrategy.entries.forEach { strategy ->
                     TextButton(onClick = { mergeStrategy = strategy }) {
@@ -172,7 +174,7 @@ fun PasswordsImportExportScreen(
                     },
                     enabled = preview.total > 0,
                 ) {
-                    Text("Importa ${preview.total} password")
+                    Text(stringResource(R.string.passwords_import_count_button, preview.total))
                 }
             }
         }
@@ -192,8 +194,8 @@ private fun biometricThenExport(activity: FragmentActivity, onSuccess: () -> Uni
     )
     prompt.authenticate(
         BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Autenticazione richiesta")
-            .setDescription("Conferma identità per esportare le password")
+            .setTitle(activity.getString(R.string.passwords_biometric_title))
+            .setDescription(activity.getString(R.string.passwords_biometric_description))
             .setAllowedAuthenticators(
                 BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL,
             )

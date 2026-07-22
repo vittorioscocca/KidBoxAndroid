@@ -55,6 +55,8 @@ import it.vittorioscocca.kidbox.ui.screens.life.formatItDate
 import it.vittorioscocca.kidbox.ui.screens.life.rememberLifeDatePicker
 import it.vittorioscocca.kidbox.ui.screens.life.vehicleFuelLabelIt
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -75,7 +77,7 @@ fun VehiclesScreen(
         containerColor = kb.background,
         topBar = {
             TopAppBar(
-                title = { Text("Garage", color = kb.title) },
+                title = { Text(stringResource(R.string.vehicles_garage), color = kb.title) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = kb.title)
@@ -91,7 +93,7 @@ fun VehiclesScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAdd = true }, containerColor = orange, contentColor = Color.White) {
-                Icon(Icons.Filled.Add, contentDescription = "Aggiungi")
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.vehicles_add))
             }
         },
     ) { padding ->
@@ -105,14 +107,14 @@ fun VehiclesScreen(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Icon(Icons.Filled.DirectionsCar, contentDescription = null, tint = kb.title)
-                Text("Nessun veicolo", color = kb.title, style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.vehicles_none), color = kb.title, style = MaterialTheme.typography.titleMedium)
                 Surface(
                     onClick = { showAdd = true },
                     color = orange,
                     shape = RoundedCornerShape(999.dp),
                 ) {
                     Text(
-                        "Aggiungi veicolo",
+                        stringResource(R.string.vehicles_add_vehicle),
                         color = Color.White,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
@@ -203,9 +205,9 @@ fun VehiclesScreen(
                 TextButton(onClick = {
                     viewModel.deleteVehicle(target) { err -> toast = err }
                     toDelete = null
-                }) { Text("Elimina", color = Color(0xFFE53935)) }
+                }) { Text(stringResource(R.string.life_delete), color = Color(0xFFE53935)) }
             },
-            dismissButton = { TextButton(onClick = { toDelete = null }) { Text("Annulla") } },
+            dismissButton = { TextButton(onClick = { toDelete = null }) { Text(stringResource(R.string.life_cancel)) } },
         )
     }
 
@@ -213,7 +215,7 @@ fun VehiclesScreen(
         AlertDialog(
             onDismissRequest = { toast = null },
             confirmButton = { TextButton(onClick = { toast = null }) { Text("OK") } },
-            title = { Text("Errore") },
+            title = { Text(stringResource(R.string.life_error)) },
             text = { Text(msg) },
         )
     }
@@ -268,33 +270,33 @@ private fun AddVehicleDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Nuovo veicolo") },
+        title = { Text(stringResource(R.string.vehicles_new_vehicle)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nome") })
-                OutlinedTextField(value = plate, onValueChange = { plate = it }, label = { Text("Targa") })
-                OutlinedTextField(value = brand, onValueChange = { brand = it }, label = { Text("Marca") })
-                OutlinedTextField(value = model, onValueChange = { model = it }, label = { Text("Modello") })
-                OutlinedTextField(value = yearText, onValueChange = { yearText = it }, label = { Text("Anno") })
-                Text("Carburante", style = MaterialTheme.typography.labelLarge)
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.life_name)) })
+                OutlinedTextField(value = plate, onValueChange = { plate = it }, label = { Text(stringResource(R.string.vehicles_plate)) })
+                OutlinedTextField(value = brand, onValueChange = { brand = it }, label = { Text(stringResource(R.string.home_items_brand)) })
+                OutlinedTextField(value = model, onValueChange = { model = it }, label = { Text(stringResource(R.string.home_items_model)) })
+                OutlinedTextField(value = yearText, onValueChange = { yearText = it }, label = { Text(stringResource(R.string.vehicles_year)) })
+                Text(stringResource(R.string.vehicles_fuel), style = MaterialTheme.typography.labelLarge)
                 fuels.forEach { f ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = fuel == f, onClick = { fuel = f })
                         Text(vehicleFuelLabelIt(f))
                     }
                 }
-                OutlinedTextField(value = color, onValueChange = { color = it }, label = { Text("Colore") })
+                OutlinedTextField(value = color, onValueChange = { color = it }, label = { Text(stringResource(R.string.vehicles_color)) })
                 OutlinedTextField(value = vin, onValueChange = { vin = it }, label = { Text("VIN") })
                 TextButton(onClick = { pickIns(ins) }) { Text("Scad. assicurazione: ${ins?.let { formatItDate(it) } ?: "—"}") }
                 TextButton(onClick = { pickRev(rev) }) { Text("Scad. revisione: ${rev?.let { formatItDate(it) } ?: "—"}") }
                 TextButton(onClick = { pickTax(tax) }) { Text("Scad. bollo: ${tax?.let { formatItDate(it) } ?: "—"}") }
                 TextButton(onClick = { pickLast(lastSvc) }) { Text("Ultimo tagliando: ${lastSvc?.let { formatItDate(it) } ?: "—"}") }
                 TextButton(onClick = { pickNext(nextSvc) }) { Text("Prossimo tagliando: ${nextSvc?.let { formatItDate(it) } ?: "—"}") }
-                OutlinedTextField(value = kmText, onValueChange = { kmText = it }, label = { Text("Km attuali") })
-                OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Note") })
+                OutlinedTextField(value = kmText, onValueChange = { kmText = it }, label = { Text(stringResource(R.string.vehicles_current_km_short)) })
+                OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text(stringResource(R.string.life_notes)) })
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = reminder, onCheckedChange = { reminder = it })
-                    Text("Promemoria")
+                    Text(stringResource(R.string.vehicles_reminder))
                 }
             }
         },
@@ -324,8 +326,8 @@ private fun AddVehicleDialog(
                         )
                     }
                 },
-            ) { Text("Salva") }
+            ) { Text(stringResource(R.string.life_save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Annulla") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.life_cancel)) } },
     )
 }

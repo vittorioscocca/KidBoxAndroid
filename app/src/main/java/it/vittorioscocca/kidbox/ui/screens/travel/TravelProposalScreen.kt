@@ -38,6 +38,8 @@ import androidx.navigation.NavHostController
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.navigation.travelPlanningViewModelOwner
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 /**
  * Proposta itinerario. Come su iOS, va mostrata con lo stesso [TravelPlanningViewModel] del wizard.
@@ -181,9 +183,9 @@ private fun TravelProposalContent(
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text("Piano Pro o Max richiesto per la pianificazione AI.", color = kb.subtitle)
+                        Text(stringResource(R.string.travel_plan_requires_pro), color = kb.subtitle)
                         Button(onClick = onOpenPlans, modifier = Modifier.fillMaxWidth()) {
-                            Text("Scopri Pro e Max")
+                            Text(stringResource(R.string.travel_discover_plans))
                         }
                     }
                 }
@@ -196,17 +198,17 @@ private fun TravelProposalContent(
                     ) {
                         if (aiAvailable) {
                             OutlinedButton(onClick = { viewModel.regenerate() }, modifier = Modifier.weight(1f)) {
-                                Text("Rigenera")
+                                Text(stringResource(R.string.travel_regenerate))
                             }
                             OutlinedButton(
                                 onClick = onOpenAiChat,
                                 modifier = Modifier.weight(1f),
                             ) {
-                                Text("Modifica")
+                                Text(stringResource(R.string.travel_edit))
                             }
                         }
                         Button(onClick = { viewModel.acceptProposal() }, modifier = Modifier.weight(1f)) {
-                            Text("Accetta ✓")
+                            Text(stringResource(R.string.travel_accept))
                         }
                     }
                 }
@@ -227,13 +229,13 @@ private fun TravelProposalContent(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Text("Piano Pro o Max richiesto per la pianificazione AI.", color = kb.subtitle)
-                        Button(onClick = onOpenPlans) { Text("Scopri Pro e Max") }
+                        Text(stringResource(R.string.travel_plan_requires_pro), color = kb.subtitle)
+                        Button(onClick = onOpenPlans) { Text(stringResource(R.string.travel_discover_plans)) }
                     }
                 }
                 isGenerating -> {
                     TravelPlanningLoadingScreen(
-                        destinationName = viewModel.destinationName.ifBlank { "il viaggio" },
+                        destinationName = viewModel.destinationName.ifBlank { stringResource(R.string.travel_the_trip) },
                         subtitle = "Sto finalizzando il percorso di ${viewModel.tripDayCount} giorni",
                         plannedDayCount = viewModel.tripDayCount,
                     )
@@ -271,7 +273,7 @@ private fun TravelProposalContent(
                         val packing = proposal["packingList"].asMapList().take(5)
                         if (packing.isNotEmpty()) {
                             item {
-                                Text("Da portare", style = MaterialTheme.typography.titleMedium, color = kb.title)
+                                Text(stringResource(R.string.travel_to_pack), style = MaterialTheme.typography.titleMedium, color = kb.title)
                             }
                             items(packing) { item ->
                                 Text("• ${item["label"]}", modifier = Modifier.padding(horizontal = 16.dp))
@@ -287,12 +289,12 @@ private fun TravelProposalContent(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         item {
-                            Text("Introduzione", style = MaterialTheme.typography.titleMedium, color = kb.title)
+                            Text(stringResource(R.string.travel_intro), style = MaterialTheme.typography.titleMedium, color = kb.title)
                             Text(narrative.orEmpty(), color = kb.subtitle)
                         }
                         item {
                             Text(
-                                "L'itinerario strutturato non è disponibile. Prova «Rigenera».",
+                                stringResource(R.string.travel_no_structured),
                                 color = kb.subtitle,
                                 style = MaterialTheme.typography.bodySmall,
                             )
@@ -310,11 +312,11 @@ private fun TravelProposalContent(
                         Text(error ?: "", color = MaterialTheme.colorScheme.error)
                         if (aiAvailable && viewModel.canGenerate) {
                             Button(onClick = { viewModel.regenerate() }) {
-                                Text("Rigenera")
+                                Text(stringResource(R.string.travel_regenerate))
                             }
                         }
                         OutlinedButton(onClick = onNavigateBack) {
-                            Text("Indietro")
+                            Text(stringResource(R.string.travel_back))
                         }
                     }
                 }
@@ -326,13 +328,13 @@ private fun TravelProposalContent(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Text("Nessun itinerario da mostrare.", color = kb.subtitle)
+                        Text(stringResource(R.string.travel_no_itinerary), color = kb.subtitle)
                         OutlinedButton(onClick = onNavigateBack) {
-                            Text("Indietro")
+                            Text(stringResource(R.string.travel_back))
                         }
                         if (aiAvailable && viewModel.canGenerate) {
                             Button(onClick = { viewModel.regenerate() }) {
-                                Text("Rigenera piano")
+                                Text(stringResource(R.string.travel_regenerate_plan))
                             }
                         }
                     }

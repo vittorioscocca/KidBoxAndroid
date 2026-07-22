@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -66,7 +68,7 @@ fun TravelAllTripsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        if (isSelectionMode) "Seleziona viaggi" else "Tutti i viaggi",
+                        if (isSelectionMode) stringResource(R.string.travel_select_trips) else stringResource(R.string.travel_all_trips),
                         color = kb.title,
                     )
                 },
@@ -88,7 +90,7 @@ fun TravelAllTripsScreen(
                                 },
                             ) {
                                 Text(
-                                    if (selectedIds.size == filteredTrips.size) "Deseleziona" else "Tutti",
+                                    if (selectedIds.size == filteredTrips.size) stringResource(R.string.travel_deselect) else stringResource(R.string.travel_all),
                                     color = kb.title,
                                 )
                             }
@@ -96,14 +98,14 @@ fun TravelAllTripsScreen(
                                 onClick = { showDeleteDialog = true },
                                 enabled = selectedIds.isNotEmpty(),
                             ) {
-                                Text("Elimina", color = MaterialTheme.colorScheme.error)
+                                Text(stringResource(R.string.travel_delete), color = MaterialTheme.colorScheme.error)
                             }
                             TextButton(onClick = { viewModel.setSelectionMode(false) }) {
-                                Text("Annulla", color = kb.title)
+                                Text(stringResource(R.string.travel_cancel), color = kb.title)
                             }
                         } else {
                             TextButton(onClick = { viewModel.setSelectionMode(true) }) {
-                                Text("Seleziona", color = kb.title)
+                                Text(stringResource(R.string.travel_select), color = kb.title)
                             }
                         }
                     }
@@ -119,7 +121,7 @@ fun TravelAllTripsScreen(
                     .padding(padding),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("Nessun viaggio", color = kb.subtitle)
+                Text(stringResource(R.string.travel_none), color = kb.subtitle)
             }
         } else {
             LazyColumn(
@@ -134,7 +136,7 @@ fun TravelAllTripsScreen(
                         value = searchQuery,
                         onValueChange = viewModel::setSearchQuery,
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Cerca viaggio o destinazione…") },
+                        placeholder = { Text(stringResource(R.string.travel_search_hint)) },
                         leadingIcon = {
                             Icon(Icons.Filled.Search, contentDescription = null)
                         },
@@ -144,7 +146,7 @@ fun TravelAllTripsScreen(
                 if (filteredTrips.isEmpty()) {
                     item {
                         Text(
-                            "Nessun risultato per la ricerca.",
+                            stringResource(R.string.travel_no_results_dot),
                             color = kb.subtitle,
                             modifier = Modifier.padding(vertical = 24.dp),
                         )
@@ -186,7 +188,7 @@ fun TravelAllTripsScreen(
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("Eliminare ${selectedIds.size} viaggi?") },
-            text = { Text("Questa azione non può essere annullata.") },
+            text = { Text(stringResource(R.string.travel_cannot_undo)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -194,12 +196,12 @@ fun TravelAllTripsScreen(
                         showDeleteDialog = false
                     },
                 ) {
-                    Text("Elimina", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.travel_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Annulla")
+                    Text(stringResource(R.string.travel_cancel))
                 }
             },
         )

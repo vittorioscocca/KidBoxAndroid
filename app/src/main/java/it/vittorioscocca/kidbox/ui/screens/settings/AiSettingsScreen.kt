@@ -81,8 +81,9 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
 
-private val CONSENT_DATE_FMT = SimpleDateFormat("d MMMM yyyy, HH:mm", Locale.ITALIAN)
+private fun CONSENT_DATE_FMT() = SimpleDateFormat("d MMMM yyyy, HH:mm", KBLocale.current())
 private val DESTRUCTIVE = Color(0xFFD32F2F)
 private val CONSENT_GREEN = Color(0xFF059669)
 
@@ -115,20 +116,20 @@ fun AiSettingsScreen(
     if (showRevokeConfirm) {
         AlertDialog(
             onDismissRequest = { showRevokeConfirm = false },
-            title = { Text("Revocare il consenso?") },
+            title = { Text(stringResource(R.string.settings_ai_revoke_q)) },
             text = {
-                Text("L'assistente AI verrà disattivato e dovrai accettare di nuovo le condizioni per usarlo.")
+                Text(stringResource(R.string.settings_ai_revoke_body))
             },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.revokeConsent()
                     showRevokeConfirm = false
                 }) {
-                    Text("Revoca", color = DESTRUCTIVE, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.settings_ai_revoke), color = DESTRUCTIVE, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showRevokeConfirm = false }) { Text("Annulla") }
+                TextButton(onClick = { showRevokeConfirm = false }) { Text(stringResource(R.string.settings_common_cancel)) }
             },
         )
     }
@@ -141,12 +142,12 @@ fun AiSettingsScreen(
             TopAppBar(
                 modifier = Modifier.statusBarsPadding(),
                 title = {
-                    Text("Assistente AI", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = kb.title)
+                    Text(stringResource(R.string.settings_ai_title), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = kb.title)
                 },
                 navigationIcon = {
                     KidBoxHeaderCircleButton(
                         icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Indietro",
+                        contentDescription = stringResource(R.string.settings_common_back),
                         onClick = onBack,
                     )
                 },
@@ -265,7 +266,7 @@ private fun CurrentPlanCard(
             }
             Column(modifier = Modifier.padding(start = 14.dp)) {
                 Text(
-                    "Piano attuale",
+                    stringResource(R.string.settings_storage_current_plan),
                     color = Color.White.copy(alpha = 0.75f),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
@@ -283,19 +284,19 @@ private fun CurrentPlanCard(
                         (plan.aiDailyLimit - usageToday).coerceAtLeast(0)
                     }
                     Text(
-                        if (plan.aiDailyLimit == Int.MAX_VALUE) "AI illimitata" else "AI: ${plan.aiDailyLimit} messaggi/giorno",
+                        if (plan.aiDailyLimit == Int.MAX_VALUE) stringResource(R.string.settings_ai_unlimited) else stringResource(R.string.settings_plan_ai_messages_per_day, plan.aiDailyLimit),
                         color = Color.White.copy(alpha = 0.85f),
                         fontSize = 13.sp,
                     )
                     Text(
-                        if (availableToday == null) "Disponibili oggi: illimitati" else "Disponibili oggi: $availableToday",
+                        if (availableToday == null) stringResource(R.string.settings_ai_available_today_unlimited) else "Disponibili oggi: $availableToday",
                         color = Color.White.copy(alpha = 0.92f),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
                 } else {
                     Text(
-                        "AI non inclusa",
+                        stringResource(R.string.settings_ai_not_included),
                         color = Color.White.copy(alpha = 0.85f),
                         fontSize = 13.sp,
                     )
@@ -318,7 +319,7 @@ private fun AIIntroCard() {
                     modifier = Modifier.size(20.dp),
                 )
                 Text(
-                    "  Assistente AI Medico",
+                    stringResource(R.string.settings_ai_medical_title),
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 15.sp,
                     color = kb.title,
@@ -326,16 +327,14 @@ private fun AIIntroCard() {
             }
             Spacer(Modifier.height(10.dp))
             Text(
-                "L'assistente analizza i dati sanitari che scegli di condividere " +
-                    "e risponde alle tue domande sulla salute del tuo bambino.",
+                stringResource(R.string.settings_ai_medical_full1),
                 fontSize = 14.sp,
                 color = kb.subtitle,
                 lineHeight = 20.sp,
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                "Le risposte sono generate da Claude di Anthropic e non sostituiscono " +
-                    "il parere del tuo pediatra.",
+                stringResource(R.string.settings_ai_medical_full2),
                 fontSize = 13.sp,
                 color = kb.subtitle,
                 lineHeight = 18.sp,
@@ -362,9 +361,9 @@ private fun AIToggleCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Abilita Assistente AI", fontSize = 16.sp, color = kb.title, fontWeight = FontWeight.Medium)
+                    Text(stringResource(R.string.settings_ai_enable), fontSize = 16.sp, color = kb.title, fontWeight = FontWeight.Medium)
                     if (!consentGiven) {
-                        Text("Richiede accettazione consenso", fontSize = 12.sp, color = kb.subtitle)
+                        Text(stringResource(R.string.settings_ai_requires_consent), fontSize = 12.sp, color = kb.subtitle)
                     }
                 }
                 Switch(checked = isEnabled, onCheckedChange = onToggle)
@@ -383,7 +382,7 @@ private fun AIToggleCard(
                         modifier = Modifier.size(16.dp),
                     )
                     Text(
-                        "  Consenso fornito il ${CONSENT_DATE_FMT.format(Date(consentDate))}",
+                        "  Consenso fornito il ${CONSENT_DATE_FMT().format(Date(consentDate))}",
                         color = CONSENT_GREEN,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
@@ -394,7 +393,7 @@ private fun AIToggleCard(
                     onClick = onRevokeClick,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
                 ) {
-                    Text("Revoca consenso e disabilita AI", color = DESTRUCTIVE, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.settings_ai_revoke_disable), color = DESTRUCTIVE, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -419,7 +418,7 @@ private fun AIUsageCard(usageToday: Int, dailyLimit: Int) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.BarChart, contentDescription = null, tint = progressColor, modifier = Modifier.size(18.dp))
                 Text(
-                    "  Messaggi AI oggi",
+                    stringResource(R.string.settings_ai_messages_today),
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
                     color = kb.title,
@@ -428,7 +427,7 @@ private fun AIUsageCard(usageToday: Int, dailyLimit: Int) {
             Spacer(Modifier.height(10.dp))
             if (isUnlimited) {
                 Text(
-                    "Disponibili: illimitati",
+                    stringResource(R.string.settings_ai_available_unlimited),
                     fontSize = 14.sp,
                     color = kb.title,
                     fontWeight = FontWeight.SemiBold,
@@ -470,13 +469,13 @@ private fun AIPrivacyCard() {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.Lock, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
-                Text("  Privacy e sicurezza", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = kb.title)
+                Text(stringResource(R.string.settings_ai_privacy_title), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = kb.title)
             }
             Spacer(Modifier.height(10.dp))
-            PrivacyLine("I dati sanitari sono cifrati prima dell'invio.")
-            PrivacyLine("Le risposte AI non vengono memorizzate sui server KidBox.")
-            PrivacyLine("Puoi revocare il consenso in qualsiasi momento.")
-            PrivacyLine("I dati sono trattati da Anthropic secondo la loro Privacy Policy.")
+            PrivacyLine(stringResource(R.string.settings_ai_privacy1))
+            PrivacyLine(stringResource(R.string.settings_ai_privacy2))
+            PrivacyLine(stringResource(R.string.settings_ai_privacy3))
+            PrivacyLine(stringResource(R.string.settings_ai_privacy4))
         }
     }
 }
@@ -503,8 +502,8 @@ private fun WeeklySummaryCard(isEnabled: Boolean, onToggle: (Boolean) -> Unit) {
             ) {
                 Icon(Icons.Filled.CalendarMonth, contentDescription = null, tint = Color(0xFF8B5CF6), modifier = Modifier.size(20.dp))
                 Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-                    Text("Riepilogo settimanale AI", fontSize = 15.sp, color = kb.title, fontWeight = FontWeight.Medium)
-                    Text("Ricevi un riassunto AI ogni settimana", fontSize = 12.sp, color = kb.subtitle)
+                    Text(stringResource(R.string.settings_ai_weekly), fontSize = 15.sp, color = kb.title, fontWeight = FontWeight.Medium)
+                    Text(stringResource(R.string.settings_ai_weekly_sub), fontSize = 12.sp, color = kb.subtitle)
                 }
                 Switch(checked = isEnabled, onCheckedChange = onToggle)
             }
@@ -578,8 +577,8 @@ private fun DailyBriefingCard(isEnabled: Boolean, onToggle: (Boolean) -> Unit) {
             ) {
                 Icon(Icons.Filled.WbSunny, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(20.dp))
                 Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-                    Text("Briefing quotidiano AI", fontSize = 15.sp, color = kb.title, fontWeight = FontWeight.Medium)
-                    Text("Notifica ogni mattina alle 8:00 con gli impegni del giorno", fontSize = 12.sp, color = kb.subtitle)
+                    Text(stringResource(R.string.settings_ai_daily), fontSize = 15.sp, color = kb.title, fontWeight = FontWeight.Medium)
+                    Text(stringResource(R.string.settings_ai_daily_sub), fontSize = 12.sp, color = kb.subtitle)
                 }
                 Switch(checked = isEnabled, onCheckedChange = onToggle)
             }
@@ -605,8 +604,8 @@ private fun HealthPatternCard(isEnabled: Boolean, onToggle: (Boolean) -> Unit) {
                     modifier = Modifier.size(20.dp),
                 )
                 Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-                    Text("Pattern salute AI", fontSize = 15.sp, color = kb.title, fontWeight = FontWeight.Medium)
-                    Text("Analisi mensile della storia sanitaria dei figli", fontSize = 12.sp, color = kb.subtitle)
+                    Text(stringResource(R.string.settings_ai_patterns), fontSize = 15.sp, color = kb.title, fontWeight = FontWeight.Medium)
+                    Text(stringResource(R.string.settings_ai_patterns_sub), fontSize = 12.sp, color = kb.subtitle)
                 }
                 Switch(checked = isEnabled, onCheckedChange = onToggle)
             }
@@ -632,13 +631,13 @@ private fun AILockedBanner(
                 Icon(Icons.Filled.Lock, contentDescription = null, tint = Color(0xFF6B7280), modifier = Modifier.size(22.dp))
                 Column(modifier = Modifier.padding(start = 12.dp)) {
                     Text(
-                        "L'assistente AI è disponibile con Pro o Max",
+                        stringResource(R.string.settings_ai_requires_plan),
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 15.sp,
                         color = kb.title,
                     )
                     Text(
-                        "Passa a Pro per 20 messaggi/giorno per membro, o a Max per 100.",
+                        stringResource(R.string.settings_ai_upgrade_hint),
                         fontSize = 13.sp,
                         color = kb.subtitle,
                         lineHeight = 18.sp,
@@ -661,8 +660,8 @@ private fun AILockedBanner(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text("Scopri i piani", color = Color(0xFF1D4ED8), fontWeight = FontWeight.SemiBold)
-                    TextButton(onClick = onDiscoverPlans) { Text("Apri", color = Color(0xFF1D4ED8)) }
+                    Text(stringResource(R.string.settings_ai_see_plans), color = Color(0xFF1D4ED8), fontWeight = FontWeight.SemiBold)
+                    TextButton(onClick = onDiscoverPlans) { Text(stringResource(R.string.settings_ai_open), color = Color(0xFF1D4ED8)) }
                 }
             }
 
@@ -675,8 +674,8 @@ private fun AILockedBanner(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("Riscatta codice offerta", color = kb.title, fontWeight = FontWeight.SemiBold)
-                TextButton(onClick = onRedeemOfferCode) { Text("Apri") }
+                Text(stringResource(R.string.settings_storage_redeem), color = kb.title, fontWeight = FontWeight.SemiBold)
+                TextButton(onClick = onRedeemOfferCode) { Text(stringResource(R.string.settings_ai_open)) }
             }
         }
     }
@@ -691,13 +690,13 @@ private fun HealthContextSettingsCard(
     SettingCard {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                "Contesto chat Salute",
+                stringResource(R.string.settings_ai_health_context),
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 15.sp,
                 color = kb.title,
             )
             Text(
-                "Con profili sanitari molto ampi puoi inviare tutti i referti o un riassunto.",
+                stringResource(R.string.settings_ai_health_context_sub),
                 fontSize = 13.sp,
                 color = kb.subtitle,
                 lineHeight = 18.sp,
@@ -713,8 +712,8 @@ private fun HealthContextSettingsCard(
                 ) {
                     RadioButton(selected = selected == pref, onClick = { onSelected(pref) })
                     Column(modifier = Modifier.padding(start = 4.dp)) {
-                        Text(pref.displayName, color = kb.title, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                        Text(pref.detail, color = kb.subtitle, fontSize = 12.sp, lineHeight = 16.sp)
+                        Text(stringResource(pref.displayNameRes), color = kb.title, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                        Text(stringResource(pref.detailRes), color = kb.subtitle, fontSize = 12.sp, lineHeight = 16.sp)
                     }
                 }
             }
@@ -732,13 +731,13 @@ fun HealthContextSendPreferenceSection(
     val kb = MaterialTheme.kidBoxColors
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
-            "Chat Salute AI",
+            stringResource(R.string.settings_ai_health_chat),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
             color = kb.title,
         )
         Text(
-            "Contesto inviato all'assistente quando il profilo sanitario è molto ampio.",
+            stringResource(R.string.settings_ai_health_chat_sub),
             style = MaterialTheme.typography.bodySmall,
             color = kb.subtitle,
             modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
@@ -753,8 +752,8 @@ fun HealthContextSendPreferenceSection(
             ) {
                 RadioButton(selected = selected == pref, onClick = { onSelected(pref) })
                 Column(modifier = Modifier.padding(start = 8.dp)) {
-                    Text(pref.displayName, color = kb.title, fontWeight = FontWeight.Medium)
-                    Text(pref.detail, style = MaterialTheme.typography.bodySmall, color = kb.subtitle)
+                    Text(stringResource(pref.displayNameRes), color = kb.title, fontWeight = FontWeight.Medium)
+                    Text(stringResource(pref.detailRes), style = MaterialTheme.typography.bodySmall, color = kb.subtitle)
                 }
             }
         }

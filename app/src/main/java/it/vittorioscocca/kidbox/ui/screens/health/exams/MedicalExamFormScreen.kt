@@ -72,8 +72,11 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
-private val DATE_FMT_EXAM_FORM = SimpleDateFormat("d MMM yyyy", Locale.ITALIAN)
+private fun DATE_FMT_EXAM_FORM() = SimpleDateFormat("d MMM yyyy", KBLocale.current())
 private val ORANGE_EXAM_FORM = Color(0xFFFF6B00)
 
 @Composable
@@ -105,7 +108,7 @@ fun MedicalExamFormScreen(
 
     LaunchedEffect(state.saved, state.examId) {
         if (state.saved) {
-            Toast.makeText(context, "Esame salvato", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.health_exam_saved), Toast.LENGTH_SHORT).show()
             val id = state.examId
             val name = state.name.trim()
             viewModel.consumeSaved()
@@ -145,7 +148,7 @@ fun MedicalExamFormScreen(
         if (granted) {
             takePictureLauncher.launch(cameraUri)
         } else {
-            Toast.makeText(context, "Permesso fotocamera negato", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.health_camera_denied), Toast.LENGTH_SHORT).show()
         }
     }
     val pickPhotoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -159,16 +162,16 @@ fun MedicalExamFormScreen(
     var currentStep by remember { mutableStateOf(0) }
     val totalSteps = 4
     val stepTitle = when (currentStep) {
-        0 -> "Dettagli esame"
-        1 -> "Stato e promemoria"
-        2 -> "Referto"
-        else -> "Riepilogo"
+        0 -> stringResource(R.string.health_exam_details)
+        1 -> stringResource(R.string.health_status_and_reminder)
+        2 -> stringResource(R.string.health_report)
+        else -> stringResource(R.string.health_summary)
     }
     val stepSubtitle = when (currentStep) {
-        0 -> "Nome, urgenza, scadenza e luogo"
-        1 -> "Stato, alert e note preparazione"
-        2 -> "Inserisci risultato se disponibile"
-        else -> "Controlla tutto prima di salvare"
+        0 -> stringResource(R.string.health_exam_step1)
+        1 -> stringResource(R.string.health_exam_step2)
+        2 -> stringResource(R.string.health_exam_step3)
+        else -> stringResource(R.string.health_exam_step4)
     }
     val canAdvance = when (currentStep) {
         0 -> state.name.isNotBlank()
@@ -193,14 +196,14 @@ fun MedicalExamFormScreen(
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 KidBoxHeaderCircleButton(
                     icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Indietro",
+                    contentDescription = stringResource(R.string.health_back),
                     onClick = onBack,
                 )
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = onBack) { Text("Annulla", color = kb.title) }
+                TextButton(onClick = onBack) { Text(stringResource(R.string.health_cancel), color = kb.title) }
             }
             Text(
-                if (examId == null) "Nuovo esame" else "Modifica esame",
+                if (examId == null) stringResource(R.string.health_new_exam) else stringResource(R.string.health_edit_exam),
                 fontSize = 30.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = kb.title,
@@ -229,11 +232,11 @@ fun MedicalExamFormScreen(
 
             if (currentStep == 0) {
             // ── 1. Nome esame ─────────────────────────────────────────────────
-            ExamSectionLabel("Nome esame")
+            ExamSectionLabel(stringResource(R.string.health_exam_name))
             OutlinedTextField(
                 value = state.name,
                 onValueChange = viewModel::setName,
-                placeholder = { Text("es. Esame del sangue") },
+                placeholder = { Text(stringResource(R.string.health_exam_name_hint)) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 singleLine = true,
@@ -241,24 +244,24 @@ fun MedicalExamFormScreen(
             Spacer(Modifier.height(16.dp))
 
             // ── 2. Urgente ────────────────────────────────────────────────────
-            ExamSectionLabel("Urgente")
-            ExamSwitchRow(label = "Esame urgente", checked = state.isUrgent, onChecked = viewModel::setIsUrgent)
+            ExamSectionLabel(stringResource(R.string.health_urgent))
+            ExamSwitchRow(label = stringResource(R.string.health_exam_urgent), checked = state.isUrgent, onChecked = viewModel::setIsUrgent)
             Spacer(Modifier.height(16.dp))
 
             // ── 3. Scadenza ───────────────────────────────────────────────────
-            ExamSectionLabel("Scadenza")
-            ExamSwitchRow(label = "Imposta scadenza", checked = state.hasDeadline, onChecked = viewModel::setHasDeadline)
+            ExamSectionLabel(stringResource(R.string.health_deadline))
+            ExamSwitchRow(label = stringResource(R.string.health_set_deadline), checked = state.hasDeadline, onChecked = viewModel::setHasDeadline)
             if (state.hasDeadline) {
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = DATE_FMT_EXAM_FORM.format(Date(state.deadlineEpochMillis)),
+                    value = DATE_FMT_EXAM_FORM().format(Date(state.deadlineEpochMillis)),
                     onValueChange = {},
                     readOnly = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     trailingIcon = {
                         IconButton(onClick = { showDeadlinePicker = true }) {
-                            Icon(Icons.Default.CalendarMonth, contentDescription = "Scegli data", tint = ORANGE_EXAM_FORM)
+                            Icon(Icons.Default.CalendarMonth, contentDescription = stringResource(R.string.health_pick_date), tint = ORANGE_EXAM_FORM)
                         }
                     },
                 )
@@ -269,7 +272,7 @@ fun MedicalExamFormScreen(
 
             if (currentStep == 1) {
             // ── 4. Stato ──────────────────────────────────────────────────────
-            ExamSectionLabel("Stato")
+            ExamSectionLabel(stringResource(R.string.health_status))
             ExposedDropdownMenuBox(
                 expanded = statusMenuOpen,
                 onExpandedChange = { statusMenuOpen = it },
@@ -297,16 +300,16 @@ fun MedicalExamFormScreen(
             Spacer(Modifier.height(16.dp))
 
             // ── 5. Promemoria ─────────────────────────────────────────────────
-            ExamSectionLabel("Promemoria")
+            ExamSectionLabel(stringResource(R.string.health_reminder))
             ExamSwitchRow(
-                label = "Avvisami il giorno prima della scadenza",
+                label = stringResource(R.string.health_notify_day_before),
                 checked = state.reminderOn,
                 onChecked = { if (state.hasDeadline) viewModel.setReminderOn(it) },
                 enabled = state.hasDeadline,
             )
             if (!state.hasDeadline) {
                 Text(
-                    "Imposta una scadenza per attivare il promemoria.",
+                    stringResource(R.string.health_set_deadline_hint),
                     fontSize = 11.sp,
                     color = kb.subtitle,
                     modifier = Modifier.padding(top = 2.dp),
@@ -315,11 +318,11 @@ fun MedicalExamFormScreen(
             Spacer(Modifier.height(16.dp))
 
             // ── 6. Luogo ──────────────────────────────────────────────────────
-            ExamSectionLabel("Luogo")
+            ExamSectionLabel(stringResource(R.string.health_place))
             OutlinedTextField(
                 value = state.location,
                 onValueChange = viewModel::setLocation,
-                placeholder = { Text("es. Laboratorio Centrale") },
+                placeholder = { Text(stringResource(R.string.health_lab_hint)) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 singleLine = true,
@@ -327,11 +330,11 @@ fun MedicalExamFormScreen(
             Spacer(Modifier.height(16.dp))
 
             // ── 7. Preparazione ───────────────────────────────────────────────
-            ExamSectionLabel("Preparazione")
+            ExamSectionLabel(stringResource(R.string.health_preparation))
             OutlinedTextField(
                 value = state.preparation,
                 onValueChange = viewModel::setPreparation,
-                placeholder = { Text("es. A digiuno da 8 ore") },
+                placeholder = { Text(stringResource(R.string.health_fasting_hint)) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 minLines = 3,
@@ -339,11 +342,11 @@ fun MedicalExamFormScreen(
             Spacer(Modifier.height(16.dp))
 
             // ── 8. Note ───────────────────────────────────────────────────────
-            ExamSectionLabel("Note")
+            ExamSectionLabel(stringResource(R.string.health_notes))
             OutlinedTextField(
                 value = state.notes,
                 onValueChange = viewModel::setNotes,
-                placeholder = { Text("Note aggiuntive") },
+                placeholder = { Text(stringResource(R.string.health_extra_notes)) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 minLines = 3,
@@ -354,9 +357,9 @@ fun MedicalExamFormScreen(
 
             if (currentStep == 2) {
             // ── 9. Risultato ──────────────────────────────────────────────────
-            ExamSectionLabel("Risultato")
+            ExamSectionLabel(stringResource(R.string.health_result))
             ExamSwitchRow(
-                label = "Risultato disponibile",
+                label = stringResource(R.string.health_result_available),
                 checked = state.hasResult,
                 onChecked = viewModel::setHasResult,
             )
@@ -365,30 +368,30 @@ fun MedicalExamFormScreen(
                 OutlinedTextField(
                     value = state.resultText,
                     onValueChange = viewModel::setResultText,
-                    placeholder = { Text("Trascrivi il referto qui") },
+                    placeholder = { Text(stringResource(R.string.health_transcribe_report)) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     minLines = 5,
                 )
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = DATE_FMT_EXAM_FORM.format(Date(state.resultDateEpochMillis)),
+                    value = DATE_FMT_EXAM_FORM().format(Date(state.resultDateEpochMillis)),
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text("Data referto") },
+                    label = { Text(stringResource(R.string.health_report_date)) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     trailingIcon = {
                         IconButton(onClick = { showResultDatePicker = true }) {
-                            Icon(Icons.Default.CalendarMonth, contentDescription = "Scegli data", tint = ORANGE_EXAM_FORM)
+                            Icon(Icons.Default.CalendarMonth, contentDescription = stringResource(R.string.health_pick_date), tint = ORANGE_EXAM_FORM)
                         }
                     },
                 )
             }
             Spacer(Modifier.height(12.dp))
-            ExamSectionLabel("Referto allegato")
+            ExamSectionLabel(stringResource(R.string.health_report_attached))
             Text(
-                "Aggiungi qui PDF/foto del referto.",
+                stringResource(R.string.health_report_attach_hint),
                 fontSize = 12.sp,
                 color = kb.subtitle,
             )
@@ -413,25 +416,25 @@ fun MedicalExamFormScreen(
             }
 
             if (currentStep == 3) {
-                ExamSectionLabel("Riepilogo")
-                OutlinedTextField(value = state.name, onValueChange = {}, readOnly = true, label = { Text("Nome esame") }, modifier = Modifier.fillMaxWidth())
+                ExamSectionLabel(stringResource(R.string.health_summary))
+                OutlinedTextField(value = state.name, onValueChange = {}, readOnly = true, label = { Text(stringResource(R.string.health_exam_name)) }, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(value = state.status.rawValue, onValueChange = {}, readOnly = true, label = { Text("Stato") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = state.status.rawValue, onValueChange = {}, readOnly = true, label = { Text(stringResource(R.string.health_status)) }, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
                 if (state.hasDeadline) {
-                    OutlinedTextField(value = DATE_FMT_EXAM_FORM.format(Date(state.deadlineEpochMillis)), onValueChange = {}, readOnly = true, label = { Text("Scadenza") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = DATE_FMT_EXAM_FORM().format(Date(state.deadlineEpochMillis)), onValueChange = {}, readOnly = true, label = { Text(stringResource(R.string.health_deadline)) }, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(8.dp))
                 }
                 if (state.hasResult) {
-                    OutlinedTextField(value = state.resultText, onValueChange = {}, readOnly = true, label = { Text("Risultato") }, modifier = Modifier.fillMaxWidth(), minLines = 3)
+                    OutlinedTextField(value = state.resultText, onValueChange = {}, readOnly = true, label = { Text(stringResource(R.string.health_result)) }, modifier = Modifier.fillMaxWidth(), minLines = 3)
                 }
                 Spacer(Modifier.height(12.dp))
-                ExamSectionLabel("Referto allegato")
+                ExamSectionLabel(stringResource(R.string.health_report_attached))
                 OutlinedTextField(
-                    value = if (state.attachments.isEmpty()) "Nessun allegato" else "${state.attachments.size} allegato/i",
+                    value = if (state.attachments.isEmpty()) stringResource(R.string.health_no_attachments) else "${state.attachments.size} allegato/i",
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text("Totale allegati") },
+                    label = { Text(stringResource(R.string.health_total_attachments)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (state.attachments.isNotEmpty()) {
@@ -441,7 +444,7 @@ fun MedicalExamFormScreen(
                             value = doc.title.ifBlank { doc.fileName },
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Allegato") },
+                            label = { Text(stringResource(R.string.health_attachment)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                         )
@@ -458,7 +461,7 @@ fun MedicalExamFormScreen(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = kb.card),
-                    ) { Text("Indietro", color = kb.title) }
+                    ) { Text(stringResource(R.string.health_back), color = kb.title) }
                 }
                 if (currentStep < totalSteps - 1) {
                     Button(
@@ -467,7 +470,7 @@ fun MedicalExamFormScreen(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = ORANGE_EXAM_FORM),
-                    ) { Text("Avanti", color = Color.White, fontWeight = FontWeight.SemiBold) }
+                    ) { Text(stringResource(R.string.health_next), color = Color.White, fontWeight = FontWeight.SemiBold) }
                 } else {
                     Button(
                         onClick = { viewModel.save() },
@@ -479,9 +482,9 @@ fun MedicalExamFormScreen(
                         if (state.isSaving) {
                             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
                             Spacer(Modifier.width(8.dp))
-                            Text("Salvataggio...", color = Color.White, fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.health_saving), color = Color.White, fontWeight = FontWeight.SemiBold)
                         } else {
-                            Text("Salva esame", color = Color.White, fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.health_save_exam), color = Color.White, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -571,7 +574,7 @@ private fun ExamDatePickerDialog(
                 pickerState.selectedDateMillis?.let { onConfirm(it) } ?: onDismiss()
             }) { Text("OK") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Annulla") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.health_cancel)) } },
     ) {
         DatePicker(state = pickerState)
     }

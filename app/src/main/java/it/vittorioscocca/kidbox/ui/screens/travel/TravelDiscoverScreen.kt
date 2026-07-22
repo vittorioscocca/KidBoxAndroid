@@ -47,6 +47,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private val TravelAccent = Color(0xFFF2611A)
 
@@ -72,7 +74,7 @@ fun TravelDiscoverScreen(
         containerColor = kb.background,
         topBar = {
             TopAppBar(
-                title = { Text("Per te, questa settimana", color = kb.title) },
+                title = { Text(stringResource(R.string.travel_for_you_week), color = kb.title) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = kb.title)
@@ -81,7 +83,7 @@ fun TravelDiscoverScreen(
                 actions = {
                     TextButton(onClick = { viewModel.loadSuggestions(force = true) }, enabled = !isLoading) {
                         Icon(Icons.Filled.Refresh, contentDescription = null, tint = kb.title)
-                        Text("Nuovi", color = kb.title, modifier = Modifier.padding(start = 4.dp))
+                        Text(stringResource(R.string.travel_new), color = kb.title, modifier = Modifier.padding(start = 4.dp))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = kb.background),
@@ -93,7 +95,7 @@ fun TravelDiscoverScreen(
                 Box(Modifier.fillMaxSize().padding(padding)) {
                     TravelPlanningLoadingScreen(
                         destinationName = "le destinazioni",
-                        subtitle = "Sto cercando i posti giusti per te",
+                        subtitle = stringResource(R.string.travel_searching_places),
                     )
                 }
             }
@@ -156,7 +158,7 @@ private fun TopMatchCard(destination: TravelDestination, onClick: () -> Unit) {
                         Surface(color = Color.White.copy(0.2f), shape = RoundedCornerShape(12.dp)) {
                             Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Box(Modifier.size(8.dp).background(TravelAccent, CircleShape))
-                                Text("MIGLIOR SCELTA", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(start = 6.dp))
+                                Text(stringResource(R.string.travel_best_choice), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(start = 6.dp))
                             }
                         }
                         Icon(Icons.Filled.FavoriteBorder, contentDescription = null, tint = Color.White)

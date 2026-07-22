@@ -1,4 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.travel
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 data class TravelPlaceReview(
     val id: String,
@@ -28,9 +30,9 @@ data class TravelPlaceDetails(
 
 sealed class TravelPlacesServiceError(message: String) : Exception(message) {
     data object NotConfigured : TravelPlacesServiceError(
-        "Google Places non è configurato. Verifica la chiave API sulle Cloud Functions.",
+        "",
     )
-    data object NotFound : TravelPlacesServiceError("Non abbiamo trovato questo luogo su Google.")
-    data object InvalidResponse : TravelPlacesServiceError("Risposta non valida dal servizio luoghi.")
+    data object NotFound : TravelPlacesServiceError("")
+    data object InvalidResponse : TravelPlacesServiceError("")
     class Network(msg: String) : TravelPlacesServiceError(msg)
 }

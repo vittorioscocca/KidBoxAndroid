@@ -100,9 +100,12 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private val ORANGE = Color(0xFFFF6B00)
-private val DATE_SHORT = SimpleDateFormat("HH:mm", Locale.ITALIAN)
+private fun DATE_SHORT() = SimpleDateFormat("HH:mm", KBLocale.current())
 
 @Composable
 private fun HealthContextNoticeBanner(
@@ -135,7 +138,7 @@ private fun HealthContextNoticeBanner(
         IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
             Icon(
                 imageVector = Icons.Default.Close,
-                contentDescription = "Chiudi",
+                contentDescription = stringResource(R.string.health_close),
                 tint = kb.subtitle,
                 modifier = Modifier.size(16.dp),
             )
@@ -143,10 +146,11 @@ private fun HealthContextNoticeBanner(
     }
 }
 
-private val SUGGESTIONS = listOf(
-    "Quali cure sta seguendo?",
-    "Ci sono esami in scadenza?",
-    "Riassumi la situazione vaccinale",
+@Composable
+private fun suggestions(): List<String> = listOf(
+    stringResource(R.string.health_ai_q_treatments),
+    stringResource(R.string.health_ai_q_exams),
+    stringResource(R.string.health_ai_q_vaccines),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -200,9 +204,10 @@ fun HealthAIChatScreen(
         viewModel.clearActionExecutionSummary()
     }
 
+    val retryLabel = stringResource(R.string.health_retry)
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let { err ->
-            val result = snackbarHostState.showSnackbar(message = err, actionLabel = "Riprova")
+            val result = snackbarHostState.showSnackbar(message = err, actionLabel = retryLabel)
             if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) viewModel.consumeError()
             else viewModel.consumeError()
         }
@@ -220,7 +225,7 @@ fun HealthAIChatScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = kb.background),
                 title = {
                     Text(
-                        "Salute",
+                        stringResource(R.string.health_title),
                         fontWeight = FontWeight.Bold,
                         fontSize = 17.sp,
                         color = kb.title,
@@ -229,7 +234,7 @@ fun HealthAIChatScreen(
                 navigationIcon = {
                     KidBoxHeaderCircleButton(
                         icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Indietro",
+                        contentDescription = stringResource(R.string.health_back),
                         onClick = onBack,
                     )
                 },
@@ -237,7 +242,7 @@ fun HealthAIChatScreen(
                     Box {
                         KidBoxHeaderCircleButton(
                             icon = Icons.Default.MoreVert,
-                            contentDescription = "Menu",
+                            contentDescription = stringResource(R.string.health_menu),
                             onClick = { showMenu = true },
                         )
                         DropdownMenu(
@@ -245,7 +250,7 @@ fun HealthAIChatScreen(
                             onDismissRequest = { showMenu = false },
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Nuova conversazione", color = Color(0xFFD32F2F)) },
+                                text = { Text(stringResource(R.string.health_new_conversation), color = Color(0xFFD32F2F)) },
                                 onClick = {
                                     showMenu = false
                                     showClearDialog = true
@@ -260,7 +265,7 @@ fun HealthAIChatScreen(
                                 },
                             )
                             DropdownMenuItem(
-                                text = { Text("Impostazioni AI") },
+                                text = { Text(stringResource(R.string.health_ai_settings)) },
                                 onClick = {
                                     showMenu = false
                                     onOpenAiSettings()
@@ -279,9 +284,9 @@ fun HealthAIChatScreen(
                             Spacer(Modifier.height(12.dp))
                             Text(
                                 if (state.isPreparingCompactContext) {
-                                    "Riassunto contesto sanitario..."
+                                    stringResource(R.string.health_summarizing_context)
                                 } else {
-                                    "Preparando il contesto sanitario..."
+                                    stringResource(R.string.health_preparing_context)
                                 },
                                 fontSize = 14.sp,
                                 color = kb.subtitle,
@@ -322,13 +327,13 @@ fun HealthAIChatScreen(
                             )
                             Spacer(Modifier.height(6.dp))
                             Text(
-                                "Puoi chiedermi un riepilogo, farmaci in corso, vaccini, visite recenti o esami in attesa.",
+                                stringResource(R.string.health_ai_intro),
                                 fontSize = 13.sp,
                                 color = kb.subtitle,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                             )
                             Spacer(Modifier.height(14.dp))
-                            SUGGESTIONS.forEach { suggestion ->
+                            suggestions().forEach { suggestion ->
                                 SuggestionChip(
                                     onClick = { viewModel.sendSuggestion(suggestion) },
                                     label = { Text(suggestion, fontSize = 13.sp) },
@@ -398,7 +403,7 @@ fun HealthAIChatScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.KeyboardArrowDown,
-                                    contentDescription = "Scorri in basso",
+                                    contentDescription = stringResource(R.string.health_scroll_down),
                                     tint = Color.White,
                                 )
                             }
@@ -446,7 +451,7 @@ fun HealthAIChatScreen(
                 OutlinedTextField(
                     value = state.inputText,
                     onValueChange = { viewModel.setInput(it) },
-                    placeholder = { Text("Scrivi un messaggio...", color = kb.subtitle) },
+                    placeholder = { Text(stringResource(R.string.health_write_message), color = kb.subtitle) },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(24.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -471,7 +476,7 @@ fun HealthAIChatScreen(
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Invia",
+                        contentDescription = stringResource(R.string.health_send),
                         tint = if (state.canSend) Color.White else kb.subtitle,
                         modifier = Modifier.size(20.dp),
                     )
@@ -517,18 +522,18 @@ fun HealthAIChatScreen(
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
-            title = { Text("Nuova conversazione") },
-            text = { Text("La cronologia verrà eliminata.") },
+            title = { Text(stringResource(R.string.health_new_conversation)) },
+            text = { Text(stringResource(R.string.health_history_deleted)) },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.clearConversation()
                     showClearDialog = false
                 }) {
-                    Text("Conferma", color = Color(0xFFD32F2F))
+                    Text(stringResource(R.string.health_confirm), color = Color(0xFFD32F2F))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showClearDialog = false }) { Text("Annulla") }
+                TextButton(onClick = { showClearDialog = false }) { Text(stringResource(R.string.health_cancel)) }
             },
         )
     }
@@ -536,10 +541,11 @@ fun HealthAIChatScreen(
     if (state.showContextModeDialog) {
         AlertDialog(
             onDismissRequest = { viewModel.cancelPendingSend() },
-            title = { Text("Contesto sanitario ampio") },
+            title = { Text(stringResource(R.string.health_wide_context)) },
             text = {
                 Text(
                     AIAskAIPayload.choiceDialogMessage(
+                        context,
                         fullUnits = state.estimatedMessageUnits,
                         compactAskUnits = state.estimatedCompactMessageUnits,
                         compactSetupUnits = state.estimatedCompactSetupUnits,
@@ -556,6 +562,7 @@ fun HealthAIChatScreen(
                 TextButton(onClick = { viewModel.confirmSend(HealthContextSendMode.COMPACT_SUMMARY) }) {
                     Text(
                         AIAskAIPayload.compactChoiceButtonLabel(
+                            context,
                             askUnits = state.estimatedCompactMessageUnits,
                             setupUnits = state.estimatedCompactSetupUnits,
                         ),

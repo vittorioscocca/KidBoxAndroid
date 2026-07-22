@@ -5,6 +5,8 @@
 
 package it.vittorioscocca.kidbox.ui.screens.passwords
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.BasicTextField
@@ -154,23 +156,23 @@ fun PasswordGroupDetailScreen(
                 .padding(top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            HeaderPill(text = "Annulla", onClick = onBack)
+            HeaderPill(text = stringResource(R.string.location_cancel_button), onClick = onBack)
             Spacer(modifier = Modifier.weight(1f))
             Text(
-                if (state.isEditMode) "Modifica gruppo" else "Nuovo gruppo",
+                if (state.isEditMode) stringResource(R.string.passwords_edit_group_title) else stringResource(R.string.passwords_new_group_title),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = kb.title,
             )
             Spacer(modifier = Modifier.weight(1f))
             HeaderPill(
-                text = "Salva",
+                text = stringResource(R.string.location_save_content_description),
                 onClick = { viewModel.save(onDone = onBack) },
                 enabled = state.title.trim().isNotEmpty() && !state.isSaving,
             )
         }
 
-        SectionTitle("Dettagli gruppo")
+        SectionTitle(stringResource(R.string.passwords_group_details_section))
         RoundedCard {
             BasicTextField(
                 value = state.title,
@@ -187,7 +189,7 @@ fun PasswordGroupDetailScreen(
                 decorationBox = { inner ->
                     Box(modifier = Modifier.fillMaxWidth()) {
                         if (state.title.isBlank()) {
-                            Text("Nome gruppo", style = MaterialTheme.typography.titleLarge, color = kb.subtitle)
+                            Text(stringResource(R.string.passwords_group_name_placeholder), style = MaterialTheme.typography.titleLarge, color = kb.subtitle)
                         }
                         inner()
                     }
@@ -203,7 +205,7 @@ fun PasswordGroupDetailScreen(
         }
 
         Spacer(modifier = Modifier.height(10.dp))
-        SectionTitle("Icona")
+        SectionTitle(stringResource(R.string.passwords_icon_section))
         RoundedCard {
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -232,7 +234,7 @@ fun PasswordGroupDetailScreen(
         }
 
         Spacer(modifier = Modifier.height(10.dp))
-        SectionTitle("Colore")
+        SectionTitle(stringResource(R.string.passwords_color_section))
         RoundedCard {
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -264,7 +266,7 @@ fun PasswordGroupDetailScreen(
         }
 
         Spacer(modifier = Modifier.height(10.dp))
-        SectionTitle("Visibilita")
+        SectionTitle(stringResource(R.string.passwords_visibility_section))
         RoundedCard {
             Row(
                 modifier = Modifier
@@ -274,8 +276,8 @@ fun PasswordGroupDetailScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 val visLabel = when (state.visibility) {
-                    KBVisibilityScope.ONLY_CREATOR -> "Solo creatore"
-                    else -> "Tutta la famiglia"
+                    KBVisibilityScope.ONLY_CREATOR -> stringResource(R.string.passwords_only_creator_label)
+                    else -> stringResource(R.string.passwords_whole_family_label)
                 }
                 Text(visLabel, style = MaterialTheme.typography.titleMedium, color = kb.title)
                 Spacer(modifier = Modifier.weight(1f))
@@ -295,13 +297,13 @@ fun PasswordGroupDetailScreen(
         ) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Text(
-                    "Visibilita gruppo",
+                    stringResource(R.string.passwords_group_visibility_sheet_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
                 VisibilityOptionRow(
-                    label = "Tutta la famiglia",
+                    label = stringResource(R.string.passwords_whole_family_label),
                     selected = state.visibility == KBVisibilityScope.FAMILY,
                     onClick = {
                         viewModel.setVisibility(KBVisibilityScope.FAMILY)
@@ -309,7 +311,7 @@ fun PasswordGroupDetailScreen(
                     },
                 )
                 VisibilityOptionRow(
-                    label = "Solo creatore",
+                    label = stringResource(R.string.passwords_only_creator_label),
                     selected = state.visibility == KBVisibilityScope.ONLY_CREATOR,
                     onClick = {
                         viewModel.setVisibility(KBVisibilityScope.ONLY_CREATOR)

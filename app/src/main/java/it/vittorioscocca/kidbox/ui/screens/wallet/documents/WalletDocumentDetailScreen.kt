@@ -2,6 +2,8 @@
 
 package it.vittorioscocca.kidbox.ui.screens.wallet.documents
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
@@ -91,6 +93,7 @@ import java.io.File
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
 
 @Composable
 fun WalletDocumentDetailScreen(
@@ -127,17 +130,17 @@ fun WalletDocumentDetailScreen(
     if (showDeleteDialog && item != null) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Elimina documento") },
-            text = { Text("L'operazione non può essere annullata.") },
+            title = { Text(stringResource(R.string.wallet_document_delete_title)) },
+            text = { Text(stringResource(R.string.wallet_action_cannot_be_undone)) },
             confirmButton = {
                 TextButton(onClick = {
                     showDeleteDialog = false
                     viewModel.deleteSingle(item.document)
                     onBack()
-                }) { Text("Elimina", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.wallet_delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Annulla") }
+                TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.wallet_cancel)) }
             },
         )
     }
@@ -166,16 +169,16 @@ fun WalletDocumentDetailScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 modifier = Modifier.statusBarsPadding(),
-                title = { Text("Documento", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.wallet_document_detail_title), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.wallet_back))
                     }
                 },
                 actions = {
                     if (item != null) {
                         IconButton(onClick = { showEditSheet = true }) {
-                            Icon(Icons.Filled.Edit, contentDescription = "Modifica")
+                            Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.wallet_document_edit_cd))
                         }
                     }
                 },
@@ -185,7 +188,7 @@ fun WalletDocumentDetailScreen(
     ) { padding ->
         if (item == null) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                if (state.isLoading) CircularProgressIndicator() else Text("Documento non trovato")
+                if (state.isLoading) CircularProgressIndicator() else Text(stringResource(R.string.wallet_document_not_found))
             }
             return@Scaffold
         }
@@ -238,7 +241,7 @@ fun WalletDocumentDetailScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Filled.Visibility, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                Text("Visualizza documento (fronte/retro)")
+                Text(stringResource(R.string.wallet_document_view_both_sides))
             }
 
             OutlinedButton(
@@ -248,7 +251,7 @@ fun WalletDocumentDetailScreen(
                             runCatching { documentsViewModel.preparePreviewFile(item.document) }.getOrNull()
                         }
                         if (file == null) {
-                            snackbarHostState.showSnackbar("Impossibile aprire il file.")
+                            snackbarHostState.showSnackbar(context.getString(R.string.wallet_document_cannot_open_file))
                             return@launch
                         }
                         openOriginalFile(context, file, item.document.mimeType)
@@ -257,7 +260,7 @@ fun WalletDocumentDetailScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Filled.OpenInNew, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                Text("Apri file originale")
+                Text(stringResource(R.string.wallet_document_open_original_file))
             }
 
             OutlinedButton(
@@ -266,7 +269,7 @@ fun WalletDocumentDetailScreen(
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
             ) {
                 Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                Text("Elimina documento")
+                Text(stringResource(R.string.wallet_document_delete_title))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -276,32 +279,32 @@ fun WalletDocumentDetailScreen(
 
 @Composable
 private fun InfoSection(metadata: WalletDocumentMetadata, ownerName: String) {
-    val dateFmt = remember { DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ITALIAN) }
+    val dateFmt = remember { DateTimeFormatter.ofPattern("d MMMM yyyy", KBLocale.current()) }
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(2.dp),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Informazioni", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.wallet_document_info_section), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(12.dp))
 
-            DetailRow(icon = Icons.Filled.Person, label = "Titolare", value = ownerName)
+            DetailRow(icon = Icons.Filled.Person, label = stringResource(R.string.wallet_holder_label), value = ownerName)
             metadata.holderName?.takeIf { it.isNotBlank() }?.let {
-                DetailRow(icon = Icons.Filled.Person, label = "Nome e cognome", value = it)
+                DetailRow(icon = Icons.Filled.Person, label = stringResource(R.string.wallet_document_full_name_label), value = it)
             }
             metadata.birthInfo?.takeIf { it.isNotBlank() }?.let {
-                DetailRow(icon = Icons.Filled.CalendarToday, label = "Nascita", value = it)
+                DetailRow(icon = Icons.Filled.CalendarToday, label = stringResource(R.string.wallet_document_birth_label), value = it)
             }
             metadata.documentNumber?.takeIf { it.isNotBlank() }?.let {
-                DetailRow(icon = Icons.Filled.CalendarToday, label = "Numero documento", value = it, monospace = true)
+                DetailRow(icon = Icons.Filled.CalendarToday, label = stringResource(R.string.wallet_document_number_label), value = it, monospace = true)
             }
             metadata.codiceFiscale?.takeIf { it.isNotBlank() }?.let {
-                DetailRow(icon = Icons.Filled.CalendarToday, label = "Codice Fiscale", value = it, monospace = true)
+                DetailRow(icon = Icons.Filled.CalendarToday, label = stringResource(R.string.wallet_document_codice_fiscale_label), value = it, monospace = true)
             }
             if (metadata.kind != DocumentKind.PATENTE) {
-                metadata.issueDate?.let { DetailRow(icon = Icons.Filled.CalendarToday, label = "Rilascio", value = it.format(dateFmt)) }
-                metadata.expiryDate?.let { DetailRow(icon = Icons.Filled.CalendarToday, label = "Scadenza", value = it.format(dateFmt)) }
+                metadata.issueDate?.let { DetailRow(icon = Icons.Filled.CalendarToday, label = stringResource(R.string.wallet_document_issue_date_label), value = it.format(dateFmt)) }
+                metadata.expiryDate?.let { DetailRow(icon = Icons.Filled.CalendarToday, label = stringResource(R.string.wallet_document_expiry_date_label), value = it.format(dateFmt)) }
             }
         }
     }
@@ -309,21 +312,21 @@ private fun InfoSection(metadata: WalletDocumentMetadata, ownerName: String) {
 
 @Composable
 private fun PatenteCategoriesSection(categories: List<it.vittorioscocca.kidbox.domain.model.PatenteCategory>) {
-    val dateFmt = remember { DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ITALIAN) }
+    val dateFmt = remember { DateTimeFormatter.ofPattern("d MMMM yyyy", KBLocale.current()) }
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(2.dp),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Categorie patente", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.wallet_document_license_categories_title), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(12.dp))
             categories.forEachIndexed { index, cat ->
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(cat.code, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Column(horizontalAlignment = Alignment.End) {
-                        cat.issueDate?.let { Text("Rilascio: ${it.format(dateFmt)}", style = MaterialTheme.typography.bodySmall) }
-                        cat.expiryDate?.let { Text("Scadenza: ${it.format(dateFmt)}", style = MaterialTheme.typography.bodySmall) }
+                        cat.issueDate?.let { Text(stringResource(R.string.wallet_document_issue_date_value, it.format(dateFmt)), style = MaterialTheme.typography.bodySmall) }
+                        cat.expiryDate?.let { Text(stringResource(R.string.wallet_document_expiry_date_value, it.format(dateFmt)), style = MaterialTheme.typography.bodySmall) }
                     }
                 }
                 if (index != categories.lastIndex) HorizontalDivider()
@@ -361,13 +364,13 @@ private fun BarcodeSection(codiceFiscale: String, clipboard: androidx.compose.ui
         elevation = CardDefaults.cardElevation(2.dp),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Codice a barre (Codice Fiscale)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.wallet_document_barcode_title), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(12.dp))
             val bitmap = remember(codiceFiscale) { generateCode39Bitmap(codiceFiscale) }
             if (bitmap != null) {
                 Image(
                     bitmap = bitmap.asImageBitmap(),
-                    contentDescription = "Barcode Code 39",
+                    contentDescription = stringResource(R.string.wallet_document_barcode_cd),
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(3f)
@@ -380,7 +383,7 @@ private fun BarcodeSection(codiceFiscale: String, clipboard: androidx.compose.ui
                 Text(codiceFiscale, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
                 TextButton(onClick = { clipboard.setText(AnnotatedString(codiceFiscale)) }) {
                     Icon(Icons.Filled.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text("  Copia")
+                    Text(stringResource(R.string.wallet_copy))
                 }
             }
         }
@@ -394,14 +397,14 @@ private fun BarcodeSection(codiceFiscale: String, clipboard: androidx.compose.ui
                     if (bitmap != null) {
                         Image(
                             bitmap = bitmap.asImageBitmap(),
-                            contentDescription = "Barcode Code 39",
+                            contentDescription = stringResource(R.string.wallet_document_barcode_cd),
                             modifier = Modifier.fillMaxWidth().aspectRatio(2.2f),
                         )
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(codiceFiscale, color = Color.Black, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.titleMedium)
                     Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = { showFullscreen = false }) { Text("Chiudi") }
+                    Button(onClick = { showFullscreen = false }) { Text(stringResource(R.string.wallet_close)) }
                 }
             }
         }
@@ -437,7 +440,7 @@ private fun FullscreenPageViewer(
             when {
                 isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 pages.isEmpty() -> Text(
-                    "Immagine non disponibile.",
+                    stringResource(R.string.wallet_document_image_not_available),
                     color = Color.Black.copy(alpha = 0.6f),
                     modifier = Modifier.align(Alignment.Center),
                 )
@@ -503,7 +506,7 @@ private fun FullscreenPageViewer(
             ) {
                 Icon(
                     Icons.Filled.Close,
-                    contentDescription = "Chiudi",
+                    contentDescription = stringResource(R.string.wallet_close),
                     tint = Color.Black.copy(alpha = 0.5f),
                     modifier = Modifier.size(28.dp),
                 )
@@ -512,10 +515,11 @@ private fun FullscreenPageViewer(
     }
 }
 
+@Composable
 private fun pageLabel(index: Int): String = when (index) {
-    0 -> "Fronte"
-    1 -> "Retro"
-    else -> "Pagina ${index + 1}"
+    0 -> stringResource(R.string.wallet_document_page_front)
+    1 -> stringResource(R.string.wallet_document_page_back)
+    else -> stringResource(R.string.wallet_document_page_number, index + 1)
 }
 
 private fun generateCode39Bitmap(text: String): Bitmap? = runCatching {
@@ -558,5 +562,5 @@ private fun openOriginalFile(context: android.content.Context, file: File, mimeT
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     runCatching { context.startActivity(intent) }
-        .onFailure { Toast.makeText(context, "Nessuna app per aprire il file", Toast.LENGTH_SHORT).show() }
+        .onFailure { Toast.makeText(context, context.getString(R.string.wallet_document_no_app_to_open_file), Toast.LENGTH_SHORT).show() }
 }

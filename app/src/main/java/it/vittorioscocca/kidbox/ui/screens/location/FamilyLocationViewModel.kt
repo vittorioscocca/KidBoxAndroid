@@ -45,6 +45,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
+import it.vittorioscocca.kidbox.util.KBLocale
 
 data class FamilyLocationUiState(
     val familyId: String = "",
@@ -453,7 +454,7 @@ class FamilyLocationViewModel @Inject constructor(
         val fallback = "$lat, $lon"
         val address = withContext(Dispatchers.IO) {
             runCatching {
-                val geocoder = Geocoder(context, Locale.ITALY)
+                val geocoder = Geocoder(context, KBLocale.current())
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     // API async introdotta in Android 13
                     kotlinx.coroutines.suspendCancellableCoroutine { cont ->

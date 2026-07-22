@@ -77,6 +77,10 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.DateFormat
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.platform.LocalContext
 
 private val PURPLE = Color(0xFF9573D9)
 
@@ -90,6 +94,10 @@ fun MedicalTreatmentsScreen(
     onOpen: (treatmentId: String) -> Unit,
     viewModel: MedicalTreatmentsViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
+    val activeTitle = stringResource(R.string.health_active_treatments)
+    val longTermTitle = stringResource(R.string.health_long_term_cap)
+    val completedTitle = stringResource(R.string.health_completed)
     val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showFilterSheet by remember { mutableStateOf(false) }
@@ -150,17 +158,17 @@ fun MedicalTreatmentsScreen(
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("Eliminare $n $curaWord?") },
-            text = { Text("Le cure verranno rimosse da tutti i dispositivi.") },
+            text = { Text(stringResource(R.string.health_treatments_removed_all)) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         viewModel.deleteSelected()
                         showDeleteConfirm = false
                     },
-                ) { Text("Elimina", color = Color(0xFFB3261E)) }
+                ) { Text(stringResource(R.string.health_delete), color = Color(0xFFB3261E)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Annulla") }
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.health_cancel)) }
             },
         )
     }
@@ -184,7 +192,7 @@ fun MedicalTreatmentsScreen(
                 } else {
                     HealthListAddBottomButton(
                         tint = PURPLE,
-                        label = "Nuova Cura",
+                        label = stringResource(R.string.health_new_treatment_cap),
                         onClick = onAdd,
                     )
                 }
@@ -209,7 +217,7 @@ fun MedicalTreatmentsScreen(
             )
 
             Text(
-                "Cure",
+                stringResource(R.string.health_treatments),
                 fontSize = 32.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = kb.title,
@@ -218,7 +226,7 @@ fun MedicalTreatmentsScreen(
             if (state.timeFilter != TreatmentTimeFilter.ALL) {
                 Spacer(Modifier.height(8.dp))
                 FilterActivePill(
-                    label = filterLabel(state),
+                    label = filterLabel(context, state),
                     onClear = { viewModel.clearTimeFilter() },
                     modifier = Modifier.padding(horizontal = 18.dp),
                 )
@@ -244,7 +252,7 @@ fun MedicalTreatmentsScreen(
                     ) {
                         item { Spacer(Modifier.height(4.dp)) }
                         treatmentSection(
-                            title = "Cure Attive",
+                            title = activeTitle,
                             items = state.active,
                             takenDosesByTreatmentId = state.takenDosesByTreatmentId,
                             isSelecting = state.isSelecting,
@@ -255,7 +263,7 @@ fun MedicalTreatmentsScreen(
                             },
                         )
                         treatmentSection(
-                            title = "Lungo termine",
+                            title = longTermTitle,
                             items = state.longTerm,
                             takenDosesByTreatmentId = state.takenDosesByTreatmentId,
                             isSelecting = state.isSelecting,
@@ -265,7 +273,7 @@ fun MedicalTreatmentsScreen(
                             },
                         )
                         treatmentSection(
-                            title = "Concluse",
+                            title = completedTitle,
                             items = state.inactive,
                             takenDosesByTreatmentId = state.takenDosesByTreatmentId,
                             isSelecting = state.isSelecting,
@@ -282,13 +290,13 @@ fun MedicalTreatmentsScreen(
     }
 }
 
-private fun filterLabel(state: MedicalTreatmentsState): String {
-    val fmt = DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.ITALY)
+private fun filterLabel(context: android.content.Context, state: MedicalTreatmentsState): String {
+    val fmt = DateFormat.getDateInstance(DateFormat.MEDIUM, KBLocale.current())
     return when (state.timeFilter) {
-        TreatmentTimeFilter.ALL -> "Tutte"
-        TreatmentTimeFilter.MONTHS_3 -> "Ultimi 3 mesi"
-        TreatmentTimeFilter.MONTHS_6 -> "Ultimi 6 mesi"
-        TreatmentTimeFilter.YEAR_LAST -> "Ultimo anno"
+        TreatmentTimeFilter.ALL -> context.getString(R.string.health_all)
+        TreatmentTimeFilter.MONTHS_3 -> context.getString(R.string.health_filter_3m)
+        TreatmentTimeFilter.MONTHS_6 -> context.getString(R.string.health_filter_6m)
+        TreatmentTimeFilter.YEAR_LAST -> context.getString(R.string.health_filter_1y)
         TreatmentTimeFilter.CUSTOM ->
             "${fmt.format(state.customFilterStartMillis)} – ${fmt.format(state.customFilterEndMillis)}"
     }
@@ -335,14 +343,14 @@ private fun EmptyFilterState(onClear: () -> Unit, modifier: Modifier = Modifier)
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                "Nessuna cura nel periodo selezionato",
+                stringResource(R.string.health_no_treatments_period),
                 fontSize = 14.sp,
                 color = kb.subtitle,
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(12.dp))
             TextButton(onClick = onClear) {
-                Text("Rimuovi filtro", color = PURPLE, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.health_remove_filter), color = PURPLE, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -357,7 +365,7 @@ private fun TreatFilterDatePickerDialog(initialMillis: Long, onDismiss: () -> Un
         confirmButton = {
             TextButton(onClick = { pickerState.selectedDateMillis?.let(onConfirm) ?: onDismiss() }) { Text("OK") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Annulla") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.health_cancel)) } },
     ) { DatePicker(state = pickerState) }
 }
 
@@ -371,7 +379,7 @@ private fun TreatmentFilterSheetContent(
     onApplyCustom: () -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
-    val dateFmt = remember { DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.ITALY) }
+    val dateFmt = remember { DateFormat.getDateInstance(DateFormat.MEDIUM, KBLocale.current()) }
     val quickOptions = listOf(
         TreatmentTimeFilter.ALL,
         TreatmentTimeFilter.MONTHS_3,
@@ -393,18 +401,18 @@ private fun TreatmentFilterSheetContent(
         ) {
             Spacer(Modifier.width(72.dp))
             Text(
-                "Filtra per periodo",
+                stringResource(R.string.health_filter_period),
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
                 color = kb.title,
             )
-            TextButton(onClick = onDismiss) { Text("Chiudi") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.health_close)) }
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            "Periodo rapido",
+            stringResource(R.string.health_quick_period),
             fontSize = 13.sp,
             color = kb.subtitle,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
@@ -426,7 +434,7 @@ private fun TreatmentFilterSheetContent(
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(f.sheetLabel, color = kb.title, fontSize = 16.sp)
+                        Text(stringResource(f.sheetLabelRes), color = kb.title, fontSize = 16.sp)
                         Spacer(Modifier.weight(1f))
                         if (state.timeFilter == f) {
                             Text("✓", color = PURPLE, fontWeight = FontWeight.Bold, fontSize = 18.sp)
@@ -437,7 +445,7 @@ private fun TreatmentFilterSheetContent(
         }
         Spacer(Modifier.height(20.dp))
         Text(
-            "Periodo personalizzato",
+            stringResource(R.string.health_custom_period),
             fontSize = 13.sp,
             color = kb.subtitle,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
@@ -488,7 +496,7 @@ private fun TreatmentFilterSheetContent(
             colors = ButtonDefaults.buttonColors(containerColor = PURPLE),
             shape = RoundedCornerShape(14.dp),
         ) {
-            Text("Applica", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(stringResource(R.string.health_apply), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
     }
 }
@@ -524,7 +532,7 @@ private fun SelectionBottomBar(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    if (allSelected) "Deseleziona" else "Tutte",
+                    if (allSelected) stringResource(R.string.health_deselect) else stringResource(R.string.health_all),
                     fontSize = 11.sp,
                     color = PURPLE,
                     fontWeight = FontWeight.Medium,
@@ -546,7 +554,7 @@ private fun SelectionBottomBar(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Duplica",
+                    stringResource(R.string.health_duplicate),
                     fontSize = 11.sp,
                     color = if (hasSelection) PURPLE else kb.subtitle,
                     fontWeight = FontWeight.Medium,
@@ -568,7 +576,7 @@ private fun SelectionBottomBar(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Elimina",
+                    stringResource(R.string.health_delete),
                     fontSize = 11.sp,
                     color = if (hasSelection) deleteTint else kb.subtitle,
                     fontWeight = FontWeight.Medium,
@@ -699,7 +707,7 @@ private fun TreatmentRow(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(13.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Lungo termine", fontSize = 12.sp, color = kb.subtitle)
+                        Text(stringResource(R.string.health_long_term_cap), fontSize = 12.sp, color = kb.subtitle)
                     }
                 } else {
                     val currentDay = daysSinceStart.coerceAtMost(treatment.durationDays.toLong())
@@ -730,9 +738,9 @@ private fun EmptyTreatments(modifier: Modifier = Modifier) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(Icons.Default.Medication, contentDescription = null, tint = kb.subtitle.copy(alpha = 0.4f), modifier = Modifier.size(56.dp))
             Spacer(Modifier.height(12.dp))
-            Text("Nessuna cura registrata", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = kb.title)
+            Text(stringResource(R.string.health_no_treatments), fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = kb.title)
             Spacer(Modifier.height(16.dp))
-            Text("Usa il pulsante in basso per aggiungere una nuova cura", color = kb.subtitle, fontSize = 12.sp)
+            Text(stringResource(R.string.health_no_treatments_hint), color = kb.subtitle, fontSize = 12.sp)
         }
     }
 }

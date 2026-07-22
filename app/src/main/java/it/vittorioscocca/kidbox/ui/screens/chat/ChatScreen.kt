@@ -173,6 +173,8 @@ import it.vittorioscocca.kidbox.util.ChatDocumentFileNaming
 import it.vittorioscocca.kidbox.util.VideoCompressor
 import it.vittorioscocca.kidbox.util.fixVideoFrameOrientation
 import java.io.ByteArrayOutputStream
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun ChatScreen(
@@ -294,7 +296,7 @@ fun ChatScreen(
             proximityManager.setRecordingActive(true)
         } else {
             inputBarViewModel.onRecordingStopped()
-            Toast.makeText(context, "Impossibile avviare la registrazione", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.chat_record_error), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -385,7 +387,7 @@ fun ChatScreen(
     }
     val requestCameraCapture = rememberCameraPermissionRequester(
         onDenied = {
-            Toast.makeText(context, "Permesso fotocamera necessario", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.chat_camera_required), Toast.LENGTH_SHORT).show()
         },
         onLaunchCamera = { cameraPicker.launch(null) },
     )
@@ -431,13 +433,13 @@ fun ChatScreen(
     ) { granted ->
         if (!granted) {
             inputBarViewModel.onRecordingStopped()
-            Toast.makeText(context, "Permesso microfono negato", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.chat_mic_denied), Toast.LENGTH_SHORT).show()
             return@rememberLauncherForActivityResult
         }
         val permission = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
         if (permission != PackageManager.PERMISSION_GRANTED) {
             inputBarViewModel.onRecordingStopped()
-            Toast.makeText(context, "Permesso microfono negato", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.chat_mic_denied), Toast.LENGTH_SHORT).show()
             return@rememberLauncherForActivityResult
         }
         startRecordingSafely()
@@ -713,7 +715,7 @@ fun ChatScreen(
                         KBLog.ui.warning("skip: recorder returned null on stop(save=true)", "KB_Transcription")
                         Toast.makeText(
                             context,
-                            "Registrazione non valida: impossibile trascrivere",
+                            context.getString(R.string.chat_invalid_recording),
                             Toast.LENGTH_SHORT,
                         ).show()
                     }
@@ -774,10 +776,10 @@ fun ChatScreen(
                     scope.launch {
                         runCatching { saveMediaToDevice(context, msg) }
                             .onSuccess {
-                                Toast.makeText(context, "Salvato", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.chat_saved), Toast.LENGTH_SHORT).show()
                             }
                             .onFailure {
-                                Toast.makeText(context, "Salvataggio non riuscito", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.chat_save_failed), Toast.LENGTH_SHORT).show()
                             }
                     }
                     actionTarget = null
@@ -796,8 +798,8 @@ fun ChatScreen(
     if (showClearConfirm) {
         AlertDialog(
             onDismissRequest = { showClearConfirm = false },
-            title = { Text("Svuota chat") },
-            text = { Text("Vuoi davvero eliminare tutti i messaggi della chat? L'azione è irreversibile.") },
+            title = { Text(stringResource(R.string.chat_clear_chat)) },
+            text = { Text(stringResource(R.string.chat_clear_chat_q)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -806,7 +808,7 @@ fun ChatScreen(
                     },
                 ) {
                     Text(
-                        "Elimina tutti",
+                        stringResource(R.string.chat_delete_all),
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
@@ -819,7 +821,7 @@ fun ChatScreen(
     if (editTarget != null) {
         AlertDialog(
             onDismissRequest = { editTarget = null },
-            title = { Text("Modifica messaggio") },
+            title = { Text(stringResource(R.string.chat_edit_message)) },
             text = {
                 OutlinedTextField(
                     value = editDraft,
@@ -835,7 +837,7 @@ fun ChatScreen(
                         if (newText.isNotBlank()) viewModel.updateMessageText(id, newText)
                         editTarget = null
                     },
-                ) { Text("Salva") }
+                ) { Text(stringResource(R.string.chat_save)) }
             },
             dismissButton = {
                 TextButton(onClick = { editTarget = null }) { Text("Annulla") }
@@ -959,7 +961,7 @@ private fun Header(
             Icon(
                 imageVector = if (isSearchActive) Icons.Default.Close
                               else Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = if (isSearchActive) "Chiudi ricerca" else "Indietro",
+                contentDescription = if (isSearchActive) stringResource(R.string.chat_close_search) else "Indietro",
                 tint = MaterialTheme.kidBoxColors.title,
             )
         }
@@ -1002,7 +1004,7 @@ private fun Header(
                             Box(modifier = Modifier.weight(1f)) {
                                 if (searchQuery.isEmpty()) {
                                     Text(
-                                        text = "Cerca nei messaggi…",
+                                        text = stringResource(R.string.chat_search_messages),
                                         color = subtitleColor,
                                         fontSize = 16.sp,
                                     )
@@ -1018,7 +1020,7 @@ private fun Header(
                                 )
                                 Icon(
                                     imageVector = Icons.Default.Close,
-                                    contentDescription = "Cancella testo",
+                                    contentDescription = stringResource(R.string.chat_clear_text),
                                     tint = subtitleColor,
                                     modifier = Modifier
                                         .size(16.dp)
@@ -1040,7 +1042,7 @@ private fun Header(
             // true centre even when the back-button and menu have different widths.
             Box(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Chat di Famiglia",
+                    text = stringResource(R.string.chat_family_chat),
                     color = MaterialTheme.kidBoxColors.title,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.ExtraBold,
@@ -1051,7 +1053,7 @@ private fun Header(
                 IconButton(onClick = { menuExpanded = true }) {
                     Icon(
                         Icons.Default.MoreVert,
-                        contentDescription = "Altre azioni",
+                        contentDescription = stringResource(R.string.chat_more_actions),
                         tint = MaterialTheme.kidBoxColors.title,
                     )
                 }
@@ -1060,7 +1062,7 @@ private fun Header(
                     onDismissRequest = { menuExpanded = false },
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Cerca") },
+                        text = { Text(stringResource(R.string.chat_search)) },
                         leadingIcon = {
                             Icon(Icons.Default.Search, contentDescription = null)
                         },
@@ -1070,7 +1072,7 @@ private fun Header(
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("Media, link e documenti") },
+                        text = { Text(stringResource(R.string.chat_media_links_docs)) },
                         leadingIcon = {
                             Icon(Icons.Default.PermMedia, contentDescription = null)
                         },
@@ -1080,7 +1082,7 @@ private fun Header(
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("Svuota chat") },
+                        text = { Text(stringResource(R.string.chat_clear_chat)) },
                         leadingIcon = {
                             Icon(
                                 Icons.Default.DeleteOutline,
@@ -1155,7 +1157,7 @@ private fun ReplyComposerBar(
                 text = when (state.typingUsers.size) {
                     1 -> "${state.typingUsers.first()} sta scrivendo..."
                     2 -> "${state.typingUsers[0]} e ${state.typingUsers[1]} stanno scrivendo..."
-                    else -> "Più persone stanno scrivendo..."
+                    else -> stringResource(R.string.chat_typing)
                 },
                 color = MaterialTheme.kidBoxColors.subtitle,
                 fontSize = 12.sp,
@@ -1298,7 +1300,7 @@ private fun ReplyComposerBar(
                     IconButton(onClick = onCancelReply, modifier = Modifier.size(36.dp)) {
                         Icon(
                             Icons.Default.Close,
-                            contentDescription = "Annulla risposta",
+                            contentDescription = stringResource(R.string.chat_cancel_reply),
                             tint = MaterialTheme.kidBoxColors.subtitle,
                             modifier = Modifier.size(18.dp),
                         )
@@ -1371,46 +1373,46 @@ private fun ComposerAttachmentSheet(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("Allega", color = MaterialTheme.kidBoxColors.title, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.chat_attach), color = MaterialTheme.kidBoxColors.title, fontWeight = FontWeight.SemiBold)
             ActionSheetRow(
                 icon = Icons.Default.PhotoCamera,
-                text = "Fotocamera",
+                text = stringResource(R.string.chat_camera),
                 textColor = MaterialTheme.kidBoxColors.title,
                 onClick = onPickCamera,
             )
             ActionSheetRow(
                 icon = Icons.Default.Image,
-                text = "Foto (max 10)",
+                text = stringResource(R.string.chat_photos_max),
                 textColor = MaterialTheme.kidBoxColors.title,
                 onClick = onPickImage,
             )
             ActionSheetRow(
                 icon = Icons.Default.VideoFile,
-                text = "Video (max 10)",
+                text = stringResource(R.string.chat_videos_max),
                 textColor = MaterialTheme.kidBoxColors.title,
                 onClick = onPickVideo,
             )
             ActionSheetRow(
                 icon = Icons.Default.Image,
-                text = "Foto e Video (max 10)",
+                text = stringResource(R.string.chat_media_max),
                 textColor = MaterialTheme.kidBoxColors.title,
                 onClick = onPickMediaGroup,
             )
             ActionSheetRow(
                 icon = Icons.Default.AttachFile,
-                text = "Documento",
+                text = stringResource(R.string.chat_document),
                 textColor = MaterialTheme.kidBoxColors.title,
                 onClick = onPickDocument,
             )
             ActionSheetRow(
                 icon = Icons.Default.Place,
-                text = "Posizione",
+                text = stringResource(R.string.chat_location),
                 textColor = MaterialTheme.kidBoxColors.title,
                 onClick = onPickLocation,
             )
             ActionSheetRow(
                 icon = Icons.Default.Person,
-                text = "Contatto",
+                text = stringResource(R.string.chat_contact),
                 textColor = MaterialTheme.kidBoxColors.title,
                 onClick = onPickContact,
             )
@@ -1473,7 +1475,7 @@ private fun MessageActionDialog(
             if (!message.isDeletedForEveryone) {
                 ActionSheetRow(
                     icon = Icons.Default.Reply,
-                    text = "Rispondi",
+                    text = stringResource(R.string.chat_reply),
                     textColor = MaterialTheme.kidBoxColors.title,
                     onClick = onReply,
                 )
@@ -1492,11 +1494,11 @@ private fun MessageActionDialog(
             // Salva — foto, video, audio, documento con media disponibile
             if (onSave != null) {
                 val saveLabel = when (message.type) {
-                    ChatMessageType.PHOTO -> "Salva foto"
-                    ChatMessageType.VIDEO -> "Salva video"
-                    ChatMessageType.AUDIO -> "Salva audio"
-                    ChatMessageType.DOCUMENT -> "Salva documento"
-                    else -> "Salva"
+                    ChatMessageType.PHOTO -> stringResource(R.string.chat_save_photo)
+                    ChatMessageType.VIDEO -> stringResource(R.string.chat_save_video)
+                    ChatMessageType.AUDIO -> stringResource(R.string.chat_save_audio)
+                    ChatMessageType.DOCUMENT -> stringResource(R.string.chat_save_document)
+                    else -> stringResource(R.string.chat_save)
                 }
                 ActionSheetRow(
                     icon = Icons.Default.SaveAlt,
@@ -1513,14 +1515,14 @@ private fun MessageActionDialog(
             // ── Elimina ──────────────────────────────────────────────────────
             ActionSheetRow(
                 icon = Icons.Default.DeleteOutline,
-                text = "Elimina per me",
+                text = stringResource(R.string.chat_delete_for_me),
                 textColor = MaterialTheme.colorScheme.error,
                 onClick = onDeleteForMe,
             )
             if (canDeleteForEveryone) {
                 ActionSheetRow(
                     icon = Icons.Default.DeleteOutline,
-                    text = "Elimina per tutti",
+                    text = stringResource(R.string.chat_delete_for_all),
                     textColor = MaterialTheme.colorScheme.error,
                     onClick = onDeleteForEveryone,
                 )
@@ -1531,7 +1533,7 @@ private fun MessageActionDialog(
 
             // ── Chiudi ───────────────────────────────────────────────────────
             Text(
-                text = "Chiudi",
+                text = stringResource(R.string.chat_close),
                 color = MaterialTheme.kidBoxColors.subtitle,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1570,7 +1572,7 @@ private fun ScrollToBottomFab(
         ) {
             Icon(
                 imageVector = Icons.Default.KeyboardArrowDown,
-                contentDescription = "Vai in fondo",
+                contentDescription = stringResource(R.string.chat_go_bottom),
                 modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.kidBoxColors.title.copy(alpha = 0.9f),
             )
@@ -1734,7 +1736,7 @@ private fun MediaGroupGalleryDialog(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = "Riproduci",
+                                    contentDescription = stringResource(R.string.chat_play_it),
                                     tint = Color.White,
                                     modifier = Modifier.size(40.dp),
                                 )
@@ -1779,7 +1781,7 @@ private fun MediaGroupGalleryDialog(
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "Chiudi",
+                    contentDescription = stringResource(R.string.chat_close),
                     tint = Color.White,
                 )
             }
@@ -1882,7 +1884,7 @@ private fun MediaPreviewTray(
                     ) {
                         Icon(
                             Icons.Default.Close,
-                            contentDescription = "Rimuovi",
+                            contentDescription = stringResource(R.string.chat_remove),
                             tint = Color.White,
                             modifier = Modifier.size(12.dp),
                         )
@@ -1913,7 +1915,7 @@ private fun MediaPreviewTray(
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Invia",
+                        contentDescription = stringResource(R.string.chat_send),
                         tint = Color.White,
                         modifier = Modifier.size(18.dp),
                     )
@@ -1972,7 +1974,7 @@ private fun LocationPickerSheet(
                 .padding(horizontal = 14.dp, vertical = 8.dp),
         ) {
             Text(
-                text = "Scegli posizione",
+                text = stringResource(R.string.chat_pick_location),
                 color = MaterialTheme.kidBoxColors.title,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 17.sp,
@@ -2002,7 +2004,7 @@ private fun LocationPickerSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 TextButton(onClick = onDismiss) { Text("Annulla") }
-                TextButton(onClick = { onConfirm(marker.latitude, marker.longitude) }) { Text("Invia") }
+                TextButton(onClick = { onConfirm(marker.latitude, marker.longitude) }) { Text(stringResource(R.string.chat_send)) }
             }
             Spacer(Modifier.height(18.dp))
         }

@@ -6,6 +6,9 @@ import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import java.util.Calendar
 import java.util.UUID
 import java.util.regex.Pattern
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.platform.LocalContext
 
 enum class PlanningActionKind {
     CREATE_EVENT,
@@ -73,6 +76,7 @@ object PlanningActionParser {
     }
 
     fun parse(
+        context: android.content.Context,
         text: String,
         openTodos: List<KBTodoItem>,
         visits: List<KBMedicalVisit>,
@@ -87,11 +91,11 @@ object PlanningActionParser {
             (lower.contains("vuoi che crei l'evento") || lower.contains("posso aggiungere al calendario") ||
                 lower.contains("aggiungere al calendario"))
         ) {
-            val title = extractQuoted(text) ?: "Nuovo evento"
+            val title = extractQuoted(text) ?: context.getString(R.string.ai_new_event)
             actions += PlanningAction(
                 kind = PlanningActionKind.CREATE_EVENT,
                 title = title,
-                subtitle = "Crea evento in calendario",
+                subtitle = context.getString(R.string.ai_create_calendar_event),
                 prefilledEventTitle = title,
             )
         }
@@ -105,11 +109,11 @@ object PlanningActionParser {
             (lower.contains("vuoi che") || lower.contains("posso "))
         ) {
             val items = extractGroceryItems(text)
-            val title = items.firstOrNull() ?: extractQuoted(text) ?: "Articoli spesa"
+            val title = items.firstOrNull() ?: extractQuoted(text) ?: context.getString(R.string.ai_grocery_items)
             actions += PlanningAction(
                 kind = PlanningActionKind.CREATE_GROCERY,
                 title = title,
-                subtitle = if (items.size > 1) "${items.size} articoli" else "Aggiungi alla lista spesa",
+                subtitle = if (items.size > 1) "${items.size} articoli" else context.getString(R.string.ai_add_to_grocery),
                 groceryItems = items.ifEmpty { listOf(title) },
             )
         }
@@ -118,11 +122,11 @@ object PlanningActionParser {
             (lower.contains("vuoi che") || lower.contains("posso ")) &&
             lower.contains("nota")
         ) {
-            val title = extractQuoted(text) ?: "Nuova nota"
+            val title = extractQuoted(text) ?: context.getString(R.string.ai_new_note)
             actions += PlanningAction(
                 kind = PlanningActionKind.CREATE_NOTE,
                 title = title,
-                subtitle = "Salva nelle note famiglia",
+                subtitle = context.getString(R.string.ai_save_family_notes),
                 noteBody = title,
             )
         }
@@ -131,11 +135,11 @@ object PlanningActionParser {
             (lower.contains("vuoi che aggiunga il to-do") || lower.contains("crea un to-do") ||
                 lower.contains("posso aggiungere il to-do"))
         ) {
-            val title = extractQuoted(text) ?: "Nuovo to-do"
+            val title = extractQuoted(text) ?: context.getString(R.string.ai_new_todo)
             actions += PlanningAction(
                 kind = PlanningActionKind.CREATE_TODO,
                 title = title,
-                subtitle = "Aggiunto alla lista condivisa",
+                subtitle = context.getString(R.string.ai_added_shared_list),
                 prefilledTodoTitle = title,
             )
         }
@@ -150,11 +154,11 @@ object PlanningActionParser {
             val due = extractDate(lower) ?: (System.currentTimeMillis() + 86_400_000L)
             actions += PlanningAction(
                 kind = PlanningActionKind.SET_REMINDER,
-                title = quoted ?: "Promemoria",
-                subtitle = "Notifica locale programmata",
+                title = quoted ?: context.getString(R.string.ai_reminder),
+                subtitle = context.getString(R.string.ai_local_notification),
                 reminderContext = PlanningReminderContext.FreeText(
                     familyId = familyId,
-                    title = quoted ?: "Promemoria",
+                    title = quoted ?: context.getString(R.string.ai_reminder),
                     dueAtEpochMillis = due,
                 ),
             )
@@ -163,24 +167,24 @@ object PlanningActionParser {
         if (lower.contains("apri il calendario") || lower.contains("vai al calendario")) {
             actions += PlanningAction(
                 kind = PlanningActionKind.NAVIGATE,
-                title = "Apri Calendario",
-                subtitle = "Vai alla vista calendario",
+                title = context.getString(R.string.ai_open_calendar),
+                subtitle = context.getString(R.string.ai_go_calendar),
                 navigationTarget = PlanningNavigationTarget.CALENDAR,
             )
         }
         if (lower.contains("apri i to-do") || lower.contains("vai ai to-do")) {
             actions += PlanningAction(
                 kind = PlanningActionKind.NAVIGATE,
-                title = "Apri To-Do",
-                subtitle = "Vai alla lista to-do",
+                title = context.getString(R.string.ai_open_todo),
+                subtitle = context.getString(R.string.ai_go_todo),
                 navigationTarget = PlanningNavigationTarget.TODO,
             )
         }
         if (lower.contains("apri salute") || lower.contains("vai alla sezione salute")) {
             actions += PlanningAction(
                 kind = PlanningActionKind.NAVIGATE,
-                title = "Apri Salute",
-                subtitle = "Vai alla sezione sanitaria",
+                title = context.getString(R.string.ai_open_health),
+                subtitle = context.getString(R.string.ai_go_health),
                 navigationTarget = PlanningNavigationTarget.HEALTH,
             )
         }

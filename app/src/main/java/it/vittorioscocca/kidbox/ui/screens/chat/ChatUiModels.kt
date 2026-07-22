@@ -17,6 +17,9 @@ import java.util.Date
 import java.util.Locale
 import org.json.JSONArray
 import org.json.JSONObject
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 // @Immutable tells the Compose compiler that instances of this class are completely
 // immutable: equality is structural (data class) and no fields can change after creation.
@@ -55,7 +58,7 @@ data class UiChatMessage(
         get() = daySeparatorLabel(createdAtMillis)
 
     val timeLabel: String
-        get() = SimpleDateFormat("HH:mm", Locale.ITALY).format(Date(createdAtMillis))
+        get() = SimpleDateFormat("HH:mm", KBLocale.current()).format(Date(createdAtMillis))
 }
 
 internal fun KBChatMessage.toUi(): UiChatMessage {
@@ -204,7 +207,7 @@ private fun daySeparatorLabel(timestampMs: Long): String {
     return when {
         DateUtils.isToday(timestampMs) -> "Oggi"
         DateUtils.isToday(timestampMs + DateUtils.DAY_IN_MILLIS) -> "Ieri"
-        else -> SimpleDateFormat("EEEE d MMM", Locale.ITALY).format(Date(timestampMs))
-            .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ITALY) else it.toString() }
+        else -> SimpleDateFormat("EEEE d MMM", KBLocale.current()).format(Date(timestampMs))
+            .replaceFirstChar { if (it.isLowerCase()) it.titlecase(KBLocale.current()) else it.toString() }
     }
 }

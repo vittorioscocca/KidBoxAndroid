@@ -56,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.text.font.FontWeight
@@ -64,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.entity.PetEntity
 import it.vittorioscocca.kidbox.data.local.entity.PetEventEntity
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
@@ -110,7 +112,7 @@ fun PetDetailScreen(
             TopAppBar(
                 title = {
                     Text(
-                        pet?.name ?: "Animale",
+                        pet?.name ?: stringResource(R.string.pets_detail_fallback_title),
                         color = kb.title,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
@@ -123,18 +125,18 @@ fun PetDetailScreen(
                 },
                 actions = {
                     IconButton(onClick = { showAddEvent = true }) {
-                        Icon(Icons.Filled.Add, contentDescription = "Nuovo evento", tint = orange)
+                        Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.pets_new_event_cd), tint = orange)
                     }
                     IconButton(onClick = { showEditPet = true }) {
-                        Icon(Icons.Filled.Edit, contentDescription = "Modifica", tint = kb.title)
+                        Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.pets_edit_cd), tint = kb.title)
                     }
                     Box {
                         IconButton(onClick = { menuOpen = true }) {
-                            Icon(Icons.Filled.MoreVert, contentDescription = "Altro", tint = kb.title)
+                            Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.pets_more_cd), tint = kb.title)
                         }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             DropdownMenuItem(
-                                text = { Text("Nuova cura") },
+                                text = { Text(stringResource(R.string.pets_new_treatment_item)) },
                                 leadingIcon = {
                                     Icon(Icons.Filled.Medication, contentDescription = null, tint = orange)
                                 },
@@ -144,7 +146,7 @@ fun PetDetailScreen(
                                 },
                             )
                             DropdownMenuItem(
-                                text = { Text("Elimina animale") },
+                                text = { Text(stringResource(R.string.pets_delete_pet_item)) },
                                 leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
                                 onClick = {
                                     menuOpen = false
@@ -180,7 +182,7 @@ fun PetDetailScreen(
             }
             item {
                 Text(
-                    "STORICO EVENTI",
+                    stringResource(R.string.pets_section_events_history),
                     color = kb.subtitle,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
@@ -190,7 +192,7 @@ fun PetDetailScreen(
             item {
                 if (events.isEmpty()) {
                     Text(
-                        "Nessun evento registrato",
+                        stringResource(R.string.pets_no_events),
                         color = kb.subtitle,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(horizontal = 4.dp),
@@ -218,7 +220,7 @@ fun PetDetailScreen(
             }
             item {
                 Text(
-                    "CURE",
+                    stringResource(R.string.pets_section_treatments),
                     color = kb.subtitle,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
@@ -229,7 +231,7 @@ fun PetDetailScreen(
                 val care = treatments.filter { !it.isDeleted }
                 if (care.isEmpty()) {
                     Text(
-                        "Nessuna cura registrata",
+                        stringResource(R.string.pets_no_treatments),
                         color = kb.subtitle,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(horizontal = 4.dp),
@@ -284,24 +286,24 @@ fun PetDetailScreen(
     if (confirmDeletePet && pet != null) {
         AlertDialog(
             onDismissRequest = { confirmDeletePet = false },
-            title = { Text("Eliminare questo animale?") },
+            title = { Text(stringResource(R.string.pets_delete_pet_confirm_title)) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         pet?.let { viewModel.deletePet(it) { err -> toast = err }; onNavigateBack() }
                         confirmDeletePet = false
                     },
-                ) { Text("Elimina", color = Color(0xFFE53935)) }
+                ) { Text(stringResource(R.string.pets_action_delete), color = Color(0xFFE53935)) }
             },
-            dismissButton = { TextButton(onClick = { confirmDeletePet = false }) { Text("Annulla") } },
+            dismissButton = { TextButton(onClick = { confirmDeletePet = false }) { Text(stringResource(R.string.pets_action_cancel)) } },
         )
     }
 
     toast?.let { msg ->
         AlertDialog(
             onDismissRequest = { toast = null },
-            confirmButton = { TextButton(onClick = { toast = null }) { Text("OK") } },
-            title = { Text("Errore") },
+            confirmButton = { TextButton(onClick = { toast = null }) { Text(stringResource(R.string.pets_action_ok)) } },
+            title = { Text(stringResource(R.string.pets_error_title)) },
             text = { Text(msg) },
         )
     }
@@ -347,16 +349,16 @@ private fun PetHeaderCard(
             p.birthDate?.let { bd ->
                 val years = petAgeYearsEuropeRome(bd)
                 PetLabeledBlock(
-                    label = "Data di nascita",
-                    value = "${formatItDate(bd)} ($years anni)",
+                    label = stringResource(R.string.pets_field_birth_date),
+                    value = stringResource(R.string.pets_birth_date_with_age, formatItDate(bd), years),
                     kb = kb,
                 )
             }
             p.chipCode?.takeIf { it.isNotBlank() }?.let { chip ->
-                PetLabeledBlock(label = "Microchip", value = chip, kb = kb)
+                PetLabeledBlock(label = stringResource(R.string.pets_field_microchip), value = chip, kb = kb)
             }
             p.color?.takeIf { it.isNotBlank() }?.let { col ->
-                PetLabeledBlock(label = "Colore", value = col, kb = kb)
+                PetLabeledBlock(label = stringResource(R.string.pets_field_color), value = col, kb = kb)
             }
             p.notes?.takeIf { it.isNotBlank() }?.let { n ->
                 Text(n, style = MaterialTheme.typography.bodySmall, color = kb.subtitle)
@@ -416,7 +418,7 @@ private fun PetTreatmentRow(
                 color = kb.title,
             )
             Text(
-                "$dosageStr ${t.dosageUnit} · ${t.dailyFrequency}x al giorno",
+                stringResource(R.string.pets_dosage_per_day, dosageStr, t.dosageUnit, t.dailyFrequency),
                 style = MaterialTheme.typography.bodySmall,
                 color = kb.subtitle,
             )
@@ -426,7 +428,7 @@ private fun PetTreatmentRow(
                     shape = RoundedCornerShape(999.dp),
                 ) {
                     Text(
-                        "Promemoria attivo",
+                        stringResource(R.string.pets_reminder_active),
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Medium,
@@ -494,7 +496,7 @@ private fun PetEventRow(
                     shape = RoundedCornerShape(999.dp),
                 ) {
                     Text(
-                        "Prossima: ${formatItDate(nd)}",
+                        stringResource(R.string.pets_next_due_prefix, formatItDate(nd)),
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Medium,
@@ -551,7 +553,7 @@ private fun AddPetEventDialog(
         ) {
             Column(Modifier.fillMaxSize()) {
                 KidBoxIosFormTopBar(
-                    title = "Nuovo evento",
+                    title = stringResource(R.string.pets_new_event_dialog_title),
                     onCancel = onDismiss,
                     onSave = {
                         if (canSave) {
@@ -582,7 +584,7 @@ private fun AddPetEventDialog(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     IosGroupedCard(kb) {
-                        IosPlainTextFieldRow(title, { title = it }, "Titolo", kb = kb)
+                        IosPlainTextFieldRow(title, { title = it }, stringResource(R.string.pets_field_title), kb = kb)
                         IosFormDivider(kb)
                         Box(Modifier.fillMaxWidth()) {
                             Row(
@@ -593,7 +595,7 @@ private fun AddPetEventDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Tipo evento", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.pets_field_event_type), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -631,7 +633,7 @@ private fun AddPetEventDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("Data", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Text(stringResource(R.string.pets_field_date), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                             Text(formatItDate(dateMillis), color = orange, style = MaterialTheme.typography.bodyLarge)
                         }
                     }
@@ -644,7 +646,7 @@ private fun AddPetEventDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("Prossima scadenza", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Text(stringResource(R.string.pets_field_next_due), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                             Switch(
                                 checked = nextDue != null,
                                 onCheckedChange = { on ->
@@ -666,7 +668,7 @@ private fun AddPetEventDialog(
                                     .padding(horizontal = 16.dp, vertical = 14.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                Text("Prossima scadenza", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.pets_field_next_due), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Text(
                                     nextDue?.let { formatItDate(it) }.orEmpty(),
                                     color = orange,
@@ -675,13 +677,13 @@ private fun AddPetEventDialog(
                             }
                         }
                         IosFormDivider(kb)
-                        IosPlainTextFieldRow(vet, { vet = it }, "Veterinario", kb = kb)
+                        IosPlainTextFieldRow(vet, { vet = it }, stringResource(R.string.pets_field_vet), kb = kb)
                         IosFormDivider(kb)
-                        IosPlainTextFieldRow(costText, { costText = it }, "Costo", kb = kb)
+                        IosPlainTextFieldRow(costText, { costText = it }, stringResource(R.string.pets_field_cost), kb = kb)
                     }
 
                     Text(
-                        "Note",
+                        stringResource(R.string.pets_field_notes),
                         style = MaterialTheme.typography.labelLarge,
                         color = kb.subtitle,
                         modifier = Modifier.padding(start = 4.dp),
@@ -694,7 +696,7 @@ private fun AddPetEventDialog(
                                 .fillMaxWidth()
                                 .heightIn(min = 120.dp)
                                 .padding(16.dp),
-                            placeholder = { Text("Note", color = kb.subtitle) },
+                            placeholder = { Text(stringResource(R.string.pets_field_notes), color = kb.subtitle) },
                             singleLine = false,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
@@ -748,7 +750,7 @@ private fun EditPetDialog(
         ) {
             Column(Modifier.fillMaxSize()) {
                 KidBoxIosFormTopBar(
-                    title = "Modifica animale",
+                    title = stringResource(R.string.pets_edit_pet_title),
                     onCancel = onDismiss,
                     onSave = {
                         if (canSave) {
@@ -780,7 +782,7 @@ private fun EditPetDialog(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     IosGroupedCard(kb) {
-                        IosPlainTextFieldRow(name, { name = it }, "Nome", kb = kb)
+                        IosPlainTextFieldRow(name, { name = it }, stringResource(R.string.pets_field_name), kb = kb)
                         IosFormDivider(kb)
                         Box(Modifier.fillMaxWidth()) {
                             Row(
@@ -791,7 +793,7 @@ private fun EditPetDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Specie", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.pets_field_species), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -821,7 +823,7 @@ private fun EditPetDialog(
                             }
                         }
                         IosFormDivider(kb)
-                        IosPlainTextFieldRow(breed, { breed = it }, "Razza (opzionale)", kb = kb)
+                        IosPlainTextFieldRow(breed, { breed = it }, stringResource(R.string.pets_field_breed_optional), kb = kb)
                     }
 
                     IosGroupedCard(kb) {
@@ -832,7 +834,7 @@ private fun EditPetDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("Data di nascita", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Text(stringResource(R.string.pets_field_birth_date), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                             Switch(
                                 checked = hasBirthDate,
                                 onCheckedChange = { on ->
@@ -856,18 +858,18 @@ private fun EditPetDialog(
                                     .padding(horizontal = 16.dp, vertical = 14.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                Text("Data", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.pets_field_date), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Text(formatItDate(birthDate), color = orange, style = MaterialTheme.typography.bodyLarge)
                             }
                         }
                         IosFormDivider(kb)
-                        IosPlainTextFieldRow(color, { color = it }, "Colore", kb = kb)
+                        IosPlainTextFieldRow(color, { color = it }, stringResource(R.string.pets_field_color), kb = kb)
                         IosFormDivider(kb)
-                        IosPlainTextFieldRow(chipCode, { chipCode = it }, "Microchip", kb = kb)
+                        IosPlainTextFieldRow(chipCode, { chipCode = it }, stringResource(R.string.pets_field_microchip), kb = kb)
                     }
 
                     Text(
-                        "Note",
+                        stringResource(R.string.pets_field_notes),
                         style = MaterialTheme.typography.labelLarge,
                         color = kb.subtitle,
                         modifier = Modifier.padding(start = 4.dp),
@@ -880,7 +882,7 @@ private fun EditPetDialog(
                                 .fillMaxWidth()
                                 .heightIn(min = 120.dp)
                                 .padding(16.dp),
-                            placeholder = { Text("Note", color = kb.subtitle) },
+                            placeholder = { Text(stringResource(R.string.pets_field_notes), color = kb.subtitle) },
                             singleLine = false,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,

@@ -80,13 +80,14 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
 
 private val EXAM_EMPTY_SUGGESTIONS = listOf(
     "Quali esami richiedono attenzione?",
     "Ci sono esami in scadenza?",
     "Riassumi i referti disponibili",
 )
-private val EXAM_TIME = SimpleDateFormat("HH:mm", Locale.ITALIAN)
+private fun EXAM_TIME() = SimpleDateFormat("HH:mm", KBLocale.current())
 
 @Composable
 fun ExamAiChatScreen(

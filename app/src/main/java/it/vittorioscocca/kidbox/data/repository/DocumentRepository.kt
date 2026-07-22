@@ -1568,13 +1568,30 @@ class DocumentRepository @Inject constructor(
                         updatedAtEpochMillis = now,
                         updatedBy = dto.updatedBy ?: local?.updatedBy ?: "",
                         isDeleted = false,
-                        parentId = expectedParentForCategoryId(familyId, resolvedCategoryId),
+                        parentId = ensureParentCategoryExists(
+                            familyId = familyId,
+                            parentId = expectedParentForCategoryId(familyId, resolvedCategoryId),
+                            now = now,
+                            updatedBy = dto.updatedBy ?: local?.updatedBy ?: "",
+                        ),
                         // Placeholder must stay local-only until authoritative category arrives.
                         syncStateRaw = KBSyncState.SYNCED.rawValue,
                         lastSyncError = null,
                     ),
                 )
             }
+        }
+
+        // Rete di sicurezza: kb_documents.categoryId ha una FK verso le categorie.
+        // Se a questo punto la cartella non esiste comunque (placeholder fallito o
+        // rimosso da un CASCADE concorrente), puntare il documento a un id inesistente
+        // farebbe fallire l'insert. Meglio mostrarlo in root che perdere la sync.
+        if (!resolvedCategoryId.isNullOrBlank() && categoryDao.getById(resolvedCategoryId) == null) {
+            KBLog.data.debug(
+                "category $resolvedCategoryId still missing for document=${dto.id}; falling back to root",
+                TAG_DOC_SYNC,
+            )
+            resolvedCategoryId = null
         }
 
         val remoteNormScope = KBVisibilityScope.normalized(dto.visibilityScope)
@@ -1713,6 +1730,55 @@ class DocumentRepository @Inject constructor(
     ): String? = when {
         categoryId.startsWith("exp-cat-") -> expensesRootFolderId(familyId)
         else -> null
+    }
+
+    /**
+     * Garantisce che la categoria padre esista prima di inserire un figlio.
+     *
+     * `kb_document_categories.parentId` ha una FK auto-referenziante: inserire una
+     * categoria il cui padre non è ancora presente in locale fa fallire l'insert con
+     * SQLITE_CONSTRAINT_FOREIGNKEY e, girando fuori dal main thread, l'eccezione
+     * risaliva fino a KBCrashHandler facendo crashare l'app durante la sync.
+     *
+     * Succedeva con le cartelle spesa: il placeholder `exp-cat-<id>` veniva creato con
+     * parent `exp-root-<familyId>`, che però non è garantito essere già arrivato (primo
+     * avvio, sync parziale, o root rimossa da un CASCADE precedente).
+     *
+     * Se il padre manca lo creiamo come root placeholder (parentId = null, quindi
+     * sempre valido); se non riusciamo a materializzarlo restituiamo null, così il
+     * figlio finisce in root invece di far fallire l'intera sincronizzazione.
+     */
+    private suspend fun ensureParentCategoryExists(
+        familyId: String,
+        parentId: String?,
+        now: Long,
+        updatedBy: String,
+    ): String? {
+        val target = parentId?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        if (categoryDao.getById(target) != null) return target
+
+        KBLog.data.debug("create placeholder root category id=$target (missing parent)", TAG_DOC_SYNC)
+        val created = runCatching {
+            categoryDao.upsert(
+                KBDocumentCategoryEntity(
+                    id = target,
+                    familyId = familyId,
+                    title = if (target.startsWith("exp-root-")) "Spese" else "Cartella",
+                    sortOrder = 0,
+                    createdAtEpochMillis = now,
+                    updatedAtEpochMillis = now,
+                    updatedBy = updatedBy,
+                    isDeleted = false,
+                    parentId = null,
+                    syncStateRaw = KBSyncState.SYNCED.rawValue,
+                    lastSyncError = null,
+                ),
+            )
+        }.isSuccess
+        if (!created) {
+            KBLog.data.debug("placeholder root creation failed id=$target; falling back to root", TAG_DOC_SYNC)
+        }
+        return target.takeIf { created }
     }
 
     private fun expectedCategoryForDocument(

@@ -91,6 +91,11 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
             putExtra("ticketId", data["ticketId"])
             putExtra("push_deep_link", data["deep_link"] ?: data["route"])
             putExtra("push_message_id", data["messageId"])
+            // Annunci dalla console admin: il testo integrale sta in `data`,
+            // perché quello mostrato nella tendina è già troncato dal sistema.
+            putExtra("push_broadcast_id", data["broadcastId"])
+            putExtra("push_title", data["title"])
+            putExtra("push_body", data["body"])
         }
         val pendingIntent = PendingIntent.getActivity(
             this,

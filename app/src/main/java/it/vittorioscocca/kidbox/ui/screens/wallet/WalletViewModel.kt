@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.wallet
 
+import it.vittorioscocca.kidbox.R
 import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
@@ -10,10 +11,14 @@ import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.entity.KBWalletTicketEntity
 import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
+import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.data.repository.WalletRepository
 import it.vittorioscocca.kidbox.data.wallet.PendingWalletImport
 import it.vittorioscocca.kidbox.data.wallet.WalletParsedData
 import it.vittorioscocca.kidbox.data.wallet.WalletPdfParser
+import it.vittorioscocca.kidbox.data.wallet.WalletTicketAIExtractor
+import it.vittorioscocca.kidbox.data.wallet.WalletTicketExtraction
+import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.domain.model.WalletTicketKind
 import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerMember
 import java.util.Locale
@@ -34,6 +39,7 @@ data class WalletUiState(
     val isImporting: Boolean = false,
     val message: String? = null,
     val pdfBytesEvent: ByteArray? = null,
+    val currentPlan: KBPlan = KBPlan.FREE,
 )
 
 @HiltViewModel
@@ -42,6 +48,8 @@ class WalletViewModel @Inject constructor(
     private val familyMemberDao: KBFamilyMemberDao,
     private val auth: FirebaseAuth,
     private val badgeManager: HomeBadgeManager,
+    private val subscriptionRepository: SubscriptionRepository,
+    private val ticketAIExtractor: WalletTicketAIExtractor,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(WalletUiState())
     val uiState: StateFlow<WalletUiState> = _uiState.asStateFlow()
@@ -64,6 +72,11 @@ class WalletViewModel @Inject constructor(
         viewModelScope.launch { badgeManager.resetRemote(familyId, CounterField.WALLET) }
 
         walletRepository.startRealtime(familyId)
+
+        viewModelScope.launch {
+            val plan = subscriptionRepository.getPlan(familyId)
+            _uiState.value = _uiState.value.copy(currentPlan = plan)
+        }
 
         observeJob?.cancel()
         observeJob = viewModelScope.launch {
@@ -132,14 +145,14 @@ class WalletViewModel @Inject constructor(
             val bytes = runCatching {
                 context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
             }.getOrNull() ?: run {
-                _uiState.value = _uiState.value.copy(isImporting = false, message = "Impossibile leggere il PDF")
+                _uiState.value = _uiState.value.copy(isImporting = false, message = context.getString(R.string.wallet_cannot_read_pdf))
                 return@launch
             }
             val parsed = runCatching {
                 WalletPdfParser.parse(context, bytes, fileName)
             }.getOrElse {
                 WalletParsedData(
-                    suggestedTitle = fileName?.removeSuffix(".pdf") ?: "Biglietto",
+                    suggestedTitle = fileName?.removeSuffix(".pdf") ?: context.getString(R.string.wallet_default_ticket_title),
                     kind = WalletTicketKind.OTHER,
                     emitter = null, eventDate = null, location = null,
                     bookingCode = null, barcodeText = null, barcodeFormat = null,
@@ -168,7 +181,7 @@ class WalletViewModel @Inject constructor(
                 context.contentResolver.openInputStream(pdfUri)?.use { it.readBytes() }
             }.getOrNull()
             if (bytes == null) {
-                _uiState.value = _uiState.value.copy(isImporting = false, message = "Impossibile leggere il PDF")
+                _uiState.value = _uiState.value.copy(isImporting = false, message = context.getString(R.string.wallet_cannot_read_pdf))
                 return@launch
             }
             val fileName = runCatching {
@@ -187,7 +200,7 @@ class WalletViewModel @Inject constructor(
             )
             _uiState.value = _uiState.value.copy(
                 isImporting = false,
-                message = result.fold(onSuccess = { null }, onFailure = { it.message ?: "Errore salvataggio" }),
+                message = result.fold(onSuccess = { null }, onFailure = { it.message ?: context.getString(R.string.wallet_save_error) }),
             )
             if (result.isSuccess) {
                 _parsedData.value = null
@@ -195,6 +208,16 @@ class WalletViewModel @Inject constructor(
             }
         }
     }
+
+    /** Lettura AI del biglietto (piano Max): [text] è il testo già estratto dal PDF (vedi [WalletParsedData.rawText]). */
+    suspend fun runAiTicketExtraction(
+        text: String?,
+        fallbackBitmap: android.graphics.Bitmap?,
+        familyId: String,
+    ): Result<WalletTicketExtraction> = ticketAIExtractor.extract(text, fallbackBitmap, familyId)
+
+    fun estimatedAiTicketMessageCost(usedImageFallback: Boolean): Int =
+        WalletTicketAIExtractor.estimatedMessageUnits(usedImageFallback)
 
     fun deleteTicket(ticketId: String) {
         val familyId = _uiState.value.familyId

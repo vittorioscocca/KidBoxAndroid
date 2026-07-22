@@ -26,7 +26,23 @@ enum class TravelStyle(val raw: String) {
             SHOPPING -> "🛍️"
         }
 
-    val title: String
+    @get:androidx.annotation.StringRes
+    val titleRes: Int
+        get() = when (this) {
+            CULTURE -> it.vittorioscocca.kidbox.R.string.travel_style_culture
+            FOOD -> it.vittorioscocca.kidbox.R.string.travel_style_food
+            NIGHTLIFE -> it.vittorioscocca.kidbox.R.string.travel_style_nightlife
+            ADVENTURE -> it.vittorioscocca.kidbox.R.string.travel_style_adventure
+            RELAXATION -> it.vittorioscocca.kidbox.R.string.travel_style_relax
+            SHOPPING -> it.vittorioscocca.kidbox.R.string.travel_style_shopping
+        }
+
+    /**
+     * Etichetta italiana usata SOLO per comporre i prompt inviati al modello:
+     * i prompt non vanno localizzati, altrimenti cambia il comportamento dell'AI.
+     * Per la UI usare [titleRes].
+     */
+    val promptLabel: String
         get() = when (this) {
             CULTURE -> "Cultura e storia"
             FOOD -> "Cibo e gastronomia"
@@ -36,14 +52,15 @@ enum class TravelStyle(val raw: String) {
             SHOPPING -> "Shopping"
         }
 
-    val subtitle: String
+    @get:androidx.annotation.StringRes
+    val subtitleRes: Int
         get() = when (this) {
-            CULTURE -> "Musei, monumenti, storie"
-            FOOD -> "Ristoranti, mercati, cucina locale"
-            NIGHTLIFE -> "Bar, locali, serate"
-            ADVENTURE -> "Trekking, sport, natura"
-            RELAXATION -> "Spa, resort, giornate lente"
-            SHOPPING -> "Boutique, mercati, design"
+            CULTURE -> it.vittorioscocca.kidbox.R.string.travel_style_culture_sub
+            FOOD -> it.vittorioscocca.kidbox.R.string.travel_style_food_sub
+            NIGHTLIFE -> it.vittorioscocca.kidbox.R.string.travel_style_nightlife_sub
+            ADVENTURE -> it.vittorioscocca.kidbox.R.string.travel_style_adventure_sub
+            RELAXATION -> it.vittorioscocca.kidbox.R.string.travel_style_relax_sub
+            SHOPPING -> it.vittorioscocca.kidbox.R.string.travel_style_shopping_sub
         }
 }
 
@@ -53,25 +70,36 @@ enum class TravelPace(val raw: String) {
     PACKED("packed"),
     ;
 
-    val title: String
+    @get:androidx.annotation.StringRes
+    val titleRes: Int
+        get() = when (this) {
+            CHILL -> it.vittorioscocca.kidbox.R.string.travel_pace_chill
+            BALANCED -> it.vittorioscocca.kidbox.R.string.travel_pace_balanced
+            PACKED -> it.vittorioscocca.kidbox.R.string.travel_pace_packed
+        }
+
+    /** Etichetta italiana per i prompt AI: vedi [TravelStyle.promptLabel]. */
+    val promptLabel: String
         get() = when (this) {
             CHILL -> "Rilassato"
             BALANCED -> "Equilibrato"
             PACKED -> "Intenso"
         }
 
-    val line1: String
+    @get:androidx.annotation.StringRes
+    val line1Res: Int
         get() = when (this) {
-            CHILL -> "1–2 attività al giorno"
-            BALANCED -> "3–4 attività al giorno"
-            PACKED -> "5–6 attività al giorno"
+            CHILL -> it.vittorioscocca.kidbox.R.string.travel_pace_chill_1
+            BALANCED -> it.vittorioscocca.kidbox.R.string.travel_pace_balanced_1
+            PACKED -> it.vittorioscocca.kidbox.R.string.travel_pace_packed_1
         }
 
-    val line2: String
+    @get:androidx.annotation.StringRes
+    val line2Res: Int
         get() = when (this) {
-            CHILL -> "Mattine lente, pasti lunghi"
-            BALANCED -> "Mix di visite e riposo"
-            PACKED -> "Vedi tutto, senza perdere tempo"
+            CHILL -> it.vittorioscocca.kidbox.R.string.travel_pace_chill_2
+            BALANCED -> it.vittorioscocca.kidbox.R.string.travel_pace_balanced_2
+            PACKED -> it.vittorioscocca.kidbox.R.string.travel_pace_packed_2
         }
 }
 
@@ -90,12 +118,13 @@ enum class TravelAgeGroup(val raw: String) {
             COMFORT -> "☕"
         }
 
-    val subtitle: String
+    @get:androidx.annotation.StringRes
+    val subtitleRes: Int
         get() = when (this) {
-            YOUNG -> "Giovane esploratore"
-            MODERN -> "Viaggiatore moderno"
-            SEASONED -> "Esperto"
-            COMFORT -> "In cerca di comfort"
+            YOUNG -> it.vittorioscocca.kidbox.R.string.travel_age_young
+            MODERN -> it.vittorioscocca.kidbox.R.string.travel_age_modern
+            SEASONED -> it.vittorioscocca.kidbox.R.string.travel_age_seasoned
+            COMFORT -> it.vittorioscocca.kidbox.R.string.travel_age_comfort
         }
 }
 

@@ -15,6 +15,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -60,7 +62,7 @@ fun PasswordStrengthMeter(
             Spacer(modifier = Modifier.weight(1f))
             if (password.isNotEmpty()) {
                 Text(
-                    text = "~${result.estimatedBits.toInt()} bit",
+                    text = stringResource(R.string.components_password_meter_bits, result.estimatedBits.toInt()),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -79,9 +79,12 @@ import it.vittorioscocca.kidbox.domain.model.ReferenceDoctorDraft
 import it.vittorioscocca.kidbox.domain.model.groupedOfficeHourDisplayLines
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.util.UUID
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
-private val BLOOD_GROUPS = listOf(
-    "Non specificato", "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-",
+private fun bloodGroups(context: android.content.Context) = listOf(
+    context.getString(R.string.health_unspecified), "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-",
 )
 
 @Composable
@@ -103,7 +106,7 @@ fun MedicalRecordScreen(
         if (uri == null) return@rememberLauncherForActivityResult
         val selected = readContact(context, uri)
         if (selected == null) {
-            Toast.makeText(context, "Impossibile leggere il contatto selezionato", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.health_contact_read_error), Toast.LENGTH_SHORT).show()
             return@rememberLauncherForActivityResult
         }
         draftContact = KBEmergencyContact(
@@ -122,7 +125,7 @@ fun MedicalRecordScreen(
         } else {
             Toast.makeText(
                 context,
-                "Per selezionare un contatto, consenti l'accesso alla rubrica.",
+                context.getString(R.string.health_contacts_permission),
                 Toast.LENGTH_LONG,
             ).show()
         }
@@ -132,19 +135,19 @@ fun MedicalRecordScreen(
 
     LaunchedEffect(state.savedAt) {
         if (state.savedAt != null) {
-            Toast.makeText(context, "Scheda salvata", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.health_card_saved), Toast.LENGTH_SHORT).show()
         }
     }
     LaunchedEffect(state.saveError) {
         state.saveError?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
     }
 
-    val primaryDoctorLabel = if (state.isChild) "Pediatra di riferimento" else "Medico di riferimento"
+    val primaryDoctorLabel = if (state.isChild) stringResource(R.string.health_pediatrician) else stringResource(R.string.health_doctor)
     val addDoctorLabel = when {
-        state.referenceDoctor.hasDoctor && state.isChild -> "Modifica Pediatra di riferimento"
-        state.referenceDoctor.hasDoctor -> "Modifica Medico di riferimento"
-        state.isChild -> "Aggiungi Pediatra di riferimento"
-        else -> "Aggiungi Medico di riferimento"
+        state.referenceDoctor.hasDoctor && state.isChild -> stringResource(R.string.health_edit_pediatrician)
+        state.referenceDoctor.hasDoctor -> stringResource(R.string.health_edit_doctor)
+        state.isChild -> stringResource(R.string.health_add_pediatrician)
+        else -> stringResource(R.string.health_add_doctor)
     }
 
     Box(
@@ -167,13 +170,13 @@ fun MedicalRecordScreen(
             ) {
                 KidBoxHeaderCircleButton(
                     icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Indietro",
+                    contentDescription = stringResource(R.string.health_back),
                     onClick = onBack,
                 )
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                "Scheda Medica",
+                stringResource(R.string.health_medical_card),
                 fontSize = 32.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = kb.title,
@@ -181,7 +184,7 @@ fun MedicalRecordScreen(
             Spacer(Modifier.height(20.dp))
 
             // ── Gruppo sanguigno ───────────────────────────────────────────────
-            SectionLabel("Gruppo sanguigno")
+            SectionLabel(stringResource(R.string.health_blood_type))
             ExposedDropdownMenuBox(
                 expanded = bloodMenuExpanded,
                 onExpandedChange = { bloodMenuExpanded = it },
@@ -210,7 +213,7 @@ fun MedicalRecordScreen(
                     expanded = bloodMenuExpanded,
                     onDismissRequest = { bloodMenuExpanded = false },
                 ) {
-                    BLOOD_GROUPS.forEach { g ->
+                    bloodGroups(context).forEach { g ->
                         DropdownMenuItem(
                             text = { Text(g) },
                             onClick = {
@@ -224,12 +227,12 @@ fun MedicalRecordScreen(
             Spacer(Modifier.height(16.dp))
 
             // ── Età / data di nascita ───────────────────────────────────────────
-            SectionLabel("Età")
+            SectionLabel(stringResource(R.string.health_age))
             val birthMillis = state.linkedBirthDateEpochMillis ?: System.currentTimeMillis()
             var showBirthDatePicker by remember { mutableStateOf(false) }
             val birthDatePickerState = rememberDatePickerState(initialSelectedDateMillis = birthMillis)
             val birthDateLabel = remember(birthMillis) {
-                SimpleDateFormat("d MMMM yyyy", Locale.ITALY).format(java.util.Date(birthMillis))
+                SimpleDateFormat("d MMMM yyyy", KBLocale.current()).format(java.util.Date(birthMillis))
             }
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -239,7 +242,7 @@ fun MedicalRecordScreen(
                     .clickable { showBirthDatePicker = true },
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Data di nascita", fontSize = 13.sp, color = kb.subtitle)
+                    Text(stringResource(R.string.health_birthdate), fontSize = 13.sp, color = kb.subtitle)
                     Text(birthDateLabel, fontSize = 17.sp, color = kb.title, fontWeight = FontWeight.SemiBold)
                     state.linkedAgeDescription?.let { age ->
                         Text(
@@ -251,9 +254,9 @@ fun MedicalRecordScreen(
                     }
                     Text(
                         if (state.hasHealthLink) {
-                            "Da App Salute — tocca per modificare"
+                            stringResource(R.string.health_from_health_app)
                         } else {
-                            "Tocca per impostare o correggere la data"
+                            stringResource(R.string.health_tap_set_date)
                         },
                         fontSize = 12.sp,
                         color = kb.subtitle,
@@ -271,7 +274,7 @@ fun MedicalRecordScreen(
                         }) { Text("OK") }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showBirthDatePicker = false }) { Text("Annulla") }
+                        TextButton(onClick = { showBirthDatePicker = false }) { Text(stringResource(R.string.health_cancel)) }
                     },
                 ) {
                     DatePicker(state = birthDatePickerState)
@@ -280,11 +283,11 @@ fun MedicalRecordScreen(
             Spacer(Modifier.height(16.dp))
 
             // ── Allergie ───────────────────────────────────────────────────────
-            SectionLabel("Allergie conosciute")
+            SectionLabel(stringResource(R.string.health_known_allergies))
             TextField(
                 value = state.allergies,
                 onValueChange = viewModel::setAllergies,
-                placeholder = { Text("es. Latte, uova, pollini") },
+                placeholder = { Text(stringResource(R.string.health_allergies_hint)) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 minLines = 2,
@@ -308,7 +311,7 @@ fun MedicalRecordScreen(
             ) {
                 if (!state.referenceDoctor.hasDoctor) {
                     Text(
-                        "Nessun medico aggiunto",
+                        stringResource(R.string.health_no_doctor),
                         color = kb.subtitle,
                         fontSize = 16.sp,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
@@ -336,7 +339,7 @@ fun MedicalRecordScreen(
             Spacer(Modifier.height(20.dp))
 
             // ── Contatti di emergenza ──────────────────────────────────────────
-            SectionLabel("Contatti emergenza")
+            SectionLabel(stringResource(R.string.health_emergency_contacts))
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 shape = RoundedCornerShape(12.dp),
@@ -344,7 +347,7 @@ fun MedicalRecordScreen(
             ) {
                 if (state.emergencyContacts.isEmpty()) {
                     Text(
-                        "Nessun contatto aggiunto",
+                        stringResource(R.string.health_no_contacts),
                         color = kb.subtitle,
                         fontSize = 18.sp,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
@@ -380,12 +383,12 @@ fun MedicalRecordScreen(
                             }
                         },
                     ) {
-                        Text("Aggiungi contatto", color = Color(0xFF0A84FF), fontSize = 18.sp)
+                        Text(stringResource(R.string.health_add_contact), color = Color(0xFF0A84FF), fontSize = 18.sp)
                     }
                 }
             }
             Text(
-                "Persone da contattare in caso di emergenza (nonni, babysitter, secondo genitore...)",
+                stringResource(R.string.health_emergency_hint),
                 fontSize = 12.sp,
                 color = kb.subtitle,
                 modifier = Modifier.padding(top = 8.dp),
@@ -393,11 +396,11 @@ fun MedicalRecordScreen(
             Spacer(Modifier.height(16.dp))
 
             // ── Note mediche ───────────────────────────────────────────────────
-            SectionLabel("Note mediche")
+            SectionLabel(stringResource(R.string.health_medical_notes))
             TextField(
                 value = state.medicalNotes,
                 onValueChange = viewModel::setMedicalNotes,
-                placeholder = { Text("Eventuali condizioni o note importanti") },
+                placeholder = { Text(stringResource(R.string.health_medical_notes_hint)) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 minLines = 3,
@@ -432,7 +435,7 @@ fun MedicalRecordScreen(
                     )
                 } else {
                     Text(
-                        "Salva scheda",
+                        stringResource(R.string.health_save_card),
                         fontWeight = FontWeight.SemiBold,
                         color = Color(0xFF0A84FF),
                     )
@@ -538,8 +541,8 @@ private fun ContactListRow(
                 Text(contact.relation, fontSize = 12.sp, color = kb.subtitle)
             }
         }
-        TextButton(onClick = onTap) { Text("Modifica", color = Color(0xFF0A84FF)) }
-        TextButton(onClick = onDelete) { Text("Elimina", color = Color(0xFFFF3B30)) }
+        TextButton(onClick = onTap) { Text(stringResource(R.string.health_edit), color = Color(0xFF0A84FF)) }
+        TextButton(onClick = onDelete) { Text(stringResource(R.string.health_delete), color = Color(0xFFFF3B30)) }
     }
 }
 
@@ -556,27 +559,27 @@ private fun EmergencyContactDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (initial == null) "Nuovo contatto" else "Modifica contatto") },
+        title = { Text(if (initial == null) stringResource(R.string.health_new_contact) else stringResource(R.string.health_edit_contact)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Nome e cognome") },
+                    label = { Text(stringResource(R.string.health_full_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = relation,
                     onValueChange = { relation = it },
-                    label = { Text("Relazione (es. Nonna)") },
+                    label = { Text(stringResource(R.string.health_relationship)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = phone,
                     onValueChange = { phone = it },
-                    label = { Text("Telefono") },
+                    label = { Text(stringResource(R.string.health_phone)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
@@ -596,10 +599,10 @@ private fun EmergencyContactDialog(
                         )
                     )
                 },
-            ) { Text("Salva") }
+            ) { Text(stringResource(R.string.health_save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Annulla") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.health_cancel)) }
         },
     )
 }

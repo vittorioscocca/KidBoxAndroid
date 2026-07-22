@@ -36,6 +36,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
@@ -65,10 +67,10 @@ fun PlansScreen(
     state.purchaseError?.let { err ->
         AlertDialog(
             onDismissRequest = viewModel::clearError,
-            title = { Text("Errore acquisto") },
+            title = { Text(stringResource(R.string.subscription_purchase_error_title)) },
             text = { Text(err) },
             confirmButton = {
-                TextButton(onClick = viewModel::clearError) { Text("OK") }
+                TextButton(onClick = viewModel::clearError) { Text(stringResource(R.string.subscription_ok)) }
             },
         )
     }
@@ -85,7 +87,7 @@ fun PlansScreen(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Indietro",
+                contentDescription = stringResource(R.string.subscription_back_desc),
                 tint = kb.title,
                 modifier = Modifier
                     .clickable(onClick = onDismiss)
@@ -93,9 +95,9 @@ fun PlansScreen(
             )
         }
         Spacer(modifier = Modifier.height(4.dp))
-        Text("Piani KidBox", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = kb.title)
+        Text(stringResource(R.string.subscription_plans_title), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = kb.title)
         Text(
-            "Un solo abbonamento copre tutti i membri.",
+            stringResource(R.string.subscription_plans_subtitle),
             color = kb.subtitle,
             fontSize = 14.sp,
             modifier = Modifier.padding(top = 2.dp),
@@ -112,14 +114,13 @@ fun PlansScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Text(
-                        "Piano gestito dal proprietario",
+                        stringResource(R.string.subscription_owner_managed_title),
                         color = Color(0xFF6D28D9),
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                     )
                     Text(
-                        "Solo il proprietario della famiglia può attivare o cambiare un abbonamento. " +
-                            "Chiedi al proprietario di passare a un piano superiore se serve più spazio o funzioni AI.",
+                        stringResource(R.string.subscription_owner_managed_body),
                         color = kb.subtitle,
                         fontSize = 13.sp,
                         lineHeight = 18.sp,
@@ -130,10 +131,13 @@ fun PlansScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         PlanCard(
-            title = "Free",
-            price = "€0 / mese",
-            badge = "Gratuito",
-            features = listOf("200 MB storage famiglia", "AI non inclusa"),
+            title = stringResource(R.string.subscription_plan_free_name),
+            price = stringResource(R.string.subscription_plan_free_price),
+            badge = stringResource(R.string.subscription_plan_free_badge),
+            features = listOf(
+                stringResource(R.string.subscription_plan_free_feature_storage),
+                stringResource(R.string.subscription_plan_free_feature_ai),
+            ),
             isCurrent = state.currentPlan == KBPlan.FREE,
             badgeColor = Color(0xFF9CA3AF),
             buttonLabel = null,
@@ -142,13 +146,17 @@ fun PlansScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         PlanCard(
-            title = "Pro",
-            price = "€4,99/mese",
-            badge = "Più popolare",
-            features = listOf("5 GB storage famiglia", "30 messaggi AI/giorno", "Sintesi settimanale AI"),
+            title = stringResource(R.string.subscription_plan_pro_name),
+            price = stringResource(R.string.subscription_plan_pro_price),
+            badge = stringResource(R.string.subscription_plan_pro_badge),
+            features = listOf(
+                stringResource(R.string.subscription_plan_pro_feature_storage),
+                stringResource(R.string.subscription_plan_pro_feature_ai_msgs),
+                stringResource(R.string.subscription_feature_ai_weekly_summary),
+            ),
             isCurrent = state.currentPlan == KBPlan.PRO,
             badgeColor = Color(0xFF2563EB),
-            buttonLabel = if (state.currentPlan != KBPlan.PRO && state.isFamilyOwner) "Abbonati" else null,
+            buttonLabel = if (state.currentPlan != KBPlan.PRO && state.isFamilyOwner) stringResource(R.string.subscription_subscribe) else null,
             onButtonClick = {
                 if (activity != null) viewModel.purchase(KBPlan.PRO, activity)
             },
@@ -156,13 +164,18 @@ fun PlansScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         PlanCard(
-            title = "Max",
-            price = "€9,99/mese",
-            badge = "Migliore",
-            features = listOf("20 GB storage famiglia", "100 messaggi AI/giorno", "Sintesi settimanale AI", "Supporto prioritario"),
+            title = stringResource(R.string.subscription_plan_max_name),
+            price = stringResource(R.string.subscription_plan_max_price),
+            badge = stringResource(R.string.subscription_plan_max_badge),
+            features = listOf(
+                stringResource(R.string.subscription_plan_max_feature_storage),
+                stringResource(R.string.subscription_plan_max_feature_ai_msgs),
+                stringResource(R.string.subscription_feature_ai_weekly_summary),
+                stringResource(R.string.subscription_plan_max_feature_support),
+            ),
             isCurrent = state.currentPlan == KBPlan.MAX,
             badgeColor = Color(0xFF7C3AED),
-            buttonLabel = if (state.currentPlan != KBPlan.MAX && state.isFamilyOwner) "Abbonati" else null,
+            buttonLabel = if (state.currentPlan != KBPlan.MAX && state.isFamilyOwner) stringResource(R.string.subscription_subscribe) else null,
             onButtonClick = {
                 if (activity != null) viewModel.purchase(KBPlan.MAX, activity)
             },
@@ -175,26 +188,26 @@ fun PlansScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
             ) {
-                Text("Ripristina acquisti precedenti")
+                Text(stringResource(R.string.subscription_restore_purchases))
             }
             Spacer(modifier = Modifier.height(10.dp))
         }
 
         Text(
-            "Gli abbonamenti si rinnovano automaticamente. Puoi gestirli in Impostazioni > Google Play > Abbonamenti.",
+            stringResource(R.string.subscription_auto_renew_notice),
             fontSize = 12.sp,
             color = kb.subtitle,
         )
         Spacer(modifier = Modifier.height(10.dp))
         Row {
             Text(
-                "Termini di servizio",
+                stringResource(R.string.subscription_terms_of_service),
                 color = Color(0xFFFF6B00),
                 modifier = Modifier.clickable { uriHandler.openUri("https://vittorioscocca.github.io/KidBox/") },
             )
             Spacer(modifier = Modifier.width(14.dp))
             Text(
-                "Privacy Policy",
+                stringResource(R.string.subscription_privacy_policy),
                 color = Color(0xFFFF6B00),
                 modifier = Modifier.clickable { uriHandler.openUri("https://vittorioscocca.github.io/KidBox/") },
             )

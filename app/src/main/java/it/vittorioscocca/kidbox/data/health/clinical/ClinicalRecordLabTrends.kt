@@ -5,6 +5,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.regex.Pattern
+import it.vittorioscocca.kidbox.util.KBLocale
 
 data class LabMeasurementPoint(
     val dateEpochMillis: Long,
@@ -48,7 +49,7 @@ object ClinicalRecordLabTrends {
             val text = listOf(exam.name, exam.resultText.orEmpty()).joinToString("\n")
             if (text.isBlank()) continue
             val date = exam.resultDateEpochMillis ?: exam.deadlineEpochMillis ?: exam.updatedAtEpochMillis
-            val year = SimpleDateFormat("yyyy", Locale.getDefault()).format(Date(date)).toIntOrNull() ?: 0
+            val year = SimpleDateFormat("yyyy", KBLocale.current()).format(Date(date)).toIntOrNull() ?: 0
 
             for ((family, label, regex) in metricPatterns) {
                 val value = regex?.let { firstMatch(it, text) } ?: continue
@@ -154,5 +155,5 @@ object ClinicalRecordLabTrends {
     }
 
     private fun formatShort(epoch: Long): String =
-        SimpleDateFormat("MMM yyyy", Locale.getDefault()).format(Date(epoch))
+        SimpleDateFormat("MMM yyyy", KBLocale.current()).format(Date(epoch))
 }

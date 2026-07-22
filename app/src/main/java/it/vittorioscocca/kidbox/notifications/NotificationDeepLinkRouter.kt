@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox.notifications
 
 import android.content.Context
 import android.content.Intent
+import it.vittorioscocca.kidbox.notifications.nudge.NudgeDestination
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.DailyBriefingDraftStore
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.HealthPatternDraftStore
@@ -26,6 +27,23 @@ import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
  *
  * Mirror del comportamento iOS (`AppCoordinator.switchFamilyIfNeededThenNavigate`).
  */
+/**
+ * Annuncio inviato a mano dalla console admin (`sendBroadcast`).
+ *
+ * Il contenuto *è* il messaggio: non c'è una destinazione dentro l'app né una
+ * famiglia di riferimento, quindi non passa da [AppDestination] come tutto il
+ * resto — viaggia intero dentro il payload della notifica.
+ */
+data class BroadcastMessage(
+    val id: String,
+    val title: String,
+    val body: String,
+    /** Campagna di origine, se è un nudge. Serve solo alle metriche. */
+    val campaignId: String? = null,
+    /** Se valorizzata, il dialog mostra "Vai" e "Non ora" invece di "Ho capito". */
+    val destination: NudgeDestination? = null,
+)
+
 object NotificationDeepLinkRouter {
 
     private const val PREFS_NAME = "kidbox_prefs"
@@ -50,6 +68,15 @@ object NotificationDeepLinkRouter {
      */
     private val _pendingFamilyId = MutableStateFlow<String?>(null)
     val pendingFamilyId: StateFlow<String?> = _pendingFamilyId.asStateFlow()
+
+    /**
+     * Annuncio da mostrare in `BroadcastMessageDialog`.
+     *
+     * Tenuto fuori da [pendingRoute] di proposito: non è navigazione, non ha
+     * famiglia da attivare e non deve entrare nel back stack.
+     */
+    private val _pendingBroadcast = MutableStateFlow<BroadcastMessage?>(null)
+    val pendingBroadcast: StateFlow<BroadcastMessage?> = _pendingBroadcast.asStateFlow()
 
     /** Incrementato a ogni tap notifica AI (anche se la chat è già aperta). */
     private val _recapTick = MutableStateFlow(0)
@@ -234,6 +261,54 @@ object NotificationDeepLinkRouter {
                     AppDestination.PasswordsSecurity.createRoute(fid)
                 }
             }
+            "broadcast" -> {
+                // `title` / `body` arrivano dagli extra del payload `data`, non
+                // dal blocco `notification`: il server li duplica lì apposta,
+                // perché quello che il sistema mostra nella tendina è già
+                // troncato e non è il testo integrale.
+                // Doppia lettura, e non è ridondanza: gli extra `push_*` li
+                // scrive `KidBoxFirebaseMessagingService`, che però viene
+                // chiamato SOLO con app in foreground. In background la
+                // notifica la mostra l'SDK di Firebase e il tap consegna il
+                // payload `data` con le chiavi grezze. Leggere solo `push_body`
+                // significa non aprire mai il dialog dal caso più comune.
+                val body = (intent.getStringExtra("push_body")
+                    ?: intent.getStringExtra("body")).orEmpty()
+                if (body.isBlank()) {
+                    KBLog.app.warning("NotificationDeepLink: broadcast senza body", TAG)
+                    return
+                }
+                _pendingBroadcast.value = BroadcastMessage(
+                    id = (intent.getStringExtra("push_broadcast_id")
+                        ?: intent.getStringExtra("broadcastId")).orEmpty(),
+                    title = (intent.getStringExtra("push_title")
+                        ?: intent.getStringExtra("title")).orEmpty(),
+                    body = body,
+                )
+                KBLog.app.info("NotificationDeepLink: broadcast in coda", TAG)
+            }
+            "nudge" -> {
+                // Stessa view del broadcast, con in più la destinazione: per
+                // l'utente sono lo stesso oggetto — un messaggio da KidBox.
+                val body = intent.getStringExtra("push_body").orEmpty()
+                val campaignId = intent.getStringExtra("push_campaign_id").orEmpty()
+                if (body.isBlank() || campaignId.isBlank()) {
+                    KBLog.app.warning("NotificationDeepLink: nudge incompleto", TAG)
+                    return
+                }
+                _pendingBroadcast.value = BroadcastMessage(
+                    id = campaignId,
+                    title = intent.getStringExtra("push_title").orEmpty(),
+                    body = body,
+                    campaignId = campaignId,
+                    // Destinazione sconosciuta (catalogo remoto più recente
+                    // dell'app): il messaggio si apre lo stesso, senza pulsante
+                    // di azione. Meglio informativo che assente.
+                    destination = NudgeDestination.from(
+                        intent.getStringExtra("push_destination")),
+                )
+                KBLog.app.info("NotificationDeepLink: nudge $campaignId", TAG)
+            }
             else -> Unit
         }
         _recapTick.value += 1
@@ -288,6 +363,15 @@ object NotificationDeepLinkRouter {
 
     fun clearChatMessageId() {
         _pendingChatMessageId.value = null
+    }
+
+    /**
+     * Consumato alla chiusura del dialog, non da [clear].
+     * [clear] scatta dopo una navigazione riuscita: un annuncio ancora aperto
+     * non deve sparire perché nel frattempo è arrivata un'altra notifica.
+     */
+    fun clearBroadcast() {
+        _pendingBroadcast.value = null
     }
 
     fun clear() {

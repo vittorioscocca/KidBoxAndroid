@@ -42,6 +42,8 @@ import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,7 +74,7 @@ fun TravelDetailScreen(
             val albumId = viewModel.ensureAlbumForTrip(tripEntity) ?: run {
                 Toast.makeText(
                     context,
-                    "Accedi per aprire l'album del viaggio",
+                    context.getString(R.string.travel_login_album),
                     Toast.LENGTH_LONG,
                 ).show()
                 return@launch
@@ -116,7 +118,7 @@ fun TravelDetailScreen(
         containerColor = kb.background,
         topBar = {
             TopAppBar(
-                title = { Text(trip?.name ?: "Viaggio", color = kb.title) },
+                title = { Text(trip?.name ?: stringResource(R.string.travel_trip), color = kb.title) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = kb.title)
@@ -124,7 +126,7 @@ fun TravelDetailScreen(
                 },
                 actions = {
                     IconButton(onClick = { showDeleteDialog = true }) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Elimina viaggio", tint = kb.title)
+                        Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.travel_delete_trip), tint = kb.title)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = kb.background),
@@ -139,7 +141,7 @@ fun TravelDetailScreen(
         when {
             currentTrip == null -> {
                 Column(Modifier.padding(padding).padding(16.dp)) {
-                    Text("Caricamento…", color = kb.subtitle)
+                    Text(stringResource(R.string.travel_loading), color = kb.subtitle)
                 }
             }
             !hasItinerary -> {
@@ -151,7 +153,7 @@ fun TravelDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     item {
-                        Text("Nessun giorno pianificato.", color = kb.subtitle)
+                        Text(stringResource(R.string.travel_no_days), color = kb.subtitle)
                     }
                     item {
                         TravelTripExtrasSection(
@@ -294,7 +296,7 @@ fun TravelDetailScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator(color = Color.White)
                     androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(8.dp))
-                    Text("Rigenerazione giorno…", color = Color.White)
+                    Text(stringResource(R.string.travel_regenerating_day), color = Color.White)
                 }
             }
         }
@@ -303,8 +305,8 @@ fun TravelDetailScreen(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Eliminare questo viaggio?") },
-            text = { Text("Itinerario e dati collegati verranno rimossi da questo dispositivo.") },
+            title = { Text(stringResource(R.string.travel_delete_trip_q)) },
+            text = { Text(stringResource(R.string.travel_delete_trip_body)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -316,12 +318,12 @@ fun TravelDetailScreen(
                         }
                     },
                 ) {
-                    Text("Elimina")
+                    Text(stringResource(R.string.travel_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Annulla")
+                    Text(stringResource(R.string.travel_cancel))
                 }
             },
         )

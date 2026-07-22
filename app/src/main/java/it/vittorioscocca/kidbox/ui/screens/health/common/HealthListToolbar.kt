@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 /**
  * Barra superiore comune (Indietro | … | pill Filtra + Seleziona/Fine | +) per liste Salute:
@@ -59,7 +61,7 @@ fun HealthListTopToolbar(
     ) {
         KidBoxHeaderCircleButton(
             icon = Icons.AutoMirrored.Filled.ArrowBack,
-            contentDescription = "Indietro",
+            contentDescription = stringResource(R.string.health_back),
             onClick = onBack,
         )
         Spacer(Modifier.weight(1f))
@@ -72,7 +74,7 @@ fun HealthListTopToolbar(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 KidBoxHeaderCircleButton(
                     icon = Icons.Default.FilterList,
-                    contentDescription = "Filtra",
+                    contentDescription = stringResource(R.string.health_filter),
                     onClick = onFilterClick,
                     iconTint = if (filterActive) tint else null,
                 )
@@ -81,7 +83,7 @@ fun HealthListTopToolbar(
                     colors = ButtonDefaults.textButtonColors(contentColor = kb.title),
                 ) {
                     Text(
-                        if (isSelecting) "Fine" else "Seleziona",
+                        if (isSelecting) stringResource(R.string.health_done) else stringResource(R.string.health_select),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -92,7 +94,7 @@ fun HealthListTopToolbar(
         if (!isSelecting && onAddClick != null) {
             KidBoxHeaderCircleButton(
                 icon = Icons.Default.Add,
-                contentDescription = "Aggiungi",
+                contentDescription = stringResource(R.string.health_add),
                 onClick = onAddClick,
             )
         }
@@ -153,7 +155,7 @@ fun HealthListDualSelectionBottomBar(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    if (allSelected) "Deseleziona" else "Tutte",
+                    if (allSelected) stringResource(R.string.health_deselect) else stringResource(R.string.health_all),
                     fontSize = 11.sp,
                     color = tint,
                     fontWeight = FontWeight.Medium,
@@ -180,7 +182,7 @@ fun HealthListDualSelectionBottomBar(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Elimina",
+                    stringResource(R.string.health_delete),
                     fontSize = 11.sp,
                     color = if (hasSelection) deleteColor else kb.subtitle,
                     fontWeight = FontWeight.Medium,

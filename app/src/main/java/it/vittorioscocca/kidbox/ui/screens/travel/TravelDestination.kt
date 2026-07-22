@@ -3,6 +3,8 @@ package it.vittorioscocca.kidbox.ui.screens.travel
 import it.vittorioscocca.kidbox.data.local.TravelPace
 import it.vittorioscocca.kidbox.data.local.TravelProfile
 import it.vittorioscocca.kidbox.data.local.TravelStyle
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 data class TravelDestination(
     val id: String,
@@ -86,9 +88,15 @@ data class TravelSuggestionsResult(
     val dailyLimit: Int,
 )
 
-fun TravelProfile.discoverSubtitle(): String {
-    val stylesPart = styles.take(2).joinToString(", ") { it.title }
-    return "In base al tuo stile${if (stylesPart.isBlank()) "" else " ($stylesPart)"}, ritmo ${pace.title.lowercase()}, fascia ${ageGroup.raw}"
+fun TravelProfile.discoverSubtitle(context: android.content.Context): String {
+    val locale = it.vittorioscocca.kidbox.util.KBLocale.current()
+    val stylesPart = styles.take(2).joinToString(", ") { context.getString(it.titleRes) }
+    return context.getString(
+        it.vittorioscocca.kidbox.R.string.travel_discover_subtitle,
+        if (stylesPart.isBlank()) "" else " ($stylesPart)",
+        context.getString(pace.titleRes).lowercase(locale),
+        ageGroup.raw,
+    )
 }
 
 object TravelDiscoverTips {

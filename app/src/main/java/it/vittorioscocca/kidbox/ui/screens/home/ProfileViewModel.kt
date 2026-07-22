@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.home
 
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.util.KBLog
 
 import android.Manifest
@@ -144,7 +145,7 @@ class ProfileViewModel @Inject constructor(
         if (familyId.isBlank()) {
             _uiState.update {
                 it.copy(
-                    planLabel = "Piano Free",
+                    planLabel = getApplication<Application>().getString(R.string.home_profile_vm_plan_free),
                     storageUsedBytes = 0L,
                     storageTotalBytes = KBPlan.FREE.storageQuota,
                 )
@@ -163,7 +164,7 @@ class ProfileViewModel @Inject constructor(
             val usedBytes = (payload.orEmpty()["usedBytes"] as? Number)?.toLong() ?: 0L
             _uiState.update {
                 it.copy(
-                    planLabel = "Piano ${plan.displayName}",
+                    planLabel = getApplication<Application>().getString(R.string.home_profile_vm_plan_label, plan.displayName),
                     storageUsedBytes = usedBytes.coerceAtLeast(0L),
                     storageTotalBytes = plan.storageQuota,
                 )
@@ -172,7 +173,7 @@ class ProfileViewModel @Inject constructor(
             // Keep quota from current plan even if usage fetch fails.
             _uiState.update {
                 it.copy(
-                    planLabel = "Piano ${plan.displayName}",
+                    planLabel = getApplication<Application>().getString(R.string.home_profile_vm_plan_label, plan.displayName),
                     storageTotalBytes = plan.storageQuota,
                 )
             }
@@ -306,7 +307,7 @@ class ProfileViewModel @Inject constructor(
                     )
                     .await()
                     ?: fusedLocation.lastLocation.await()
-                if (location == null) error("Posizione non disponibile")
+                if (location == null) error(getApplication<Application>().getString(R.string.home_profile_vm_error_location_unavailable))
                 val addr = withContext(Dispatchers.IO) {
                     val geocoder = Geocoder(getApplication(), Locale.getDefault())
                     @Suppress("DEPRECATION")
@@ -326,7 +327,7 @@ class ProfileViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isResolvingLocation = false,
-                        saveError = e.localizedMessage ?: "Errore rilevamento posizione",
+                        saveError = e.localizedMessage ?: getApplication<Application>().getString(R.string.home_profile_vm_error_location_resolve),
                     )
                 }
             }
@@ -375,7 +376,7 @@ class ProfileViewModel @Inject constructor(
                 recomputeDirty()
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(isSaving = false, saveError = e.localizedMessage ?: "Errore salvataggio")
+                    it.copy(isSaving = false, saveError = e.localizedMessage ?: getApplication<Application>().getString(R.string.home_profile_vm_error_save))
                 }
             }
         }
@@ -398,7 +399,7 @@ class ProfileViewModel @Inject constructor(
                 onDone()
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(isDeleting = false, saveError = e.localizedMessage ?: "Errore eliminazione account")
+                    it.copy(isDeleting = false, saveError = e.localizedMessage ?: getApplication<Application>().getString(R.string.home_profile_vm_error_delete_account))
                 }
             }
         }

@@ -19,6 +19,9 @@ import androidx.navigation.navArgument
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
 import it.vittorioscocca.kidbox.notifications.NotificationDeepLinkRouter
+import it.vittorioscocca.kidbox.notifications.nudge.NudgeDestination
+import it.vittorioscocca.kidbox.ui.BroadcastMessageDialog
+import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
 import it.vittorioscocca.kidbox.ui.family.FamilySwitcherViewModel
 import it.vittorioscocca.kidbox.ui.screens.auth.LoginScreen
 import it.vittorioscocca.kidbox.ui.screens.grocery.GroceryListScreen
@@ -32,6 +35,7 @@ import it.vittorioscocca.kidbox.ui.screens.vehicles.VehicleInterventionsListScre
 import it.vittorioscocca.kidbox.ui.screens.vehicles.VehiclesScreen
 import it.vittorioscocca.kidbox.ui.screens.home.HomeScreen
 import it.vittorioscocca.kidbox.ui.screens.home.ProfileScreen
+import it.vittorioscocca.kidbox.ui.screens.home.SuggestionsScreen
 import it.vittorioscocca.kidbox.ui.screens.onboarding.OnboardingScreen
 import it.vittorioscocca.kidbox.ui.screens.onboarding.WikiOnboardingScreen
 import it.vittorioscocca.kidbox.ui.screens.documents.DocumentBrowserScreen
@@ -51,6 +55,8 @@ import it.vittorioscocca.kidbox.ui.screens.settings.support.SupportChatScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.AutoFillSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.StorageUsageScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.ThemeScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.LanguageScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.GuideWebViewScreen
 import it.vittorioscocca.kidbox.ui.subscription.PlansScreen
 import it.vittorioscocca.kidbox.ui.screens.calendar.CalendarScreen
 import it.vittorioscocca.kidbox.ui.screens.expenses.ExpensesHomeScreen
@@ -140,6 +146,46 @@ fun AppNavGraph(
         navController.navigate(route) { launchSingleTop = true }
         NotificationDeepLinkRouter.clear()
     }
+
+    // Annuncio dalla console admin: non è una destinazione, quindi vive sopra il
+    // NavHost e non tocca il back stack.
+    val pendingBroadcast by NotificationDeepLinkRouter.pendingBroadcast.collectAsStateWithLifecycle()
+    BroadcastMessageDialog(
+        message = pendingBroadcast,
+        onDismiss = {
+            pendingBroadcast?.campaignId?.let { KBAnalytics.logNudge("nudge_dismissed", it) }
+            NotificationDeepLinkRouter.clearBroadcast()
+        },
+        onAction = { msg ->
+            msg.campaignId?.let { KBAnalytics.logNudge("nudge_opened", it) }
+            // Si chiude PRIMA di navigare: lasciare il dialog aperto sopra la
+            // destinazione la coprirebbe.
+            NotificationDeepLinkRouter.clearBroadcast()
+            val fid = activeFamilyId
+            val route = when (msg.destination) {
+                NudgeDestination.INVITE -> AppDestination.InviteCode.route
+                // Le sezioni di famiglia hanno bisogno della famiglia attiva.
+                // Se manca (utente senza famiglia) l'unica destinazione sensata
+                // resta l'invito, che di famiglia non ha bisogno.
+                null -> null
+                else -> if (fid.isNullOrBlank()) {
+                    AppDestination.InviteCode.route
+                } else {
+                    when (msg.destination) {
+                        NudgeDestination.DOCUMENTS -> AppDestination.DocumentsHome.createRoute(fid)
+                        NudgeDestination.WALLET -> AppDestination.WalletHome.createRoute(fid)
+                        NudgeDestination.HEALTH ->
+                            AppDestination.PediatricChildSelector.createRoute(fid)
+                        NudgeDestination.AI -> AppDestination.AiChat.createRoute(fid)
+                        NudgeDestination.CHAT -> AppDestination.Chat.route
+                        NudgeDestination.CALENDAR -> AppDestination.Calendar.createRoute(fid)
+                        else -> null
+                    }
+                }
+            }
+            route?.let { navController.navigate(it) { launchSingleTop = true } }
+        },
+    )
 
     NavHost(
         navController = navController,
@@ -246,6 +292,8 @@ fun AppNavGraph(
             SettingsScreen(
                 onBack = { navController.popBackToHome() },
                 onTheme = { navController.navigate(AppDestination.Theme.route) },
+                onLanguage = { navController.navigate(AppDestination.Language.route) },
+                onUsageGuide = { navController.navigate(AppDestination.UsageGuide.route) },
                 onFamilySettings = { navController.navigate(AppDestination.FamilySettings.route) },
                 onMessageSettings = { navController.navigate(AppDestination.MessageSettings.route) },
                 onNotifications = { navController.navigate(AppDestination.NotificationSettings.route) },
@@ -311,6 +359,18 @@ fun AppNavGraph(
 
         composable(AppDestination.Theme.route) {
             ThemeScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(AppDestination.Language.route) {
+            LanguageScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(AppDestination.UsageGuide.route) {
+            GuideWebViewScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(AppDestination.Suggestions.route) {
+            SuggestionsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(AppDestination.InviteCode.route) {

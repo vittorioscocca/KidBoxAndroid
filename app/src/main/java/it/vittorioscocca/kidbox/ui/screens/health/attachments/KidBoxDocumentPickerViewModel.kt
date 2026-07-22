@@ -28,7 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 data class KidBoxPickerUiState(
-    val title: String = "Documenti",
+    val title: String = "",
     val folders: List<KBDocumentCategoryEntity> = emptyList(),
     val documents: List<KBDocumentEntity> = emptyList(),
     val canGoUp: Boolean = false,
@@ -43,7 +43,7 @@ class KidBoxDocumentPickerViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val familyId = MutableStateFlow<String?>(null)
-    private val folderStack = MutableStateFlow<List<Pair<String?, String>>>(listOf(null to "Documenti"))
+    private val folderStack = MutableStateFlow<List<Pair<String?, String>>>(listOf(null to ""))
     private val busy = MutableStateFlow(false)
     private val error = MutableStateFlow<String?>(null)
 
@@ -77,7 +77,7 @@ class KidBoxDocumentPickerViewModel @Inject constructor(
 
     fun bindFamily(id: String) {
         familyId.value = id
-        folderStack.value = listOf(null to "Documenti")
+        folderStack.value = listOf(null to "")
         error.value = null
         // Avvia il listener Firestore → Room se non è già attivo per questa famiglia.
         // Senza questo, se l'utente non ha mai aperto la sezione Documenti nella sessione

@@ -26,7 +26,7 @@
         <item name="android:forceDarkAllowed">false</item>
     </style>
 
-    <style name="Theme.KidBox.NoActionBar" parent="android:Theme.Material.Light.NoActionBar">
+    <style name="Theme.KidBox.NoActionBar" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="android:windowBackground">@color/kidbox_background_light</item>
         <item name="android:windowNoTitle">true</item>
         <item name="windowActionBar">false</item>

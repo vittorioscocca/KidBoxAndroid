@@ -36,6 +36,8 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 
 object HealthPatternAnalyzerService {
     private const val PREFS_NAME = "kidbox_prefs"
@@ -53,7 +55,7 @@ object HealthPatternAnalyzerService {
         if (!prefs.getBoolean(PREF_ENABLED, true)) return
         if (prefs.getString(PREF_LAST_MONTH_KEY, null) == currentMonthKey()) return
 
-        val familyName = prefs.getString("active_family_name", "la tua famiglia") ?: "la tua famiglia"
+        val familyName = prefs.getString("active_family_name", context.getString(R.string.ai_your_family)) ?: context.getString(R.string.ai_your_family)
         val request = OneTimeWorkRequestBuilder<HealthPatternWorker>()
             .setInputData(
                 Data.Builder()
@@ -125,10 +127,10 @@ object HealthPatternAnalyzerService {
         manager.createNotificationChannel(
             NotificationChannel(
                 HealthPatternBroadcastReceiver.CHANNEL_ID,
-                "Pattern salute AI",
+                context.getString(R.string.ai_health_patterns),
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "Analisi mensile dei pattern sanitari dei figli"
+                description = context.getString(R.string.ai_health_patterns_sub)
             },
         )
     }
@@ -154,7 +156,7 @@ object HealthPatternAnalyzerService {
             if (!aiSettings.isEnabled.value) return Result.success()
 
             val familyId = inputData.getString(KEY_FAMILY_ID) ?: return Result.failure()
-            val familyName = inputData.getString(KEY_FAMILY_NAME) ?: "la tua famiglia"
+            val familyName = inputData.getString(KEY_FAMILY_NAME) ?: applicationContext.getString(R.string.ai_your_family)
             val monthKey = currentMonthKey()
             val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -233,7 +235,7 @@ object HealthPatternAnalyzerService {
 class HealthPatternBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val familyId = intent.getStringExtra("familyId").orEmpty()
-        val familyName = intent.getStringExtra("familyName").orEmpty().ifBlank { "la tua famiglia" }
+        val familyName = intent.getStringExtra("familyName").orEmpty().ifBlank { context.getString(R.string.ai_your_family) }
         val fullText = intent.getStringExtra("fullText").orEmpty()
         val firstLine = fullText.lineSequence()
             .firstOrNull { line ->
@@ -262,7 +264,7 @@ class HealthPatternBroadcastReceiver : BroadcastReceiver() {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_kidbox)
             .setContentTitle("🔍 Pattern salute · $familyName")
-            .setContentText(firstLine.ifBlank { "Apri gli insight sanitari" })
+            .setContentText(firstLine.ifBlank { context.getString(R.string.ai_open_health_insights) })
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pending)

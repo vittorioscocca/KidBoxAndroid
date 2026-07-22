@@ -2,6 +2,8 @@
 
 package it.vittorioscocca.kidbox.ui.screens.wallet
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -26,6 +28,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.Button
@@ -53,6 +56,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -65,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.data.wallet.WalletParsedData
+import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.domain.model.WalletTicketKind
 import it.vittorioscocca.kidbox.ui.screens.health.attachments.KidBoxDocumentPickerSheet
@@ -73,6 +78,8 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.launch
+import it.vittorioscocca.kidbox.util.KBLocale
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -80,8 +87,10 @@ fun AddWalletTicketSheet(
     familyId: String,
     viewModel: WalletViewModel,
     onDismiss: () -> Unit,
+    onUpgrade: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val parsedData by viewModel.parsedData.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -92,18 +101,28 @@ fun AddWalletTicketSheet(
     var selectedKind by rememberSaveable { mutableStateOf(WalletTicketKind.OTHER) }
     var hasDate by rememberSaveable { mutableStateOf(false) }
     var eventDateMs by rememberSaveable { mutableLongStateOf(System.currentTimeMillis()) }
+    var hasArrivalDate by rememberSaveable { mutableStateOf(false) }
+    var arrivalDateMs by rememberSaveable { mutableLongStateOf(System.currentTimeMillis()) }
     var location by rememberSaveable { mutableStateOf("") }
+    var arrivalLocation by rememberSaveable { mutableStateOf("") }
+    var holderName by rememberSaveable { mutableStateOf("") }
     var bookingCode by rememberSaveable { mutableStateOf("") }
     var notes by rememberSaveable { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
+    var showArrivalDatePicker by remember { mutableStateOf(false) }
+    var showArrivalTimePicker by remember { mutableStateOf(false) }
+
+    var isAiReading by remember { mutableStateOf(false) }
+    var showAiCostConfirm by remember { mutableStateOf(false) }
+    var aiError by remember { mutableStateOf<String?>(null) }
 
     var showVisibilityPicker by remember { mutableStateOf(false) }
     var showKidBoxDocumentPicker by remember { mutableStateOf(false) }
     var draftVisibilityScope by remember { mutableStateOf(KBVisibilityScope.ONLY_CREATOR) }
     var draftVisibilityMemberIds by remember { mutableStateOf<List<String>>(emptyList()) }
 
-    val dateFmt = remember { SimpleDateFormat("EEE d MMM yyyy, HH:mm", Locale.ITALIAN) }
+    val dateFmt = remember { SimpleDateFormat("EEE d MMM yyyy, HH:mm", KBLocale.current()) }
 
     LaunchedEffect(parsedData) {
         val p = parsedData ?: return@LaunchedEffect
@@ -116,6 +135,52 @@ fun AddWalletTicketSheet(
         if (location.isBlank() && !p.location.isNullOrBlank()) location = p.location
         if (bookingCode.isBlank() && !p.bookingCode.isNullOrBlank()) bookingCode = p.bookingCode
         if (notes.isBlank() && !p.notes.isNullOrBlank()) notes = p.notes
+    }
+
+    fun applyAiExtraction(ext: it.vittorioscocca.kidbox.data.wallet.WalletTicketExtraction) {
+        ext.holderName?.let { holderName = it }
+        ext.bookingCode?.let { bookingCode = it }
+        ext.kind?.let { selectedKind = it }
+        ext.departureLocation?.let { location = it }
+        ext.departureDateTimeEpochMillis?.let { hasDate = true; eventDateMs = it }
+        ext.arrivalLocation?.let { arrivalLocation = it }
+        ext.arrivalDateTimeEpochMillis?.let { hasArrivalDate = true; arrivalDateMs = it }
+    }
+
+    fun runAiExtraction() {
+        scope.launch {
+            isAiReading = true
+            aiError = null
+            val bitmap = parsedData?.thumbnailBase64?.let { b64 ->
+                runCatching { Base64.decode(b64, Base64.DEFAULT) }.getOrNull()
+                    ?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+            }
+            viewModel.runAiTicketExtraction(parsedData?.rawText, bitmap, familyId)
+                .onSuccess { applyAiExtraction(it) }
+                .onFailure { aiError = it.localizedMessage ?: context.getString(R.string.wallet_ai_read_failed) }
+            isAiReading = false
+        }
+    }
+
+    if (showAiCostConfirm) {
+        val usedImageFallback = parsedData?.rawText.isNullOrBlank()
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showAiCostConfirm = false },
+            title = { Text(stringResource(R.string.wallet_ai_read_title)) },
+            text = {
+                Text(
+                    stringResource(R.string.wallet_ai_read_cost_message, viewModel.estimatedAiTicketMessageCost(usedImageFallback)),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showAiCostConfirm = false; runAiExtraction() }) {
+                    Text(context.getString(R.string.wallet_read_ai_msg_count, viewModel.estimatedAiTicketMessageCost(usedImageFallback)))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAiCostConfirm = false }) { Text(stringResource(R.string.wallet_cancel)) }
+            },
+        )
     }
 
     val pdfPicker = rememberLauncherForActivityResult(
@@ -140,20 +205,67 @@ fun AddWalletTicketSheet(
                     datePickerState.selectedDateMillis?.let { eventDateMs = it }
                     showDatePicker = false
                     showTimePicker = true
-                }) { Text("Avanti") }
+                }) { Text(stringResource(R.string.wallet_next)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Annulla") }
+                TextButton(onClick = { showDatePicker = false }) { Text(stringResource(R.string.wallet_cancel)) }
             },
         ) {
             DatePicker(state = datePickerState)
         }
     }
 
+    if (showArrivalDatePicker) {
+        val arrivalDatePickerState = rememberDatePickerState(initialSelectedDateMillis = arrivalDateMs)
+        DatePickerDialog(
+            onDismissRequest = { showArrivalDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    arrivalDatePickerState.selectedDateMillis?.let { arrivalDateMs = it }
+                    showArrivalDatePicker = false
+                    showArrivalTimePicker = true
+                }) { Text(stringResource(R.string.wallet_next)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showArrivalDatePicker = false }) { Text(stringResource(R.string.wallet_cancel)) }
+            },
+        ) {
+            DatePicker(state = arrivalDatePickerState)
+        }
+    }
+
+    if (showArrivalTimePicker) {
+        val cal = Calendar.getInstance().apply { timeInMillis = arrivalDateMs }
+        val arrivalTimePickerState = rememberTimePickerState(
+            initialHour = cal.get(Calendar.HOUR_OF_DAY),
+            initialMinute = cal.get(Calendar.MINUTE),
+        )
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showArrivalTimePicker = false },
+            title = { Text(stringResource(R.string.wallet_select_arrival_time_title)) },
+            text = { TimePicker(state = arrivalTimePickerState) },
+            confirmButton = {
+                TextButton(onClick = {
+                    val newCal = Calendar.getInstance().apply {
+                        timeInMillis = arrivalDateMs
+                        set(Calendar.HOUR_OF_DAY, arrivalTimePickerState.hour)
+                        set(Calendar.MINUTE, arrivalTimePickerState.minute)
+                        set(Calendar.SECOND, 0)
+                    }
+                    arrivalDateMs = newCal.timeInMillis
+                    showArrivalTimePicker = false
+                }) { Text(stringResource(R.string.wallet_ok)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showArrivalTimePicker = false }) { Text(stringResource(R.string.wallet_cancel)) }
+            },
+        )
+    }
+
     if (showVisibilityPicker) {
         VisibilityPickerFullscreenDialog(
             currentUid = FirebaseAuth.getInstance().currentUser?.uid,
-            scopeSectionTitle = "Chi può vedere questo biglietto",
+            scopeSectionTitle = stringResource(R.string.wallet_visibility_who_can_see_ticket),
             membersExcludingSelf = state.visibilityMembers,
             initialScope = draftVisibilityScope,
             initialMemberIds = draftVisibilityMemberIds,
@@ -190,7 +302,7 @@ fun AddWalletTicketSheet(
         )
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showTimePicker = false },
-            title = { Text("Seleziona ora") },
+            title = { Text(stringResource(R.string.wallet_select_time_title)) },
             text = { TimePicker(state = timePickerState) },
             confirmButton = {
                 TextButton(onClick = {
@@ -202,10 +314,10 @@ fun AddWalletTicketSheet(
                     }
                     eventDateMs = newCal.timeInMillis
                     showTimePicker = false
-                }) { Text("OK") }
+                }) { Text(stringResource(R.string.wallet_ok)) }
             },
             dismissButton = {
-                TextButton(onClick = { showTimePicker = false }) { Text("Annulla") }
+                TextButton(onClick = { showTimePicker = false }) { Text(stringResource(R.string.wallet_cancel)) }
             },
         )
     }
@@ -227,9 +339,9 @@ fun AddWalletTicketSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onDismiss) { Text("Annulla") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.wallet_cancel)) }
                 Text(
-                    "Nuovo biglietto",
+                    stringResource(R.string.wallet_new_ticket_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -255,7 +367,10 @@ fun AddWalletTicketSheet(
                             parsed = p.copy(
                                 kind = selectedKind,
                                 eventDate = if (hasDate) eventDateMs else null,
+                                eventEndDate = if (hasArrivalDate) arrivalDateMs else null,
                                 location = location.ifBlank { null },
+                                arrivalLocation = arrivalLocation.ifBlank { null },
+                                holderName = holderName.ifBlank { null },
                                 bookingCode = bookingCode.ifBlank { null },
                                 notes = notes.ifBlank { null },
                             ),
@@ -270,7 +385,7 @@ fun AddWalletTicketSheet(
                     if (state.isImporting) {
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     } else {
-                        Text("Salva", fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.wallet_save), fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -278,7 +393,7 @@ fun AddWalletTicketSheet(
             HorizontalDivider()
 
             Text(
-                "Visibilità",
+                stringResource(R.string.wallet_visibility_label),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -311,7 +426,7 @@ fun AddWalletTicketSheet(
 
             // PDF section
             Text(
-                "PDF",
+                stringResource(R.string.wallet_pdf_section_label),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -326,13 +441,13 @@ fun AddWalletTicketSheet(
                 ) {
                     Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Dispositivo", maxLines = 1)
+                    Text(stringResource(R.string.wallet_device_button), maxLines = 1)
                 }
                 OutlinedButton(
                     modifier = Modifier.weight(1f),
                     onClick = { showKidBoxDocumentPicker = true },
                 ) {
-                    Text("KidBox", maxLines = 1)
+                    Text(stringResource(R.string.wallet_kidbox_button), maxLines = 1)
                 }
             }
 
@@ -363,22 +478,54 @@ fun AddWalletTicketSheet(
                             }
                         }
                         Text(
-                            pdfFileName ?: "PDF selezionato",
+                            pdfFileName ?: stringResource(R.string.wallet_pdf_selected_fallback),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
-                            "Usa i pulsanti sopra per cambiare file",
+                            stringResource(R.string.wallet_pdf_change_hint),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 } else {
                     Text(
-                        "Scegli un PDF dal dispositivo o dai documenti KidBox.",
+                        stringResource(R.string.wallet_pdf_choose_hint),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+
+            if (pdfUri != null) {
+                if (state.currentPlan == KBPlan.MAX) {
+                    OutlinedButton(
+                        onClick = { showAiCostConfirm = true },
+                        enabled = !isAiReading,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (isAiReading) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(stringResource(R.string.wallet_read_with_ai_button))
+                        }
+                    }
+                } else {
+                    OutlinedButton(onClick = onUpgrade, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.wallet_read_ai_plan_max))
+                    }
+                }
+                Text(
+                    stringResource(R.string.wallet_ticket_ai_assisted_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                aiError?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
             }
 
@@ -386,7 +533,7 @@ fun AddWalletTicketSheet(
 
             // Ticket data
             Text(
-                "Dati biglietto",
+                stringResource(R.string.wallet_ticket_data_section),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -394,14 +541,14 @@ fun AddWalletTicketSheet(
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
-                label = { Text("Titolo") },
+                label = { Text(stringResource(R.string.wallet_label_title)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
 
             // Kind selector
             Text(
-                "Tipo",
+                stringResource(R.string.wallet_label_type),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
@@ -418,13 +565,21 @@ fun AddWalletTicketSheet(
                 }
             }
 
-            // Date toggle
+            OutlinedTextField(
+                value = holderName,
+                onValueChange = { holderName = it },
+                label = { Text(stringResource(R.string.wallet_holder_name_optional_label)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            // Departure
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Data evento", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.wallet_departure_time_label), style = MaterialTheme.typography.bodyMedium)
                 Switch(
                     checked = hasDate,
                     onCheckedChange = { hasDate = it },
@@ -436,7 +591,7 @@ fun AddWalletTicketSheet(
                     value = dateFmt.format(Date(eventDateMs)),
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text("Data e ora") },
+                    label = { Text(stringResource(R.string.wallet_departure_datetime_label)) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { showDatePicker = true },
@@ -447,7 +602,41 @@ fun AddWalletTicketSheet(
             OutlinedTextField(
                 value = location,
                 onValueChange = { location = it },
-                label = { Text("Luogo (opzionale)") },
+                label = { Text(stringResource(R.string.wallet_departure_location_optional_label)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            // Arrival
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.wallet_arrival_time_label), style = MaterialTheme.typography.bodyMedium)
+                Switch(
+                    checked = hasArrivalDate,
+                    onCheckedChange = { hasArrivalDate = it },
+                )
+            }
+
+            if (hasArrivalDate) {
+                OutlinedTextField(
+                    value = dateFmt.format(Date(arrivalDateMs)),
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text(stringResource(R.string.wallet_arrival_datetime_label)) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showArrivalDatePicker = true },
+                    enabled = false,
+                )
+            }
+
+            OutlinedTextField(
+                value = arrivalLocation,
+                onValueChange = { arrivalLocation = it },
+                label = { Text(stringResource(R.string.wallet_arrival_location_optional_label)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -455,7 +644,7 @@ fun AddWalletTicketSheet(
             OutlinedTextField(
                 value = bookingCode,
                 onValueChange = { bookingCode = it },
-                label = { Text("Codice prenotazione (opzionale)") },
+                label = { Text(stringResource(R.string.wallet_ticket_code_optional_label)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -463,7 +652,7 @@ fun AddWalletTicketSheet(
             OutlinedTextField(
                 value = notes,
                 onValueChange = { notes = it },
-                label = { Text("Note (opzionale)") },
+                label = { Text(stringResource(R.string.wallet_notes_optional_label)) },
                 minLines = 3,
                 modifier = Modifier.fillMaxWidth(),
             )

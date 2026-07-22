@@ -33,6 +33,14 @@ data class WalletParsedData(
     val barcodeFormat: String?,
     val notes: String?,
     val thumbnailBase64: String?,
+    /** Orario di arrivo (`eventDate` resta l'orario di partenza). Popolato da lettura AI o inserito a mano. */
+    val eventEndDate: Long? = null,
+    /** Luogo di arrivo (`location` resta il luogo di partenza). */
+    val arrivalLocation: String? = null,
+    /** Nome del titolare del biglietto. */
+    val holderName: String? = null,
+    /** Testo grezzo estratto dal PDF (per la lettura AI). */
+    val rawText: String? = null,
 )
 
 object WalletPdfParser {
@@ -83,6 +91,7 @@ object WalletPdfParser {
             barcodeFormat = barcodeResult?.second,
             notes = notes,
             thumbnailBase64 = thumbnail,
+            rawText = text,
         )
     }
 

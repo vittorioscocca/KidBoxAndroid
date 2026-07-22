@@ -1,9 +1,12 @@
 package it.vittorioscocca.kidbox.ui.share
 
 import android.content.ContentResolver
+import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import com.google.firebase.functions.FirebaseFunctions
+import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.chat.model.ChatMessageType
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoListDao
@@ -35,6 +38,7 @@ data class ShareActionInput(
 
 @Singleton
 class ShareActionHandler @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val chatRepository: ChatRepository,
     private val noteRepository: NoteRepository,
     private val todoRepository: TodoRepository,
@@ -112,7 +116,7 @@ class ShareActionHandler @Inject constructor(
                 chatRepository.sendMessage(
                     familyId = input.familyId,
                     type = ChatMessageType.DOCUMENT,
-                    text = resolveFileName(resolver, content.uri) ?: "Documento",
+                    text = resolveFileName(resolver, content.uri) ?: appContext.getString(R.string.share_default_document_name),
                     mediaBytes = bytes,
                     fileName = resolveFileName(resolver, content.uri) ?: "file.pdf",
                     mimeType = "application/pdf",
@@ -123,7 +127,7 @@ class ShareActionHandler @Inject constructor(
                 chatRepository.sendMessage(
                     familyId = input.familyId,
                     type = ChatMessageType.DOCUMENT,
-                    text = resolveFileName(resolver, content.uri) ?: "Documento",
+                    text = resolveFileName(resolver, content.uri) ?: appContext.getString(R.string.share_default_document_name),
                     mediaBytes = bytes,
                     fileName = resolveFileName(resolver, content.uri) ?: "file.bin",
                     mimeType = content.mimeType,
@@ -138,7 +142,7 @@ class ShareActionHandler @Inject constructor(
     }
 
     private suspend fun handleNote(input: ShareActionInput) {
-        val title = input.title.ifBlank { "Condiviso" }
+        val title = input.title.ifBlank { appContext.getString(R.string.share_default_note_title) }
         val body = when (val content = input.contentType) {
             is ShareContentType.TextContent -> input.text.ifBlank { content.text }
             is ShareContentType.UrlContent -> input.text.ifBlank { content.url }
@@ -149,10 +153,10 @@ class ShareActionHandler @Inject constructor(
 
     private suspend fun handleTodo(input: ShareActionInput) {
         val childId = childDao.getChildrenByFamilyId(input.familyId).firstOrNull()?.id
-            ?: error("Nessun bambino disponibile per creare il To-Do")
+            ?: error(appContext.getString(R.string.share_error_no_child_for_todo))
         val existingList = todoListDao.getByFamilyAndChild(input.familyId, childId).firstOrNull()
-        val listId = existingList?.id ?: todoRepository.addList(input.familyId, childId, "Generale")
-        val todoTitle = input.title.ifBlank { input.text.lineSequence().firstOrNull().orEmpty().ifBlank { "Nuovo To-Do" } }
+        val listId = existingList?.id ?: todoRepository.addList(input.familyId, childId, appContext.getString(R.string.share_default_todo_list_name))
+        val todoTitle = input.title.ifBlank { input.text.lineSequence().firstOrNull().orEmpty().ifBlank { appContext.getString(R.string.share_default_todo_title) } }
         todoRepository.addTodo(
             familyId = input.familyId,
             childId = childId,
@@ -200,7 +204,7 @@ class ShareActionHandler @Inject constructor(
 
     private suspend fun handleShopping(input: ShareActionInput) {
         val lines = input.text.lines().map { it.trim() }.filter { it.isNotBlank() }
-        val items = if (lines.isEmpty()) listOf(input.title.ifBlank { "Nuovo elemento" }) else lines
+        val items = if (lines.isEmpty()) listOf(input.title.ifBlank { appContext.getString(R.string.share_default_shopping_item) }) else lines
         items.forEach { name ->
             groceryRepository.addItem(input.familyId, name, category = null, notes = null)
         }
@@ -216,7 +220,7 @@ class ShareActionHandler @Inject constructor(
                 id = UUID.randomUUID().toString(),
                 familyId = input.familyId,
                 childId = null,
-                title = input.title.ifBlank { "Nuovo evento" },
+                title = input.title.ifBlank { appContext.getString(R.string.share_default_event_title) },
                 notes = input.text.takeIf { it.isNotBlank() },
                 location = null,
                 startDateEpochMillis = start,
@@ -252,7 +256,7 @@ class ShareActionHandler @Inject constructor(
             .getData() as? Map<*, *>
         val usedBytes = (result?.get("usedBytes") as? Number)?.toLong() ?: 0L
         if (usedBytes >= planBytes) {
-            error("Spazio esaurito. Aggiorna il piano per continuare.")
+            error(appContext.getString(R.string.share_error_storage_full))
         }
     }
 

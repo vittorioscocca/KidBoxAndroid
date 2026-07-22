@@ -88,6 +88,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Accent colour (matches the rest of KidBox)
@@ -126,8 +129,8 @@ data class GalleryDocItem(
     val createdAtMillis: Long,
 )
 
-private enum class GalleryTab(val label: String) {
-    MEDIA("Media"), LINKS("Link"), DOCS("Documenti")
+private enum class GalleryTab(@androidx.annotation.StringRes val labelRes: Int) {
+    MEDIA(R.string.chat_media), LINKS(R.string.chat_links), DOCS(R.string.chat_documents)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -198,14 +201,14 @@ private fun buildLinkItems(messages: List<UiChatMessage>): List<GalleryLinkItem>
         )
     }
 
-private fun buildDocItems(messages: List<UiChatMessage>): List<GalleryDocItem> =
+private fun buildDocItems(context: android.content.Context, messages: List<UiChatMessage>): List<GalleryDocItem> =
     messages.mapNotNull { msg ->
         if (msg.type != ChatMessageType.DOCUMENT) return@mapNotNull null
         val url = msg.mediaUrl ?: return@mapNotNull null
         GalleryDocItem(
             messageId = msg.id,
             url = url,
-            fileName = msg.text?.takeIf { it.isNotBlank() } ?: "Documento",
+            fileName = msg.text?.takeIf { it.isNotBlank() } ?: context.getString(R.string.chat_document),
             fileSizeBytes = msg.mediaFileSize,
             senderName = msg.senderName,
             createdAtMillis = msg.createdAtMillis,
@@ -213,7 +216,7 @@ private fun buildDocItems(messages: List<UiChatMessage>): List<GalleryDocItem> =
     }
 
 private fun Long.toGalleryDate(): String =
-    SimpleDateFormat("dd MMM yyyy", Locale.ITALY).format(Date(this))
+    SimpleDateFormat("dd MMM yyyy", KBLocale.current()).format(Date(this))
 
 private fun Long.formatFileSize(): String {
     val kb = this / 1024
@@ -232,10 +235,11 @@ internal fun ChatMediaGalleryScreen(
     onDismiss: () -> Unit,
     onGoToMessage: (messageId: String) -> Unit,
 ) {
+    val context = LocalContext.current
     // Pre-compute items once per messages snapshot
     val mediaItems = remember(messages) { buildMediaItems(messages) }
     val linkItems  = remember(messages) { buildLinkItems(messages) }
-    val docItems   = remember(messages) { buildDocItems(messages) }
+    val docItems   = remember(messages) { buildDocItems(context, messages) }
 
     var selectedTab by remember { mutableStateOf(GalleryTab.MEDIA) }
     var searchQuery by remember { mutableStateOf("") }
@@ -273,7 +277,7 @@ internal fun ChatMediaGalleryScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Media, link e documenti",
+                        text = stringResource(R.string.chat_media_links_docs),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.kidBoxColors.title,
                     )
@@ -309,7 +313,7 @@ internal fun ChatMediaGalleryScreen(
                     GalleryTab.entries.forEach { tab ->
                         val isActive = tab == selectedTab
                         Text(
-                            text = tab.label,
+                            text = stringResource(tab.labelRes),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(999.dp))
                                 .background(
@@ -327,9 +331,9 @@ internal fun ChatMediaGalleryScreen(
 
                 // ── Search bar ────────────────────────────────────────────────
                 val placeholder = when (selectedTab) {
-                    GalleryTab.MEDIA -> "Cerca media o mittente"
-                    GalleryTab.LINKS -> "Cerca link o sito"
-                    GalleryTab.DOCS  -> "Cerca documento o mittente"
+                    GalleryTab.MEDIA -> stringResource(R.string.chat_search_media)
+                    GalleryTab.LINKS -> stringResource(R.string.chat_search_link)
+                    GalleryTab.DOCS  -> stringResource(R.string.chat_search_doc)
                 }
                 val kb = MaterialTheme.kidBoxColors
                 OutlinedTextField(
@@ -345,7 +349,7 @@ internal fun ChatMediaGalleryScreen(
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
                             IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(36.dp)) {
-                                Icon(Icons.Default.Close, contentDescription = "Cancella", tint = kb.subtitle, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.chat_clear), tint = kb.subtitle, modifier = Modifier.size(16.dp))
                             }
                         }
                     },
@@ -411,7 +415,7 @@ private fun MediaTab(
     onGoToMessage: (messageId: String) -> Unit,
 ) {
     if (items.isEmpty()) {
-        GalleryEmptyState(Icons.Default.PhotoLibrary, "Nessun media condiviso")
+        GalleryEmptyState(Icons.Default.PhotoLibrary, stringResource(R.string.chat_no_media))
         return
     }
 
@@ -481,14 +485,14 @@ private fun MediaThumbCell(
 
         DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
             DropdownMenuItem(
-                text = { Text("Vai al messaggio") },
+                text = { Text(stringResource(R.string.chat_go_to_message)) },
                 onClick = {
                     showMenu = false
                     onGoToMessage(item.messageId)
                 },
             )
             DropdownMenuItem(
-                text = { Text("Elimina per me", color = Color(0xFFD32F2F)) },
+                text = { Text(stringResource(R.string.chat_delete_for_me), color = Color(0xFFD32F2F)) },
                 onClick = { showMenu = false /* no-op: destructive action requires ViewModel */ },
             )
         }
@@ -506,7 +510,7 @@ private fun LinksTab(
     onDismiss: () -> Unit,
 ) {
     if (items.isEmpty()) {
-        GalleryEmptyState(Icons.Default.Link, "Nessun link condiviso")
+        GalleryEmptyState(Icons.Default.Link, stringResource(R.string.chat_no_links))
         return
     }
 
@@ -601,11 +605,11 @@ private fun GalleryLinkRow(
         Box {
             DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                 DropdownMenuItem(
-                    text = { Text("Copia link") },
+                    text = { Text(stringResource(R.string.chat_copy_link)) },
                     onClick = { showMenu = false; onCopyLink() },
                 )
                 DropdownMenuItem(
-                    text = { Text("Vai al messaggio") },
+                    text = { Text(stringResource(R.string.chat_go_to_message)) },
                     onClick = { showMenu = false; onGoToMessage() },
                 )
             }
@@ -624,7 +628,7 @@ private fun DocsTab(
     onDismiss: () -> Unit,
 ) {
     if (items.isEmpty()) {
-        GalleryEmptyState(Icons.Default.Description, "Nessun documento condiviso")
+        GalleryEmptyState(Icons.Default.Description, stringResource(R.string.chat_no_docs))
         return
     }
 
@@ -637,7 +641,7 @@ private fun DocsTab(
                     runCatching {
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(item.url))
                         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        context.startActivity(Intent.createChooser(intent, "Apri con"))
+                        context.startActivity(Intent.createChooser(intent, context.getString(R.string.chat_open_with)))
                     }
                 },
                 onGoToMessage = {
@@ -705,7 +709,7 @@ private fun GalleryDocRow(
         Box {
             DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                 DropdownMenuItem(
-                    text = { Text("Vai al messaggio") },
+                    text = { Text(stringResource(R.string.chat_go_to_message)) },
                     onClick = { showMenu = false; onGoToMessage() },
                 )
             }
@@ -804,7 +808,7 @@ private fun GalleryFullscreenViewer(
                                 .clickable { isPlaying = true },
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(40.dp))
+                            Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.chat_play), tint = Color.White, modifier = Modifier.size(40.dp))
                         }
                     }
                 } else {
@@ -835,7 +839,7 @@ private fun GalleryFullscreenViewer(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onClose) {
-                Icon(Icons.Default.Close, contentDescription = "Chiudi", tint = Color.White)
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.chat_close), tint = Color.White)
             }
             Column(modifier = Modifier.weight(1f)) {
                 if (current != null) {
@@ -884,7 +888,7 @@ private fun GalleryFullscreenViewer(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Text("Vai al messaggio", color = Color.White, fontSize = 13.sp)
+                    Text(stringResource(R.string.chat_go_to_message), color = Color.White, fontSize = 13.sp)
                     Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                 }
             }

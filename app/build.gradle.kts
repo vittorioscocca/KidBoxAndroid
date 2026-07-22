@@ -25,14 +25,14 @@ if (mapsApiKey.isBlank() || mapsApiKey == "YOUR_GOOGLE_MAPS_API_KEY") {
 
 android {
     namespace = "it.vittorioscocca.kidbox"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "it.vittorioscocca.kidbox"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 28
-        versionName = "2.0.3"
+        targetSdk = 36
+        versionCode = 29
+        versionName = "2.0.5"
         manifestPlaceholders["googleMapsApiKey"] = mapsApiKey
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
         buildConfigField("Boolean", "AI_ENABLED", "true")
@@ -142,7 +142,7 @@ dependencies {
     implementation(libs.androidx.credentials.play.services)
     implementation(libs.googleid)
     implementation("com.google.android.gms:play-services-auth:21.2.0")
-    implementation("com.android.billingclient:billing-ktx:7.1.1")
+    implementation("com.android.billingclient:billing-ktx:8.0.0")
     implementation(libs.facebook.login)
     implementation("com.google.zxing:core:3.5.3")
 

@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.expenses
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import android.app.DatePickerDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -115,6 +117,7 @@ import java.util.Locale
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import it.vittorioscocca.kidbox.util.KBLocale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -247,7 +250,7 @@ fun ExpensesHomeScreen(
             }
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "Spese di famiglia",
+                text = stringResource(R.string.expenses_title),
                 fontSize = 38.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.kidBoxColors.title,
@@ -261,7 +264,7 @@ fun ExpensesHomeScreen(
             ) {
                 ExpensePeriod.entries.forEach { p ->
                     PeriodPill(
-                        label = p.label,
+                        label = stringResource(p.labelRes),
                         selected = state.period == p,
                         onClick = { viewModel.setPeriod(p) },
                     )
@@ -392,8 +395,8 @@ fun ExpensesHomeScreen(
     if (showDeleteSelectedConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteSelectedConfirm = false },
-            title = { Text("Eliminare le spese selezionate?") },
-            text = { Text("Questa azione eliminerà ${selectedExpenseIds.size} elementi.") },
+            title = { Text(stringResource(R.string.expenses_delete_selected_title)) },
+            text = { Text(stringResource(R.string.expenses_delete_selected_message, selectedExpenseIds.size)) },
             confirmButton = {
                 TextButton(onClick = {
                     showDeleteSelectedConfirm = false
@@ -401,10 +404,10 @@ fun ExpensesHomeScreen(
                     viewModel.deleteExpenses(toDelete)
                     selectedExpenseIds = emptySet()
                     isSelectingExpenses = false
-                }) { Text("Elimina") }
+                }) { Text(stringResource(R.string.expenses_delete)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteSelectedConfirm = false }) { Text("Annulla") }
+                TextButton(onClick = { showDeleteSelectedConfirm = false }) { Text(stringResource(R.string.expenses_cancel)) }
             },
         )
     }
@@ -429,7 +432,7 @@ fun ExpensesHomeScreen(
                         strokeWidth = 2.dp,
                     )
                     Text(
-                        text = "Apro allegato...",
+                        text = stringResource(R.string.expenses_opening_attachment),
                         modifier = Modifier.padding(start = 10.dp),
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.kidBoxColors.title,
@@ -457,7 +460,7 @@ private fun ExpenseTotalCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("Totale speso", color = MaterialTheme.kidBoxColors.subtitle, fontSize = 18.sp)
+                Text(stringResource(R.string.expenses_total_spent), color = MaterialTheme.kidBoxColors.subtitle, fontSize = 18.sp)
                 Text(
                     formatEuro(total),
                     color = MaterialTheme.kidBoxColors.title,
@@ -465,7 +468,7 @@ private fun ExpenseTotalCard(
                     fontSize = 42.sp,
                 )
             }
-            Text("$count spese", color = MaterialTheme.kidBoxColors.subtitle, fontSize = 30.sp)
+            Text(stringResource(R.string.expenses_count_expenses, count), color = MaterialTheme.kidBoxColors.subtitle, fontSize = 30.sp)
         }
     }
 }
@@ -480,7 +483,7 @@ private fun MonthlyChartCard(bars: List<MonthlyExpenseBar>) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.BarChart, contentDescription = null, tint = MaterialTheme.kidBoxColors.title, modifier = Modifier.size(18.dp))
-                Text(" Andamento mensile", fontWeight = FontWeight.Bold, fontSize = 30.sp, color = MaterialTheme.kidBoxColors.title)
+                Text(stringResource(R.string.expenses_monthly_trend), fontWeight = FontWeight.Bold, fontSize = 30.sp, color = MaterialTheme.kidBoxColors.title)
             }
             Spacer(Modifier.height(10.dp))
             Row(
@@ -533,7 +536,7 @@ private fun CategoryChartCard(slices: List<ExpenseCategorySlice>) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.PieChart, contentDescription = null, tint = MaterialTheme.kidBoxColors.title, modifier = Modifier.size(18.dp))
-                Text(" Per categoria", fontWeight = FontWeight.Bold, fontSize = 24.sp, color = MaterialTheme.kidBoxColors.title)
+                Text(stringResource(R.string.expenses_by_category), fontWeight = FontWeight.Bold, fontSize = 24.sp, color = MaterialTheme.kidBoxColors.title)
             }
             Spacer(Modifier.height(12.dp))
             val total = slices.sumOf { it.total }.coerceAtLeast(0.001)
@@ -593,7 +596,7 @@ private fun ExpenseListCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Tutte le spese", fontWeight = FontWeight.Bold, fontSize = 24.sp, color = MaterialTheme.kidBoxColors.title)
+                Text(stringResource(R.string.expenses_all_expenses), fontWeight = FontWeight.Bold, fontSize = 24.sp, color = MaterialTheme.kidBoxColors.title)
                 Spacer(modifier = Modifier.weight(1f))
                 if (selecting && selectedExpenseIds.isNotEmpty()) {
                     Surface(
@@ -607,7 +610,7 @@ private fun ExpenseListCard(
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFE35156), modifier = Modifier.size(14.dp))
                             Text(
-                                text = " Elimina (${selectedExpenseIds.size})",
+                                text = stringResource(R.string.expenses_delete_count, selectedExpenseIds.size),
                                 color = Color(0xFFE35156),
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp,
@@ -617,12 +620,12 @@ private fun ExpenseListCard(
                     Spacer(modifier = Modifier.width(8.dp))
                 }
                 TextButton(onClick = onToggleSelecting) {
-                    Text(if (selecting) "Fine" else "Seleziona")
+                    Text(if (selecting) stringResource(R.string.expenses_selection_done) else stringResource(R.string.expenses_selection_select))
                 }
             }
             Spacer(Modifier.height(10.dp))
             if (expenses.isEmpty()) {
-                Text("Nessuna spesa nel periodo selezionato", color = MaterialTheme.kidBoxColors.subtitle)
+                Text(stringResource(R.string.expenses_no_expenses_in_period), color = MaterialTheme.kidBoxColors.subtitle)
             } else {
                 expenses.forEachIndexed { index, expense ->
                     val category = categories.firstOrNull { it.id == expense.categoryId }
@@ -672,7 +675,7 @@ private fun ExpenseListCard(
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Icon(
                                         imageVector = Icons.Default.AttachFile,
-                                        contentDescription = "Ha allegato",
+                                        contentDescription = stringResource(R.string.expenses_has_attachment),
                                         tint = Color(0xFF1E88E5),
                                         modifier = Modifier.size(14.dp),
                                     )
@@ -721,7 +724,7 @@ private fun AddEditExpenseSheet(
     val context = LocalContext.current
     val date = Instant.ofEpochMilli(dateEpochMillis).atZone(ZoneId.systemDefault()).toLocalDate()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val titleText = if (editing == null) "Nuova spesa" else "Modifica spesa"
+    val titleText = if (editing == null) stringResource(R.string.expenses_new_expense_title) else stringResource(R.string.expenses_edit_expense_title)
     var showKidBoxPicker by remember { mutableStateOf(false) }
     val selectedKidBoxDocument = availableDocuments.firstOrNull { it.id == selectedKidBoxDocumentId }
 
@@ -743,7 +746,7 @@ private fun AddEditExpenseSheet(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CapsuleActionButton(label = "Annulla", onClick = onDismiss, enabled = true, modifier = Modifier.width(92.dp))
+                CapsuleActionButton(label = stringResource(R.string.expenses_cancel), onClick = onDismiss, enabled = true, modifier = Modifier.width(92.dp))
                 Text(
                     text = titleText,
                     fontWeight = FontWeight.Bold,
@@ -753,11 +756,11 @@ private fun AddEditExpenseSheet(
                     color = MaterialTheme.kidBoxColors.title,
                 )
                 CapsuleActionButton(
-                    label = if (editing == null) "Aggiungi" else "Salva",
+                    label = if (editing == null) stringResource(R.string.expenses_add) else stringResource(R.string.expenses_save),
                     onClick = {
                         val amount = amountText.replace(",", ".").toDoubleOrNull()
                         if (title.isBlank() || amount == null) {
-                            Toast.makeText(context, "Inserisci titolo e importo validi", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.expenses_invalid_title_amount), Toast.LENGTH_SHORT).show()
                             return@CapsuleActionButton
                         }
                         onSave(title.trim(), amount, dateEpochMillis, selectedCategoryId, notes.trim().ifEmpty { null })
@@ -769,13 +772,13 @@ private fun AddEditExpenseSheet(
             Spacer(Modifier.height(12.dp))
             Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Text("Importo", color = MaterialTheme.kidBoxColors.subtitle)
+                    Text(stringResource(R.string.expenses_amount_label), color = MaterialTheme.kidBoxColors.subtitle)
                     OutlinedTextField(
                         value = amountText,
                         onValueChange = { amountText = it.filter { ch -> ch.isDigit() || ch == ',' || ch == '.' } },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        placeholder = { Text("0,00") },
+                        placeholder = { Text(stringResource(R.string.expenses_amount_placeholder)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     )
                 }
@@ -787,7 +790,7 @@ private fun AddEditExpenseSheet(
                         value = title,
                         onValueChange = { title = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Descrizione") },
+                        placeholder = { Text(stringResource(R.string.expenses_description_label)) },
                         singleLine = true,
                     )
                     Spacer(Modifier.height(10.dp))
@@ -795,7 +798,7 @@ private fun AddEditExpenseSheet(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Data", fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.title)
+                        Text(stringResource(R.string.expenses_date_label), fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.title)
                         Spacer(Modifier.weight(1f))
                         Surface(
                             shape = RoundedCornerShape(999.dp),
@@ -815,7 +818,7 @@ private fun AddEditExpenseSheet(
                             },
                         ) {
                             Text(
-                                text = date.format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ITALIAN)),
+                                text = date.format(DateTimeFormatter.ofPattern("dd MMM yyyy", KBLocale.current())),
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                                 color = MaterialTheme.kidBoxColors.title,
                             )
@@ -826,14 +829,14 @@ private fun AddEditExpenseSheet(
             Spacer(Modifier.height(10.dp))
             Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Text("Categoria", color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.expenses_category_label), color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(10.dp))
                     Row(
                         modifier = Modifier.horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         CategoryPill(
-                            label = "Nessuna",
+                            label = stringResource(R.string.expenses_category_none),
                             color = Color(0xFF9E9E9E),
                             icon = Icons.Default.MoreHoriz,
                             selected = selectedCategoryId == null,
@@ -854,24 +857,24 @@ private fun AddEditExpenseSheet(
             Spacer(Modifier.height(10.dp))
             Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Text("Note", color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.expenses_notes_label), color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
                     OutlinedTextField(
                         value = notes,
                         onValueChange = { notes = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Aggiungi una nota...") },
+                        placeholder = { Text(stringResource(R.string.expenses_notes_placeholder)) },
                     )
                 }
             }
             Spacer(Modifier.height(10.dp))
             Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Text("Ricevute e allegati", color = Color(0xFF1E88E5), fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.expenses_receipts_attachments), color = Color(0xFF1E88E5), fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(6.dp))
                     Text(
                         text = pendingAttachment?.fileName
                             ?: selectedKidBoxDocument?.fileName
-                            ?: "Aggiungi foto, PDF o documenti alla spesa",
+                            ?: stringResource(R.string.expenses_attachment_placeholder),
                         color = MaterialTheme.kidBoxColors.subtitle,
                         fontSize = 12.sp,
                     )
@@ -880,12 +883,12 @@ private fun AddEditExpenseSheet(
                         modifier = Modifier.horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        AttachmentPill(label = "Scatta foto", onClick = onPickCamera)
-                        AttachmentPill(label = "Carica foto", onClick = onPickPhoto)
-                        AttachmentPill(label = "Carica file", onClick = onPickFile)
-                        AttachmentPill(label = "Da Documenti KidBox", onClick = { showKidBoxPicker = true })
+                        AttachmentPill(label = stringResource(R.string.expenses_take_photo), onClick = onPickCamera)
+                        AttachmentPill(label = stringResource(R.string.expenses_upload_photo), onClick = onPickPhoto)
+                        AttachmentPill(label = stringResource(R.string.expenses_upload_file), onClick = onPickFile)
+                        AttachmentPill(label = stringResource(R.string.expenses_from_kidbox_documents), onClick = { showKidBoxPicker = true })
                         if (selectedKidBoxDocumentId != null || pendingAttachment != null) {
-                            AttachmentPill(label = "Elimina dalla spesa", onClick = onRemoveAttachment)
+                            AttachmentPill(label = stringResource(R.string.expenses_remove_attachment), onClick = onRemoveAttachment)
                         }
                     }
                 }
@@ -952,12 +955,12 @@ private fun KidBoxDocumentPickerSheet(
                 if (currentFolderId != null) {
                     TextButton(onClick = {
                         currentFolderId = folders.firstOrNull { it.id == currentFolderId }?.parentId
-                    }) { Text("Indietro") }
+                    }) { Text(stringResource(R.string.expenses_back)) }
                 } else {
                     Spacer(modifier = Modifier.width(68.dp))
                 }
                 Text(
-                    "Seleziona da Documenti KidBox",
+                    stringResource(R.string.expenses_pick_from_kidbox_documents_title),
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
                     modifier = Modifier.weight(1f),
@@ -974,14 +977,14 @@ private fun KidBoxDocumentPickerSheet(
                         .horizontalScroll(rememberScrollState())
                         .padding(bottom = 8.dp),
                 ) {
-                    Text("Documenti", color = MaterialTheme.kidBoxColors.subtitle, fontSize = 12.sp)
+                    Text(stringResource(R.string.expenses_documents_root_label), color = MaterialTheme.kidBoxColors.subtitle, fontSize = 12.sp)
                     breadcrumbs.forEach { crumb ->
                         Text(" / ${crumb.title}", color = MaterialTheme.kidBoxColors.subtitle, fontSize = 12.sp)
                     }
                 }
             }
             if (visibleFolders.isEmpty() && visibleDocuments.isEmpty()) {
-                Text("Nessun elemento in questa cartella", color = MaterialTheme.kidBoxColors.subtitle)
+                Text(stringResource(R.string.expenses_no_items_in_folder), color = MaterialTheme.kidBoxColors.subtitle)
             } else {
                 LazyColumn(
                     modifier = Modifier
@@ -1042,7 +1045,7 @@ private fun KidBoxDocumentPickerSheet(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text("Annulla") }
+            TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.expenses_cancel)) }
         }
     }
 }
@@ -1082,7 +1085,7 @@ private fun ExpenseDetailSheet(
             ) {
                 HeaderCircleButton(icon = Icons.AutoMirrored.Filled.ArrowBack, onClick = onDismiss)
                 Text(
-                    "Dettaglio spesa",
+                    stringResource(R.string.expenses_expense_detail_title),
                     fontWeight = FontWeight.Bold,
                     fontSize = 24.sp,
                     modifier = Modifier.weight(1f),
@@ -1120,7 +1123,7 @@ private fun ExpenseDetailSheet(
                         color = parseHexColor(category?.colorHex ?: "#9E9E9E").copy(alpha = 0.16f),
                     ) {
                         Text(
-                            text = category?.name ?: "Nessuna",
+                            text = category?.name ?: stringResource(R.string.expenses_category_none),
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
                             color = parseHexColor(category?.colorHex ?: "#9E9E9E"),
                             fontWeight = FontWeight.SemiBold,
@@ -1131,11 +1134,11 @@ private fun ExpenseDetailSheet(
             Spacer(Modifier.height(10.dp))
             Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-                    DetailRow(icon = Icons.Default.Description, label = "Descrizione", value = expense.title)
+                    DetailRow(icon = Icons.Default.Description, label = stringResource(R.string.expenses_description_label), value = expense.title)
                     DividerLine()
-                    DetailRow(icon = Icons.Default.CalendarMonth, label = "Data", value = formatDate(expense.dateEpochMillis))
+                    DetailRow(icon = Icons.Default.CalendarMonth, label = stringResource(R.string.expenses_date_label), value = formatDate(expense.dateEpochMillis))
                     DividerLine()
-                    DetailRow(icon = Icons.Default.LocalOffer, label = "Categoria", value = category?.name ?: "Nessuna")
+                    DetailRow(icon = Icons.Default.LocalOffer, label = stringResource(R.string.expenses_category_label), value = category?.name ?: stringResource(R.string.expenses_category_none))
                 }
             }
             Spacer(Modifier.height(10.dp))
@@ -1143,7 +1146,7 @@ private fun ExpenseDetailSheet(
                 Column(modifier = Modifier.padding(14.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.AttachFile, contentDescription = null, tint = Color(0xFF1E88E5))
-                        Text(" Allegati", color = Color(0xFF1E88E5), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Text(stringResource(R.string.expenses_attachments_label), color = Color(0xFF1E88E5), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     }
                     Spacer(Modifier.height(8.dp))
                     if (!expense.attachedDocumentId.isNullOrBlank()) {
@@ -1162,7 +1165,7 @@ private fun ExpenseDetailSheet(
                             ) {
                                 Icon(Icons.Default.AttachFile, contentDescription = null, tint = Color(0xFF1E88E5))
                                 Text(
-                                    text = if (isOpeningAttachment) "Caricamento allegato..." else "Documento allegato",
+                                    text = if (isOpeningAttachment) stringResource(R.string.expenses_loading_attachment) else stringResource(R.string.expenses_attached_document),
                                     modifier = Modifier.weight(1f).padding(start = 8.dp),
                                     fontWeight = FontWeight.SemiBold,
                                 )
@@ -1173,7 +1176,7 @@ private fun ExpenseDetailSheet(
                                         color = Color(0xFF1E88E5),
                                     )
                                 } else {
-                                    Text("Apri", color = Color(0xFF1E88E5), fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                                    Text(stringResource(R.string.expenses_open), color = Color(0xFF1E88E5), fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                                 }
                             }
                         }
@@ -1192,7 +1195,7 @@ private fun ExpenseDetailSheet(
                             ) {
                                 Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFE35156), modifier = Modifier.size(16.dp))
                                 Text(
-                                    text = " Elimina allegato dalla spesa",
+                                    text = stringResource(R.string.expenses_remove_attachment_from_expense),
                                     color = Color(0xFFE35156),
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 12.sp,
@@ -1200,18 +1203,18 @@ private fun ExpenseDetailSheet(
                             }
                         }
                     } else {
-                        Text("Nessun allegato", color = MaterialTheme.kidBoxColors.subtitle, fontSize = 12.sp)
+                        Text(stringResource(R.string.expenses_no_attachment), color = MaterialTheme.kidBoxColors.subtitle, fontSize = 12.sp)
                     }
                     Spacer(Modifier.height(6.dp))
-                    Text("Visibili anche in Documenti › Spese", color = MaterialTheme.kidBoxColors.subtitle, fontSize = 11.sp)
+                    Text(stringResource(R.string.expenses_also_visible_in_documents), color = MaterialTheme.kidBoxColors.subtitle, fontSize = 11.sp)
                 }
             }
             Spacer(Modifier.height(10.dp))
             Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-                    DetailMetaRow(label = "Aggiunta il", value = formatDateTime(expense.createdAtEpochMillis))
+                    DetailMetaRow(label = stringResource(R.string.expenses_added_on), value = formatDateTime(expense.createdAtEpochMillis))
                     DividerLine()
-                    DetailMetaRow(label = "Modificata il", value = formatDateTime(expense.updatedAtEpochMillis))
+                    DetailMetaRow(label = stringResource(R.string.expenses_modified_on), value = formatDateTime(expense.updatedAtEpochMillis))
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -1226,7 +1229,7 @@ private fun ExpenseDetailSheet(
                     horizontalArrangement = Arrangement.Center,
                 ) {
                     Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFE35156))
-                    Text(" Elimina spesa", color = Color(0xFFE35156), fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.expenses_delete_expense), color = Color(0xFFE35156), fontWeight = FontWeight.SemiBold)
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -1236,14 +1239,14 @@ private fun ExpenseDetailSheet(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Eliminare questa spesa?") },
+            title = { Text(stringResource(R.string.expenses_delete_expense_confirm_title)) },
             confirmButton = {
                 TextButton(onClick = {
                     showDeleteConfirm = false
                     onDelete()
-                }) { Text("Elimina") }
+                }) { Text(stringResource(R.string.expenses_delete)) }
             },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Annulla") } },
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.expenses_cancel)) } },
         )
     }
 }
@@ -1418,7 +1421,7 @@ private suspend fun openExpenseAttachmentPreview(
 ) {
     val documentId = expense.attachedDocumentId
     if (documentId.isNullOrBlank()) {
-        Toast.makeText(context, "Nessun allegato disponibile", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.expenses_no_attachment_available), Toast.LENGTH_SHORT).show()
         return
     }
     try {
@@ -1427,7 +1430,7 @@ private suspend fun openExpenseAttachmentPreview(
         }
         val (document, file) = prepared
             ?: run {
-                Toast.makeText(context, "Allegato non disponibile", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, context.getString(R.string.expenses_attachment_not_available), Toast.LENGTH_LONG).show()
                 return
             }
         val uri = FileProvider.getUriForFile(
@@ -1442,13 +1445,13 @@ private suspend fun openExpenseAttachmentPreview(
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
     } catch (_: ActivityNotFoundException) {
-        Toast.makeText(context, "Nessuna app disponibile per aprire questo file", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, context.getString(R.string.expenses_no_app_to_open), Toast.LENGTH_LONG).show()
     } catch (_: TimeoutCancellationException) {
-        Toast.makeText(context, "Timeout apertura allegato", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, context.getString(R.string.expenses_timeout_opening_attachment), Toast.LENGTH_LONG).show()
     } catch (e: Exception) {
         Toast.makeText(
             context,
-            "Impossibile aprire allegato: ${e.localizedMessage ?: "errore sconosciuto"}",
+            context.getString(R.string.expenses_cannot_open_attachment, e.localizedMessage ?: "errore sconosciuto"),
             Toast.LENGTH_LONG,
         ).show()
     }
@@ -1465,7 +1468,7 @@ private fun parseHexColor(hex: String): Color {
 }
 
 private fun formatEuro(value: Double): String {
-    val fmt = NumberFormat.getCurrencyInstance(Locale.ITALY)
+    val fmt = NumberFormat.getCurrencyInstance(KBLocale.current())
     return fmt.format(value)
 }
 
@@ -1476,12 +1479,12 @@ private fun formatEuroCompact(value: Double): String {
 
 private fun formatDate(epochMillis: Long): String {
     val date = Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).toLocalDate()
-    return date.format(DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ITALIAN))
+    return date.format(DateTimeFormatter.ofPattern("d MMMM yyyy", KBLocale.current()))
 }
 
 private fun formatDateTime(epochMillis: Long): String {
     val date = Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault())
-    return date.format(DateTimeFormatter.ofPattern("d MMM yyyy 'at' HH:mm", Locale.ITALIAN))
+    return date.format(DateTimeFormatter.ofPattern("d MMM yyyy · HH:mm", KBLocale.current()))
 }
 
 private fun categoryIcon(category: KBExpenseCategoryEntity?): androidx.compose.ui.graphics.vector.ImageVector {

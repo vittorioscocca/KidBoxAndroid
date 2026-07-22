@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import it.vittorioscocca.kidbox.util.KBLocale
 
 data class PasswordsSettingsUiState(
     val weeklyEnabled: Boolean = true,
@@ -61,6 +62,6 @@ class PasswordsSettingsViewModel @Inject constructor(
     }
 
     private fun formatDate(epochMillis: Long): String {
-        return SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date(epochMillis))
+        return SimpleDateFormat("dd/MM/yyyy HH:mm", KBLocale.current()).format(Date(epochMillis))
     }
 }

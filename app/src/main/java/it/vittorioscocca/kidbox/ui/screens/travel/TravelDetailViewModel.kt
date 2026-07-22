@@ -50,6 +50,7 @@ import java.util.Locale
 import java.util.UUID
 import org.json.JSONArray
 import org.json.JSONObject
+import it.vittorioscocca.kidbox.util.KBLocale
 
 data class TravelTripExtrasUiState(
     val photoCount: Int = 0,
@@ -221,7 +222,7 @@ class TravelDetailViewModel @Inject constructor(
     fun addExpense(familyId: String, tripId: String, amount: Double, currency: String) {
         if (amount <= 0) return
         viewModelScope.launch {
-            val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val fmt = SimpleDateFormat("yyyy-MM-dd", KBLocale.current())
             tripExpenseDao.upsert(
                 KBTripExpenseEntity(
                     id = UUID.randomUUID().toString(),

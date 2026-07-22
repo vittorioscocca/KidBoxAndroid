@@ -123,12 +123,15 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private val PURPLE_DETAIL = Color(0xFF9573D9)
 private val GREEN_DETAIL = Color(0xFF4CAF50)
-private val DATE_FMT_DAY = SimpleDateFormat("EEE d MMM", Locale.ITALIAN)
-private val DATE_FMT_RANGE = SimpleDateFormat("d MMM yyyy", Locale.ITALIAN)
-private val DOSE_TAKEN_DETAIL_FMT = SimpleDateFormat("d MMMM yyyy 'alle' HH:mm", Locale.ITALIAN)
+private fun DATE_FMT_DAY() = SimpleDateFormat("EEE d MMM", KBLocale.current())
+private fun DATE_FMT_RANGE() = SimpleDateFormat("d MMM yyyy", KBLocale.current())
+private fun DOSE_TAKEN_DETAIL_FMT() = SimpleDateFormat("d MMMM yyyy · HH:mm", KBLocale.current())
 private val LocaleItIT = Locale.forLanguageTag("it-IT")
 
 /** Giorno terapia 1-based (allineato a iOS): 1 = primo giorno dalla data di inizio cura. */
@@ -225,7 +228,7 @@ fun MedicalTreatmentDetailScreen(
         if (granted) {
             takePictureLauncher.launch(cameraUri)
         } else {
-            Toast.makeText(context, "Permesso fotocamera negato", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.health_camera_denied), Toast.LENGTH_SHORT).show()
         }
     }
     val pickPhotoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -245,7 +248,7 @@ fun MedicalTreatmentDetailScreen(
 
     val treatment = state.treatment ?: run {
         Box(modifier = Modifier.fillMaxSize().background(kb.background), contentAlignment = Alignment.Center) {
-            Text("Cura non trovata", color = kb.title)
+            Text(stringResource(R.string.health_treatment_not_found), color = kb.title)
         }
         return
     }
@@ -292,15 +295,15 @@ fun MedicalTreatmentDetailScreen(
         ) {
             KidBoxHeaderCircleButton(
                 icon = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Indietro",
+                contentDescription = stringResource(R.string.health_back),
                 onClick = onBack,
             )
             Spacer(Modifier.weight(1f))
-            Text("Cura", fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = kb.title)
+            Text(stringResource(R.string.health_treatment), fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = kb.title)
             Spacer(Modifier.weight(1f))
             KidBoxHeaderCircleButton(
                 icon = Icons.Default.Edit,
-                contentDescription = "Modifica",
+                contentDescription = stringResource(R.string.health_edit),
                 onClick = onEdit,
             )
         }
@@ -346,7 +349,7 @@ fun MedicalTreatmentDetailScreen(
                     label = "treatmentProgressRing",
                 )
                 Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                    Text("Progresso", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = kb.title)
+                    Text(stringResource(R.string.health_progress), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = kb.title)
                     Spacer(Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -385,14 +388,14 @@ fun MedicalTreatmentDetailScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Text("∞", color = PURPLE_DETAIL, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                     Text(
-                                        "Cura a lungo termine",
+                                        stringResource(R.string.health_long_term_treatment),
                                         fontWeight = FontWeight.SemiBold,
                                         fontSize = 14.sp,
                                         color = kb.title,
                                     )
                                 }
                                 Text(
-                                    "In corso dal ${DATE_FMT_RANGE.format(Date(treatment.startDateEpochMillis))}",
+                                    "In corso dal ${DATE_FMT_RANGE().format(Date(treatment.startDateEpochMillis))}",
                                     fontSize = 12.sp,
                                     color = kb.subtitle,
                                 )
@@ -410,7 +413,7 @@ fun MedicalTreatmentDetailScreen(
                                     color = kb.title,
                                 )
                                 Text(
-                                    "${DATE_FMT_RANGE.format(Date(treatment.startDateEpochMillis))} – ${DATE_FMT_RANGE.format(Date(endMillis))}",
+                                    "${DATE_FMT_RANGE().format(Date(treatment.startDateEpochMillis))} – ${DATE_FMT_RANGE().format(Date(endMillis))}",
                                     fontSize = 12.sp,
                                     color = kb.subtitle,
                                 )
@@ -433,10 +436,10 @@ fun MedicalTreatmentDetailScreen(
             ) {
                 Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = Color(0xFF46996A))
                 Spacer(Modifier.width(8.dp))
-                Text("Estendi cura", color = Color(0xFF46996A), fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.health_extend_treatment), color = Color(0xFF46996A), fontWeight = FontWeight.SemiBold)
             }
 
-            Text("Orari somministrazione", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = kb.title)
+            Text(stringResource(R.string.health_dose_times), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = kb.title)
 
             Row(modifier = Modifier.fillMaxWidth().horizontalScroll(dayRingScroll), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val ringDays = state.calendarDays
@@ -457,8 +460,8 @@ fun MedicalTreatmentDetailScreen(
                     ) {
                         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             val d = Date(day.dateMillis)
-                            Text(SimpleDateFormat("d", Locale.ITALIAN).format(d), color = if (selected) Color.White else kb.title, fontWeight = FontWeight.Bold)
-                            Text(SimpleDateFormat("MMM", Locale.ITALIAN).format(d), color = if (selected) Color.White.copy(alpha = 0.9f) else kb.subtitle, fontSize = 11.sp)
+                            Text(SimpleDateFormat("d", KBLocale.current()).format(d), color = if (selected) Color.White else kb.title, fontWeight = FontWeight.Bold)
+                            Text(SimpleDateFormat("MMM", KBLocale.current()).format(d), color = if (selected) Color.White.copy(alpha = 0.9f) else kb.subtitle, fontSize = 11.sp)
                             val allDosesTaken = day.slots.isNotEmpty() &&
                                 day.slots.all { it.state == DoseState.TAKEN }
                             if (allDosesTaken) {
@@ -485,7 +488,7 @@ fun MedicalTreatmentDetailScreen(
                             if (dayIsFuture) return@SlotCompactRow
                             confirmDose = ConfirmDoseUi(
                                 slot = slot,
-                                dayLabel = DATE_FMT_DAY.format(Date(day.dateMillis)),
+                                dayLabel = DATE_FMT_DAY().format(Date(day.dateMillis)),
                                 dayDateMillis = day.dateMillis,
                             )
                         },
@@ -524,7 +527,7 @@ fun MedicalTreatmentDetailScreen(
                     OutlinedButton(onClick = onEdit, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                         Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = PURPLE_DETAIL)
                         Spacer(Modifier.width(6.dp))
-                        Text("Personalizza orari", color = PURPLE_DETAIL)
+                        Text(stringResource(R.string.health_customize_times), color = PURPLE_DETAIL)
                     }
                 }
             }
@@ -535,15 +538,15 @@ fun MedicalTreatmentDetailScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Notifications, contentDescription = null, tint = PURPLE_DETAIL, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Promemoria", color = PURPLE_DETAIL, fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.health_reminder), color = PURPLE_DETAIL, fontWeight = FontWeight.SemiBold)
                         }
                         Spacer(Modifier.height(4.dp))
-                        Text(if (treatment.reminderEnabled) "Promemoria attivo" else "Promemoria disattivato", color = kb.title)
+                        Text(if (treatment.reminderEnabled) stringResource(R.string.health_reminder_active) else stringResource(R.string.health_reminder_off), color = kb.title)
                         Text(
                             if (treatment.intervalBetweenDosesDays > 0) {
                                 "Notifica nei giorni di dose (ogni ${treatment.intervalBetweenDosesDays} giorni)"
                             } else {
-                                "Notifica per ogni dose agli orari impostati"
+                                stringResource(R.string.health_notify_each_dose)
                             },
                             color = kb.subtitle,
                             fontSize = 12.sp,
@@ -584,7 +587,7 @@ fun MedicalTreatmentDetailScreen(
                 onPickFromKidBoxDocuments = { showKidBoxDocPicker = true },
             )
             Text(
-                "Visibili anche in Documenti > Salute > Referti",
+                stringResource(R.string.health_also_in_documents),
                 color = kb.subtitle,
                 fontSize = 12.sp,
                 textAlign = TextAlign.Center,
@@ -599,7 +602,7 @@ fun MedicalTreatmentDetailScreen(
             ) {
                 Icon(Icons.Default.PauseCircle, contentDescription = null, tint = Color(0xFFE68A00))
                 Spacer(Modifier.width(8.dp))
-                Text("Interrompi cura", color = Color(0xFFE68A00), fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.health_stop_treatment), color = Color(0xFFE68A00), fontWeight = FontWeight.SemiBold)
             }
 
             Button(
@@ -610,7 +613,7 @@ fun MedicalTreatmentDetailScreen(
             ) {
                 Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFD32F2F))
                 Spacer(Modifier.width(8.dp))
-                Text("Elimina", color = Color(0xFFD32F2F), fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.health_delete), color = Color(0xFFD32F2F), fontWeight = FontWeight.SemiBold)
             }
             Spacer(Modifier.height(30.dp))
         }
@@ -626,15 +629,15 @@ fun MedicalTreatmentDetailScreen(
     if (state.showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissDeleteDialog() },
-            title = { Text("Elimina cura") },
-            text = { Text("Eliminare la cura? Tutte le notifiche verranno cancellate.") },
+            title = { Text(stringResource(R.string.health_delete_treatment)) },
+            text = { Text(stringResource(R.string.health_delete_treatment_q)) },
             confirmButton = {
                 TextButton(onClick = { viewModel.delete() }) {
-                    Text("Elimina", color = Color.Red)
+                    Text(stringResource(R.string.health_delete), color = Color.Red)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.dismissDeleteDialog() }) { Text("Annulla") }
+                TextButton(onClick = { viewModel.dismissDeleteDialog() }) { Text(stringResource(R.string.health_cancel)) }
             },
         )
     }
@@ -775,27 +778,27 @@ private fun SlotCompactRow(
                 when (slot.state) {
                     DoseState.PENDING -> {
                         if (!registrationsAllowed) {
-                            Text("Giorno futuro: non puoi registrare assunzioni.", color = kb.subtitle, fontSize = 13.sp)
+                            Text(stringResource(R.string.health_future_day), color = kb.subtitle, fontSize = 13.sp)
                         } else {
-                            Text("Da prendere", color = kb.subtitle, fontSize = 14.sp)
+                            Text(stringResource(R.string.health_to_take), color = kb.subtitle, fontSize = 14.sp)
                         }
                     }
                     DoseState.TAKEN -> {
                         val at = slot.takenAtEpochMillis
                         if (at != null) {
-                            Text(DOSE_TAKEN_DETAIL_FMT.format(Date(at)), color = GREEN_DETAIL, fontSize = 13.sp)
+                            Text(DOSE_TAKEN_DETAIL_FMT().format(Date(at)), color = GREEN_DETAIL, fontSize = 13.sp)
                         } else {
-                            Text("Assunta", color = GREEN_DETAIL, fontSize = 14.sp)
+                            Text(stringResource(R.string.health_taken), color = GREEN_DETAIL, fontSize = 14.sp)
                         }
                     }
-                    DoseState.SKIPPED -> Text("Saltata", color = Color(0xFFE65100), fontSize = 14.sp)
+                    DoseState.SKIPPED -> Text(stringResource(R.string.health_skipped), color = Color(0xFFE65100), fontSize = 14.sp)
                 }
             }
             when (slot.state) {
                 DoseState.TAKEN, DoseState.SKIPPED -> {
                     val (label, color) = when (slot.state) {
-                        DoseState.TAKEN -> "Annulla" to PURPLE_DETAIL
-                        else -> "Riprendi" to Color(0xFFE65100)
+                        DoseState.TAKEN -> stringResource(R.string.health_cancel) to PURPLE_DETAIL
+                        else -> stringResource(R.string.health_resume) to Color(0xFFE65100)
                     }
                     OutlinedButton(
                         onClick = onUndo,
@@ -817,14 +820,14 @@ private fun SlotCompactRow(
                             DoseActionCircle(
                                 onClick = onSkipped,
                                 containerColor = Color(0xFFE0E0E0),
-                                actionLabel = "Segna saltata",
+                                actionLabel = stringResource(R.string.health_mark_skipped),
                             ) {
                                 Icon(Icons.Default.Close, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(16.dp))
                             }
                             DoseActionCircle(
                                 onClick = onOpenConfirmTaken,
                                 containerColor = GREEN_DETAIL,
-                                actionLabel = "Segna assunta",
+                                actionLabel = stringResource(R.string.health_mark_taken),
                             ) {
                                 Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             }
@@ -852,10 +855,10 @@ private fun ConfirmDoseSheet(
     var showTimePicker by remember { mutableStateOf(false) }
 
     val quickOptions = listOf(
-        "Adesso" to 0L,
-        "30 min fa" to -30L * 60 * 1000,
-        "1 ora fa" to -60L * 60 * 1000,
-        "2 ore fa" to -120L * 60 * 1000,
+        stringResource(R.string.health_now) to 0L,
+        stringResource(R.string.health_30_min_ago) to -30L * 60 * 1000,
+        stringResource(R.string.health_1_hour_ago) to -60L * 60 * 1000,
+        stringResource(R.string.health_2_hours_ago) to -120L * 60 * 1000,
     )
 
     fun applyQuick(offset: Long) {
@@ -878,9 +881,9 @@ private fun ConfirmDoseSheet(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onDismiss) { Text("Annulla") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.health_cancel)) }
                 Spacer(Modifier.weight(1f))
-                Text("Conferma dose", fontWeight = FontWeight.SemiBold, color = kb.title, fontSize = 16.sp)
+                Text(stringResource(R.string.health_confirm_dose), fontWeight = FontWeight.SemiBold, color = kb.title, fontSize = 16.sp)
                 Spacer(Modifier.weight(1f))
                 Spacer(Modifier.width(64.dp))
             }
@@ -898,9 +901,9 @@ private fun ConfirmDoseSheet(
                 Spacer(Modifier.height(6.dp))
                 val fasciaRegistrata = remember(takenAtMillis) { TreatmentSchedulePeriod.fromEpochMillis(takenAtMillis) }
                 TreatmentPeriodBadge(fasciaRegistrata)
-                Text("Quando hai dato la medicina?", fontSize = 13.sp, color = kb.subtitle)
+                Text(stringResource(R.string.health_when_given), fontSize = 13.sp, color = kb.subtitle)
             }
-            Text("SELEZIONE RAPIDA", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = kb.subtitle, letterSpacing = 0.6.sp)
+            Text(stringResource(R.string.health_quick_select), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = kb.subtitle, letterSpacing = 0.6.sp)
             quickOptions.chunked(2).forEach { pair ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -924,7 +927,7 @@ private fun ConfirmDoseSheet(
                     }
                 }
             }
-            Text("DATA E ORA", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = kb.subtitle, letterSpacing = 0.6.sp)
+            Text(stringResource(R.string.health_date_time), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = kb.subtitle, letterSpacing = 0.6.sp)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = {
@@ -933,7 +936,7 @@ private fun ConfirmDoseSheet(
                     },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
-                ) { Text("Data") }
+                ) { Text(stringResource(R.string.health_date)) }
                 OutlinedButton(
                     onClick = {
                         selectedQuickOffset = Long.MIN_VALUE
@@ -941,10 +944,10 @@ private fun ConfirmDoseSheet(
                     },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
-                ) { Text("Ora") }
+                ) { Text(stringResource(R.string.health_time)) }
             }
             Text(
-                DOSE_TAKEN_DETAIL_FMT.format(Date(takenAtMillis)),
+                DOSE_TAKEN_DETAIL_FMT().format(Date(takenAtMillis)),
                 fontSize = 13.sp,
                 color = kb.subtitle,
                 modifier = Modifier.fillMaxWidth(),
@@ -957,7 +960,7 @@ private fun ConfirmDoseSheet(
             ) {
                 Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Conferma dose", color = Color.White, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.health_confirm_dose), color = Color.White, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -992,7 +995,7 @@ private fun ConfirmDoseSheet(
                 ) {
                     TimePicker(state = pickerState)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { showTimePicker = false }) { Text("Annulla") }
+                        TextButton(onClick = { showTimePicker = false }) { Text(stringResource(R.string.health_cancel)) }
                         TextButton(onClick = {
                             takenAtMillis = mergeLocalTime(takenAtMillis, pickerState.hour, pickerState.minute)
                             showTimePicker = false
@@ -1014,7 +1017,7 @@ private fun ConfirmDoseDatePickerDialog(initialMillis: Long, onDismiss: () -> Un
             confirmButton = {
                 TextButton(onClick = { pickerState.selectedDateMillis?.let(onConfirm) ?: onDismiss() }) { Text("OK") }
             },
-            dismissButton = { TextButton(onClick = onDismiss) { Text("Annulla") } },
+            dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.health_cancel)) } },
         ) { DatePicker(state = pickerState) }
     }
 }
@@ -1081,8 +1084,8 @@ private fun ExtendSheet(onDismiss: () -> Unit, onExtend: (Int) -> Unit) {
             modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(kb.card).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Estendi cura", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = kb.title)
-            listOf(3 to "+3 giorni", 7 to "+7 giorni", 14 to "+14 giorni").forEach { (days, label) ->
+            Text(stringResource(R.string.health_extend_treatment), fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = kb.title)
+            listOf(3 to stringResource(R.string.health_plus_3_days), 7 to stringResource(R.string.health_plus_7_days), 14 to stringResource(R.string.health_plus_14_days)).forEach { (days, label) ->
                 Button(
                     onClick = { onExtend(days) },
                     colors = ButtonDefaults.buttonColors(containerColor = PURPLE_DETAIL),
@@ -1093,17 +1096,17 @@ private fun ExtendSheet(onDismiss: () -> Unit, onExtend: (Int) -> Unit) {
             androidx.compose.material3.OutlinedTextField(
                 value = customDays,
                 onValueChange = { customDays = it },
-                placeholder = { Text("Giorni personalizzati") },
+                placeholder = { Text(stringResource(R.string.health_custom_days)) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 singleLine = true,
             )
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onDismiss) { Text("Annulla") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.health_cancel)) }
                 TextButton(onClick = {
                     val d = customDays.toIntOrNull()
                     if (d != null && d > 0) onExtend(d) else onDismiss()
-                }) { Text("Conferma") }
+                }) { Text(stringResource(R.string.health_confirm)) }
             }
         }
     }

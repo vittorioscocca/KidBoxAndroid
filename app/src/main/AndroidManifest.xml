@@ -36,7 +36,8 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.KidBox">
+        android:theme="@style/Theme.KidBox"
+        android:localeConfig="@xml/locales_config">
 
         <meta-data
             android:name="com.facebook.sdk.ApplicationId"
@@ -112,6 +113,10 @@
 
         <receiver
             android:name=".notifications.HealthReminderReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".notifications.nudge.NudgeReceiver"
             android:exported="false" />
 
         <receiver
@@ -211,5 +216,15 @@
             android:name=".feature.passwords.autofill.AutoFillProviderSettingsActivity"
             android:exported="true"
             android:theme="@style/Theme.KidBox" />
+
+        <!-- Persistenza della lingua per-app su API < 33 (su 33+ ci pensa il sistema). -->
+        <service
+            android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
+            android:enabled="false"
+            android:exported="false">
+            <meta-data
+                android:name="autoStoreLocales"
+                android:value="true" />
+        </service>
     </application>
 </manifest>

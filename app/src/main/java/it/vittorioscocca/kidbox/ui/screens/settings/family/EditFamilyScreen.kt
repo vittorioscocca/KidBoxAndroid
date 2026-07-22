@@ -58,6 +58,8 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.UUID
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 data class ChildEntry(
     val id: String = UUID.randomUUID().toString(),
@@ -121,7 +123,7 @@ fun EditFamilyScreen(
             .padding(16.dp),
     ) {
         Text(
-            "Modifica famiglia",
+            stringResource(R.string.settings_editfamily_title),
             fontSize = 34.sp,
             fontWeight = FontWeight.ExtraBold,
             color = Color(0xFF1A1A1A),
@@ -139,8 +141,8 @@ fun EditFamilyScreen(
                     Icon(Icons.Filled.Groups, null, tint = Color(0xFF2E86FF))
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
-                        Text("Famiglia", fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
-                        Text("Aggiorna nome famiglia e gestisci i figli.", color = sectionSubtitle, fontSize = 12.sp)
+                        Text(stringResource(R.string.settings_family_title), fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
+                        Text(stringResource(R.string.settings_editfamily_intro), color = sectionSubtitle, fontSize = 12.sp)
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
@@ -176,7 +178,7 @@ fun EditFamilyScreen(
                     Icon(Icons.Filled.ChildCare, null, tint = Color(0xFF777777))
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
-                        Text("Figli", fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
+                        Text(stringResource(R.string.settings_editfamily_children), fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
                         Text("${children.count { it.id.isNotBlank() }} figlio/i configurato/i.", color = sectionSubtitle, fontSize = 12.sp)
                     }
                 }
@@ -196,11 +198,11 @@ fun EditFamilyScreen(
                             // Existing saved child — tap chevron to edit
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    if (child.name.isBlank()) "Senza nome" else child.name,
+                                    if (child.name.isBlank()) stringResource(R.string.settings_editfamily_unnamed) else child.name,
                                     fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF1A1A1A),
                                 )
                                 Text(
-                                    child.birthDate?.format(dateFormat) ?: "Nessuna data",
+                                    child.birthDate?.format(dateFormat) ?: stringResource(R.string.settings_editfamily_no_date),
                                     fontSize = 12.sp, color = Color(0xFF999999),
                                 )
                             }
@@ -215,7 +217,7 @@ fun EditFamilyScreen(
                                     children = children.toMutableList().also { it[index] = it[index].copy(name = value) }
                                 },
                                 modifier = Modifier.weight(1f),
-                                placeholder = { Text("Nome figlio") },
+                                placeholder = { Text(stringResource(R.string.settings_editfamily_child_name)) },
                                 singleLine = true,
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedTextColor = Color(0xFF1A1A1A),
@@ -248,7 +250,7 @@ fun EditFamilyScreen(
                 ) {
                     Icon(Icons.Filled.AddCircle, null, tint = Color(0xFF2E86FF))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Aggiungi figlio", color = Color(0xFF2E86FF), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.settings_editfamily_add_child), color = Color(0xFF2E86FF), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -292,10 +294,10 @@ fun EditFamilyScreen(
                 }
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
-                    Text("Salva modifiche", fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
+                    Text(stringResource(R.string.settings_editfamily_save), fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
                     Text(
                         state.savingMessage?.takeIf { it.isNotBlank() }
-                            ?: "Le modifiche verranno sincronizzate.",
+                            ?: stringResource(R.string.settings_editfamily_sync_note),
                         color = sectionSubtitle,
                         fontSize = 12.sp,
                     )

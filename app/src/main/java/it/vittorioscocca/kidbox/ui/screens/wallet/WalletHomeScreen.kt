@@ -2,6 +2,8 @@
 
 package it.vittorioscocca.kidbox.ui.screens.wallet
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -78,6 +80,7 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
 
 @Composable
 fun WalletHomeScreen(
@@ -114,19 +117,20 @@ fun WalletHomeScreen(
             familyId = familyId,
             viewModel = viewModel,
             onDismiss = { showAddSheet = false },
+            onUpgrade = onUpgrade,
         )
     }
 
     if (showDocAddChoice) {
         AlertDialog(
             onDismissRequest = { showDocAddChoice = false },
-            title = { Text("Nuovo documento", fontWeight = FontWeight.SemiBold) },
-            text = { Text("Come vuoi aggiungerlo?") },
+            title = { Text(stringResource(R.string.wallet_new_document_title), fontWeight = FontWeight.SemiBold) },
+            text = { Text(stringResource(R.string.wallet_new_document_how)) },
             confirmButton = {
-                TextButton(onClick = { showDocAddChoice = false; showDocAddSheet = true }) { Text("Scansiona nuovo documento") }
+                TextButton(onClick = { showDocAddChoice = false; showDocAddSheet = true }) { Text(stringResource(R.string.wallet_scan_new_document)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDocAddChoice = false; showDocLinkSheet = true }) { Text("Collega documento già in Documenti") }
+                TextButton(onClick = { showDocAddChoice = false; showDocLinkSheet = true }) { Text(stringResource(R.string.wallet_link_existing_document)) }
             },
         )
     }
@@ -145,36 +149,36 @@ fun WalletHomeScreen(
                     ),
                     title = {
                         Text(
-                            "Wallet",
+                            stringResource(R.string.wallet_title),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                         )
                     },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.wallet_back))
                         }
                     },
                     actions = {
                         if (selectedTab == 0) {
                             IconButton(onClick = { showAddSheet = true }) {
-                                Icon(Icons.Filled.Add, contentDescription = "Aggiungi biglietto")
+                                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.wallet_add_ticket_cd))
                             }
                         } else {
                             if (docsState.isSelecting) {
-                                TextButton(onClick = { documentsViewModel.exitSelectionMode() }) { Text("Annulla") }
+                                TextButton(onClick = { documentsViewModel.exitSelectionMode() }) { Text(stringResource(R.string.wallet_cancel)) }
                                 IconButton(
                                     onClick = { documentsViewModel.deleteSelected() },
                                     enabled = docsState.selectedIds.isNotEmpty() && !docsState.isDeleting,
                                 ) {
-                                    Icon(Icons.Filled.Delete, contentDescription = "Elimina selezionati", tint = MaterialTheme.colorScheme.error)
+                                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.wallet_delete_selected_cd), tint = MaterialTheme.colorScheme.error)
                                 }
                             } else {
                                 if (docsState.items.isNotEmpty()) {
-                                    TextButton(onClick = { documentsViewModel.enterSelectionMode() }) { Text("Seleziona") }
+                                    TextButton(onClick = { documentsViewModel.enterSelectionMode() }) { Text(stringResource(R.string.wallet_select)) }
                                 }
                                 IconButton(onClick = { showDocAddChoice = true }) {
-                                    Icon(Icons.Filled.Add, contentDescription = "Aggiungi documento")
+                                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.wallet_add_document_cd))
                                 }
                             }
                         }
@@ -184,8 +188,8 @@ fun WalletHomeScreen(
                     selectedTabIndex = selectedTab,
                     containerColor = MaterialTheme.kidBoxColors.background,
                 ) {
-                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Biglietti") })
-                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Documenti") })
+                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text(stringResource(R.string.wallet_tab_tickets)) })
+                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text(stringResource(R.string.wallet_tab_documents)) })
                 }
             }
         },
@@ -232,13 +236,13 @@ fun WalletHomeScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "PDF condiviso con KidBox",
+                                stringResource(R.string.wallet_shared_pdf_title),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.kidBoxColors.title,
                             )
                             Text(
-                                "Tocca per salvare nel wallet famiglia",
+                                stringResource(R.string.wallet_shared_pdf_subtitle),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.kidBoxColors.subtitle,
                             )
@@ -269,7 +273,7 @@ fun WalletHomeScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        "Nessun biglietto. Aggiungi il tuo primo PDF.",
+                        stringResource(R.string.wallet_no_tickets_empty),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.kidBoxColors.subtitle,
                     )
@@ -317,13 +321,13 @@ fun WalletTicketCard(
     val kind = WalletTicketKind.from(ticket.kindRaw)
     val gradientStart = Color(kind.gradientStartHex)
     val gradientEnd = Color(kind.gradientEndHex)
-    val dateFmt = remember { SimpleDateFormat("EEE, d MMM", Locale.ITALIAN) }
-    val timeFmt = remember { SimpleDateFormat("HH:mm", Locale.ITALIAN) }
+    val dateFmt = remember { SimpleDateFormat("EEE, d MMM", KBLocale.current()) }
+    val timeFmt = remember { SimpleDateFormat("HH:mm", KBLocale.current()) }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(180.dp)
+            .height(200.dp)
             .shadow(
                 elevation = 8.dp,
                 shape = RoundedCornerShape(22.dp),
@@ -386,8 +390,9 @@ fun WalletTicketCard(
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 1.5.sp,
                     )
+                    val defaultTicketTitle = stringResource(R.string.wallet_default_ticket_title)
                     Text(
-                        ticket.title.ifBlank { "Biglietto" },
+                        ticket.title.ifBlank { defaultTicketTitle },
                         color = Color.White,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
@@ -402,28 +407,49 @@ fun WalletTicketCard(
                 verticalAlignment = Alignment.Bottom,
             ) {
                 val eventMs = ticket.eventDateEpochMillis
-                if (eventMs != null) {
-                    Column {
+                val arrivalMs = ticket.eventEndDateEpochMillis
+                val hasJourney = eventMs != null || arrivalMs != null ||
+                    !ticket.location.isNullOrBlank() || !ticket.arrivalLocation.isNullOrBlank()
+
+                Column(modifier = Modifier.weight(1f)) {
+                    if (hasJourney) {
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            JourneyPoint(
+                                timeText = eventMs?.let { timeFmt.format(Date(it)) },
+                                location = ticket.location,
+                                dateText = eventMs?.let { dateFmt.format(Date(it)) },
+                            )
+                            if (arrivalMs != null || !ticket.arrivalLocation.isNullOrBlank()) {
+                                Text(
+                                    "  →  ",
+                                    color = Color.White.copy(alpha = 0.6f),
+                                    fontSize = 13.sp,
+                                    modifier = Modifier.padding(bottom = 2.dp),
+                                )
+                                JourneyPoint(
+                                    timeText = arrivalMs?.let { timeFmt.format(Date(it)) },
+                                    location = ticket.arrivalLocation,
+                                    dateText = null,
+                                )
+                            }
+                        }
+                    }
+                    if (!ticket.holderName.isNullOrBlank()) {
                         Text(
-                            dateFmt.format(Date(eventMs)),
-                            color = Color.White.copy(alpha = 0.8f),
-                            fontSize = 12.sp,
-                        )
-                        Text(
-                            timeFmt.format(Date(eventMs)),
-                            color = Color.White,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
+                            ticket.holderName,
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            modifier = Modifier.padding(top = if (hasJourney) 4.dp else 0.dp),
                         )
                     }
-                } else {
-                    Spacer(modifier = Modifier.weight(1f))
                 }
 
                 if (!ticket.bookingCode.isNullOrBlank()) {
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
-                            "CODICE",
+                            stringResource(R.string.wallet_code_label),
                             color = Color.White.copy(alpha = 0.75f),
                             fontSize = 9.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -439,6 +465,32 @@ fun WalletTicketCard(
                     }
                 }
             }
+        }
+    }
+}
+
+/** Un estremo del viaggio (orario + luogo) mostrato nel footer della card biglietto. */
+@Composable
+private fun JourneyPoint(timeText: String?, location: String?, dateText: String?) {
+    Column {
+        if (dateText != null) {
+            Text(dateText, color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+        }
+        if (timeText != null) {
+            Text(
+                timeText,
+                color = Color.White,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        if (!location.isNullOrBlank()) {
+            Text(
+                location,
+                color = Color.White.copy(alpha = 0.75f),
+                fontSize = 11.sp,
+                maxLines = 1,
+            )
         }
     }
 }

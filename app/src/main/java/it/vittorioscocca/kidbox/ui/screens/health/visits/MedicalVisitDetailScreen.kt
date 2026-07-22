@@ -92,9 +92,12 @@ import java.util.Locale
 import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
-private val DATE_LONG_FMT = SimpleDateFormat("d MMMM yyyy · HH:mm", Locale.ITALIAN)
-private val NEXT_VISIT_DATE_FMT = SimpleDateFormat("EEEE d MMMM yyyy", Locale.ITALIAN)
+private fun DATE_LONG_FMT() = SimpleDateFormat("d MMMM yyyy · HH:mm", KBLocale.current())
+private fun NEXT_VISIT_DATE_FMT() = SimpleDateFormat("EEEE d MMMM yyyy", KBLocale.current())
 private val ORANGE_DETAIL = Color(0xFFFF6B00)
 private val DANGER_RED = Color(0xFFD32F2F)
 /** Tint sezioni dettaglio visita (allineato a iOS). */
@@ -160,9 +163,9 @@ fun MedicalVisitDetailScreen(
         val v = state.visit
         if (v != null) {
             onOpenVisitAiChat(
-                state.childName.ifBlank { "Profilo" },
-                v.reason.ifBlank { "Visita medica" },
-                DATE_LONG_FMT.format(Date(v.dateEpochMillis)),
+                state.childName.ifBlank { context.getString(R.string.health_profile) },
+                v.reason.ifBlank { context.getString(R.string.health_visit_lower) },
+                DATE_LONG_FMT().format(Date(v.dateEpochMillis)),
                 v.diagnosis.orEmpty(),
                 v.notes.orEmpty(),
             )
@@ -180,7 +183,7 @@ fun MedicalVisitDetailScreen(
         if (granted) {
             takePictureLauncher.launch(cameraUri)
         } else {
-            Toast.makeText(context, "Permesso fotocamera negato", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.health_camera_denied), Toast.LENGTH_SHORT).show()
         }
     }
     val pickPhotoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -209,11 +212,11 @@ fun MedicalVisitDetailScreen(
                 ) {
                     KidBoxHeaderCircleButton(
                         icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Indietro",
+                        contentDescription = stringResource(R.string.health_back),
                         onClick = onBack,
                     )
                     Spacer(Modifier.height(40.dp))
-                    Text(state.error ?: "Visita non trovata.", color = kb.subtitle, fontSize = 16.sp)
+                    Text(state.error ?: stringResource(R.string.health_visit_not_found_dot), color = kb.subtitle, fontSize = 16.sp)
                 }
             }
             else -> {
@@ -237,7 +240,7 @@ fun MedicalVisitDetailScreen(
                     ) {
                         KidBoxHeaderCircleButton(
                             icon = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Indietro",
+                            contentDescription = stringResource(R.string.health_back),
                             onClick = onBack,
                         )
                         Spacer(Modifier.weight(1f))
@@ -270,7 +273,7 @@ fun MedicalVisitDetailScreen(
                                 Spacer(Modifier.width(14.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        visit.reason.ifBlank { "Visita medica" },
+                                        visit.reason.ifBlank { stringResource(R.string.health_visit_lower) },
                                         fontWeight = FontWeight.ExtraBold,
                                         fontSize = 20.sp,
                                         color = kb.title,
@@ -281,7 +284,7 @@ fun MedicalVisitDetailScreen(
                             }
                             Spacer(Modifier.height(12.dp))
                             Text(
-                                DATE_LONG_FMT.format(Date(visit.dateEpochMillis)),
+                                DATE_LONG_FMT().format(Date(visit.dateEpochMillis)),
                                 fontSize = 13.sp,
                                 color = kb.subtitle,
                             )
@@ -302,7 +305,7 @@ fun MedicalVisitDetailScreen(
                                         modifier = Modifier.size(16.dp),
                                     )
                                     Spacer(Modifier.width(4.dp))
-                                    Text("Promemoria attivo", fontSize = 12.sp, color = ORANGE_DETAIL)
+                                    Text(stringResource(R.string.health_reminder_active), fontSize = 12.sp, color = ORANGE_DETAIL)
                                 }
                             }
                         }
@@ -318,16 +321,16 @@ fun MedicalVisitDetailScreen(
                             if (hasRecommendations) add("Raccomandazioni:\n${visit.recommendations}")
                         }.joinToString("\n\n")
                         DetailSectionCard(
-                            title = "Esito della Visita",
+                            title = stringResource(R.string.health_visit_outcome),
                             titleAllCaps = false,
                             copyText = outcomeCopyText,
                         ) {
                             if (hasDiagnosis) {
-                                DetailBlock("Diagnosi", visit.diagnosis!!)
+                                DetailBlock(stringResource(R.string.health_diagnosis), visit.diagnosis!!)
                             }
                             if (hasRecommendations) {
                                 if (hasDiagnosis) Spacer(Modifier.height(8.dp))
-                                DetailBlock("Raccomandazioni", visit.recommendations!!)
+                                DetailBlock(stringResource(R.string.health_recommendations), visit.recommendations!!)
                             }
                         }
                         Spacer(Modifier.height(12.dp))
@@ -392,7 +395,7 @@ fun MedicalVisitDetailScreen(
 
                     // ── Appunti ─────────────────────────────────────────────────
                     if (!visit.notes.isNullOrBlank()) {
-                        DetailSectionCard(title = "Appunti", titleAllCaps = false) {
+                        DetailSectionCard(title = stringResource(R.string.health_notes_short), titleAllCaps = false) {
                             Text(visit.notes!!, fontSize = 14.sp, color = kb.title)
                         }
                         Spacer(Modifier.height(12.dp))
@@ -416,7 +419,7 @@ fun MedicalVisitDetailScreen(
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = VISIT_DETAIL_TINT),
                     ) {
-                        Text("Modifica", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.health_edit), color = Color.White, fontWeight = FontWeight.SemiBold)
                     }
                     OutlinedButton(
                         onClick = { viewModel.requestDelete() },
@@ -425,7 +428,7 @@ fun MedicalVisitDetailScreen(
                         border = BorderStroke(1.5.dp, DANGER_RED.copy(alpha = 0.5f)),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = DANGER_RED),
                     ) {
-                        Text("Elimina", fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.health_delete), fontWeight = FontWeight.SemiBold)
                     }
                 }
 
@@ -435,7 +438,7 @@ fun MedicalVisitDetailScreen(
                             .align(Alignment.BottomEnd)
                             .padding(end = 20.dp, bottom = 92.dp),
                         isEnabled = true,
-                        contentDescription = "Chiedi all'AI sulla visita",
+                        contentDescription = stringResource(R.string.health_ask_ai_visit),
                         onTap = { showAiChat = true },
                     )
                 }
@@ -455,15 +458,15 @@ fun MedicalVisitDetailScreen(
     if (state.confirmDelete) {
         AlertDialog(
             onDismissRequest = { viewModel.cancelDelete() },
-            title = { Text("Eliminare la visita?") },
-            text = { Text("L'azione non può essere annullata.") },
+            title = { Text(stringResource(R.string.health_delete_visit_q)) },
+            text = { Text(stringResource(R.string.health_cannot_undo)) },
             confirmButton = {
                 TextButton(onClick = { viewModel.confirmDelete() }) {
-                    Text("Elimina", color = DANGER_RED)
+                    Text(stringResource(R.string.health_delete), color = DANGER_RED)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.cancelDelete() }) { Text("Annulla") }
+                TextButton(onClick = { viewModel.cancelDelete() }) { Text(stringResource(R.string.health_cancel)) }
             },
         )
     }
@@ -529,14 +532,14 @@ private fun PrescrizioniDetailCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             VisitDetailSectionHeader(
-                title = "Prescrizioni",
+                title = stringResource(R.string.health_prescriptions),
                 icon = Icons.Default.LocalPharmacy,
                 tint = tint,
             )
             Spacer(Modifier.height(12.dp))
 
             if (asNeeded.isNotEmpty()) {
-                PrescriptionSubHeader(title = "Al Bisogno", icon = Icons.Default.LocalPharmacy, kb = kb)
+                PrescriptionSubHeader(title = stringResource(R.string.health_as_needed_cap), icon = Icons.Default.LocalPharmacy, kb = kb)
                 Spacer(Modifier.height(8.dp))
                 asNeeded.forEach { drug ->
                     AsNeededDrugRow(drug = drug, tint = tint, kb = kb)
@@ -549,7 +552,7 @@ private fun PrescrizioniDetailCard(
                     HorizontalDivider(color = kb.subtitle.copy(alpha = 0.12f))
                     Spacer(Modifier.height(12.dp))
                 }
-                PrescriptionSubHeader(title = "Terapie", icon = Icons.Default.DirectionsWalk, kb = kb)
+                PrescriptionSubHeader(title = stringResource(R.string.health_therapies), icon = Icons.Default.DirectionsWalk, kb = kb)
                 Spacer(Modifier.height(8.dp))
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -660,10 +663,10 @@ private fun NextAppointmentCard(visit: KBMedicalVisit, kb: KidBoxColorScheme) {
             }
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("Prossimo Appuntamento", fontSize = 12.sp, color = kb.subtitle)
+                Text(stringResource(R.string.health_next_appointment), fontSize = 12.sp, color = kb.subtitle)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    NEXT_VISIT_DATE_FMT.format(Date(nextMs)),
+                    NEXT_VISIT_DATE_FMT().format(Date(nextMs)),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = kb.title,
@@ -682,7 +685,7 @@ private fun NextAppointmentCard(visit: KBMedicalVisit, kb: KidBoxColorScheme) {
                             modifier = Modifier.size(14.dp),
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text("Promemoria attivo", fontSize = 12.sp, color = ORANGE_DETAIL)
+                        Text(stringResource(R.string.health_reminder_active), fontSize = 12.sp, color = ORANGE_DETAIL)
                     }
                 }
             }
@@ -719,13 +722,13 @@ private fun DetailSectionCard(
                     IconButton(
                         onClick = {
                             clipboard.setText(AnnotatedString(copyText))
-                            Toast.makeText(context, "Esito copiato", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.health_outcome_copied), Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.size(28.dp),
                     ) {
                         Icon(
                             Icons.Filled.ContentCopy,
-                            contentDescription = "Copia esito della visita",
+                            contentDescription = stringResource(R.string.health_copy_outcome),
                             tint = kb.subtitle,
                             modifier = Modifier.size(18.dp),
                         )
@@ -827,7 +830,7 @@ private fun LinkedExamRow(
                         color = Color(0xFFE53935),
                     ) {
                         Text(
-                            "Urgente",
+                            stringResource(R.string.health_urgent),
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,

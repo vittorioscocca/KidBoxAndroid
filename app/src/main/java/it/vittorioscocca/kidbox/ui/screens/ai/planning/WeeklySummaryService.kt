@@ -32,6 +32,8 @@ import it.vittorioscocca.kidbox.notifications.ExactAlarmScheduler
 import java.util.Calendar
 import java.util.Locale
 import java.util.UUID
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 object WeeklySummaryService {
     private const val PREFS_NAME = "kidbox_prefs"
     private const val PREF_LAST_ISO_WEEK = "kb_weeklySummary_lastISOWeek"
@@ -47,7 +49,7 @@ object WeeklySummaryService {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         if (!prefs.getBoolean(PREF_ENABLED, true)) return
         if (prefs.getString(PREF_LAST_ISO_WEEK, null) == currentISOWeek()) return
-        val familyName = prefs.getString("active_family_name", "la tua famiglia") ?: "la tua famiglia"
+        val familyName = prefs.getString("active_family_name", context.getString(R.string.ai_your_family)) ?: context.getString(R.string.ai_your_family)
 
         val request = OneTimeWorkRequestBuilder<WeeklySummaryWorker>()
             .setInputData(
@@ -123,10 +125,10 @@ object WeeklySummaryService {
         manager.createNotificationChannel(
             NotificationChannel(
                 WeeklySummaryBroadcastReceiver.CHANNEL_ID,
-                "Sintesi settimanale",
+                context.getString(R.string.ai_weekly_summary),
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "Recap automatico settimanale della famiglia"
+                description = context.getString(R.string.ai_weekly_summary_sub)
             },
         )
     }
@@ -142,7 +144,7 @@ object WeeklySummaryService {
 
         override suspend fun doWork(): Result {
             val familyId = inputData.getString(KEY_FAMILY_ID) ?: return Result.failure()
-            val familyName = inputData.getString(KEY_FAMILY_NAME) ?: "la tua famiglia"
+            val familyName = inputData.getString(KEY_FAMILY_NAME) ?: applicationContext.getString(R.string.ai_your_family)
 
             val systemPrompt = """
                 Sei l'assistente AI di KidBox per la famiglia $familyName.
@@ -152,7 +154,7 @@ object WeeklySummaryService {
                 - Niente intestazioni, markdown o emoji
                 - Evidenzia: scadenze importanti, cure, eventi, todo urgenti, spese significative
                 - Termina con UN solo suggerimento pratico
-                - Se non c'è niente di significativo: "Settimana tranquilla! Nessuna scadenza urgente."
+                - Se non c'è niente di significativo: context.getString(R.string.ai_quiet_week)
             """.trimIndent()
 
             val userMessage = weeklyDataMessageBuilder.buildWeeklyDataMessage(
@@ -204,7 +206,7 @@ object WeeklySummaryService {
 class WeeklySummaryBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val familyId = intent.getStringExtra("familyId").orEmpty()
-        val familyName = intent.getStringExtra("familyName").orEmpty().ifBlank { "la tua famiglia" }
+        val familyName = intent.getStringExtra("familyName").orEmpty().ifBlank { context.getString(R.string.ai_your_family) }
         val fullText = intent.getStringExtra("fullText").orEmpty()
         if (fullText.isNotBlank()) {
             WeeklySummaryDraftStore.save(context, fullText)
@@ -229,7 +231,7 @@ class WeeklySummaryBroadcastReceiver : BroadcastReceiver() {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_kidbox)
             .setContentTitle("Settimana di $familyName")
-            .setContentText(firstLine.ifBlank { "Apri il recap settimanale" })
+            .setContentText(firstLine.ifBlank { context.getString(R.string.ai_open_weekly) })
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pending)

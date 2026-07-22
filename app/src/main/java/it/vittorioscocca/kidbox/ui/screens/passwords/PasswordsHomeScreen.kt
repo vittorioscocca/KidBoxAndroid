@@ -2,6 +2,8 @@
 
 package it.vittorioscocca.kidbox.ui.screens.passwords
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -109,6 +111,7 @@ fun PasswordsHomeScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val addComingSoonMessage = stringResource(R.string.passwords_add_coming_soon_snackbar)
     val kb = MaterialTheme.kidBoxColors
     val isLight = !isSystemInDarkTheme()
     val pageBg = kb.background
@@ -151,7 +154,7 @@ fun PasswordsHomeScreen(
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Indietro",
+                            contentDescription = stringResource(R.string.location_back_content_description),
                             tint = kb.title,
                             modifier = Modifier.size(22.dp),
                         )
@@ -164,7 +167,7 @@ fun PasswordsHomeScreen(
                     onClick = { viewModel.setSelecting(!state.isSelecting) },
                 ) {
                     Text(
-                        if (state.isSelecting) "Annulla" else "Seleziona",
+                        if (state.isSelecting) stringResource(R.string.location_cancel_button) else stringResource(R.string.passwords_select_button),
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
@@ -191,7 +194,7 @@ fun PasswordsHomeScreen(
                         ) {
                             Icon(
                                 Icons.Outlined.VerifiedUser,
-                                contentDescription = "Sicurezza password",
+                                contentDescription = stringResource(R.string.passwords_security_section_title),
                                 tint = kb.title,
                             )
                         }
@@ -208,26 +211,26 @@ fun PasswordsHomeScreen(
                             onClick = { showMenu = true },
                             modifier = Modifier.size(40.dp),
                         ) {
-                            Icon(Icons.Filled.MoreVert, contentDescription = "Menu", tint = kb.title)
+                            Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.passwords_menu_content_description), tint = kb.title)
                         }
                     }
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                         DropdownMenuItem(
-                            text = { Text("Gestisci gruppi") },
+                            text = { Text(stringResource(R.string.passwords_manage_groups_title)) },
                             onClick = {
                                 showMenu = false
                                 onManageGroups()
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("Importa / Esporta") },
+                            text = { Text(stringResource(R.string.passwords_import_export_menu_label)) },
                             onClick = {
                                 showMenu = false
                                 onOpenImportExport()
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("Impostazioni") },
+                            text = { Text(stringResource(R.string.passwords_settings_menu_label)) },
                             onClick = {
                                 showMenu = false
                                 onOpenSettings()
@@ -238,7 +241,7 @@ fun PasswordsHomeScreen(
             }
 
             Text(
-                "Password",
+                stringResource(R.string.passwords_password_placeholder),
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.Bold,
@@ -255,28 +258,28 @@ fun PasswordsHomeScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 PasswordFilterChip(
-                    title = "Tutti",
+                    title = stringResource(R.string.passwords_filter_all),
                     selected = state.filter is PasswordHomeFilter.All,
                     surfaceCard = surfaceCard,
                     chipBorder = chipBorder,
                     onClick = { viewModel.setFilter(PasswordHomeFilter.All) },
                 )
                 PasswordFilterChip(
-                    title = "Preferite",
+                    title = stringResource(R.string.passwords_filter_favorites),
                     selected = state.filter is PasswordHomeFilter.Favorites,
                     surfaceCard = surfaceCard,
                     chipBorder = chipBorder,
                     onClick = { viewModel.setFilter(PasswordHomeFilter.Favorites) },
                 )
                 PasswordFilterChip(
-                    title = "In famiglia",
+                    title = stringResource(R.string.passwords_filter_family),
                     selected = state.filter is PasswordHomeFilter.FamilyShared,
                     surfaceCard = surfaceCard,
                     chipBorder = chipBorder,
                     onClick = { viewModel.setFilter(PasswordHomeFilter.FamilyShared) },
                 )
                 PasswordFilterChip(
-                    title = "Solo io",
+                    title = stringResource(R.string.passwords_filter_only_me),
                     selected = state.filter is PasswordHomeFilter.OnlyMineVisibility,
                     surfaceCard = surfaceCard,
                     chipBorder = chipBorder,
@@ -359,7 +362,7 @@ fun PasswordsHomeScreen(
                 ) {
                     TextButton(onClick = { showDeleteConfirm = true }) {
                         Text(
-                            "Elimina (${state.selectedIds.size})",
+                            stringResource(R.string.passwords_delete_count_button, state.selectedIds.size),
                             color = MaterialTheme.colorScheme.error,
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -405,7 +408,7 @@ fun PasswordsHomeScreen(
                                 innerTextField()
                                 if (state.searchQuery.isEmpty()) {
                                     Text(
-                                        "Cerca",
+                                        stringResource(R.string.passwords_search_placeholder),
                                         modifier = Modifier.align(Alignment.CenterStart),
                                         style = MaterialTheme.typography.bodyLarge,
                                         color = kb.subtitle,
@@ -437,7 +440,7 @@ fun PasswordsHomeScreen(
                             add()
                         } else {
                             scope.launch {
-                                snackbarHostState.showSnackbar("Aggiunta password in arrivo su Android.")
+                                snackbarHostState.showSnackbar(addComingSoonMessage)
                             }
                         }
                     },
@@ -445,7 +448,7 @@ fun PasswordsHomeScreen(
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                         Icon(
                             Icons.Filled.Add,
-                            contentDescription = "Aggiungi password",
+                            contentDescription = stringResource(R.string.passwords_add_password_content_description),
                             tint = Color.White,
                             modifier = Modifier.size(28.dp),
                         )
@@ -465,17 +468,17 @@ fun PasswordsHomeScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Eliminare ${state.selectedIds.size} password?") },
+            title = { Text(stringResource(R.string.passwords_delete_confirm_title, state.selectedIds.size)) },
             confirmButton = {
                 Button(
                     onClick = {
                         showDeleteConfirm = false
                         viewModel.softDeleteSelected(familyId)
                     },
-                ) { Text("Elimina") }
+                ) { Text(stringResource(R.string.location_delete_content_description)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Annulla") }
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.location_cancel_button)) }
             },
         )
     }
@@ -535,7 +538,7 @@ private fun PasswordHomeSection(
                 } else {
                     Icons.AutoMirrored.Outlined.KeyboardArrowRight
                 },
-                contentDescription = if (section.isExpanded) "Comprimi gruppo" else "Espandi gruppo",
+                contentDescription = if (section.isExpanded) stringResource(R.string.passwords_collapse_group_content_description) else stringResource(R.string.passwords_expand_group_content_description),
                 tint = kb.subtitle,
                 modifier = Modifier.size(20.dp),
             )
@@ -789,23 +792,23 @@ private fun PasswordsEmptyState(
     kb: KidBoxColorScheme,
 ) {
     val title = when {
-        searchQuery.isNotBlank() -> "Nessun risultato"
-        filter is PasswordHomeFilter.Favorites -> "Nessuna preferita"
-        filter is PasswordHomeFilter.FamilyShared -> "Nessuna condivisa in famiglia"
-        filter is PasswordHomeFilter.OnlyMineVisibility -> "Nessuna solo per te"
-        else -> "Nessuna password"
+        searchQuery.isNotBlank() -> stringResource(R.string.passwords_empty_no_results)
+        filter is PasswordHomeFilter.Favorites -> stringResource(R.string.passwords_empty_no_favorites)
+        filter is PasswordHomeFilter.FamilyShared -> stringResource(R.string.passwords_empty_no_family_shared)
+        filter is PasswordHomeFilter.OnlyMineVisibility -> stringResource(R.string.passwords_empty_no_only_mine)
+        else -> stringResource(R.string.passwords_empty_no_passwords)
     }
     val subtitle = when {
         searchQuery.isNotBlank() ->
-            "Prova con altre parole chiave."
+            stringResource(R.string.passwords_empty_try_other_keywords)
         filter is PasswordHomeFilter.Favorites ->
-            "Segna le password come preferite dal dettaglio o dalla riga."
+            stringResource(R.string.passwords_empty_favorites_hint)
         filter is PasswordHomeFilter.FamilyShared ->
-            "Qui compaiono le password con visibilità «Tutta la famiglia»."
+            stringResource(R.string.passwords_empty_family_hint)
         filter is PasswordHomeFilter.OnlyMineVisibility ->
-            "Qui compaiono le password con visibilità «Solo io» che hai creato tu."
+            stringResource(R.string.passwords_empty_only_mine_hint)
         else ->
-            "Tocca + per aggiungere la prima credenziale."
+            stringResource(R.string.passwords_empty_add_hint)
     }
     Column(
         modifier = Modifier

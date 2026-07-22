@@ -57,11 +57,16 @@ class PushNotificationManager @Inject constructor(
             .await()
     }
 
-    private fun defaultEnabled(key: String): Boolean = when (key) {
-        PreferenceKeys.NOTIFY_ON_NEW_DOCS -> false
-        PreferenceKeys.NOTIFY_ON_LOCATION_SHARING -> false
-        else -> true
-    }
+    /**
+     * Tutte le preferenze nascono ATTIVE.
+     *
+     * Non è una scelta di gusto: è il server a decidere se inviare, e la sua
+     * regola (`getUserTokensIfEnabled` in functions/index.js) è "preferenza
+     * assente = attiva". Con `false` qui per documenti e posizione,
+     * l'interfaccia mostrava spento ciò che invece stava arrivando — l'utente
+     * riceveva notifiche che secondo le Impostazioni aveva disattivate.
+     */
+    private fun defaultEnabled(key: String): Boolean = true
 
     object PreferenceKeys {
         const val NOTIFY_ON_NEW_DOCS = "notifyOnNewDocs"

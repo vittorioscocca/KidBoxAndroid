@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.location.geofence
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -94,10 +96,10 @@ fun GeofenceEditScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (state.geofenceId == null) "Nuova zona" else "Modifica zona") },
+                title = { Text(if (state.geofenceId == null) stringResource(R.string.location_geofence_new_title) else stringResource(R.string.location_geofence_edit_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.location_back_content_description))
                     }
                 },
                 actions = {
@@ -109,7 +111,7 @@ fun GeofenceEditScreen(
                             if (state.isSaving) {
                                 CircularProgressIndicator(modifier = Modifier.padding(8.dp), strokeWidth = 2.dp)
                             } else {
-                                Icon(Icons.Default.Check, contentDescription = "Salva")
+                                Icon(Icons.Default.Check, contentDescription = stringResource(R.string.location_save_content_description))
                             }
                         }
                     }
@@ -126,7 +128,7 @@ fun GeofenceEditScreen(
         }
         if (!state.isOwner) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("Solo il proprietario può modificare le zone", color = MaterialTheme.kidBoxColors.title)
+                Text(stringResource(R.string.location_owner_only_edit_message), color = MaterialTheme.kidBoxColors.title)
             }
             return@Scaffold
         }
@@ -143,11 +145,11 @@ fun GeofenceEditScreen(
             OutlinedTextField(
                 value = state.name,
                 onValueChange = viewModel::updateName,
-                label = { Text("Nome zona") },
+                label = { Text(stringResource(R.string.location_geofence_name_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
-            Text("Emoji", fontWeight = FontWeight.SemiBold, color = kb.title)
+            Text(stringResource(R.string.location_emoji_label), fontWeight = FontWeight.SemiBold, color = kb.title)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 presetEmojis.forEach { emoji ->
                     Text(
@@ -167,7 +169,7 @@ fun GeofenceEditScreen(
             OutlinedTextField(
                 value = state.searchQuery,
                 onValueChange = viewModel::updateSearchQuery,
-                label = { Text("Cerca indirizzo") },
+                label = { Text(stringResource(R.string.location_search_address_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
@@ -198,7 +200,7 @@ fun GeofenceEditScreen(
                 ) {
                     Marker(
                         state = MarkerState(pin),
-                        title = state.name.ifBlank { "Zona" },
+                        title = state.name.ifBlank { stringResource(R.string.location_geofence_default_name) },
                     )
                     MapCircle(
                         center = pin,
@@ -209,7 +211,7 @@ fun GeofenceEditScreen(
                     )
                 }
             }
-            Text("Raggio: ${state.radius.toInt()} m", fontWeight = FontWeight.SemiBold, color = kb.title)
+            Text(stringResource(R.string.location_radius_label, state.radius.toInt()), fontWeight = FontWeight.SemiBold, color = kb.title)
             Slider(
                 value = state.radius,
                 onValueChange = viewModel::updateRadius,
@@ -218,35 +220,35 @@ fun GeofenceEditScreen(
 
             )
             SettingsRow(
-                title = "Applica la zona a",
+                title = stringResource(R.string.location_apply_zone_to_label),
                 subtitle = memberSummary(
                     useAll = state.monitorAllMembers,
                     selectedIds = state.monitoredUserIds,
                     members = state.members,
-                    fallbackEmpty = "Seleziona membri…",
+                    fallbackEmpty = stringResource(R.string.location_select_members_placeholder),
                 ),
                 onClick = { showMonitorPicker = true },
             )
             SettingsRow(
-                title = "Avvisa",
+                title = stringResource(R.string.location_notify_label),
                 subtitle = memberSummary(
                     useAll = state.notifyAllMembers,
                     selectedIds = state.notifyUserIds,
                     members = state.members,
-                    fallbackEmpty = "Seleziona destinatari…",
+                    fallbackEmpty = stringResource(R.string.location_select_recipients_placeholder),
                 ),
                 onClick = { showNotifyPicker = true },
             )
-            Text("Quando avvisare", fontWeight = FontWeight.SemiBold, color = kb.title)
-            ToggleRow("All'arrivo", state.notifyOnArrive, viewModel::updateNotifyOnArrive)
-            ToggleRow("Alla partenza", state.notifyOnLeave, viewModel::updateNotifyOnLeave)
+            Text(stringResource(R.string.location_when_to_notify_label), fontWeight = FontWeight.SemiBold, color = kb.title)
+            ToggleRow(stringResource(R.string.location_notify_on_arrive), state.notifyOnArrive, viewModel::updateNotifyOnArrive)
+            ToggleRow(stringResource(R.string.location_notify_on_leave), state.notifyOnLeave, viewModel::updateNotifyOnLeave)
         }
     }
 
     if (showMonitorPicker) {
         GeofenceMemberPickerSheet(
-            title = "Chi monitorare",
-            footer = "Sul telefono di ogni persona selezionata, con posizione condivisa attiva, KidBox rileva entrata e uscita da questa zona.",
+            title = stringResource(R.string.location_who_to_monitor_title),
+            footer = stringResource(R.string.location_monitor_footer),
             useAll = state.monitorAllMembers,
             onUseAllChange = viewModel::updateMonitorAll,
             selectedIds = state.monitoredUserIds,
@@ -257,8 +259,8 @@ fun GeofenceEditScreen(
     }
     if (showNotifyPicker) {
         GeofenceMemberPickerSheet(
-            title = "Chi avvisare",
-            footer = "Riceveranno una notifica quando qualcuno entra o esce. Chi genera l'evento non riceve la propria notifica.",
+            title = stringResource(R.string.location_who_to_notify_title),
+            footer = stringResource(R.string.location_notify_footer),
             useAll = state.notifyAllMembers,
             onUseAllChange = viewModel::updateNotifyAll,
             selectedIds = state.notifyUserIds,
@@ -302,7 +304,7 @@ private fun GeofenceMemberPickerSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Tutti i membri")
+                Text(stringResource(R.string.location_all_members))
                 Icon(
                     imageVector = if (useAll) Icons.Default.Check else Icons.Outlined.Circle,
                     contentDescription = null,
@@ -321,7 +323,7 @@ private fun GeofenceMemberPickerSheet(
 
             // ── Sezione "Membri" (selezione singola) ────────────────────
             Text(
-                "Membri",
+                stringResource(R.string.location_members_label),
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp,
@@ -329,7 +331,7 @@ private fun GeofenceMemberPickerSheet(
             )
             if (members.isEmpty()) {
                 Text(
-                    "Nessun membro disponibile",
+                    stringResource(R.string.location_no_members_available),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(vertical = 12.dp),
@@ -359,7 +361,7 @@ private fun GeofenceMemberPickerSheet(
             }
             if (useAll) {
                 Text(
-                    "Tocca un membro per scegliere solo alcune persone.",
+                    stringResource(R.string.location_tap_member_hint),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(top = 4.dp),
@@ -368,20 +370,21 @@ private fun GeofenceMemberPickerSheet(
 
             Spacer(Modifier.height(12.dp))
             TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
-                Text("Fine")
+                Text(stringResource(R.string.location_done_button))
             }
             Spacer(Modifier.height(24.dp))
         }
     }
 }
 
+@Composable
 private fun memberSummary(
     useAll: Boolean,
     selectedIds: Set<String>,
     members: List<KBFamilyMemberEntity>,
     fallbackEmpty: String,
 ): String {
-    if (useAll) return "Tutti i membri"
+    if (useAll) return stringResource(R.string.location_all_members)
     val names = members
         .filter { selectedIds.contains(it.userId) }
         .mapNotNull { m ->

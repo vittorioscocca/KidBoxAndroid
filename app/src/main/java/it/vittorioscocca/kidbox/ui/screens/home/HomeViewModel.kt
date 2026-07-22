@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.home
 
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.util.KBLog
 
 import android.content.Context
@@ -130,8 +131,21 @@ class HomeViewModel @Inject constructor(
     private val passwordsRepository: PasswordsRepository,
     private val subscriptionRepository: SubscriptionRepository,
     private val familyMemoryService: FamilyMemoryService,
+    private val homeViewModePreference: it.vittorioscocca.kidbox.data.local.HomeViewModePreference,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
+    val homeViewMode: StateFlow<it.vittorioscocca.kidbox.data.local.HomeViewMode> =
+        homeViewModePreference.getViewModeFlow()
+
+    fun setHomeViewMode(mode: it.vittorioscocca.kidbox.data.local.HomeViewMode) {
+        homeViewModePreference.setViewMode(mode)
+    }
+
+    fun getGridOrder(): List<String>? = homeViewModePreference.getOrder()
+
+    fun setGridOrder(ids: List<String>) {
+        homeViewModePreference.setOrder(ids)
+    }
 
     private val db get() = FirebaseFirestore.getInstance()
     private val prefs = appContext.getSharedPreferences("home_quick_actions", Context.MODE_PRIVATE)
@@ -165,7 +179,7 @@ class HomeViewModel @Inject constructor(
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         appContext,
-                        "Sei stato rimosso dalla famiglia",
+                        appContext.getString(R.string.home_vm_removed_from_family_toast),
                         Toast.LENGTH_LONG,
                     ).show()
                     val intent = appContext.packageManager
@@ -409,7 +423,7 @@ class HomeViewModel @Inject constructor(
             KBLog.ui.warning("timeout familyId=$familyId after=${MEMBERS_SYNC_TIMEOUT_MS}ms, release loading with warning", MEMBERS_SYNC_TAG)
             _uiState.value = current.copy(
                 isMembersSyncing = false,
-                membersSyncWarning = "Sincronizzazione membri lenta. Aggiorno appena disponibili.",
+                membersSyncWarning = appContext.getString(R.string.home_vm_members_sync_slow_warning),
             )
         }
     }
@@ -581,7 +595,7 @@ class HomeViewModel @Inject constructor(
                         ?: (d["name"] as? String)
                         ?: (d["fullName"] as? String)
                         ?: (d["email"] as? String)
-                        ?: "Membro"
+                        ?: appContext.getString(R.string.home_vm_member_default_name)
                     familyMemberDao.upsert(
                         KBFamilyMemberEntity(
                             id = doc.id,
@@ -629,7 +643,7 @@ class HomeViewModel @Inject constructor(
     fun onHeroPhotoSelected(uri: Uri, context: Context) {
         if (_uiState.value.familyId.isBlank()) {
             _uiState.value = _uiState.value.copy(
-                errorMessage = "Crea prima una famiglia per caricare una foto",
+                errorMessage = appContext.getString(R.string.home_vm_error_create_family_first),
             )
             return
         }
@@ -641,7 +655,7 @@ class HomeViewModel @Inject constructor(
                 _pendingHeroUri.value = uri
             } catch (e: Exception) {
                 KBLog.ui.error("hero read failed: ${e.message}", TAG)
-                _uiState.value = _uiState.value.copy(errorMessage = "Impossibile leggere l'immagine")
+                _uiState.value = _uiState.value.copy(errorMessage = appContext.getString(R.string.home_vm_error_read_image))
             }
         }
     }
@@ -657,7 +671,7 @@ class HomeViewModel @Inject constructor(
 
         val bytes = pendingHeroBytes ?: run {
             KBLog.ui.error("onHeroCropSaved: no pending bytes", TAG)
-            _uiState.value = _uiState.value.copy(errorMessage = "Immagine non disponibile, riprova")
+            _uiState.value = _uiState.value.copy(errorMessage = appContext.getString(R.string.home_vm_error_image_unavailable))
             return
         }
 
@@ -691,7 +705,7 @@ class HomeViewModel @Inject constructor(
                 KBLog.ui.error("hero upload failed: ${e.message}", TAG, e)
                 _uiState.value = _uiState.value.copy(
                     isUploadingHero = false,
-                    errorMessage = e.localizedMessage ?: "Errore upload foto",
+                    errorMessage = e.localizedMessage ?: appContext.getString(R.string.home_vm_error_upload_photo),
                 )
             }
         }
@@ -809,8 +823,8 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun compressJpeg(context: Context, uri: Uri): ByteArray {
-        val input = context.contentResolver.openInputStream(uri) ?: error("Immagine non leggibile")
-        val bitmap = input.use { BitmapFactory.decodeStream(it) } ?: error("Immagine non valida")
+        val input = context.contentResolver.openInputStream(uri) ?: error(appContext.getString(R.string.home_vm_error_image_unreadable))
+        val bitmap = input.use { BitmapFactory.decodeStream(it) } ?: error(appContext.getString(R.string.home_vm_error_image_invalid))
         val out = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
         return out.toByteArray()
@@ -860,7 +874,7 @@ class HomeViewModel @Inject constructor(
     )
 
     private fun todayLabel(): String {
-        val formatter = java.text.SimpleDateFormat("EEEE, d MMMM", java.util.Locale.getDefault())
+        val formatter = java.text.SimpleDateFormat("EEEE, d MMMM", it.vittorioscocca.kidbox.util.KBLocale.current())
         return formatter.format(java.util.Date())
     }
 

@@ -14,7 +14,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun AIChatCopyableMessageContainer(
@@ -45,7 +47,7 @@ fun AIChatCopyableMessageContainer(
                 onDismissRequest = { showCopyMenu = false },
             ) {
                 DropdownMenuItem(
-                    text = { Text("Copia messaggio") },
+                    text = { Text(stringResource(R.string.ai_copy_message)) },
                     onClick = {
                         clipboard.setText(AnnotatedString(AIChatMarkdownPlainText.forClipboard(copyText)))
                         showCopyMenu = false

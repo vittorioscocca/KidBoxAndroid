@@ -34,8 +34,9 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
 
-private val EXAM_DEADLINE_FMT = SimpleDateFormat("d MMM yyyy", Locale.ITALIAN)
+private fun EXAM_DEADLINE_FMT() = SimpleDateFormat("d MMM yyyy", KBLocale.current())
 
 data class LinkedPrescriptionRow(
     val id: String,
@@ -211,7 +212,7 @@ class MedicalVisitDetailViewModel @Inject constructor(
 
     private fun buildExamLinkedRow(e: KBMedicalExam): LinkedPrescriptionRow {
         val statusLabel = KBExamStatus.entries.firstOrNull { it.rawValue == e.statusRaw }?.rawValue ?: e.statusRaw
-        val entro = e.deadlineEpochMillis?.let { EXAM_DEADLINE_FMT.format(Date(it)) }
+        val entro = e.deadlineEpochMillis?.let { EXAM_DEADLINE_FMT().format(Date(it)) }
         val subtitle = buildString {
             if (entro != null) append("Entro: ").append(entro)
             if (statusLabel.isNotBlank()) {

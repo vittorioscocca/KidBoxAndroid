@@ -29,6 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun PrivacySettingsScreen(onBack: () -> Unit) {
@@ -51,12 +53,12 @@ fun PrivacySettingsScreen(onBack: () -> Unit) {
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Indietro",
+                    contentDescription = stringResource(R.string.settings_common_back),
                     tint = kb.title,
                 )
             }
             Text(
-                text = "Privacy",
+                text = stringResource(R.string.settings_privacy_title),
                 fontSize = 20.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = kb.title,
@@ -69,7 +71,7 @@ fun PrivacySettingsScreen(onBack: () -> Unit) {
                 .padding(horizontal = 16.dp),
         ) {
             Text(
-                text = "Log tecnici e report errori",
+                text = stringResource(R.string.settings_privacy_logs_title),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = kb.subtitle,
@@ -84,9 +86,7 @@ fun PrivacySettingsScreen(onBack: () -> Unit) {
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "KidBox salva log tecnici sul dispositivo (avvio app, sincronizzazione, crash). " +
-                            "Se attivi l’invio automatico, analizziamo questi log e possiamo inviare un report " +
-                            "anonimo per correggere bug e migliorare l’app.",
+                        text = stringResource(R.string.settings_privacy_body_full),
                         style = MaterialTheme.typography.bodyMedium,
                         color = kb.subtitle,
                     )
@@ -98,8 +98,7 @@ fun PrivacySettingsScreen(onBack: () -> Unit) {
             Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = "Su Android l’analisi usa Gemini sul dispositivo quando disponibile, altrimenti un servizio cloud dedicato. " +
-                    "Non inviamo nomi, chat, documenti o dati sanitari. Puoi disattivare l’invio in qualsiasi momento.",
+                text = stringResource(R.string.settings_privacy_note_full),
                 style = MaterialTheme.typography.bodySmall,
                 color = kb.subtitle,
                 modifier = Modifier.padding(horizontal = 4.dp),

@@ -20,8 +20,9 @@ import java.util.Locale
 import kotlin.math.floor
 import org.json.JSONArray
 import org.json.JSONException
+import it.vittorioscocca.kidbox.util.KBLocale
 
-private val DATE_FMT = SimpleDateFormat("d MMM yyyy", Locale.ITALIAN)
+private fun DATE_FMT() = SimpleDateFormat("d MMM yyyy", KBLocale.current())
 private const val TAG = "HealthContextBuilder"
 
 fun computeScopeId(
@@ -81,7 +82,7 @@ REGOLE IMPORTANTI:
         sb.appendLine("--- CURE ATTIVE (${activeTreatments.size}) ---")
         activeTreatments.forEach { t ->
             val dosageStr = formatDosage(t.dosageValue)
-            val endDate = t.endDateEpochMillis?.let { DATE_FMT.format(Date(it)) } ?: "in corso"
+            val endDate = t.endDateEpochMillis?.let { DATE_FMT().format(Date(it)) } ?: "in corso"
             val notesStr = if (!t.notes.isNullOrBlank()) " — ${t.notes}" else ""
             sb.appendLine("- ${t.drugName} — $dosageStr ${t.dosageUnit}, ${t.dailyFrequency}x/giorno, ${t.durationDays} giorni (fine: $endDate)$notesStr")
             documentsByTreatmentId[t.id]?.forEach { doc ->
@@ -99,8 +100,8 @@ REGOLE IMPORTANTI:
             val status = v.computedStatus().rawValue
             val typeStr = if (v.vaccineTypeRaw.isNotBlank()) " ${v.vaccineTypeRaw}" else ""
             val dateStr = when {
-                v.administeredDateEpochMillis != null -> "somministrato il ${DATE_FMT.format(Date(v.administeredDateEpochMillis))}"
-                v.scheduledDateEpochMillis != null -> "programmato il ${DATE_FMT.format(Date(v.scheduledDateEpochMillis))}"
+                v.administeredDateEpochMillis != null -> "somministrato il ${DATE_FMT().format(Date(v.administeredDateEpochMillis))}"
+                v.scheduledDateEpochMillis != null -> "programmato il ${DATE_FMT().format(Date(v.scheduledDateEpochMillis))}"
                 else -> ""
             }
             sb.appendLine("- ${v.name} [$status]$typeStr${if (dateStr.isNotBlank()) " — $dateStr" else ""}")
@@ -113,7 +114,7 @@ REGOLE IMPORTANTI:
         sb.appendLine()
         sb.appendLine("--- VISITE (${sortedVisits.size}) ---")
         sortedVisits.forEach { v ->
-            val dateStr = DATE_FMT.format(Date(v.dateEpochMillis))
+            val dateStr = DATE_FMT().format(Date(v.dateEpochMillis))
             val statusStr = v.visitStatusRaw?.takeIf { it.isNotBlank() } ?: "sconosciuto"
             sb.appendLine("- $dateStr — ${v.reason.ifBlank { "Visita medica" }} [$statusStr]")
             val doctorParts = listOfNotNull(v.doctorName?.takeIf { it.isNotBlank() }, v.doctorSpecializationRaw?.takeIf { it.isNotBlank() })
@@ -124,7 +125,7 @@ REGOLE IMPORTANTI:
             if (examsStr.isNotBlank()) sb.appendLine("  Esami prescritti: $examsStr")
             if (!v.notes.isNullOrBlank()) sb.appendLine("  Note: ${v.notes}")
             if (v.nextVisitDateEpochMillis != null) {
-                val nextDateStr = DATE_FMT.format(Date(v.nextVisitDateEpochMillis))
+                val nextDateStr = DATE_FMT().format(Date(v.nextVisitDateEpochMillis))
                 val nextReason = v.nextVisitReason?.takeIf { it.isNotBlank() }?.let { " — $it" } ?: ""
                 sb.appendLine("  Prossima visita: $nextDateStr$nextReason")
             }
@@ -141,7 +142,7 @@ REGOLE IMPORTANTI:
         sb.appendLine("--- ESAMI (${sortedExams.size}) ---")
         val overdueStatuses = setOf(KBExamStatus.PENDING.rawValue, KBExamStatus.BOOKED.rawValue)
         sortedExams.forEach { e ->
-            val deadlineStr = e.deadlineEpochMillis?.let { "scadenza: ${DATE_FMT.format(Date(it))}" } ?: "senza scadenza"
+            val deadlineStr = e.deadlineEpochMillis?.let { "scadenza: ${DATE_FMT().format(Date(it))}" } ?: "senza scadenza"
             val isOverdue = e.deadlineEpochMillis != null && e.deadlineEpochMillis < now && e.statusRaw in overdueStatuses
             val urgentStr = if (e.isUrgent) " {URGENTE}" else ""
             val overdueStr = if (isOverdue) " ⚠️ SCADUTA" else ""

@@ -53,6 +53,8 @@ import it.vittorioscocca.kidbox.data.notification.PushNotificationManager.Prefer
 import it.vittorioscocca.kidbox.notifications.KidBoxFirebaseMessagingService
 import it.vittorioscocca.kidbox.ui.permissions.RuntimePermissions
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun NotificationSettingsScreen(
@@ -117,12 +119,12 @@ fun NotificationSettingsScreen(
             IconButton(onClick = onBack) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Indietro",
+                    contentDescription = stringResource(R.string.settings_common_back),
                     tint = kb.title,
                 )
             }
             Text(
-                text = "Notifiche",
+                text = stringResource(R.string.settings_notifications_title),
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                 color = kb.title,
             )
@@ -152,26 +154,26 @@ fun NotificationSettingsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Canale notifiche silenzioso",
+                            text = stringResource(R.string.settings_notif_silent_channel),
                             style = MaterialTheme.typography.titleMedium,
                             color = kb.title,
                         )
                         Text(
-                            text = "Tocca qui per attivare alert visibili (popup/suono).",
+                            text = stringResource(R.string.settings_notif_silent_channel_sub),
                             style = MaterialTheme.typography.bodySmall,
                             color = kb.subtitle,
                         )
                     }
                     Text(
-                        text = "Apri",
+                        text = stringResource(R.string.settings_notif_open),
                         color = Color(0xFFFF6B00),
                         style = MaterialTheme.typography.titleSmall,
                     )
                 }
             }
             NotificationToggleRow(
-                title = "Notifica nuovi documenti",
-                subtitle = "Quando viene caricato un documento condiviso",
+                title = stringResource(R.string.settings_notif_documents),
+                subtitle = stringResource(R.string.settings_notif_documents_sub),
                 checked = state.notifyOnNewDocs,
                 enabled = !state.isLoading && pendingEnableKey == null,
                 onCheckedChange = { enabled ->
@@ -190,8 +192,8 @@ fun NotificationSettingsScreen(
                 },
             )
             NotificationToggleRow(
-                title = "Notifica nuovi messaggi in chat",
-                subtitle = "Quando un membro invia un messaggio",
+                title = stringResource(R.string.settings_notif_chat),
+                subtitle = stringResource(R.string.settings_notif_chat_sub),
                 checked = state.notifyOnNewMessages,
                 enabled = !state.isLoading && pendingEnableKey == null,
                 onCheckedChange = { enabled ->
@@ -210,8 +212,8 @@ fun NotificationSettingsScreen(
                 },
             )
             NotificationToggleRow(
-                title = "Notifiche posizione",
-                subtitle = "Inizio/fine condivisione posizione",
+                title = stringResource(R.string.settings_notif_location),
+                subtitle = stringResource(R.string.settings_notif_location_sub),
                 checked = state.notifyOnLocationSharing,
                 enabled = !state.isLoading && pendingEnableKey == null,
                 onCheckedChange = { enabled ->
@@ -230,8 +232,8 @@ fun NotificationSettingsScreen(
                 },
             )
             NotificationToggleRow(
-                title = "Notifiche Todo",
-                subtitle = "Assegnazioni e scadenze",
+                title = stringResource(R.string.settings_notif_todo),
+                subtitle = stringResource(R.string.settings_notif_todo_sub),
                 checked = state.notifyOnTodoAssigned,
                 enabled = !state.isLoading && pendingEnableKey == null,
                 onCheckedChange = { enabled ->
@@ -250,8 +252,8 @@ fun NotificationSettingsScreen(
                 },
             )
             NotificationToggleRow(
-                title = "Notifiche lista della spesa",
-                subtitle = "Quando un membro aggiunge un prodotto",
+                title = stringResource(R.string.settings_notif_shopping),
+                subtitle = stringResource(R.string.settings_notif_shopping_sub),
                 checked = state.notifyOnNewGroceryItem,
                 enabled = !state.isLoading && pendingEnableKey == null,
                 onCheckedChange = { enabled ->
@@ -270,8 +272,8 @@ fun NotificationSettingsScreen(
                 },
             )
             NotificationToggleRow(
-                title = "Notifiche nuove note",
-                subtitle = "Quando viene creata una nuova nota",
+                title = stringResource(R.string.settings_notif_notes),
+                subtitle = stringResource(R.string.settings_notif_notes_sub),
                 checked = state.notifyOnNewNote,
                 enabled = !state.isLoading && pendingEnableKey == null,
                 onCheckedChange = { enabled ->
@@ -290,8 +292,8 @@ fun NotificationSettingsScreen(
                 },
             )
             NotificationToggleRow(
-                title = "Notifiche calendario",
-                subtitle = "Quando viene aggiunto un evento",
+                title = stringResource(R.string.settings_notif_calendar),
+                subtitle = stringResource(R.string.settings_notif_calendar_sub),
                 checked = state.notifyOnNewCalendarEvent,
                 enabled = !state.isLoading && pendingEnableKey == null,
                 onCheckedChange = { enabled ->
@@ -310,8 +312,8 @@ fun NotificationSettingsScreen(
                 },
             )
             NotificationToggleRow(
-                title = "Notifiche nuove spese",
-                subtitle = "Quando viene registrata una spesa famiglia",
+                title = stringResource(R.string.settings_notif_expenses),
+                subtitle = stringResource(R.string.settings_notif_expenses_sub),
                 checked = state.notifyOnNewExpense,
                 enabled = !state.isLoading && pendingEnableKey == null,
                 onCheckedChange = { enabled ->
@@ -330,8 +332,18 @@ fun NotificationSettingsScreen(
                 },
             )
             NotificationToggleRow(
-                title = "Promemoria Wallet",
-                subtitle = "Un’ora prima dell’evento del biglietto (solo su questo dispositivo)",
+                title = stringResource(R.string.settings_notif_tips),
+                subtitle = stringResource(R.string.settings_notif_tips_sub),
+                checked = state.nudgesEnabled,
+                // Non passa da `updatePreferenceWithPermission`: spegnere non
+                // richiede alcun permesso, e riaccendere non deve chiederlo a
+                // freddo — il motore verifica da sé se può notificare.
+                enabled = !state.isLoading,
+                onCheckedChange = { viewModel.setNudgesEnabled(it) },
+            )
+            NotificationToggleRow(
+                title = stringResource(R.string.settings_notif_wallet),
+                subtitle = stringResource(R.string.settings_notif_wallet_sub),
                 checked = state.notifyOnWalletReminder,
                 enabled = !state.isLoading && pendingEnableKey == null,
                 onCheckedChange = { enabled ->

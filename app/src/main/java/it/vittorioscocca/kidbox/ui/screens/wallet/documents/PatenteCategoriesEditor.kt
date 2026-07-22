@@ -2,6 +2,8 @@
 
 package it.vittorioscocca.kidbox.ui.screens.wallet.documents
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -47,14 +49,14 @@ fun PatenteCategoriesEditor(
 ) {
     Column {
         Text(
-            "Categorie patente",
+            stringResource(R.string.wallet_document_license_categories_title),
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(bottom = 8.dp),
         )
         if (categories.isEmpty()) {
             Text(
-                "Aggiungi le categorie (A, B, C, …) con le rispettive date.",
+                stringResource(R.string.wallet_document_add_categories_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -73,7 +75,7 @@ fun PatenteCategoriesEditor(
         }
         Button(onClick = { onCategoriesChange(categories + PatenteCategory(code = "")) }) {
             Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
-            Text("Aggiungi categoria")
+            Text(stringResource(R.string.wallet_document_add_category_button))
         }
     }
 }
@@ -92,21 +94,21 @@ private fun CategoryRow(
             OutlinedTextField(
                 value = category.code,
                 onValueChange = { onChange(category.copy(code = it.uppercase())) },
-                label = { Text("Categoria (es. B)") },
+                label = { Text(stringResource(R.string.wallet_document_category_code_placeholder)) },
                 singleLine = true,
                 modifier = Modifier.weight(1f),
             )
             IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "Elimina categoria")
+                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.wallet_document_delete_category_cd))
             }
         }
         DateField(
-            label = "Rilascio",
+            label = stringResource(R.string.wallet_document_issue_date_label),
             date = category.issueDate,
             onChange = { onChange(category.copy(issueDate = it)) },
         )
         DateField(
-            label = "Scadenza",
+            label = stringResource(R.string.wallet_document_expiry_date_label),
             date = category.expiryDate,
             onChange = { onChange(category.copy(expiryDate = it)) },
         )
@@ -136,7 +138,7 @@ private fun DateField(label: String, date: LocalDate?, onChange: (LocalDate?) ->
                         .padding(top = 12.dp),
                 )
                 IconButton(onClick = { showPicker = true }) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Cambia data")
+                    Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.wallet_document_change_date_cd))
                 }
             }
         }
@@ -156,10 +158,10 @@ private fun DateField(label: String, date: LocalDate?, onChange: (LocalDate?) ->
                         onChange(Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC")).toLocalDate())
                     }
                     showPicker = false
-                }) { Text("OK") }
+                }) { Text(stringResource(R.string.wallet_ok)) }
             },
             dismissButton = {
-                Button(onClick = { showPicker = false }) { Text("Annulla") }
+                Button(onClick = { showPicker = false }) { Text(stringResource(R.string.wallet_cancel)) }
             },
         ) {
             DatePicker(state = pickerState)

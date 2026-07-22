@@ -62,6 +62,9 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.io.File
 import java.text.NumberFormat
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,7 +114,7 @@ fun HousePaymentDetailScreen(
         if (ok) viewModel.uploadHousePaymentAttachment(camUri)
     }
     val camPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { g ->
-        if (g) takePicture.launch(camUri) else Toast.makeText(context, "Permesso fotocamera negato", Toast.LENGTH_SHORT).show()
+        if (g) takePicture.launch(camUri) else Toast.makeText(context, context.getString(R.string.life_camera_denied), Toast.LENGTH_SHORT).show()
     }
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { u ->
         u?.let { viewModel.uploadHousePaymentAttachment(it) }
@@ -123,7 +126,7 @@ fun HousePaymentDetailScreen(
         containerColor = kb.background,
         topBar = {
             TopAppBar(
-                title = { Text(pay?.name ?: "Dettaglio", color = kb.title) },
+                title = { Text(pay?.name ?: stringResource(R.string.life_detail), color = kb.title) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = kb.title)
@@ -134,9 +137,9 @@ fun HousePaymentDetailScreen(
                         Icon(Icons.Filled.MoreVert, contentDescription = null, tint = kb.title)
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(text = { Text("Modifica") }, onClick = { menuOpen = false; editing = true })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.life_edit)) }, onClick = { menuOpen = false; editing = true })
                         DropdownMenuItem(
-                            text = { Text("Elimina") },
+                            text = { Text(stringResource(R.string.life_delete)) },
                             leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
                             onClick = { menuOpen = false; confirmDelete = true },
                         )
@@ -170,14 +173,14 @@ fun HousePaymentDetailScreen(
                     Text(p.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = kb.title)
                     p.subtypeRaw?.takeIf { it.isNotBlank() }?.let { Text(it, color = kb.subtitle) }
                     p.importo?.let { v ->
-                        val cur = NumberFormat.getCurrencyInstance(Locale.ITALY).format(v)
+                        val cur = NumberFormat.getCurrencyInstance(KBLocale.current()).format(v)
                         Text("Importo: $cur", color = kb.subtitle)
                     }
                     p.fornitore?.takeIf { it.isNotBlank() }?.let { Text("Fornitore: $it", color = kb.subtitle) }
                     p.note?.takeIf { it.isNotBlank() }?.let { Text(it, color = kb.subtitle) }
                 }
             }
-            Text("Scadenze", fontWeight = FontWeight.SemiBold, color = kb.title)
+            Text(stringResource(R.string.home_items_deadlines), fontWeight = FontWeight.SemiBold, color = kb.title)
             p.giornoDiScadenzaMensile?.let { giorno ->
                 HousePaymentDeadlineCalculator.nextMonthlyDeadlineOnly(p)?.let { d ->
                     deadlineChip("Prossima scadenza mensile (giorno $giorno)", d)
@@ -185,13 +188,13 @@ fun HousePaymentDetailScreen(
             }
             p.dataScadenza?.let {
                 HousePaymentDeadlineCalculator.nextAnnualDeadlineOnly(p)?.let { d ->
-                    deadlineChip("Prossima scadenza annuale", d)
+                    deadlineChip(stringResource(R.string.home_items_next_annual), d)
                 }
             }
             p.dataScadenzaContratto?.let { c ->
-                deadlineChip("Scadenza contratto", c)
+                deadlineChip(stringResource(R.string.home_items_contract_expiry), c)
             }
-            Text("ALLEGATI", fontWeight = FontWeight.SemiBold, color = kb.subtitle, style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.section_attachments), fontWeight = FontWeight.SemiBold, color = kb.subtitle, style = MaterialTheme.typography.labelLarge)
             HealthAttachmentsCard(
                 attachments = paymentAttachments,
                 tintColor = orange,
@@ -228,14 +231,14 @@ fun HousePaymentDetailScreen(
         var note by remember(base.id) { mutableStateOf(base.note.orEmpty()) }
         AlertDialog(
             onDismissRequest = { editing = false },
-            title = { Text("Modifica") },
+            title = { Text(stringResource(R.string.life_edit)) },
             text = {
                 Column(
                     modifier = Modifier.heightIn(max = 480.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nome") })
-                    OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text("Note") })
+                    OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.life_name)) })
+                    OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text(stringResource(R.string.life_notes)) })
                     HealthAttachmentsCard(
                         attachments = paymentAttachments,
                         tintColor = orange,
@@ -263,16 +266,16 @@ fun HousePaymentDetailScreen(
                         ) { err -> toast = err }
                         editing = false
                     },
-                ) { Text("Salva") }
+                ) { Text(stringResource(R.string.life_save)) }
             },
-            dismissButton = { TextButton(onClick = { editing = false }) { Text("Annulla") } },
+            dismissButton = { TextButton(onClick = { editing = false }) { Text(stringResource(R.string.life_cancel)) } },
         )
     }
 
     if (confirmDelete && pay != null) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Eliminare questa voce?") },
+            title = { Text(stringResource(R.string.home_items_delete_entry_q)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -280,9 +283,9 @@ fun HousePaymentDetailScreen(
                         confirmDelete = false
                         onNavigateBack()
                     },
-                ) { Text("Elimina", color = Color(0xFFE53935)) }
+                ) { Text(stringResource(R.string.life_delete), color = Color(0xFFE53935)) }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Annulla") } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.life_cancel)) } },
         )
     }
 
@@ -290,7 +293,7 @@ fun HousePaymentDetailScreen(
         AlertDialog(
             onDismissRequest = { toast = null },
             confirmButton = { TextButton(onClick = { toast = null }) { Text("OK") } },
-            title = { Text("Errore") },
+            title = { Text(stringResource(R.string.life_error)) },
             text = { Text(msg) },
         )
     }

@@ -84,9 +84,13 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
 import org.json.JSONArray
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.platform.LocalContext
 
-private val DATE_FMT_EXAM = SimpleDateFormat("d MMM yyyy", Locale.ITALIAN)
-private val DATE_FMT_SHORT = SimpleDateFormat("dd/MM/yy", Locale.ITALIAN)
+private fun DATE_FMT_EXAM() = SimpleDateFormat("d MMM yyyy", KBLocale.current())
+private fun DATE_FMT_SHORT() = SimpleDateFormat("dd/MM/yy", KBLocale.current())
 private val TEAL = Color(0xFF40A6BF)
 private val ORANGE_EXAMS = Color(0xFFFF6B00)
 private val ORANGE_STATUS = Color(0xFFFF9800)
@@ -102,6 +106,7 @@ fun MedicalExamsScreen(
     onOpenExamsListAiChat: (subjectName: String, examIdsJson: String) -> Unit = { _, _ -> },
     viewModel: MedicalExamsViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val isAiGloballyEnabled by viewModel.isAiGloballyEnabled.collectAsStateWithLifecycle()
@@ -138,17 +143,17 @@ fun MedicalExamsScreen(
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("Eliminare $n esam${if (n == 1) "e" else "i"}?") },
-            text = { Text("Gli esami verranno rimossi da tutti i dispositivi.") },
+            text = { Text(stringResource(R.string.health_exams_removed_all)) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         viewModel.deleteSelected()
                         showDeleteConfirm = false
                     },
-                ) { Text("Elimina", color = Color(0xFFD32F2F)) }
+                ) { Text(stringResource(R.string.health_delete), color = Color(0xFFD32F2F)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Annulla") }
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.health_cancel)) }
             },
         )
     }
@@ -172,7 +177,7 @@ fun MedicalExamsScreen(
                 } else {
                     HealthListAddBottomButton(
                         tint = TEAL,
-                        label = "Nuovo Esame",
+                        label = stringResource(R.string.health_new_exam_cap),
                         onClick = onAdd,
                     )
                 }
@@ -198,7 +203,7 @@ fun MedicalExamsScreen(
             )
 
             Text(
-                "Analisi & Esami",
+                stringResource(R.string.health_exams),
                 fontSize = 32.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = kb.title,
@@ -207,7 +212,7 @@ fun MedicalExamsScreen(
 
             if (state.timeFilter != ExamTimeFilter.ALL) {
                 FilterActivePill(
-                    label = filterPillLabel(state),
+                    label = filterPillLabel(context, state),
                     onClear = { viewModel.setTimeFilter(ExamTimeFilter.ALL) },
                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
                 )
@@ -238,7 +243,7 @@ fun MedicalExamsScreen(
                         ) {
                             item { Spacer(Modifier.height(4.dp)) }
                             examSection(
-                                title = "In attesa",
+                                title = context.getString(R.string.health_status_pending),
                                 icon = Icons.Default.Schedule,
                                 tint = ORANGE_STATUS,
                                 items = state.pending,
@@ -249,7 +254,7 @@ fun MedicalExamsScreen(
                                 },
                             )
                             examSection(
-                                title = "Prenotati",
+                                title = context.getString(R.string.health_status_booked),
                                 icon = Icons.Default.EventAvailable,
                                 tint = TEAL,
                                 items = state.booked,
@@ -260,7 +265,7 @@ fun MedicalExamsScreen(
                                 },
                             )
                             examSection(
-                                title = "Eseguiti",
+                                title = context.getString(R.string.health_status_done),
                                 icon = Icons.Default.CheckCircle,
                                 tint = Color(0xFF43A047),
                                 items = state.executed,
@@ -271,7 +276,7 @@ fun MedicalExamsScreen(
                                 },
                             )
                             examSection(
-                                title = "Senza stato",
+                                title = context.getString(R.string.health_status_none),
                                 icon = Icons.Default.Search,
                                 tint = kb.subtitle,
                                 items = state.unknownStatus,
@@ -288,7 +293,7 @@ fun MedicalExamsScreen(
             }
             }
 
-            val displayName = state.childName.ifBlank { "Profilo" }
+            val displayName = state.childName.ifBlank { stringResource(R.string.health_profile) }
             val showExamsAiFab = isAiGloballyEnabled &&
                 !state.isSelecting &&
                 !state.isLoading &&
@@ -334,13 +339,13 @@ private fun FilterActivePill(label: String, onClear: () -> Unit, modifier: Modif
     }
 }
 
-private fun filterPillLabel(state: MedicalExamsState): String = when (state.timeFilter) {
-    ExamTimeFilter.ALL -> "Tutti"
-    ExamTimeFilter.MONTHS_3 -> "Ultimi 3 mesi"
-    ExamTimeFilter.MONTHS_6 -> "Ultimi 6 mesi"
-    ExamTimeFilter.YEAR_1 -> "Ultimo anno"
+private fun filterPillLabel(context: android.content.Context, state: MedicalExamsState): String = when (state.timeFilter) {
+    ExamTimeFilter.ALL -> context.getString(R.string.health_all_m)
+    ExamTimeFilter.MONTHS_3 -> context.getString(R.string.health_filter_3m)
+    ExamTimeFilter.MONTHS_6 -> context.getString(R.string.health_filter_6m)
+    ExamTimeFilter.YEAR_1 -> context.getString(R.string.health_filter_1y)
     ExamTimeFilter.CUSTOM ->
-        "${DATE_FMT_SHORT.format(Date(state.customFilterStartEpoch))} – ${DATE_FMT_SHORT.format(Date(state.customFilterEndEpoch))}"
+        "${DATE_FMT_SHORT().format(Date(state.customFilterStartEpoch))} – ${DATE_FMT_SHORT().format(Date(state.customFilterEndEpoch))}"
 }
 
 @Composable
@@ -364,11 +369,11 @@ private fun ExamFilterSheetContent(
 
     Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("Filtra per periodo", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = kb.title)
-            TextButton(onClick = onDismiss) { Text("Chiudi") }
+            Text(stringResource(R.string.health_filter_period), fontWeight = FontWeight.Bold, fontSize = 17.sp, color = kb.title)
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.health_close)) }
         }
         Spacer(Modifier.height(8.dp))
-        Text("Periodo rapido", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = kb.subtitle, letterSpacing = 0.8.sp)
+        Text(stringResource(R.string.health_quick_period), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = kb.subtitle, letterSpacing = 0.8.sp)
         Spacer(Modifier.height(6.dp))
         ExamTimeFilter.entries.filter { it != ExamTimeFilter.CUSTOM }.forEach { f ->
             Row(
@@ -379,7 +384,7 @@ private fun ExamFilterSheetContent(
                     .padding(vertical = 12.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(f.displayLabel, color = kb.title, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                Text(stringResource(f.displayLabelRes), color = kb.title, fontSize = 15.sp, modifier = Modifier.weight(1f))
                 if (state.timeFilter == f) {
                     Icon(Icons.Default.CheckCircle, contentDescription = null, tint = TEAL, modifier = Modifier.size(20.dp))
                 }
@@ -388,7 +393,7 @@ private fun ExamFilterSheetContent(
         Spacer(Modifier.height(16.dp))
         HorizontalDivider()
         Spacer(Modifier.height(12.dp))
-        Text("Personalizzato", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = kb.subtitle, letterSpacing = 0.8.sp)
+        Text(stringResource(R.string.health_custom), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = kb.subtitle, letterSpacing = 0.8.sp)
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedDateChip("Da", customStart) { showStartPicker = true }
@@ -400,7 +405,7 @@ private fun ExamFilterSheetContent(
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(containerColor = TEAL),
         ) {
-            Text("Applica", color = Color.White)
+            Text(stringResource(R.string.health_apply), color = Color.White)
         }
         Spacer(Modifier.height(24.dp))
     }
@@ -416,7 +421,7 @@ private fun ExamFilterSheetContent(
                     },
                 ) { Text("OK") }
             },
-            dismissButton = { TextButton(onClick = { showStartPicker = false }) { Text("Annulla") } },
+            dismissButton = { TextButton(onClick = { showStartPicker = false }) { Text(stringResource(R.string.health_cancel)) } },
         ) { DatePicker(state = startPickerState) }
     }
     if (showEndPicker) {
@@ -430,7 +435,7 @@ private fun ExamFilterSheetContent(
                     },
                 ) { Text("OK") }
             },
-            dismissButton = { TextButton(onClick = { showEndPicker = false }) { Text("Annulla") } },
+            dismissButton = { TextButton(onClick = { showEndPicker = false }) { Text(stringResource(R.string.health_cancel)) } },
         ) { DatePicker(state = endPickerState) }
     }
 }
@@ -446,7 +451,7 @@ private fun OutlinedDateChip(label: String, epochMillis: Long, onClick: () -> Un
     ) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
             Text(label, fontSize = 11.sp, color = kb.subtitle)
-            Text(DATE_FMT_SHORT.format(Date(epochMillis)), fontSize = 14.sp, color = kb.title, fontWeight = FontWeight.Medium)
+            Text(DATE_FMT_SHORT().format(Date(epochMillis)), fontSize = 14.sp, color = kb.title, fontWeight = FontWeight.Medium)
         }
     }
 }
@@ -459,14 +464,14 @@ private fun EmptyFilterState(modifier: Modifier = Modifier, onClearFilter: () ->
             Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(40.dp))
             Spacer(Modifier.height(12.dp))
             Text(
-                "Nessun esame nel periodo selezionato",
+                stringResource(R.string.health_no_exams_period),
                 fontSize = 14.sp,
                 color = kb.subtitle,
                 fontWeight = FontWeight.Medium,
             )
             Spacer(Modifier.height(12.dp))
             TextButton(onClick = onClearFilter) {
-                Text("Rimuovi filtro", color = TEAL, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.health_remove_filter), color = TEAL, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -592,7 +597,7 @@ private fun ExamRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(statusIcon(status), contentDescription = null, tint = tint, modifier = Modifier.size(12.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text(status.rawValue, fontSize = 12.sp, color = tint, fontWeight = FontWeight.Medium)
+                    Text(stringResource(status.labelRes), fontSize = 12.sp, color = tint, fontWeight = FontWeight.Medium)
                 }
                 if (exam.deadlineEpochMillis != null) {
                     Spacer(Modifier.height(4.dp))
@@ -600,7 +605,7 @@ private fun ExamRow(
                         Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(12.dp))
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            "Entro ${DATE_FMT_EXAM.format(Date(exam.deadlineEpochMillis!!))}",
+                            "Entro ${DATE_FMT_EXAM().format(Date(exam.deadlineEpochMillis!!))}",
                             fontSize = 12.sp,
                             color = if (overdue) Color(0xFFD32F2F) else kb.subtitle,
                         )
@@ -640,7 +645,7 @@ private fun ExamsEmptyState(modifier: Modifier = Modifier, onAdd: () -> Unit) {
             }
             Spacer(Modifier.height(12.dp))
             Text(
-                "Nessun esame registrato",
+                stringResource(R.string.health_no_exams),
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 16.sp,
                 color = kb.title,
@@ -651,7 +656,7 @@ private fun ExamsEmptyState(modifier: Modifier = Modifier, onAdd: () -> Unit) {
                 colors = ButtonDefaults.buttonColors(containerColor = ORANGE_EXAMS),
                 shape = RoundedCornerShape(12.dp),
             ) {
-                Text("Nuovo esame", color = Color.White, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.health_new_exam), color = Color.White, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -671,7 +676,7 @@ fun ExamStatusBadge(status: KBExamStatus) {
             .background(bgColor)
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
-        Text(status.rawValue, fontSize = 11.sp, color = textColor, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(status.labelRes), fontSize = 11.sp, color = textColor, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -683,7 +688,7 @@ fun UrgentChip() {
             .background(Color(0xFFFFCDD2))
             .padding(horizontal = 6.dp, vertical = 2.dp),
     ) {
-        Text("Urgente", fontSize = 10.sp, color = Color(0xFFD32F2F), fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.health_urgent), fontSize = 10.sp, color = Color(0xFFD32F2F), fontWeight = FontWeight.SemiBold)
     }
 }
 

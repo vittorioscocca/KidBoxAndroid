@@ -39,11 +39,13 @@ import android.content.Context
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.ui.components.KidBoxChip
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
@@ -108,7 +110,7 @@ fun NoteDetailScreen(
                 },
             )
             Text(
-                text = "Nota",
+                text = stringResource(R.string.notes_detail_title),
                 color = kb.title,
                 fontWeight = FontWeight.Bold,
                 fontSize = 22.sp,
@@ -128,7 +130,7 @@ fun NoteDetailScreen(
                         },
                         enabled = !state.isSaving,
                     ) {
-                        Icon(Icons.Default.Check, contentDescription = "Salva", tint = kb.title)
+                        Icon(Icons.Default.Check, contentDescription = stringResource(R.string.notes_detail_save_cd), tint = kb.title)
                     }
                 }
             }
@@ -172,7 +174,7 @@ fun NoteDetailScreen(
     if (showVisibilityPick) {
         VisibilityPickerBottomSheet(
             currentUid = state.currentUid,
-            scopeSectionTitle = "Chi può vedere questa nota",
+            scopeSectionTitle = stringResource(R.string.notes_visibility_section_title),
             membersExcludingSelf = state.pickerMembersExcludingSelf,
             initialScope = state.visibilityScope,
             initialMemberIds = state.visibilityMemberIds,
@@ -187,11 +189,11 @@ fun NoteDetailScreen(
     if (showVisibilityLocked) {
         AlertDialog(
             onDismissRequest = { showVisibilityLocked = false },
-            title = { Text("Visibilità bloccata") },
-            text = { Text("Solo chi ha creato la nota può modificare la visibilità.") },
+            title = { Text(stringResource(R.string.notes_visibility_locked_title)) },
+            text = { Text(stringResource(R.string.notes_visibility_locked_message)) },
             confirmButton = {
                 TextButton(onClick = { showVisibilityLocked = false }) {
-                    Text("OK")
+                    Text(stringResource(R.string.notes_ok))
                 }
             },
         )

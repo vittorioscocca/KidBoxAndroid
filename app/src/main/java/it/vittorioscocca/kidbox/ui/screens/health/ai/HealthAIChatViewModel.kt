@@ -94,6 +94,7 @@ class HealthAIChatViewModel @Inject constructor(
     private val familyMemoryService: FamilyMemoryService,
     private val aiSettingsStore: AISettingsStore,
     private val aiRemotePrefs: AIRemotePreferences,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
 ) : ViewModel() {
     private val COMPACTION_THRESHOLD = 0.60
     private var lastCompactionStep: Int = 0
@@ -503,7 +504,7 @@ class HealthAIChatViewModel @Inject constructor(
         if (units <= 1 || didShowLargeContextNotice || _uiState.value.isLoadingContext) return
         didShowLargeContextNotice = true
         _uiState.value = _uiState.value.copy(
-            contextNoticeMessage = AIAskAIPayload.TRANSIENT_LARGE_CONTEXT_NOTICE,
+            contextNoticeMessage = AIAskAIPayload.transientLargeContextNotice(appContext),
         )
     }
 

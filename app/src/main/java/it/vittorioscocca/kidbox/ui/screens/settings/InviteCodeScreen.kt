@@ -33,6 +33,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.screens.onboarding.InviteCodeViewModel
 import it.vittorioscocca.kidbox.ui.screens.onboarding.QRCodeView
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun InviteCodeScreen(
@@ -60,7 +62,7 @@ fun InviteCodeScreen(
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                "Invita",
+                stringResource(R.string.settings_invite_title),
                 fontSize = 34.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.kidBoxColors.title,
@@ -83,17 +85,17 @@ fun InviteCodeScreen(
                         OutlinedButton(
                             onClick = { showRevokeConfirmation = true },
                         ) {
-                            Text("Revoca invito")
+                            Text(stringResource(R.string.settings_invite_revoke))
                         }
                     }
                 }
                 errorMessage != null -> {
                     Text(errorMessage.orEmpty(), color = Color(0xFFE53E3E))
                     Spacer(modifier = Modifier.size(8.dp))
-                    Button(onClick = viewModel::generateInviteCode) { Text("Riprova") }
+                    Button(onClick = viewModel::generateInviteCode) { Text(stringResource(R.string.settings_invite_retry)) }
                 }
                 else -> {
-                    Button(onClick = viewModel::generateInviteCode) { Text("Genera invito") }
+                    Button(onClick = viewModel::generateInviteCode) { Text(stringResource(R.string.settings_invite_generate)) }
                 }
             }
         }
@@ -103,15 +105,15 @@ fun InviteCodeScreen(
         if (showRevokeConfirmation && confirmFamilyId != null && confirmInviteId != null) {
             AlertDialog(
                 onDismissRequest = { showRevokeConfirmation = false },
-                title = { Text("Revocare invito?") },
+                title = { Text(stringResource(R.string.settings_invite_revoke_q)) },
                 text = {
                     Text(
-                        "Se revochi l'invito, il codice QR attuale non sarà più valido e nessuno potrà più usarlo per entrare nella famiglia.",
+                        stringResource(R.string.settings_invite_revoke_body),
                     )
                 },
                 dismissButton = {
                     TextButton(onClick = { showRevokeConfirmation = false }) {
-                        Text("Annulla")
+                        Text(stringResource(R.string.settings_common_cancel))
                     }
                 },
                 confirmButton = {
@@ -124,7 +126,7 @@ fun InviteCodeScreen(
                             )
                         },
                     ) {
-                        Text("Revoca", color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(R.string.settings_ai_revoke), color = MaterialTheme.colorScheme.error)
                     }
                 },
             )

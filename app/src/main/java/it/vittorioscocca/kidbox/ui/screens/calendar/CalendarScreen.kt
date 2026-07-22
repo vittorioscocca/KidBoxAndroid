@@ -66,6 +66,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.firebase.auth.FirebaseAuth
@@ -82,6 +83,8 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.util.KBLocale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -131,11 +134,11 @@ fun CalendarScreen(
                 ) {
                     HeaderCircleButton(
                         icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Indietro",
+                        contentDescription = stringResource(R.string.calendar_back_cd),
                         onClick = onBack,
                     )
                     Text(
-                        text = "Calendario",
+                        text = stringResource(R.string.calendar_title),
                         modifier = Modifier.weight(1f),
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.titleLarge,
@@ -143,7 +146,7 @@ fun CalendarScreen(
                     )
                     HeaderCircleButton(
                         icon = Icons.Default.Add,
-                        contentDescription = "Nuovo evento",
+                        contentDescription = stringResource(R.string.calendar_new_event_cd),
                         onClick = {
                             editingEvent = null
                             showForm = true
@@ -168,12 +171,12 @@ fun CalendarScreen(
                     .padding(3.dp),
             ) {
                 TogglePill(
-                    text = "Mese",
+                    text = stringResource(R.string.calendar_month_tab),
                     selected = state.mode == CalendarMode.MONTH,
                     modifier = Modifier.weight(1f),
                 ) { viewModel.setMode(CalendarMode.MONTH) }
                 TogglePill(
-                    text = "Anno",
+                    text = stringResource(R.string.calendar_year_tab),
                     selected = state.mode == CalendarMode.YEAR,
                     modifier = Modifier.weight(1f),
                 ) { viewModel.setMode(CalendarMode.YEAR) }
@@ -254,7 +257,7 @@ private fun CalendarMonthView(
     }
 
     val days = remember(displayedMonth) { monthGridDays(displayedMonth.withDayOfMonth(1)) }
-    val locale = Locale("it", "IT")
+    val locale = KBLocale.current()
     val monthLabel = displayedMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy", locale))
         .replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
 
@@ -351,7 +354,7 @@ private fun CalendarMonthView(
                         tint = MaterialTheme.kidBoxColors.subtitle,
                         modifier = Modifier.size(42.dp),
                     )
-                    Text("Nessun evento", color = MaterialTheme.kidBoxColors.subtitle, modifier = Modifier.padding(top = 6.dp))
+                    Text(stringResource(R.string.calendar_no_events), color = MaterialTheme.kidBoxColors.subtitle, modifier = Modifier.padding(top = 6.dp))
                 }
             }
         } else {
@@ -406,7 +409,7 @@ private fun YearBlock(
     eventDates: Set<LocalDate>,
     onSelectDate: (LocalDate) -> Unit,
 ) {
-    val locale = Locale("it", "IT")
+    val locale = KBLocale.current()
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -576,7 +579,7 @@ private fun CalendarEventDialog(
     onSave: (CalendarDraftInput) -> Unit,
 ) {
     val context = LocalContext.current
-    val locale = Locale("it", "IT")
+    val locale = KBLocale.current()
     val formatter = remember { DateTimeFormatter.ofPattern("dd MMM yyyy", locale) }
     val kb = MaterialTheme.kidBoxColors
     val colorScheme = MaterialTheme.colorScheme
@@ -630,7 +633,7 @@ private fun CalendarEventDialog(
     }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val titleText = if (initial == null) "Nuovo evento" else "Modifica evento"
+    val titleText = if (initial == null) stringResource(R.string.calendar_new_event_title) else stringResource(R.string.calendar_edit_event_title)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -663,17 +666,17 @@ private fun CalendarEventDialog(
 
             Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("TITOLO", fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.calendar_field_title_label), fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
                     TextField(
                         value = title,
                         onValueChange = { title = it },
-                        placeholder = { Text("Es. Visita pediatrica", color = kb.subtitle.copy(alpha = 0.72f)) },
+                        placeholder = { Text(stringResource(R.string.calendar_title_placeholder), color = kb.subtitle.copy(alpha = 0.72f)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = calendarTextFieldColors(),
                     )
                     Divider()
-                    Text("CATEGORIA", fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.calendar_field_category_label), fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("children", "school", "health", "family").forEach { raw ->
                             CategoryPill(
@@ -708,7 +711,7 @@ private fun CalendarEventDialog(
                     }
                     Divider()
                     DateTimeRow(
-                        label = "Inizio",
+                        label = stringResource(R.string.calendar_start_label),
                         dateText = startDate.format(formatter),
                         timeText = startTime.format(DateTimeFormatter.ofPattern("HH:mm")),
                         allDay = isAllDay,
@@ -719,7 +722,7 @@ private fun CalendarEventDialog(
                     )
                     Divider()
                     DateTimeRow(
-                        label = "Fine",
+                        label = stringResource(R.string.calendar_end_label),
                         dateText = endDate.format(formatter),
                         timeText = endTime.format(DateTimeFormatter.ofPattern("HH:mm")),
                         allDay = isAllDay,
@@ -729,7 +732,7 @@ private fun CalendarEventDialog(
                         onPickTime = { pickTime(endTime) { endTime = it } },
                     )
                     Divider()
-                    Text("RICORRENZA", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle)
+                    Text(stringResource(R.string.section_recurrence), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         listOf(
                             "none" to "Nessuna",
@@ -777,7 +780,7 @@ private fun CalendarEventDialog(
             Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = kb.card)) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text(
-                        "VISIBILITÀ",
+                        stringResource(R.string.calendar_field_visibility_label),
                         fontSize = 12.sp,
                         color = kb.subtitle,
                         fontWeight = FontWeight.SemiBold,
@@ -824,21 +827,21 @@ private fun CalendarEventDialog(
 
             Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("LUOGO", fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.calendar_field_location_label), fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
                     TextField(
                         value = location,
                         onValueChange = { location = it },
-                        placeholder = { Text("Indirizzo o luogo", color = kb.subtitle.copy(alpha = 0.72f)) },
+                        placeholder = { Text(stringResource(R.string.calendar_location_placeholder), color = kb.subtitle.copy(alpha = 0.72f)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = calendarTextFieldColors(),
                     )
                     Divider()
-                    Text("NOTE", fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.calendar_field_notes_label), fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle, fontWeight = FontWeight.SemiBold)
                     TextField(
                         value = notes,
                         onValueChange = { notes = it },
-                        placeholder = { Text("Aggiungi note...", color = kb.subtitle.copy(alpha = 0.72f)) },
+                        placeholder = { Text(stringResource(R.string.calendar_notes_placeholder), color = kb.subtitle.copy(alpha = 0.72f)) },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 3,
                         colors = calendarTextFieldColors(),

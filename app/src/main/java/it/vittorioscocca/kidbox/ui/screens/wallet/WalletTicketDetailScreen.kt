@@ -2,6 +2,8 @@
 
 package it.vittorioscocca.kidbox.ui.screens.wallet
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import android.content.Intent
 import android.graphics.Bitmap
 import android.widget.Toast
@@ -31,6 +33,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -87,6 +90,7 @@ import kotlinx.coroutines.launch
 import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
+import it.vittorioscocca.kidbox.util.KBLocale
 
 @Composable
 fun WalletTicketDetailScreen(
@@ -138,7 +142,7 @@ fun WalletTicketDetailScreen(
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         runCatching { context.startActivity(intent) }
-            .onFailure { Toast.makeText(context, "Nessuna app per aprire PDF", Toast.LENGTH_SHORT).show() }
+            .onFailure { Toast.makeText(context, context.getString(R.string.wallet_no_app_to_open_pdf), Toast.LENGTH_SHORT).show() }
     }
 
     LaunchedEffect(state.message) {
@@ -150,8 +154,8 @@ fun WalletTicketDetailScreen(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Elimina biglietto") },
-            text = { Text("L'operazione non può essere annullata.") },
+            title = { Text(stringResource(R.string.wallet_delete_ticket_title)) },
+            text = { Text(stringResource(R.string.wallet_action_cannot_be_undone)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -159,10 +163,10 @@ fun WalletTicketDetailScreen(
                         viewModel.deleteTicket(ticketId)
                         onBack()
                     },
-                ) { Text("Elimina", color = MaterialTheme.colorScheme.error) }
+                ) { Text(stringResource(R.string.wallet_delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Annulla") }
+                TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.wallet_cancel)) }
             },
         )
     }
@@ -170,7 +174,7 @@ fun WalletTicketDetailScreen(
     if (showVisibilityPicker) {
         VisibilityPickerFullscreenDialog(
             currentUid = FirebaseAuth.getInstance().currentUser?.uid,
-            scopeSectionTitle = "Chi può vedere questo biglietto",
+            scopeSectionTitle = stringResource(R.string.wallet_visibility_who_can_see_ticket),
             membersExcludingSelf = state.visibilityMembers,
             initialScope = draftVisibilityScope,
             initialMemberIds = draftVisibilityMemberIds,
@@ -186,10 +190,10 @@ fun WalletTicketDetailScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 modifier = Modifier.statusBarsPadding(),
-                title = { Text("Dettaglio biglietto", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.wallet_ticket_detail_title), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.wallet_back))
                     }
                 },
             )
@@ -206,7 +210,7 @@ fun WalletTicketDetailScreen(
                 if (state.isLoading) {
                     CircularProgressIndicator()
                 } else {
-                    Text("Biglietto non trovato")
+                    Text(stringResource(R.string.wallet_ticket_not_found))
                 }
             }
             return@Scaffold
@@ -221,6 +225,7 @@ fun WalletTicketDetailScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
+            val onlyCreatorMsg = stringResource(R.string.wallet_only_creator_can_edit_visibility)
             Surface(
                 onClick = {
                     val uid = FirebaseAuth.getInstance().currentUser?.uid
@@ -228,7 +233,7 @@ fun WalletTicketDetailScreen(
                     if (createdBy.isNotEmpty() && uid != null && createdBy != uid) {
                         coroutineScope.launch {
                             snackbarHostState.showSnackbar(
-                                "Solo chi ha creato il biglietto può modificare la visibilità.",
+                                onlyCreatorMsg,
                             )
                         }
                         return@Surface
@@ -273,7 +278,10 @@ fun WalletTicketDetailScreen(
 
             // Details section
             val hasDetails = ticket.eventDateEpochMillis != null ||
+                ticket.eventEndDateEpochMillis != null ||
                 !ticket.location.isNullOrBlank() ||
+                !ticket.arrivalLocation.isNullOrBlank() ||
+                !ticket.holderName.isNullOrBlank() ||
                 !ticket.bookingCode.isNullOrBlank() ||
                 !ticket.notes.isNullOrBlank()
 
@@ -291,7 +299,7 @@ fun WalletTicketDetailScreen(
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
                 } else {
                     Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                    Text("Apri PDF")
+                    Text(stringResource(R.string.wallet_open_pdf))
                 }
             }
 
@@ -301,7 +309,7 @@ fun WalletTicketDetailScreen(
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
             ) {
                 Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                Text("Elimina biglietto")
+                Text(stringResource(R.string.wallet_delete_ticket_title))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -322,7 +330,7 @@ private fun BarcodeSection(ticket: KBWalletTicketEntity) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                "Codice di accesso",
+                stringResource(R.string.wallet_access_code_label),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -335,7 +343,7 @@ private fun BarcodeSection(ticket: KBWalletTicketEntity) {
             if (bitmap != null) {
                 androidx.compose.foundation.Image(
                     bitmap = bitmap.asImageBitmap(),
-                    contentDescription = "Barcode",
+                    contentDescription = stringResource(R.string.wallet_barcode_cd),
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(if (format == "QR_CODE" || format == "AZTEC") 1f else 3f)
@@ -358,7 +366,7 @@ private fun BarcodeSection(ticket: KBWalletTicketEntity) {
                     onClick = { clipboardManager.setText(AnnotatedString(barcodeText)) },
                 ) {
                     Icon(Icons.Filled.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text("  Copia", fontSize = 13.sp)
+                    Text(stringResource(R.string.wallet_copy), fontSize = 13.sp)
                 }
             }
             Text(
@@ -373,7 +381,7 @@ private fun BarcodeSection(ticket: KBWalletTicketEntity) {
 
 @Composable
 private fun DetailsSection(ticket: KBWalletTicketEntity) {
-    val dateFmt = remember { SimpleDateFormat("EEEE, d MMMM yyyy 'alle' HH:mm", Locale.ITALIAN) }
+    val dateFmt = remember { SimpleDateFormat("EEEE, d MMMM yyyy · HH:mm", KBLocale.current()) }
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -382,30 +390,51 @@ private fun DetailsSection(ticket: KBWalletTicketEntity) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                "Dettagli",
+                stringResource(R.string.wallet_details_label),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.height(12.dp))
 
+            ticket.holderName?.takeIf { it.isNotBlank() }?.let {
+                DetailRow(
+                    icon = { Icon(Icons.Filled.Person, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
+                    label = stringResource(R.string.wallet_holder_label),
+                    value = it,
+                )
+            }
             ticket.eventDateEpochMillis?.let { ms ->
                 DetailRow(
                     icon = { Icon(Icons.Filled.CalendarToday, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
-                    label = "Quando",
+                    label = stringResource(R.string.wallet_departure_label),
                     value = dateFmt.format(Date(ms)),
                 )
             }
             ticket.location?.takeIf { it.isNotBlank() }?.let {
                 DetailRow(
                     icon = { Icon(Icons.Filled.Place, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
-                    label = "Dove",
+                    label = stringResource(R.string.wallet_departure_location_label),
+                    value = it,
+                )
+            }
+            ticket.eventEndDateEpochMillis?.let { ms ->
+                DetailRow(
+                    icon = { Icon(Icons.Filled.CalendarToday, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
+                    label = stringResource(R.string.wallet_arrival_label),
+                    value = dateFmt.format(Date(ms)),
+                )
+            }
+            ticket.arrivalLocation?.takeIf { it.isNotBlank() }?.let {
+                DetailRow(
+                    icon = { Icon(Icons.Filled.Place, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
+                    label = stringResource(R.string.wallet_arrival_location_label),
                     value = it,
                 )
             }
             ticket.bookingCode?.takeIf { it.isNotBlank() }?.let {
                 DetailRow(
                     icon = { Icon(Icons.Filled.Tag, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
-                    label = "Codice prenotazione",
+                    label = stringResource(R.string.wallet_ticket_code_label),
                     value = it,
                     monospace = true,
                 )
@@ -413,7 +442,7 @@ private fun DetailsSection(ticket: KBWalletTicketEntity) {
             ticket.notes?.takeIf { it.isNotBlank() }?.let {
                 DetailRow(
                     icon = { Icon(Icons.AutoMirrored.Filled.Note, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
-                    label = "Note",
+                    label = stringResource(R.string.wallet_notes_label),
                     value = it,
                 )
             }

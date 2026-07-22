@@ -2,6 +2,8 @@
 
 package it.vittorioscocca.kidbox.ui.screens.passwords
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -73,6 +75,7 @@ import java.text.DateFormat
 import java.util.Calendar
 import java.util.Locale
 import kotlinx.coroutines.launch
+import it.vittorioscocca.kidbox.util.KBLocale
 
 private val PasswordsAccentPurple = Color(0xFF9973D9)
 
@@ -204,7 +207,7 @@ fun AddPasswordScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        if (isEditMode) "Modifica password" else "Nuova password",
+                        if (isEditMode) stringResource(R.string.passwords_edit_title) else stringResource(R.string.passwords_add_title),
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 17.sp,
                         color = kb.title,
@@ -212,13 +215,13 @@ fun AddPasswordScreen(
                 },
                 navigationIcon = {
                     TextButton(onClick = onBack, enabled = !saving) {
-                        Text("Annulla", color = PasswordsAccentPurple)
+                        Text(stringResource(R.string.location_cancel_button), color = PasswordsAccentPurple)
                     }
                 },
                 actions = {
                     TextButton(onClick = { submit() }, enabled = !saving && canSave) {
                         Text(
-                            "Salva",
+                            stringResource(R.string.location_save_content_description),
                             fontWeight = FontWeight.SemiBold,
                             color = if (canSave) PasswordsAccentPurple else kb.subtitle,
                         )
@@ -235,7 +238,7 @@ fun AddPasswordScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp),
         ) {
-            PasswordIosSectionLabel("Visibilità", sectionMuted)
+            PasswordIosSectionLabel(stringResource(R.string.passwords_visibility_section_label), sectionMuted)
             IosFormCard(cardBg) {
                 Row(
                     modifier = Modifier
@@ -254,13 +257,13 @@ fun AddPasswordScreen(
                 }
             }
 
-            PasswordIosSectionLabel("Credenziali", sectionMuted)
+            PasswordIosSectionLabel(stringResource(R.string.passwords_credentials_section_label), sectionMuted)
             IosFormCard(cardBg) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Titolo", color = kb.subtitle) },
+                    placeholder = { Text(stringResource(R.string.passwords_title_placeholder), color = kb.subtitle) },
                     singleLine = true,
                     enabled = !saving,
                     colors = borderlessFieldColors,
@@ -270,7 +273,7 @@ fun AddPasswordScreen(
                     value = username,
                     onValueChange = { username = it },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Nome utente", color = kb.subtitle) },
+                    placeholder = { Text(stringResource(R.string.passwords_username_placeholder), color = kb.subtitle) },
                     singleLine = true,
                     enabled = !saving,
                     colors = borderlessFieldColors,
@@ -287,7 +290,7 @@ fun AddPasswordScreen(
                         if (it.isEmpty()) showPasswordPlain = false
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Password", color = kb.subtitle) },
+                    placeholder = { Text(stringResource(R.string.passwords_password_placeholder), color = kb.subtitle) },
                     singleLine = true,
                     enabled = !saving,
                     visualTransformation = if (showPasswordPlain) {
@@ -324,7 +327,7 @@ fun AddPasswordScreen(
                         .padding(horizontal = 14.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Generatore", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                    Text(stringResource(R.string.passwords_generator_label), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                     IconArrow()
                 }
                 if (genExpanded) {
@@ -335,25 +338,25 @@ fun AddPasswordScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                            Text("Lunghezza: ${genOptions.length}", style = MaterialTheme.typography.bodyMedium, color = kb.title)
+                            Text(stringResource(R.string.passwords_generator_length_label, genOptions.length), style = MaterialTheme.typography.bodyMedium, color = kb.title)
                             Row {
                                 TextButton(onClick = { genOptions = genOptions.copy(length = (genOptions.length - 1).coerceAtLeast(8)) }) { Text("−") }
                                 TextButton(onClick = { genOptions = genOptions.copy(length = (genOptions.length + 1).coerceAtMost(64)) }) { Text("+") }
                             }
                         }
-                        PasswordGenToggle("Maiuscole (A–Z)", genOptions.includeUppercase) { v ->
+                        PasswordGenToggle(stringResource(R.string.passwords_generator_uppercase), genOptions.includeUppercase) { v ->
                             genOptions = genOptions.copy(includeUppercase = v)
                         }
-                        PasswordGenToggle("Minuscole (a–z)", genOptions.includeLowercase) { v ->
+                        PasswordGenToggle(stringResource(R.string.passwords_generator_lowercase), genOptions.includeLowercase) { v ->
                             genOptions = genOptions.copy(includeLowercase = v)
                         }
-                        PasswordGenToggle("Numeri", genOptions.includeNumbers) { v ->
+                        PasswordGenToggle(stringResource(R.string.passwords_generator_numbers), genOptions.includeNumbers) { v ->
                             genOptions = genOptions.copy(includeNumbers = v)
                         }
-                        PasswordGenToggle("Simboli", genOptions.includeSymbols) { v ->
+                        PasswordGenToggle(stringResource(R.string.passwords_generator_symbols), genOptions.includeSymbols) { v ->
                             genOptions = genOptions.copy(includeSymbols = v)
                         }
-                        PasswordGenToggle("Escludi caratteri ambigui (0 O 1 l I)", genOptions.excludeAmbiguous) { v ->
+                        PasswordGenToggle(stringResource(R.string.passwords_generator_exclude_ambiguous), genOptions.excludeAmbiguous) { v ->
                             genOptions = genOptions.copy(excludeAmbiguous = v)
                         }
                         TextButton(
@@ -363,13 +366,13 @@ fun AddPasswordScreen(
                             },
                             enabled = !saving,
                         ) {
-                            Text("Genera password", color = PasswordsAccentPurple, fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.passwords_generate_button), color = PasswordsAccentPurple, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
             }
 
-            PasswordIosSectionLabel("Sito web", sectionMuted)
+            PasswordIosSectionLabel(stringResource(R.string.passwords_website_section_label), sectionMuted)
             IosFormCard(cardBg) {
                 OutlinedTextField(
                     value = website,
@@ -377,7 +380,7 @@ fun AddPasswordScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp, vertical = 4.dp),
-                    placeholder = { Text("https://…", color = kb.subtitle) },
+                    placeholder = { Text(stringResource(R.string.passwords_website_placeholder), color = kb.subtitle) },
                     singleLine = true,
                     enabled = !saving,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false),
@@ -385,7 +388,7 @@ fun AddPasswordScreen(
                 )
             }
 
-            PasswordIosSectionLabel("Gruppo", sectionMuted)
+            PasswordIosSectionLabel(stringResource(R.string.passwords_group_section_label), sectionMuted)
             IosFormCard(cardBg) {
                 Row(
                     modifier = Modifier
@@ -404,7 +407,7 @@ fun AddPasswordScreen(
                 }
             }
 
-            PasswordIosSectionLabel("Note", sectionMuted)
+            PasswordIosSectionLabel(stringResource(R.string.passwords_notes_section_label), sectionMuted)
             IosFormCard(cardBg) {
                 OutlinedTextField(
                     value = notes,
@@ -413,7 +416,7 @@ fun AddPasswordScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp, vertical = 4.dp)
                         .height(120.dp),
-                    placeholder = { Text("Note (opzionale)", color = kb.subtitle) },
+                    placeholder = { Text(stringResource(R.string.passwords_notes_placeholder), color = kb.subtitle) },
                     minLines = 3,
                     enabled = !saving,
                     colors = borderlessFieldColors,
@@ -428,7 +431,7 @@ fun AddPasswordScreen(
                         .padding(horizontal = 14.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Data di scadenza", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                    Text(stringResource(R.string.passwords_expiry_date_label), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                     Switch(
                         checked = hasExpiry,
                         onCheckedChange = { v ->
@@ -449,10 +452,10 @@ fun AddPasswordScreen(
                             .padding(horizontal = 14.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Scade il", style = MaterialTheme.typography.bodyMedium, color = kb.subtitle)
+                        Text(stringResource(R.string.passwords_expires_on_label), style = MaterialTheme.typography.bodyMedium, color = kb.subtitle)
                         Spacer(modifier = Modifier.weight(1f))
                         Text(
-                            DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.ITALY).format(expiryMillis),
+                            DateFormat.getDateInstance(DateFormat.MEDIUM, KBLocale.current()).format(expiryMillis),
                             style = MaterialTheme.typography.bodyLarge,
                             color = kb.title,
                         )
@@ -473,7 +476,7 @@ fun AddPasswordScreen(
         ) {
             Column(Modifier.padding(horizontal = 8.dp, vertical = 8.dp)) {
                 Text(
-                    "Chi può vedere questa password",
+                    stringResource(R.string.passwords_visibility_sheet_title),
                     modifier = Modifier.padding(16.dp),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
@@ -500,7 +503,7 @@ fun AddPasswordScreen(
                 }
                 if (visibilityScope == KBVisibilityScope.MEMBERS) {
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                    Text("Membri", style = MaterialTheme.typography.labelLarge, color = kb.subtitle, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                    Text(stringResource(R.string.location_members_label), style = MaterialTheme.typography.labelLarge, color = kb.subtitle, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
                     pickerMembers.forEach { m ->
                         Row(
                             modifier = Modifier
@@ -521,7 +524,7 @@ fun AddPasswordScreen(
                 TextButton(
                     onClick = { showVisibilitySheet = false },
                     modifier = Modifier.align(Alignment.End).padding(16.dp),
-                ) { Text("Fine", color = PasswordsAccentPurple, fontWeight = FontWeight.SemiBold) }
+                ) { Text(stringResource(R.string.location_done_button), color = PasswordsAccentPurple, fontWeight = FontWeight.SemiBold) }
                 Spacer(Modifier.height(24.dp))
             }
         }
@@ -546,7 +549,7 @@ fun AddPasswordScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(selected = selectedGroupId == null, onClick = null)
-                        Text("Non assegnato", style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.passwords_unassigned_group_label), style = MaterialTheme.typography.bodyLarge)
                     }
                 }
                 items(pickerGroups, key = { it.id }) { g ->
@@ -578,10 +581,10 @@ fun AddPasswordScreen(
                         pickerState.selectedDateMillis?.let { expiryMillis = it }
                         showDatePicker = false
                     },
-                ) { Text("OK") }
+                ) { Text(stringResource(R.string.passwords_ok_button)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Annulla") }
+                TextButton(onClick = { showDatePicker = false }) { Text(stringResource(R.string.location_cancel_button)) }
             },
         ) {
             DatePicker(state = pickerState)
@@ -661,13 +664,14 @@ private fun strengthColor(level: PasswordStrengthLevel): Color = when (level) {
     PasswordStrengthLevel.STRONG, PasswordStrengthLevel.VERY_STRONG -> Color(0xFF34C759)
 }
 
+@Composable
 private fun groupLabel(
     selectedGroupId: String?,
     groups: List<AddPasswordPickerGroup>,
     familyId: String,
 ): String {
-    if (selectedGroupId == null) return "Non assegnato"
+    if (selectedGroupId == null) return stringResource(R.string.passwords_unassigned_group_label)
     val unassigned = PasswordGroupIds.id(familyId, PasswordGroupIds.UNASSIGNED_SLUG)
-    if (selectedGroupId == unassigned) return "Non assegnato"
-    return groups.find { it.id == selectedGroupId }?.label ?: "Gruppo"
+    if (selectedGroupId == unassigned) return stringResource(R.string.passwords_unassigned_group_label)
+    return groups.find { it.id == selectedGroupId }?.label ?: stringResource(R.string.passwords_group_fallback_label)
 }

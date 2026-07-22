@@ -48,6 +48,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -56,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.io.File
@@ -75,6 +78,7 @@ fun FamilySwitcherBottomSheet(
     val families by viewModel.families.collectAsStateWithLifecycle()
     val activeFamilyId by viewModel.activeFamilyId.collectAsStateWithLifecycle()
     val isCreating by viewModel.isCreating.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     var showCreateDialog by remember { mutableStateOf(false) }
     var newFamilyName by remember { mutableStateOf("") }
 
@@ -88,7 +92,7 @@ fun FamilySwitcherBottomSheet(
                 FamilySwitcherViewModel.Event.FamilyCreated -> {
                     showCreateDialog = false
                     newFamilyName = ""
-                    snackbarHostState.showSnackbar("Famiglia creata! Tocca per passarci.")
+                    snackbarHostState.showSnackbar(context.getString(R.string.family_switcher_created_snackbar))
                 }
                 is FamilySwitcherViewModel.Event.Error -> {
                     snackbarHostState.showSnackbar(event.message)
@@ -110,7 +114,7 @@ fun FamilySwitcherBottomSheet(
                 .padding(bottom = 32.dp),
         ) {
             Text(
-                text = "Le tue famiglie",
+                text = stringResource(R.string.family_switcher_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = kb.title,
@@ -152,7 +156,7 @@ fun FamilySwitcherBottomSheet(
                     tint = KidBoxAccentBlue,
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("Crea nuova famiglia")
+                Text(stringResource(R.string.family_switcher_create_button))
             }
 
             Spacer(Modifier.height(8.dp))
@@ -177,11 +181,11 @@ fun FamilySwitcherBottomSheet(
                     tint = Color(0xFF30B0C7),
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("Entra in una famiglia")
+                Text(stringResource(R.string.family_switcher_join_button))
             }
 
             Text(
-                text = "Scansiona il QR di chi vuole invitarti o inserisci il codice a 6 cifre.",
+                text = stringResource(R.string.family_switcher_join_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = kb.subtitle,
                 modifier = Modifier
@@ -197,12 +201,12 @@ fun FamilySwitcherBottomSheet(
             containerColor = kb.card,
             titleContentColor = kb.title,
             textContentColor = kb.subtitle,
-            title = { Text("Nuova famiglia") },
+            title = { Text(stringResource(R.string.family_switcher_new_family_title)) },
             text = {
                 OutlinedTextField(
                     value = newFamilyName,
                     onValueChange = { newFamilyName = it },
-                    placeholder = { Text("Nome della famiglia (es. Famiglia Rossi)", color = kb.subtitle) },
+                    placeholder = { Text(stringResource(R.string.family_switcher_new_family_placeholder), color = kb.subtitle) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isCreating,
@@ -216,7 +220,7 @@ fun FamilySwitcherBottomSheet(
                     if (isCreating) {
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     } else {
-                        Text("Crea")
+                        Text(stringResource(R.string.family_switcher_create_confirm))
                     }
                 }
             },
@@ -224,7 +228,7 @@ fun FamilySwitcherBottomSheet(
                 TextButton(
                     onClick = { showCreateDialog = false },
                     enabled = !isCreating,
-                ) { Text("Annulla") }
+                ) { Text(stringResource(R.string.family_switcher_cancel)) }
             },
         )
     }
@@ -299,7 +303,7 @@ private fun FamilySwitcherRow(
                 )
                 if (isActive) {
                     Text(
-                        text = "Famiglia attiva",
+                        text = stringResource(R.string.family_switcher_active_label),
                         style = MaterialTheme.typography.bodySmall,
                         color = KidBoxAccentBlue,
                     )

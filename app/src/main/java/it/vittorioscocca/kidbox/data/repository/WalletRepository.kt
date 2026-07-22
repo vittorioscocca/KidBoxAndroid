@@ -124,10 +124,12 @@ class WalletRepository @Inject constructor(
                 title = title,
                 kindRaw = parsed.kind.raw,
                 eventDateEpochMillis = parsed.eventDate,
-                eventEndDateEpochMillis = null,
+                eventEndDateEpochMillis = parsed.eventEndDate,
                 location = parsed.location,
                 seat = null,
                 bookingCode = parsed.bookingCode,
+                arrivalLocation = parsed.arrivalLocation,
+                holderName = parsed.holderName,
                 notes = parsed.notes,
                 emitter = parsed.emitter,
                 pdfStorageURL = downloadUrl,
@@ -303,6 +305,8 @@ class WalletRepository @Inject constructor(
                                 location = decrypted.location,
                                 seat = decrypted.seat,
                                 bookingCode = decrypted.bookingCode,
+                                arrivalLocation = decrypted.arrivalLocation,
+                                holderName = decrypted.holderName,
                                 notes = decrypted.notes,
                                 emitter = dto.emitter,
                                 pdfStorageURL = dto.pdfStorageURL,
@@ -348,6 +352,10 @@ class WalletRepository @Inject constructor(
                 ?: dto.seatPlain?.trim()?.takeIf { it.isNotEmpty() },
             bookingCode = decryptField(dto.bookingCodeEnc, familyId)
                 ?: dto.bookingCodePlain?.trim()?.takeIf { it.isNotEmpty() },
+            arrivalLocation = decryptField(dto.arrivalLocationEnc, familyId)
+                ?: dto.arrivalLocationPlain?.trim()?.takeIf { it.isNotEmpty() },
+            holderName = decryptField(dto.holderNameEnc, familyId)
+                ?: dto.holderNamePlain?.trim()?.takeIf { it.isNotEmpty() },
             notes = decryptField(dto.notesEnc, familyId)
                 ?: dto.notesPlain?.trim()?.takeIf { it.isNotEmpty() },
             barcodeText = decryptField(dto.barcodeTextEnc, familyId)
@@ -362,6 +370,8 @@ class WalletRepository @Inject constructor(
         val location: String?,
         val seat: String?,
         val bookingCode: String?,
+        val arrivalLocation: String?,
+        val holderName: String?,
         val notes: String?,
         val barcodeText: String?,
         val pdfFileName: String?,

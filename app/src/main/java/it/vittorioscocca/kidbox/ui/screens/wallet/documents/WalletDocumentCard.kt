@@ -2,6 +2,8 @@
 
 package it.vittorioscocca.kidbox.ui.screens.wallet.documents
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -127,7 +129,7 @@ fun WalletDocumentCard(
                 if (expiry != null) {
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
-                            if (expiry.isBefore(LocalDate.now())) "SCADUTO" else "SCADE",
+                            if (expiry.isBefore(LocalDate.now())) stringResource(R.string.wallet_document_expired_label) else stringResource(R.string.wallet_document_expiring_label),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = Color.White.copy(alpha = 0.85f),

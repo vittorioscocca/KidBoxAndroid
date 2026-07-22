@@ -2,6 +2,8 @@
 
 package it.vittorioscocca.kidbox.ui.screens.passwords
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import android.Manifest
 import android.content.pm.PackageManager
 import android.widget.Toast
@@ -123,7 +125,7 @@ fun PasswordDetailScreen(
     fun showCreatorOnlyMessage() {
         Toast.makeText(
             context,
-            "Solo il creatore puo modificare o eliminare questa password.",
+            context.getString(R.string.passwords_creator_only_message),
             Toast.LENGTH_SHORT,
         ).show()
     }
@@ -139,7 +141,7 @@ fun PasswordDetailScreen(
                 .background(kb.background),
             contentAlignment = Alignment.Center,
         ) {
-            Text("Caricamento...", color = kb.subtitle)
+            Text(stringResource(R.string.passwords_loading_label), color = kb.subtitle)
         }
         return
     }
@@ -151,7 +153,7 @@ fun PasswordDetailScreen(
                 .background(kb.background),
             contentAlignment = Alignment.Center,
         ) {
-            Text("Password non trovata", color = kb.subtitle)
+            Text(stringResource(R.string.passwords_not_found_label), color = kb.subtitle)
         }
         return
     }
@@ -170,11 +172,11 @@ fun PasswordDetailScreen(
         ) {
             Surface(shape = CircleShape, color = kb.card, shadowElevation = 1.dp) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro", tint = kb.title)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.location_back_content_description), tint = kb.title)
                 }
             }
             Text(
-                text = state.title.ifBlank { "Password" },
+                text = state.title.ifBlank { stringResource(R.string.passwords_password_placeholder) },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = kb.title,
@@ -186,7 +188,7 @@ fun PasswordDetailScreen(
                 IconButton(onClick = viewModel::toggleFavorite) {
                     Icon(
                         if (state.isFavorite) Icons.Filled.Star else Icons.Filled.StarBorder,
-                        contentDescription = "Preferita",
+                        contentDescription = stringResource(R.string.passwords_favorite_content_description),
                         tint = if (state.isFavorite) Color(0xFFFFB300) else kb.subtitle,
                     )
                 }
@@ -198,14 +200,14 @@ fun PasswordDetailScreen(
                         else showCreatorOnlyMessage()
                     },
                 ) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Modifica", tint = kb.title)
+                    Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.passwords_edit_content_description), tint = kb.title)
                 }
             }
             Surface(shape = CircleShape, color = kb.card, shadowElevation = 1.dp) {
                 IconButton(
                     onClick = { showActionsDialog = true },
                 ) {
-                    Icon(Icons.Filled.MoreHoriz, contentDescription = "Altro", tint = kb.title)
+                    Icon(Icons.Filled.MoreHoriz, contentDescription = stringResource(R.string.passwords_more_content_description), tint = kb.title)
                 }
             }
         }
@@ -216,13 +218,13 @@ fun PasswordDetailScreen(
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             ActionPill(
-                label = "Copia utente",
+                label = stringResource(R.string.passwords_copy_username_label),
                 icon = Icons.Filled.ContentCopy,
                 onClick = { clipboard.setText(AnnotatedString(state.username)) },
                 modifier = Modifier.weight(1f),
             )
             ActionPill(
-                label = "Copia password",
+                label = stringResource(R.string.passwords_copy_password_label),
                 icon = Icons.Filled.Key,
                 isPrimary = true,
                 onClick = {
@@ -237,7 +239,7 @@ fun PasswordDetailScreen(
                 modifier = Modifier.weight(1f),
             )
             ActionPill(
-                label = "Cambia password",
+                label = stringResource(R.string.passwords_change_password_label),
                 icon = Icons.Filled.Edit,
                 onClick = {
                     if (state.canManage && onChangePassword != null) onChangePassword.invoke()
@@ -250,50 +252,50 @@ fun PasswordDetailScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
         InfoCard {
-            InfoRow(label = "Titolo", value = state.title.ifBlank { "—" })
-            InfoRow(label = "Nome utente", value = state.username.ifBlank { "—" })
+            InfoRow(label = stringResource(R.string.passwords_title_placeholder), value = state.title.ifBlank { "—" })
+            InfoRow(label = stringResource(R.string.passwords_username_placeholder), value = state.username.ifBlank { "—" })
             PasswordRow(
-                label = "Password",
+                label = stringResource(R.string.passwords_password_placeholder),
                 passwordValue = state.password,
                 showPassword = showPassword,
                 onTogglePassword = { showPassword = !showPassword },
             )
-            InfoRow(label = "Sito web", value = state.website.ifBlank { "—" })
+            InfoRow(label = stringResource(R.string.passwords_website_section_label), value = state.website.ifBlank { "—" })
             if (state.notes.isNotBlank()) {
-                InfoRow(label = "Note", value = state.notes)
+                InfoRow(label = stringResource(R.string.passwords_notes_section_label), value = state.notes)
             }
             if (state.visibilityLabel.isNotBlank()) {
-                InfoRow(label = "Visibilità", value = state.visibilityLabel)
+                InfoRow(label = stringResource(R.string.passwords_visibility_section_label), value = state.visibilityLabel)
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
         InfoCard {
-            Text("Sicurezza password", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = kb.title)
+            Text(stringResource(R.string.passwords_security_section_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = kb.title)
             Spacer(modifier = Modifier.height(8.dp))
             SecurityLine(
-                title = "Controllo fughe (HIBP)",
+                title = stringResource(R.string.passwords_hibp_check_label),
                 body = if ((state.pwnedCount ?: 0) > 0) {
-                    "Trovata ${state.pwnedCount} volte in data breach pubblici."
+                    stringResource(R.string.passwords_pwned_found_message, state.pwnedCount ?: 0)
                 } else {
-                    "Nessuna compromissione nota."
+                    stringResource(R.string.passwords_no_compromise_message)
                 },
-                footer = if (state.pwnedCheckedAtLabel.isBlank()) "" else "Ultimo controllo: ${state.pwnedCheckedAtLabel}",
+                footer = if (state.pwnedCheckedAtLabel.isBlank()) "" else stringResource(R.string.passwords_last_check_label, state.pwnedCheckedAtLabel),
                 warning = (state.pwnedCount ?: 0) > 0,
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = kb.divider)
             SecurityLine(
-                title = "Password duplicata",
+                title = stringResource(R.string.passwords_duplicate_label),
                 body = if (state.hasDuplicate) {
-                    "Vulnerabile: questa password e usata anche in altri account."
+                    stringResource(R.string.passwords_vulnerable_duplicate_message)
                 } else {
-                    "Nessun altra voce nella famiglia usa la stessa password."
+                    stringResource(R.string.passwords_no_duplicate_message)
                 },
                 icon = Icons.Filled.ContentCopy,
                 iconTint = if (state.hasDuplicate) Color(0xFFFFC107) else Color(0xFF34C759),
             )
             Spacer(modifier = Modifier.height(10.dp))
-            Text("Forza stimata", style = MaterialTheme.typography.bodyMedium, color = kb.subtitle)
+            Text(stringResource(R.string.passwords_estimated_strength_label), style = MaterialTheme.typography.bodyMedium, color = kb.subtitle)
             LinearProgressIndicator(
                 progress = { (state.estimatedBits / 80f).coerceIn(0f, 1f) },
                 modifier = Modifier
@@ -306,12 +308,12 @@ fun PasswordDetailScreen(
             Row(modifier = Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(state.strengthLabel, color = Color(0xFFFF8A00), fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.weight(1f))
-                Text("~${state.estimatedBits} bit", color = kb.subtitle)
+                Text(stringResource(R.string.passwords_bits_label, state.estimatedBits), color = kb.subtitle)
             }
             Text(state.strengthAdvice, color = Color(0xFFFF8A00), modifier = Modifier.padding(top = 4.dp))
             if (state.isVulnerable) {
                 Text(
-                    "Password vulnerabile: risulta esposta o riutilizzata.",
+                    stringResource(R.string.passwords_vulnerable_warning),
                     color = Color(0xFFE53935),
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(top = 6.dp),
@@ -324,7 +326,7 @@ fun PasswordDetailScreen(
                 shape = RoundedCornerShape(999.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF3EDFF), contentColor = PasswordsAccentPurple),
             ) {
-                Text("Apri report Sicurezza password")
+                Text(stringResource(R.string.passwords_open_security_report_button))
             }
         }
 
@@ -334,31 +336,31 @@ fun PasswordDetailScreen(
                 config = config,
                 onCopy = { otp ->
                     clipboard.setText(AnnotatedString(otp.replace(" ", "")))
-                    Toast.makeText(context, "OTP copiato", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.passwords_otp_copied_toast), Toast.LENGTH_SHORT).show()
                 },
             )
         }
 
         Spacer(modifier = Modifier.height(10.dp))
-        Text("Ultimo aggiornamento: ${state.updatedAtLabel}", color = kb.subtitle)
-        Text("Password modificata: ${state.passwordUpdatedAtLabel}", color = kb.subtitle)
+        Text(stringResource(R.string.passwords_last_updated_label, state.updatedAtLabel), color = kb.subtitle)
+        Text(stringResource(R.string.passwords_password_modified_label, state.passwordUpdatedAtLabel), color = kb.subtitle)
     }
 
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Elimina password") },
-            text = { Text("Questa azione non e reversibile.") },
+            title = { Text(stringResource(R.string.passwords_delete_dialog_title)) },
+            text = { Text(stringResource(R.string.passwords_delete_irreversible_message)) },
             confirmButton = {
                 Button(
                     onClick = {
                         showDeleteDialog = false
                         viewModel.deleteCurrent(onDone = onBack)
                     },
-                ) { Text("Elimina") }
+                ) { Text(stringResource(R.string.location_delete_content_description)) }
             },
             dismissButton = {
-                Button(onClick = { showDeleteDialog = false }) { Text("Annulla") }
+                Button(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.location_cancel_button)) }
             },
         )
     }
@@ -366,7 +368,7 @@ fun PasswordDetailScreen(
     if (showActionsDialog) {
         AlertDialog(
             onDismissRequest = { showActionsDialog = false },
-            title = { Text("Azioni password") },
+            title = { Text(stringResource(R.string.passwords_actions_dialog_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
@@ -381,7 +383,7 @@ fun PasswordDetailScreen(
                         },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("Configura OTP")
+                        Text(stringResource(R.string.passwords_configure_otp_label))
                     }
                     if (state.otpConfig != null) {
                         Button(
@@ -391,7 +393,7 @@ fun PasswordDetailScreen(
                             },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text("Elimina OTP")
+                            Text(stringResource(R.string.passwords_delete_otp_label))
                         }
                     }
                     Button(
@@ -402,26 +404,26 @@ fun PasswordDetailScreen(
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEFEF), contentColor = Color(0xFFC62828)),
                     ) {
-                        Text("Elimina password")
+                        Text(stringResource(R.string.passwords_delete_dialog_title))
                     }
                 }
             },
             confirmButton = {},
-            dismissButton = { Button(onClick = { showActionsDialog = false }) { Text("Chiudi") } },
+            dismissButton = { Button(onClick = { showActionsDialog = false }) { Text(stringResource(R.string.passwords_close_button)) } },
         )
     }
 
     if (showOtpDialog) {
         AlertDialog(
             onDismissRequest = { showOtpDialog = false },
-            title = { Text("Configura OTP") },
+            title = { Text(stringResource(R.string.passwords_configure_otp_label)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = otpInput,
                         onValueChange = { otpInput = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Chiave Base32 o otpauth://") },
+                        label = { Text(stringResource(R.string.passwords_otp_key_label)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Password,
@@ -436,7 +438,7 @@ fun PasswordDetailScreen(
                         },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("Scan QR Code")
+                        Text(stringResource(R.string.passwords_scan_qr_button))
                     }
                 }
             },
@@ -450,37 +452,37 @@ fun PasswordDetailScreen(
                             OtpConfig(secret = raw, period = 30, digits = 6, algorithm = "SHA1")
                         }
                         if (config == null || config.secret.isBlank()) {
-                            Toast.makeText(context, "Config OTP non valida", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.passwords_invalid_otp_config_toast), Toast.LENGTH_SHORT).show()
                         } else {
                             viewModel.saveOtpConfig(config)
                             showOtpDialog = false
                         }
                     },
-                ) { Text("Salva") }
+                ) { Text(stringResource(R.string.location_save_content_description)) }
             },
-            dismissButton = { Button(onClick = { showOtpDialog = false }) { Text("Annulla") } },
+            dismissButton = { Button(onClick = { showOtpDialog = false }) { Text(stringResource(R.string.location_cancel_button)) } },
         )
     }
 
     if (showOtpDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showOtpDeleteDialog = false },
-            title = { Text("Elimina OTP") },
-            text = { Text("Vuoi eliminare la configurazione OTP di questa password?") },
+            title = { Text(stringResource(R.string.passwords_delete_otp_label)) },
+            text = { Text(stringResource(R.string.passwords_delete_otp_confirm_message)) },
             confirmButton = {
                 Button(onClick = {
                     viewModel.deleteOtpConfig()
                     showOtpDeleteDialog = false
-                }) { Text("Elimina") }
+                }) { Text(stringResource(R.string.location_delete_content_description)) }
             },
-            dismissButton = { Button(onClick = { showOtpDeleteDialog = false }) { Text("Annulla") } },
+            dismissButton = { Button(onClick = { showOtpDeleteDialog = false }) { Text(stringResource(R.string.location_cancel_button)) } },
         )
     }
 
     if (showOtpScanner) {
         AlertDialog(
             onDismissRequest = { showOtpScanner = false },
-            title = { Text("Scanner OTP") },
+            title = { Text(stringResource(R.string.passwords_otp_scanner_title)) },
             text = {
                 OtpQrScanner(
                     onConfigDetected = { config ->
@@ -489,7 +491,7 @@ fun PasswordDetailScreen(
                     },
                 )
             },
-            confirmButton = { Button(onClick = { showOtpScanner = false }) { Text("Chiudi") } },
+            confirmButton = { Button(onClick = { showOtpScanner = false }) { Text(stringResource(R.string.passwords_close_button)) } },
         )
     }
 
@@ -518,7 +520,7 @@ private fun OtpSection(
     val expiringRed = Color(0xFFE53935)
 
     InfoCard {
-        Text("OTP", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = kb.title)
+        Text(stringResource(R.string.passwords_otp_label), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = kb.title)
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             formatted,
@@ -544,7 +546,7 @@ private fun OtpSection(
             )
             Spacer(modifier = Modifier.weight(1f))
             Button(onClick = { if (code != null) onCopy(formatted) }, enabled = code != null) {
-                Text("Copia")
+                Text(stringResource(R.string.passwords_copy_button))
             }
         }
     }
@@ -576,7 +578,7 @@ private fun OtpQrScanner(
     }
 
     if (!hasPermission) {
-        Text("Permesso fotocamera non concesso")
+        Text(stringResource(R.string.passwords_camera_permission_denied))
         return
     }
 
@@ -664,7 +666,7 @@ private fun HeaderCard(iconUrl: String?, title: String) {
             }
             Spacer(modifier = Modifier.width(10.dp))
             Text(
-                text = title.ifBlank { "Password" },
+                text = title.ifBlank { stringResource(R.string.passwords_password_placeholder) },
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = kb.title,
@@ -759,7 +761,7 @@ private fun PasswordRow(
                 modifier = Modifier.size(16.dp),
             )
             Spacer(modifier = Modifier.width(4.dp))
-            Text(if (showPassword) "Nascondi" else "Mostra", color = PasswordsAccentPurple)
+            Text(if (showPassword) stringResource(R.string.passwords_hide_button) else stringResource(R.string.passwords_show_button), color = PasswordsAccentPurple)
         }
     }
     Text(

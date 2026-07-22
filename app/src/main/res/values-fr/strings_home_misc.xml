@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ═══ components (KidBoxIosFormChrome, PasswordStrengthMeter) ═══ -->
+    <string name="components_ios_form_cancel">Annuler</string>
+    <string name="components_ios_form_save">Enregistrer</string>
+    <string name="components_password_meter_bits">~%1$d bits</string>
+
+    <!-- ═══ family (FamilySwitcherBottomSheet, FamilySwitcherViewModel) ═══ -->
+    <string name="family_switcher_title">Tes familles</string>
+    <string name="family_switcher_created_snackbar">Famille créée ! Touche pour y passer.</string>
+    <string name="family_switcher_create_button">Créer une nouvelle famille</string>
+    <string name="family_switcher_join_button">Rejoindre une famille</string>
+    <string name="family_switcher_join_hint">Scanne le QR de la personne qui t\'invite ou saisis le code à 6 chiffres.</string>
+    <string name="family_switcher_new_family_title">Nouvelle famille</string>
+    <string name="family_switcher_new_family_placeholder">Nom de la famille (ex. Famille Martin)</string>
+    <string name="family_switcher_create_confirm">Créer</string>
+    <string name="family_switcher_cancel">Annuler</string>
+    <string name="family_switcher_active_label">Famille active</string>
+    <string name="family_switcher_error_not_authenticated">Utilisateur non authentifié</string>
+    <string name="family_switcher_error_create_failed">Erreur lors de la création</string>
+
+    <!-- ═══ permissions (LocationDisclosureDialog) ═══ -->
+    <string name="permissions_location_dialog_title">KidBox utilise ta position</string>
+    <string name="permissions_location_dialog_body_suffix">\n\nLa position n\'est collectée que lorsque tu le demandes et sert uniquement à cette fonctionnalité : nous ne la vendons pas et ne l\'utilisons pas à des fins publicitaires.\n\nÀ l\'écran suivant, Android te demandera d\'autoriser l\'accès à la position.</string>
+    <string name="permissions_location_dialog_accept">Continuer</string>
+    <string name="permissions_location_dialog_decline">Non, merci</string>
+
+    <!-- ═══ home: AvatarCropperScreen ═══ -->
+    <string name="home_avatar_cropper_cancel_desc">Annuler</string>
+    <string name="home_avatar_cropper_reset_desc">Réinitialiser</string>
+    <string name="home_avatar_cropper_title">Photo de profil</string>
+    <string name="home_avatar_cropper_hint">Fais glisser et pince pour ajuster la photo</string>
+    <string name="home_avatar_cropper_cancel">Annuler</string>
+    <string name="home_avatar_cropper_save">Enregistrer</string>
+
+    <!-- ═══ home: HeroPhotoCropperScreen ═══ -->
+    <string name="home_hero_cropper_cancel_desc">Annuler</string>
+    <string name="home_hero_cropper_reset_desc">Réinitialiser</string>
+    <string name="home_hero_cropper_title">Photo de famille</string>
+    <string name="home_hero_cropper_hint">Fais glisser pour déplacer • Pince pour zoomer</string>
+    <string name="home_hero_cropper_cancel">Annuler</string>
+    <string name="home_hero_cropper_save">Enregistrer</string>
+
+    <!-- ═══ home: HomeScreen chrome ═══ -->
+    <string name="home_change_family_desc">Changer de famille</string>
+    <string name="home_members_syncing">Synchronisation des membres…</string>
+    <string name="home_ai_assistant_desc">Assistant IA</string>
+    <string name="home_hero_default_family_name">Ta famille</string>
+    <string name="home_hero_members_count">%1$d membres</string>
+    <string name="home_hero_change_photo">Changer la photo</string>
+    <string name="home_hero_add_photo">Ajouter une photo</string>
+
+    <!-- ═══ home: promo carousel (9 slides) ═══ -->
+    <string name="home_promo_invite_title">Agrandis ton cercle. Invite de nouveaux membres</string>
+    <string name="home_promo_password_title">Les mots de passe de la famille, bien au chaud</string>
+    <string name="home_promo_password_subtitle">Partage en toute sécurité, sans quitter KidBox</string>
+    <string name="home_promo_ai_title">Pose-lui n\'importe quelle question</string>
+    <string name="home_promo_ai_subtitle">Elle répond aussitôt, dans ta langue</string>
+    <string name="home_promo_grocery_title">La liste se met à jour toute seule</string>
+    <string name="home_promo_grocery_subtitle">L\'un coche, l\'autre le voit aussitôt</string>
+    <string name="home_promo_calendar_title">Un agenda, deux parents, zéro conflit</string>
+    <string name="home_promo_expenses_title">Tu sais toujours où passe l\'argent</string>
+    <string name="home_promo_expenses_subtitle">Dépenses par catégorie, tickets et photos joints</string>
+    <string name="home_promo_documents1_title">Chaque document, toujours à portée de main</string>
+    <string name="home_promo_documents1_subtitle">Comptes rendus, certificats et photos dans un coffre sûr</string>
+    <string name="home_promo_documents2_title">Scanne. Elle s\'occupe du reste.</string>
+    <string name="home_promo_documents2_subtitle">L\'IA lit le document et propose la bonne action</string>
+    <string name="home_promo_health_title">La santé des enfants, toujours sous contrôle</string>
+    <string name="home_promo_health_subtitle">Vaccins, visites et examens : plus aucune échéance oubliée</string>
+
+    <!-- ═══ home: feature cards (titles/subtitles) ═══ -->
+    <string name="home_feature_notes_title">Notes</string>
+    <string name="home_feature_notes_subtitle">Notes rapides</string>
+    <string name="home_feature_todo_title">To-Do</string>
+    <string name="home_feature_todo_subtitle">Liste partagée</string>
+    <string name="home_feature_shopping_title">Liste de courses</string>
+    <string name="home_feature_shopping_subtitle">Liste partagée</string>
+    <string name="home_feature_calendar_title">Agenda</string>
+    <string name="home_feature_calendar_subtitle">Événements et gardes</string>
+    <string name="home_feature_health_title">Santé</string>
+    <string name="home_feature_health_subtitle">Suivi santé</string>
+    <string name="home_feature_chat_title">Chat</string>
+    <string name="home_feature_chat_subtitle">Messages de famille</string>
+    <string name="home_feature_expenses_title">Dépenses</string>
+    <string name="home_feature_expenses_subtitle">Frais, visites, extras</string>
+    <string name="home_feature_documents_title">Documents</string>
+    <string name="home_feature_documents_subtitle">Papiers importants</string>
+    <string name="home_feature_wallet_title">Wallet</string>
+    <string name="home_feature_wallet_subtitle">Billets et PDF</string>
+    <string name="home_feature_location_title">Position</string>
+    <string name="home_feature_location_subtitle">Où est tout le monde</string>
+    <string name="home_feature_photos_title">Photos et vidéos</string>
+    <string name="home_feature_photos_subtitle">Souvenirs de famille</string>
+    <string name="home_feature_pets_title">Animaux</string>
+    <string name="home_feature_pets_subtitle">Soins et rappels</string>
+    <string name="home_feature_home_items_title">Maison</string>
+    <string name="home_feature_home_items_subtitle">Garanties et entretien</string>
+    <string name="home_feature_vehicles_title">Garage</string>
+    <string name="home_feature_vehicles_subtitle">Voitures et échéances</string>
+    <string name="home_feature_travel_title">Voyages</string>
+    <string name="home_feature_travel_subtitle_locked">Plan Pro ou Max pour l\'IA</string>
+    <string name="home_feature_travel_subtitle_unlocked">Planifie avec l\'IA</string>
+    <string name="home_feature_ai_title_locked">Assistant</string>
+    <string name="home_feature_ai_title_unlocked">Assistant IA</string>
+    <string name="home_feature_ai_subtitle_locked">Disponible avec Pro ou Max</string>
+    <string name="home_feature_ai_subtitle_unlocked">Demande de l\'aide</string>
+    <string name="home_feature_passwords_title">Mots de passe</string>
+    <string name="home_feature_passwords_subtitle">Identifiants de la famille</string>
+    <string name="home_feature_family_title">Famille</string>
+    <string name="home_feature_family_subtitle">Gérer la famille</string>
+
+    <!-- ═══ home: category groups ═══ -->
+    <string name="home_group_organization">Organisation</string>
+    <string name="home_group_family_health">Famille &amp; Santé</string>
+    <string name="home_group_documents_money">Documents &amp; Argent</string>
+    <string name="home_group_daily_life">Vie quotidienne</string>
+    <string name="home_shortcuts_eyebrow">Raccourcis</string>
+
+    <!-- ═══ home: HomeViewModel ═══ -->
+    <string name="home_vm_member_default_name">Membre</string>
+    <string name="home_vm_removed_from_family_toast">Tu as été retiré de la famille</string>
+    <string name="home_vm_members_sync_slow_warning">Synchronisation des membres lente. Mise à jour dès que possible.</string>
+    <string name="home_vm_error_create_family_first">Crée d\'abord une famille pour envoyer une photo</string>
+    <string name="home_vm_error_read_image">Impossible de lire l\'image</string>
+    <string name="home_vm_error_image_unavailable">Image indisponible, réessaie</string>
+    <string name="home_vm_error_upload_photo">Erreur lors de l\'envoi de la photo</string>
+    <string name="home_vm_error_image_unreadable">Image illisible</string>
+    <string name="home_vm_error_image_invalid">Image non valide</string>
+
+    <!-- ═══ home: ProfileScreen ═══ -->
+    <string name="home_profile_delete_account_title">Supprimer le compte</string>
+    <string name="home_profile_delete_account_confirm_hint">Pour confirmer, écris SUPPRIMER. Cette action supprime le compte et les données.</string>
+    <string name="home_profile_delete_type_placeholder">Saisis SUPPRIMER</string>
+    <string name="home_profile_cancel">Annuler</string>
+    <string name="home_profile_delete_confirm">Supprimer</string>
+    <string name="home_profile_logout_title">Se déconnecter ?</string>
+    <string name="home_profile_logout_body">Tu seras redirigé vers l\'écran de connexion.</string>
+    <string name="home_profile_logout_confirm">Déconnexion</string>
+    <string name="home_profile_title">Profil</string>
+    <string name="home_profile_name_placeholder">Prénom</string>
+    <string name="home_profile_surname_placeholder">Nom</string>
+    <string name="home_profile_save_changes">Enregistrer les modifications</string>
+    <string name="home_profile_address_section_title">ADRESSE DE LA FAMILLE</string>
+    <string name="home_profile_address_placeholder">Rechercher une adresse…</string>
+    <string name="home_profile_use_current_location_loading">Localisation en cours…</string>
+    <string name="home_profile_use_current_location">Utiliser ma position actuelle</string>
+    <string name="home_profile_account_section_title">COMPTE</string>
+    <string name="home_profile_email_label">E-mail</string>
+    <string name="home_profile_last_login_label">Dernière connexion</string>
+    <string name="home_profile_subscription_section_title">ABONNEMENT</string>
+    <string name="home_profile_upgrade">Passer au supérieur</string>
+    <string name="home_profile_storage_used_of_total">%1$s sur %2$s</string>
+    <string name="home_profile_manage_storage_plans">Gérer l\'espace et les plans</string>
+    <string name="home_profile_logout_action">Déconnexion</string>
+    <string name="home_profile_delete_account_action">Supprimer le compte</string>
+    <string name="home_profile_saved">Profil enregistré.</string>
+    <string name="home_profile_location_disclosure_purpose">KidBox collecte les données de position de ton appareil pour retrouver ton adresse et remplir automatiquement le champ adresse du profil.</string>
+    <string name="home_profile_placeholder_dash">—</string>
+
+    <!-- ═══ home: ProfileViewModel ═══ -->
+    <string name="home_profile_vm_plan_free">Plan Free</string>
+    <string name="home_profile_vm_plan_label">Plan %1$s</string>
+    <string name="home_profile_vm_error_location_unavailable">Position indisponible</string>
+    <string name="home_profile_vm_error_location_resolve">Erreur de localisation</string>
+    <string name="home_profile_vm_error_save">Erreur d\'enregistrement</string>
+    <string name="home_profile_vm_error_delete_account">Erreur lors de la suppression du compte</string>
+
+    <!-- ═══ home: SuggestionsScreen ═══ -->
+    <string name="home_suggestions_title">Astuces</string>
+    <string name="home_suggestions_notes_body">Écris des notes libres ou mises en forme (gras, italique, listes) et choisis de les partager avec toute la famille ou de les garder pour toi.</string>
+    <string name="home_suggestions_todo_body">Crée des listes de tâches et attribue-les à un membre de la famille. Dès que quelqu\'un coche une tâche, tout le monde la voit mise à jour à l\'instant.</string>
+    <string name="home_suggestions_shopping_body">La liste de courses est partagée en temps réel : si un proche coche un produit au supermarché, tu le vois aussitôt. Les produits sont classés par rayon pour faire les courses plus vite.</string>
+    <string name="home_suggestions_calendar_body">Un agenda unique pour toute la famille, avec des catégories colorées et des événements récurrents. Tu peux relier un événement à une visite ou à un vaccin, pour ne jamais oublier une échéance de santé.</string>
+    <string name="home_suggestions_health_body">Gère le dossier médical, les vaccins, les visites et les examens de chaque enfant. Demande à l\'assistant IA un résumé de l\'état de santé ou un conseil basé sur l\'historique clinique.</string>
+    <string name="home_suggestions_documents_body">Envoie et partage documents et images avec les membres de la famille que tu choisis, ou garde-les pour toi. Si un PDF est protégé par mot de passe, tu peux le retirer directement depuis l\'app, et en sélectionnant plusieurs PDF tu peux les fusionner en un seul fichier.</string>
+    <string name="home_suggestions_expenses_body">Suis les dépenses de la famille par catégorie, joins tickets et photos et découvre d\'un coup d\'œil qui a dépensé quoi et quand.</string>
+    <string name="home_suggestions_wallet_body">Conserve billets, cartes et pièces d\'identité de la famille au même endroit, toujours à portée de main même sans connexion.</string>
+    <string name="home_suggestions_passwords_body">Enregistre les mots de passe de la famille en toute sécurité et partage-les seulement avec qui tu veux. Chaque mot de passe affiche un indicateur de robustesse, pour savoir tout de suite lesquels changer.</string>
+    <string name="home_suggestions_location_body">Partage ta position en temps réel avec la famille et crée des zones (geofence) pour être averti quand un enfant entre ou sort d\'un lieu, comme l\'école ou la maison.</string>
+    <string name="home_suggestions_photos_body">Rassemble les photos et vidéos importantes de la famille dans des albums partagés, organisés automatiquement par date.</string>
+    <string name="home_suggestions_family_body">Gère les membres de la famille, invite un nouveau parent avec un QR code et garde un œil sur qui fait partie du foyer.</string>
+    <string name="home_suggestions_pets_body">Garde une trace des vaccins, des visites vétérinaires et des rappels pour chaque animal de la famille.</string>
+    <string name="home_suggestions_home_items_body">Enregistre l\'électroménager, les garanties et les échéances d\'entretien de la maison, avec des rappels automatiques à l\'approche d\'une échéance.</string>
+    <string name="home_suggestions_vehicles_body">Garde le contrôle sur la carte grise, l\'assurance, le contrôle technique et l\'entretien de chaque véhicule de la famille, sans oublier les échéances.</string>
+    <string name="home_suggestions_travel_body">Organise tes voyages avec itinéraires, documents et checklists, le tout partagé avec ceux qui partent avec toi.</string>
+    <string name="home_suggestions_ai_body">Demande n\'importe quoi sur ta famille : l\'assistant connaît la santé, les documents, les dépenses, l\'agenda et les mots de passe, et peut créer des événements ou des rappels à ta place.</string>
+
+    <!-- ═══ share (ShareActionHandler, ShareBottomSheet, ShareDestination, ShareReceiverActivity) ═══ -->
+    <string name="share_default_note_title">Partagé</string>
+    <string name="share_error_no_child_for_todo">Aucun enfant disponible pour créer le To-Do</string>
+    <string name="share_default_todo_list_name">Général</string>
+    <string name="share_default_todo_title">Nouveau To-Do</string>
+    <string name="share_default_document_name">Document</string>
+    <string name="share_default_shopping_item">Nouvel élément</string>
+    <string name="share_default_event_title">Nouvel événement</string>
+    <string name="share_error_storage_full">Espace épuisé. Change de plan pour continuer.</string>
+
+    <string name="share_destination_chat">Chat de famille</string>
+    <string name="share_destination_note">Notes</string>
+    <string name="share_destination_todo">To-Do</string>
+    <string name="share_destination_documents">Documents</string>
+    <string name="share_destination_shopping">Liste de courses</string>
+    <string name="share_destination_photos">Photos et vidéos</string>
+    <string name="share_destination_event">Événement</string>
+
+    <string name="share_sheet_title">Partager dans KidBox</string>
+    <string name="share_sheet_title_field_label">Titre (facultatif)</string>
+    <string name="share_sheet_confirm">Confirmer</string>
+    <string name="share_sheet_cancel">Annuler</string>
+    <string name="share_preview_video_name">Vidéo partagée</string>
+    <string name="share_preview_pdf_name">Document PDF</string>
+    <string name="share_preview_file_name">Fichier partagé</string>
+    <string name="share_preview_unknown_name">Contenu non reconnu</string>
+    <string name="share_preview_unknown_subtitle">Tu peux quand même l\'envoyer dans le chat.</string>
+    <string name="share_preview_image_desc">Aperçu de l\'image</string>
+
+    <string name="share_receiver_login_required">Connecte-toi à KidBox pour partager du contenu</string>
+    <string name="share_receiver_open_kidbox">Ouvrir KidBox</string>
+    <string name="share_receiver_family_not_found">Famille introuvable. Ouvre KidBox et réessaie.</string>
+    <string name="share_receiver_shared_success">Contenu partagé</string>
+    <string name="share_receiver_error_generic">Erreur lors du partage</string>
+
+    <!-- ═══ splash (SplashScreen) ═══ -->
+    <string name="splash_tagline">Ta famille, dans une seule app.</string>
+
+    <!-- ═══ subscription (PlansScreen) ═══ -->
+    <string name="subscription_purchase_error_title">Erreur d\'achat</string>
+    <string name="subscription_ok">OK</string>
+    <string name="subscription_back_desc">Retour</string>
+    <string name="subscription_plans_title">Plans KidBox</string>
+    <string name="subscription_plans_subtitle">Un seul abonnement couvre tous les membres.</string>
+    <string name="subscription_owner_managed_title">Plan géré par le propriétaire</string>
+    <string name="subscription_owner_managed_body">Seul le propriétaire de la famille peut activer ou changer un abonnement. Demande-lui de passer à un plan supérieur s\'il te faut plus d\'espace ou les fonctions IA.</string>
+    <string name="subscription_plan_free_name">Free</string>
+    <string name="subscription_plan_free_price">0 € / mois</string>
+    <string name="subscription_plan_free_badge">Gratuit</string>
+    <string name="subscription_plan_free_feature_storage">200 Mo de stockage famille</string>
+    <string name="subscription_plan_free_feature_ai">IA non incluse</string>
+    <string name="subscription_plan_pro_name">Pro</string>
+    <string name="subscription_plan_pro_price">4,99 €/mois</string>
+    <string name="subscription_plan_pro_badge">Le plus populaire</string>
+    <string name="subscription_plan_pro_feature_storage">5 Go de stockage famille</string>
+    <string name="subscription_plan_pro_feature_ai_msgs">30 messages IA/jour</string>
+    <string name="subscription_plan_max_name">Max</string>
+    <string name="subscription_plan_max_price">9,99 €/mois</string>
+    <string name="subscription_plan_max_badge">Le meilleur</string>
+    <string name="subscription_plan_max_feature_storage">20 Go de stockage famille</string>
+    <string name="subscription_plan_max_feature_ai_msgs">100 messages IA/jour</string>
+    <string name="subscription_plan_max_feature_support">Assistance prioritaire</string>
+    <string name="subscription_feature_ai_weekly_summary">Synthèse hebdomadaire IA</string>
+    <string name="subscription_subscribe">S\'abonner</string>
+    <string name="subscription_restore_purchases">Restaurer les achats précédents</string>
+    <string name="subscription_auto_renew_notice">Les abonnements se renouvellent automatiquement. Tu peux les gérer dans Paramètres &gt; Google Play &gt; Abonnements.</string>
+    <string name="subscription_terms_of_service">Conditions d\'utilisation</string>
+    <string name="subscription_privacy_policy">Politique de confidentialité</string>
+    <string name="home_view_mode_list_desc">Vue liste</string>
+    <string name="home_view_mode_grid_desc">Vue grille</string>
+    <string name="settings_language_system">Langue du système</string>
+</resources>

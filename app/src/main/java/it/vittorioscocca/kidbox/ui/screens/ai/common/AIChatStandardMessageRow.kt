@@ -23,8 +23,9 @@ import it.vittorioscocca.kidbox.ui.theme.KidBoxColorScheme
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
 
-private val TIME_FMT = SimpleDateFormat("HH:mm", Locale.ITALIAN)
+private fun TIME_FMT() = SimpleDateFormat("HH:mm", KBLocale.current())
 
 @Composable
 fun AIChatStandardMessageRow(
@@ -112,7 +113,7 @@ fun AIChatStandardMessageRow(
         }
         Spacer(Modifier.height(2.dp))
         Text(
-            TIME_FMT.format(Date(createdAtEpochMillis)),
+            TIME_FMT().format(Date(createdAtEpochMillis)),
             fontSize = 10.sp,
             color = kb.subtitle,
         )

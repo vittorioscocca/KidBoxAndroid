@@ -63,6 +63,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.entity.KBGroceryItemEntity
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,7 +104,7 @@ fun GroceryListScreen(
                     HeaderCircleButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Indietro",
+                            contentDescription = stringResource(R.string.grocery_back),
                             tint = kb.title,
                         )
                     }
@@ -113,14 +115,14 @@ fun GroceryListScreen(
                     }) {
                         Icon(
                             Icons.Default.Add,
-                            contentDescription = "Aggiungi prodotto",
+                            contentDescription = stringResource(R.string.grocery_add_product),
                             tint = kb.title,
                         )
                     }
                 }
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    "Spesa",
+                    stringResource(R.string.grocery_title),
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontWeight = FontWeight.Bold,
                         fontSize = 40.sp,
@@ -137,7 +139,7 @@ fun GroceryListScreen(
                     .padding(padding),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("Caricamento lista...")
+                Text(stringResource(R.string.grocery_loading))
             }
         } else {
             LazyColumn(
@@ -159,7 +161,7 @@ fun GroceryListScreen(
                                 .padding(top = 2.dp),
                         ) {
                             Text(
-                                text = "Lista vuota",
+                                text = stringResource(R.string.grocery_empty),
                                 color = groceryTextMuted,
                                 style = MaterialTheme.typography.titleLarge,
                                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
@@ -171,7 +173,7 @@ fun GroceryListScreen(
                 state.groupedToBuy.forEach { (category, itemsInCategory) ->
                     item(key = "header_$category") {
                         Text(
-                            text = category,
+                            text = groceryCategoryLabel(category),
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                             color = kb.title,
                             modifier = Modifier.padding(top = 10.dp, bottom = 6.dp),
@@ -206,7 +208,7 @@ fun GroceryListScreen(
                             )
                             Spacer(Modifier.weight(1f))
                             TextButton(onClick = { showDeletePurchasedAlert = true }) {
-                                Text("Elimina tutti", color = Color(0xFFE35156))
+                                Text(stringResource(R.string.grocery_delete_all), color = Color(0xFFE35156))
                             }
                         }
                     }
@@ -250,16 +252,16 @@ fun GroceryListScreen(
     if (showDeletePurchasedAlert) {
         AlertDialog(
             onDismissRequest = { showDeletePurchasedAlert = false },
-            title = { Text("Elimina acquistati") },
-            text = { Text("Vuoi eliminare tutti i prodotti già acquistati?") },
+            title = { Text(stringResource(R.string.grocery_delete_bought)) },
+            text = { Text(stringResource(R.string.grocery_delete_bought_q)) },
             confirmButton = {
                 Button(onClick = {
                     showDeletePurchasedAlert = false
                     scope.launch { viewModel.deleteAllPurchased() }
-                }) { Text("Elimina") }
+                }) { Text(stringResource(R.string.life_delete)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeletePurchasedAlert = false }) { Text("Annulla") }
+                TextButton(onClick = { showDeletePurchasedAlert = false }) { Text(stringResource(R.string.life_cancel)) }
             },
         )
     }
@@ -319,7 +321,7 @@ private fun GroceryRow(
             if (item.isPurchased) {
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "Segna acquistato",
+                    contentDescription = stringResource(R.string.grocery_mark_bought),
                     tint = Color(0xFF27AE60),
                 )
             } else {
@@ -346,7 +348,7 @@ private fun GroceryRow(
                 )
             }
         }
-        TextButton(onClick = onDelete) { Text("Elimina", color = Color(0xFFE35156)) }
+        TextButton(onClick = onDelete) { Text(stringResource(R.string.life_delete), color = Color(0xFFE35156)) }
     }
 }
 
@@ -361,15 +363,7 @@ private fun GroceryEditDialog(
     var name by remember(initialItem?.id) { mutableStateOf(initialItem?.name.orEmpty()) }
     var category by remember(initialItem?.id) { mutableStateOf(initialItem?.category.orEmpty()) }
     var notes by remember(initialItem?.id) { mutableStateOf(initialItem?.notes.orEmpty()) }
-    val categories = listOf(
-        "Frutta e Verdura",
-        "Carne e Pesce",
-        "Latticini",
-        "Pane e Cereali",
-        "Surgelati",
-        "Bevande",
-        "Altro",
-    )
+    val categories = GroceryCategory.entries
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -387,17 +381,17 @@ private fun GroceryEditDialog(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PillButton(
-                    text = "Annulla",
+                    text = stringResource(R.string.life_cancel),
                     onClick = onDismiss,
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    text = if (initialItem == null) "Nuovo prodotto" else "Modifica prodotto",
+                    text = if (initialItem == null) stringResource(R.string.grocery_new_product) else stringResource(R.string.grocery_edit_product),
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                 )
                 Spacer(Modifier.weight(1f))
                 PillButton(
-                    text = "Salva",
+                    text = stringResource(R.string.life_save),
                     onClick = {
                         onSave(
                             name.trim(),
@@ -409,21 +403,22 @@ private fun GroceryEditDialog(
                 )
             }
             Spacer(Modifier.height(18.dp))
-            Text("Prodotto", style = MaterialTheme.typography.titleMedium.copy(color = kb.subtitle, fontWeight = FontWeight.Bold))
+            Text(stringResource(R.string.grocery_product), style = MaterialTheme.typography.titleMedium.copy(color = kb.subtitle, fontWeight = FontWeight.Bold))
             Spacer(Modifier.height(8.dp))
-            AppleTextField(value = name, onValueChange = { name = it }, placeholder = "Nome prodotto")
+            AppleTextField(value = name, onValueChange = { name = it }, placeholder = stringResource(R.string.grocery_product_name))
 
             Spacer(Modifier.height(16.dp))
-            Text("Categoria", style = MaterialTheme.typography.titleMedium.copy(color = kb.subtitle, fontWeight = FontWeight.Bold))
+            Text(stringResource(R.string.life_category), style = MaterialTheme.typography.titleMedium.copy(color = kb.subtitle, fontWeight = FontWeight.Bold))
             Spacer(Modifier.height(8.dp))
             Card(
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = kb.card),
             ) {
+                val knownCategory = GroceryCategory.fromStored(category)
                 AppleTextField(
-                    value = category,
+                    value = if (knownCategory != null) stringResource(knownCategory.labelRes) else category,
                     onValueChange = { category = it },
-                    placeholder = "Es. Frutta e Verdura",
+                    placeholder = stringResource(R.string.grocery_cat_hint),
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.padding(10.dp),
                 )
@@ -440,14 +435,15 @@ private fun GroceryEditDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(categories) { cat ->
+                        val isSelected = GroceryCategory.fromStored(category) == cat
                         Surface(
                             shape = RoundedCornerShape(999.dp),
-                            color = if (category == cat) kb.title else kb.background,
-                            modifier = Modifier.clickable { category = cat },
+                            color = if (isSelected) kb.title else kb.background,
+                            modifier = Modifier.clickable { category = cat.key },
                         ) {
                             Text(
-                                text = cat,
-                                color = if (category == cat) kb.card else kb.title,
+                                text = stringResource(cat.labelRes),
+                                color = if (isSelected) kb.card else kb.title,
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                             )
@@ -457,12 +453,12 @@ private fun GroceryEditDialog(
             }
 
             Spacer(Modifier.height(16.dp))
-            Text("Note (opzionale)", style = MaterialTheme.typography.titleMedium.copy(color = kb.subtitle, fontWeight = FontWeight.Bold))
+            Text(stringResource(R.string.grocery_notes_optional), style = MaterialTheme.typography.titleMedium.copy(color = kb.subtitle, fontWeight = FontWeight.Bold))
             Spacer(Modifier.height(8.dp))
             AppleTextField(
                 value = notes,
                 onValueChange = { notes = it },
-                placeholder = "Es. marca preferita, quantità...",
+                placeholder = stringResource(R.string.grocery_notes_hint),
                 minLines = 3,
             )
             Spacer(Modifier.height(20.dp))

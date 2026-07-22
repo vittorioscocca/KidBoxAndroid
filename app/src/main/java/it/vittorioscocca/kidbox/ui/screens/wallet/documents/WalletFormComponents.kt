@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.wallet.documents
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -59,7 +61,7 @@ fun NotifyRow(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            "Avvisami una settimana prima della scadenza",
+            stringResource(R.string.wallet_document_notify_before_expiry),
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f).padding(end = 12.dp),
         )

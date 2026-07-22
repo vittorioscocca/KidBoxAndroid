@@ -5,6 +5,7 @@ import androidx.room.RoomDatabase
 import it.vittorioscocca.kidbox.data.local.dao.KBAIConversationDao
 import it.vittorioscocca.kidbox.data.local.dao.KBAIMessageDao
 import it.vittorioscocca.kidbox.data.local.dao.KBHealthInsightDao
+import it.vittorioscocca.kidbox.data.local.dao.NudgeSignalsDao
 import it.vittorioscocca.kidbox.data.local.dao.KBMemoryFactDao
 import it.vittorioscocca.kidbox.data.local.dao.KBCalendarEventDao
 import it.vittorioscocca.kidbox.data.local.dao.KBChatMessageDao
@@ -100,7 +101,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBTripExpenseEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTripLegEntity
 
 @Database(
-    version = 34,
+    version = 35,
     exportSchema = false,
     entities = [
         KBUserProfileEntity::class,
@@ -202,4 +203,10 @@ abstract class KidBoxDatabase : RoomDatabase() {
     abstract fun tripDayPlanDao(): KBTripDayPlanDao
     abstract fun tripExpenseDao(): KBTripExpenseDao
     abstract fun packingItemDao(): KBPackingItemDao
+
+    /**
+     * Solo letture di conteggio per il motore di nudge. Non introduce entità
+     * nuove, quindi non serve una migrazione: legge tabelle che esistono già.
+     */
+    abstract fun nudgeSignalsDao(): NudgeSignalsDao
 }

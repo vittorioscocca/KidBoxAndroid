@@ -50,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -57,20 +58,30 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.BuildConfig
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import it.vittorioscocca.kidbox.util.CrashReportPreferences
+import it.vittorioscocca.kidbox.util.KBLocale
 import it.vittorioscocca.kidbox.util.KBLog
 import java.util.Calendar
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private enum class NoteSection(val label: String) {
-    PINNED("In evidenza"),
-    LAST_7("Ultimi 7 giorni"),
-    LAST_30("Ultimi 30 giorni"),
-    OLDER("Più vecchie"),
+private enum class NoteSection {
+    PINNED,
+    LAST_7,
+    LAST_30,
+    OLDER,
+}
+
+@Composable
+private fun NoteSection.label(): String = when (this) {
+    NoteSection.PINNED -> stringResource(R.string.notes_section_pinned)
+    NoteSection.LAST_7 -> stringResource(R.string.notes_section_last7)
+    NoteSection.LAST_30 -> stringResource(R.string.notes_section_last30)
+    NoteSection.OLDER -> stringResource(R.string.notes_section_older)
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -158,7 +169,11 @@ fun NotesHomeScreen(
             Spacer(Modifier.weight(1f))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = if (isSelecting) "Fine" else "Seleziona",
+                    text = if (isSelecting) {
+                        stringResource(R.string.notes_selection_done)
+                    } else {
+                        stringResource(R.string.notes_selection_select)
+                    },
                     color = kb.subtitle,
                     fontSize = 13.sp,
                     modifier = Modifier
@@ -186,7 +201,7 @@ fun NotesHomeScreen(
         }
 
         Text(
-            text = "Note",
+            text = stringResource(R.string.notes_home_title),
             color = kb.title,
             fontSize = 40.sp,
             fontWeight = FontWeight.ExtraBold,
@@ -197,7 +212,7 @@ fun NotesHomeScreen(
             value = searchQuery,
             onValueChange = { searchQuery = it },
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Cerca nelle note") },
+            placeholder = { Text(stringResource(R.string.notes_search_placeholder)) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             singleLine = true,
             shape = RoundedCornerShape(16.dp),
@@ -220,13 +235,21 @@ fun NotesHomeScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = if (selectedIds.isEmpty()) "Seleziona note" else "${selectedIds.size} selezionate",
+                    text = if (selectedIds.isEmpty()) {
+                        stringResource(R.string.notes_select_notes)
+                    } else {
+                        stringResource(R.string.notes_selected_count, selectedIds.size)
+                    },
                     color = kb.subtitle,
                     fontSize = 13.sp,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = if (selectedIds.size == allVisibleIds.size && allVisibleIds.isNotEmpty()) "Deseleziona tutto" else "Seleziona tutto",
+                        text = if (selectedIds.size == allVisibleIds.size && allVisibleIds.isNotEmpty()) {
+                            stringResource(R.string.notes_deselect_all)
+                        } else {
+                            stringResource(R.string.notes_select_all)
+                        },
                         color = kb.subtitle,
                         fontSize = 13.sp,
                         modifier = Modifier.clickable {
@@ -243,7 +266,7 @@ fun NotesHomeScreen(
                     ) {
                         Icon(
                             Icons.Default.Delete,
-                            contentDescription = "Elimina selezione",
+                            contentDescription = stringResource(R.string.notes_delete_selection_cd),
                             tint = if (selectedIds.isEmpty()) kb.subtitle else Color(0xFFD62828),
                         )
                     }
@@ -256,13 +279,13 @@ fun NotesHomeScreen(
         when {
             state.isLoading -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Caricamento note...", color = kb.subtitle)
+                    Text(stringResource(R.string.notes_loading), color = kb.subtitle)
                 }
             }
 
             state.notes.isEmpty() -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Nessuna nota. Tocca + per crearne una.", color = kb.subtitle)
+                    Text(stringResource(R.string.notes_empty_state), color = kb.subtitle)
                 }
             }
 
@@ -279,14 +302,14 @@ fun NotesHomeScreen(
                                     .padding(top = 32.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Text("Nessun risultato", color = kb.subtitle)
+                                Text(stringResource(R.string.notes_no_results), color = kb.subtitle)
                             }
                         }
                     } else {
                         sectioned.forEach { (section, notes) ->
                             item(key = "section-${section.name}") {
                                 Text(
-                                    text = section.label.uppercase(Locale.getDefault()),
+                                    text = section.label().uppercase(KBLocale.current()),
                                     color = kb.subtitle,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
@@ -351,7 +374,7 @@ fun NotesHomeScreen(
                                                     .padding(end = 6.dp),
                                             )
                                             Text(
-                                                text = note.title.ifBlank { "Senza titolo" },
+                                                text = note.title.ifBlank { stringResource(R.string.notes_untitled) },
                                                 color = kb.title,
                                                 fontWeight = FontWeight.SemiBold,
                                                 fontSize = 18.sp,
@@ -372,7 +395,7 @@ fun NotesHomeScreen(
                                                 ) {
                                                     Icon(
                                                         Icons.Default.PinDrop,
-                                                        contentDescription = "Pin",
+                                                        contentDescription = stringResource(R.string.notes_pin_cd),
                                                         tint = pinTint,
                                                         modifier = Modifier.size(16.dp),
                                                     )
@@ -383,7 +406,7 @@ fun NotesHomeScreen(
                                                 ) {
                                                     Icon(
                                                         Icons.Default.Delete,
-                                                        contentDescription = "Elimina",
+                                                        contentDescription = stringResource(R.string.notes_delete_cd),
                                                         tint = kb.subtitle,
                                                         modifier = Modifier.size(17.dp),
                                                     )
@@ -392,14 +415,14 @@ fun NotesHomeScreen(
                                         }
                                         Spacer(Modifier.height(6.dp))
                                         Text(
-                                            text = previewFor(note.body),
+                                            text = previewFor(note.body, stringResource(R.string.notes_no_content)),
                                             color = kb.subtitle,
                                             maxLines = 2,
                                             fontSize = 14.sp,
                                         )
                                         Spacer(Modifier.height(8.dp))
                                         Text(
-                                            text = formatDate(note.updatedAtEpochMillis),
+                                            text = formatDate(note.updatedAtEpochMillis, stringResource(R.string.notes_yesterday)),
                                             color = kb.subtitle,
                                             fontSize = 12.sp,
                                         )
@@ -414,13 +437,13 @@ fun NotesHomeScreen(
     }
 }
 
-private fun previewFor(text: String): String {
+private fun previewFor(text: String, emptyPlaceholder: String): String {
     val plain = text.htmlToPlainText()
-    if (plain.isBlank()) return "Nessun contenuto"
+    if (plain.isBlank()) return emptyPlaceholder
     return plain.replace('\n', ' ')
 }
 
-private fun formatDate(epochMillis: Long): String {
+private fun formatDate(epochMillis: Long, yesterdayLabel: String): String {
     val date = Date(epochMillis)
     val cal = Calendar.getInstance()
     val today = Calendar.getInstance()
@@ -428,13 +451,13 @@ private fun formatDate(epochMillis: Long): String {
     return when {
         cal.get(Calendar.YEAR) == today.get(Calendar.YEAR) &&
             cal.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR) ->
-            SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)
+            SimpleDateFormat("HH:mm", KBLocale.current()).format(date)
 
         cal.get(Calendar.YEAR) == today.get(Calendar.YEAR) &&
             cal.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR) - 1 ->
-            "Ieri"
+            yesterdayLabel
 
-        else -> SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(date)
+        else -> SimpleDateFormat("dd/MM/yyyy HH:mm", KBLocale.current()).format(date)
     }
 }
 

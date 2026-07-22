@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun MessageSettingsScreen(
@@ -54,12 +56,12 @@ fun MessageSettingsScreen(
             IconButton(onClick = onBack) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Indietro",
+                    contentDescription = stringResource(R.string.settings_common_back),
                     tint = kb.title,
                 )
             }
             Text(
-                text = "Messaggi",
+                text = stringResource(R.string.settings_messages_title),
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                 color = kb.title,
             )
@@ -87,12 +89,12 @@ fun MessageSettingsScreen(
                     )
                     Column(modifier = Modifier.padding(start = 12.dp)) {
                         Text(
-                            text = "Trascrizione messaggi vocali",
+                            text = stringResource(R.string.settings_messages_transcription_title),
                             style = MaterialTheme.typography.titleMedium,
                             color = kb.title,
                         )
                         Text(
-                            text = "Converte automaticamente i vocali in testo",
+                            text = stringResource(R.string.settings_messages_transcription_sub),
                             style = MaterialTheme.typography.bodySmall,
                             color = kb.subtitle,
                         )
@@ -106,7 +108,7 @@ fun MessageSettingsScreen(
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "La trascrizione e' best-effort e dipende dai servizi vocali disponibili sul dispositivo.",
+            text = stringResource(R.string.settings_messages_transcription_note),
             style = MaterialTheme.typography.bodySmall,
             color = kb.subtitle,
         )

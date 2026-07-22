@@ -38,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -49,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import it.vittorioscocca.kidbox.R
 
 data class HeroCrop(
     val scale: Float = 1f,
@@ -93,10 +95,10 @@ fun HeroPhotoCropperScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = { if (!isSaving) onCancel() }) {
-                Icon(Icons.Filled.Close, contentDescription = "Annulla", tint = Color.White)
+                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.home_hero_cropper_cancel_desc), tint = Color.White)
             }
             Text(
-                "Foto famiglia",
+                stringResource(R.string.home_hero_cropper_title),
                 color = Color.White,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 17.sp,
@@ -106,7 +108,7 @@ fun HeroPhotoCropperScreen(
                     scale = 1f; offsetX = 0f; offsetY = 0f
                 }
             }) {
-                Icon(Icons.Filled.RestartAlt, contentDescription = "Reset", tint = Color.White)
+                Icon(Icons.Filled.RestartAlt, contentDescription = stringResource(R.string.home_hero_cropper_reset_desc), tint = Color.White)
             }
         }
 
@@ -160,7 +162,7 @@ fun HeroPhotoCropperScreen(
                     .padding(horizontal = 10.dp, vertical = 6.dp),
             ) {
                 Text(
-                    "Trascina per spostare • Pinch per zoom",
+                    stringResource(R.string.home_hero_cropper_hint),
                     color = Color.White,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -195,7 +197,7 @@ fun HeroPhotoCropperScreen(
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
             ) {
-                Text("Annulla")
+                Text(stringResource(R.string.home_hero_cropper_cancel))
             }
             Button(
                 onClick = {
@@ -213,7 +215,7 @@ fun HeroPhotoCropperScreen(
                     )
                 } else {
                     Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White)
-                    Text(" Salva", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(" " + stringResource(R.string.home_hero_cropper_save), color = Color.White, fontWeight = FontWeight.SemiBold)
                 }
             }
         }

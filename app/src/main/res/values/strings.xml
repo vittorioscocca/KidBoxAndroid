@@ -11,4 +11,22 @@
     <string name="ai_exact_alarm_banner_title">Notifiche puntuali alle 8:00</string>
     <string name="ai_exact_alarm_banner_body">Per ricevere briefing e riepilogo esattamente alle 8:00, consenti gli allarmi e promemoria per KidBox nelle impostazioni di sistema.</string>
     <string name="ai_exact_alarm_banner_action">Apri impostazioni</string>
+
+    <!-- Nudge: suggerimenti in-app su aree mai usate (NudgeCatalog.kt) -->
+    <string name="nudge_family_invite_title">KidBox funziona in famiglia</string>
+    <string name="nudge_family_invite_body">Invita l\'altro genitore o gli altri membri: documenti, wallet, salute, spese e calendario diventano condivisi e aggiornati per tutti, in tempo reale.</string>
+    <string name="nudge_documents_title">I documenti, sempre con te</string>
+    <string name="nudge_documents_body">Carica un documento una volta sola: tutta la famiglia lo vede subito, senza doverlo chiedere a nessuno.</string>
+    <string name="nudge_wallet_title">Carte d\'identità e biglietti nel Wallet</string>
+    <string name="nudge_wallet_body">Conserva documenti d\'identità e di viaggio, e ricevi un promemoria una settimana prima che scadano.</string>
+    <string name="nudge_health_title">La salute dei tuoi figli, in un posto solo</string>
+    <string name="nudge_health_body">Visite, accertamenti, cure e cartella clinica: lo storico completo, condiviso con chi se ne occupa insieme a te.</string>
+    <string name="nudge_ai_title">Chiedi, invece di cercare</string>
+    <string name="nudge_ai_body">L\'assistente conosce quello che hai in KidBox: fai una domanda, e può anche creare promemoria ed eventi per te.</string>
+    <string name="nudge_chat_title">La chat di famiglia</string>
+    <string name="nudge_chat_body">Un posto solo per parlarne, con accanto i documenti e le foto di cui state parlando.</string>
+    <string name="nudge_calendar_title">Un calendario che vedete in due</string>
+    <string name="nudge_calendar_body">Visite, sport, compleanni: chi c\'è, quando, e chi ci pensa. Senza rincorrersi a messaggi.</string>
+    <string name="settings_notif_tips">Consigli su KidBox</string>
+    <string name="settings_notif_tips_sub">Suggerimenti occasionali sulle funzioni che non hai ancora provato.</string>
 </resources>

@@ -2,6 +2,8 @@
 
 package it.vittorioscocca.kidbox.ui.screens.wallet.documents
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -61,6 +63,7 @@ fun AddWalletDocumentSheet(
     onUpgrade: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -118,7 +121,7 @@ fun AddWalletDocumentSheet(
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text("Nuovo documento", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.wallet_document_new_document_title), style = MaterialTheme.typography.titleLarge)
 
             KindDropdown(selected = kind, onSelected = { kind = it; title = it.displayName })
             OwnerDropdown(owners = state.owners, selected = owner, onSelected = { owner = it })
@@ -126,13 +129,13 @@ fun AddWalletDocumentSheet(
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
-                label = { Text("Titolo") },
+                label = { Text(stringResource(R.string.wallet_label_title)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
 
             if (pages.isEmpty()) {
-                val scanLabel = if (kind != DocumentKind.CODICE_FISCALE) "Scansiona documento (fronte e retro)" else "Scansiona documento"
+                val scanLabel = if (kind != DocumentKind.CODICE_FISCALE) stringResource(R.string.wallet_document_scan_both_sides) else stringResource(R.string.wallet_document_scan_single)
                 Button(onClick = { launchScanner() }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Filled.DocumentScanner, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
                     Text(scanLabel)
@@ -151,7 +154,7 @@ fun AddWalletDocumentSheet(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { launchScanner() }, modifier = Modifier.weight(1f)) {
-                        Text("Riscansiona")
+                        Text(stringResource(R.string.wallet_document_rescan))
                     }
                     if (state.currentPlan == KBPlan.MAX) {
                         Button(
@@ -161,7 +164,7 @@ fun AddWalletDocumentSheet(
                                     errorText = null
                                     viewModel.runAIExtraction(pages, kind, familyId)
                                         .onSuccess { applyExtraction(it) }
-                                        .onFailure { errorText = it.localizedMessage ?: "Lettura AI non riuscita." }
+                                        .onFailure { errorText = it.localizedMessage ?: context.getString(R.string.wallet_ai_read_failed) }
                                     isExtracting = false
                                 }
                             },
@@ -169,7 +172,7 @@ fun AddWalletDocumentSheet(
                             modifier = Modifier.weight(1f),
                         ) {
                             Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
-                            Text("Leggi con AI (${viewModel.estimatedAiMessageCost(pages.size)})")
+                            Text(stringResource(R.string.wallet_document_read_with_ai_count, viewModel.estimatedAiMessageCost(pages.size)))
                         }
                     } else {
                         OutlinedButton(onClick = onUpgrade, modifier = Modifier.weight(1f)) {
@@ -183,7 +186,7 @@ fun AddWalletDocumentSheet(
             if (isExtracting) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CircularProgressIndicator(modifier = Modifier.height(18.dp), strokeWidth = 2.dp)
-                    Text("Estrazione in corso…", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.wallet_document_extracting), style = MaterialTheme.typography.bodySmall)
                 }
             }
 
@@ -193,7 +196,7 @@ fun AddWalletDocumentSheet(
                 OutlinedTextField(
                     value = codiceFiscale,
                     onValueChange = { codiceFiscale = it.uppercase() },
-                    label = { Text("Codice Fiscale") },
+                    label = { Text(stringResource(R.string.wallet_document_codice_fiscale_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -201,14 +204,14 @@ fun AddWalletDocumentSheet(
             OutlinedTextField(
                 value = holderName,
                 onValueChange = { holderName = it },
-                label = { Text("Nome e cognome") },
+                label = { Text(stringResource(R.string.wallet_document_full_name_label)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = birthInfo,
                 onValueChange = { birthInfo = it },
-                label = { Text("Nascita") },
+                label = { Text(stringResource(R.string.wallet_document_birth_label)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -216,7 +219,7 @@ fun AddWalletDocumentSheet(
                 OutlinedTextField(
                     value = documentNumber,
                     onValueChange = { documentNumber = it },
-                    label = { Text("Numero documento") },
+                    label = { Text(stringResource(R.string.wallet_document_number_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -225,8 +228,8 @@ fun AddWalletDocumentSheet(
             if (kind == DocumentKind.PATENTE) {
                 PatenteCategoriesEditor(categories = patenteCategories, onCategoriesChange = { patenteCategories = it })
             } else if (kind != DocumentKind.CODICE_FISCALE) {
-                DocumentDateField(label = "Rilascio", date = issueDate, onChange = { issueDate = it })
-                DocumentDateField(label = "Scadenza", date = expiryDate, onChange = { expiryDate = it })
+                DocumentDateField(label = stringResource(R.string.wallet_document_issue_date_label), date = issueDate, onChange = { issueDate = it })
+                DocumentDateField(label = stringResource(R.string.wallet_document_expiry_date_label), date = expiryDate, onChange = { expiryDate = it })
             }
 
             NotifyRow(notifyBeforeExpiry) { notifyBeforeExpiry = it }
@@ -239,7 +242,7 @@ fun AddWalletDocumentSheet(
                 onClick = {
                     val bytes = pdfBytes
                     if (bytes == null) {
-                        errorText = "Scansiona prima il documento."
+                        errorText = context.getString(R.string.wallet_document_scan_first_error)
                         return@Button
                     }
                     scope.launch {
@@ -268,7 +271,7 @@ fun AddWalletDocumentSheet(
                             onDismiss()
                         }.onFailure {
                             isSaving = false
-                            errorText = it.localizedMessage ?: "Errore di salvataggio."
+                            errorText = it.localizedMessage ?: context.getString(R.string.wallet_document_save_error)
                         }
                     }
                 },
@@ -279,7 +282,7 @@ fun AddWalletDocumentSheet(
                 if (isSaving) {
                     CircularProgressIndicator(modifier = Modifier.height(20.dp), strokeWidth = 2.dp)
                 } else {
-                    Text("Salva documento")
+                    Text(stringResource(R.string.wallet_document_save_button))
                 }
             }
 

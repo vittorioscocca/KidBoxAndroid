@@ -9,16 +9,17 @@ import androidx.compose.material.icons.filled.Note
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.ui.graphics.vector.ImageVector
+import it.vittorioscocca.kidbox.R
 import java.util.Locale
 
-enum class ShareDestination(val labelIt: String, val icon: ImageVector) {
-    CHAT("Chat famiglia", Icons.Default.Chat),
-    NOTE("Note", Icons.Default.Note),
-    TODO("To-Do", Icons.Default.CheckCircle),
-    DOCUMENTS("Documenti", Icons.Default.Folder),
-    SHOPPING("Lista spesa", Icons.Default.ShoppingCart),
-    PHOTOS("Foto e video", Icons.Default.Photo),
-    EVENT("Evento", Icons.Default.CalendarMonth),
+enum class ShareDestination(val labelRes: Int, val icon: ImageVector) {
+    CHAT(R.string.share_destination_chat, Icons.Default.Chat),
+    NOTE(R.string.share_destination_note, Icons.Default.Note),
+    TODO(R.string.share_destination_todo, Icons.Default.CheckCircle),
+    DOCUMENTS(R.string.share_destination_documents, Icons.Default.Folder),
+    SHOPPING(R.string.share_destination_shopping, Icons.Default.ShoppingCart),
+    PHOTOS(R.string.share_destination_photos, Icons.Default.Photo),
+    EVENT(R.string.share_destination_event, Icons.Default.CalendarMonth),
 }
 
 object ShareDestinationSuggester {

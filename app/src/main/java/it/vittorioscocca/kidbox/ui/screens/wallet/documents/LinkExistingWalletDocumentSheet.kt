@@ -2,6 +2,8 @@
 
 package it.vittorioscocca.kidbox.ui.screens.wallet.documents
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
@@ -73,6 +75,7 @@ fun LinkExistingWalletDocumentSheet(
     onDismiss: () -> Unit,
     documentsViewModel: DocumentsViewModel = hiltViewModel(),
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
@@ -145,9 +148,9 @@ fun LinkExistingWalletDocumentSheet(
             topBar = {
                 CenterAlignedTopAppBar(
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.kidBoxColors.background),
-                    title = { Text("Collega documento", fontWeight = FontWeight.SemiBold) },
+                    title = { Text(stringResource(R.string.wallet_document_link_title), fontWeight = FontWeight.SemiBold) },
                     navigationIcon = {
-                        TextButton(onClick = onDismiss) { Text("Annulla") }
+                        TextButton(onClick = onDismiss) { Text(stringResource(R.string.wallet_cancel)) }
                     },
                     actions = {
                         if (isSaving) {
@@ -176,12 +179,12 @@ fun LinkExistingWalletDocumentSheet(
                                             }
                                             .onFailure {
                                                 isSaving = false
-                                                errorText = it.localizedMessage ?: "Errore di collegamento."
+                                                errorText = it.localizedMessage ?: context.getString(R.string.wallet_document_link_error)
                                             }
                                     }
                                 },
                                 enabled = picked != null && !isExtracting,
-                            ) { Text("Salva") }
+                            ) { Text(stringResource(R.string.wallet_save)) }
                         }
                     },
                 )
@@ -195,17 +198,17 @@ fun LinkExistingWalletDocumentSheet(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                FormSection(title = "Tipo documento") {
+                FormSection(title = stringResource(R.string.wallet_document_section_type)) {
                     KindDropdown(selected = kind, onSelected = { kind = it })
                     OwnerDropdown(owners = state.owners, selected = owner, onSelected = { owner = it })
                 }
 
-                FormSection(title = "Documento") {
+                FormSection(title = stringResource(R.string.wallet_document_section_document)) {
                     val doc = picked
                     if (doc == null) {
                         OutlinedButton(onClick = { showPicker = true }, modifier = Modifier.fillMaxWidth()) {
                             Icon(Icons.Filled.Folder, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                            Text("Scegli da Documenti")
+                            Text(stringResource(R.string.wallet_document_choose_from_documents))
                         }
                     } else {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -219,42 +222,42 @@ fun LinkExistingWalletDocumentSheet(
                                 Text(doc.fileName, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.kidBoxColors.subtitle, maxLines = 1)
                             }
                         }
-                        TextButton(onClick = { showPicker = true }) { Text("Cambia documento") }
+                        TextButton(onClick = { showPicker = true }) { Text(stringResource(R.string.wallet_document_change_document)) }
                     }
                 }
 
-                FormSection(title = "Dati") {
+                FormSection(title = stringResource(R.string.wallet_document_section_data)) {
                     if (isExtracting) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             CircularProgressIndicator(modifier = Modifier.height(18.dp), strokeWidth = 2.dp)
-                            Text("Lettura dati in corso…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.kidBoxColors.subtitle)
+                            Text(stringResource(R.string.wallet_document_reading_data), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.kidBoxColors.subtitle)
                         }
                     }
                     OutlinedTextField(
                         value = title,
                         onValueChange = { title = it },
-                        label = { Text("Titolo") },
+                        label = { Text(stringResource(R.string.wallet_label_title)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
                         value = holderName,
                         onValueChange = { holderName = it },
-                        label = { Text("Nome e cognome titolare") },
+                        label = { Text(stringResource(R.string.wallet_document_holder_full_name_label)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
                         value = birthInfo,
                         onValueChange = { birthInfo = it },
-                        label = { Text("Data e luogo di nascita") },
+                        label = { Text(stringResource(R.string.wallet_document_birth_date_place_label)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
                         value = documentNumber,
                         onValueChange = { documentNumber = it },
-                        label = { Text(if (isPatente) "Numero patente" else "Numero documento") },
+                        label = { Text(if (isPatente) stringResource(R.string.wallet_document_license_number_label) else stringResource(R.string.wallet_document_number_label)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -262,12 +265,12 @@ fun LinkExistingWalletDocumentSheet(
                         OutlinedTextField(
                             value = codiceFiscale,
                             onValueChange = { codiceFiscale = it.uppercase() },
-                            label = { Text("Codice Fiscale") },
+                            label = { Text(stringResource(R.string.wallet_document_codice_fiscale_label)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
-                        DocumentDateField(label = "Data di rilascio", date = issueDate, onChange = { issueDate = it })
-                        DocumentDateField(label = "Data di scadenza", date = expiryDate, onChange = { expiryDate = it })
+                        DocumentDateField(label = stringResource(R.string.wallet_document_issue_date_full_label), date = issueDate, onChange = { issueDate = it })
+                        DocumentDateField(label = stringResource(R.string.wallet_document_expiry_date_full_label), date = expiryDate, onChange = { expiryDate = it })
                         if (expiryDate != null) {
                             NotifyRow(notifyBeforeExpiry) { notifyBeforeExpiry = it }
                         }
@@ -275,7 +278,7 @@ fun LinkExistingWalletDocumentSheet(
                 }
 
                 if (picked != null) {
-                    FormSection(title = "Lettura assistita") {
+                    FormSection(title = stringResource(R.string.wallet_document_section_assisted_reading)) {
                         if (state.currentPlan == KBPlan.MAX) {
                             OutlinedButton(
                                 onClick = {
@@ -283,7 +286,7 @@ fun LinkExistingWalletDocumentSheet(
                                         isExtracting = true
                                         viewModel.runAIExtraction(pages, kind, familyId)
                                             .onSuccess { applyExtraction(it) }
-                                            .onFailure { errorText = it.localizedMessage ?: "Lettura AI non riuscita." }
+                                            .onFailure { errorText = it.localizedMessage ?: context.getString(R.string.wallet_ai_read_failed) }
                                         isExtracting = false
                                     }
                                 },
@@ -291,16 +294,16 @@ fun LinkExistingWalletDocumentSheet(
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
-                                Text("Leggi con AI (${viewModel.estimatedAiMessageCost(pages.size)} msg)")
+                                Text(stringResource(R.string.wallet_document_read_with_ai_msg_count, viewModel.estimatedAiMessageCost(pages.size)))
                             }
                         } else {
                             OutlinedButton(onClick = onUpgrade, modifier = Modifier.fillMaxWidth()) {
                                 Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
-                                Text("Leggi con AI (piano Max)")
+                                Text(stringResource(R.string.wallet_read_ai_plan_max))
                             }
                         }
                         Text(
-                            "Lettura assistita dall'AI: più precisa su patente e tabelle. Disponibile con il piano Max.",
+                            stringResource(R.string.wallet_document_ai_assisted_description),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.kidBoxColors.subtitle,
                         )
@@ -308,7 +311,7 @@ fun LinkExistingWalletDocumentSheet(
                 }
 
                 if (isPatente) {
-                    FormSection(title = "Categorie") {
+                    FormSection(title = stringResource(R.string.wallet_document_section_categories)) {
                         PatenteCategoriesEditor(categories = patenteCategories, onCategoriesChange = { patenteCategories = it })
                     }
                     FormSection(title = null) {

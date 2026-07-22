@@ -110,6 +110,8 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @Composable
 internal fun ChatBubble(
@@ -282,7 +284,7 @@ internal fun ChatBubble(
                     ) {
                         if (message.editedAtMillis != null) {
                             Text(
-                                text = "Modificato",
+                                text = stringResource(R.string.chat_edited),
                                 fontSize = 10.sp,
                                 color = Color.White.copy(alpha = 0.9f),
                             )
@@ -319,7 +321,7 @@ internal fun ChatBubble(
 
                     if (message.isDeletedForEveryone) {
                         Text(
-                            text = "Messaggio eliminato",
+                            text = stringResource(R.string.chat_message_deleted),
                             color = subtitleColor,
                             fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                             fontSize = 14.sp,
@@ -351,7 +353,7 @@ internal fun ChatBubble(
                         modifier = Modifier.align(Alignment.End),
                     ) {
                         if (message.editedAtMillis != null) {
-                            Text("Modificato", fontSize = 10.sp, color = subtitleColor)
+                            Text(stringResource(R.string.chat_edited), fontSize = 10.sp, color = subtitleColor)
                         }
                         Text(message.timeLabel, fontSize = 10.sp, color = subtitleColor)
                         if (isOwn) {
@@ -428,7 +430,7 @@ private fun ReplyContextHeader(
         Spacer(Modifier.width(8.dp))
         Column {
             Text(
-                text = repliedTo?.senderName ?: "Messaggio",
+                text = repliedTo?.senderName ?: stringResource(R.string.chat_message),
                 color = accent,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -436,7 +438,7 @@ private fun ReplyContextHeader(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = repliedTo?.previewText() ?: "Messaggio non disponibile",
+                text = repliedTo?.previewText() ?: stringResource(R.string.chat_message_unavailable),
                 color = if (isOwn) Color.White.copy(alpha = 0.78f) else MaterialTheme.kidBoxColors.subtitle,
                 fontSize = 11.sp,
                 maxLines = 1,
@@ -952,7 +954,7 @@ private fun LocationContent(
         ) {
             Marker(
                 state = MarkerState(position = LatLng(lat, lon)),
-                title = "Posizione",
+                title = stringResource(R.string.chat_location),
             )
         }
 
@@ -1019,7 +1021,7 @@ private fun ContactContent(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = payload?.fullName ?: "Contatto",
+                    text = payload?.fullName ?: stringResource(R.string.chat_contact),
                     color = textColor,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
@@ -1027,7 +1029,7 @@ private fun ContactContent(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = payload?.primaryPhone ?: "Nessun numero",
+                    text = payload?.primaryPhone ?: stringResource(R.string.chat_no_number),
                     color = subtitleColor,
                     fontSize = 12.sp,
                     maxLines = 1,
@@ -1048,7 +1050,7 @@ private fun ContactContent(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                text = "Visualizza",
+                text = stringResource(R.string.chat_view),
                 color = actionColor,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -1129,7 +1131,7 @@ private fun ContactDetailSheet(
         if (payload.phoneNumbers.isNotEmpty()) {
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "Numeri di telefono",
+                text = stringResource(R.string.chat_phone_numbers),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.kidBoxColors.subtitle,
@@ -1189,7 +1191,7 @@ private fun ContactDetailSheet(
         if (payload.emailAddresses.isNotEmpty()) {
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "Email",
+                text = stringResource(R.string.chat_email),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.kidBoxColors.subtitle,
@@ -1256,7 +1258,7 @@ private fun ContactDetailSheet(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = "Aggiungi ai contatti",
+                text = stringResource(R.string.chat_add_contacts),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = accent,
@@ -1302,9 +1304,9 @@ private fun DocumentContent(
                         setDataAndType(uri, mime)
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
-                    context.startActivity(Intent.createChooser(intent, "Apri con"))
+                    context.startActivity(Intent.createChooser(intent, context.getString(R.string.chat_open_with)))
                 }.onFailure { err ->
-                    downloadError = err.message ?: "Errore download"
+                    downloadError = err.message ?: context.getString(R.string.chat_download_error)
                 }
                 isDownloading = false
             }
@@ -1338,7 +1340,7 @@ private fun DocumentContent(
             }
             Column {
                 Text(
-                    text = message.text ?: "Documento",
+                    text = message.text ?: stringResource(R.string.chat_document),
                     color = textColor,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
@@ -1346,9 +1348,9 @@ private fun DocumentContent(
                     overflow = TextOverflow.Ellipsis,
                 )
                 val subLabel = when {
-                    message.mediaUrl == null -> "In caricamento…"
-                    isDownloading -> "Download in corso…"
-                    else -> "Tocca per aprire"
+                    message.mediaUrl == null -> stringResource(R.string.chat_uploading)
+                    isDownloading -> stringResource(R.string.chat_downloading)
+                    else -> stringResource(R.string.chat_tap_to_open)
                 }
                 Text(text = subLabel, color = subtitleColor, fontSize = 11.sp)
             }
@@ -1566,7 +1568,7 @@ private fun AudioContent(
                         modifier = Modifier.size(14.dp),
                     )
                     Text(
-                        text = "Trascrizione automatica",
+                        text = stringResource(R.string.chat_auto_transcription),
                         color = subtitleColor,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -1595,7 +1597,7 @@ private fun AudioContent(
                         color = subtitleColor,
                     )
                     Text(
-                        text = "Trascrizione in corso…",
+                        text = stringResource(R.string.chat_transcribing),
                         color = subtitleColor,
                         fontSize = 11.sp,
                         fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
@@ -1608,7 +1610,7 @@ private fun AudioContent(
             (transcriptStatus == "completed" && transcriptText.isBlank()) -> {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Trascrizione non disponibile",
+                    text = stringResource(R.string.chat_transcription_unavailable),
                     color = subtitleColor,
                     fontSize = 11.sp,
                     fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,

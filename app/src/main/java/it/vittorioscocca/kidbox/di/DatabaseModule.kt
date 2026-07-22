@@ -54,6 +54,7 @@ import it.vittorioscocca.kidbox.data.local.dao.VehicleEventDao
 import it.vittorioscocca.kidbox.data.local.dao.PasswordEntryDao
 import it.vittorioscocca.kidbox.data.local.dao.PasswordGroupDao
 import it.vittorioscocca.kidbox.data.local.dao.PwnedPrefixCacheDao
+import it.vittorioscocca.kidbox.data.local.dao.NudgeSignalsDao
 import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
 import javax.inject.Singleton
@@ -642,6 +643,19 @@ object DatabaseModule {
      * nelle chat di famiglia. Il campo è nullable e default `NULL`, così i
      * messaggi esistenti non hanno bisogno di backfill.
      */
+    /**
+     * Aggiunge `arrivalLocation`/`holderName` a `kb_wallet_tickets`: la card
+     * biglietto ora mostra partenza→arrivo e titolare (non solo un luogo
+     * generico), popolati da lettura AI o inseriti a mano. Nullable, nessun
+     * backfill necessario.
+     */
+    private val MIGRATION_34_35 = object : Migration(34, 35) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `kb_wallet_tickets` ADD COLUMN `arrivalLocation` TEXT")
+            db.execSQL("ALTER TABLE `kb_wallet_tickets` ADD COLUMN `holderName` TEXT")
+        }
+    }
+
     private val MIGRATION_33_34 = object : Migration(33, 34) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE kb_chat_messages ADD COLUMN mentionsJSON TEXT")
@@ -1116,6 +1130,7 @@ object DatabaseModule {
         MIGRATION_31_32,
         MIGRATION_32_33,
         MIGRATION_33_34,
+        MIGRATION_34_35,
     )
         .fallbackToDestructiveMigration()
         .build()
@@ -1226,6 +1241,10 @@ object DatabaseModule {
     @Provides
     fun provideWalletTicketDao(database: KidBoxDatabase): WalletTicketDao =
         database.walletTicketDao()
+
+    @Provides
+    fun provideNudgeSignalsDao(database: KidBoxDatabase): NudgeSignalsDao =
+        database.nudgeSignalsDao()
 
     @Provides
     fun providePetDao(database: KidBoxDatabase): PetDao = database.petDao()

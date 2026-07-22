@@ -54,23 +54,26 @@ import it.vittorioscocca.kidbox.ui.screens.life.formatItDate
 import it.vittorioscocca.kidbox.ui.screens.life.housePaymentTypeLabelIt
 import it.vittorioscocca.kidbox.ui.screens.life.rememberLifeDatePicker
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.platform.LocalContext
 
-private fun billSubtypeLabelIt(raw: String): String = when (raw) {
-    "luce" -> "Luce"
-    "gas" -> "Gas"
-    "internet" -> "Internet"
-    "telefono" -> "Telefono"
-    "acqua" -> "Acqua"
-    "condominio" -> "Condominio"
+private fun billSubtypeLabelIt(context: android.content.Context, raw: String): String = when (raw) {
+    "luce" -> context.getString(R.string.home_items_electricity)
+    "gas" -> context.getString(R.string.home_items_gas)
+    "internet" -> context.getString(R.string.home_items_internet)
+    "telefono" -> context.getString(R.string.home_items_phone)
+    "acqua" -> context.getString(R.string.home_items_water)
+    "condominio" -> context.getString(R.string.home_items_condo)
     else -> raw
 }
 
-private fun taxSubtypeLabelIt(raw: String): String = when (raw) {
+private fun taxSubtypeLabelIt(context: android.content.Context, raw: String): String = when (raw) {
     "IMU" -> "IMU"
     "TARI" -> "TARI"
-    "dichiarazione redditi" -> "Dichiarazione redditi"
-    "bollo auto" -> "Bollo auto"
-    "altre" -> "Altre"
+    "dichiarazione redditi" -> context.getString(R.string.home_items_tax_return)
+    "bollo auto" -> context.getString(R.string.home_items_car_tax)
+    "altre" -> context.getString(R.string.home_items_others)
     else -> raw
 }
 
@@ -98,6 +101,7 @@ fun AddHousePaymentDialog(
         reminderOn: Boolean,
     ) -> Unit,
 ) {
+    val context = LocalContext.current
     var name by remember { mutableStateOf("") }
     var typeRaw by remember { mutableStateOf("bolletta") }
     var subtype by remember { mutableStateOf("luce") }
@@ -144,7 +148,7 @@ fun AddHousePaymentDialog(
         ) {
             Column(Modifier.fillMaxSize()) {
                 KidBoxIosFormTopBar(
-                    title = "Nuova scadenza",
+                    title = stringResource(R.string.home_items_new_deadline),
                     onCancel = onDismiss,
                     onSave = {
                         if (canSave) {
@@ -177,7 +181,7 @@ fun AddHousePaymentDialog(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     IosGroupedCard(kb) {
-                        IosPlainTextFieldRow(name, { name = it }, "Nome", kb = kb)
+                        IosPlainTextFieldRow(name, { name = it }, stringResource(R.string.life_name), kb = kb)
                         IosFormDivider(kb)
                         Box(Modifier.fillMaxWidth()) {
                             Row(
@@ -188,7 +192,7 @@ fun AddHousePaymentDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Tipo", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.home_items_type), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -231,13 +235,13 @@ fun AddHousePaymentDialog(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
-                                        Text("Tipologia", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                        Text(stringResource(R.string.home_items_kind), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                         Row(
                                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
                                             Text(
-                                                if (typeRaw == "bolletta") billSubtypeLabelIt(subtype) else taxSubtypeLabelIt(subtype),
+                                                if (typeRaw == "bolletta") billSubtypeLabelIt(context, subtype) else taxSubtypeLabelIt(context, subtype),
                                                 color = kb.subtitle,
                                             )
                                             Icon(
@@ -252,7 +256,7 @@ fun AddHousePaymentDialog(
                                         if (typeRaw == "bolletta") {
                                             billSub.forEach { s ->
                                                 DropdownMenuItem(
-                                                    text = { Text(billSubtypeLabelIt(s)) },
+                                                    text = { Text(billSubtypeLabelIt(context, s)) },
                                                     onClick = {
                                                         subtype = s
                                                         subtypeMenuOpen = false
@@ -262,7 +266,7 @@ fun AddHousePaymentDialog(
                                         } else {
                                             taxSub.forEach { s ->
                                                 DropdownMenuItem(
-                                                    text = { Text(taxSubtypeLabelIt(s)) },
+                                                    text = { Text(taxSubtypeLabelIt(context, s)) },
                                                     onClick = {
                                                         subtype = s
                                                         subtypeMenuOpen = false
@@ -278,7 +282,7 @@ fun AddHousePaymentDialog(
                                 IosPlainTextFieldRow(
                                     subtypeFree,
                                     { subtypeFree = it },
-                                    if (typeRaw == "altro") "Tipologia (libero)" else "Dettaglio (opzionale)",
+                                    if (typeRaw == "altro") stringResource(R.string.home_items_kind_free) else stringResource(R.string.home_items_detail_optional),
                                     kb = kb,
                                 )
                             }
@@ -288,7 +292,7 @@ fun AddHousePaymentDialog(
                         IosPlainTextFieldRow(
                             importoText,
                             { importoText = it },
-                            "Importo (opzionale)",
+                            stringResource(R.string.home_items_amount_optional),
                             kb = kb,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         )
@@ -304,7 +308,7 @@ fun AddHousePaymentDialog(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(
-                                    "Giorno di scadenza nel mese",
+                                    stringResource(R.string.home_items_day_of_month),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = kb.title,
                                 )
@@ -350,7 +354,7 @@ fun AddHousePaymentDialog(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(
-                                    "Data scadenza annuale",
+                                    stringResource(R.string.home_items_annual_date),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = kb.title,
                                 )
@@ -376,7 +380,7 @@ fun AddHousePaymentDialog(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Text("Scadenza", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                    Text(stringResource(R.string.home_items_deadline), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                     Text(
                                         formatItDate(dataScadenza),
                                         color = orange,
@@ -395,7 +399,7 @@ fun AddHousePaymentDialog(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(
-                                    "Scadenza contratto",
+                                    stringResource(R.string.home_items_contract_expiry),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = kb.title,
                                 )
@@ -421,7 +425,7 @@ fun AddHousePaymentDialog(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Text("Contratto fino al", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                    Text(stringResource(R.string.home_items_contract_until), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                     Text(
                                         formatItDate(dataContratto),
                                         color = orange,
@@ -433,7 +437,7 @@ fun AddHousePaymentDialog(
                     }
 
                     Text(
-                        "Fornitore",
+                        stringResource(R.string.home_items_supplier),
                         style = MaterialTheme.typography.labelLarge,
                         color = kb.subtitle,
                         modifier = Modifier.padding(start = 4.dp),
@@ -442,13 +446,13 @@ fun AddHousePaymentDialog(
                         IosPlainTextFieldRow(
                             fornitore,
                             { fornitore = it },
-                            "Banca / gestore / agenzia",
+                            stringResource(R.string.home_items_bank_hint),
                             kb = kb,
                         )
                     }
 
                     Text(
-                        "Note",
+                        stringResource(R.string.life_notes),
                         style = MaterialTheme.typography.labelLarge,
                         color = kb.subtitle,
                         modifier = Modifier.padding(start = 4.dp),
@@ -461,7 +465,7 @@ fun AddHousePaymentDialog(
                                 .fillMaxWidth()
                                 .heightIn(min = 120.dp)
                                 .padding(16.dp),
-                            placeholder = { Text("Note", color = kb.subtitle) },
+                            placeholder = { Text(stringResource(R.string.life_notes), color = kb.subtitle) },
                             singleLine = false,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
@@ -479,7 +483,7 @@ fun AddHousePaymentDialog(
                     }
 
                     Text(
-                        "Allegati",
+                        stringResource(R.string.life_attachments),
                         style = MaterialTheme.typography.labelLarge,
                         color = kb.subtitle,
                         fontWeight = FontWeight.SemiBold,
@@ -506,7 +510,7 @@ fun AddHousePaymentDialog(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                "Promemoria (3 giorni prima)",
+                                stringResource(R.string.home_items_reminder_3d),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = kb.title,
                             )

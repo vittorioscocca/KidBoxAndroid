@@ -92,8 +92,11 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
-private val DATE_FMT_TREAT_FORM = SimpleDateFormat("d MMM yyyy", Locale.ITALIAN)
+private fun DATE_FMT_TREAT_FORM() = SimpleDateFormat("d MMM yyyy", KBLocale.current())
 private val PURPLE_FORM = Color(0xFF9573D9)
 private val DOSE_UNITS = listOf("ml", "mg", "gocce", "cpr", "bustine")
 private val COMMON_DRUGS_PEDIATRIC = listOf("Tachipirina", "Nurofen", "Augmentin", "Bentelan", "Aerosol", "Vitamina D")
@@ -125,7 +128,7 @@ fun MedicalTreatmentFormScreen(
     LaunchedEffect(familyId, childId, petId, treatmentId) { viewModel.bind(familyId, childId, petId, treatmentId) }
     LaunchedEffect(state.saved, state.treatmentId) {
         if (state.saved) {
-            Toast.makeText(context, "Cura salvata", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.health_treatment_saved), Toast.LENGTH_SHORT).show()
             val id = state.treatmentId
             viewModel.consumeSaved()
             onSaved(id)
@@ -163,7 +166,7 @@ fun MedicalTreatmentFormScreen(
         if (granted) {
             takePictureLauncher.launch(cameraUri)
         } else {
-            Toast.makeText(context, "Permesso fotocamera negato", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.health_camera_denied), Toast.LENGTH_SHORT).show()
         }
     }
     val pickPhotoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -177,16 +180,16 @@ fun MedicalTreatmentFormScreen(
     var currentStep by remember { mutableStateOf(0) }
     val totalSteps = 4
     val stepTitle = when (currentStep) {
-        0 -> "Farmaco"
-        1 -> "Dose e frequenza"
-        2 -> "Orari"
-        else -> "Riepilogo"
+        0 -> stringResource(R.string.health_medication)
+        1 -> stringResource(R.string.health_dose_frequency)
+        2 -> stringResource(R.string.health_times)
+        else -> stringResource(R.string.health_summary)
     }
     val stepSubtitle = when (currentStep) {
-        0 -> "Scegli il farmaco"
-        1 -> "Configura dose, durata e ritmo"
-        2 -> "Imposta inizio e orari"
-        else -> "Promemoria, note e allegati"
+        0 -> stringResource(R.string.health_pick_medication)
+        1 -> stringResource(R.string.health_configure_dose)
+        2 -> stringResource(R.string.health_set_start_times)
+        else -> stringResource(R.string.health_reminders_notes_attachments)
     }
     val canAdvance = when (currentStep) {
         0 -> state.drugName.isNotBlank()
@@ -206,14 +209,14 @@ fun MedicalTreatmentFormScreen(
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 KidBoxHeaderCircleButton(
                     icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Indietro",
+                    contentDescription = stringResource(R.string.health_back),
                     onClick = onBack,
                 )
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = onBack) { Text("Annulla", color = kb.title) }
+                TextButton(onClick = onBack) { Text(stringResource(R.string.health_cancel), color = kb.title) }
             }
 
-            Text(if (treatmentId == null) "Nuova cura" else "Modifica cura", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = kb.title)
+            Text(if (treatmentId == null) stringResource(R.string.health_new_treatment) else stringResource(R.string.health_edit_treatment), fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = kb.title)
             if (state.childName.isNotBlank()) {
                 Text(state.childName, fontSize = 14.sp, color = kb.subtitle)
             }
@@ -237,18 +240,18 @@ fun MedicalTreatmentFormScreen(
             Spacer(Modifier.height(20.dp))
 
             if (currentStep == 0) {
-                TreatSectionLabel("Farmaco")
+                TreatSectionLabel(stringResource(R.string.health_medication))
                 OutlinedTextField(
                     value = state.drugName,
                     onValueChange = viewModel::setDrugName,
-                    placeholder = { Text("Nome farmaco *") },
+                    placeholder = { Text(stringResource(R.string.health_medication_name_req)) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     singleLine = true,
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    if (state.forPetTreatment) "Farmaci suggeriti (cane / veterinaria)" else "Farmaci suggeriti",
+                    if (state.forPetTreatment) stringResource(R.string.health_suggested_vet) else stringResource(R.string.health_suggested_meds),
                     fontSize = 12.sp,
                     color = kb.subtitle,
                 )
@@ -274,7 +277,7 @@ fun MedicalTreatmentFormScreen(
                 OutlinedTextField(
                     value = state.activeIngredient,
                     onValueChange = viewModel::setActiveIngredient,
-                    placeholder = { Text("Principio attivo (opzionale)") },
+                    placeholder = { Text(stringResource(R.string.health_active_ingredient)) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     singleLine = true,
@@ -287,14 +290,14 @@ fun MedicalTreatmentFormScreen(
                         Icon(Icons.Default.Medication, contentDescription = null, tint = PURPLE_FORM)
                         Spacer(Modifier.width(10.dp))
                         Column {
-                            Text(if (state.drugName.isBlank()) "Farmaco" else state.drugName, fontWeight = FontWeight.SemiBold, color = kb.title)
+                            Text(if (state.drugName.isBlank()) stringResource(R.string.health_medication) else state.drugName, fontWeight = FontWeight.SemiBold, color = kb.title)
                             if (state.activeIngredient.isNotBlank()) Text(state.activeIngredient, fontSize = 12.sp, color = kb.subtitle)
                         }
                     }
                 }
                 Spacer(Modifier.height(16.dp))
 
-                TreatSectionLabel("Dosaggio")
+                TreatSectionLabel(stringResource(R.string.health_dosage))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = state.dosageValue,
@@ -323,25 +326,25 @@ fun MedicalTreatmentFormScreen(
                 }
                 Spacer(Modifier.height(16.dp))
 
-                TreatSectionLabel("Tipo cura")
-                TreatSwitchRow("Cura a lungo termine", state.isLongTerm, viewModel::setIsLongTerm)
+                TreatSectionLabel(stringResource(R.string.health_treatment_type))
+                TreatSwitchRow(stringResource(R.string.health_long_term_treatment), state.isLongTerm, viewModel::setIsLongTerm)
                 Spacer(Modifier.height(16.dp))
 
                 if (!state.isLongTerm) {
-                    TreatSectionLabel("Durata")
+                    TreatSectionLabel(stringResource(R.string.health_duration))
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("${state.durationDays} giorni", fontWeight = FontWeight.SemiBold, color = kb.title, fontSize = 14.sp)
                         Row {
-                            IconButton(onClick = { viewModel.setDurationDays(state.durationDays - 1) }) { Icon(Icons.Default.Remove, contentDescription = "Meno", tint = kb.title) }
-                            IconButton(onClick = { viewModel.setDurationDays(state.durationDays + 1) }) { Icon(Icons.Default.Add, contentDescription = "Più", tint = kb.title) }
+                            IconButton(onClick = { viewModel.setDurationDays(state.durationDays - 1) }) { Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.health_less), tint = kb.title) }
+                            IconButton(onClick = { viewModel.setDurationDays(state.durationDays + 1) }) { Icon(Icons.Default.Add, contentDescription = stringResource(R.string.health_more), tint = kb.title) }
                         }
                     }
-                    Text("Fine: ${DATE_FMT_TREAT_FORM.format(Date(state.endDateEpochMillis))}", fontSize = 12.sp, color = kb.subtitle)
+                    Text("Fine: ${DATE_FMT_TREAT_FORM().format(Date(state.endDateEpochMillis))}", fontSize = 12.sp, color = kb.subtitle)
                     Spacer(Modifier.height(16.dp))
                 }
 
-                TreatSectionLabel("Frequenza")
-                val freqOptions = listOf(1 to "Mattina", 2 to "Mattina + Sera", 3 to "Mattina + Pranzo + Sera", 4 to "Mattina + Pranzo + Sera + Notte")
+                TreatSectionLabel(stringResource(R.string.health_frequency))
+                val freqOptions = listOf(1 to stringResource(R.string.health_morning), 2 to stringResource(R.string.health_morning_evening), 3 to stringResource(R.string.health_morning_noon_evening), 4 to stringResource(R.string.health_four_times))
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     freqOptions.forEach { (freq, subtitle) ->
                         val selected = state.intervalBetweenDosesDays == 0 && state.dailyFrequency == freq
@@ -377,7 +380,7 @@ fun MedicalTreatmentFormScreen(
                             fontSize = 14.sp,
                         )
                         TextButton(onClick = { viewModel.openCustomFrequencySheet() }) {
-                            Text("Modifica", color = PURPLE_FORM, fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.health_edit), color = PURPLE_FORM, fontWeight = FontWeight.SemiBold)
                         }
                     }
                     Spacer(Modifier.height(8.dp))
@@ -390,7 +393,7 @@ fun MedicalTreatmentFormScreen(
                     colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Transparent),
                 ) {
                     Text(
-                        "Personalizza frequenza assunzione",
+                        stringResource(R.string.health_customize_frequency),
                         color = PURPLE_FORM,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 14.sp,
@@ -399,22 +402,22 @@ fun MedicalTreatmentFormScreen(
             }
 
             if (currentStep == 2) {
-                TreatSectionLabel("Data inizio")
+                TreatSectionLabel(stringResource(R.string.health_start_date))
                 OutlinedTextField(
-                    value = DATE_FMT_TREAT_FORM.format(Date(state.startDateEpochMillis)),
+                    value = DATE_FMT_TREAT_FORM().format(Date(state.startDateEpochMillis)),
                     onValueChange = {},
                     readOnly = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     trailingIcon = {
                         IconButton(onClick = { showStartPicker = true }) {
-                            Icon(Icons.Default.CalendarMonth, contentDescription = "Scegli data", tint = PURPLE_FORM)
+                            Icon(Icons.Default.CalendarMonth, contentDescription = stringResource(R.string.health_pick_date), tint = PURPLE_FORM)
                         }
                     },
                 )
                 Spacer(Modifier.height(16.dp))
 
-                TreatSectionLabel("Orari")
+                TreatSectionLabel(stringResource(R.string.health_times))
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     state.scheduleTimes.forEachIndexed { idx, time ->
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
@@ -437,28 +440,28 @@ fun MedicalTreatmentFormScreen(
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                TreatSectionLabel("Riepilogo rapido")
-                Text("$frequencySummary · ${if (state.isLongTerm) "Lungo termine" else "${state.durationDays} giorni"}", fontSize = 12.sp, color = kb.subtitle)
+                TreatSectionLabel(stringResource(R.string.health_quick_summary))
+                Text("$frequencySummary · ${if (state.isLongTerm) stringResource(R.string.health_long_term_cap) else "${state.durationDays} giorni"}", fontSize = 12.sp, color = kb.subtitle)
             }
 
             if (currentStep == 3) {
-                TreatSectionLabel("Riepilogo")
-                OutlinedTextField(value = state.drugName, onValueChange = {}, readOnly = true, label = { Text("Farmaco") }, modifier = Modifier.fillMaxWidth())
+                TreatSectionLabel(stringResource(R.string.health_summary))
+                OutlinedTextField(value = state.drugName, onValueChange = {}, readOnly = true, label = { Text(stringResource(R.string.health_medication)) }, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(value = "${state.dosageValue} ${state.dosageUnit}", onValueChange = {}, readOnly = true, label = { Text("Dosaggio") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = "${state.dosageValue} ${state.dosageUnit}", onValueChange = {}, readOnly = true, label = { Text(stringResource(R.string.health_dosage)) }, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(value = frequencySummary, onValueChange = {}, readOnly = true, label = { Text("Frequenza") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = frequencySummary, onValueChange = {}, readOnly = true, label = { Text(stringResource(R.string.health_frequency)) }, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(value = DATE_FMT_TREAT_FORM.format(Date(state.startDateEpochMillis)), onValueChange = {}, readOnly = true, label = { Text("Inizio") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = DATE_FMT_TREAT_FORM().format(Date(state.startDateEpochMillis)), onValueChange = {}, readOnly = true, label = { Text(stringResource(R.string.health_start)) }, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(16.dp))
 
-                TreatSectionLabel("Promemoria")
-                TreatSwitchRow("Avvisami agli orari di somministrazione", state.reminderEnabled, viewModel::setReminderEnabled)
+                TreatSectionLabel(stringResource(R.string.health_reminder))
+                TreatSwitchRow(stringResource(R.string.health_notify_at_times), state.reminderEnabled, viewModel::setReminderEnabled)
                 Text(
                     if (state.intervalBetweenDosesDays > 0) {
                         "Le notifiche arrivano nei giorni di dose (ogni ${state.intervalBetweenDosesDays} giorni), all'orario impostato."
                     } else {
-                        "Le notifiche vengono pianificate per tutti i giorni della cura."
+                        stringResource(R.string.health_notifications_all_days)
                     },
                     fontSize = 11.sp,
                     color = kb.subtitle,
@@ -466,11 +469,11 @@ fun MedicalTreatmentFormScreen(
                 )
                 Spacer(Modifier.height(16.dp))
 
-                TreatSectionLabel("Note")
+                TreatSectionLabel(stringResource(R.string.health_notes))
                 OutlinedTextField(
                     value = state.notes,
                     onValueChange = viewModel::setNotes,
-                    placeholder = { Text("Note aggiuntive (opzionale)") },
+                    placeholder = { Text(stringResource(R.string.health_extra_notes_optional)) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     minLines = 3,
@@ -504,7 +507,7 @@ fun MedicalTreatmentFormScreen(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = kb.card),
-                    ) { Text("Indietro", color = kb.title) }
+                    ) { Text(stringResource(R.string.health_back), color = kb.title) }
                 }
                 if (currentStep < totalSteps - 1) {
                     Button(
@@ -513,7 +516,7 @@ fun MedicalTreatmentFormScreen(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = PURPLE_FORM),
-                    ) { Text("Avanti", color = Color.White, fontWeight = FontWeight.SemiBold) }
+                    ) { Text(stringResource(R.string.health_next), color = Color.White, fontWeight = FontWeight.SemiBold) }
                 } else {
                     Button(
                         onClick = { viewModel.save() },
@@ -525,9 +528,9 @@ fun MedicalTreatmentFormScreen(
                         if (state.isSaving) {
                             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
                             Spacer(Modifier.width(8.dp))
-                            Text("Salvataggio...", color = Color.White, fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.health_saving), color = Color.White, fontWeight = FontWeight.SemiBold)
                         } else {
-                            Text("Salva cura", color = Color.White, fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.health_save_treatment), color = Color.White, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -559,7 +562,7 @@ fun MedicalTreatmentFormScreen(
             ) {
                 TimePicker(state = pickerState)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = { timePickerSlot = null }) { Text("Annulla") }
+                    TextButton(onClick = { timePickerSlot = null }) { Text(stringResource(R.string.health_cancel)) }
                     TextButton(onClick = {
                         val h = pickerState.hour.toString().padStart(2, '0')
                         val m = pickerState.minute.toString().padStart(2, '0')
@@ -585,22 +588,22 @@ fun MedicalTreatmentFormScreen(
                     .padding(bottom = 32.dp)
                     .verticalScroll(sheetScroll),
             ) {
-                Text("Frequenza assunzione", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = kb.title)
+                Text(stringResource(R.string.health_dose_frequency_title), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = kb.title)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Indica ogni quanti giorni assumere una dose. È previsto un solo orario al giorno di assunzione.",
+                    stringResource(R.string.health_dose_frequency_hint),
                     fontSize = 12.sp,
                     color = kb.subtitle,
                 )
                 Spacer(Modifier.height(16.dp))
-                Text("Preimpostate", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = kb.title)
+                Text(stringResource(R.string.health_presets), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = kb.title)
                 Spacer(Modifier.height(6.dp))
                 val presets = listOf(
-                    "Ogni 7 giorni" to 7,
-                    "Ogni 15 giorni" to 15,
-                    "Circa 2 volte al mese (~15 giorni)" to 15,
-                    "Circa 1 volta al mese (~30 giorni)" to 30,
-                    "Una volta all'anno (~365 giorni)" to 365,
+                    stringResource(R.string.health_every_7_days) to 7,
+                    stringResource(R.string.health_every_15_days) to 15,
+                    stringResource(R.string.health_twice_month) to 15,
+                    stringResource(R.string.health_once_month) to 30,
+                    stringResource(R.string.health_once_year) to 365,
                 )
                 presets.forEach { (label, days) ->
                     TextButton(
@@ -611,7 +614,7 @@ fun MedicalTreatmentFormScreen(
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                Text("Personalizzato", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = kb.title)
+                Text(stringResource(R.string.health_custom), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = kb.title)
                 Spacer(Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -621,10 +624,10 @@ fun MedicalTreatmentFormScreen(
                     Text("Ogni ${state.customIntervalDaysDraft} giorni", color = kb.title, fontWeight = FontWeight.SemiBold)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = { viewModel.setCustomIntervalDaysDraft(state.customIntervalDaysDraft - 1) }) {
-                            Icon(Icons.Default.Remove, contentDescription = "Meno giorni", tint = kb.title)
+                            Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.health_fewer_days), tint = kb.title)
                         }
                         IconButton(onClick = { viewModel.setCustomIntervalDaysDraft(state.customIntervalDaysDraft + 1) }) {
-                            Icon(Icons.Default.Add, contentDescription = "Più giorni", tint = kb.title)
+                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.health_more_days), tint = kb.title)
                         }
                     }
                 }
@@ -634,13 +637,13 @@ fun MedicalTreatmentFormScreen(
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = PURPLE_FORM),
                 ) {
-                    Text("Usa questo intervallo", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.health_use_interval), color = Color.White, fontWeight = FontWeight.SemiBold)
                 }
                 Spacer(Modifier.height(16.dp))
-                Text("Anni", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = kb.title)
+                Text(stringResource(R.string.health_years), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = kb.title)
                 Spacer(Modifier.height(8.dp))
                 val yearsLabel = if (state.customIntervalYearsDraft == 1) {
-                    "Ogni 1 anno"
+                    stringResource(R.string.health_every_1_year)
                 } else {
                     "Ogni ${state.customIntervalYearsDraft} anni"
                 }
@@ -652,10 +655,10 @@ fun MedicalTreatmentFormScreen(
                     Text(yearsLabel, color = kb.title, fontWeight = FontWeight.SemiBold)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = { viewModel.setCustomIntervalYearsDraft(state.customIntervalYearsDraft - 1) }) {
-                            Icon(Icons.Default.Remove, contentDescription = "Meno anni", tint = kb.title)
+                            Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.health_fewer_years), tint = kb.title)
                         }
                         IconButton(onClick = { viewModel.setCustomIntervalYearsDraft(state.customIntervalYearsDraft + 1) }) {
-                            Icon(Icons.Default.Add, contentDescription = "Più anni", tint = kb.title)
+                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.health_more_years), tint = kb.title)
                         }
                     }
                 }
@@ -665,14 +668,14 @@ fun MedicalTreatmentFormScreen(
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = PURPLE_FORM),
                 ) {
-                    Text("Usa questo intervallo", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.health_use_interval), color = Color.White, fontWeight = FontWeight.SemiBold)
                 }
                 Spacer(Modifier.height(16.dp))
                 TextButton(
                     onClick = { viewModel.dismissCustomFrequencySheet() },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Chiudi", color = kb.subtitle)
+                    Text(stringResource(R.string.health_close), color = kb.subtitle)
                 }
             }
         }
@@ -724,6 +727,6 @@ private fun TreatDatePickerDialog(initialMillis: Long, onDismiss: () -> Unit, on
         confirmButton = {
             TextButton(onClick = { pickerState.selectedDateMillis?.let(onConfirm) ?: onDismiss() }) { Text("OK") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Annulla") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.health_cancel)) } },
     ) { DatePicker(state = pickerState) }
 }

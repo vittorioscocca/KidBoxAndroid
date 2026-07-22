@@ -59,6 +59,8 @@ import it.vittorioscocca.kidbox.domain.model.KBTextExtractionStatus
 import it.vittorioscocca.kidbox.ui.theme.KidBoxColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.io.File
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 /**
  * Bottom sheet «Aggiungi allegato»: stesso contenuto di [HealthAttachmentsCard] (cure / analisi / visita).
@@ -96,7 +98,7 @@ fun HealthAttachmentSourcePickerSheet(
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
             Text(
-                "Aggiungi allegato",
+                stringResource(R.string.health_add_attachment),
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
                 color = tintColor,
@@ -107,7 +109,7 @@ fun HealthAttachmentSourcePickerSheet(
             )
             HorizontalDivider(color = kb.subtitle.copy(alpha = 0.15f))
             AttachmentSourceRow(
-                label = "Scatta foto",
+                label = stringResource(R.string.health_take_photo),
                 icon = Icons.Default.PhotoCamera,
                 tintColor = tintColor,
                 kb = kb,
@@ -118,7 +120,7 @@ fun HealthAttachmentSourcePickerSheet(
                 },
             )
             AttachmentSourceRow(
-                label = "Scegli dalla libreria",
+                label = stringResource(R.string.health_pick_library),
                 icon = Icons.Default.PhotoLibrary,
                 tintColor = tintColor,
                 kb = kb,
@@ -129,7 +131,7 @@ fun HealthAttachmentSourcePickerSheet(
                 },
             )
             AttachmentSourceRow(
-                label = "File del telefono",
+                label = stringResource(R.string.health_phone_files),
                 icon = Icons.Default.InsertDriveFile,
                 tintColor = tintColor,
                 kb = kb,
@@ -141,7 +143,7 @@ fun HealthAttachmentSourcePickerSheet(
             )
             if (onPickFromKidBoxDocuments != null) {
                 AttachmentSourceRow(
-                    label = "Da KidBox Documenti",
+                    label = stringResource(R.string.health_from_kidbox_docs),
                     icon = Icons.Default.Folder,
                     tintColor = tintColor,
                     kb = kb,
@@ -193,7 +195,7 @@ fun HealthAttachmentsCard(
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    "ALLEGATI",
+                    stringResource(R.string.section_attachments),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = tintColor,
@@ -202,7 +204,7 @@ fun HealthAttachmentsCard(
                 if (isUploading) {
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        "Caricamento…",
+                        stringResource(R.string.health_loading_dots),
                         fontSize = 11.sp,
                         color = kb.subtitle,
                     )
@@ -214,7 +216,7 @@ fun HealthAttachmentsCard(
                 ) {
                     Icon(
                         Icons.Default.Add,
-                        contentDescription = "Aggiungi allegato",
+                        contentDescription = stringResource(R.string.health_add_attachment),
                         tint = tintColor,
                         modifier = Modifier.size(20.dp),
                     )
@@ -224,7 +226,7 @@ fun HealthAttachmentsCard(
             if (attachments.isEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Nessun allegato",
+                    stringResource(R.string.health_no_attachments),
                     fontSize = 13.sp,
                     color = kb.subtitle,
                     fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
@@ -259,18 +261,18 @@ fun HealthAttachmentsCard(
     pendingDelete?.let { doc ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("Elimina allegato?") },
+            title = { Text(stringResource(R.string.health_delete_attachment_q)) },
             text = { Text("\"${doc.title}\" verrà eliminato definitivamente.") },
             confirmButton = {
                 TextButton(onClick = {
                     onDeleteAttachment(doc)
                     pendingDelete = null
                 }) {
-                    Text("Elimina", color = Color(0xFFD32F2F))
+                    Text(stringResource(R.string.health_delete), color = Color(0xFFD32F2F))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text("Annulla") }
+                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.health_cancel)) }
             },
         )
     }
@@ -322,7 +324,7 @@ private fun AttachmentRow(
         ) {
             Icon(
                 Icons.Default.Delete,
-                contentDescription = "Elimina",
+                contentDescription = stringResource(R.string.health_delete),
                 tint = kb.subtitle,
                 modifier = Modifier.size(18.dp),
             )
@@ -337,14 +339,14 @@ private fun ExtractionStatusLabel(doc: KBDocumentEntity, kb: KidBoxColorScheme) 
         KBTextExtractionStatus.COMPLETED -> {
             if (!doc.extractedText.isNullOrBlank()) {
                 Text(
-                    "Leggibile dall'AI ✓",
+                    stringResource(R.string.health_ai_readable),
                     fontSize = 11.sp,
                     color = Color(0xFF2E7D32),
                     fontWeight = FontWeight.Medium,
                 )
             } else {
                 Text(
-                    "Nessun testo rilevato",
+                    stringResource(R.string.health_no_text_found),
                     fontSize = 11.sp,
                     color = kb.subtitle,
                 )
@@ -360,7 +362,7 @@ private fun ExtractionStatusLabel(doc: KBDocumentEntity, kb: KidBoxColorScheme) 
                     strokeWidth = 1.5.dp,
                     color = kb.subtitle,
                 )
-                Text("In attesa di lettura…", fontSize = 11.sp, color = kb.subtitle)
+                Text(stringResource(R.string.health_awaiting_read), fontSize = 11.sp, color = kb.subtitle)
             }
         }
         KBTextExtractionStatus.PROCESSING -> {
@@ -373,19 +375,19 @@ private fun ExtractionStatusLabel(doc: KBDocumentEntity, kb: KidBoxColorScheme) 
                     strokeWidth = 1.5.dp,
                     color = kb.subtitle,
                 )
-                Text("Lettura in corso…", fontSize = 11.sp, color = kb.subtitle)
+                Text(stringResource(R.string.health_reading), fontSize = 11.sp, color = kb.subtitle)
             }
         }
         KBTextExtractionStatus.FAILED -> {
             Text(
-                "Lettura fallita",
+                stringResource(R.string.health_read_failed),
                 fontSize = 11.sp,
                 color = Color(0xFFF59E0B),
                 fontWeight = FontWeight.Medium,
             )
         }
         KBTextExtractionStatus.NONE -> {
-            Text("In attesa di lettura…", fontSize = 11.sp, color = kb.subtitle)
+            Text(stringResource(R.string.health_awaiting_read), fontSize = 11.sp, color = kb.subtitle)
         }
     }
 }

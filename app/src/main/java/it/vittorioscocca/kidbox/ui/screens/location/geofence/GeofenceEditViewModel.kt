@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import it.vittorioscocca.kidbox.util.KBLocale
 
 data class GeofenceAddressSuggestion(
     val id: String,
@@ -193,7 +194,7 @@ class GeofenceEditViewModel @Inject constructor(
             val suggestions = withContext(Dispatchers.IO) {
                 runCatching {
                     if (!Geocoder.isPresent()) return@runCatching emptyList()
-                    val geocoder = Geocoder(app, Locale.ITALY)
+                    val geocoder = Geocoder(app, KBLocale.current())
                     @Suppress("DEPRECATION")
                     geocoder.getFromLocationName(query.trim(), 5)
                         ?.mapIndexedNotNull { index, address ->

@@ -2,6 +2,8 @@
 
 package it.vittorioscocca.kidbox.ui.screens.wallet.documents
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -51,7 +53,7 @@ fun OwnerDropdown(
             onValueChange = {},
             readOnly = true,
             enabled = enabled,
-            label = { Text("Titolare") },
+            label = { Text(stringResource(R.string.wallet_holder_label)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier.fillMaxWidth().menuAnchor(),
         )
@@ -90,7 +92,7 @@ fun KindDropdown(
             onValueChange = {},
             readOnly = true,
             enabled = enabled,
-            label = { Text("Tipo di documento") },
+            label = { Text(stringResource(R.string.wallet_document_type_label)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier.fillMaxWidth().menuAnchor(),
         )
@@ -127,7 +129,7 @@ fun DocumentDateField(label: String, date: LocalDate?, onChange: (LocalDate?) ->
                     modifier = Modifier.padding(start = 8.dp, top = 12.dp),
                 )
                 IconButton(onClick = { showPicker = true }) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Cambia data")
+                    Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.wallet_document_change_date_cd))
                 }
             }
         }
@@ -147,10 +149,10 @@ fun DocumentDateField(label: String, date: LocalDate?, onChange: (LocalDate?) ->
                         onChange(Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC")).toLocalDate())
                     }
                     showPicker = false
-                }) { Text("OK") }
+                }) { Text(stringResource(R.string.wallet_ok)) }
             },
             dismissButton = {
-                Button(onClick = { showPicker = false }) { Text("Annulla") }
+                Button(onClick = { showPicker = false }) { Text(stringResource(R.string.wallet_cancel)) }
             },
         ) {
             DatePicker(state = pickerState)

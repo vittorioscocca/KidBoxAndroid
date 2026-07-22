@@ -71,6 +71,9 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun TodoListScreen(
@@ -152,7 +155,7 @@ fun TodoListScreen(
                     fontWeight = FontWeight.Medium,
                 )
                 Text(
-                    "Questa lista contiene solo attività personali di altri membri.",
+                    stringResource(R.string.todo_only_personal),
                     fontSize = 14.sp,
                     color = kb.subtitle,
                 )
@@ -197,7 +200,7 @@ fun TodoListScreen(
                             colors = CardDefaults.cardColors(containerColor = kb.card),
                         ) {
                             Text(
-                                "Nessun elemento",
+                                stringResource(R.string.todo_no_items),
                                 modifier = Modifier.padding(16.dp),
                                 color = kb.subtitle,
                             )
@@ -327,7 +330,7 @@ private fun TodoRow(
                     if (todo.reminderEnabled) {
                         Icon(
                             imageVector = Icons.Filled.Alarm,
-                            contentDescription = "Promemoria attivo",
+                            contentDescription = stringResource(R.string.todo_reminder_on),
                             tint = Color(0xFFF59E0B),
                             modifier = Modifier.size(14.dp),
                         )
@@ -345,7 +348,7 @@ private fun TodoRow(
                 }
                 if (isUrgent) {
                     Text(
-                        "Urgente",
+                        stringResource(R.string.todo_urgent),
                         color = Color(0xFFE5484D),
                         fontSize = 11.sp,
                         modifier = Modifier
@@ -355,7 +358,7 @@ private fun TodoRow(
                     )
                 }
             }
-            TextButton(onClick = onDelete) { Text("Elimina", color = Color(0xFFD92323)) }
+            TextButton(onClick = onDelete) { Text(stringResource(R.string.life_delete), color = Color(0xFFD92323)) }
         }
     }
 }
@@ -451,11 +454,11 @@ private fun TodoEditDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (initial == null) "Nuovo To-Do" else "Modifica To-Do") },
+        title = { Text(if (initial == null) stringResource(R.string.todo_new) else stringResource(R.string.todo_edit)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                TextField(value = title, onValueChange = { title = it }, placeholder = { Text("Titolo") })
-                TextField(value = notes, onValueChange = { notes = it }, placeholder = { Text("Note") })
+                TextField(value = title, onValueChange = { title = it }, placeholder = { Text(stringResource(R.string.vehicles_title_field)) })
+                TextField(value = notes, onValueChange = { notes = it }, placeholder = { Text(stringResource(R.string.life_notes)) })
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -476,7 +479,7 @@ private fun TodoEditDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text("Visibilità", fontSize = 13.sp, color = MaterialTheme.kidBoxColors.subtitle)
+                        Text(stringResource(R.string.todo_visibility), fontSize = 13.sp, color = MaterialTheme.kidBoxColors.subtitle)
                         Text(
                             KBVisibilityScope.chipLabel(displayVisScope),
                             fontSize = 15.sp,
@@ -485,7 +488,7 @@ private fun TodoEditDialog(
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Text("Scadenza")
+                    Text(stringResource(R.string.home_items_deadline))
                     Switch(
                         checked = dueEnabled,
                         onCheckedChange = {
@@ -527,7 +530,7 @@ private fun TodoEditDialog(
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Text("Promemoria")
+                    Text(stringResource(R.string.vehicles_reminder))
                     Switch(
                         checked = reminderEnabled,
                         onCheckedChange = { enabled ->
@@ -542,7 +545,7 @@ private fun TodoEditDialog(
                     )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Text("Urgente")
+                    Text(stringResource(R.string.todo_urgent))
                     Switch(checked = urgent, onCheckedChange = { urgent = it })
                 }
                 Card(
@@ -559,9 +562,9 @@ private fun TodoEditDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text("Assegnato a", fontSize = 13.sp, color = MaterialTheme.kidBoxColors.subtitle)
+                        Text(stringResource(R.string.todo_assigned_to), fontSize = 13.sp, color = MaterialTheme.kidBoxColors.subtitle)
                         Text(
-                            members.firstOrNull { it.uid == assignedTo }?.displayName ?: "Nessuno",
+                            members.firstOrNull { it.uid == assignedTo }?.displayName ?: stringResource(R.string.todo_nobody),
                             fontSize = 15.sp,
                             color = MaterialTheme.kidBoxColors.title,
                         )
@@ -591,15 +594,15 @@ private fun TodoEditDialog(
                         ),
                     )
                 },
-            ) { Text("Salva") }
+            ) { Text(stringResource(R.string.life_save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Annulla") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.life_cancel)) } },
     )
 
     if (showReminderConfirm) {
         AlertDialog(
             onDismissRequest = { showReminderConfirm = false },
-            title = { Text("Creare un promemoria?") },
+            title = { Text(stringResource(R.string.todo_create_reminder_q)) },
             text = { Text("Vuoi ricevere una notifica locale il ${formatDate(dueAt)}?") },
             dismissButton = {
                 TextButton(onClick = {
@@ -619,11 +622,11 @@ private fun TodoEditDialog(
     if (showAssigneePicker) {
         AlertDialog(
             onDismissRequest = { showAssigneePicker = false },
-            title = { Text("Assegna a") },
+            title = { Text(stringResource(R.string.todo_assign_to)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        text = "Nessuno",
+                        text = stringResource(R.string.todo_nobody),
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
@@ -647,14 +650,14 @@ private fun TodoEditDialog(
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = { showAssigneePicker = false }) { Text("Chiudi") } },
+            dismissButton = { TextButton(onClick = { showAssigneePicker = false }) { Text(stringResource(R.string.photos_close)) } },
         )
     }
 
     if (showVisPick && canEditTodoVisibility) {
         VisibilityPickerBottomSheet(
             currentUid = currentUid,
-            scopeSectionTitle = "Chi può vedere questo to-do",
+            scopeSectionTitle = stringResource(R.string.todo_who_can_see),
             membersExcludingSelf = visibilityPickerMembers,
             initialScope = visScope,
             initialMemberIds = visMemberIds.toList(),
@@ -670,8 +673,8 @@ private fun TodoEditDialog(
     if (showVisLocked) {
         AlertDialog(
             onDismissRequest = { showVisLocked = false },
-            title = { Text("Visibilità bloccata") },
-            text = { Text("Solo chi ha creato il to-do può modificare la visibilità.") },
+            title = { Text(stringResource(R.string.todo_visibility_locked)) },
+            text = { Text(stringResource(R.string.todo_visibility_locked_hint)) },
             confirmButton = {
                 TextButton(onClick = { showVisLocked = false }) { Text("OK") }
             },
@@ -680,12 +683,12 @@ private fun TodoEditDialog(
 }
 
 private fun formatDate(epochMillis: Long): String {
-    val formatter = DateTimeFormatter.ofPattern("d MMM 'at' HH:mm")
+    val formatter = DateTimeFormatter.ofPattern("d MMM, HH:mm", KBLocale.current())
     return Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(formatter)
 }
 
 private fun formatDateOnly(epochMillis: Long): String {
-    val formatter = DateTimeFormatter.ofPattern("d MMM yyyy")
+    val formatter = DateTimeFormatter.ofPattern("d MMM yyyy", KBLocale.current())
     return Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(formatter)
 }
 

@@ -2,6 +2,8 @@
 
 package it.vittorioscocca.kidbox.ui.screens.wallet.documents
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -60,7 +62,8 @@ fun WalletDocumentPickerSheet(
     onSelect: (KBDocumentEntity) -> Unit,
     onCancel: () -> Unit,
 ) {
-    val stack = remember { mutableStateListOf(FolderLevel(id = null, title = "Documenti")) }
+    val rootTitle = stringResource(R.string.wallet_document_documents_root_title)
+    val stack = remember { mutableStateListOf(FolderLevel(id = null, title = rootTitle)) }
     val current = stack.last()
     val data by viewModel.browse(familyId, current.id).collectAsStateWithLifecycle(
         initialValue = DocumentBrowserData(emptyList(), emptyList()),
@@ -79,12 +82,12 @@ fun WalletDocumentPickerSheet(
                     navigationIcon = {
                         if (stack.size > 1) {
                             IconButton(onClick = { stack.removeAt(stack.lastIndex) }) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.wallet_back))
                             }
                         }
                     },
                     actions = {
-                        TextButton(onClick = onCancel) { Text("Annulla") }
+                        TextButton(onClick = onCancel) { Text(stringResource(R.string.wallet_cancel)) }
                     },
                 )
             },
@@ -92,7 +95,7 @@ fun WalletDocumentPickerSheet(
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                 if (data.folders.isEmpty() && data.documents.isEmpty()) {
                     Text(
-                        "Nessun documento in questa cartella.",
+                        stringResource(R.string.wallet_document_no_documents_in_folder),
                         modifier = Modifier.align(Alignment.Center).padding(32.dp),
                         color = MaterialTheme.kidBoxColors.subtitle,
                     )
@@ -100,7 +103,7 @@ fun WalletDocumentPickerSheet(
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         if (data.folders.isNotEmpty()) {
                             item {
-                                SectionHeader("CARTELLE")
+                                SectionHeader(stringResource(R.string.wallet_document_section_folders))
                             }
                             items(data.folders, key = { it.id }) { folder ->
                                 FolderRow(folder) { stack.add(FolderLevel(id = folder.id, title = folder.title)) }
@@ -109,7 +112,7 @@ fun WalletDocumentPickerSheet(
                         }
                         if (data.documents.isNotEmpty()) {
                             item {
-                                SectionHeader("DOCUMENTI")
+                                SectionHeader(stringResource(R.string.wallet_document_section_documents_header))
                             }
                             items(data.documents, key = { it.id }) { doc ->
                                 DocumentRow(doc) { onSelect(doc) }

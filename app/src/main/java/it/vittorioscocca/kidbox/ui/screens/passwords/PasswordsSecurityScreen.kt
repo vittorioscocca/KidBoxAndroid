@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.passwords
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -74,7 +76,7 @@ fun PasswordsSecurityScreen(
         ) {
             Surface(shape = CircleShape, color = Color.White, shadowElevation = 1.dp) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.location_back_content_description))
                 }
             }
             Spacer(modifier = Modifier.weight(1f))
@@ -88,12 +90,12 @@ fun PasswordsSecurityScreen(
             ) {
                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
                        Spacer(modifier = Modifier.size(6.dp))
-                       Text("Scansiona ora", fontWeight = FontWeight.SemiBold)
+                       Text(stringResource(R.string.passwords_scan_now_button), fontWeight = FontWeight.SemiBold)
             }
         }
 
         Text(
-            "Sicurezza password",
+            stringResource(R.string.passwords_security_section_title),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = kb.title,
@@ -102,14 +104,14 @@ fun PasswordsSecurityScreen(
             if (state.isOffline) {
                 AssistChip(
                     onClick = {},
-                    label = { Text("Offline - verdetti potrebbero essere obsoleti") },
+                    label = { Text(stringResource(R.string.passwords_offline_chip_label)) },
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
             }
             when (val s = scanState) {
-                is ScanState.Running -> Text("Scansione in corso...", color = kb.subtitle, modifier = Modifier.padding(bottom = 6.dp))
+                is ScanState.Running -> Text(stringResource(R.string.passwords_scan_in_progress), color = kb.subtitle, modifier = Modifier.padding(bottom = 6.dp))
                 is ScanState.Done -> Text(
-                    "Scansione completata: ${s.compromised} compromesse, ${s.duplicates} cluster duplicati, ${s.weak} deboli.",
+                    stringResource(R.string.passwords_scan_completed_message, s.compromised, s.duplicates, s.weak),
                     color = kb.subtitle,
                     modifier = Modifier.padding(bottom = 6.dp),
                 )
@@ -122,27 +124,27 @@ fun PasswordsSecurityScreen(
             modifier = Modifier.fillMaxSize(),
         ) {
             item {
-                SectionTitle("🔴 Compromesse")
+                SectionTitle(stringResource(R.string.passwords_compromised_section_title))
                 if (state.compromised.isEmpty()) {
-                    EmptySectionCard("Nessuna password compromessa.")
+                    EmptySectionCard(stringResource(R.string.passwords_no_compromised_message))
                 } else {
                            SecurityCardList(rows = state.compromised, showWarningIcon = true, onOpenPassword = onOpenPassword)
                 }
             }
             item {
-                SectionTitle("🟡 Duplicate")
+                SectionTitle(stringResource(R.string.passwords_duplicates_section_title))
             }
             if (state.duplicateClusters.isEmpty()) {
-                item { EmptySectionCard("Nessuna password duplicata.") }
+                item { EmptySectionCard(stringResource(R.string.passwords_no_duplicates_message)) }
             } else {
                 items(state.duplicateClusters, key = { it.id }) { cluster ->
                     DuplicateClusterCard(cluster = cluster)
                 }
             }
                 item {
-                    SectionTitle("🟠 Deboli")
+                    SectionTitle(stringResource(R.string.passwords_weak_section_title))
                     if (state.weak.isEmpty()) {
-                        EmptySectionCard("Nessuna password debole.")
+                        EmptySectionCard(stringResource(R.string.passwords_no_weak_message))
                     } else {
                         SecurityCardList(rows = state.weak, onOpenPassword = onOpenPassword)
                     }

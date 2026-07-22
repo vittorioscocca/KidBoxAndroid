@@ -43,6 +43,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -55,6 +56,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.util.fixBitmapOrientationFromBytes
 import java.io.ByteArrayOutputStream
 import kotlin.math.min
@@ -138,12 +140,12 @@ fun AvatarCropperScreen(
             IconButton(onClick = { if (!isSaving) onCancel() }) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Annulla",
+                    contentDescription = stringResource(R.string.home_avatar_cropper_cancel_desc),
                     tint = Color.White,
                 )
             }
             Text(
-                text = "Foto profilo",
+                text = stringResource(R.string.home_avatar_cropper_title),
                 color = Color.White,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 17.sp,
@@ -151,7 +153,7 @@ fun AvatarCropperScreen(
             IconButton(onClick = {
                 if (!isSaving) { scale = 1f; offsetX = 0f; offsetY = 0f }
             }) {
-                Icon(Icons.Filled.RestartAlt, contentDescription = "Reset", tint = Color.White)
+                Icon(Icons.Filled.RestartAlt, contentDescription = stringResource(R.string.home_avatar_cropper_reset_desc), tint = Color.White)
             }
         }
 
@@ -235,7 +237,7 @@ fun AvatarCropperScreen(
 
         Spacer(Modifier.height(20.dp))
         Text(
-            text = "Trascina e pizzica per sistemare la foto",
+            text = stringResource(R.string.home_avatar_cropper_hint),
             color = Color.White.copy(alpha = 0.55f),
             fontSize = 13.sp,
             modifier = Modifier.align(Alignment.CenterHorizontally),
@@ -255,7 +257,7 @@ fun AvatarCropperScreen(
                 onClick = { if (!isSaving) onCancel() },
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-            ) { Text("Annulla") }
+            ) { Text(stringResource(R.string.home_avatar_cropper_cancel)) }
 
             Button(
                 onClick = {
@@ -281,7 +283,7 @@ fun AvatarCropperScreen(
                     )
                 } else {
                     Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White)
-                    Text(" Salva", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(" " + stringResource(R.string.home_avatar_cropper_save), color = Color.White, fontWeight = FontWeight.SemiBold)
                 }
             }
         }

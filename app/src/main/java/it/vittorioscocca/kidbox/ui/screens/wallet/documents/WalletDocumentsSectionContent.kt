@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.wallet.documents
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -106,16 +108,16 @@ fun WalletDocumentsSectionContent(
     pendingSingleDelete?.let { doc ->
         AlertDialog(
             onDismissRequest = { pendingSingleDelete = null },
-            title = { Text("Elimina documento") },
-            text = { Text("\"${doc.title.ifBlank { "Documento" }}\" verrà eliminato. L'operazione non può essere annullata.") },
+            title = { Text(stringResource(R.string.wallet_document_delete_title)) },
+            text = { Text(stringResource(R.string.wallet_document_delete_document_confirm, doc.title.ifBlank { stringResource(R.string.wallet_document_detail_title) })) },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.deleteSingle(doc)
                     pendingSingleDelete = null
-                }) { Text("Elimina", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.wallet_delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingSingleDelete = null }) { Text("Annulla") }
+                TextButton(onClick = { pendingSingleDelete = null }) { Text(stringResource(R.string.wallet_cancel)) }
             },
         )
     }

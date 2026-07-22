@@ -85,13 +85,16 @@ import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatStandardMessageRow
 import it.vittorioscocca.kidbox.ui.screens.ai.common.rememberStreamScrollTick
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private val AI_BLUE = Color(0xFF5C6BC0)
 
-private val SUGGESTIONS = listOf(
-    "Cosa ho in programma questa settimana?",
-    "Cosa manca ancora alla lista della spesa?",
-    "Aiutami a pianificare il weekend",
+@Composable
+private fun suggestions() = listOf(
+    stringResource(R.string.ai_q_week),
+    stringResource(R.string.ai_q_grocery),
+    stringResource(R.string.ai_q_weekend),
 )
 
 @Composable
@@ -136,14 +139,14 @@ fun AIChatScreen(
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
-            title = { Text("Nuova conversazione?") },
-            text = { Text("La conversazione attuale verrà cancellata e non sarà recuperabile.") },
+            title = { Text(stringResource(R.string.ai_new_conversation_q)) },
+            text = { Text(stringResource(R.string.ai_new_conversation_body)) },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.clearConversation()
                     showClearDialog = false
                 }) {
-                    Text("Cancella", color = Color(0xFFD32F2F), fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.chat_clear), color = Color(0xFFD32F2F), fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
@@ -160,7 +163,7 @@ fun AIChatScreen(
                 title = {
                     Column {
                         Text(
-                            "Assistente AI",
+                            stringResource(R.string.ai_assistant),
                             fontWeight = FontWeight.Bold,
                             fontSize = 17.sp,
                             color = kb.title,
@@ -187,7 +190,7 @@ fun AIChatScreen(
                         Box {
                             KidBoxHeaderCircleButton(
                                 icon = Icons.Default.MoreVert,
-                                contentDescription = "Menu",
+                                contentDescription = stringResource(R.string.ai_menu),
                                 onClick = { showMenu = true },
                             )
                             DropdownMenu(
@@ -195,11 +198,11 @@ fun AIChatScreen(
                                 onDismissRequest = { showMenu = false },
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text("Nuova conversazione", color = Color(0xFFD32F2F)) },
+                                    text = { Text(stringResource(R.string.ai_new_conversation), color = Color(0xFFD32F2F)) },
                                     onClick = { showMenu = false; showClearDialog = true },
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Impostazioni AI") },
+                                    text = { Text(stringResource(R.string.ai_settings)) },
                                     onClick = {
                                         showMenu = false
                                         onOpenAiSettings()
@@ -217,7 +220,7 @@ fun AIChatScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             CircularProgressIndicator(color = AI_BLUE)
                             Spacer(Modifier.height(12.dp))
-                            Text("Preparando il contesto...", fontSize = 14.sp, color = kb.subtitle)
+                            Text(stringResource(R.string.ai_preparing_context), fontSize = 14.sp, color = kb.subtitle)
                         }
                     }
                 }
@@ -235,7 +238,7 @@ fun AIChatScreen(
                                 modifier = Modifier.size(46.dp),
                             )
                             Spacer(Modifier.height(10.dp))
-                            val name = state.familyName.ifBlank { "la tua famiglia" }
+                            val name = state.familyName.ifBlank { stringResource(R.string.ai_your_family) }
                             Text(
                                 "Ciao! Sono il tuo assistente AI per $name.",
                                 fontSize = 15.sp,
@@ -258,12 +261,12 @@ fun AIChatScreen(
                             )
                             Spacer(Modifier.height(14.dp))
                             Text(
-                                "Puoi iniziare con uno di questi suggerimenti:",
+                                stringResource(R.string.ai_suggestions_intro),
                                 fontSize = 13.sp,
                                 color = kb.subtitle,
                             )
                             Spacer(Modifier.height(8.dp))
-                            SUGGESTIONS.forEach { suggestion ->
+                            suggestions().forEach { suggestion ->
                                 SuggestionChip(
                                     onClick = { viewModel.sendSuggestion(suggestion) },
                                     label = { Text(suggestion, fontSize = 13.sp) },
@@ -333,7 +336,7 @@ fun AIChatScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.KeyboardArrowDown,
-                                    contentDescription = "Scorri in basso",
+                                    contentDescription = stringResource(R.string.ai_scroll_down),
                                     tint = Color.White,
                                 )
                             }
@@ -365,7 +368,7 @@ fun AIChatScreen(
                 OutlinedTextField(
                     value = state.inputText,
                     onValueChange = { viewModel.setInput(it) },
-                    placeholder = { Text("Scrivi un messaggio...", color = kb.subtitle) },
+                    placeholder = { Text(stringResource(R.string.ai_write_message), color = kb.subtitle) },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(24.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -399,7 +402,7 @@ fun AIChatScreen(
                             ) {
                                 Icon(
                                     Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = "Invia",
+                                    contentDescription = stringResource(R.string.chat_send),
                                     tint = if (state.canSend) Color.White else kb.subtitle,
                                     modifier = Modifier.size(20.dp),
                                 )

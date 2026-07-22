@@ -145,10 +145,13 @@ import kotlinx.coroutines.withContext
 import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private enum class PhotosTab { LIBRARY, ALBUMS }
-private enum class PhotoGrouping(val label: String) {
-    YEAR("Anni"), MONTH("Mesi"), DAY("Giorni"), ALL("Tutto")
+private enum class PhotoGrouping(@androidx.annotation.StringRes val labelRes: Int) {
+    YEAR(R.string.photos_years), MONTH(R.string.photos_months), DAY(R.string.photos_days), ALL(R.string.photos_all)
 }
 
 @Composable
@@ -275,7 +278,7 @@ fun FamilyPhotosScreen(
                 },
                 onCamera = {
                     val uri = photosCreateCaptureUri(context) ?: run {
-                        Toast.makeText(context, "Impossibile aprire la fotocamera", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, context.getString(R.string.photos_camera_error), Toast.LENGTH_LONG).show()
                         return@TopHeader
                     }
                     pendingCaptureUri = uri
@@ -291,7 +294,7 @@ fun FamilyPhotosScreen(
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "Foto e Video",
+                text = stringResource(R.string.photos_title),
                 fontSize = 40.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.kidBoxColors.title,
@@ -306,7 +309,7 @@ fun FamilyPhotosScreen(
             if (currentTab == PhotosTab.LIBRARY && state.selectedAlbumId != null) {
                 Spacer(Modifier.height(8.dp))
                 TextButton(onClick = { viewModel.selectAlbum(null) }) {
-                    Text("Mostra tutta la libreria")
+                    Text(stringResource(R.string.photos_show_library))
                 }
             }
 
@@ -336,7 +339,7 @@ fun FamilyPhotosScreen(
                             if (selectedPhotoIds.isEmpty()) isSelectionMode = false
                         },
                     ) {
-                        Text(if (selectedPhotoIds.size == state.filteredPhotos.size) "Deseleziona tutto" else "Seleziona tutto")
+                        Text(if (selectedPhotoIds.size == state.filteredPhotos.size) stringResource(R.string.photos_deselect_all) else stringResource(R.string.photos_select_all))
                     }
                 }
             }
@@ -367,7 +370,7 @@ fun FamilyPhotosScreen(
                             if (selectedAlbumIds.isEmpty()) isAlbumSelectionMode = false
                         },
                     ) {
-                        Text(if (selectedAlbumIds.size == state.albums.size) "Deseleziona tutto" else "Seleziona tutto")
+                        Text(if (selectedAlbumIds.size == state.albums.size) stringResource(R.string.photos_deselect_all) else stringResource(R.string.photos_select_all))
                     }
                 }
             }
@@ -398,7 +401,7 @@ fun FamilyPhotosScreen(
                         },
                         onEmptyCamera = {
                             val uri = photosCreateCaptureUri(context) ?: run {
-                                Toast.makeText(context, "Impossibile aprire la fotocamera", Toast.LENGTH_LONG).show()
+                                Toast.makeText(context, context.getString(R.string.photos_camera_error), Toast.LENGTH_LONG).show()
                                 return@LibraryContent
                             }
                             pendingCaptureUri = uri
@@ -593,7 +596,7 @@ fun FamilyPhotosScreen(
                         val file = withContext(Dispatchers.IO) { viewModel.preparePreviewFile(photo) }
                         openMedia(context, photo.mimeType, file)
                     }.onFailure {
-                        Toast.makeText(context, "Impossibile aprire il media", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, context.getString(R.string.photos_open_media_error), Toast.LENGTH_LONG).show()
                     }
                 }
             },
@@ -676,13 +679,13 @@ private fun TabSwitcher(
     ) {
         Row(modifier = Modifier.padding(3.dp)) {
             TabPill(
-                label = "Libreria",
+                label = stringResource(R.string.photos_library),
                 selected = selectedTab == PhotosTab.LIBRARY,
                 onClick = { onSelect(PhotosTab.LIBRARY) },
                 modifier = Modifier.weight(1f),
             )
             TabPill(
-                label = "Album",
+                label = stringResource(R.string.photos_albums),
                 selected = selectedTab == PhotosTab.ALBUMS,
                 onClick = { onSelect(PhotosTab.ALBUMS) },
                 modifier = Modifier.weight(1f),
@@ -713,6 +716,7 @@ private fun LibraryContent(
     onPhotoLongPress: (KBFamilyPhotoEntity) -> Unit,
     onSetSelected: (String, Boolean) -> Unit,
 ) {
+    val context = LocalContext.current
     if (isLoading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = Color(0xFFFF6B00))
@@ -766,7 +770,7 @@ private fun LibraryContent(
                             onSetSelected = onSetSelected,
                         )
                         PhotoGrouping.YEAR -> YearsLayout(
-                            groups = remember(photos) { groupPhotos(photos, PhotoGrouping.YEAR) },
+                            groups = remember(photos) { groupPhotos(context, photos, PhotoGrouping.YEAR) },
                             layoutWidth = layoutWidth,
                             familyId = familyId,
                             loadPreview = loadPreview,
@@ -777,7 +781,7 @@ private fun LibraryContent(
                             onPhotoLongPress = onPhotoLongPress,
                         )
                         PhotoGrouping.MONTH -> MosaicSections(
-                            groups = remember(photos) { groupPhotos(photos, PhotoGrouping.MONTH) },
+                            groups = remember(photos) { groupPhotos(context, photos, PhotoGrouping.MONTH) },
                             layoutWidth = layoutWidth,
                             pendingScrollKey = pendingScrollKey,
                             onScrollConsumed = onScrollConsumed,
@@ -788,7 +792,7 @@ private fun LibraryContent(
                             onPhotoLongPress = onPhotoLongPress,
                         )
                         PhotoGrouping.DAY -> MosaicSections(
-                            groups = remember(photos) { groupPhotos(photos, PhotoGrouping.DAY) },
+                            groups = remember(photos) { groupPhotos(context, photos, PhotoGrouping.DAY) },
                             layoutWidth = layoutWidth,
                             pendingScrollKey = pendingScrollKey,
                             onScrollConsumed = onScrollConsumed,
@@ -840,7 +844,7 @@ private fun GroupingBar(
                     color = if (selected) MaterialTheme.kidBoxColors.title.copy(alpha = 0.12f) else Color.Transparent,
                 ) {
                     Text(
-                        text = g.label,
+                        text = stringResource(g.labelRes),
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
                         color = if (selected) MaterialTheme.kidBoxColors.title else MaterialTheme.kidBoxColors.subtitle,
                         fontWeight = FontWeight.SemiBold,
@@ -1356,14 +1360,14 @@ private data class PhotoGroup(
 )
 
 private fun monthKeyOf(photo: KBFamilyPhotoEntity): String =
-    SimpleDateFormat("yyyy-MM", Locale.ITALIAN).format(Date(photo.takenAtEpochMillis))
+    SimpleDateFormat("yyyy-MM", KBLocale.current()).format(Date(photo.takenAtEpochMillis))
 
-private fun groupPhotos(photos: List<KBFamilyPhotoEntity>, grouping: PhotoGrouping): List<PhotoGroup> {
+private fun groupPhotos(context: android.content.Context, photos: List<KBFamilyPhotoEntity>, grouping: PhotoGrouping): List<PhotoGroup> {
     val sorted = photos.sortedByDescending { it.takenAtEpochMillis }
     if (grouping == PhotoGrouping.ALL) {
-        return listOf(PhotoGroup("all", "Tutto", sorted))
+        return listOf(PhotoGroup("all", context.getString(R.string.photos_all), sorted))
     }
-    val locale = Locale.ITALIAN
+    val locale = KBLocale.current()
     val keyFormat = when (grouping) {
         PhotoGrouping.DAY -> SimpleDateFormat("yyyy-MM-dd", locale)
         PhotoGrouping.MONTH -> SimpleDateFormat("yyyy-MM", locale)
@@ -1462,7 +1466,7 @@ private fun AlbumsContent(
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.kidBoxColors.title)
                 Text(
-                    text = "Nuovo album",
+                    text = stringResource(R.string.photos_new_album),
                     color = MaterialTheme.kidBoxColors.title,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -1515,13 +1519,13 @@ private fun AlbumSelectionActionBar(
         ) {
             PhotosActionIconButton(
                 icon = Icons.Default.Close,
-                label = "Annulla",
+                label = stringResource(R.string.life_cancel),
                 enabled = true,
                 onClick = onDeselect,
             )
             PhotosActionIconButton(
                 icon = Icons.Default.Delete,
-                label = "Elimina",
+                label = stringResource(R.string.life_delete),
                 enabled = selectedCount > 0,
                 destructive = true,
                 onClick = onDelete,
@@ -1558,37 +1562,37 @@ private fun SelectionActionBar(
         ) {
             PhotosActionIconButton(
                 icon = Icons.Default.Close,
-                label = "Annulla",
+                label = stringResource(R.string.life_cancel),
                 enabled = true,
                 onClick = onDeselect,
             )
             PhotosActionIconButton(
                 icon = Icons.AutoMirrored.Filled.PlaylistAdd,
-                label = "Aggiungi",
+                label = stringResource(R.string.vehicles_add),
                 enabled = selectedCount > 0,
                 onClick = onAdd,
             )
             PhotosActionIconButton(
                 icon = Icons.AutoMirrored.Filled.DriveFileMove,
-                label = "Sposta",
+                label = stringResource(R.string.photos_move),
                 enabled = selectedCount > 0,
                 onClick = onMove,
             )
             PhotosActionIconButton(
                 icon = Icons.Default.RemoveCircleOutline,
-                label = "Rimuovi",
+                label = stringResource(R.string.photos_remove),
                 enabled = canRemoveFromAlbum,
                 onClick = onRemove,
             )
             PhotosActionIconButton(
                 icon = Icons.Default.Image,
-                label = "Copertina",
+                label = stringResource(R.string.photos_cover),
                 enabled = canSetCover,
                 onClick = onSetCover,
             )
             PhotosActionIconButton(
                 icon = Icons.Default.Delete,
-                label = "Elimina",
+                label = stringResource(R.string.life_delete),
                 enabled = selectedCount > 0,
                 destructive = true,
                 onClick = onDelete,
@@ -1610,14 +1614,14 @@ private fun EmptyLibraryState(
         verticalArrangement = Arrangement.Top,
     ) {
         Text(
-            text = "Nessuna foto",
+            text = stringResource(R.string.photos_none),
             color = MaterialTheme.kidBoxColors.title,
             fontWeight = FontWeight.Bold,
             fontSize = 30.sp,
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Aggiungi le prime foto condivise della famiglia.",
+            text = stringResource(R.string.photos_none_hint),
             color = MaterialTheme.kidBoxColors.subtitle,
             fontSize = 14.sp,
         )
@@ -1628,7 +1632,7 @@ private fun EmptyLibraryState(
             color = Color(0xFFFF2D6F),
         ) {
             Text(
-                text = "Aggiungi foto e video",
+                text = stringResource(R.string.photos_add_media),
                 color = Color.White,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
@@ -1652,7 +1656,7 @@ private fun EmptyLibraryState(
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text = "Scatta una foto",
+                    text = stringResource(R.string.photos_take_photo),
                     color = Color(0xFFFF2D6F),
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -1791,7 +1795,7 @@ private fun CreateAlbumCard(
             Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.kidBoxColors.subtitle)
         }
         Text(
-            text = "Nuovo album",
+            text = stringResource(R.string.photos_new_album),
             color = MaterialTheme.kidBoxColors.title,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
@@ -1809,7 +1813,7 @@ private fun AlbumLongPressMenuDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Azioni album") },
+        title = { Text(stringResource(R.string.photos_album_actions)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -1822,7 +1826,7 @@ private fun AlbumLongPressMenuDialog(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
-                        text = "Apri",
+                        text = stringResource(R.string.photos_open),
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                         color = MaterialTheme.kidBoxColors.title,
                     )
@@ -1834,7 +1838,7 @@ private fun AlbumLongPressMenuDialog(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
-                        text = "Seleziona",
+                        text = stringResource(R.string.photos_select),
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                         color = MaterialTheme.kidBoxColors.title,
                     )
@@ -1846,7 +1850,7 @@ private fun AlbumLongPressMenuDialog(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
-                        text = "Elimina album",
+                        text = stringResource(R.string.photos_delete_album),
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                         color = Color(0xFFE35156),
                         fontWeight = FontWeight.SemiBold,
@@ -1856,7 +1860,7 @@ private fun AlbumLongPressMenuDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Chiudi") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.photos_close)) }
         },
     )
 }
@@ -1870,7 +1874,7 @@ private fun PhotoLongPressMenuDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Azioni foto") },
+        title = { Text(stringResource(R.string.photos_photo_actions)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -1883,7 +1887,7 @@ private fun PhotoLongPressMenuDialog(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
-                        text = "Apri",
+                        text = stringResource(R.string.photos_open),
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                         color = MaterialTheme.kidBoxColors.title,
                     )
@@ -1895,7 +1899,7 @@ private fun PhotoLongPressMenuDialog(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
-                        text = "Seleziona",
+                        text = stringResource(R.string.photos_select),
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                         color = MaterialTheme.kidBoxColors.title,
                     )
@@ -1907,7 +1911,7 @@ private fun PhotoLongPressMenuDialog(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
-                        text = "Elimina",
+                        text = stringResource(R.string.life_delete),
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                         color = Color(0xFFE35156),
                         fontWeight = FontWeight.SemiBold,
@@ -1917,7 +1921,7 @@ private fun PhotoLongPressMenuDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Annulla") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.life_cancel)) }
         },
     )
 }
@@ -1968,7 +1972,7 @@ private fun AlbumSelectionDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Seleziona album") },
+        title = { Text(stringResource(R.string.photos_select_album)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 albums.forEach { album ->
@@ -1986,13 +1990,13 @@ private fun AlbumSelectionDialog(
                     }
                 }
                 if (albums.isEmpty()) {
-                    Text("Nessun album disponibile", color = MaterialTheme.kidBoxColors.subtitle)
+                    Text(stringResource(R.string.photos_no_albums), color = MaterialTheme.kidBoxColors.subtitle)
                 }
             }
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Annulla") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.life_cancel)) }
         },
     )
 }
@@ -2005,13 +2009,13 @@ private fun CreateAlbumDialog(
     var title by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Nuovo album") },
+        title = { Text(stringResource(R.string.photos_new_album)) },
         text = {
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Nome album") },
+                placeholder = { Text(stringResource(R.string.photos_album_name)) },
                 singleLine = true,
             )
         },
@@ -2019,10 +2023,10 @@ private fun CreateAlbumDialog(
             TextButton(
                 onClick = { onCreate(title.trim()) },
                 enabled = title.isNotBlank(),
-            ) { Text("Crea") }
+            ) { Text(stringResource(R.string.photos_create)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Annulla") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.life_cancel)) }
         },
     )
 }
@@ -2110,7 +2114,7 @@ internal fun PhotosFullscreenMediaViewer(
                         runCatching { withContext(Dispatchers.IO) { prepareFile(photo) } }
                             .onSuccess { preparedFiles[photo.id] = it }
                             .onFailure {
-                                Toast.makeText(context, "Errore caricamento media", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.photos_load_error), Toast.LENGTH_SHORT).show()
                             }
                         loadingIds[photo.id] = false
                     }
@@ -2134,7 +2138,7 @@ internal fun PhotosFullscreenMediaViewer(
                             ) {
                                 Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
                                 Text(
-                                    text = "Apri video",
+                                    text = stringResource(R.string.photos_open_video),
                                     color = Color.White,
                                     fontWeight = FontWeight.SemiBold,
                                 )
@@ -2214,7 +2218,7 @@ internal fun PhotosFullscreenMediaViewer(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     ActionLabel(
-                        label = "Condividi",
+                        label = stringResource(R.string.photos_share),
                         onClick = {
                             currentPhoto?.let { photo ->
                                 scope.launch {
@@ -2222,14 +2226,14 @@ internal fun PhotosFullscreenMediaViewer(
                                         val file = withContext(Dispatchers.IO) { prepareFile(photo) }
                                         shareMedia(context, photo.mimeType, file)
                                     }.onFailure {
-                                        Toast.makeText(context, "Impossibile condividere il file", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.photos_share_error), Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             }
                         },
                     )
                     ActionLabel(
-                        label = "Modifica",
+                        label = stringResource(R.string.life_edit),
                         enabled = currentPhoto?.mimeType?.startsWith("image/") == true,
                         onClick = {
                             currentPhoto?.let { photo ->
@@ -2242,14 +2246,14 @@ internal fun PhotosFullscreenMediaViewer(
                                         editorBitmap = bitmap
                                         showEditorForPhoto = photo
                                     }.onFailure {
-                                        Toast.makeText(context, "Impossibile aprire editor foto", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.photos_editor_error), Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             }
                         },
                     )
                     ActionLabel(
-                        label = "Elimina",
+                        label = stringResource(R.string.life_delete),
                         destructive = true,
                         onClick = { currentPhoto?.let { onDelete(it) } },
                     )
@@ -2369,14 +2373,14 @@ private fun PhotoAdjustEditorDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(onClick = onDismiss) { Text("Annulla", color = Color.White) }
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.life_cancel), color = Color.White) }
                     TextButton(
                         onClick = {
                             val out = java.io.ByteArrayOutputStream()
                             editedBitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)
                             onSaveCopy(out.toByteArray())
                         },
-                    ) { Text("Salva copia") }
+                    ) { Text(stringResource(R.string.photos_save_copy)) }
                 }
                 Box(
                     modifier = Modifier
@@ -2401,7 +2405,7 @@ private fun PhotoAdjustEditorDialog(
                 ) {
                     EditorTool.values().forEach { tool ->
                         ToolPill(
-                            label = tool.label,
+                            label = stringResource(tool.labelRes),
                             selected = selectedTool == tool,
                             onClick = { selectedTool = tool },
                         )
@@ -2418,7 +2422,7 @@ private fun PhotoAdjustEditorDialog(
                         ) {
                             CropPreset.values().forEach { preset ->
                                 ToolPill(
-                                    label = preset.label,
+                                    label = stringResource(preset.labelRes),
                                     selected = cropPreset == preset,
                                     onClick = { cropPreset = preset },
                                 )
@@ -2433,9 +2437,9 @@ private fun PhotoAdjustEditorDialog(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             EditSlider("Luminosita", brightness, -100f..100f) { brightness = it }
-                            EditSlider("Contrasto", contrast, 0.2f..2.2f) { contrast = it }
-                            EditSlider("Saturazione", saturation, 0f..2f) { saturation = it }
-                            EditSlider("Calore", warmth, 0.4f..1.8f) { warmth = it }
+                            EditSlider(stringResource(R.string.photos_contrast), contrast, 0.2f..2.2f) { contrast = it }
+                            EditSlider(stringResource(R.string.photos_saturation), saturation, 0f..2f) { saturation = it }
+                            EditSlider(stringResource(R.string.photos_warmth), warmth, 0.4f..1.8f) { warmth = it }
                         }
                     }
                     EditorTool.FILTERS -> {
@@ -2467,7 +2471,7 @@ private fun PhotoAdjustEditorDialog(
                         ) {
                             items(PhotoFilterPreset.values().toList(), key = { it.name }) { preset ->
                                 FilterPreviewItem(
-                                    title = preset.label,
+                                    title = stringResource(preset.labelRes),
                                     preview = filterPreviewBitmaps[preset],
                                     selected = filterPreset == preset,
                                     onClick = { filterPreset = preset },
@@ -2486,12 +2490,12 @@ private fun PhotoAdjustEditorDialog(
                                 value = textDraft,
                                 onValueChange = { textDraft = it },
                                 modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("Inserisci testo") },
+                                placeholder = { Text(stringResource(R.string.photos_insert_text)) },
                                 singleLine = true,
                             )
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 ToolPill(
-                                    label = "Aggiungi testo",
+                                    label = stringResource(R.string.photos_add_text),
                                     selected = false,
                                     onClick = {
                                         val value = textDraft.trim()
@@ -2502,7 +2506,7 @@ private fun PhotoAdjustEditorDialog(
                                     },
                                 )
                                 ToolPill(
-                                    label = "Rimuovi ultimo",
+                                    label = stringResource(R.string.photos_remove_last),
                                     selected = false,
                                     onClick = {
                                         if (textOverlays.isNotEmpty()) {
@@ -2535,7 +2539,7 @@ private fun PhotoAdjustEditorDialog(
                                 }
                             }
                             ToolPill(
-                                label = "Rimuovi ultimo sticker",
+                                label = stringResource(R.string.photos_remove_last_sticker),
                                 selected = false,
                                 onClick = {
                                     if (stickerOverlays.isNotEmpty()) {
@@ -2551,29 +2555,29 @@ private fun PhotoAdjustEditorDialog(
     }
 }
 
-private enum class EditorTool(val label: String) {
-    CROP("Crop"),
-    ADJUST("Regola"),
-    FILTERS("Filtri"),
-    TEXT("Testo"),
-    STICKERS("Sticker"),
+private enum class EditorTool(@androidx.annotation.StringRes val labelRes: Int) {
+    CROP(R.string.photos_crop),
+    ADJUST(R.string.photos_adjust),
+    FILTERS(R.string.photos_filters),
+    TEXT(R.string.photos_text),
+    STICKERS(R.string.photos_stickers),
 }
 
-private enum class CropPreset(val label: String) {
-    ORIGINAL("Originale"),
-    SQUARE("1:1"),
-    RATIO_4_5("4:5"),
-    RATIO_16_9("16:9"),
+private enum class CropPreset(@androidx.annotation.StringRes val labelRes: Int) {
+    ORIGINAL(R.string.photos_original),
+    SQUARE(R.string.photos_ratio_1_1),
+    RATIO_4_5(R.string.photos_ratio_4_5),
+    RATIO_16_9(R.string.photos_ratio_16_9),
 }
 
-private enum class PhotoFilterPreset(val label: String) {
-    NONE("Originale"),
-    VIVID("Vivido"),
-    FADE("Fade"),
-    MONO("Noir"),
-    CHROME("Chrome"),
-    WARM("Caldo"),
-    COOL("Freddo"),
+private enum class PhotoFilterPreset(@androidx.annotation.StringRes val labelRes: Int) {
+    NONE(R.string.photos_original),
+    VIVID(R.string.photos_vivid),
+    FADE(R.string.photos_fade),
+    MONO(R.string.photos_noir),
+    CHROME(R.string.photos_chrome),
+    WARM(R.string.photos_warm),
+    COOL(R.string.photos_cold),
 }
 
 @Composable
@@ -2823,7 +2827,7 @@ private fun drawOverlays(
 private fun formatHeaderDate(epochMillis: Long): String {
     if (epochMillis <= 0L) return ""
     return runCatching {
-        SimpleDateFormat("dd MMM yyyy 'alle' HH:mm", Locale.ITALY).format(Date(epochMillis))
+        SimpleDateFormat("dd MMM yyyy · HH:mm", KBLocale.current()).format(Date(epochMillis))
     }.getOrDefault("")
 }
 
@@ -2884,7 +2888,7 @@ private fun openMedia(
     try {
         context.startActivity(intent)
     } catch (_: ActivityNotFoundException) {
-        Toast.makeText(context, "Nessuna app disponibile per aprire il file", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, context.getString(R.string.photos_no_app), Toast.LENGTH_LONG).show()
     }
 }
 
@@ -2903,7 +2907,7 @@ private fun shareMedia(
         .putExtra(Intent.EXTRA_STREAM, uri)
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    context.startActivity(Intent.createChooser(intent, "Condividi").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    context.startActivity(Intent.createChooser(intent, context.getString(R.string.photos_share)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 }
 
 internal fun photosCreateCaptureUri(context: android.content.Context): Uri? {

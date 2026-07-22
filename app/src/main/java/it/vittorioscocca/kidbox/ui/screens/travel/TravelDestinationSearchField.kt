@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import kotlinx.coroutines.delay
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun TravelDestinationSearchField(
@@ -105,7 +107,7 @@ private fun TravelDestinationSearchFieldContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .onFocusChanged { isFocused = it.isFocused },
-            placeholder = { Text("Es. Procida, Barcellona…") },
+            placeholder = { Text(stringResource(R.string.travel_dest_hint)) },
             leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
             trailingIcon = {
                 when {
@@ -181,7 +183,7 @@ private fun TravelDestinationSearchFieldContent(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     CircularProgressIndicator(strokeWidth = 2.dp)
-                    Text("Ricerca in corso…", color = kb.subtitle, modifier = Modifier.padding(start = 12.dp))
+                    Text(stringResource(R.string.travel_searching), color = kb.subtitle, modifier = Modifier.padding(start = 12.dp))
                 }
             }
         } else if (destinationName.isNotBlank() && destinationRegion.isNotBlank()) {

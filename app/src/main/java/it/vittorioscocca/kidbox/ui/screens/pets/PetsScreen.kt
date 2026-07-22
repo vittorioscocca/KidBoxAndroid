@@ -43,11 +43,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.entity.PetEntity
 import it.vittorioscocca.kidbox.ui.screens.life.speciesEmoji
 import it.vittorioscocca.kidbox.ui.screens.life.speciesLabelIt
@@ -72,7 +74,7 @@ fun PetsScreen(
         containerColor = kb.background,
         topBar = {
             TopAppBar(
-                title = { Text("Animali domestici", color = kb.title) },
+                title = { Text(stringResource(R.string.pets_title), color = kb.title) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = kb.title)
@@ -92,7 +94,7 @@ fun PetsScreen(
                 containerColor = orange,
                 contentColor = Color.White,
             ) {
-                Icon(Icons.Filled.Add, contentDescription = "Aggiungi")
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.pets_add_cd))
             }
         },
     ) { padding ->
@@ -106,7 +108,7 @@ fun PetsScreen(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Icon(Icons.Filled.Pets, contentDescription = null, tint = orange, modifier = Modifier.padding(bottom = 8.dp))
-                Text("Nessun animale ancora", style = MaterialTheme.typography.titleMedium, color = kb.title)
+                Text(stringResource(R.string.pets_empty_title), style = MaterialTheme.typography.titleMedium, color = kb.title)
                 Spacer(Modifier.height(16.dp))
                 Surface(
                     onClick = { showAdd = true },
@@ -114,7 +116,7 @@ fun PetsScreen(
                     shape = RoundedCornerShape(999.dp),
                 ) {
                     Text(
-                        "Aggiungi animale",
+                        stringResource(R.string.pets_add_button),
                         color = Color.White,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
@@ -179,24 +181,24 @@ fun PetsScreen(
     petToDelete?.let { target ->
         AlertDialog(
             onDismissRequest = { petToDelete = null },
-            title = { Text("Eliminare ${target.name}?") },
+            title = { Text(stringResource(R.string.pets_delete_confirm_title, target.name)) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         viewModel.deletePet(target) { err -> toast = err }
                         petToDelete = null
                     },
-                ) { Text("Elimina", color = Color(0xFFE53935)) }
+                ) { Text(stringResource(R.string.pets_action_delete), color = Color(0xFFE53935)) }
             },
-            dismissButton = { TextButton(onClick = { petToDelete = null }) { Text("Annulla") } },
+            dismissButton = { TextButton(onClick = { petToDelete = null }) { Text(stringResource(R.string.pets_action_cancel)) } },
         )
     }
 
     toast?.let { msg ->
         AlertDialog(
             onDismissRequest = { toast = null },
-            confirmButton = { TextButton(onClick = { toast = null }) { Text("OK") } },
-            title = { Text("Errore") },
+            confirmButton = { TextButton(onClick = { toast = null }) { Text(stringResource(R.string.pets_action_ok)) } },
+            title = { Text(stringResource(R.string.pets_error_title)) },
             text = { Text(msg) },
         )
     }
@@ -215,11 +217,11 @@ private fun AddPetDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Nuovo animale") },
+        title = { Text(stringResource(R.string.pets_new_pet_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nome") }, singleLine = true)
-                Text("Specie", style = MaterialTheme.typography.labelLarge)
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.pets_field_name)) }, singleLine = true)
+                Text(stringResource(R.string.pets_field_species), style = MaterialTheme.typography.labelLarge)
                 Column {
                     speciesOptions.forEach { opt ->
                         Row(
@@ -234,8 +236,8 @@ private fun AddPetDialog(
                         }
                     }
                 }
-                OutlinedTextField(value = breed, onValueChange = { breed = it }, label = { Text("Razza (opzionale)") }, singleLine = true)
-                OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Note") })
+                OutlinedTextField(value = breed, onValueChange = { breed = it }, label = { Text(stringResource(R.string.pets_field_breed_optional)) }, singleLine = true)
+                OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text(stringResource(R.string.pets_field_notes)) })
             }
         },
         confirmButton = {
@@ -245,8 +247,8 @@ private fun AddPetDialog(
                         onConfirm(name.trim(), species, breed.trim().takeIf { it.isNotEmpty() }, notes.trim().takeIf { it.isNotEmpty() })
                     }
                 },
-            ) { Text("Salva") }
+            ) { Text(stringResource(R.string.pets_action_save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Annulla") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.pets_action_cancel)) } },
     )
 }

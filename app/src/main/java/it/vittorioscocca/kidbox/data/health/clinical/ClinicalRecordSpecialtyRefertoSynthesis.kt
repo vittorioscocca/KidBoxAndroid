@@ -5,6 +5,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBMedicalVisitEntity
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
 
 /** Sintesi UI Cardiologia / Urologia da referti, con terminologia originale. */
 object ClinicalRecordSpecialtyRefertoSynthesis {
@@ -188,7 +189,7 @@ object ClinicalRecordSpecialtyRefertoSynthesis {
     }
 
     private fun formatMonthYear(epoch: Long): String =
-        SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(Date(epoch))
+        SimpleDateFormat("MMMM yyyy", KBLocale.current()).format(Date(epoch))
 
     private fun year(epoch: Long): Int {
         val cal = java.util.Calendar.getInstance()

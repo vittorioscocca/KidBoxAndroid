@@ -3,6 +3,8 @@ package it.vittorioscocca.kidbox.ui.screens.travel
 import it.vittorioscocca.kidbox.data.local.entity.KBTripLegEntity
 import it.vittorioscocca.kidbox.data.remote.ai.TravelPlanResponse
 import org.json.JSONObject
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 object TravelDayRegeneration {
 
@@ -33,7 +35,7 @@ object TravelDayRegeneration {
                 )
             }
         }
-        val place = fallbackLocation.trim().ifBlank { "Destinazione" }
+        val place = fallbackLocation.trim().ifBlank { "" }
         return listOf(
             mapOf(
                 "order" to 1,

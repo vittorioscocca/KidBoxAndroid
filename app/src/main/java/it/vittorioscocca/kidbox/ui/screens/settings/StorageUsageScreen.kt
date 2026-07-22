@@ -66,6 +66,8 @@ import it.vittorioscocca.kidbox.domain.model.KBPlan
 import android.app.Activity
 import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun StorageUsageScreen(
@@ -87,7 +89,7 @@ fun StorageUsageScreen(
     state.restoreDialogError?.let { err ->
         AlertDialog(
             onDismissRequest = viewModel::clearRestoreDialogError,
-            title = { Text("Ripristino acquisti") },
+            title = { Text(stringResource(R.string.settings_storage_restore_purchases_title)) },
             text = { Text(err) },
             confirmButton = {
                 TextButton(onClick = viewModel::clearRestoreDialogError) { Text("OK") }
@@ -98,7 +100,7 @@ fun StorageUsageScreen(
     state.billingPurchaseError?.let { err ->
         AlertDialog(
             onDismissRequest = viewModel::clearBillingPurchaseError,
-            title = { Text("Errore acquisto") },
+            title = { Text(stringResource(R.string.settings_storage_purchase_error)) },
             text = { Text(err) },
             confirmButton = {
                 TextButton(onClick = viewModel::clearBillingPurchaseError) { Text("OK") }
@@ -118,13 +120,13 @@ fun StorageUsageScreen(
         Row(verticalAlignment = Alignment.CenterVertically) {
             KidBoxHeaderCircleButton(
                 icon = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Indietro",
+                contentDescription = stringResource(R.string.settings_common_back),
                 onClick = onBack,
             )
         }
         Spacer(Modifier.height(10.dp))
         Text(
-            "Utilizzo spazio",
+            stringResource(R.string.settings_storage_title),
             color = kb.title,
             fontSize = 44.sp,
             fontWeight = FontWeight.ExtraBold,
@@ -150,7 +152,7 @@ fun StorageUsageScreen(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Upgrade", color = Color(0xFF2563EB), fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.settings_storage_upgrade), color = Color(0xFF2563EB), fontWeight = FontWeight.Bold)
                     Spacer(Modifier.width(8.dp))
                     Text(
                         "Passa a ${if (state.plan == KBPlan.FREE) "Pro" else "Max"} per più spazio e AI.",
@@ -163,10 +165,10 @@ fun StorageUsageScreen(
         }
 
         Spacer(Modifier.height(14.dp))
-        SectionCard(title = "Utilizzo per sezione") {
+        SectionCard(title = stringResource(R.string.settings_storage_by_section)) {
             if (state.sections.isEmpty()) {
                 Text(
-                    if (state.isLoading) "Caricamento..." else "Nessun dato disponibile",
+                    if (state.isLoading) stringResource(R.string.settings_storage_loading) else stringResource(R.string.settings_storage_no_data),
                     color = kb.subtitle,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(16.dp),
@@ -182,7 +184,7 @@ fun StorageUsageScreen(
         }
 
         Spacer(Modifier.height(14.dp))
-        SectionCard(title = "Piani disponibili") {
+        SectionCard(title = stringResource(R.string.settings_storage_plans_available)) {
             KBPlan.entries.forEachIndexed { idx, plan ->
                 PlanRow(
                     plan = plan,
@@ -212,14 +214,13 @@ fun StorageUsageScreen(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Text(
-                            "Piano gestito dal proprietario",
+                            stringResource(R.string.settings_storage_owner_managed),
                             color = Color(0xFF6D28D9),
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp,
                         )
                         Text(
-                            "Solo il proprietario della famiglia può attivare o cambiare un abbonamento. " +
-                                "Chiedi al proprietario di passare a un piano superiore se serve più spazio o funzioni AI.",
+                            stringResource(R.string.settings_storage_owner_full),
                             color = kb.subtitle,
                             fontSize = 13.sp,
                             lineHeight = 18.sp,
@@ -231,10 +232,10 @@ fun StorageUsageScreen(
 
         if (state.plan != KBPlan.FREE) {
             Spacer(Modifier.height(14.dp))
-            SectionCard(title = "Abbonamento attivo") {
+            SectionCard(title = stringResource(R.string.settings_storage_active_subscription)) {
                 ActionRow(
                     icon = Icons.Filled.Description,
-                    title = "Gestisci abbonamento",
+                    title = stringResource(R.string.settings_storage_manage_subscription),
                     subtitle = null,
                     onClick = {
                         onOpenPlans()
@@ -247,7 +248,7 @@ fun StorageUsageScreen(
         SectionCard(title = null) {
             ActionRow(
                 icon = Icons.Filled.People,
-                title = "Lo spazio è condiviso tra tutti i membri della famiglia.",
+                title = stringResource(R.string.settings_storage_shared_note),
                 subtitle = null,
                 trailing = false,
                 onClick = {},
@@ -255,7 +256,7 @@ fun StorageUsageScreen(
             HorizontalDivider(color = kb.divider, modifier = Modifier.padding(start = 16.dp))
             ActionRow(
                 icon = Icons.Filled.Refresh,
-                title = "Ripristina acquisti",
+                title = stringResource(R.string.settings_storage_restore),
                 subtitle = null,
                 enabled = !state.isRestoreInProgress,
                 isLoading = state.isRestoreInProgress,
@@ -264,8 +265,8 @@ fun StorageUsageScreen(
             HorizontalDivider(color = kb.divider, modifier = Modifier.padding(start = 16.dp))
             ActionRow(
                 icon = Icons.Filled.Redeem,
-                title = "Riscatta codice offerta",
-                subtitle = "Codice promo o carte regalo Google Play",
+                title = stringResource(R.string.settings_storage_redeem),
+                subtitle = stringResource(R.string.settings_storage_redeem_sub),
                 onClick = {
                     runCatching { uriHandler.openUri("https://play.google.com/redeem") }
                 },
@@ -274,7 +275,7 @@ fun StorageUsageScreen(
 
         Spacer(Modifier.height(8.dp))
         Text(
-            "Gli acquisti vengono verificati tramite lo store. Il piano si applica all'intera famiglia.",
+            stringResource(R.string.settings_storage_verified_note),
             color = kb.subtitle,
             fontSize = 12.sp,
             modifier = Modifier.padding(horizontal = 6.dp),
@@ -308,7 +309,7 @@ private fun SpaceSummaryCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.People, null, tint = kb.subtitle, modifier = Modifier.size(15.dp))
                 Text(
-                    "  SPAZIO FAMIGLIA",
+                    stringResource(R.string.settings_storage_family_space),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = kb.subtitle,
@@ -470,7 +471,7 @@ private fun PlanRow(
                             .background(Color(0xFFE8F1FF))
                             .padding(horizontal = 8.dp, vertical = 3.dp),
                     ) {
-                        Text("Piano attuale", color = Color(0xFF4F8FDB), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.settings_storage_current_plan), color = Color(0xFF4F8FDB), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -478,7 +479,7 @@ private fun PlanRow(
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                if (plan == KBPlan.FREE) "Senza AI" else "${plan.aiDailyMessagesForUi()} msg AI/giorno",
+                if (plan == KBPlan.FREE) stringResource(R.string.settings_storage_no_ai) else stringResource(R.string.settings_plan_ai_per_day, plan.aiDailyMessagesForUi()),
                 color = kb.subtitle,
                 fontSize = 14.sp,
             )
@@ -488,9 +489,9 @@ private fun PlanRow(
             } else {
                 Text(
                     when (plan) {
-                        KBPlan.FREE -> "Gratis"
-                        KBPlan.PRO -> "€4,99/mese"
-                        KBPlan.MAX -> "€ 9.99/mese"
+                        KBPlan.FREE -> stringResource(R.string.settings_storage_free)
+                        KBPlan.PRO -> stringResource(R.string.settings_plan_pro_price)
+                        KBPlan.MAX -> stringResource(R.string.settings_plan_max_price)
                     },
                     color = if (plan == KBPlan.PRO) Color(0xFF4F8FDB) else kb.subtitle,
                     fontWeight = if (plan == KBPlan.PRO) FontWeight.Bold else FontWeight.Normal,

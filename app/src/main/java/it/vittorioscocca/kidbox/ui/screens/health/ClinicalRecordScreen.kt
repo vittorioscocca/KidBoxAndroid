@@ -67,6 +67,8 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private val CLINICAL_TINT = Color(0xFF738FE6)
 
@@ -90,7 +92,7 @@ fun ClinicalRecordScreen(
         val intent = state.exportPdfIntent ?: return@LaunchedEffect
         runCatching { context.startActivity(intent) }
             .onFailure {
-                Toast.makeText(context, "Installa un lettore PDF per aprire il file.", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, context.getString(R.string.health_install_pdf_reader), Toast.LENGTH_LONG).show()
             }
         viewModel.consumeExportIntent()
     }
@@ -123,12 +125,12 @@ fun ClinicalRecordScreen(
         ) {
             KidBoxHeaderCircleButton(
                 icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                contentDescription = "Indietro",
+                contentDescription = stringResource(R.string.health_back),
                 onClick = onBack,
             )
             Spacer(Modifier.weight(1f))
             Text(
-                "Cartella clinica",
+                stringResource(R.string.health_clinical_record),
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
                 color = kb.title,
@@ -197,7 +199,7 @@ fun ClinicalRecordScreen(
                         )
                         Spacer(Modifier.width(8.dp))
                     }
-                    Text(if (state.isRefreshing) "Aggiornamento…" else "Aggiorna")
+                    Text(if (state.isRefreshing) stringResource(R.string.health_updating) else stringResource(R.string.health_refresh))
                 }
                 Button(
                     onClick = { viewModel.exportPdf() },
@@ -212,7 +214,7 @@ fun ClinicalRecordScreen(
                         )
                         Spacer(Modifier.width(8.dp))
                     }
-                    Text(if (state.isExporting) "Esportazione…" else "Esporta PDF")
+                    Text(if (state.isExporting) stringResource(R.string.health_exporting) else stringResource(R.string.health_export_pdf))
                 }
             }
         }
@@ -227,8 +229,8 @@ private fun SectionDetailContent(area: it.vittorioscocca.kidbox.data.health.clin
         area.analisiNarrativa?.takeIf { it.isNotBlank() }?.let { narrative ->
             val synthTitle = when (area.id) {
                 ClinicalRecordTopicBuilder.TopicId.CARDIOLOGY.raw,
-                ClinicalRecordTopicBuilder.TopicId.UROLOGY.raw -> "Sintesi dai referti"
-                else -> "Sintesi andamento"
+                ClinicalRecordTopicBuilder.TopicId.UROLOGY.raw -> stringResource(R.string.health_reports_summary)
+                else -> stringResource(R.string.health_trend_summary)
             }
             Text(synthTitle, fontWeight = FontWeight.SemiBold, color = CLINICAL_TINT)
             Spacer(Modifier.height(4.dp))
@@ -243,15 +245,15 @@ private fun SectionDetailContent(area: it.vittorioscocca.kidbox.data.health.clin
             Spacer(Modifier.height(8.dp))
         }
         area.trendNarrative?.takeIf { it.isNotBlank() }?.let { trend ->
-            Text("Andamento nel tempo", fontWeight = FontWeight.SemiBold, color = CLINICAL_TINT)
+            Text(stringResource(R.string.health_trend_over_time), fontWeight = FontWeight.SemiBold, color = CLINICAL_TINT)
             Spacer(Modifier.height(4.dp))
             Text(ClinicalRecordTextSanitizer.sanitize(trend), fontSize = 14.sp, color = kb.title)
             Spacer(Modifier.height(12.dp))
         }
         val timelineTitle = when (area.id) {
             ClinicalRecordTopicBuilder.TopicId.CARDIOLOGY.raw,
-            ClinicalRecordTopicBuilder.TopicId.UROLOGY.raw -> "REFERTI NEL TEMPO"
-            else -> "CRONOLOGIA"
+            ClinicalRecordTopicBuilder.TopicId.UROLOGY.raw -> stringResource(R.string.health_reports_over_time)
+            else -> stringResource(R.string.section_history)
         }
         Text(timelineTitle, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = kb.title)
         Spacer(Modifier.height(8.dp))
@@ -295,7 +297,7 @@ private fun ClinicalRecordContent(
             SectionCard(section, kb, onClick = { onSectionClick(section.id) })
         }
         Text(
-            "Ogni argomento apre andamento, visite ed esami correlati. Il PDF riporta il riepilogo completo.",
+            stringResource(R.string.health_topic_hint),
             fontSize = 12.sp,
             color = kb.subtitle,
             textAlign = TextAlign.Center,
@@ -350,12 +352,12 @@ private fun PendingAiUsageBanner(units: Int, kb: KidBoxColorScheme) {
 private fun GlobalSummaryCard(global: it.vittorioscocca.kidbox.data.health.clinical.ClinicalRecordGlobalSummary, kb: KidBoxColorScheme) {
     Card(colors = CardDefaults.cardColors(containerColor = kb.card), shape = RoundedCornerShape(16.dp)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Sintesi clinica", fontWeight = FontWeight.Bold, color = kb.title)
+            Text(stringResource(R.string.health_clinical_summary), fontWeight = FontWeight.Bold, color = kb.title)
             Text("${global.monitoredSpecialtiesCount} aree · ${global.attentionCount} da monitorare", fontSize = 12.sp, color = kb.subtitle)
             global.statusLines.take(4).forEach { row ->
                 Text("${row.status.emoji} ${row.specialtyTitle}: ${row.headline}", fontSize = 12.sp, color = kb.title)
             }
-            Text("Non sostituisce il parere medico.", fontSize = 11.sp, color = kb.subtitle)
+            Text(stringResource(R.string.health_not_medical_advice), fontSize = 11.sp, color = kb.subtitle)
         }
     }
 }
@@ -393,7 +395,7 @@ private fun HeaderCard(snapshot: ClinicalRecordSnapshot, kb: KidBoxColorScheme) 
                 )
                 if (snapshot.reportSourceAiEnhanced) {
                     Text(
-                        "Sintesi narrativa AI",
+                        stringResource(R.string.health_ai_narrative),
                         fontSize = 11.sp,
                         color = CLINICAL_TINT,
                     )
@@ -417,8 +419,8 @@ private fun OverviewRow(
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OverviewPill("$filled", "argomenti", kb, Modifier.weight(1f))
         OverviewPill("$treatmentCount", "terapie", kb, Modifier.weight(1f))
-        OverviewPill("$pending", "in attesa", kb, Modifier.weight(1f))
-        OverviewPill("$examCount", "esami arch.", kb, Modifier.weight(1f))
+        OverviewPill("$pending", stringResource(R.string.health_pending), kb, Modifier.weight(1f))
+        OverviewPill("$examCount", stringResource(R.string.health_archived_exams), kb, Modifier.weight(1f))
     }
 }
 
@@ -495,7 +497,7 @@ private fun SectionCard(section: ClinicalRecordSection, kb: KidBoxColorScheme, o
             }
             if (section.highlights.isEmpty()) {
                 Text(
-                    "Nessun dato in questa sezione.",
+                    stringResource(R.string.health_no_data_section),
                     fontSize = 12.sp,
                     color = kb.subtitle,
                     modifier = Modifier.padding(start = 56.dp),
@@ -554,7 +556,7 @@ private fun RefreshingOverlay(message: String, kb: KidBoxColorScheme) {
 private fun ClinicalRecordEmptyState(
     kb: KidBoxColorScheme,
     isRefreshing: Boolean = false,
-    refreshMessage: String = "Integrazione dati e sintesi…",
+    refreshMessage: String = stringResource(R.string.health_integrating),
 ) {
     Column(
         modifier = Modifier
@@ -583,10 +585,10 @@ private fun ClinicalRecordEmptyState(
                 Icon(Icons.Default.Folder, contentDescription = null, tint = CLINICAL_TINT, modifier = Modifier.size(40.dp))
             }
             Spacer(Modifier.height(16.dp))
-            Text("Cartella vuota", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = kb.title)
+            Text(stringResource(R.string.health_empty_record), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = kb.title)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Tocca «Aggiorna» per creare un riepilogo da scheda medica, visite, esami, vaccini e app Salute.",
+                stringResource(R.string.health_empty_record_hint),
                 textAlign = TextAlign.Center,
                 color = kb.subtitle,
                 fontSize = 14.sp,

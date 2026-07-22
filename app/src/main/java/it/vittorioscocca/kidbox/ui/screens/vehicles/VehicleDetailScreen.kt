@@ -103,6 +103,9 @@ import java.text.NumberFormat
 import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.launch
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private enum class GarageAttachmentPickTarget {
     DetailVehicle,
@@ -182,7 +185,7 @@ fun VehicleDetailScreen(
     }
     val cameraPermLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (!granted) {
-            Toast.makeText(context, "Permesso fotocamera negato", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.life_camera_denied), Toast.LENGTH_SHORT).show()
             pickTarget = null
             return@rememberLauncherForActivityResult
         }
@@ -227,7 +230,7 @@ fun VehicleDetailScreen(
             TopAppBar(
                 title = {
                     Text(
-                        vehicle?.name ?: "Garage",
+                        vehicle?.name ?: stringResource(R.string.vehicles_garage),
                         color = kb.title,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
@@ -247,13 +250,13 @@ fun VehicleDetailScreen(
                                 showAddEvent = true
                             },
                         ) {
-                            Icon(Icons.Filled.Add, contentDescription = "Nuovo intervento", tint = orange)
+                            Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.vehicles_new_service), tint = orange)
                         }
                         IconButton(onClick = { showEditVehicle = true }) {
-                            Icon(Icons.Filled.Edit, contentDescription = "Modifica veicolo", tint = kb.title)
+                            Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.vehicles_edit), tint = kb.title)
                         }
                         IconButton(onClick = { confirmDelete = true }) {
-                            Icon(Icons.Filled.Delete, contentDescription = "Elimina veicolo", tint = destructive)
+                            Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.vehicles_delete), tint = destructive)
                         }
                     }
                 },
@@ -316,7 +319,7 @@ fun VehicleDetailScreen(
             }
             item {
                 Text(
-                    "ALLEGATI",
+                    stringResource(R.string.section_attachments),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = kb.subtitle,
@@ -336,14 +339,14 @@ fun VehicleDetailScreen(
                 )
             }
             item {
-                Text("SCADENZE", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = kb.subtitle)
+                Text(stringResource(R.string.section_deadlines), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = kb.subtitle)
             }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    VehicleDeadlineCard("Assicurazione", v.insuranceExpiryDate)
-                    VehicleDeadlineCard("Revisione", v.revisionExpiryDate)
-                    VehicleDeadlineCard("Bollo", v.taxExpiryDate)
-                    VehicleDeadlineCard("Prossimo tagliando", v.nextServiceDate)
+                    VehicleDeadlineCard(stringResource(R.string.vehicles_insurance), v.insuranceExpiryDate)
+                    VehicleDeadlineCard(stringResource(R.string.vehicles_inspection), v.revisionExpiryDate)
+                    VehicleDeadlineCard(stringResource(R.string.vehicles_road_tax), v.taxExpiryDate)
+                    VehicleDeadlineCard(stringResource(R.string.vehicles_next_service), v.nextServiceDate)
                 }
             }
             item {
@@ -353,14 +356,14 @@ fun VehicleDetailScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        "STORICO INTERVENTI",
+                        stringResource(R.string.vehicles_service_history),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = kb.subtitle,
                     )
                     if (showSeeAllInterventions) {
                         TextButton(onClick = onSeeAllInterventions) {
-                            Text("Vedi tutti", color = orange, fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.vehicles_see_all), color = orange, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -368,7 +371,7 @@ fun VehicleDetailScreen(
             item {
                 if (events.isEmpty()) {
                     Text(
-                        "Nessun intervento registrato",
+                        stringResource(R.string.vehicles_no_services),
                         style = MaterialTheme.typography.bodyMedium,
                         color = kb.subtitle,
                     )
@@ -462,7 +465,7 @@ fun VehicleDetailScreen(
     if (confirmDelete && vehicle != null) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Eliminare questo veicolo?") },
+            title = { Text(stringResource(R.string.vehicles_delete_q)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -472,9 +475,9 @@ fun VehicleDetailScreen(
                         }
                         confirmDelete = false
                     },
-                ) { Text("Elimina", color = Color(0xFFE53935)) }
+                ) { Text(stringResource(R.string.life_delete), color = Color(0xFFE53935)) }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Annulla") } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.life_cancel)) } },
         )
     }
 
@@ -482,7 +485,7 @@ fun VehicleDetailScreen(
         AlertDialog(
             onDismissRequest = { toast = null },
             confirmButton = { TextButton(onClick = { toast = null }) { Text("OK") } },
-            title = { Text("Errore") },
+            title = { Text(stringResource(R.string.life_error)) },
             text = { Text(msg) },
         )
     }
@@ -535,7 +538,7 @@ private fun VehicleDeadlineCard(label: String, millis: Long?) {
 }
 
 private fun formatVehicleEventCostEuro(value: Double): String {
-    val nf = NumberFormat.getCurrencyInstance(Locale.ITALY)
+    val nf = NumberFormat.getCurrencyInstance(KBLocale.current())
     nf.minimumFractionDigits = 0
     nf.maximumFractionDigits = 2
     return nf.format(value)
@@ -621,7 +624,7 @@ private fun AddVehicleEventDialog(
         ) {
             Column(Modifier.fillMaxSize()) {
                 KidBoxIosFormTopBar(
-                    title = "Nuovo intervento",
+                    title = stringResource(R.string.vehicles_new_service),
                     onCancel = onDismiss,
                     onSave = {
                         if (canSave) {
@@ -650,7 +653,7 @@ private fun AddVehicleEventDialog(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     IosGroupedCard(kb) {
-                        IosPlainTextFieldRow(title, { title = it }, "Titolo", kb = kb)
+                        IosPlainTextFieldRow(title, { title = it }, stringResource(R.string.vehicles_title_field), kb = kb)
                         IosFormDivider(kb)
                         Box(Modifier.fillMaxWidth()) {
                             Row(
@@ -661,7 +664,7 @@ private fun AddVehicleEventDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Tipo", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.home_items_type), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -698,7 +701,7 @@ private fun AddVehicleEventDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("Data", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Text(stringResource(R.string.vehicles_date), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -733,7 +736,7 @@ private fun AddVehicleEventDialog(
                         IosPlainTextFieldRow(
                             km,
                             { km = it },
-                            "Chilometri",
+                            stringResource(R.string.vehicles_km),
                             kb = kb,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         )
@@ -741,15 +744,15 @@ private fun AddVehicleEventDialog(
                         IosPlainTextFieldRow(
                             cost,
                             { cost = it },
-                            "Costo",
+                            stringResource(R.string.vehicles_cost),
                             kb = kb,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         )
                         IosFormDivider(kb)
-                        IosPlainTextFieldRow(garage, { garage = it }, "Officina", kb = kb)
+                        IosPlainTextFieldRow(garage, { garage = it }, stringResource(R.string.vehicles_workshop), kb = kb)
                     }
                     Text(
-                        "Note",
+                        stringResource(R.string.life_notes),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = kb.subtitle,
@@ -762,7 +765,7 @@ private fun AddVehicleEventDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = 120.dp),
-                            placeholder = { Text("Note", color = kb.subtitle) },
+                            placeholder = { Text(stringResource(R.string.life_notes), color = kb.subtitle) },
                             singleLine = false,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
@@ -779,7 +782,7 @@ private fun AddVehicleEventDialog(
                         )
                     }
                     Text(
-                        "Allegati",
+                        stringResource(R.string.life_attachments),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = kb.subtitle,
@@ -891,7 +894,7 @@ private fun EditVehicleDialog(
         ) {
             Column(Modifier.fillMaxSize()) {
                 KidBoxIosFormTopBar(
-                    title = "Modifica veicolo",
+                    title = stringResource(R.string.vehicles_edit),
                     onCancel = onDismiss,
                     onSave = { if (canSave) commitSave() },
                     saveEnabled = canSave,
@@ -908,18 +911,18 @@ private fun EditVehicleDialog(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     IosGroupedCard(kb) {
-                        IosPlainTextFieldRow(name, { name = it }, "Nome", kb = kb)
+                        IosPlainTextFieldRow(name, { name = it }, stringResource(R.string.life_name), kb = kb)
                         IosFormDivider(kb)
-                        IosPlainTextFieldRow(plate, { plate = it }, "Targa", kb = kb)
+                        IosPlainTextFieldRow(plate, { plate = it }, stringResource(R.string.vehicles_plate), kb = kb)
                         IosFormDivider(kb)
-                        IosPlainTextFieldRow(brand, { brand = it }, "Marca", kb = kb)
+                        IosPlainTextFieldRow(brand, { brand = it }, stringResource(R.string.home_items_brand), kb = kb)
                         IosFormDivider(kb)
-                        IosPlainTextFieldRow(model, { model = it }, "Modello", kb = kb)
+                        IosPlainTextFieldRow(model, { model = it }, stringResource(R.string.home_items_model), kb = kb)
                         IosFormDivider(kb)
                         IosPlainTextFieldRow(
                             yearText,
                             { yearText = it },
-                            "Anno",
+                            stringResource(R.string.vehicles_year),
                             kb = kb,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         )
@@ -933,7 +936,7 @@ private fun EditVehicleDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Carburante", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.vehicles_fuel), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -963,13 +966,13 @@ private fun EditVehicleDialog(
                             }
                         }
                         IosFormDivider(kb)
-                        IosPlainTextFieldRow(color, { color = it }, "Colore", kb = kb)
+                        IosPlainTextFieldRow(color, { color = it }, stringResource(R.string.vehicles_color), kb = kb)
                         IosFormDivider(kb)
-                        IosPlainTextFieldRow(vin, { vin = it }, "Numero telaio / VIN", kb = kb)
+                        IosPlainTextFieldRow(vin, { vin = it }, stringResource(R.string.vehicles_vin), kb = kb)
                     }
 
                     Text(
-                        "Scadenze",
+                        stringResource(R.string.home_items_deadlines),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = kb.subtitle,
@@ -982,7 +985,7 @@ private fun EditVehicleDialog(
                                 .padding(horizontal = 16.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("Assicurazione", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Text(stringResource(R.string.vehicles_insurance), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                             Switch(
                                 checked = hasIns,
                                 onCheckedChange = {
@@ -1001,7 +1004,7 @@ private fun EditVehicleDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Scadenza", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.home_items_deadline), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Surface(
                                     shape = RoundedCornerShape(10.dp),
                                     color = kb.surfaceOverlay,
@@ -1024,7 +1027,7 @@ private fun EditVehicleDialog(
                                 .padding(horizontal = 16.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("Revisione", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Text(stringResource(R.string.vehicles_inspection), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                             Switch(
                                 checked = hasRev,
                                 onCheckedChange = {
@@ -1043,7 +1046,7 @@ private fun EditVehicleDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Scadenza", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.home_items_deadline), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Surface(
                                     shape = RoundedCornerShape(10.dp),
                                     color = kb.surfaceOverlay,
@@ -1066,7 +1069,7 @@ private fun EditVehicleDialog(
                                 .padding(horizontal = 16.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("Bollo", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Text(stringResource(R.string.vehicles_road_tax), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                             Switch(
                                 checked = hasTax,
                                 onCheckedChange = {
@@ -1085,7 +1088,7 @@ private fun EditVehicleDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Scadenza", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.home_items_deadline), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Surface(
                                     shape = RoundedCornerShape(10.dp),
                                     color = kb.surfaceOverlay,
@@ -1109,7 +1112,7 @@ private fun EditVehicleDialog(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                "Prossimo tagliando",
+                                stringResource(R.string.vehicles_next_service),
                                 modifier = Modifier.weight(1f),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = kb.title,
@@ -1132,7 +1135,7 @@ private fun EditVehicleDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Data", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                Text(stringResource(R.string.vehicles_date), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                 Surface(
                                     shape = RoundedCornerShape(10.dp),
                                     color = kb.surfaceOverlay,
@@ -1150,7 +1153,7 @@ private fun EditVehicleDialog(
                     }
 
                     Text(
-                        "Note",
+                        stringResource(R.string.life_notes),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = kb.subtitle,
@@ -1160,7 +1163,7 @@ private fun EditVehicleDialog(
                         IosPlainTextFieldRow(
                             kmText,
                             { kmText = it },
-                            "Chilometri attuali",
+                            stringResource(R.string.vehicles_current_km),
                             kb = kb,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         )
@@ -1171,7 +1174,7 @@ private fun EditVehicleDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = 120.dp),
-                            placeholder = { Text("Note", color = kb.subtitle) },
+                            placeholder = { Text(stringResource(R.string.life_notes), color = kb.subtitle) },
                             singleLine = false,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
@@ -1188,7 +1191,7 @@ private fun EditVehicleDialog(
                         )
                     }
                     Text(
-                        "Allegati",
+                        stringResource(R.string.life_attachments),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = kb.subtitle,

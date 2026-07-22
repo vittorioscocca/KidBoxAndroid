@@ -34,6 +34,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private val WikiOrange = Color(0xFFF2600A)
 
@@ -70,7 +72,7 @@ fun WikiOnboardingScreen(
         }
         Spacer(modifier = Modifier.height(28.dp))
         Text(
-            text = "Il vostro Wiki di famiglia 📖",
+            text = stringResource(R.string.onboarding_wiki_title),
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
             color = Color.White,
@@ -79,17 +81,17 @@ fun WikiOnboardingScreen(
         Spacer(modifier = Modifier.height(24.dp))
         WikiBullet(
             icon = Icons.Filled.MenuBook,
-            text = "Tutto su salute, scuola e routine in un posto solo.",
+            text = stringResource(R.string.onboarding_wiki1),
         )
         Spacer(modifier = Modifier.height(14.dp))
         WikiBullet(
             icon = Icons.Filled.Sync,
-            text = "Aggiornato in tempo reale tra te e il partner.",
+            text = stringResource(R.string.onboarding_wiki2),
         )
         Spacer(modifier = Modifier.height(14.dp))
         WikiBullet(
             icon = Icons.Filled.Lock,
-            text = "Privato e cifrato: solo la vostra famiglia.",
+            text = stringResource(R.string.onboarding_wiki3),
         )
         Spacer(modifier = Modifier.height(32.dp))
         Button(
@@ -105,7 +107,7 @@ fun WikiOnboardingScreen(
                 contentColor = WikiOrange,
             ),
         ) {
-            Text("Inizia!", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+            Text(stringResource(R.string.onboarding_lets_go), fontWeight = FontWeight.Bold, fontSize = 17.sp)
         }
     }
 }

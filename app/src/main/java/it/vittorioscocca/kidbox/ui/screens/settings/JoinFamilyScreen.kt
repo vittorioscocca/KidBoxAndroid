@@ -68,6 +68,8 @@ import com.google.mlkit.vision.common.InputImage
 import java.util.Locale
 import java.util.concurrent.Executors
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,10 +99,10 @@ fun JoinFamilyScreen(
             .statusBarsPadding()
             .padding(16.dp),
     ) {
-        Text("Entra con codice", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.kidBoxColors.title)
+        Text(stringResource(R.string.settings_join_title), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.kidBoxColors.title)
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            "Inserisci il codice invito ricevuto oppure scansiona il QR code.",
+            stringResource(R.string.settings_join_body),
             color = MaterialTheme.kidBoxColors.subtitle,
             fontSize = 14.sp,
         )
@@ -110,7 +112,7 @@ fun JoinFamilyScreen(
         OutlinedTextField(
             value = code,
             onValueChange = { code = it.uppercase(Locale.ROOT) },
-            label = { Text("Codice invito") },
+            label = { Text(stringResource(R.string.settings_join_code_label)) },
             placeholder = { Text("Es. K7P4D2") },
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
             singleLine = true,
@@ -145,7 +147,7 @@ fun JoinFamilyScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6B00)),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Scansiona QR code", fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.settings_join_scan), fontWeight = FontWeight.SemiBold)
                 }
             }
 
@@ -179,7 +181,7 @@ fun JoinFamilyScreen(
                             strokeWidth = 2.dp,
                         )
                     } else {
-                        Text("Entra")
+                        Text(stringResource(R.string.settings_join_enter))
                     }
                 }
             }
@@ -198,7 +200,7 @@ fun JoinFamilyScreen(
         // Successo
         if (state.didJoin) {
             Spacer(modifier = Modifier.height(12.dp))
-            Text("Sei entrato nella famiglia! ✓", color = Color(0xFF2E7D32), fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.settings_join_success), color = Color(0xFF2E7D32), fontWeight = FontWeight.SemiBold)
         }
     }
 
@@ -237,10 +239,10 @@ fun JoinFamilyScreen(
                     onClick = { showScanner = false },
                     modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
                 ) {
-                    Icon(Icons.Filled.Close, contentDescription = "Chiudi", tint = Color.White)
+                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.settings_common_close), tint = Color.White)
                 }
                 Text(
-                    "Inquadra il QR code",
+                    stringResource(R.string.settings_join_frame_qr),
                     color = Color.White,
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp),
                     fontSize = 14.sp,

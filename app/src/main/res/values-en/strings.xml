@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Nudge: suggerimenti in-app su aree mai usate (NudgeCatalog.kt) -->
+    <string name="nudge_family_invite_title">KidBox works best with your family</string>
+    <string name="nudge_family_invite_body">Invite your partner or the other family members: documents, wallet, health, expenses and calendar become shared and up to date for everyone, in real time.</string>
+    <string name="nudge_documents_title">Your documents, always with you</string>
+    <string name="nudge_documents_body">Upload a document once: your whole family sees it right away, without having to ask anyone.</string>
+    <string name="nudge_wallet_title">ID cards and tickets in your Wallet</string>
+    <string name="nudge_wallet_body">Keep identity and travel documents, and get a reminder a week before they expire.</string>
+    <string name="nudge_health_title">Your children\'s health, all in one place</string>
+    <string name="nudge_health_body">Visits, tests, treatments and medical records: the full history, shared with whoever looks after them with you.</string>
+    <string name="nudge_ai_title">Ask, instead of searching</string>
+    <string name="nudge_ai_body">The assistant knows what you keep in KidBox: ask a question, and it can even create reminders and events for you.</string>
+    <string name="nudge_chat_title">Your family chat</string>
+    <string name="nudge_chat_body">One place to talk it through, right next to the documents and photos you\'re talking about.</string>
+    <string name="nudge_calendar_title">A calendar you both can see</string>
+    <string name="nudge_calendar_body">Appointments, sports, birthdays: who\'s going, when, and who\'s taking care of it. Without chasing each other over messages.</string>
+    <string name="settings_notif_tips">KidBox tips</string>
+    <string name="settings_notif_tips_sub">Occasional suggestions about features you haven\'t tried yet.</string>
+</resources>

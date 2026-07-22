@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Nudge: suggerimenti in-app su aree mai usate (NudgeCatalog.kt) -->
+    <string name="nudge_family_invite_title">KidBox funciona en familia</string>
+    <string name="nudge_family_invite_body">Invita al otro progenitor o a los demás miembros: documentos, wallet, salud, gastos y calendario pasan a estar compartidos y actualizados para todos, en tiempo real.</string>
+    <string name="nudge_documents_title">Tus documentos, siempre contigo</string>
+    <string name="nudge_documents_body">Sube un documento una sola vez: toda la familia lo ve al instante, sin tener que pedírselo a nadie.</string>
+    <string name="nudge_wallet_title">DNI y billetes en el Wallet</string>
+    <string name="nudge_wallet_body">Guarda documentos de identidad y de viaje, y recibe un aviso una semana antes de que caduquen.</string>
+    <string name="nudge_health_title">La salud de tus hijos, en un solo sitio</string>
+    <string name="nudge_health_body">Visitas, pruebas, tratamientos e historial médico: el histórico completo, compartido con quien se ocupa de ellos contigo.</string>
+    <string name="nudge_ai_title">Pregunta, en vez de buscar</string>
+    <string name="nudge_ai_body">El asistente conoce lo que guardas en KidBox: haz una pregunta, e incluso puede crear recordatorios y eventos por ti.</string>
+    <string name="nudge_chat_title">El chat de la familia</string>
+    <string name="nudge_chat_body">Un único sitio para hablarlo, junto a los documentos y las fotos de los que estáis hablando.</string>
+    <string name="nudge_calendar_title">Un calendario que veis los dos</string>
+    <string name="nudge_calendar_body">Citas, deporte, cumpleaños: quién va, cuándo y quién se encarga. Sin perseguiros a mensajes.</string>
+    <string name="settings_notif_tips">Consejos de KidBox</string>
+    <string name="settings_notif_tips_sub">Sugerencias ocasionales sobre funciones que aún no has probado.</string>
+</resources>

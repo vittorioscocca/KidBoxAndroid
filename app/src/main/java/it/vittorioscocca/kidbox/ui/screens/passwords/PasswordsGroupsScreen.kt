@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.passwords
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -74,19 +76,19 @@ fun PasswordsGroupsScreen(
         ) {
             Surface(shape = androidx.compose.foundation.shape.CircleShape, color = kb.card, shadowElevation = 1.dp) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro", tint = kb.title)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.location_back_content_description), tint = kb.title)
                 }
             }
             Spacer(modifier = Modifier.weight(1f))
             Surface(shape = androidx.compose.foundation.shape.CircleShape, color = kb.card, shadowElevation = 1.dp) {
                 IconButton(onClick = onOpenCreateGroup) {
-                    Icon(Icons.Filled.Add, contentDescription = "Nuovo gruppo", tint = kb.title)
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.passwords_new_group_title), tint = kb.title)
                 }
             }
         }
 
         Text(
-            "Gestisci gruppi",
+            stringResource(R.string.passwords_manage_groups_title),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = kb.title,
@@ -102,7 +104,7 @@ fun PasswordsGroupsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    "Nessun gruppo visibile.",
+                    stringResource(R.string.passwords_no_groups_visible),
                     style = MaterialTheme.typography.bodyLarge,
                     color = kb.subtitle,
                 )

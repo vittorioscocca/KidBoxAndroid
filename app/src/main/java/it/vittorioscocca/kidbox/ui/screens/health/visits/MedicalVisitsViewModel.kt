@@ -22,12 +22,12 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 /** Allineato a iOS [PeriodFilter] (sheet periodo rapido). */
-enum class VisitPeriodFilter(val displayLabel: String) {
-    ALL("Tutto"),
-    THREE_MONTHS("3 mesi"),
-    SIX_MONTHS("6 mesi"),
-    ONE_YEAR("1 anno"),
-    CUSTOM("Personalizzato"),
+enum class VisitPeriodFilter(@androidx.annotation.StringRes val displayLabelRes: Int) {
+    ALL(it.vittorioscocca.kidbox.R.string.health_filter_all_n),
+    THREE_MONTHS(it.vittorioscocca.kidbox.R.string.health_3_months),
+    SIX_MONTHS(it.vittorioscocca.kidbox.R.string.health_6_months),
+    ONE_YEAR(it.vittorioscocca.kidbox.R.string.health_filter_1y_short),
+    CUSTOM(it.vittorioscocca.kidbox.R.string.health_custom),
 }
 
 data class MedicalVisitsState(

@@ -39,6 +39,10 @@ import it.vittorioscocca.kidbox.ui.theme.KidBoxColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.SimpleDateFormat
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.platform.LocalContext
 
 private val ItineraryAccent = Color(0xFFF2611A)
 
@@ -103,7 +107,7 @@ fun TravelItineraryDetailContent(
             )
             introduction?.trim()?.takeIf { it.isNotEmpty() }?.let { text ->
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Introduzione", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = kb.title)
+                    Text(stringResource(R.string.travel_intro), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = kb.title)
                     Text(text, color = kb.subtitle, fontSize = 15.sp)
                 }
             }
@@ -124,7 +128,7 @@ fun TravelItineraryDetailContent(
 private fun BudgetSummaryCard(overview: TravelItineraryOverview, kb: KidBoxColorScheme) {
     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
         Column(Modifier.padding(18.dp)) {
-            Text("TOTALE STIMATO", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = kb.subtitle)
+            Text(stringResource(R.string.travel_estimated_total), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = kb.subtitle)
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     formatMoney(overview.estimatedTotal, overview.currency),
@@ -164,12 +168,12 @@ private fun BudgetCategorySection(
                 color = MaterialTheme.colorScheme.surface,
                 border = BorderStroke(1.dp, kb.subtitle.copy(alpha = 0.15f)),
             ) {
-                BudgetRowContent("🛏️", "Hotel", "~${formatMoney(overview.budget.hotels, overview.currency)} per $nights notti", hotelAction, kb, tappable = true)
+                BudgetRowContent("🛏️", stringResource(R.string.travel_hotels), "~${formatMoney(overview.budget.hotels, overview.currency)} per $nights notti", hotelAction, kb, tappable = true)
             }
         } else {
-            BudgetRow("🛏️", "Hotel", "~${formatMoney(overview.budget.hotels, overview.currency)} per $nights notti", hotelAction, kb, tappable = false)
+            BudgetRow("🛏️", stringResource(R.string.travel_hotels), "~${formatMoney(overview.budget.hotels, overview.currency)} per $nights notti", hotelAction, kb, tappable = false)
         }
-        BudgetRow("✈️", "Voli", formatMoney(overview.budget.flights, overview.currency), null, kb, tappable = false)
+        BudgetRow("✈️", stringResource(R.string.travel_flights), formatMoney(overview.budget.flights, overview.currency), null, kb, tappable = false)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             if (onRestaurantsClick != null && restaurantsCount > 0) {
                 Surface(
@@ -181,7 +185,7 @@ private fun BudgetCategorySection(
                 ) {
                     BudgetCompactContent(
                         "🍽️",
-                        "Ristoranti",
+                        stringResource(R.string.travel_restaurants),
                         overview.budget.restaurants,
                         overview.currency,
                         kb,
@@ -190,7 +194,7 @@ private fun BudgetCategorySection(
                     )
                 }
             } else {
-                BudgetCompact("🍽️", "Ristoranti", overview.budget.restaurants, overview.currency, Modifier.weight(1f), kb)
+                BudgetCompact("🍽️", stringResource(R.string.travel_restaurants), overview.budget.restaurants, overview.currency, Modifier.weight(1f), kb)
             }
             if (onActivitiesClick != null && activitiesCount > 0) {
                 Surface(
@@ -202,7 +206,7 @@ private fun BudgetCategorySection(
                 ) {
                     BudgetCompactContent(
                         "🎯",
-                        "Attività",
+                        stringResource(R.string.travel_activities),
                         overview.budget.activities,
                         overview.currency,
                         kb,
@@ -211,7 +215,7 @@ private fun BudgetCategorySection(
                     )
                 }
             } else {
-                BudgetCompact("🎯", "Attività", overview.budget.activities, overview.currency, Modifier.weight(1f), kb)
+                BudgetCompact("🎯", stringResource(R.string.travel_activities), overview.budget.activities, overview.currency, Modifier.weight(1f), kb)
             }
         }
     }
@@ -336,7 +340,7 @@ private fun DaySection(
         if (day.dayIndex == 1) {
             Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
                 Text(
-                    "GIORNO 1 · ANTEPRIMA",
+                    stringResource(R.string.travel_day1_preview),
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
@@ -369,7 +373,7 @@ private fun DaySection(
                     ) {
                         Icon(
                             Icons.Filled.Refresh,
-                            contentDescription = "Rigenera giorno",
+                            contentDescription = stringResource(R.string.travel_regenerate_day),
                             tint = ItineraryAccent,
                             modifier = Modifier.size(18.dp),
                         )
@@ -391,6 +395,7 @@ private fun PeriodBlockCard(
     kb: KidBoxColorScheme,
     onStopClick: ((TravelItineraryStopContext) -> Unit)?,
 ) {
+    val context = LocalContext.current
     val currency = overview.currency
     val stopLabel = if (block.stops.size == 1) "tappa" else "tappe"
     val meta = listOfNotNull(
@@ -417,7 +422,7 @@ private fun PeriodBlockCard(
                         .background(block.period.dotColor),
                 )
                 Text(
-                    "${block.period.title} · ${block.stops.size} $stopLabel",
+                    "${stringResource(block.period.titleRes)} · ${block.stops.size} $stopLabel",
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(start = 8.dp),
@@ -439,6 +444,7 @@ private fun PeriodBlockCard(
                         {
                             handler(
                                 placeContextFromStop(
+                                    context,
                                     stop = stop,
                                     day = day,
                                     block = block,
@@ -512,7 +518,7 @@ private fun currencySymbol(currency: String): String =
     if (currency.equals("EUR", ignoreCase = true)) "€" else currency
 
 private fun formatDate(iso: String): String = runCatching {
-    val inFmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val inFmt = SimpleDateFormat("yyyy-MM-dd", KBLocale.current())
     val outFmt = SimpleDateFormat("d MMM yyyy", Locale("it", "IT"))
     inFmt.parse(iso)?.let { outFmt.format(it) }
 }.getOrNull() ?: iso

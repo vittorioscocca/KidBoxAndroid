@@ -4,13 +4,15 @@ import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import androidx.annotation.StringRes
+import it.vittorioscocca.kidbox.R
 /** Allineato a iOS [TreatmentTimeFilter] + [passesTimeFilter]. */
-enum class TreatmentTimeFilter(val sheetLabel: String) {
-    ALL("Tutte"),
-    MONTHS_3("3 mesi"),
-    MONTHS_6("6 mesi"),
-    YEAR_LAST("Ultimo anno"),
-    CUSTOM("Personalizzato"),
+enum class TreatmentTimeFilter(@StringRes val sheetLabelRes: Int) {
+    ALL(R.string.health_all),
+    MONTHS_3(R.string.health_3_months),
+    MONTHS_6(R.string.health_6_months),
+    YEAR_LAST(R.string.health_filter_1y),
+    CUSTOM(R.string.health_custom),
 }
 
 internal fun treatmentRefEpochMillis(t: KBTreatment): Long {

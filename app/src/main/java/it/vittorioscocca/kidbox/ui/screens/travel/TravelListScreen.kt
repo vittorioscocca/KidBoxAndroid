@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,7 +78,7 @@ fun TravelListScreen(
         containerColor = kb.background,
         topBar = {
             TopAppBar(
-                title = { Text("Viaggi", color = kb.title) },
+                title = { Text(stringResource(R.string.travel_title), color = kb.title) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = kb.title)
@@ -87,7 +89,7 @@ fun TravelListScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = onOpenWizard) {
-                Icon(Icons.Filled.Add, contentDescription = "Nuovo viaggio")
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.travel_new_trip))
             }
         },
     ) { padding ->
@@ -115,13 +117,13 @@ fun TravelListScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            "I tuoi viaggi",
+                            stringResource(R.string.travel_your_trips),
                             fontWeight = FontWeight.Bold,
                             color = kb.title,
                             modifier = Modifier.weight(1f),
                         )
                         TextButton(onClick = onOpenAllTrips) {
-                            Text("Vedi tutti", color = kb.title)
+                            Text(stringResource(R.string.travel_see_all), color = kb.title)
                         }
                     }
                 }
@@ -138,7 +140,7 @@ fun TravelListScreen(
             } else if (!aiAvailable) {
                 item {
                     Text(
-                        "Passa a Pro o Max per pianificare viaggi con l'AI.",
+                        stringResource(R.string.travel_upgrade_hint),
                         color = kb.subtitle,
                         modifier = Modifier.padding(top = 4.dp),
                     )

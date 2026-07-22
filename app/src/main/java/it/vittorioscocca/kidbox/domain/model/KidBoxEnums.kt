@@ -40,6 +40,21 @@ enum class KBExamStatus(val rawValue: String) {
     BOOKED("Prenotato"),
     DONE("Eseguito"),
     RESULT_IN("Risultato disponibile"),
+    ;
+
+    /**
+     * [rawValue] è persistito su Room/Firestore da sempre: NON va tradotto, altrimenti
+     * i dati esistenti smetterebbero di essere riconosciuti. Per la UI si usa questa
+     * etichetta localizzata.
+     */
+    @get:androidx.annotation.StringRes
+    val labelRes: Int
+        get() = when (this) {
+            PENDING -> it.vittorioscocca.kidbox.R.string.health_status_pending_f
+            BOOKED -> it.vittorioscocca.kidbox.R.string.health_status_booked_m
+            DONE -> it.vittorioscocca.kidbox.R.string.health_status_done_m
+            RESULT_IN -> it.vittorioscocca.kidbox.R.string.health_status_result_available
+        }
 }
 
 /** Tipo vaccino (KBVaccine). */

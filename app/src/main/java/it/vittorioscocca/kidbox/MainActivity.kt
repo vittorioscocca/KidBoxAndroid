@@ -3,10 +3,17 @@ package it.vittorioscocca.kidbox
 import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.background
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,6 +32,7 @@ import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
 import it.vittorioscocca.kidbox.data.local.ThemePreference
 import it.vittorioscocca.kidbox.data.update.AppUpdateChecker
 import it.vittorioscocca.kidbox.ui.CrashReportConsentDialog
+import it.vittorioscocca.kidbox.ui.EdgeToEdgeController
 import it.vittorioscocca.kidbox.ui.UpdateAvailableDialog
 import android.content.Intent
 import it.vittorioscocca.kidbox.notifications.NotificationDeepLinkRouter
@@ -35,7 +43,7 @@ import it.vittorioscocca.kidbox.util.CrashAnalyzer
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
 
     @Inject
     lateinit var themePreference: ThemePreference
@@ -48,7 +56,16 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         title = ""
-        WindowCompat.setDecorFitsSystemWindows(window, true)
+        // Edge-to-edge esplicito su TUTTE le versioni, non solo dove è imposto.
+        //
+        // Con `targetSdk 36` Android ignora `windowOptOutEdgeToEdgeEnforcement`:
+        // il vecchio modello (`setDecorFitsSystemWindows(window, true)`, sistema
+        // che rimpicciolisce la finestra per te) non è più disponibile. Metterlo
+        // a `false` qui, invece di lasciare che sia il framework a farlo solo su
+        // Android 16, evita di avere DUE comportamenti diversi a seconda del
+        // dispositivo: il padding lo mette la radice della UI, sempre allo
+        // stesso modo, e si testa una configurazione sola.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         applySystemBarAppearance(resolveDarkTheme())
 
         val onboardingPreferences = OnboardingPreferences(applicationContext)
@@ -75,7 +92,42 @@ class MainActivity : ComponentActivity() {
                     updateVersionCode = appUpdateChecker.checkForUpdate()
                 }
 
-                Box(modifier = Modifier.fillMaxSize()) {
+                // Riproduce in un punto solo quello che prima faceva il sistema.
+                //
+                // `systemBars ∪ displayCutout` e NON `safeDrawing`: safeDrawing
+                // include anche la tastiera, e spostando tutta l'app verso
+                // l'alto renderebbe inerti gli `imePadding` già presenti nelle
+                // schermate con input (chat, note, calendario), che gestiscono
+                // la tastiera meglio di una traslazione globale.
+                //
+                // Il cutout serve perché il tema dichiara
+                // `windowLayoutInDisplayCutoutMode=shortEdges`: senza, in
+                // orizzontale il contenuto finirebbe sotto la tacca.
+                // Una schermata alla volta può chiedere il pieno schermo (la
+                // mappa). Il padding resta comunque deciso qui: le schermate
+                // dichiarano l'intenzione, non manipolano la finestra.
+                val fullBleed = EdgeToEdgeController.isFullBleed
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // Il colore va PRIMA del padding, così tinge anche le
+                        // strisce sotto le barre di sistema. Serve perché da
+                        // API 35 `window.statusBarColor` e `navigationBarColor`
+                        // sono no-op: le barre sono trasparenti e sotto si vede
+                        // quello che disegna l'app. Senza questo si vedrebbe
+                        // `windowBackground` del tema XML, che non segue il tema
+                        // scelto in-app (chiaro/scuro/sistema).
+                        .background(MaterialTheme.colorScheme.background)
+                        .then(
+                            if (fullBleed) {
+                                Modifier
+                            } else {
+                                Modifier.windowInsetsPadding(
+                                    WindowInsets.systemBars.union(WindowInsets.displayCutout),
+                                )
+                            },
+                        ),
+                ) {
                     AppNavGraph(
                         navController = navController,
                         startDestination = AppDestination.Login.route,

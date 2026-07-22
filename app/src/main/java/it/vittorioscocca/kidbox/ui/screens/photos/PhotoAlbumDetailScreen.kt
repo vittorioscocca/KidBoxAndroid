@@ -74,6 +74,8 @@ import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun PhotoAlbumDetailScreen(
@@ -104,7 +106,7 @@ fun PhotoAlbumDetailScreen(
 
     fun openCamera() {
         val uri = photosCreateCaptureUri(context) ?: run {
-            Toast.makeText(context, "Impossibile aprire la fotocamera", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, context.getString(R.string.photos_camera_error), Toast.LENGTH_LONG).show()
             return
         }
         pendingCaptureUri = uri
@@ -142,7 +144,7 @@ fun PhotoAlbumDetailScreen(
         ) {
             AlbumDetailTopHeader(
                 title = if (isSelectionMode) {
-                    if (selectedPhotoIds.isEmpty()) "Seleziona" else "${selectedPhotoIds.size} selezionati"
+                    if (selectedPhotoIds.isEmpty()) stringResource(R.string.photos_select) else "${selectedPhotoIds.size} selezionati"
                 } else {
                     state.albumTitle
                 },
@@ -253,7 +255,7 @@ fun PhotoAlbumDetailScreen(
     if (showRemoveConfirm) {
         AlertDialog(
             onDismissRequest = { showRemoveConfirm = false },
-            title = { Text("Rimuovi dall'album") },
+            title = { Text(stringResource(R.string.photos_remove_from_album)) },
             text = { Text("Rimuovere ${selectedPhotoIds.size} foto da questo album? Le foto resteranno nella libreria.") },
             confirmButton = {
                 TextButton(
@@ -263,10 +265,10 @@ fun PhotoAlbumDetailScreen(
                         isSelectionMode = false
                         showRemoveConfirm = false
                     },
-                ) { Text("Rimuovi") }
+                ) { Text(stringResource(R.string.photos_remove)) }
             },
             dismissButton = {
-                TextButton(onClick = { showRemoveConfirm = false }) { Text("Annulla") }
+                TextButton(onClick = { showRemoveConfirm = false }) { Text(stringResource(R.string.life_cancel)) }
             },
         )
     }
@@ -284,7 +286,7 @@ fun PhotoAlbumDetailScreen(
                         val file = withContext(Dispatchers.IO) { viewModel.preparePreviewFile(photo) }
                         openAlbumPhotoMedia(context, photo.mimeType, file)
                     }.onFailure {
-                        Toast.makeText(context, "Impossibile aprire il media", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, context.getString(R.string.photos_open_media_error), Toast.LENGTH_LONG).show()
                     }
                 }
             },
@@ -315,7 +317,7 @@ private fun AlbumDetailTopHeader(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (isSelectionMode) {
                 TextButton(onClick = onSelectAll) {
-                    Text(if (allSelected) "Deseleziona tutto" else "Seleziona tutto")
+                    Text(if (allSelected) stringResource(R.string.photos_deselect_all) else stringResource(R.string.photos_select_all))
                 }
             } else {
                 Surface(
@@ -343,7 +345,7 @@ private fun AlbumDetailTopHeader(
                                 .background(MaterialTheme.kidBoxColors.subtitle.copy(alpha = 0.2f)),
                         )
                         TextButton(onClick = onToggleSelection) {
-                            Text("Seleziona", color = MaterialTheme.kidBoxColors.title)
+                            Text(stringResource(R.string.photos_select), color = MaterialTheme.kidBoxColors.title)
                         }
                     }
                 }
@@ -374,7 +376,7 @@ private fun TripDedicatedAlbumBanner(modifier: Modifier = Modifier) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Default.FlightTakeoff, contentDescription = null, tint = kb.title)
                 Text(
-                    text = "Album dedicato al viaggio",
+                    text = stringResource(R.string.photos_trip_album),
                     fontWeight = FontWeight.SemiBold,
                     color = kb.title,
                     fontSize = 15.sp,
@@ -406,13 +408,13 @@ private fun AlbumEmptyState(
     ) {
         Icon(Icons.Default.Image, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(64.dp))
         Spacer(Modifier.height(16.dp))
-        Text("Album vuoto", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = kb.title)
+        Text(stringResource(R.string.photos_album_empty), fontWeight = FontWeight.Bold, fontSize = 22.sp, color = kb.title)
         Spacer(Modifier.height(8.dp))
         Text(
             text = if (isTripAlbum) {
-                "Scatta la prima foto del viaggio: verrà salvata automaticamente in questo album dedicato."
+                stringResource(R.string.photos_trip_album_hint)
             } else {
-                "Aggiungi foto a questo album dalla libreria o scatta direttamente con la fotocamera."
+                stringResource(R.string.photos_album_add_hint)
             },
             color = kb.subtitle,
             fontSize = 14.sp,
@@ -430,13 +432,13 @@ private fun AlbumEmptyState(
             ) {
                 Icon(Icons.Default.CameraAlt, contentDescription = null, tint = Color.White)
                 Spacer(Modifier.width(8.dp))
-                Text("Scatta una foto", color = Color.White, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.photos_take_photo), color = Color.White, fontWeight = FontWeight.SemiBold)
             }
         }
         if (!isTripAlbum) {
             Spacer(Modifier.height(12.dp))
             TextButton(onClick = onPickFromLibrary) {
-                Text("Aggiungi dalla libreria")
+                Text(stringResource(R.string.photos_add_from_library))
             }
         }
     }
@@ -554,16 +556,16 @@ private fun AlbumPhotoSelectionBar(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PhotosActionIconButton(icon = Icons.Default.Close, label = "Annulla", enabled = true, onClick = onDeselect)
+            PhotosActionIconButton(icon = Icons.Default.Close, label = stringResource(R.string.life_cancel), enabled = true, onClick = onDeselect)
             PhotosActionIconButton(
                 icon = Icons.Default.RemoveCircleOutline,
-                label = "Rimuovi",
+                label = stringResource(R.string.photos_remove),
                 enabled = selectedCount > 0,
                 onClick = onRemove,
             )
             PhotosActionIconButton(
                 icon = Icons.Default.Delete,
-                label = "Elimina",
+                label = stringResource(R.string.life_delete),
                 enabled = selectedCount > 0,
                 destructive = true,
                 onClick = onDelete,

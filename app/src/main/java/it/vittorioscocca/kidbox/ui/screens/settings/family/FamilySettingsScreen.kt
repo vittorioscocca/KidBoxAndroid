@@ -59,6 +59,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun FamilySettingsScreen(
@@ -109,10 +111,10 @@ fun FamilySettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
         ) {
-            Text("Family", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.kidBoxColors.title)
+            Text(stringResource(R.string.settings_family_title), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.kidBoxColors.title)
             Spacer(modifier = Modifier.height(8.dp))
-            Text("Famiglia", fontWeight = FontWeight.Bold, color = MaterialTheme.kidBoxColors.title)
-            Text("Qui gestisci la famiglia e inviti l'altro genitore.", color = MaterialTheme.kidBoxColors.subtitle, fontSize = 13.sp)
+            Text(stringResource(R.string.settings_family_title), fontWeight = FontWeight.Bold, color = MaterialTheme.kidBoxColors.title)
+            Text(stringResource(R.string.settings_family_intro), color = MaterialTheme.kidBoxColors.subtitle, fontSize = 13.sp)
             Spacer(modifier = Modifier.height(12.dp))
 
             if (state.isLoading) {
@@ -129,13 +131,13 @@ fun FamilySettingsScreen(
                             Icon(Icons.Filled.Warning, null, tint = Color(0xFFFF6B00))
                             Spacer(modifier = Modifier.size(8.dp))
                             Text(
-                                "Nessuna famiglia configurata",
+                                stringResource(R.string.settings_family_none),
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.kidBoxColors.title,
                             )
                         }
-                        SimpleActionCard("Crea una famiglia", "Configura la tua famiglia", onClick = onEditFamily)
-                        SimpleActionCard("Entra con codice", "Usa un invito", onClick = onJoin)
+                        SimpleActionCard(stringResource(R.string.settings_family_create), stringResource(R.string.settings_family_configure), onClick = onEditFamily)
+                        SimpleActionCard(stringResource(R.string.settings_join_title), stringResource(R.string.settings_family_use_invite), onClick = onJoin)
                     }
                 }
                 return@Column
@@ -156,7 +158,7 @@ fun FamilySettingsScreen(
                             color = MaterialTheme.kidBoxColors.title,
                         )
                         val childrenText = if (state.children.isEmpty()) {
-                            "Nessun figlio configurato."
+                            stringResource(R.string.settings_family_no_children)
                         } else if (state.children.size == 1) {
                             "Figlio: ${state.children[0].name}"
                         } else {
@@ -178,11 +180,11 @@ fun FamilySettingsScreen(
                     Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Groups, null, tint = MaterialTheme.kidBoxColors.subtitle)
                         Spacer(modifier = Modifier.size(8.dp))
-                        Text("Membri", fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.title)
+                        Text(stringResource(R.string.settings_family_members), fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.title)
                         Spacer(modifier = Modifier.size(8.dp))
                         Text(
                             if (showMembersLoading) {
-                                "Caricamento membri…"
+                                stringResource(R.string.settings_family_loading_members)
                             } else {
                                 "${state.members.size} membri collegati."
                             },
@@ -205,7 +207,7 @@ fun FamilySettingsScreen(
                             )
                             Spacer(modifier = Modifier.size(10.dp))
                             Text(
-                                "Caricamento membri…",
+                                stringResource(R.string.settings_family_loading_members),
                                 fontSize = 14.sp,
                                 color = MaterialTheme.kidBoxColors.subtitle,
                             )
@@ -214,7 +216,7 @@ fun FamilySettingsScreen(
                     state.members.forEachIndexed { idx, member ->
                         val memberLabel = sequenceOf(member.displayName, member.email)
                             .mapNotNull { it?.trim()?.takeIf { s -> s.isNotEmpty() } }
-                            .firstOrNull() ?: "Membro"
+                            .firstOrNull() ?: stringResource(R.string.settings_family_member)
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -228,7 +230,7 @@ fun FamilySettingsScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(memberLabel, color = MaterialTheme.kidBoxColors.title)
                                 Text(
-                                    if (member.role.equals("owner", true)) "Owner" else "Membro",
+                                    if (member.role.equals("owner", true)) stringResource(R.string.settings_family_owner) else stringResource(R.string.settings_family_member),
                                     fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle,
                                 )
                             }
@@ -245,8 +247,8 @@ fun FamilySettingsScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             SimpleActionCard(
-                title = "Invita l'altro genitore o un altro componente della famiglia",
-                subtitle = "Genera un codice e condividilo.",
+                title = stringResource(R.string.settings_family_invite_other),
+                subtitle = stringResource(R.string.settings_family_generate_share),
                 icon = Icons.Filled.QrCode2,
                 iconTint = Color(0xFF2E86FF),
                 borderColor = Color(0x552E86FF),
@@ -255,8 +257,8 @@ fun FamilySettingsScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             SimpleActionCard(
-                title = "Entra con codice",
-                subtitle = "Usa un codice se vuoi unirti a un'altra famiglia.",
+                title = stringResource(R.string.settings_join_title),
+                subtitle = stringResource(R.string.settings_family_use_code_hint),
                 icon = Icons.Filled.Key,
                 iconTint = MaterialTheme.kidBoxColors.subtitle,
                 onClick = onJoin,
@@ -283,8 +285,8 @@ fun FamilySettingsScreen(
                     Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = Color(0xFFE53E3E))
                     Spacer(modifier = Modifier.size(10.dp))
                     Column {
-                        Text("Esci dalla famiglia", fontWeight = FontWeight.SemiBold, color = Color(0xFFE53E3E))
-                        Text("Non potrai più accedere ai dati condivisi.", fontSize = 13.sp, color = MaterialTheme.kidBoxColors.subtitle)
+                        Text(stringResource(R.string.settings_family_leave), fontWeight = FontWeight.SemiBold, color = Color(0xFFE53E3E))
+                        Text(stringResource(R.string.settings_family_leave_sub), fontSize = 13.sp, color = MaterialTheme.kidBoxColors.subtitle)
                     }
                 }
             }
@@ -295,14 +297,14 @@ fun FamilySettingsScreen(
         if (memberToRevoke != null) {
             AlertDialog(
                 onDismissRequest = { memberToRevoke = null },
-                title = { Text("Rimuovere il membro?") },
+                title = { Text(stringResource(R.string.settings_family_remove_q)) },
                 text = {
                     Text(
-                        "La persona non potrà più accedere ai dati della famiglia da questo account.",
+                        stringResource(R.string.settings_family_remove_body),
                     )
                 },
                 dismissButton = {
-                    TextButton(onClick = { memberToRevoke = null }) { Text("Annulla") }
+                    TextButton(onClick = { memberToRevoke = null }) { Text(stringResource(R.string.settings_common_cancel)) }
                 },
                 confirmButton = {
                     TextButton(
@@ -312,7 +314,7 @@ fun FamilySettingsScreen(
                             viewModel.removeMember(m)
                         },
                     ) {
-                        Text("Rimuovi", color = Color(0xFFE53E3E))
+                        Text(stringResource(R.string.settings_family_remove), color = Color(0xFFE53E3E))
                     }
                 },
             )
@@ -322,52 +324,52 @@ fun FamilySettingsScreen(
             LeaveDialogState.Hidden -> {}
             LeaveDialogState.ConfirmLeave -> AlertDialog(
                 onDismissRequest = { viewModel.dismissLeaveDialog() },
-                title = { Text("Esci dalla famiglia?") },
-                text = { Text("Confermi di voler uscire dalla famiglia?") },
+                title = { Text(stringResource(R.string.settings_family_leave_q)) },
+                text = { Text(stringResource(R.string.settings_family_leave_confirm)) },
                 confirmButton = {
                     TextButton(onClick = {
                         KBLog.ui.info("ConfirmLeave -> Esci clicked", tag)
                         viewModel.leaveFamily()
                     }) {
-                        Text("Esci", color = Color(0xFFE53E3E))
+                        Text(stringResource(R.string.settings_family_exit), color = Color(0xFFE53E3E))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = {
                         KBLog.ui.debug("ConfirmLeave -> Annulla clicked", tag)
                         viewModel.dismissLeaveDialog()
-                    }) { Text("Annulla") }
+                    }) { Text(stringResource(R.string.settings_common_cancel)) }
                 },
             )
             LeaveDialogState.OwnerAlone -> AlertDialog(
                 onDismissRequest = { viewModel.dismissLeaveDialog() },
-                title = { Text("Non puoi uscire ora") },
-                text = { Text("Sei l'unico membro. Devi eliminare la famiglia per uscire.") },
+                title = { Text(stringResource(R.string.settings_family_cannot_leave)) },
+                text = { Text(stringResource(R.string.settings_family_only_member)) },
                 confirmButton = {
                     TextButton(onClick = {
                         KBLog.ui.info("OwnerAlone -> Elimina famiglia clicked", tag)
                         viewModel.deleteFamily()
                     }) {
-                        Text("Elimina famiglia", color = Color(0xFFE53E3E))
+                        Text(stringResource(R.string.settings_family_delete), color = Color(0xFFE53E3E))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = {
                         KBLog.ui.debug("OwnerAlone -> Annulla clicked", tag)
                         viewModel.dismissLeaveDialog()
-                    }) { Text("Annulla") }
+                    }) { Text(stringResource(R.string.settings_common_cancel)) }
                 },
             )
             is LeaveDialogState.OwnerWithMembers -> AlertDialog(
                 onDismissRequest = { viewModel.dismissLeaveDialog() },
-                title = { Text("Sei il creatore della famiglia") },
-                text = { Text("Prima di uscire puoi trasferire la ownership oppure eliminare la famiglia.") },
+                title = { Text(stringResource(R.string.settings_family_you_are_creator)) },
+                text = { Text(stringResource(R.string.settings_family_transfer_hint)) },
                 confirmButton = {
                     TextButton(onClick = {
                         KBLog.ui.info("OwnerWithMembers -> Trasferisci ownership clicked", tag)
                         viewModel.showTransferOwnershipDialog()
                     }) {
-                        Text("Trasferisci ownership")
+                        Text(stringResource(R.string.settings_family_transfer))
                     }
                 },
                 dismissButton = {
@@ -376,12 +378,12 @@ fun FamilySettingsScreen(
                             KBLog.ui.info("OwnerWithMembers -> Elimina famiglia clicked", tag)
                             viewModel.deleteFamily()
                         }) {
-                            Text("Elimina famiglia", color = Color(0xFFE53E3E))
+                            Text(stringResource(R.string.settings_family_delete), color = Color(0xFFE53E3E))
                         }
                         TextButton(onClick = {
                             KBLog.ui.debug("OwnerWithMembers -> Annulla clicked", tag)
                             viewModel.dismissLeaveDialog()
-                        }) { Text("Annulla") }
+                        }) { Text(stringResource(R.string.settings_common_cancel)) }
                     }
                 },
             )
@@ -390,13 +392,13 @@ fun FamilySettingsScreen(
                 KBLog.ui.debug("TransferOwnership candidates=${candidates.size}", tag)
                 AlertDialog(
                     onDismissRequest = { viewModel.dismissLeaveDialog() },
-                    title = { Text("Seleziona nuovo owner") },
+                    title = { Text(stringResource(R.string.settings_family_select_owner)) },
                     text = {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             candidates.forEach { member ->
                                 val label = sequenceOf(member.displayName, member.email)
                                     .mapNotNull { it?.trim()?.takeIf { s -> s.isNotEmpty() } }
-                                    .firstOrNull() ?: "Membro"
+                                    .firstOrNull() ?: stringResource(R.string.settings_family_member)
                                 Text(
                                     text = label,
                                     modifier = Modifier
@@ -416,7 +418,7 @@ fun FamilySettingsScreen(
                         TextButton(onClick = {
                             KBLog.ui.debug("TransferOwnership -> Annulla clicked", tag)
                             viewModel.dismissLeaveDialog()
-                        }) { Text("Annulla") }
+                        }) { Text(stringResource(R.string.settings_common_cancel)) }
                     },
                 )
             }
@@ -425,8 +427,8 @@ fun FamilySettingsScreen(
         if (!state.error.isNullOrBlank()) {
             AlertDialog(
                 onDismissRequest = { viewModel.clearError() },
-                title = { Text("Errore uscita famiglia") },
-                text = { Text(state.error ?: "Errore sconosciuto") },
+                title = { Text(stringResource(R.string.settings_family_leave_error)) },
+                text = { Text(state.error ?: stringResource(R.string.settings_common_unknown_error)) },
                 confirmButton = {
                     TextButton(onClick = { viewModel.clearError() }) { Text("OK") }
                 },

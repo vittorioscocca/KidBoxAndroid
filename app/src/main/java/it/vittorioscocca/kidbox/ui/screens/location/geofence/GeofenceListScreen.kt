@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.location.geofence
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -68,16 +70,16 @@ fun GeofenceListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Zone di arrivo") },
+                title = { Text(stringResource(R.string.location_geofences_content_description)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.location_back_content_description))
                     }
                 },
                 actions = {
                     if (state.isOwner) {
                         IconButton(onClick = onAdd) {
-                            Icon(Icons.Default.Add, contentDescription = "Aggiungi zona")
+                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.location_add_geofence_content_description))
                         }
                     }
                 },
@@ -105,10 +107,10 @@ fun GeofenceListScreen(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text("Nessuna zona", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.location_no_geofences_title), fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "Crea zone come casa o scuola per ricevere avvisi quando un membro entra o esce.",
+                        stringResource(R.string.location_no_geofences_subtitle),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -147,11 +149,14 @@ private fun GeofenceRow(
     onDelete: () -> Unit,
 ) {
     val monitored = decodeStringList(geofence.monitoredMemberIdsJson)
+    val arriveWord = stringResource(R.string.location_arrive_word)
+    val leaveWord = stringResource(R.string.location_leave_word)
+    val membersWord = stringResource(R.string.location_members_count_suffix)
     val subtitle = buildString {
         append("${geofence.radius.toInt()} m")
-        if (geofence.notifyOnArrive) append(" · Arrivo")
-        if (geofence.notifyOnLeave) append(" · Partenza")
-        if (monitored.isNotEmpty()) append(" · ${monitored.size} membri")
+        if (geofence.notifyOnArrive) append(" · " + arriveWord)
+        if (geofence.notifyOnLeave) append(" · " + leaveWord)
+        if (monitored.isNotEmpty()) append(" · ${monitored.size} " + membersWord)
     }
     Card(
         modifier = Modifier
@@ -181,7 +186,7 @@ private fun GeofenceRow(
                     onCheckedChange = onToggle,
                 )
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "Elimina", tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.location_delete_content_description), tint = MaterialTheme.colorScheme.error)
                 }
             }
         }

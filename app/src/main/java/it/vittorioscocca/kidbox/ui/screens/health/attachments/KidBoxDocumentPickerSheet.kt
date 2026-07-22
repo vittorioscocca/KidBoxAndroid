@@ -52,6 +52,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private val PickerTint = Color(0xFF9573D9)
 
@@ -128,13 +130,13 @@ fun KidBoxDocumentPickerSheet(
                                 modifier = Modifier.size(20.dp),
                             )
                             Spacer(Modifier.size(4.dp))
-                            Text("Indietro", color = PickerTint, fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.health_back), color = PickerTint, fontWeight = FontWeight.SemiBold)
                         }
                     } else {
                         Spacer(Modifier.size(48.dp))
                     }
                     Text(
-                        state.title,
+                        state.title.ifBlank { stringResource(R.string.documents_default_title) },
                         modifier = Modifier.weight(1f),
                         textAlign = TextAlign.Center,
                         fontWeight = FontWeight.Bold,
@@ -142,11 +144,11 @@ fun KidBoxDocumentPickerSheet(
                         color = kb.title,
                     )
                     TextButton(onClick = onDismiss) {
-                        Text("Annulla", color = PickerTint, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.health_cancel), color = PickerTint, fontWeight = FontWeight.SemiBold)
                     }
                 }
                 Text(
-                    if (pdfOnly) "Scegli un PDF da KidBox" else "Scegli da KidBox",
+                    if (pdfOnly) stringResource(R.string.health_pick_pdf_kidbox) else stringResource(R.string.health_pick_from_kidbox),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     textAlign = TextAlign.Center,
                     fontSize = 13.sp,
@@ -162,7 +164,7 @@ fun KidBoxDocumentPickerSheet(
                     if (state.folders.isEmpty() && visibleDocuments.isEmpty() && !state.isBusy) {
                         item {
                             Text(
-                                if (pdfOnly) "Nessun PDF in questa cartella." else "Cartella vuota",
+                                if (pdfOnly) stringResource(R.string.health_no_pdf_folder) else stringResource(R.string.health_empty_record),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(32.dp),
@@ -245,7 +247,7 @@ fun KidBoxDocumentPickerSheet(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(color = PickerTint)
                         Spacer(Modifier.height(12.dp))
-                        Text("Preparazione allegato…", fontSize = 14.sp, color = kb.subtitle)
+                        Text(stringResource(R.string.health_preparing_attachment), fontSize = 14.sp, color = kb.subtitle)
                     }
                 }
             }

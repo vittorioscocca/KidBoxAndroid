@@ -2,10 +2,10 @@ package it.vittorioscocca.kidbox.ui.screens.travel
 
 import androidx.compose.ui.graphics.Color
 
-enum class TravelItineraryPeriod(val title: String, val dotColor: Color) {
-    MORNING("MATTINA", Color(0xFFF2BF1A)),
-    AFTERNOON("POMERIGGIO", Color(0xFFF2611A)),
-    EVENING("SERA", Color(0xFF8C59D9)),
+enum class TravelItineraryPeriod(@androidx.annotation.StringRes val titleRes: Int, val dotColor: Color) {
+    MORNING(it.vittorioscocca.kidbox.R.string.travel_morning_up, Color(0xFFF2BF1A)),
+    AFTERNOON(it.vittorioscocca.kidbox.R.string.travel_afternoon_up, Color(0xFFF2611A)),
+    EVENING(it.vittorioscocca.kidbox.R.string.travel_evening_up, Color(0xFF8C59D9)),
 }
 
 enum class TravelItineraryStopCategory(val raw: String, val emoji: String) {

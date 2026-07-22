@@ -49,6 +49,8 @@ import it.vittorioscocca.kidbox.data.local.TravelPace
 import it.vittorioscocca.kidbox.data.local.TravelProfile
 import it.vittorioscocca.kidbox.data.local.TravelStyle
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private val TravelAccent = Color(0xFFF2611A)
 
@@ -82,7 +84,7 @@ fun TravelOnboardingScreen(
         ) {
             if (step > 0) {
                 TextButton(onClick = { step -= 1 }) {
-                    Text("Indietro", color = kb.title)
+                    Text(stringResource(R.string.travel_back), color = kb.title)
                 }
             } else {
                 Spacer(modifier = Modifier.width(72.dp))
@@ -116,9 +118,9 @@ fun TravelOnboardingScreen(
         ) {
             when (step) {
                 0 -> {
-                    Text("Qual è il tuo stile di viaggio?", fontWeight = FontWeight.Bold, fontSize = 28.sp, color = kb.title)
+                    Text(stringResource(R.string.travel_style_q), fontWeight = FontWeight.Bold, fontSize = 28.sp, color = kb.title)
                     Text(
-                        "Seleziona tutto ciò che ti interessa",
+                        stringResource(R.string.travel_select_all_interest),
                         color = kb.subtitle,
                         modifier = Modifier.padding(top = 8.dp, bottom = 20.dp),
                     )
@@ -139,9 +141,9 @@ fun TravelOnboardingScreen(
                 }
 
                 1 -> {
-                    Text("Come ti piace viaggiare?", fontWeight = FontWeight.Bold, fontSize = 28.sp, color = kb.title)
+                    Text(stringResource(R.string.travel_how_travel_q), fontWeight = FontWeight.Bold, fontSize = 28.sp, color = kb.title)
                     Text(
-                        "Il tuo ritmo preferito",
+                        stringResource(R.string.travel_pace),
                         color = kb.subtitle,
                         modifier = Modifier.padding(top = 8.dp, bottom = 20.dp),
                     )
@@ -156,9 +158,9 @@ fun TravelOnboardingScreen(
                 }
 
                 else -> {
-                    Text("La tua fascia d'età?", fontWeight = FontWeight.Bold, fontSize = 28.sp, color = kb.title)
+                    Text(stringResource(R.string.travel_age_q), fontWeight = FontWeight.Bold, fontSize = 28.sp, color = kb.title)
                     Text(
-                        "Ci aiuta a personalizzare i consigli",
+                        stringResource(R.string.travel_age_hint),
                         color = kb.subtitle,
                         modifier = Modifier.padding(top = 8.dp, bottom = 20.dp),
                     )
@@ -178,9 +180,9 @@ fun TravelOnboardingScreen(
                         color = MaterialTheme.colorScheme.surface,
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text("Quasi fatto!", fontWeight = FontWeight.Bold, color = kb.title)
+                            Text(stringResource(R.string.travel_almost_done), fontWeight = FontWeight.Bold, color = kb.title)
                             Text(
-                                "Salveremo le tue preferenze per proporti itinerari più adatti a te.",
+                                stringResource(R.string.travel_prefs_saved),
                                 color = kb.subtitle,
                                 modifier = Modifier.padding(top = 6.dp),
                             )
@@ -210,7 +212,7 @@ fun TravelOnboardingScreen(
                 disabledContainerColor = kb.subtitle.copy(alpha = 0.25f),
             ),
         ) {
-            Text("Continua", modifier = Modifier.padding(vertical = 6.dp))
+            Text(stringResource(R.string.travel_continue), modifier = Modifier.padding(vertical = 6.dp))
         }
     }
 }
@@ -232,8 +234,8 @@ private fun StyleRow(style: TravelStyle, selected: Boolean, onToggle: () -> Unit
         ) {
             Text(style.emoji, fontSize = 28.sp, modifier = Modifier.width(40.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(style.title, fontWeight = FontWeight.SemiBold, color = kb.title)
-                Text(style.subtitle, fontSize = 12.sp, color = kb.subtitle)
+                Text(stringResource(style.titleRes), fontWeight = FontWeight.SemiBold, color = kb.title)
+                Text(stringResource(style.subtitleRes), fontSize = 12.sp, color = kb.subtitle)
             }
             Icon(
                 imageVector = if (selected) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
@@ -280,9 +282,9 @@ private fun PaceRow(pace: TravelPace, selected: Boolean, onClick: () -> Unit) {
             }
             Spacer(modifier = Modifier.width(14.dp))
             Column {
-                Text(pace.title, fontWeight = FontWeight.SemiBold, color = kb.title)
-                Text(pace.line1, fontSize = 12.sp, color = kb.subtitle)
-                Text(pace.line2, fontSize = 12.sp, color = kb.subtitle)
+                Text(stringResource(pace.titleRes), fontWeight = FontWeight.SemiBold, color = kb.title)
+                Text(stringResource(pace.line1Res), fontSize = 12.sp, color = kb.subtitle)
+                Text(stringResource(pace.line2Res), fontSize = 12.sp, color = kb.subtitle)
             }
         }
     }
@@ -309,7 +311,7 @@ private fun AgeCard(
             Text(group.emoji, fontSize = 32.sp)
             Text(group.raw, fontWeight = FontWeight.Bold, color = kb.title, modifier = Modifier.padding(top = 8.dp))
             Text(
-                group.subtitle,
+                stringResource(group.subtitleRes),
                 fontSize = 12.sp,
                 color = kb.subtitle,
                 modifier = Modifier.padding(top = 4.dp),

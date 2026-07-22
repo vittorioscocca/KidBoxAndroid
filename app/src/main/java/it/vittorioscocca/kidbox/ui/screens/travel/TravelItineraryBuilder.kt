@@ -10,6 +10,8 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 import kotlin.math.max
 import kotlin.math.roundToInt
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 object TravelItineraryBuilder {
 

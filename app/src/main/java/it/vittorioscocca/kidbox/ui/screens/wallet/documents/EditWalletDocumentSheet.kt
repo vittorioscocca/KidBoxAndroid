@@ -2,6 +2,8 @@
 
 package it.vittorioscocca.kidbox.ui.screens.wallet.documents
 
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -48,6 +50,7 @@ fun EditWalletDocumentSheet(
     viewModel: WalletDocumentsViewModel,
     onDismiss: () -> Unit,
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
 
     var kind by remember { mutableStateOf(metadata?.kind ?: DocumentKind.ALTRO) }
@@ -90,7 +93,7 @@ fun EditWalletDocumentSheet(
                 }
                 .onFailure {
                     isSaving = false
-                    errorText = it.localizedMessage ?: "Errore di salvataggio."
+                    errorText = it.localizedMessage ?: context.getString(R.string.wallet_document_save_error)
                 }
         }
     }
@@ -102,15 +105,15 @@ fun EditWalletDocumentSheet(
             topBar = {
                 CenterAlignedTopAppBar(
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.kidBoxColors.background),
-                    title = { Text("Modifica documento", fontWeight = FontWeight.SemiBold) },
+                    title = { Text(stringResource(R.string.wallet_document_edit_title), fontWeight = FontWeight.SemiBold) },
                     navigationIcon = {
-                        TextButton(onClick = onDismiss) { Text("Annulla") }
+                        TextButton(onClick = onDismiss) { Text(stringResource(R.string.wallet_cancel)) }
                     },
                     actions = {
                         if (isSaving) {
                             CircularProgressIndicator(modifier = Modifier.padding(end = 16.dp).height(20.dp), strokeWidth = 2.dp)
                         } else {
-                            TextButton(onClick = { save() }, enabled = cleanTitle.isNotEmpty()) { Text("Salva") }
+                            TextButton(onClick = { save() }, enabled = cleanTitle.isNotEmpty()) { Text(stringResource(R.string.wallet_save)) }
                         }
                     },
                 )
@@ -124,37 +127,37 @@ fun EditWalletDocumentSheet(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                FormSection(title = "Tipo documento") {
+                FormSection(title = stringResource(R.string.wallet_document_section_type)) {
                     KindDropdown(selected = kind, onSelected = { kind = it })
                     OwnerDropdown(owners = owners, selected = owner, onSelected = { owner = it })
                 }
 
-                FormSection(title = "Dati") {
+                FormSection(title = stringResource(R.string.wallet_document_section_data)) {
                     OutlinedTextField(
                         value = title,
                         onValueChange = { title = it },
-                        label = { Text("Titolo") },
+                        label = { Text(stringResource(R.string.wallet_label_title)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
                         value = holderName,
                         onValueChange = { holderName = it },
-                        label = { Text("Nome e cognome titolare") },
+                        label = { Text(stringResource(R.string.wallet_document_holder_full_name_label)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
                         value = birthInfo,
                         onValueChange = { birthInfo = it },
-                        label = { Text("Data e luogo di nascita") },
+                        label = { Text(stringResource(R.string.wallet_document_birth_date_place_label)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
                         value = documentNumber,
                         onValueChange = { documentNumber = it },
-                        label = { Text(if (isPatente) "Numero patente" else "Numero documento") },
+                        label = { Text(if (isPatente) stringResource(R.string.wallet_document_license_number_label) else stringResource(R.string.wallet_document_number_label)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -162,12 +165,12 @@ fun EditWalletDocumentSheet(
                         OutlinedTextField(
                             value = codiceFiscale,
                             onValueChange = { codiceFiscale = it.uppercase() },
-                            label = { Text("Codice Fiscale") },
+                            label = { Text(stringResource(R.string.wallet_document_codice_fiscale_label)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
-                        DocumentDateField(label = "Data di rilascio", date = issueDate, onChange = { issueDate = it })
-                        DocumentDateField(label = "Data di scadenza", date = expiryDate, onChange = { expiryDate = it })
+                        DocumentDateField(label = stringResource(R.string.wallet_document_issue_date_full_label), date = issueDate, onChange = { issueDate = it })
+                        DocumentDateField(label = stringResource(R.string.wallet_document_expiry_date_full_label), date = expiryDate, onChange = { expiryDate = it })
                         if (expiryDate != null) {
                             NotifyRow(notifyBeforeExpiry) { notifyBeforeExpiry = it }
                         }
@@ -175,7 +178,7 @@ fun EditWalletDocumentSheet(
                 }
 
                 if (isPatente) {
-                    FormSection(title = "Categorie") {
+                    FormSection(title = stringResource(R.string.wallet_document_section_categories)) {
                         PatenteCategoriesEditor(categories = patenteCategories, onCategoriesChange = { patenteCategories = it })
                     }
                     FormSection(title = null) {

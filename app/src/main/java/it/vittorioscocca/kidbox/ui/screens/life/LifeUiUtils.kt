@@ -8,14 +8,15 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.util.Date
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
 
-private val itDate = SimpleDateFormat("dd/MM/yyyy", Locale.ITALY)
-private val itDateTime = SimpleDateFormat("dd/MM/yyyy, HH:mm", Locale.ITALY)
-private val itTimeHm = SimpleDateFormat("HH:mm", Locale.ITALY)
-private val itDateMedium: DateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.ITALY)
+private fun itDate() = SimpleDateFormat("dd/MM/yyyy", KBLocale.current())
+private fun itDateTime() = SimpleDateFormat("dd/MM/yyyy, HH:mm", KBLocale.current())
+private fun itTimeHm() = SimpleDateFormat("HH:mm", KBLocale.current())
+private val itDateMedium: DateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM, KBLocale.current())
 
 fun formatItDate(epochMillis: Long?): String =
-    epochMillis?.let { itDate.format(Date(it)) }.orEmpty()
+    epochMillis?.let { itDate().format(Date(it)) }.orEmpty()
 
 /** Es. "11 mag 2026" (stile medio italiano, come iOS sul dettaglio Casa). */
 fun formatItDateMedium(epochMillis: Long?): String =
@@ -23,11 +24,11 @@ fun formatItDateMedium(epochMillis: Long?): String =
 
 /** Data breve con ora (allineato a iOS `shortDateTime` sullo storico eventi animale). */
 fun formatItDateTime(epochMillis: Long?): String =
-    epochMillis?.let { itDateTime.format(Date(it)) }.orEmpty()
+    epochMillis?.let { itDateTime().format(Date(it)) }.orEmpty()
 
 /** Solo ora locale (picker compatti tipo iOS). */
 fun formatItTimeHm(epochMillis: Long?): String =
-    epochMillis?.let { itTimeHm.format(Date(it)) }.orEmpty()
+    epochMillis?.let { itTimeHm().format(Date(it)) }.orEmpty()
 
 /** Giorni tra oggi e la scadenza (inizio giornata Europe/Rome), come iOS `KidBoxUrgency.daysRemaining`. */
 fun daysRemainingCalendarIt(deadlineMillis: Long, fromMillis: Long = System.currentTimeMillis()): Int {

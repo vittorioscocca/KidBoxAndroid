@@ -70,6 +70,9 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.platform.LocalContext
 
 private val WizardAccent = Color(0xFFF2611A)
 private const val TOTAL_STEPS = 7
@@ -83,6 +86,7 @@ fun TravelWizardScreen(
     onOpenPlans: () -> Unit,
     viewModel: TravelPlanningViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val kb = MaterialTheme.kidBoxColors
     var step by remember { mutableIntStateOf(0) }
     var showProposal by remember { mutableStateOf(false) }
@@ -125,7 +129,7 @@ fun TravelWizardScreen(
 
     if (isGenerating) {
         TravelPlanningLoadingScreen(
-            destinationName = viewModel.destinationName.ifBlank { "il viaggio" },
+            destinationName = viewModel.destinationName.ifBlank { stringResource(R.string.travel_the_trip) },
             subtitle = "Sto finalizzando il percorso di ${viewModel.tripDayCount} giorni",
             plannedDayCount = viewModel.tripDayCount,
         )
@@ -162,8 +166,8 @@ fun TravelWizardScreen(
                     .verticalScroll(scrollState)
                     .padding(horizontal = 20.dp),
             ) {
-                Text(stepTitle(step), fontWeight = FontWeight.Bold, fontSize = 28.sp, color = kb.title)
-                Text(stepSubtitle(step, viewModel.destinationName), color = kb.subtitle, modifier = Modifier.padding(top = 8.dp, bottom = 20.dp))
+                Text(stepTitle(context, step), fontWeight = FontWeight.Bold, fontSize = 28.sp, color = kb.title)
+                Text(stepSubtitle(context, step, viewModel.destinationName), color = kb.subtitle, modifier = Modifier.padding(top = 8.dp, bottom = 20.dp))
                 when (step) {
                     0 -> DestinationStep(familyId, viewModel)
                     1 -> DatesStep(viewModel)
@@ -202,7 +206,7 @@ fun TravelWizardScreen(
                 ),
             ) {
                 Text(
-                    if (step == TOTAL_STEPS - 1) "Crea il mio piano" else "Continua",
+                    if (step == TOTAL_STEPS - 1) stringResource(R.string.travel_create_plan) else stringResource(R.string.travel_continue),
                     modifier = Modifier.padding(vertical = 6.dp),
                 )
             }
@@ -215,7 +219,7 @@ private fun WizardHeader(step: Int, onBack: () -> Unit, onCancel: () -> Unit) {
     Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onBack) {
-                Text(if (step > 0) "Indietro" else "Annulla")
+                Text(if (step > 0) stringResource(R.string.travel_back) else stringResource(R.string.travel_cancel))
             }
             Spacer(Modifier.weight(1f))
             Text("${step + 1} di $TOTAL_STEPS", fontSize = 14.sp, color = MaterialTheme.kidBoxColors.subtitle)
@@ -238,24 +242,24 @@ private fun WizardHeader(step: Int, onBack: () -> Unit, onCancel: () -> Unit) {
     }
 }
 
-private fun stepTitle(step: Int): String = when (step) {
-    0 -> "Dove vuoi andare?"
-    1 -> "Quando è il tuo viaggio?"
-    2 -> "Come ci arriverete?"
-    3 -> "Chi viaggia?"
-    4 -> "Qual è il tuo budget?"
-    5 -> "Qual è il mood di questo viaggio?"
-    else -> "Crea il tuo piano"
+private fun stepTitle(context: android.content.Context, step: Int): String = when (step) {
+    0 -> context.getString(R.string.travel_where_go_q)
+    1 -> context.getString(R.string.travel_when_q)
+    2 -> context.getString(R.string.travel_how_get_q)
+    3 -> context.getString(R.string.travel_who_q)
+    4 -> context.getString(R.string.travel_budget_q)
+    5 -> context.getString(R.string.travel_mood_q)
+    else -> context.getString(R.string.travel_create_your_plan)
 }
 
-private fun stepSubtitle(step: Int, destination: String): String = when (step) {
-    0 -> "Cerca la destinazione del viaggio"
-    1 -> "Scegli le date del viaggio"
-    2 -> "Scegli come viaggerete"
-    3 -> "Definisce tutto il piano"
-    4 -> "Costo totale del viaggio"
-    5 -> if (destination.isBlank()) "Ogni viaggio è diverso" else "Personalizza per $destination"
-    else -> "Verifica e genera con l'AI"
+private fun stepSubtitle(context: android.content.Context, step: Int, destination: String): String = when (step) {
+    0 -> context.getString(R.string.travel_search_dest)
+    1 -> context.getString(R.string.travel_pick_dates)
+    2 -> context.getString(R.string.travel_pick_transport)
+    3 -> context.getString(R.string.travel_defines_plan)
+    4 -> context.getString(R.string.travel_total_cost)
+    5 -> if (destination.isBlank()) context.getString(R.string.travel_each_trip) else "Personalizza per $destination"
+    else -> context.getString(R.string.travel_review_generate)
 }
 
 @Composable
@@ -289,14 +293,14 @@ private fun DatesStep(vm: TravelPlanningViewModel) {
 
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         DateSummaryCard(
-            label = "PARTENZA",
+            label = stringResource(R.string.travel_departure_up),
             dateMillis = vm.startDate,
             modifier = Modifier.weight(1f),
             selected = editingDeparture,
             onClick = { editingDeparture = true },
         )
         DateSummaryCard(
-            label = "RITORNO",
+            label = stringResource(R.string.travel_return_up),
             dateMillis = vm.endDate,
             modifier = Modifier.weight(1f),
             selected = !editingDeparture,
@@ -426,13 +430,13 @@ private fun ParticipantsStep(
             }
         }
         if (lines.isEmpty()) {
-            Text("Aggiungi membri della famiglia in Impostazioni.", color = MaterialTheme.kidBoxColors.subtitle)
+            Text(stringResource(R.string.travel_add_members_hint), color = MaterialTheme.kidBoxColors.subtitle)
         }
         if (vm.selectedParticipantIds.isNotEmpty()) {
             val count = vm.selectedParticipantIds.size
             Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("SELEZIONATI", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.kidBoxColors.subtitle)
+                    Text(stringResource(R.string.travel_selected_up), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.kidBoxColors.subtitle)
                     Text(vm.selectedParticipantSummary(members, children), fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp))
                     Text(
                         "Perfetto. Pianificheremo per $count ${if (count == 1) "persona" else "persone"}.",
@@ -531,7 +535,7 @@ private fun BudgetStep(
                 Text(vm.budgetFootnote(members, children), fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle, modifier = Modifier.padding(top = 8.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
         }
-        Text("SELEZIONE RAPIDA", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.kidBoxColors.subtitle)
+        Text(stringResource(R.string.travel_quick_select), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.kidBoxColors.subtitle)
         presets.chunked(3).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 row.forEach { preset ->
@@ -546,7 +550,7 @@ private fun BudgetStep(
                         color = if (selected) Color.Black else MaterialTheme.colorScheme.surfaceVariant,
                     ) {
                         Text(
-                            if (preset == null) "Personalizzato" else preset.label(vm.currency),
+                            if (preset == null) stringResource(R.string.travel_custom) else preset.label(vm.currency),
                             color = if (selected) Color.White else MaterialTheme.kidBoxColors.title,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -567,7 +571,7 @@ private fun BudgetStep(
                     .focusRequester(customBudgetFocusRequester)
                     .bringIntoViewRequester(customBudgetBringIntoView)
                     .onFocusEvent { customBudgetFieldFocused = it.isFocused },
-                label = { Text("Importo personalizzato") },
+                label = { Text(stringResource(R.string.travel_custom_amount)) },
                 suffix = { Text(symbol) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -586,9 +590,9 @@ private fun BudgetStep(
                     .background(Color(0xFFFFF8E1))
                     .padding(12.dp),
             ) {
-                Text("Suggerimento", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.travel_tip), fontWeight = FontWeight.Bold)
                 Text(
-                    "Il budget include voli, alloggio, cibo, attività e trasporti locali.",
+                    stringResource(R.string.travel_budget_includes),
                     fontSize = 14.sp,
                     color = MaterialTheme.kidBoxColors.subtitle,
                     modifier = Modifier.padding(top = 4.dp),
@@ -608,7 +612,7 @@ private fun TripStyleStep(vm: TravelPlanningViewModel) {
         Surface(color = Color(0xFFFFF8E1), shape = RoundedCornerShape(12.dp)) {
             Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.Info, null, tint = WizardAccent)
-                Text("Precompilato dal tuo profilo — modifica quando vuoi.", modifier = Modifier.padding(start = 8.dp), fontSize = 14.sp)
+                Text(stringResource(R.string.travel_prefilled), modifier = Modifier.padding(start = 8.dp), fontSize = 14.sp)
             }
         }
         styles.chunked(2).forEach { row ->
@@ -626,8 +630,8 @@ private fun TripStyleStep(vm: TravelPlanningViewModel) {
                     ) {
                         Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(style.emoji, fontSize = 28.sp)
-                            Text(style.title, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                            Text(style.subtitle, fontSize = 10.sp, color = MaterialTheme.kidBoxColors.subtitle, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
+                            Text(stringResource(style.titleRes), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                            Text(stringResource(style.subtitleRes), fontSize = 10.sp, color = MaterialTheme.kidBoxColors.subtitle, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
                         }
                     }
                 }
@@ -647,12 +651,12 @@ private fun BuildStep(
 ) {
     val kb = MaterialTheme.kidBoxColors
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        summaryLine("Destinazione", vm.destinationName)
-        summaryLine("Viaggiatori", vm.selectedParticipantSummary(members, children))
-        summaryLine("Budget", "${vm.budgetTotal.toInt()} ${if (vm.currency == "EUR") "€" else "$"}")
+        summaryLine(stringResource(R.string.travel_destination), vm.destinationName)
+        summaryLine(stringResource(R.string.travel_travellers), vm.selectedParticipantSummary(members, children))
+        summaryLine(stringResource(R.string.travel_budget), "${vm.budgetTotal.toInt()} ${if (vm.currency == "EUR") "€" else "$"}")
         if (!aiAvailable) {
-            Text("Richiede piano Pro o Max.", color = kb.subtitle)
-            TextButton(onClick = onOpenPlans) { Text("Scopri Pro e Max") }
+            Text(stringResource(R.string.travel_requires_pro), color = kb.subtitle)
+            TextButton(onClick = onOpenPlans) { Text(stringResource(R.string.travel_discover_plans)) }
         } else {
             OutlinedTextField(
                 value = vm.freeTextPrompt,
@@ -660,11 +664,11 @@ private fun BuildStep(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(120.dp),
-                placeholder = { Text("Note per l'AI (opzionale)") },
+                placeholder = { Text(stringResource(R.string.travel_ai_notes_optional)) },
             )
             if (!vm.canGenerate) {
                 Text(
-                    "Completa destinazione, viaggiatori, stili e budget per generare il piano.",
+                    stringResource(R.string.travel_complete_all),
                     color = kb.subtitle,
                     fontSize = 12.sp,
                     modifier = Modifier.padding(top = 8.dp),

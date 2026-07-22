@@ -10,12 +10,16 @@ import org.json.JSONObject
 
 // ── Visit Status ─────────────────────────────────────────────────────────────
 
-enum class KBVisitStatus(val rawValue: String, val displayLabel: String, val wizardChipLabel: String) {
-    PENDING("pending", "In attesa", "In attesa"),
-    BOOKED("booked", "Prenotata", "Prenotata"),
-    COMPLETED("completed", "Eseguite", "Eseguita"),
-    RESULT_AVAILABLE("result_available", "Risultato disponibile", "Risultati"),
-    UNKNOWN_STATUS("unknown", "Senza stato", "—");
+enum class KBVisitStatus(
+    val rawValue: String,
+    @androidx.annotation.StringRes val displayLabelRes: Int,
+    @androidx.annotation.StringRes val wizardChipLabelRes: Int,
+) {
+    PENDING("pending", it.vittorioscocca.kidbox.R.string.health_status_pending_f, it.vittorioscocca.kidbox.R.string.health_status_pending_f),
+    BOOKED("booked", it.vittorioscocca.kidbox.R.string.health_status_booked_f, it.vittorioscocca.kidbox.R.string.health_status_booked_f),
+    COMPLETED("completed", it.vittorioscocca.kidbox.R.string.health_status_completed_pl, it.vittorioscocca.kidbox.R.string.health_status_completed_f),
+    RESULT_AVAILABLE("result_available", it.vittorioscocca.kidbox.R.string.health_status_result_available, it.vittorioscocca.kidbox.R.string.health_status_results),
+    UNKNOWN_STATUS("unknown", it.vittorioscocca.kidbox.R.string.health_status_unknown, it.vittorioscocca.kidbox.R.string.health_status_dash);
 
     companion object {
         fun fromRaw(raw: String?): KBVisitStatus =

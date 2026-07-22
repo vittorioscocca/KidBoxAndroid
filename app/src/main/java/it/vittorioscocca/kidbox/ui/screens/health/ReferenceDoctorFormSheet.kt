@@ -63,6 +63,8 @@ import it.vittorioscocca.kidbox.domain.model.ReferenceDoctorDraft
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.util.Locale
 import java.util.UUID
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private val iosBlue = Color(0xFF0A84FF)
 private val cardFieldColors @Composable get() = TextFieldDefaults.colors(
@@ -95,7 +97,7 @@ fun ReferenceDoctorFormScreen(
         mutableStateListOf<KBDoctorOfficeHourSlot>().apply { addAll(initial.officeHours) }
     }
 
-    val title = if (isChild) "Pediatra di riferimento" else "Medico di riferimento"
+    val title = if (isChild) stringResource(R.string.health_pediatrician) else stringResource(R.string.health_doctor)
     val canSave = name.isNotBlank()
 
     Box(
@@ -116,7 +118,7 @@ fun ReferenceDoctorFormScreen(
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ToolbarPillButton(text = "Annulla", onClick = onDismiss)
+                ToolbarPillButton(text = stringResource(R.string.health_cancel), onClick = onDismiss)
                 Text(
                     text = title,
                     modifier = Modifier.weight(1f),
@@ -126,7 +128,7 @@ fun ReferenceDoctorFormScreen(
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
                 ToolbarPillButton(
-                    text = "Salva",
+                    text = stringResource(R.string.health_save),
                     enabled = canSave,
                     onClick = {
                         onSave(
@@ -149,7 +151,7 @@ fun ReferenceDoctorFormScreen(
                     .padding(horizontal = 18.dp),
             ) {
                 // ── Dati medico ──────────────────────────────────────────────────
-                FormSectionLabel("Dati medico")
+                FormSectionLabel(stringResource(R.string.health_doctor_data))
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     shape = RoundedCornerShape(12.dp),
@@ -158,13 +160,13 @@ fun ReferenceDoctorFormScreen(
                     FormCardTextField(
                         value = name,
                         onValueChange = { name = it },
-                        placeholder = "Nome e cognome",
+                        placeholder = stringResource(R.string.health_full_name),
                     )
                     FormDivider()
                     FormCardTextField(
                         value = email,
                         onValueChange = { email = it },
-                        placeholder = "Email",
+                        placeholder = stringResource(R.string.health_email),
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Email,
                             capitalization = KeyboardCapitalization.None,
@@ -175,14 +177,14 @@ fun ReferenceDoctorFormScreen(
                     FormCardTextField(
                         value = address,
                         onValueChange = { address = it },
-                        placeholder = "Indirizzo studio",
+                        placeholder = stringResource(R.string.health_office_address),
                         minLines = 2,
                     )
                     FormDivider()
                     FormCardTextField(
                         value = website,
                         onValueChange = { website = it },
-                        placeholder = "Sito web (opzionale)",
+                        placeholder = stringResource(R.string.health_website_optional),
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Uri,
                             capitalization = KeyboardCapitalization.None,
@@ -194,7 +196,7 @@ fun ReferenceDoctorFormScreen(
                 Spacer(Modifier.height(20.dp))
 
                 // ── Orari di studio ──────────────────────────────────────────────
-                FormSectionLabel("Orari di studio")
+                FormSectionLabel(stringResource(R.string.health_office_hours))
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     shape = RoundedCornerShape(12.dp),
@@ -202,7 +204,7 @@ fun ReferenceDoctorFormScreen(
                 ) {
                     if (officeHours.isEmpty()) {
                         Text(
-                            text = "Nessun orario di ricevimento",
+                            text = stringResource(R.string.health_no_hours),
                             color = kb.subtitle,
                             fontSize = 16.sp,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
@@ -245,7 +247,7 @@ fun ReferenceDoctorFormScreen(
                             },
                         ) {
                             Text(
-                                "Aggiungi fascia oraria",
+                                stringResource(R.string.health_add_slot),
                                 color = iosBlue,
                                 fontSize = 17.sp,
                             )
@@ -253,7 +255,7 @@ fun ReferenceDoctorFormScreen(
                     }
                 }
                 Text(
-                    text = "Indica il giorno e scegli le fasce dalle/alle con i selettori orario.",
+                    text = stringResource(R.string.health_slot_hint),
                     fontSize = 12.sp,
                     color = kb.subtitle,
                     modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp),
@@ -371,7 +373,7 @@ private fun OfficeHourSlotEditor(
                     value = slot.weekday,
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text("Giorno", fontSize = 12.sp, color = kb.subtitle) },
+                    label = { Text(stringResource(R.string.health_day), fontSize = 12.sp, color = kb.subtitle) },
                     trailingIcon = {
                         ExposedDropdownMenuDefaults.TrailingIcon(expanded = weekdayExpanded)
                     },
@@ -397,7 +399,7 @@ private fun OfficeHourSlotEditor(
                 }
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Rimuovi fascia", tint = Color(0xFFFF3B30))
+                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.health_remove_slot), tint = Color(0xFFFF3B30))
             }
         }
         Row(
@@ -405,13 +407,13 @@ private fun OfficeHourSlotEditor(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             OfficeHourTimePickerField(
-                label = "Dalle",
+                label = stringResource(R.string.health_from),
                 time = slot.fromTime,
                 onTimeChange = { onChange(slot.copy(fromTime = it)) },
                 modifier = Modifier.weight(1f),
             )
             OfficeHourTimePickerField(
-                label = "Alle",
+                label = stringResource(R.string.health_to),
                 time = slot.toTime,
                 onTimeChange = { onChange(slot.copy(toTime = it)) },
                 modifier = Modifier.weight(1f),
@@ -478,7 +480,7 @@ private fun OfficeHourTimePickerField(
                         horizontalArrangement = Arrangement.End,
                     ) {
                         TextButton(onClick = { showPicker = false }) {
-                            Text("Annulla", color = iosBlue)
+                            Text(stringResource(R.string.health_cancel), color = iosBlue)
                         }
                         TextButton(
                             onClick = {

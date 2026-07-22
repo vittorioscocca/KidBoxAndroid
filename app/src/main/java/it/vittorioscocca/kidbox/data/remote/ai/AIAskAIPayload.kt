@@ -30,31 +30,32 @@ object AIAskAIPayload {
     fun clinicalRecordMessageUnits(totalChars: Int): Int =
         maxOf(CLINICAL_RECORD_MIN_UNITS, messageUnits(totalChars))
 
-    const val TRANSIENT_LARGE_CONTEXT_NOTICE: String =
-        "Contesto sanitario ampio: alla prossima domanda potrai scegliere tra risposta accurata o contesto riassunto."
+    fun transientLargeContextNotice(context: android.content.Context): String =
+        context.getString(it.vittorioscocca.kidbox.R.string.health_ctx_large_notice)
 
     fun choiceDialogMessage(
+        context: android.content.Context,
         fullUnits: Int,
         compactAskUnits: Int,
         compactSetupUnits: Int,
         hasCompactCache: Boolean,
     ): String =
         if (hasCompactCache) {
-            "Il profilo sanitario inviato all'AI supera lo standard (~$STANDARD_CHARS caratteri). " +
-                "Scegli come procedere per questa domanda: accurata ($fullUnits messaggi) o riassunta " +
-                "($compactAskUnits ${if (compactAskUnits == 1) "messaggio" else "messaggi"})."
+            context.getString(
+                it.vittorioscocca.kidbox.R.string.health_ctx_choice_cached,
+                STANDARD_CHARS, fullUnits, compactAskUnits,
+            )
         } else {
-            "Il profilo sanitario è molto ampio. Accuratezza: $fullUnits messaggi per questa domanda. " +
-                "Riassunto: $compactAskUnits ${if (compactAskUnits == 1) "messaggio" else "messaggi"} per questa domanda, " +
-                "più $compactSetupUnits ${if (compactSetupUnits == 1) "messaggio" else "messaggi"} una sola volta in questa chat " +
-                "per creare il riassunto (le domande successive con riassunto costano meno)."
+            context.getString(
+                it.vittorioscocca.kidbox.R.string.health_ctx_choice_fresh,
+                fullUnits, compactAskUnits, compactSetupUnits,
+            )
         }
 
-    fun compactChoiceButtonLabel(askUnits: Int, setupUnits: Int): String =
+    fun compactChoiceButtonLabel(context: android.content.Context, askUnits: Int, setupUnits: Int): String =
         if (setupUnits > 0) {
-            "Contesto riassunto ($askUnits + $setupUnits una tantum)"
+            context.getString(it.vittorioscocca.kidbox.R.string.health_ctx_compact_btn_setup, askUnits, setupUnits)
         } else {
-            val suffix = if (askUnits == 1) "messaggio" else "messaggi"
-            "Contesto riassunto ($askUnits $suffix)"
+            context.getString(it.vittorioscocca.kidbox.R.string.health_ctx_compact_btn, askUnits)
         }
 }

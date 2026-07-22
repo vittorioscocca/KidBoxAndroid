@@ -85,9 +85,12 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
-private val DATE_LONG_EXAM = SimpleDateFormat("d MMMM yyyy", Locale.ITALIAN)
-private val DATE_CREATED_EXAM = SimpleDateFormat("d MMM yyyy", Locale.ITALIAN)
+private fun DATE_LONG_EXAM() = SimpleDateFormat("d MMMM yyyy", KBLocale.current())
+private fun DATE_CREATED_EXAM() = SimpleDateFormat("d MMM yyyy", KBLocale.current())
 private val TEAL_DETAIL = Color(0xFF40A6BF)
 private val ORANGE_STATUS = Color(0xFFFF9800)
 private val MINT_RESULT = Color(0xFF66BB6A)
@@ -146,14 +149,14 @@ fun MedicalExamDetailScreen(
         if (ex != null) {
             val status = KBExamStatus.entries.firstOrNull { it.rawValue == ex.statusRaw }
                 ?: KBExamStatus.PENDING
-            val deadlineStr = ex.deadlineEpochMillis?.let { DATE_LONG_EXAM.format(Date(it)) } ?: "—"
+            val deadlineStr = ex.deadlineEpochMillis?.let { DATE_LONG_EXAM().format(Date(it)) } ?: "—"
             val resultForAi = buildExamResultSummaryForAi(ex)
             val attachN = state.attachments.size
-            val attachStr = if (attachN == 0) "Nessun allegato" else "$attachN file allegati"
+            val attachStr = if (attachN == 0) context.getString(R.string.health_no_attachments) else "$attachN file allegati"
             onOpenExamAiChat(
-                state.childName.ifBlank { "Profilo" },
-                ex.name.ifBlank { "Esame" },
-                status.rawValue,
+                state.childName.ifBlank { context.getString(R.string.health_profile) },
+                ex.name.ifBlank { context.getString(R.string.health_exam) },
+                context.getString(status.labelRes),
                 deadlineStr,
                 ex.preparation.orEmpty().ifBlank { "—" },
                 resultForAi,
@@ -173,7 +176,7 @@ fun MedicalExamDetailScreen(
         if (granted) {
             takePictureLauncher.launch(cameraUri)
         } else {
-            Toast.makeText(context, "Permesso fotocamera negato", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.health_camera_denied), Toast.LENGTH_SHORT).show()
         }
     }
     val pickPhotoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -202,11 +205,11 @@ fun MedicalExamDetailScreen(
                 ) {
                     KidBoxHeaderCircleButton(
                         icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Indietro",
+                        contentDescription = stringResource(R.string.health_back),
                         onClick = onBack,
                     )
                     Spacer(Modifier.height(40.dp))
-                    Text(state.error ?: "Esame non trovato.", color = kb.subtitle, fontSize = 16.sp)
+                    Text(state.error ?: stringResource(R.string.health_exam_not_found_dot), color = kb.subtitle, fontSize = 16.sp)
                 }
             }
             else -> {
@@ -226,13 +229,13 @@ fun MedicalExamDetailScreen(
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         KidBoxHeaderCircleButton(
                             icon = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Indietro",
+                            contentDescription = stringResource(R.string.health_back),
                             onClick = onBack,
                         )
                     }
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        "Esami",
+                        stringResource(R.string.health_exams_label),
                         fontWeight = FontWeight.Bold,
                         fontSize = 28.sp,
                         color = kb.title,
@@ -249,28 +252,28 @@ fun MedicalExamDetailScreen(
 
                     // ── Luogo card ─────────────────────────────────────────────
                     if (!exam.location.isNullOrBlank()) {
-                        ExamDetailCard(title = "Luogo") { Text(exam.location, fontSize = 14.sp, color = kb.title) }
+                        ExamDetailCard(title = stringResource(R.string.health_place)) { Text(exam.location, fontSize = 14.sp, color = kb.title) }
                         Spacer(Modifier.height(12.dp))
                     }
 
                     // ── Preparazione card ──────────────────────────────────────
                     if (!exam.preparation.isNullOrBlank()) {
-                        ExamDetailCard(title = "Preparazione") { Text(exam.preparation, fontSize = 14.sp, color = kb.title) }
+                        ExamDetailCard(title = stringResource(R.string.health_preparation)) { Text(exam.preparation, fontSize = 14.sp, color = kb.title) }
                         Spacer(Modifier.height(12.dp))
                     }
 
                     // ── Note card ──────────────────────────────────────────────
                     if (!exam.notes.isNullOrBlank()) {
-                        ExamDetailCard(title = "Note") { Text(exam.notes, fontSize = 14.sp, color = kb.title) }
+                        ExamDetailCard(title = stringResource(R.string.health_notes)) { Text(exam.notes, fontSize = 14.sp, color = kb.title) }
                         Spacer(Modifier.height(12.dp))
                     }
 
                     // ── Risultato card ─────────────────────────────────────────
                     val hasResult = !exam.resultText.isNullOrBlank() || exam.resultDateEpochMillis != null
                     if (hasResult) {
-                        ExamDetailCard(title = "Risultato") {
+                        ExamDetailCard(title = stringResource(R.string.health_result)) {
                             exam.resultDateEpochMillis?.let { ms ->
-                                Text(DATE_LONG_EXAM.format(Date(ms)), fontSize = 12.sp, color = kb.subtitle)
+                                Text(DATE_LONG_EXAM().format(Date(ms)), fontSize = 12.sp, color = kb.subtitle)
                                 Spacer(Modifier.height(4.dp))
                             }
                             if (!exam.resultText.isNullOrBlank()) {
@@ -330,7 +333,7 @@ fun MedicalExamDetailScreen(
                     ) {
                         Icon(Icons.Default.Edit, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Modifica", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                        Text(stringResource(R.string.health_edit), color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                     }
                     OutlinedButton(
                         onClick = { viewModel.requestDelete() },
@@ -343,7 +346,7 @@ fun MedicalExamDetailScreen(
                     ) {
                         Icon(Icons.Default.Delete, contentDescription = null, tint = DANGER_EXAM, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Elimina", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                        Text(stringResource(R.string.health_delete), fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                     }
                 }
 
@@ -373,15 +376,15 @@ fun MedicalExamDetailScreen(
     if (state.confirmDelete) {
         AlertDialog(
             onDismissRequest = { viewModel.cancelDelete() },
-            title = { Text("Eliminare l'esame?") },
-            text = { Text("L'azione non può essere annullata.") },
+            title = { Text(stringResource(R.string.health_delete_exam_q)) },
+            text = { Text(stringResource(R.string.health_cannot_undo)) },
             confirmButton = {
                 TextButton(onClick = { viewModel.confirmDelete() }) {
-                    Text("Elimina", color = DANGER_EXAM)
+                    Text(stringResource(R.string.health_delete), color = DANGER_EXAM)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.cancelDelete() }) { Text("Annulla") }
+                TextButton(onClick = { viewModel.cancelDelete() }) { Text(stringResource(R.string.health_cancel)) }
             },
         )
     }
@@ -391,7 +394,7 @@ fun MedicalExamDetailScreen(
 
 private fun buildExamResultSummaryForAi(exam: KBMedicalExam): String {
     val parts = mutableListOf<String>()
-    exam.resultDateEpochMillis?.let { parts.add(DATE_LONG_EXAM.format(Date(it))) }
+    exam.resultDateEpochMillis?.let { parts.add(DATE_LONG_EXAM().format(Date(it))) }
     exam.resultText?.trim()?.takeIf { it.isNotEmpty() }?.let { raw ->
         parts.add(HealthAiDocumentText.prepareExtractedTextForAi(raw))
     }
@@ -470,7 +473,7 @@ private fun MedicalExamHeaderCard(
                                 color = Color(0xFFD32F2F),
                             ) {
                                 Text(
-                                    "Urgente",
+                                    stringResource(R.string.health_urgent),
                                     color = Color.White,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
@@ -488,11 +491,11 @@ private fun MedicalExamHeaderCard(
                             modifier = Modifier.size(14.dp),
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text(status.rawValue, fontSize = 13.sp, color = tint, fontWeight = FontWeight.Medium)
+                        Text(stringResource(status.labelRes), fontSize = 13.sp, color = tint, fontWeight = FontWeight.Medium)
                     }
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Creato: ${DATE_CREATED_EXAM.format(Date(exam.createdAtEpochMillis))}",
+                        "Creato: ${DATE_CREATED_EXAM().format(Date(exam.createdAtEpochMillis))}",
                         fontSize = 12.sp,
                         color = kb.subtitle,
                     )
@@ -512,22 +515,22 @@ private fun MedicalExamHeaderCard(
                     )
                     Spacer(Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Da eseguire entro", fontSize = 12.sp, color = kb.subtitle)
+                        Text(stringResource(R.string.health_due_by), fontSize = 12.sp, color = kb.subtitle)
                         Text(
-                            DATE_LONG_EXAM.format(Date(deadlineMs)),
+                            DATE_LONG_EXAM().format(Date(deadlineMs)),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (overdue) DANGER_EXAM else kb.title,
                         )
                         if (overdue) {
                             Spacer(Modifier.height(2.dp))
-                            Text("Scaduto", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = DANGER_EXAM)
+                            Text(stringResource(R.string.health_overdue), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = DANGER_EXAM)
                         }
                     }
                     IconButton(onClick = onToggleReminder) {
                         Icon(
                             imageVector = if (exam.reminderOn) Icons.Default.Notifications else Icons.Outlined.Notifications,
-                            contentDescription = if (exam.reminderOn) "Rimuovi promemoria" else "Aggiungi promemoria",
+                            contentDescription = if (exam.reminderOn) stringResource(R.string.health_remove_reminder) else stringResource(R.string.health_add_reminder),
                             tint = if (exam.reminderOn) Color(0xFFFF9800) else kb.subtitle,
                             modifier = Modifier.size(22.dp),
                         )
@@ -547,7 +550,7 @@ private fun MedicalExamHeaderCard(
                         modifier = Modifier.size(18.dp),
                     )
                     Spacer(Modifier.width(6.dp))
-                    Text("In sincronizzazione…", fontSize = 12.sp, color = kb.subtitle)
+                    Text(stringResource(R.string.health_syncing), fontSize = 12.sp, color = kb.subtitle)
                 }
             }
         }

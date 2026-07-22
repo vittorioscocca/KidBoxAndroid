@@ -54,6 +54,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun TodoHomeScreen(
@@ -102,16 +104,16 @@ fun TodoHomeScreen(
             Spacer(Modifier.height(12.dp))
             Text("To-Do", fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, color = kb.title)
             Spacer(Modifier.height(18.dp))
-            Text("Panoramica", fontWeight = FontWeight.SemiBold, fontSize = 24.sp, color = kb.title)
+            Text(stringResource(R.string.todo_overview), fontWeight = FontWeight.SemiBold, fontSize = 24.sp, color = kb.title)
             Spacer(Modifier.height(12.dp))
 
             val cards = listOf(
-                TodoOverviewCard("Oggi", state.todayCount, TodoSmartKind.TODAY, Icons.Filled.CalendarMonth, Color(0xFFF59E0B)),
-                TodoOverviewCard("Tutti", state.allCount, TodoSmartKind.ALL, Icons.Filled.List, Color(0xFF3B82F6)),
-                TodoOverviewCard("Assegnati a me", state.activeTodos.count { it.assignedTo == state.currentUid }, TodoSmartKind.ASSIGNED_TO_ME, Icons.Filled.PersonAdd, Color(0xFF06B6D4)),
-                TodoOverviewCard("Completati", state.completedCount, TodoSmartKind.COMPLETED, Icons.Filled.DoneAll, Color(0xFF22C55E)),
-                TodoOverviewCard("Non assegnati a me", state.activeTodos.count { it.assignedTo != state.currentUid }, TodoSmartKind.NOT_ASSIGNED_TO_ME, Icons.Filled.PersonOff, Color(0xFFA855F7)),
-                TodoOverviewCard("Non completati", state.notCompletedCount, TodoSmartKind.NOT_COMPLETED, Icons.Filled.RadioButtonUnchecked, Color(0xFFEF4444)),
+                TodoOverviewCard(stringResource(R.string.todo_today), state.todayCount, TodoSmartKind.TODAY, Icons.Filled.CalendarMonth, Color(0xFFF59E0B)),
+                TodoOverviewCard(stringResource(R.string.todo_all), state.allCount, TodoSmartKind.ALL, Icons.Filled.List, Color(0xFF3B82F6)),
+                TodoOverviewCard(stringResource(R.string.todo_assigned_me), state.activeTodos.count { it.assignedTo == state.currentUid }, TodoSmartKind.ASSIGNED_TO_ME, Icons.Filled.PersonAdd, Color(0xFF06B6D4)),
+                TodoOverviewCard(stringResource(R.string.todo_completed), state.completedCount, TodoSmartKind.COMPLETED, Icons.Filled.DoneAll, Color(0xFF22C55E)),
+                TodoOverviewCard(stringResource(R.string.todo_not_assigned_me), state.activeTodos.count { it.assignedTo != state.currentUid }, TodoSmartKind.NOT_ASSIGNED_TO_ME, Icons.Filled.PersonOff, Color(0xFFA855F7)),
+                TodoOverviewCard(stringResource(R.string.todo_not_completed), state.notCompletedCount, TodoSmartKind.NOT_COMPLETED, Icons.Filled.RadioButtonUnchecked, Color(0xFFEF4444)),
             )
             cards.chunked(2).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
@@ -175,10 +177,10 @@ fun TodoHomeScreen(
             }
 
             Spacer(Modifier.height(8.dp))
-            Text("Le mie liste", fontWeight = FontWeight.SemiBold, fontSize = 24.sp, color = kb.title)
+            Text(stringResource(R.string.todo_my_lists), fontWeight = FontWeight.SemiBold, fontSize = 24.sp, color = kb.title)
             Spacer(Modifier.height(12.dp))
             if (state.lists.isEmpty()) {
-                EmptyCard("Nessuna lista")
+                EmptyCard(stringResource(R.string.todo_no_lists))
             } else {
                 state.lists.forEach { list ->
                     Card(
@@ -221,12 +223,12 @@ fun TodoHomeScreen(
     if (showNewList) {
         AlertDialog(
             onDismissRequest = { showNewList = false },
-            title = { Text(if (editingListId == null) "Nuova lista" else "Modifica lista") },
+            title = { Text(if (editingListId == null) stringResource(R.string.todo_new_list) else stringResource(R.string.todo_edit_list)) },
             text = {
                 TextField(
                     value = listNameDraft,
                     onValueChange = { listNameDraft = it },
-                    placeholder = { Text("Nome lista") },
+                    placeholder = { Text(stringResource(R.string.todo_list_name)) },
                     singleLine = true,
                 )
             },
@@ -238,10 +240,10 @@ fun TodoHomeScreen(
                         if (editingListId == null) viewModel.createList(value) else viewModel.renameList(editingListId!!, value)
                         showNewList = false
                     },
-                ) { Text("Salva") }
+                ) { Text(stringResource(R.string.life_save)) }
             },
             dismissButton = {
-                TextButton(onClick = { showNewList = false }) { Text("Annulla") }
+                TextButton(onClick = { showNewList = false }) { Text(stringResource(R.string.life_cancel)) }
             },
         )
     }
@@ -253,7 +255,7 @@ fun TodoHomeScreen(
                 longPressListName = ""
             },
             title = { Text(longPressListName) },
-            text = { Text("Scegli azione per questa lista") },
+            text = { Text(stringResource(R.string.todo_choose_action)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -263,7 +265,7 @@ fun TodoHomeScreen(
                         longPressListId = null
                         longPressListName = ""
                     },
-                ) { Text("Modifica") }
+                ) { Text(stringResource(R.string.life_edit)) }
             },
             dismissButton = {
                 Row {
@@ -273,13 +275,13 @@ fun TodoHomeScreen(
                             longPressListId = null
                             longPressListName = ""
                         },
-                    ) { Text("Elimina", color = Color(0xFFD92323)) }
+                    ) { Text(stringResource(R.string.life_delete), color = Color(0xFFD92323)) }
                     TextButton(
                         onClick = {
                             longPressListId = null
                             longPressListName = ""
                         },
-                    ) { Text("Annulla") }
+                    ) { Text(stringResource(R.string.life_cancel)) }
                 }
             },
         )

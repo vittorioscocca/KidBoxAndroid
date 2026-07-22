@@ -54,6 +54,9 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun EditChildScreen(
@@ -68,7 +71,7 @@ fun EditChildScreen(
     var showDelete by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    val dateFormat = remember { DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ITALIAN) }
+    val dateFormat = remember { DateTimeFormatter.ofPattern("d MMM yyyy", KBLocale.current()) }
     val cardShape = RoundedCornerShape(16.dp)
 
     // Lifecycle-aware: calls startObserving() every time screen resumes
@@ -101,10 +104,10 @@ fun EditChildScreen(
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
     ) {
-        Text("Figlio", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.kidBoxColors.title)
+        Text(stringResource(R.string.settings_child_title), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.kidBoxColors.title)
         Spacer(modifier = Modifier.height(16.dp))
 
-        Text("Dati", fontSize = 13.sp, color = MaterialTheme.kidBoxColors.subtitle)
+        Text(stringResource(R.string.settings_child_data), fontSize = 13.sp, color = MaterialTheme.kidBoxColors.subtitle)
         Spacer(modifier = Modifier.height(8.dp))
 
         Card(
@@ -133,14 +136,14 @@ fun EditChildScreen(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                 ) {
-                    Text("Data di nascita", color = MaterialTheme.kidBoxColors.title, modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.settings_child_birthdate), color = MaterialTheme.kidBoxColors.title, modifier = Modifier.weight(1f))
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = MaterialTheme.kidBoxColors.divider,
                         modifier = Modifier.clickable { showDatePicker = true },
                     ) {
                         Text(
-                            text = birth?.format(dateFormat) ?: "Aggiungi",
+                            text = birth?.format(dateFormat) ?: stringResource(R.string.settings_common_add),
                             color = if (birth != null) MaterialTheme.kidBoxColors.title else Color(0xFF2E86FF),
                             fontSize = 15.sp,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -173,13 +176,13 @@ fun EditChildScreen(
                         modifier = Modifier.width(18.dp).height(18.dp),
                     )
                 } else {
-                    Text("Salva", color = Color(0xFF2E86FF), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.settings_common_save), color = Color(0xFF2E86FF), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(28.dp))
-        Text("Zona Pericolosa", fontSize = 13.sp, color = MaterialTheme.kidBoxColors.subtitle)
+        Text(stringResource(R.string.settings_child_danger_zone), fontSize = 13.sp, color = MaterialTheme.kidBoxColors.subtitle)
         Spacer(modifier = Modifier.height(8.dp))
 
         // ── Elimina figlio ───────────────────────────────────────────────────
@@ -193,13 +196,13 @@ fun EditChildScreen(
                 Icon(Icons.Filled.Delete, null, tint = Color(0xFFE53E3E),
                     modifier = Modifier.width(20.dp).height(20.dp))
                 Spacer(modifier = Modifier.width(10.dp))
-                Text("Elimina figlio", color = Color(0xFFE53E3E), fontSize = 17.sp)
+                Text(stringResource(R.string.settings_child_delete), color = Color(0xFFE53E3E), fontSize = 17.sp)
             }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            "Questa azione non può essere annullata. Il figlio verrà eliminato definitivamente.",
+            stringResource(R.string.settings_child_delete_warning),
             fontSize = 13.sp, color = MaterialTheme.kidBoxColors.subtitle,
         )
     }
@@ -207,16 +210,16 @@ fun EditChildScreen(
     if (showDelete) {
         AlertDialog(
             onDismissRequest = { showDelete = false },
-            title = { Text("Eliminare figlio?") },
-            text = { Text("Confermi eliminazione?") },
+            title = { Text(stringResource(R.string.settings_child_delete_q)) },
+            text = { Text(stringResource(R.string.settings_common_confirm_delete)) },
             confirmButton = {
                 TextButton(onClick = {
                     showDelete = false
                     viewModel.deleteChild(childId, onBack)
-                }) { Text("Elimina", color = Color(0xFFE53E3E)) }
+                }) { Text(stringResource(R.string.settings_common_delete), color = Color(0xFFE53E3E)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDelete = false }) { Text("Annulla") }
+                TextButton(onClick = { showDelete = false }) { Text(stringResource(R.string.settings_common_cancel)) }
             },
         )
     }

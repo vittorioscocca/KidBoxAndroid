@@ -57,6 +57,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import org.json.JSONArray
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.platform.LocalContext
 
 /** Stesso family del viola cure / tema iOS (avatar cerchio sotto nome). */
 private val HEALTH_HEADER_TINT = Color(0xFF9573D9)
@@ -69,6 +72,7 @@ fun HealthHomeScreen(
     onNavigate: (String) -> Unit,
     viewModel: HealthHomeViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val isAiGloballyEnabled by viewModel.isAiGloballyEnabled.collectAsStateWithLifecycle()
@@ -87,7 +91,7 @@ fun HealthHomeScreen(
         val cureSubtitle = when {
             state.activeTreatmentCount == 1 -> "1 attiva"
             state.activeTreatmentCount > 1 -> "${state.activeTreatmentCount} attive"
-            else -> "Farmaci attivi"
+            else -> context.getString(R.string.health_active_meds)
         }
         val examSubtitle = when {
             state.pendingExamCount > 0 -> "${state.pendingExamCount} in attesa"
@@ -95,7 +99,7 @@ fun HealthHomeScreen(
         }
         listOf(
             HealthCard(
-                title = "Cure",
+                title = context.getString(R.string.health_treatments),
                 subtitle = cureSubtitle,
                 icon = Icons.Default.Medication,
                 tint = Color(0xFF9573D9),
@@ -103,7 +107,7 @@ fun HealthHomeScreen(
                 onClick = { onNavigate(AppDestination.Treatments.route(familyId, childId)) },
             ),
             HealthCard(
-                title = "Vaccini",
+                title = context.getString(R.string.health_vaccines),
                 subtitle = "${state.vaccineCount} registrati",
                 icon = Icons.Default.Vaccines,
                 tint = Color(0xFFF38D73),
@@ -111,7 +115,7 @@ fun HealthHomeScreen(
                 onClick = { onNavigate(AppDestination.Vaccines.route(familyId, childId)) },
             ),
             HealthCard(
-                title = "Visite",
+                title = context.getString(R.string.health_visits),
                 subtitle = "${state.visitCount} registrate",
                 icon = Icons.Default.MonitorHeart,
                 tint = Color(0xFF5996D9),
@@ -119,7 +123,7 @@ fun HealthHomeScreen(
                 onClick = { onNavigate(AppDestination.MedicalVisits.route(familyId, childId)) },
             ),
             HealthCard(
-                title = "Analisi & Esami",
+                title = context.getString(R.string.health_exams),
                 subtitle = examSubtitle,
                 icon = Icons.Default.Biotech,
                 tint = Color(0xFF40A6BF),
@@ -127,28 +131,28 @@ fun HealthHomeScreen(
                 onClick = { onNavigate(AppDestination.MedicalExams.route(familyId, childId)) },
             ),
             HealthCard(
-                title = "App Salute",
-                subtitle = "Passi, cuore, pressione, O₂",
+                title = context.getString(R.string.health_app),
+                subtitle = context.getString(R.string.health_app_sub),
                 icon = Icons.Default.MonitorHeart,
                 tint = Color(0xFFFF5C7A),
                 onClick = { onNavigate(AppDestination.HealthConnectApp.route(familyId, childId)) },
             ),
             HealthCard(
-                title = "Scheda Medica",
-                subtitle = "Allergie, pediatra",
+                title = context.getString(R.string.health_medical_card),
+                subtitle = context.getString(R.string.health_medical_card_sub),
                 icon = Icons.Default.Description,
                 tint = Color(0xFF66BFA6),
                 onClick = { onNavigate(AppDestination.MedicalRecord.route(familyId, childId)) },
             ),
             HealthCard(
-                title = "Cartella clinica",
-                subtitle = "Riepilogo ed esporta PDF",
+                title = context.getString(R.string.health_clinical_record),
+                subtitle = context.getString(R.string.health_clinical_record_sub),
                 icon = Icons.Default.Folder,
                 tint = Color(0xFF738FE6),
                 onClick = { onNavigate(AppDestination.ClinicalRecord.route(familyId, childId)) },
             ),
             HealthCard(
-                title = "Storico Salute",
+                title = context.getString(R.string.health_history),
                 subtitle = when (state.timelineEventCount) {
                     1 -> "1 evento"
                     else -> "${state.timelineEventCount} eventi"
@@ -179,13 +183,13 @@ fun HealthHomeScreen(
             ) {
                 KidBoxHeaderCircleButton(
                     icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                    contentDescription = "Indietro",
+                    contentDescription = stringResource(R.string.health_back),
                     onClick = onBack,
                 )
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                "Salute",
+                stringResource(R.string.health_title),
                 fontWeight = FontWeight.Bold,
                 fontSize = 34.sp,
                 color = kb.title,
@@ -206,12 +210,12 @@ fun HealthHomeScreen(
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(
-                        state.subjectName.ifBlank { "Profilo" },
+                        state.subjectName.ifBlank { stringResource(R.string.health_profile) },
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp,
                         color = kb.title,
                     )
-                    Text("Diario di salute", fontSize = 14.sp, color = kb.subtitle)
+                    Text(stringResource(R.string.health_diary), fontSize = 14.sp, color = kb.subtitle)
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -251,7 +255,7 @@ fun HealthHomeScreen(
                 subjectName = state.subjectName,
                 isEnabled = askEnabled,
                 onTap = {
-                    val subjectLabel = state.subjectName.ifBlank { "Profilo" }
+                    val subjectLabel = state.subjectName.ifBlank { context.getString(R.string.health_profile) }
                     onNavigate(
                         AppDestination.HealthAIChat.routeWithContext(
                             familyId = familyId,

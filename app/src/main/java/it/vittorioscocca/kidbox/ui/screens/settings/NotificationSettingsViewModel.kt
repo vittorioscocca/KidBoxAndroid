@@ -1,13 +1,17 @@
 package it.vittorioscocca.kidbox.ui.screens.settings
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.notification.PushNotificationManager
 import it.vittorioscocca.kidbox.data.notification.PushNotificationManager.PreferenceKeys
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.wallet.WalletReminderPrefs
 import it.vittorioscocca.kidbox.notifications.WalletReminderScheduler
+import it.vittorioscocca.kidbox.notifications.nudge.NudgeEngine
+import it.vittorioscocca.kidbox.notifications.nudge.NudgeState
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,15 +20,17 @@ import kotlinx.coroutines.launch
 
 data class NotificationSettingsUiState(
     val isLoading: Boolean = true,
-    val notifyOnNewDocs: Boolean = false,
+    val notifyOnNewDocs: Boolean = true,
     val notifyOnNewMessages: Boolean = true,
-    val notifyOnLocationSharing: Boolean = false,
+    val notifyOnLocationSharing: Boolean = true,
     val notifyOnTodoAssigned: Boolean = true,
     val notifyOnNewGroceryItem: Boolean = true,
     val notifyOnNewNote: Boolean = true,
     val notifyOnNewCalendarEvent: Boolean = true,
     val notifyOnNewExpense: Boolean = true,
     val notifyOnWalletReminder: Boolean = true,
+    /** Suggerimenti su aree mai usate. Locale, indipendente dalle push. */
+    val nudgesEnabled: Boolean = true,
     val message: String? = null,
 )
 
@@ -34,6 +40,8 @@ class NotificationSettingsViewModel @Inject constructor(
     private val walletReminderPrefs: WalletReminderPrefs,
     private val familyDao: KBFamilyDao,
     private val walletReminderScheduler: WalletReminderScheduler,
+    @ApplicationContext private val appContext: Context,
+    private val nudgeEngine: NudgeEngine,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(NotificationSettingsUiState())
     val uiState: StateFlow<NotificationSettingsUiState> = _uiState.asStateFlow()
@@ -44,9 +52,10 @@ class NotificationSettingsViewModel @Inject constructor(
                 .onSuccess { prefs ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        notifyOnNewDocs = prefs[PreferenceKeys.NOTIFY_ON_NEW_DOCS] ?: false,
+                        nudgesEnabled = !NudgeState.isOptedOut(appContext),
+                        notifyOnNewDocs = prefs[PreferenceKeys.NOTIFY_ON_NEW_DOCS] ?: true,
                         notifyOnNewMessages = prefs[PreferenceKeys.NOTIFY_ON_NEW_MESSAGES] ?: true,
-                        notifyOnLocationSharing = prefs[PreferenceKeys.NOTIFY_ON_LOCATION_SHARING] ?: false,
+                        notifyOnLocationSharing = prefs[PreferenceKeys.NOTIFY_ON_LOCATION_SHARING] ?: true,
                         notifyOnTodoAssigned = prefs[PreferenceKeys.NOTIFY_ON_TODO_ASSIGNED] ?: true,
                         notifyOnNewGroceryItem = prefs[PreferenceKeys.NOTIFY_ON_NEW_GROCERY_ITEM] ?: true,
                         notifyOnNewNote = prefs[PreferenceKeys.NOTIFY_ON_NEW_NOTE] ?: true,
@@ -88,6 +97,18 @@ class NotificationSettingsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(message = err.message ?: "Errore salvataggio preferenze")
             }
         }
+    }
+
+    /**
+     * Suggerimenti in-app. Vive solo in locale: non è una preferenza di
+     * notifica lato server come le altre di questa schermata, perché i nudge
+     * non partono dal server. Spegnendolo la coda viene svuotata subito, senza
+     * aspettare il prossimo foreground.
+     */
+    fun setNudgesEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(nudgesEnabled = enabled)
+        NudgeState.setOptedOut(appContext, !enabled)
+        viewModelScope.launch { runCatching { nudgeEngine.refresh() } }
     }
 
     fun clearMessage() {

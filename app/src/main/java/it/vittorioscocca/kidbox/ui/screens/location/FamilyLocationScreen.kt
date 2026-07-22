@@ -1,10 +1,9 @@
 package it.vittorioscocca.kidbox.ui.screens.location
 
+import androidx.compose.ui.res.stringResource
 import android.Manifest
-import android.graphics.Color as AndroidColor
 import android.os.Build
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -70,7 +69,7 @@ import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
-import androidx.core.view.WindowCompat
+import it.vittorioscocca.kidbox.ui.EdgeToEdgeController
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
@@ -90,6 +89,7 @@ import kotlinx.coroutines.launch
 import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
+import it.vittorioscocca.kidbox.util.KBLocale
 
 @Composable
 fun FamilyLocationScreen(
@@ -100,7 +100,6 @@ fun FamilyLocationScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val window = (context as? ComponentActivity)?.window
     val isDarkTheme = isSystemInDarkTheme()
     val darkMapStyle = remember(isDarkTheme, context) {
         if (!isDarkTheme) {
@@ -114,24 +113,15 @@ fun FamilyLocationScreen(
     val myUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
     val scope = rememberCoroutineScope()
 
-    // Mappa a tutto schermo sotto status/navigation bar (ripristina uscendo dalla schermata).
-    DisposableEffect(window, isDarkTheme) {
-        if (window == null) {
-            onDispose { }
-        } else {
-            val prevStatusColor = window.statusBarColor
-            val prevNavColor = window.navigationBarColor
-            WindowCompat.setDecorFitsSystemWindows(window, false)
-            window.statusBarColor = AndroidColor.TRANSPARENT
-            window.navigationBarColor = AndroidColor.TRANSPARENT
-            onDispose {
-                WindowCompat.setDecorFitsSystemWindows(window, true)
-                val restored = if (isDarkTheme) 0xFF1C1C1E.toInt() else 0xFFF5F3EE.toInt()
-                window.statusBarColor = prevStatusColor.takeIf { it != AndroidColor.TRANSPARENT } ?: restored
-                window.navigationBarColor = prevNavColor.takeIf { it != AndroidColor.TRANSPARENT } ?: restored
-            }
-        }
-    }
+    // Mappa a tutto schermo, sotto le barre di sistema.
+    //
+    // Non si tocca più la finestra a mano: con l'edge-to-edge imposto, il
+    // ripristino all'uscita non riportava le cose com'erano e lasciava due
+    // fasce su TUTTE le schermate visitate dopo la mappa. Qui si dichiara solo
+    // l'intenzione; a rispettarla è la radice, che è l'unica a decidere il
+    // padding. Il contatore si azzera da sé quando la schermata esce di
+    // composizione, anche uscendo con il gesto indietro.
+    EdgeToEdgeController.RequestFullBleed()
     var showShareOptions by remember { mutableStateOf(false) }
     var showTemporaryDialog by remember { mutableStateOf(false) }
     var temporaryHours by remember { mutableIntStateOf(2) }
@@ -172,7 +162,7 @@ fun FamilyLocationScreen(
             }
         } else {
             requestLocationForSharing = false
-            Toast.makeText(context, "Permesso posizione necessario", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, context.getString(R.string.location_permission_required_toast), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -286,7 +276,7 @@ fun FamilyLocationScreen(
         }
 
         Text(
-            text = "Posizione",
+            text = stringResource(R.string.location_title),
             modifier = Modifier
                 .statusBarsPadding()
                 .align(Alignment.TopCenter)
@@ -314,7 +304,7 @@ fun FamilyLocationScreen(
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Default.Place,
-                        contentDescription = "Zone di arrivo",
+                        contentDescription = stringResource(R.string.location_geofences_content_description),
                         tint = Color(0xFFFF6B00),
                     )
                 }
@@ -339,7 +329,7 @@ fun FamilyLocationScreen(
                             modifier = Modifier.size(16.dp),
                         )
                         Text(
-                            text = "Seguo ${currentFollowed.name}",
+                            text = stringResource(R.string.location_following_user, currentFollowed.name),
                             fontSize = 13.sp,
                             color = Color.Black,
                             fontWeight = FontWeight.Medium,
@@ -606,13 +596,13 @@ private fun LocationBottomCard(
     val chevronColor = if (isDarkTheme) Color(0xFFB7C0CD) else Color.Gray
 
     val myStatusText = when (state.myMode) {
-        LocationShareMode.REALTIME -> "Stai condividendo la tua posizione"
+        LocationShareMode.REALTIME -> stringResource(R.string.location_sharing_realtime_status)
         LocationShareMode.TEMPORARY -> {
             val expires = state.myExpiresAtEpochMillis
             if (expires != null) {
-                "Stai condividendo temporaneamente fino alle ${formatHour(expires)}"
+                stringResource(R.string.location_sharing_temporary_until, formatHour(expires))
             } else {
-                "Stai condividendo temporaneamente"
+                stringResource(R.string.location_sharing_temporary_status)
             }
         }
         null -> null
@@ -632,7 +622,7 @@ private fun LocationBottomCard(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "Io",
+                    text = stringResource(R.string.location_my_section_title),
                     fontSize = 34.sp,
                     lineHeight = 34.sp,
                     fontWeight = FontWeight.ExtraBold,
@@ -640,7 +630,7 @@ private fun LocationBottomCard(
                 )
                 if (!state.isSharing) {
                     Text(
-                        text = "Nessuna posizione condivisa",
+                        text = stringResource(R.string.location_no_location_shared),
                         color = dangerColor,
                         fontSize = 22.sp,
                         lineHeight = 24.sp,
@@ -691,7 +681,7 @@ private fun LocationBottomCard(
                             }
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "La mia posizione",
+                                text = stringResource(R.string.location_my_location_label),
                                 color = MaterialTheme.kidBoxColors.title,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 19.sp,
@@ -710,7 +700,7 @@ private fun LocationBottomCard(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                text = "Condividi la mia posizione",
+                                text = stringResource(R.string.location_share_my_location_label),
                                 color = MaterialTheme.kidBoxColors.title,
                                 fontSize = 18.sp,
                                 lineHeight = 20.sp,
@@ -739,9 +729,9 @@ private fun LocationBottomCard(
                         }
 
                         Row(modifier = Modifier.fillMaxWidth()) {
-                            Text("Condivisa da", color = tertiaryTextColor, fontSize = 11.sp)
+                            Text(stringResource(R.string.location_shared_from_label), color = tertiaryTextColor, fontSize = 11.sp)
                             Spacer(modifier = Modifier.weight(1f))
-                            Text("Questo Android", color = tertiaryTextColor, fontSize = 11.sp)
+                            Text(stringResource(R.string.location_this_android), color = tertiaryTextColor, fontSize = 11.sp)
                         }
                     }
                 }
@@ -784,7 +774,7 @@ private fun ForegroundLocationDisclosureOverlay(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    text = "KidBox usa la tua posizione",
+                    text = stringResource(R.string.location_foreground_disclosure_title),
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
@@ -792,21 +782,13 @@ private fun ForegroundLocationDisclosureOverlay(
                     textAlign = TextAlign.Center,
                 )
                 Text(
-                    text = "KidBox raccoglie i dati di posizione del tuo dispositivo per " +
-                        "mostrarti sulla mappa della famiglia e per condividere la tua " +
-                        "posizione con i membri della tua famiglia che scegli tu.\n\n" +
-                        "La posizione viene raccolta solo quando attivi la condivisione e " +
-                        "viene usata esclusivamente per questa funzione: non la vendiamo e " +
-                        "non la usiamo per pubblicità. Puoi interrompere la condivisione in " +
-                        "qualsiasi momento dall'app.\n\n" +
-                        "Nella schermata successiva Android ti chiederà di consentire " +
-                        "l'accesso alla posizione.",
+                    text = stringResource(R.string.location_foreground_disclosure_body),
                     fontSize = 14.sp,
                     color = bodyColor,
                     lineHeight = 20.sp,
                 )
-                ShareActionButton(label = "Continua", onClick = onAccept, isDarkTheme = isDarkTheme)
-                ShareActionButton(label = "No, grazie", onClick = onDecline, isDarkTheme = isDarkTheme)
+                ShareActionButton(label = stringResource(R.string.location_continue_button), onClick = onAccept, isDarkTheme = isDarkTheme)
+                ShareActionButton(label = stringResource(R.string.location_no_thanks_button), onClick = onDecline, isDarkTheme = isDarkTheme)
             }
         }
     }
@@ -846,7 +828,7 @@ private fun BackgroundLocationDisclosureOverlay(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    text = "Accesso alla posizione in background",
+                    text = stringResource(R.string.location_background_disclosure_title),
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
@@ -854,21 +836,13 @@ private fun BackgroundLocationDisclosureOverlay(
                     textAlign = TextAlign.Center,
                 )
                 Text(
-                    text = "Per condividere la tua posizione con la tua famiglia e per le " +
-                        "notifiche delle zone (geofence) di arrivo/partenza, KidBox ha bisogno " +
-                        "di accedere alla tua posizione anche quando l'app è chiusa o non in uso " +
-                        "(in background).\n\n" +
-                        "La posizione viene usata solo per mostrarla ai membri della tua famiglia " +
-                        "e per le zone che configuri. Puoi interrompere la condivisione in " +
-                        "qualsiasi momento dall'app.\n\n" +
-                        "Nella schermata successiva seleziona \"Consenti sempre\" per attivare " +
-                        "questa funzione.",
+                    text = stringResource(R.string.location_background_disclosure_body),
                     fontSize = 14.sp,
                     color = bodyColor,
                     lineHeight = 20.sp,
                 )
-                ShareActionButton(label = "Accetto", onClick = onAccept, isDarkTheme = isDarkTheme)
-                ShareActionButton(label = "No, grazie", onClick = onDecline, isDarkTheme = isDarkTheme)
+                ShareActionButton(label = stringResource(R.string.location_accept_button), onClick = onAccept, isDarkTheme = isDarkTheme)
+                ShareActionButton(label = stringResource(R.string.location_no_thanks_button), onClick = onDecline, isDarkTheme = isDarkTheme)
             }
         }
     }
@@ -908,15 +882,15 @@ private fun ShareModeOverlay(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
-                    text = "Condividi la tua posizione",
+                    text = stringResource(R.string.location_share_mode_title),
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Medium,
                     color = if (isDarkTheme) Color(0xFFEAF0F7) else Color.Black,
                 )
-                ShareActionButton(label = "Tempo reale", onClick = onRealtime, isDarkTheme = isDarkTheme)
-                ShareActionButton(label = "Temporaneamente", onClick = onTemporary, isDarkTheme = isDarkTheme)
-                ShareActionButton(label = "Annulla", onClick = onDismiss, isDarkTheme = isDarkTheme)
+                ShareActionButton(label = stringResource(R.string.location_realtime_option), onClick = onRealtime, isDarkTheme = isDarkTheme)
+                ShareActionButton(label = stringResource(R.string.location_temporary_option), onClick = onTemporary, isDarkTheme = isDarkTheme)
+                ShareActionButton(label = stringResource(R.string.location_cancel_button), onClick = onDismiss, isDarkTheme = isDarkTheme)
             }
         }
     }
@@ -958,7 +932,7 @@ private fun TemporaryDurationOverlay(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 Text(
-                    text = "Condividi temporaneamente",
+                    text = stringResource(R.string.location_temporary_share_title),
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 34.sp,
                     lineHeight = 36.sp,
@@ -984,7 +958,7 @@ private fun TemporaryDurationOverlay(
                             },
                         ) {
                             Text(
-                                text = "$hours ore",
+                                text = stringResource(R.string.location_hours_format, hours),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 8.dp),
@@ -1008,14 +982,14 @@ private fun TemporaryDurationOverlay(
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 ) {
                     Text(
-                        text = "Conferma",
+                        text = stringResource(R.string.location_confirm_button),
                         modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
                         color = Color.White,
                         fontSize = 22.sp,
                     )
                 }
                 Text(
-                    text = "Annulla",
+                    text = stringResource(R.string.location_cancel_button),
                     modifier = Modifier
                         .align(Alignment.CenterHorizontally)
                         .clickable(onClick = onDismiss),
@@ -1052,12 +1026,13 @@ private fun ShareActionButton(
     }
 }
 
+@Composable
 private fun KBSharedLocationEntity.statusSnippet(): String {
     if (modeRaw == LocationShareMode.TEMPORARY.raw && expiresAtEpochMillis != null) {
         return "Temporaneamente fino alle ${formatHour(expiresAtEpochMillis)}"
     }
-    return "Tempo reale"
+    return stringResource(R.string.location_realtime_option)
 }
 
 private fun formatHour(epochMillis: Long): String =
-    SimpleDateFormat("HH:mm", Locale.ITALY).format(Date(epochMillis))
+    SimpleDateFormat("HH:mm", KBLocale.current()).format(Date(epochMillis))

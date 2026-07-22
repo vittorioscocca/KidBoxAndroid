@@ -99,6 +99,8 @@ import it.vittorioscocca.kidbox.ui.screens.settings.QRScannerView
 import java.util.Locale
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private val BackgroundBeige = Color(0xFFF2F0EB)
 private val OrangeAccent = Color(0xFFFF6B00)
@@ -120,14 +122,15 @@ private data class IntroSlide(
     val subtitle: String,
 )
 
-private val introSlides = listOf(
+@Composable
+private fun introslides() = listOf(
     IntroSlide(
         icon = Icons.Filled.Favorite,
         iconTint = Color(0xFFFFBF40),
         accent = OrangeAccent,
         glow = OrangeAccent.copy(alpha = 0.35f),
         title = "La tua famiglia,\nin un'unica app.",
-        subtitle = "Tutto quello che riguarda i tuoi figli — organizzato, condiviso e sempre a portata di mano.",
+        subtitle = stringResource(R.string.onboarding_slide1),
     ),
     IntroSlide(
         icon = Icons.Filled.PhotoLibrary,
@@ -135,7 +138,7 @@ private val introSlides = listOf(
         accent = PurpleAccent,
         glow = PurpleAccent.copy(alpha = 0.35f),
         title = "Ricordi condivisi\ncon il tuo partner.",
-        subtitle = "Foto, video e momenti speciali in una galleria privata, cifrata e sincronizzata in tempo reale.",
+        subtitle = stringResource(R.string.onboarding_slide2),
     ),
     IntroSlide(
         icon = Icons.Filled.MedicalServices,
@@ -143,7 +146,7 @@ private val introSlides = listOf(
         accent = GreenAccent,
         glow = GreenAccent.copy(alpha = 0.35f),
         title = "Salute, spese\ne molto altro.",
-        subtitle = "Visite mediche, vaccini, spese di famiglia e lista della spesa. Tutto aggiornato tra voi due.",
+        subtitle = stringResource(R.string.onboarding_slide3),
     ),
 )
 
@@ -188,7 +191,7 @@ fun OnboardingScreen(
                 userScrollEnabled = false,
             ) { page ->
                 when {
-                    page in 0..2 -> IntroPageContent(slide = introSlides[page])
+                    page in 0..2 -> IntroPageContent(slide = introslides()[page])
                     page == 3 -> FamilyPathPickerPageContent(
                         selected = familyPath,
                         onSelect = { familyPath = it },
@@ -242,7 +245,7 @@ fun OnboardingScreen(
                 5 -> createdFamilyId != null
                 else -> true
             }
-            val ctaLabel = if (currentPage == totalPages - 1) "Inizia" else "Continua"
+            val ctaLabel = if (currentPage == totalPages - 1) stringResource(R.string.onboarding_start) else stringResource(R.string.travel_continue)
 
             if (isJoinPage) {
                 Spacer(
@@ -486,14 +489,14 @@ private fun CreateFamilyPageContent(
         }
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            "Crea la tua famiglia",
+            stringResource(R.string.onboarding_create_family),
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
             color = BlackText,
             textAlign = TextAlign.Center,
         )
         Text(
-            "Dai un nome alla famiglia e aggiungi il primo figlio. Potrai modificare tutto in seguito.",
+            stringResource(R.string.onboarding_create_family_hint),
             fontSize = 15.sp,
             color = GraySubtitle,
             textAlign = TextAlign.Center,
@@ -502,7 +505,7 @@ private fun CreateFamilyPageContent(
         )
         Spacer(modifier = Modifier.height(12.dp))
 
-        FormFieldLabel("Nome famiglia")
+        FormFieldLabel(stringResource(R.string.onboarding_family_name))
         OutlinedTextField(
             value = familyName,
             onValueChange = {
@@ -512,7 +515,7 @@ private fun CreateFamilyPageContent(
             modifier = Modifier.fillMaxWidth(),
             enabled = !familyCreated,
             singleLine = true,
-            placeholder = { Text("Es. Famiglia Rossi", color = GrayCaption) },
+            placeholder = { Text(stringResource(R.string.onboarding_family_hint), color = GrayCaption) },
             leadingIcon = {
                 Text("👨‍👩‍👧", fontSize = 20.sp)
             },
@@ -526,7 +529,7 @@ private fun CreateFamilyPageContent(
         )
         Spacer(modifier = Modifier.height(12.dp))
 
-        FormFieldLabel("Primo figlio")
+        FormFieldLabel(stringResource(R.string.onboarding_first_child))
         OutlinedTextField(
             value = childName,
             onValueChange = {
@@ -536,7 +539,7 @@ private fun CreateFamilyPageContent(
             modifier = Modifier.fillMaxWidth(),
             enabled = !familyCreated,
             singleLine = true,
-            placeholder = { Text("Nome del bambino/a", color = GrayCaption) },
+            placeholder = { Text(stringResource(R.string.onboarding_child_name), color = GrayCaption) },
             leadingIcon = {
                 Text("🚶", fontSize = 20.sp)
             },
@@ -569,7 +572,7 @@ private fun CreateFamilyPageContent(
             Spacer(modifier = Modifier.width(10.dp))
             Text(
                 text = birthMillis?.let { formatBirthLabel(it) }
-                    ?: "Data di nascita (opzionale)",
+                    ?: stringResource(R.string.onboarding_birthdate_optional),
                 color = if (birthMillis != null) BlackText else GrayCaption,
                 fontSize = 16.sp,
                 modifier = Modifier.weight(1f),
@@ -594,7 +597,7 @@ private fun CreateFamilyPageContent(
                     ) { Text("OK") }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showDatePicker = false }) { Text("Annulla") }
+                    TextButton(onClick = { showDatePicker = false }) { Text(stringResource(R.string.travel_cancel)) }
                 },
             ) {
                 DatePicker(state = datePickerState)
@@ -617,7 +620,7 @@ private fun CreateFamilyPageContent(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    "Famiglia creata! Continua per invitare il partner.",
+                    stringResource(R.string.onboarding_family_created),
                     color = SuccessGreen,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
@@ -647,7 +650,7 @@ private fun CreateFamilyPageContent(
                         strokeWidth = 2.dp,
                     )
                 } else {
-                    Text("Crea famiglia", fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.onboarding_create), fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -663,7 +666,7 @@ private fun CreateFamilyPageContent(
         }
 
         Text(
-            "Potrai creare la famiglia anche dopo da Impostazioni",
+            stringResource(R.string.onboarding_later_hint),
             fontSize = 12.sp,
             color = GrayCaption.copy(alpha = 0.85f),
             textAlign = TextAlign.Center,
@@ -730,14 +733,14 @@ private fun InvitePartnerPageContent(familyId: String) {
         }
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            "Aggiungi il tuo partner",
+            stringResource(R.string.onboarding_add_partner),
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
             color = BlackText,
             textAlign = TextAlign.Center,
         )
         Text(
-            "Fallo scansionare al tuo partner per unirsi alla famiglia — riceverà tutto automaticamente.",
+            stringResource(R.string.onboarding_scan_hint),
             fontSize = 17.sp,
             color = GraySubtitle,
             textAlign = TextAlign.Center,
@@ -767,7 +770,7 @@ private fun InvitePartnerPageContent(familyId: String) {
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         CircularProgressIndicator(color = OrangeAccent)
-                        Text("Generazione QR…", color = GraySubtitle, fontSize = 14.sp)
+                        Text(stringResource(R.string.onboarding_generating_qr), color = GraySubtitle, fontSize = 14.sp)
                     }
                 }
                 qrPayload != null -> {
@@ -782,7 +785,7 @@ private fun InvitePartnerPageContent(familyId: String) {
                             payload = qrPayload.orEmpty(),
                             modifier = Modifier.size(156.dp),
                         )
-                        Text("Valido 24 ore", fontSize = 13.sp, color = GrayCaption)
+                        Text(stringResource(R.string.onboarding_valid_24h), fontSize = 13.sp, color = GrayCaption)
                     }
                 }
                 errorMessage != null -> {
@@ -806,7 +809,7 @@ private fun InvitePartnerPageContent(familyId: String) {
                             textAlign = TextAlign.Center,
                         )
                         TextButton(onClick = viewModel::generateInviteCode) {
-                            Text("Riprova", color = OrangeAccent)
+                            Text(stringResource(R.string.onboarding_retry), color = OrangeAccent)
                         }
                     }
                 }
@@ -827,14 +830,14 @@ private fun InvitePartnerPageContent(familyId: String) {
                     containerColor = OrangeAccent.copy(alpha = 0.10f),
                     contentColor = OrangeAccent,
                     icon = Icons.Filled.Share,
-                    label = "Condividi",
+                    label = stringResource(R.string.onboarding_share),
                     onClick = {
                         val shareText = "KidBox — codice invito: ${code.orEmpty()}"
                         val send = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
                             putExtra(Intent.EXTRA_TEXT, shareText)
                         }
-                        context.startActivity(Intent.createChooser(send, "Condividi"))
+                        context.startActivity(Intent.createChooser(send, context.getString(R.string.onboarding_share)))
                     },
                 )
                 OutlinedSoftButton(
@@ -842,7 +845,7 @@ private fun InvitePartnerPageContent(familyId: String) {
                     containerColor = GraySubtitle.copy(alpha = 0.08f),
                     contentColor = if (didCopy) SuccessGreen else GraySubtitle,
                     icon = if (didCopy) Icons.Filled.CheckCircle else Icons.Filled.ContentCopy,
-                    label = if (didCopy) "Copiato!" else "Copia codice",
+                    label = if (didCopy) stringResource(R.string.onboarding_copied) else stringResource(R.string.onboarding_copy_code),
                     onClick = {
                         val value = code.orEmpty()
                         if (value.isNotBlank()) {
@@ -864,7 +867,7 @@ private fun InvitePartnerPageContent(familyId: String) {
             }
         }
         Text(
-            "Puoi farlo anche dopo da Impostazioni → Invita partner",
+            stringResource(R.string.onboarding_invite_later),
             fontSize = 12.sp,
             color = GrayCaption,
             textAlign = TextAlign.Center,
@@ -981,7 +984,7 @@ private fun FamilyPathPickerPageContent(
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            "Come vuoi iniziare?",
+            stringResource(R.string.onboarding_how_start),
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
             color = BlackText,
@@ -989,7 +992,7 @@ private fun FamilyPathPickerPageContent(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            "Scegli se creare una nuova famiglia o unirti a una esistente.",
+            stringResource(R.string.onboarding_choose_hint),
             fontSize = 15.sp,
             color = GraySubtitle,
             textAlign = TextAlign.Center,
@@ -1003,8 +1006,8 @@ private fun FamilyPathPickerPageContent(
             isSelected = selected == FamilyPath.Create,
             icon = Icons.Filled.Home,
             accent = OrangeAccent,
-            title = "Crea la tua famiglia",
-            subtitle = "Sarai il creatore e potrai invitare il tuo partner.",
+            title = stringResource(R.string.onboarding_create_family),
+            subtitle = stringResource(R.string.onboarding_creator_hint),
             onSelect = onSelect,
         )
         Spacer(modifier = Modifier.height(12.dp))
@@ -1013,8 +1016,8 @@ private fun FamilyPathPickerPageContent(
             isSelected = selected == FamilyPath.Join,
             icon = Icons.Filled.QrCodeScanner,
             accent = PurpleAccent,
-            title = "Entra in una famiglia",
-            subtitle = "Hai un codice QR o un codice testuale? Usalo per unirti.",
+            title = stringResource(R.string.onboarding_join_family),
+            subtitle = stringResource(R.string.onboarding_join_hint),
             onSelect = onSelect,
         )
         Spacer(modifier = Modifier.height(24.dp))
@@ -1126,7 +1129,7 @@ private fun JoinFamilyPageContent(
         }
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            "Entra nella famiglia",
+            stringResource(R.string.onboarding_enter_family),
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
             color = BlackText,
@@ -1247,7 +1250,7 @@ private fun JoinFamilyPageContent(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    "Sei entrato nella famiglia!",
+                    stringResource(R.string.onboarding_joined),
                     color = SuccessGreen,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,

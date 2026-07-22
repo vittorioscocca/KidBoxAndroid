@@ -17,13 +17,17 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Notifications
@@ -51,6 +55,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.content.pm.PackageInfoCompat
 import it.vittorioscocca.kidbox.data.local.AppTheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private data class SettingRowItem(
     val title: String,
@@ -64,6 +70,8 @@ private data class SettingRowItem(
 fun SettingsScreen(
     onBack: () -> Unit,
     onTheme: () -> Unit,
+    onLanguage: () -> Unit,
+    onUsageGuide: () -> Unit,
     onFamilySettings: () -> Unit,
     onMessageSettings: () -> Unit,
     onNotifications: () -> Unit,
@@ -89,62 +97,74 @@ fun SettingsScreen(
 
     val rows = listOf(
         SettingRowItem(
-            title = "Tema",
+            title = stringResource(R.string.settings_row_theme),
             subtitle = theme.toSubtitle(),
             icon = Icons.Filled.Contrast,
             showChevron = true,
             onClick = onTheme,
         ),
         SettingRowItem(
-            title = "Impostazioni famiglia",
+            title = stringResource(R.string.settings_row_language),
+            icon = Icons.Filled.Language,
+            showChevron = true,
+            onClick = onLanguage,
+        ),
+        SettingRowItem(
+            title = stringResource(R.string.settings_row_family),
             icon = Icons.Filled.Groups,
             showChevron = true,
             onClick = onFamilySettings,
         ),
         SettingRowItem(
-            title = "Messaggi",
+            title = stringResource(R.string.settings_row_messages),
             icon = Icons.AutoMirrored.Filled.Chat,
             showChevron = true,
             onClick = onMessageSettings,
         ),
         SettingRowItem(
-            title = "Assistente AI",
+            title = stringResource(R.string.settings_row_ai),
             icon = Icons.Filled.AutoAwesome,
             showChevron = true,
             onClick = onAiSettings,
         ),
         SettingRowItem(
-            title = "Notifiche",
+            title = stringResource(R.string.settings_row_notifications),
             icon = Icons.Filled.Notifications,
             showChevron = true,
             onClick = onNotifications,
         ),
         SettingRowItem(
-            title = "Privacy",
-            subtitle = "Report errori e log tecnici",
+            title = stringResource(R.string.settings_row_privacy),
+            subtitle = stringResource(R.string.settings_row_privacy_sub),
             icon = Icons.Filled.Shield,
             showChevron = true,
             onClick = onPrivacySettings,
         ),
         SettingRowItem(
-            title = "Utilizzo spazio",
+            title = stringResource(R.string.settings_row_storage),
             icon = Icons.Filled.Storage,
             showChevron = true,
             onClick = onStorageUsage,
         ),
         SettingRowItem(
-            title = "AutoFill",
-            subtitle = "Password, biometria, servizi di sistema",
+            title = stringResource(R.string.settings_row_autofill),
+            subtitle = stringResource(R.string.settings_row_autofill_sub),
             icon = Icons.Filled.Key,
             showChevron = true,
             onClick = onAutoFillSettings,
         ),
         SettingRowItem(
-            title = "Assistente & Supporto",
-            subtitle = "Domande, problemi e suggerimenti",
+            title = stringResource(R.string.settings_row_support),
+            subtitle = stringResource(R.string.settings_row_support_sub),
             icon = Icons.Filled.SupportAgent,
             showChevron = true,
             onClick = onSupportChat,
+        ),
+        SettingRowItem(
+            title = stringResource(R.string.settings_row_guide),
+            icon = Icons.AutoMirrored.Filled.MenuBook,
+            showChevron = true,
+            onClick = onUsageGuide,
         ),
     )
 
@@ -153,10 +173,11 @@ fun SettingsScreen(
             .fillMaxSize()
             .background(MaterialTheme.kidBoxColors.background)
             .statusBarsPadding()
+            .verticalScroll(rememberScrollState())
             .padding(top = 24.dp, start = 16.dp, end = 16.dp),
     ) {
         Text(
-            text = "Impostazioni",
+            text = stringResource(R.string.settings_title),
             fontSize = 34.sp,
             fontWeight = FontWeight.ExtraBold,
             color = MaterialTheme.kidBoxColors.title,
@@ -181,7 +202,7 @@ fun SettingsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(32.dp))
 
         Column(
             modifier = Modifier
@@ -207,10 +228,11 @@ fun SettingsScreen(
     }
 }
 
+@Composable
 private fun AppTheme.toSubtitle(): String = when (this) {
-    AppTheme.LIGHT -> "Chiaro"
-    AppTheme.DARK -> "Scuro"
-    AppTheme.SYSTEM -> "Sistema"
+    AppTheme.LIGHT -> stringResource(R.string.settings_theme_light)
+    AppTheme.DARK -> stringResource(R.string.settings_theme_dark)
+    AppTheme.SYSTEM -> stringResource(R.string.settings_theme_system)
 }
 
 @Composable

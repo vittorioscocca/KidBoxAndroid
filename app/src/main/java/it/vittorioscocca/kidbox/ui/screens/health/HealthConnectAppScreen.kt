@@ -54,6 +54,9 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun HealthConnectAppScreen(
@@ -74,7 +77,7 @@ fun HealthConnectAppScreen(
         } else {
             Toast.makeText(
                 context,
-                "Per importare i dati, consenti l'accesso a Health Connect.",
+                context.getString(R.string.health_hc_permission),
                 Toast.LENGTH_LONG,
             ).show()
         }
@@ -102,13 +105,13 @@ fun HealthConnectAppScreen(
         ) {
             KidBoxHeaderCircleButton(
                 icon = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Indietro",
+                contentDescription = stringResource(R.string.health_back),
                 onClick = onBack,
             )
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            "App Salute",
+            stringResource(R.string.health_app),
             fontSize = 32.sp,
             fontWeight = FontWeight.ExtraBold,
             color = kb.title,
@@ -116,7 +119,7 @@ fun HealthConnectAppScreen(
         )
         Spacer(Modifier.height(20.dp))
 
-        SectionLabel("Dati importati", kb.subtitle)
+        SectionLabel(stringResource(R.string.health_data_imported), kb.subtitle)
         Card(
             colors = CardDefaults.cardColors(containerColor = Color.White),
             shape = RoundedCornerShape(12.dp),
@@ -132,14 +135,14 @@ fun HealthConnectAppScreen(
                     }
                     snapshot != null -> {
                         Text(
-                            "Nessun dato cardiaco o di attività recente.",
+                            stringResource(R.string.health_no_recent_data),
                             fontSize = 15.sp,
                             color = kb.subtitle,
                         )
                     }
                     else -> {
                         Text(
-                            "Non ancora collegato a Health Connect.",
+                            stringResource(R.string.health_not_connected),
                             fontSize = 15.sp,
                             color = kb.subtitle,
                         )
@@ -149,7 +152,7 @@ fun HealthConnectAppScreen(
         }
 
         Spacer(Modifier.height(16.dp))
-        SectionLabel("Profilo da Salute", kb.subtitle)
+        SectionLabel(stringResource(R.string.health_profile_from_health), kb.subtitle)
         Card(
             colors = CardDefaults.cardColors(containerColor = Color.White),
             shape = RoundedCornerShape(12.dp),
@@ -164,7 +167,7 @@ fun HealthConnectAppScreen(
                 state.ageDescription?.let { Text("Età: $it", fontSize = 15.sp, color = kb.title) }
                 state.childWeightKg?.let { w ->
                     Text(
-                        String.format(Locale.ITALY, "Peso: %.1f kg", w),
+                        String.format(KBLocale.current(), "Peso: %.1f kg", w),
                         fontSize = 15.sp,
                         color = kb.title,
                     )
@@ -181,7 +184,7 @@ fun HealthConnectAppScreen(
                 if (!state.healthConnectAvailable) {
                     Toast.makeText(
                         context,
-                        "Installa l'app Salute di Google (Health Connect) dal Play Store.",
+                        context.getString(R.string.health_install_hc),
                         Toast.LENGTH_LONG,
                     ).show()
                     return@TextButton
@@ -197,14 +200,14 @@ fun HealthConnectAppScreen(
                     Spacer(Modifier.width(8.dp))
                 }
                 Text(
-                    if (state.snapshot == null) "Collega Health Connect" else "Aggiorna abbinamento",
+                    if (state.snapshot == null) stringResource(R.string.health_connect_hc) else stringResource(R.string.health_refresh_pairing),
                     color = Color(0xFF0A84FF),
                     fontSize = 17.sp,
                 )
             }
         }
         Text(
-            "Il peso viene salvato sul profilo; gruppo sanguigno ed età sono usati dalla Scheda Medica quando presenti.",
+            stringResource(R.string.health_weight_note),
             fontSize = 12.sp,
             color = kb.subtitle,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
@@ -222,8 +225,8 @@ private fun SectionLabel(text: String, kb: androidx.compose.ui.graphics.Color) {
 @Composable
 private fun HealthDetailedMetrics(snapshot: HealthImportSnapshot) {
     val kb = MaterialTheme.kidBoxColors
-    val timeFmt = remember { SimpleDateFormat("HH:mm", Locale.ITALY) }
-    val dayFmt = remember { SimpleDateFormat("d MMM yyyy", Locale.ITALY) }
+    val timeFmt = remember { SimpleDateFormat("HH:mm", KBLocale.current()) }
+    val dayFmt = remember { SimpleDateFormat("d MMM yyyy", KBLocale.current()) }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         snapshot.heartRateBpm?.let { bpm ->
@@ -231,7 +234,7 @@ private fun HealthDetailedMetrics(snapshot: HealthImportSnapshot) {
                 Icon(Icons.Default.Favorite, null, tint = Color(0xFFFF2D55), modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    String.format(Locale.ITALY, "Ultimo battito: %.0f bpm", bpm),
+                    String.format(KBLocale.current(), "Ultimo battito: %.0f bpm", bpm),
                     fontSize = 14.sp,
                     color = kb.title,
                 )
@@ -249,7 +252,7 @@ private fun HealthDetailedMetrics(snapshot: HealthImportSnapshot) {
                 Icon(Icons.Default.LocalFireDepartment, null, tint = Color(0xFFFF9500), modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    String.format(Locale.ITALY, "Energia attiva oggi: %.0f kcal", kcal),
+                    String.format(KBLocale.current(), "Energia attiva oggi: %.0f kcal", kcal),
                     fontSize = 14.sp,
                     color = kb.title,
                 )
@@ -257,11 +260,11 @@ private fun HealthDetailedMetrics(snapshot: HealthImportSnapshot) {
         }
 
         if (snapshot.recentHeartRates.isNotEmpty()) {
-            Text("Ultimi battiti", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = kb.title)
+            Text(stringResource(R.string.health_last_heartbeats), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = kb.title)
             snapshot.recentHeartRates.forEach { reading ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        String.format(Locale.ITALY, "%.0f bpm", reading.bpm),
+                        String.format(KBLocale.current(), "%.0f bpm", reading.bpm),
                         fontSize = 14.sp,
                         color = Color(0xFFFF2D55),
                     )
@@ -272,7 +275,7 @@ private fun HealthDetailedMetrics(snapshot: HealthImportSnapshot) {
         }
 
         if (snapshot.recentWorkouts.isNotEmpty() || snapshot.recentDailyActivity.isNotEmpty()) {
-            Text("Attività recenti", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = kb.title)
+            Text(stringResource(R.string.health_recent_activity), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = kb.title)
             snapshot.recentWorkouts.forEach { workout ->
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -284,7 +287,7 @@ private fun HealthDetailedMetrics(snapshot: HealthImportSnapshot) {
                         add(dayFmt.format(Date(workout.startedAtEpochMillis)))
                         workout.durationMinutes?.takeIf { it > 0 }?.let { add("$it min") }
                         workout.activeEnergyKcal?.takeIf { it > 0 }?.let {
-                            add(String.format(Locale.ITALY, "%.0f kcal", it))
+                            add(String.format(KBLocale.current(), "%.0f kcal", it))
                         }
                     }.joinToString(" · ")
                     Text(details, fontSize = 12.sp, color = kb.subtitle)
@@ -297,7 +300,7 @@ private fun HealthDetailedMetrics(snapshot: HealthImportSnapshot) {
                     val parts = buildList {
                         day.steps?.takeIf { it > 0 }?.let { add("$it passi") }
                         day.activeEnergyKcal?.takeIf { it > 0 }?.let {
-                            add(String.format(Locale.ITALY, "%.0f kcal", it))
+                            add(String.format(KBLocale.current(), "%.0f kcal", it))
                         }
                     }.joinToString(" · ")
                     if (parts.isNotBlank()) {
@@ -313,7 +316,7 @@ private fun HealthDetailedMetrics(snapshot: HealthImportSnapshot) {
                 Icon(Icons.Default.MonitorHeart, null, tint = kb.subtitle, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "Nessun ECG in Health Connect. Su Android l'ECG è disponibile principalmente tramite dispositivi compatibili sincronizzati con Salute.",
+                    stringResource(R.string.health_no_ecg),
                     fontSize = 12.sp,
                     color = kb.subtitle,
                 )

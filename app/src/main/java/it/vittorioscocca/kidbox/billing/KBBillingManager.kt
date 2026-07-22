@@ -15,6 +15,8 @@ import com.android.billingclient.api.AcknowledgePurchaseResponseListener
 import com.android.billingclient.api.PurchasesResponseListener
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
+import com.android.billingclient.api.QueryProductDetailsResult
+import it.vittorioscocca.kidbox.util.KBLog
 import com.android.billingclient.api.QueryPurchasesParams
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -269,17 +271,31 @@ class KBBillingManager @Inject constructor(
 
         billingClient.queryProductDetailsAsync(
             params,
+            // Billing 8: la callback non consegna più una `List<ProductDetails>`
+            // ma un `QueryProductDetailsResult`, che oltre ai prodotti trovati
+            // porta la lista di quelli NON trovati. È la ragione del cambio di
+            // firma, ed è informazione utile: un prodotto assente dallo store
+            // (id sbagliato, non pubblicato, paese non coperto) prima si
+            // manifestava solo come lista più corta del previsto.
             object : ProductDetailsResponseListener {
                 override fun onProductDetailsResponse(
                     result: BillingResult,
-                    detailsList: MutableList<ProductDetails>,
+                    productDetailsResult: QueryProductDetailsResult,
                 ) {
-                    if (result.responseCode == BillingClient.BillingResponseCode.OK) {
-                        _products.value = detailsList
-                    } else {
+                    if (result.responseCode != BillingClient.BillingResponseCode.OK) {
                         _purchaseError.value =
                             result.debugMessage.ifBlank { "Errore caricamento piani dallo store." }
+                        return
                     }
+                    val unfetched = productDetailsResult.unfetchedProductList
+                    if (unfetched.isNotEmpty()) {
+                        KBLog.app.warning(
+                            "Billing: prodotti non trovati nello store: " +
+                                unfetched.joinToString { it.productId },
+                            "Billing",
+                        )
+                    }
+                    _products.value = productDetailsResult.productDetailsList
                 }
             },
         )

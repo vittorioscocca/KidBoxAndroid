@@ -43,6 +43,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private val TravelAccent = Color(0xFFF2611A)
 
@@ -84,7 +86,7 @@ fun TravelDestinationDetailScreen(
 
     if (destination == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Destinazione non trovata", color = kb.subtitle)
+            Text(stringResource(R.string.travel_destination_not_found), color = kb.subtitle)
         }
         return
     }
@@ -97,9 +99,9 @@ fun TravelDestinationDetailScreen(
     }.joinToString("\n\n")
 
     val footerCaption = if (hasStructuredPreview) {
-        "Itinerario AI pronto: accetta per salvare il viaggio pianificato con giorni e tappe già impostati."
+        stringResource(R.string.travel_ai_ready)
     } else {
-        "Anteprima generata dall'AI in base al tuo profilo. Personalizza date, budget e viaggiatori nel passo successivo."
+        stringResource(R.string.travel_ai_preview_note)
     }
 
     Scaffold(
@@ -146,7 +148,7 @@ fun TravelDestinationDetailScreen(
                         )
                     } else {
                         Text(
-                            if (hasStructuredPreview) "Accetta viaggio ✓" else "Pianifica questo viaggio",
+                            if (hasStructuredPreview) stringResource(R.string.travel_accept_trip) else stringResource(R.string.travel_plan_this),
                             modifier = Modifier.padding(vertical = 8.dp),
                         )
                     }
@@ -160,7 +162,7 @@ fun TravelDestinationDetailScreen(
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isAccepting,
                     ) {
-                        Text("Personalizza date e viaggiatori", color = TravelAccent)
+                        Text(stringResource(R.string.travel_customize_dates), color = TravelAccent)
                     }
                 }
             }

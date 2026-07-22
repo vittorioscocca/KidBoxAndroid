@@ -1,15 +1,21 @@
 package it.vittorioscocca.kidbox
 
+import android.app.Activity
 import android.app.Application
+import android.os.Bundle
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.WorkManager
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.HiltAndroidApp
 import it.vittorioscocca.kidbox.data.location.GeofenceMonitorRestorer
+import it.vittorioscocca.kidbox.data.notification.PushNotificationManager
 import it.vittorioscocca.kidbox.notifications.KidBoxFirebaseMessagingService
+import it.vittorioscocca.kidbox.notifications.nudge.NudgeEngine
 import it.vittorioscocca.kidbox.util.CrashAnalyzer
 import it.vittorioscocca.kidbox.util.KBCrashHandler
 import it.vittorioscocca.kidbox.util.KBFileLogger
+import it.vittorioscocca.kidbox.util.KBLog
 import it.vittorioscocca.kidbox.util.KidBoxApplicationHolder
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsLifecycleObserver
 import javax.inject.Inject
@@ -27,6 +33,12 @@ class KidBoxApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var geofenceMonitorRestorer: GeofenceMonitorRestorer
 
+    @Inject
+    lateinit var pushNotificationManager: PushNotificationManager
+
+    @Inject
+    lateinit var nudgeEngine: NudgeEngine
+
     private val appInitScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
@@ -43,6 +55,80 @@ class KidBoxApplication : Application(), Configuration.Provider {
         }
         appInitScope.launch {
             runCatching { geofenceMonitorRestorer.restore() }
+        }
+        startFcmTokenOwnershipObserver()
+        registerActivityLifecycleCallbacks(NudgeForegroundObserver())
+    }
+
+    /**
+     * Ricalcola la coda dei nudge a ogni passaggio in foreground.
+     *
+     * Stessa tecnica di [KBAnalyticsLifecycleObserver] — conteggio delle
+     * Activity avviate — per lo stesso motivo: `lifecycle-process` non è tra le
+     * dipendenze, e il contatore 0→1 è immune alle rotazioni di schermo.
+     *
+     * Throttle di due minuti: la valutazione è tutta locale, ma rifarla a ogni
+     * rientro rapido è lavoro sprecato.
+     */
+    private inner class NudgeForegroundObserver : Application.ActivityLifecycleCallbacks {
+        private var startedActivities = 0
+        private var lastRunAt = 0L
+
+        override fun onActivityStarted(activity: Activity) {
+            if (startedActivities == 0) {
+                val now = System.currentTimeMillis()
+                if (now - lastRunAt >= THROTTLE_MS) {
+                    lastRunAt = now
+                    appInitScope.launch { runCatching { nudgeEngine.refresh() } }
+                }
+            }
+            startedActivities++
+        }
+
+        override fun onActivityStopped(activity: Activity) {
+            startedActivities = (startedActivities - 1).coerceAtLeast(0)
+        }
+
+        override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
+        override fun onActivityResumed(activity: Activity) = Unit
+        override fun onActivityPaused(activity: Activity) = Unit
+        override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
+        override fun onActivityDestroyed(activity: Activity) = Unit
+    }
+
+    private companion object {
+        const val THROTTLE_MS = 2 * 60 * 1000L
+    }
+
+    /**
+     * Ripersiste il token FCM a ogni sessione autenticata.
+     *
+     * Senza questo il token si salva solo in `onNewToken` e al toggle di una
+     * preferenza in Impostazioni. `onNewToken` scatta però *prima* del login al
+     * primo avvio: lì `uid` è null, il token viene scartato e non viene mai più
+     * ritentato, quindi il dispositivo resta invisibile al server per sempre.
+     *
+     * Il listener copre sia l'avvio con sessione già attiva sia il login.
+     * `persistFcmToken` fa `set(merge)` sul documento con id = token, quindi
+     * riscrivere lo stesso token è un no-op idempotente.
+     *
+     * Gemello di `startAuthStateObserver` su iOS — che in più cancella il token
+     * dell'utente precedente al cambio account. Qui quella pulizia manca
+     * ancora: token vecchi restano finché non falliscono l'invio e vengono
+     * potati lato server.
+     */
+    private fun startFcmTokenOwnershipObserver() {
+        FirebaseAuth.getInstance().addAuthStateListener { auth ->
+            if (auth.currentUser == null) return@addAuthStateListener
+            appInitScope.launch {
+                runCatching { pushNotificationManager.registerCurrentFcmToken() }
+                    .onFailure {
+                        KBLog.app.warning(
+                            "FCM token non persistito: ${it.message}",
+                            "PushToken",
+                        )
+                    }
+            }
         }
     }
 

@@ -39,6 +39,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.AppTheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private data class ThemeRow(
     val title: String,
@@ -55,9 +57,9 @@ fun ThemeScreen(
     val current by viewModel.theme.collectAsStateWithLifecycle()
 
     val rows = listOf(
-        ThemeRow("Chiaro", Icons.Filled.WbSunny, AppTheme.LIGHT),
-        ThemeRow("Scuro", Icons.Filled.DarkMode, AppTheme.DARK),
-        ThemeRow("Sistema", Icons.Filled.BrightnessAuto, AppTheme.SYSTEM),
+        ThemeRow(stringResource(R.string.settings_theme_light), Icons.Filled.WbSunny, AppTheme.LIGHT),
+        ThemeRow(stringResource(R.string.settings_theme_dark), Icons.Filled.DarkMode, AppTheme.DARK),
+        ThemeRow(stringResource(R.string.settings_theme_system), Icons.Filled.BrightnessAuto, AppTheme.SYSTEM),
     )
 
     Column(
@@ -68,7 +70,7 @@ fun ThemeScreen(
             .padding(top = 24.dp, start = 16.dp, end = 16.dp),
     ) {
         Text(
-            text = "Tema",
+            text = stringResource(R.string.settings_row_theme),
             fontSize = 34.sp,
             fontWeight = FontWeight.ExtraBold,
             color = MaterialTheme.kidBoxColors.title,

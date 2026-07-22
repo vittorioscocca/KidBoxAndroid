@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.dp
 import it.vittorioscocca.kidbox.util.CrashAnalyzer
 import it.vittorioscocca.kidbox.util.CrashReportPreferences
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 /**
  * Switch «Invia report errori automatici» (schermata Impostazioni → Privacy).
@@ -39,12 +41,12 @@ fun CrashReportSettingsRow(modifier: Modifier = Modifier) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Invia report errori automatici",
+                    text = stringResource(R.string.settings_crash_send_title),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
                 )
                 Text(
-                    text = "Nessun dato personale o familiare nei report.",
+                    text = stringResource(R.string.settings_crash_send_sub),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),

@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
 
 data class PasswordDetailUiState(
     val isLoading: Boolean = true,
@@ -183,7 +184,7 @@ private fun PasswordEntryEntity.toUiState(
         runCatching { cypher.decrypt(data, familyId, visibility, createdBy, uid) }.getOrNull()
     }.orEmpty()
     val strength = PasswordStrength.evaluate(password)
-    val dateFmt = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.ITALY)
+    val dateFmt = SimpleDateFormat("dd MMM yyyy, HH:mm", KBLocale.current())
     val advice = when (strength.level) {
         it.vittorioscocca.kidbox.feature.passwords.PasswordStrengthLevel.VERY_WEAK,
         it.vittorioscocca.kidbox.feature.passwords.PasswordStrengthLevel.WEAK,

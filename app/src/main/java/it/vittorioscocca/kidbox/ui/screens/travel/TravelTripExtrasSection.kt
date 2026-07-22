@@ -27,6 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private val ExtrasAccent = Color(0xFFF2611A)
 
@@ -46,9 +48,9 @@ fun TravelTripExtrasSection(
     Column(modifier, verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)) {
         TravelTripExtraCard(
             icon = Icons.Default.PhotoLibrary,
-            title = "Foto del viaggio",
+            title = stringResource(R.string.travel_photos),
             subtitle = if (photoCount == 0) {
-                "Apri l'album dedicato · le nuove foto si salvano qui"
+                stringResource(R.string.travel_photos_hint)
             } else {
                 "$photoCount foto nell'album del viaggio"
             },
@@ -56,13 +58,13 @@ fun TravelTripExtrasSection(
         )
         TravelTripExtraCard(
             icon = Icons.Default.EditNote,
-            title = "Note",
-            subtitle = if (noteHasContent) noteTitle else "Aggiungi idee, indirizzi e promemoria",
+            title = stringResource(R.string.travel_notes),
+            subtitle = if (noteHasContent) noteTitle else stringResource(R.string.travel_notes_hint),
             onClick = onNotesClick,
         )
         TravelTripExtraCard(
             icon = Icons.Default.Checklist,
-            title = "Todo",
+            title = stringResource(R.string.travel_todo),
             subtitle = if (openTodoCount == 0) {
                 "Lista «$todoListName»"
             } else {
@@ -72,8 +74,8 @@ fun TravelTripExtrasSection(
         )
         TravelTripExtraCard(
             icon = Icons.Default.AttachMoney,
-            title = "Spese",
-            subtitle = "Registra le spese del viaggio · categoria Viaggi",
+            title = stringResource(R.string.travel_expenses),
+            subtitle = stringResource(R.string.travel_expenses_hint),
             onClick = onExpensesClick,
         )
     }

@@ -23,7 +23,7 @@ data class GroceryListUiState(
     val toBuy: List<KBGroceryItemEntity> get() = items.filter { !it.isPurchased }
     val purchased: List<KBGroceryItemEntity> get() = items.filter { it.isPurchased }
     val groupedToBuy: Map<String, List<KBGroceryItemEntity>> get() = toBuy.groupBy {
-        it.category?.trim()?.takeIf { value -> value.isNotEmpty() } ?: "Altro"
+        it.category?.trim()?.takeIf { value -> value.isNotEmpty() } ?: GroceryCategory.OTHER.key
     }.toSortedMap()
 }
 

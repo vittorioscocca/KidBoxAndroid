@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import it.vittorioscocca.kidbox.util.KBLocale
 
 data class ExamAiChatUiState(
     val messages: List<AiMessage> = emptyList(),
@@ -58,7 +59,7 @@ class ExamAiChatViewModel @Inject constructor(
     private var messagesInSession: Int = 0
     private var dailyLimit: Int = 0
 
-    private val dateFmt = SimpleDateFormat("d MMM yyyy", Locale.ITALIAN)
+    private val dateFmt = SimpleDateFormat("d MMM yyyy", KBLocale.current())
     private val familyId: String = savedStateHandle["familyId"] ?: ""
     private val childId: String = savedStateHandle["childId"] ?: ""
     private val examId: String = savedStateHandle["examId"] ?: ""

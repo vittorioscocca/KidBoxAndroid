@@ -3,6 +3,7 @@ package it.vittorioscocca.kidbox.ui.screens.home
 import android.Manifest
 import android.graphics.BitmapFactory
 import android.net.Uri
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.util.fixBitmapOrientationFromBytes
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -67,6 +68,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -148,8 +150,7 @@ fun ProfileScreen(
 
     LocationDisclosureDialog(
         visible = showLocationDisclosure,
-        purpose = "KidBox raccoglie i dati di posizione del tuo dispositivo per ricavare " +
-            "il tuo indirizzo e compilare automaticamente il campo indirizzo del profilo.",
+        purpose = stringResource(R.string.home_profile_location_disclosure_purpose),
         onAccept = {
             showLocationDisclosure = false
             locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -169,19 +170,19 @@ fun ProfileScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    "Elimina account",
+                    stringResource(R.string.home_profile_delete_account_title),
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
                     color = MaterialTheme.kidBoxColors.title,
                 )
                 Text(
-                    "Per confermare scrivi ELIMINA. Questa azione elimina account e dati.",
+                    stringResource(R.string.home_profile_delete_account_confirm_hint),
                     color = kb.subtitle,
                 )
                 OutlinedTextField(
                     value = deleteConfirmText,
                     onValueChange = { deleteConfirmText = it },
-                    label = { Text("Digita ELIMINA") },
+                    label = { Text(stringResource(R.string.home_profile_delete_type_placeholder)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -194,7 +195,7 @@ fun ProfileScreen(
                     ),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    TextButton(onClick = { showDeleteSheet = false }) { Text("Annulla") }
+                    TextButton(onClick = { showDeleteSheet = false }) { Text(stringResource(R.string.home_profile_cancel)) }
                     Button(
                         onClick = { viewModel.deleteAccount(onLoggedOut) },
                         enabled = deleteConfirmText.trim().uppercase() == "ELIMINA" && !state.isDeleting,
@@ -203,7 +204,7 @@ fun ProfileScreen(
                         if (state.isDeleting) {
                             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                         } else {
-                            Text("Elimina")
+                            Text(stringResource(R.string.home_profile_delete_confirm))
                         }
                     }
                 }
@@ -214,17 +215,17 @@ fun ProfileScreen(
     if (showLogoutConfirm) {
         AlertDialog(
             onDismissRequest = { showLogoutConfirm = false },
-            title = { Text("Esci dall'account?") },
-            text = { Text("Verrai reindirizzato alla schermata di accesso.") },
+            title = { Text(stringResource(R.string.home_profile_logout_title)) },
+            text = { Text(stringResource(R.string.home_profile_logout_body)) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showLogoutConfirm = false
                         viewModel.logout(onLoggedOut)
                     },
-                ) { Text("Esci", color = Color(0xFFD32F2F)) }
+                ) { Text(stringResource(R.string.home_profile_logout_confirm), color = Color(0xFFD32F2F)) }
             },
-            dismissButton = { TextButton(onClick = { showLogoutConfirm = false }) { Text("Annulla") } },
+            dismissButton = { TextButton(onClick = { showLogoutConfirm = false }) { Text(stringResource(R.string.home_profile_cancel)) } },
         )
     }
 
@@ -267,7 +268,7 @@ fun ProfileScreen(
         }
 
         Text(
-            "Profilo",
+            stringResource(R.string.home_profile_title),
             style = MaterialTheme.typography.headlineLarge.copy(fontSize = 44.sp, lineHeight = 46.sp),
             fontWeight = FontWeight.ExtraBold,
             color = kb.title,
@@ -358,8 +359,8 @@ fun ProfileScreen(
                 }
 
                 HorizontalDivider(color = kb.divider)
-                ProfileInput("Nome", state.firstName, viewModel::setFirstName)
-                ProfileInput("Cognome", state.lastName, viewModel::setLastName)
+                ProfileInput(stringResource(R.string.home_profile_name_placeholder), state.firstName, viewModel::setFirstName)
+                ProfileInput(stringResource(R.string.home_profile_surname_placeholder), state.lastName, viewModel::setLastName)
 
                 if (state.isDirty) {
                     Button(
@@ -372,7 +373,7 @@ fun ProfileScreen(
                         if (state.isSaving) {
                             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
                         } else {
-                            Text("Salva modifiche", fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.home_profile_save_changes), fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -382,12 +383,12 @@ fun ProfileScreen(
         SectionCard(
             icon = Icons.Default.Home,
             iconColor = AccentOrange,
-            title = "INDIRIZZO FAMIGLIA",
+            title = stringResource(R.string.home_profile_address_section_title),
         ) {
             OutlinedTextField(
                 value = state.addressQuery,
                 onValueChange = viewModel::setAddressQuery,
-                placeholder = { Text("Cerca indirizzo…") },
+                placeholder = { Text(stringResource(R.string.home_profile_address_placeholder)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -436,17 +437,23 @@ fun ProfileScreen(
                 onClick = viewModel::requestCurrentLocation,
                 enabled = !state.isResolvingLocation,
             ) {
-                Text(if (state.isResolvingLocation) "Rilevamento in corso…" else "Usa la mia posizione attuale", color = AccentOrange)
+                Text(
+                    stringResource(
+                        if (state.isResolvingLocation) R.string.home_profile_use_current_location_loading
+                        else R.string.home_profile_use_current_location,
+                    ),
+                    color = AccentOrange,
+                )
             }
         }
 
-        SectionCard(icon = Icons.Default.Email, iconColor = Color(0xFF2F80ED), title = "ACCOUNT") {
-            InfoRow(Icons.Default.Email, Color(0xFF5EA8E2), "Email", state.email.ifBlank { "—" })
+        SectionCard(icon = Icons.Default.Email, iconColor = Color(0xFF2F80ED), title = stringResource(R.string.home_profile_account_section_title)) {
+            InfoRow(Icons.Default.Email, Color(0xFF5EA8E2), stringResource(R.string.home_profile_email_label), state.email.ifBlank { stringResource(R.string.home_profile_placeholder_dash) })
             HorizontalDivider(color = kb.divider)
-            InfoRow(Icons.Default.Update, Color(0xFF67B96D), "Ultimo accesso", "13 Apr 2026 at 9:17")
+            InfoRow(Icons.Default.Update, Color(0xFF67B96D), stringResource(R.string.home_profile_last_login_label), "13 Apr 2026 at 9:17")
         }
 
-        SectionCard(icon = Icons.Default.Star, iconColor = Color(0xFF3DA668), title = "ABBONAMENTO") {
+        SectionCard(icon = Icons.Default.Star, iconColor = Color(0xFF3DA668), title = stringResource(R.string.home_profile_subscription_section_title)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
@@ -467,7 +474,7 @@ fun ProfileScreen(
                         .clickable(onClick = onOpenPlans)
                         .padding(horizontal = 10.dp, vertical = 4.dp),
                 ) {
-                    Text("Upgrade", color = Color(0xFF2F80ED), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.home_profile_upgrade), color = Color(0xFF2F80ED), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
             val progress = (state.storageUsedBytes.toFloat() / state.storageTotalBytes.toFloat()).coerceIn(0f, 1f)
@@ -478,7 +485,11 @@ fun ProfileScreen(
                 trackColor = kb.divider,
             )
             Text(
-                "${state.storageUsedBytes.toStorageString()} di ${state.storageTotalBytes.toStorageString()}",
+                stringResource(
+                    R.string.home_profile_storage_used_of_total,
+                    state.storageUsedBytes.toStorageString(),
+                    state.storageTotalBytes.toStorageString(),
+                ),
                 fontSize = 12.sp,
                 color = kb.subtitle,
             )
@@ -492,7 +503,7 @@ fun ProfileScreen(
             ) {
                 Icon(Icons.Default.Home, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(10.dp))
-                Text("Gestisci spazio e piani", color = kb.title)
+                Text(stringResource(R.string.home_profile_manage_storage_plans), color = kb.title)
                 Spacer(Modifier.weight(1f))
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = kb.subtitle)
             }
@@ -506,14 +517,14 @@ fun ProfileScreen(
             ActionRow(
                 icon = Icons.AutoMirrored.Filled.ExitToApp,
                 tint = AccentOrange,
-                label = "Esci",
+                label = stringResource(R.string.home_profile_logout_action),
                 onClick = { showLogoutConfirm = true },
             )
             HorizontalDivider(color = kb.divider, modifier = Modifier.padding(start = 56.dp))
             ActionRow(
                 icon = Icons.Default.Delete,
                 tint = Color(0xFFD32F2F),
-                label = "Elimina account",
+                label = stringResource(R.string.home_profile_delete_account_action),
                 onClick = {
                     deleteConfirmText = ""
                     showDeleteSheet = true
@@ -525,7 +536,7 @@ fun ProfileScreen(
             Text(it, color = Color(0xFFD32F2F), style = MaterialTheme.typography.bodySmall)
         }
         if (state.saveSucceeded && !state.isDirty) {
-            Text("Profilo salvato.", color = Color(0xFF2E7D32), style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.home_profile_saved), color = Color(0xFF2E7D32), style = MaterialTheme.typography.bodySmall)
         }
         Spacer(modifier = Modifier.height(28.dp))
     }

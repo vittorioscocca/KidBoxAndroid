@@ -9,6 +9,8 @@ import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.Train
 import androidx.compose.ui.graphics.vector.ImageVector
 import java.util.Locale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 enum class TransportMode(val raw: String, val label: String, val icon: ImageVector) {
     FLIGHT("flight", "Aereo", Icons.Filled.AirplanemodeActive),
@@ -26,9 +28,9 @@ enum class TransportMode(val raw: String, val label: String, val icon: ImageVect
 }
 
 enum class WizardPrimaryTransport(val raw: String, val title: String, val subtitle: String, val emoji: String) {
-    FLIGHT("flight", "Volo", "Prezzi voli in tempo reale", "✈️"),
-    CAR("car", "In auto", "Viaggio su strada flessibile", "🚗"),
-    OTHER("other", "Altro", "Treno, autobus, traghetto…", "🚆"),
+    FLIGHT("flight", "Volo", "", "✈️"),
+    CAR("car", "", "", "🚗"),
+    OTHER("other", "Altro", "", "🚆"),
     ;
 
     fun transportModeRaw(): String = when (this) {

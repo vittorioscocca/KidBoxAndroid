@@ -31,6 +31,7 @@ fun TravelPlaceResult.toPlaceContext(categoryTitle: String, destinationTitle: St
 }
 
 fun placeContextFromStop(
+    context: android.content.Context,
     stop: TravelItineraryStop,
     day: TravelItineraryDay,
     block: TravelItineraryPeriodBlock,
@@ -42,7 +43,11 @@ fun placeContextFromStop(
         id = "${day.id}-${block.period.name}-${stop.title}".hashCode().toString(),
         placeName = TravelItineraryBuilder.placeQueryName(stop.title, stop.detail),
         locationContext = TravelItineraryBuilder.placeSearchLocationContext(day.location, destinationTitle),
-        scheduleBadge = "GIORNO ${day.dayIndex} · ${block.period.title}",
+        scheduleBadge = context.getString(
+            it.vittorioscocca.kidbox.R.string.travel_day_badge,
+            day.dayIndex,
+            context.getString(block.period.titleRes),
+        ),
         time = stop.time,
         staySummary = metrics.first,
         costSummary = metrics.second,

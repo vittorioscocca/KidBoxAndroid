@@ -29,9 +29,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
@@ -137,20 +139,20 @@ private fun VisibilityPickerPanel(
     Column(modifier) {
         Text(scopeSectionTitle, style = MaterialTheme.typography.titleSmall, color = kb.title)
         Spacer(Modifier.height(8.dp))
-        VisibilityOptionRow(label = "👨‍👩‍👧 Tutta la famiglia", selected = selScope == KBVisibilityScope.FAMILY) {
+        VisibilityOptionRow(label = stringResource(R.string.notes_visibility_option_family), selected = selScope == KBVisibilityScope.FAMILY) {
             selScope = KBVisibilityScope.FAMILY
             selMembers = emptySet()
         }
-        VisibilityOptionRow(label = "👥 Membri selezionati", selected = selScope == KBVisibilityScope.MEMBERS) {
+        VisibilityOptionRow(label = stringResource(R.string.notes_visibility_option_members), selected = selScope == KBVisibilityScope.MEMBERS) {
             selScope = KBVisibilityScope.MEMBERS
         }
-        VisibilityOptionRow(label = "🔒 Solo io", selected = selScope == KBVisibilityScope.ONLY_CREATOR) {
+        VisibilityOptionRow(label = stringResource(R.string.notes_visibility_option_only_me), selected = selScope == KBVisibilityScope.ONLY_CREATOR) {
             selScope = KBVisibilityScope.ONLY_CREATOR
             selMembers = emptySet()
         }
         if (selScope == KBVisibilityScope.MEMBERS) {
             Spacer(Modifier.height(12.dp))
-            Text("Seleziona membri", style = MaterialTheme.typography.titleSmall, color = kb.title)
+            Text(stringResource(R.string.notes_visibility_select_members), style = MaterialTheme.typography.titleSmall, color = kb.title)
             Spacer(Modifier.height(6.dp))
             membersExcludingSelf.forEach { m ->
                 Row(
@@ -182,7 +184,7 @@ private fun VisibilityPickerPanel(
                 .padding(top = 16.dp),
             horizontalArrangement = Arrangement.End,
         ) {
-            TextButton(onClick = onDismiss) { Text("Annulla") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.notes_visibility_cancel)) }
             TextButton(
                 onClick = {
                     val me = currentUid?.takeIf { it.isNotBlank() }
@@ -192,7 +194,7 @@ private fun VisibilityPickerPanel(
                     onConfirmed(selScope, finalMembers.sorted())
                     onDismiss()
                 },
-            ) { Text("Conferma") }
+            ) { Text(stringResource(R.string.notes_visibility_confirm)) }
         }
     }
 }

@@ -87,6 +87,8 @@ import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatListScrollEffect
 import it.vittorioscocca.kidbox.ui.screens.ai.common.TypewriterClaudeMarkdownText
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.AIChatTypingIndicator
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 private const val ROLE_USER = "user"
 private const val ROLE_ASSISTANT = "assistant"
@@ -125,9 +127,10 @@ fun SupportChatScreen(
         reverseLayout = false,
     )
 
+    val ticketSentMessage = stringResource(R.string.settings_support_sent)
     LaunchedEffect(state.ticketSent) {
         if (state.ticketSent) {
-            snackHost.showSnackbar("✅ Segnalazione inviata. Ti risponderemo presto.")
+            snackHost.showSnackbar(ticketSentMessage)
         }
     }
 
@@ -147,7 +150,7 @@ fun SupportChatScreen(
                     ) {
                         Text("🤖", fontSize = 22.sp)
                         Text(
-                            "Assistente KidBox",
+                            stringResource(R.string.settings_support_assistant),
                             color = kb.title,
                             fontWeight = FontWeight.Bold,
                         )
@@ -157,7 +160,7 @@ fun SupportChatScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Indietro",
+                            contentDescription = stringResource(R.string.settings_common_back),
                             tint = kb.title,
                         )
                     }
@@ -166,7 +169,7 @@ fun SupportChatScreen(
                     IconButton(onClick = { showInfoSheet = true }) {
                         Icon(
                             Icons.Default.Info,
-                            contentDescription = "Informazioni",
+                            contentDescription = stringResource(R.string.settings_support_info),
                             tint = kb.title,
                         )
                     }
@@ -246,7 +249,7 @@ fun SupportChatScreen(
                                     modifier = Modifier.weight(1f),
                                 )
                                 IconButton(onClick = viewModel::dismissError) {
-                                    Icon(Icons.Default.Close, contentDescription = "Chiudi")
+                                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.settings_common_close))
                                 }
                             }
                         }
@@ -256,8 +259,7 @@ fun SupportChatScreen(
                 if (state.messages.isEmpty() && !state.isLoading) {
                     item(key = "hint") {
                         Text(
-                            text = "Descrivi un problema, una domanda o un suggerimento. " +
-                                "Puoi allegare fino a 5 screenshot.",
+                            text = stringResource(R.string.settings_support_describe_full),
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
                             fontSize = 14.sp,
                             color = kb.subtitle,
@@ -287,17 +289,15 @@ fun SupportChatScreen(
     if (state.showSubmitConfirm) {
         AlertDialog(
             onDismissRequest = viewModel::dismissSubmitConfirm,
-            title = { Text("Invia segnalazione?") },
+            title = { Text(stringResource(R.string.settings_support_send_q)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        "La conversazione verrà inviata al team KidBox. " +
-                            "Riceverai assistenza il prima possibile.",
+                        stringResource(R.string.settings_support_send_full),
                     )
                     if (state.detectedType == TYPE_BUG) {
                         Text(
-                            "Per i bug, KidBox allega automaticamente i log diagnostici " +
-                                "dell'app (gli stessi usati per i crash report).",
+                            stringResource(R.string.settings_support_logs_full),
                             fontSize = 14.sp,
                             color = kb.subtitle,
                         )
@@ -309,12 +309,12 @@ fun SupportChatScreen(
                     onClick = { viewModel.confirmSubmit() },
                     enabled = !state.isLoading,
                 ) {
-                    Text("Invia")
+                    Text(stringResource(R.string.settings_support_send))
                 }
             },
             dismissButton = {
                 TextButton(onClick = viewModel::dismissSubmitConfirm) {
-                    Text("Annulla")
+                    Text(stringResource(R.string.settings_common_cancel))
                 }
             },
         )
@@ -342,42 +342,39 @@ private fun SupportInfoBottomSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                "Assistente & Supporto",
+                stringResource(R.string.settings_support_title),
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = kb.title,
             )
             Text(
-                "Questa chat ti aiuta a ottenere risposte su KidBox e, se serve, " +
-                    "a inviare una segnalazione al nostro team.",
+                stringResource(R.string.settings_support_intro_full),
                 fontSize = 15.sp,
                 color = kb.subtitle,
                 lineHeight = 22.sp,
             )
             InfoBullet(
-                title = "Domande",
-                body = "Chiedi come funzionano calendario, documenti, salute, chat, viaggi e le altre sezioni dell'app.",
+                title = stringResource(R.string.settings_support_questions),
+                body = stringResource(R.string.settings_support_questions_body),
             )
             InfoBullet(
-                title = "Problemi e bug",
-                body = "Descrivi cosa non va: l'assistente ti guida e, per i bug, allega automaticamente " +
-                    "i log diagnostici dell'app all'invio della segnalazione.",
+                title = stringResource(R.string.settings_support_bugs),
+                body = stringResource(R.string.settings_support_bugs_full),
             )
             InfoBullet(
-                title = "Suggerimenti",
-                body = "Proponi miglioramenti o nuove funzioni: li classifichiamo e li valutiamo per le prossime versioni.",
+                title = stringResource(R.string.settings_support_suggestions),
+                body = stringResource(R.string.settings_support_suggestions_body),
             )
             InfoBullet(
-                title = "Screenshot",
-                body = "Puoi allegare fino a 5 immagini per chiarire il problema (icona 📎 sotto la chat).",
+                title = stringResource(R.string.settings_support_screenshots),
+                body = stringResource(R.string.settings_support_screenshots_body),
             )
             InfoBullet(
-                title = "Invio segnalazione",
-                body = "Quando la conversazione è completa, l'assistente ti propone di inviare il ticket. " +
-                    "Riceverai assistenza il prima possibile.",
+                title = stringResource(R.string.settings_support_sending),
+                body = stringResource(R.string.settings_support_sending_full),
             )
             Text(
-                "I messaggi usano la quota AI giornaliera del piano famiglia (Pro o Max).",
+                stringResource(R.string.settings_support_quota_note),
                 fontSize = 13.sp,
                 color = kb.subtitle,
                 lineHeight = 18.sp,
@@ -386,7 +383,7 @@ private fun SupportInfoBottomSheet(
                 onClick = onDismiss,
                 modifier = Modifier.align(Alignment.End),
             ) {
-                Text("Ho capito", fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.settings_support_got_it), fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -446,7 +443,7 @@ private fun SupportChatBubble(message: SupportMessage) {
                                     items(message.imageUris, key = { it.toString() }) { uri ->
                                         AsyncImage(
                                             model = uri,
-                                            contentDescription = "Immagine allegata",
+                                            contentDescription = stringResource(R.string.settings_support_image_attached),
                                             modifier = Modifier
                                                 .size(72.dp)
                                                 .clip(RoundedCornerShape(8.dp)),
@@ -499,7 +496,7 @@ private fun SupportAttachmentPreviewTray(
             ) {
                 AsyncImage(
                     model = uri,
-                    contentDescription = "Anteprima allegato",
+                    contentDescription = stringResource(R.string.settings_support_attachment_preview),
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
                 )
@@ -515,7 +512,7 @@ private fun SupportAttachmentPreviewTray(
                 ) {
                     Icon(
                         Icons.Default.Close,
-                        contentDescription = "Rimuovi",
+                        contentDescription = stringResource(R.string.settings_family_remove),
                         tint = Color.White,
                         modifier = Modifier.size(14.dp),
                     )
@@ -573,7 +570,7 @@ private fun SupportInputBar(
             ) {
                 Icon(
                     Icons.Default.AddCircle,
-                    contentDescription = "Allega foto",
+                    contentDescription = stringResource(R.string.settings_support_attach_photo),
                     tint = KidBoxUserBubbleOrange,
                     modifier = Modifier.size(32.dp),
                 )
@@ -605,7 +602,7 @@ private fun SupportInputBar(
                         Box {
                             if (inputText.isEmpty()) {
                                 Text(
-                                    text = "Messaggio…",
+                                    text = stringResource(R.string.settings_support_message_placeholder),
                                     color = kb.subtitle,
                                     fontSize = 16.sp,
                                 )
@@ -632,7 +629,7 @@ private fun SupportInputBar(
                 ) {
                     Icon(
                         Icons.Default.ArrowCircleUp,
-                        contentDescription = "Invia",
+                        contentDescription = stringResource(R.string.settings_support_send),
                         tint = if (canSend) {
                             KidBoxUserBubbleOrange
                         } else {

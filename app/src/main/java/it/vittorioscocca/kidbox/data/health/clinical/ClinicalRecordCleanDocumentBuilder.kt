@@ -11,6 +11,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
 
 /** Documento cartella clinica in formato pulito (intestazione, patologie per area, esami, andamenti sintetici). */
 object ClinicalRecordCleanDocumentBuilder {
@@ -486,7 +487,7 @@ object ClinicalRecordCleanDocumentBuilder {
         DateFormat.getDateInstance(DateFormat.LONG, Locale.getDefault()).format(Date(epoch))
 
     private fun formatMonthYear(epoch: Long): String =
-        SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(Date(epoch))
+        SimpleDateFormat("MMMM yyyy", KBLocale.current()).format(Date(epoch))
 
     private fun year(epoch: Long): Int =
         Calendar.getInstance().apply { timeInMillis = epoch }.get(Calendar.YEAR)

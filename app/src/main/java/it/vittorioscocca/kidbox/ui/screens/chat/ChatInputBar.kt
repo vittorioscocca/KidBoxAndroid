@@ -50,6 +50,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun ChatInputBar(
@@ -139,9 +141,9 @@ fun ChatInputBar(
                 )
                 Text(
                     text = when {
-                        recordingState.isLocked -> "Bloccato"
-                        recordingState.isCancelling -> "Annulla..."
-                        else -> "Scorri su blocca / sx annulla"
+                        recordingState.isLocked -> stringResource(R.string.chat_locked)
+                        recordingState.isCancelling -> stringResource(R.string.chat_cancel_dots)
+                        else -> stringResource(R.string.chat_swipe_hint)
                     },
                     color = MaterialTheme.kidBoxColors.subtitle,
                 )
@@ -196,7 +198,7 @@ fun ChatInputBar(
                     .weight(1f)
                     .heightIn(min = 40.dp, max = 120.dp),
                 shape = RoundedCornerShape(20.dp),
-                placeholder = { Text("Messaggio...") },
+                placeholder = { Text(stringResource(R.string.chat_message_placeholder)) },
                 maxLines = 5,
                 enabled = !recordingState.isRecording,
             )

@@ -80,13 +80,14 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
 
 private val VISIT_EMPTY_SUGGESTIONS = listOf(
     "Riassumi le visite recenti",
     "Quali prescrizioni sono attive?",
     "Mostrami eventuali controlli da fare",
 )
-private val VISIT_TIME = SimpleDateFormat("HH:mm", Locale.ITALIAN)
+private fun VISIT_TIME() = SimpleDateFormat("HH:mm", KBLocale.current())
 
 @Composable
 fun VisitAiChatScreen(

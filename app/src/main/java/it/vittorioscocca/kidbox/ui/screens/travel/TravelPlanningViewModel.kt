@@ -47,6 +47,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.json.JSONArray
+import it.vittorioscocca.kidbox.util.KBLocale
 
 @HiltViewModel
 class TravelPlanningViewModel @Inject constructor(
@@ -255,7 +256,7 @@ class TravelPlanningViewModel @Inject constructor(
         if (freeTextPrompt.isNotBlank()) append(freeTextPrompt.trim())
         if (tripStyles.isNotEmpty()) {
             if (isNotEmpty()) append("\n")
-            append("Stili per questo viaggio: ${tripStyles.joinToString { it.title }}.")
+            append("Stili per questo viaggio: ${tripStyles.joinToString { it.promptLabel }}.")
         }
         if (destinationRegion.isNotBlank()) {
             if (isNotEmpty()) append("\n")
@@ -386,7 +387,7 @@ class TravelPlanningViewModel @Inject constructor(
             val profiles = pediatricProfileDao.observeByFamilyId(familyId).first()
             val members = familyMemberDao.observeActiveByFamilyId(familyId).first()
 
-            val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val fmt = SimpleDateFormat("yyyy-MM-dd", KBLocale.current())
             val wizardData = mapOf(
                 "tripName" to tripName,
                 "startDate" to fmt.format(Date(startDate)),
@@ -729,7 +730,7 @@ class TravelPlanningViewModel @Inject constructor(
     }
 
     fun refinementSeed(): String {
-        val fmt = SimpleDateFormat("d MMM yyyy", Locale.getDefault())
+        val fmt = SimpleDateFormat("d MMM yyyy", KBLocale.current())
         val intro = "Sto pianificando il viaggio \"$tripName\" dal ${fmt.format(Date(startDate))} al ${fmt.format(Date(endDate))}."
         val narrative = _proposalNarrative.value?.take(1200).orEmpty()
         return buildString {

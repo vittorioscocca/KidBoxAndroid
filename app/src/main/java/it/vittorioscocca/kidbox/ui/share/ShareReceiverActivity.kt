@@ -3,7 +3,7 @@ package it.vittorioscocca.kidbox.ui.share
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -25,9 +25,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.AndroidEntryPoint
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.MainActivity
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.remote.ai.AIService
@@ -36,7 +38,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
-class ShareReceiverActivity : ComponentActivity() {
+class ShareReceiverActivity : AppCompatActivity() {
 
     @Inject
     lateinit var aiService: AIService
@@ -84,12 +86,12 @@ class ShareReceiverActivity : ComponentActivity() {
                             modifier = Modifier.padding(20.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            Text("Accedi a KidBox per condividere contenuti")
+                            Text(stringResource(R.string.share_receiver_login_required))
                             Button(onClick = {
                                 startActivity(Intent(this@ShareReceiverActivity, MainActivity::class.java))
                                 finish()
                             }) {
-                                Text("Apri KidBox")
+                                Text(stringResource(R.string.share_receiver_open_kidbox))
                             }
                         }
                     }
@@ -136,7 +138,7 @@ class ShareReceiverActivity : ComponentActivity() {
                         onCancel = { finish() },
                         onConfirm = {
                             if (familyId.isBlank()) {
-                                scope.launch { snackState.showSnackbar("Famiglia non trovata. Apri KidBox e riprova.") }
+                                scope.launch { snackState.showSnackbar(getString(R.string.share_receiver_family_not_found)) }
                                 return@ShareBottomSheet
                             }
                             isSubmitting = true
@@ -154,10 +156,10 @@ class ShareReceiverActivity : ComponentActivity() {
                                         contentResolver,
                                     )
                                 }.onSuccess {
-                                    snackState.showSnackbar("Contenuto condiviso")
+                                    snackState.showSnackbar(getString(R.string.share_receiver_shared_success))
                                     finish()
                                 }.onFailure { err ->
-                                    snackState.showSnackbar(err.message ?: "Errore durante la condivisione")
+                                    snackState.showSnackbar(err.message ?: getString(R.string.share_receiver_error_generic))
                                     isSubmitting = false
                                 }
                             }

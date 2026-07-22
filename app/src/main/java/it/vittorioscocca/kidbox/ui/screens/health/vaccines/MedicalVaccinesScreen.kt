@@ -73,20 +73,24 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.platform.LocalContext
 
-private val DATE_FMT_VACCINE_ROW = SimpleDateFormat("d MMM yyyy", Locale.ENGLISH)
+private fun DATE_FMT_VACCINE_ROW() = SimpleDateFormat("d MMM yyyy", KBLocale.current())
 private val SALMON = Color(0xFFF38B75)
 private val GREEN = Color(0xFF2E7D32)
 private val BLUE = Color(0xFF1565C0)
 private val ORANGE = Color(0xFFE65100)
 private val RED = Color(0xFFD32F2F)
 
-private fun timeFilterLabel(filter: VaccineListTimeFilter): String = when (filter) {
-    VaccineListTimeFilter.ALL -> "Tutti"
-    VaccineListTimeFilter.MONTHS3 -> "3 mesi"
-    VaccineListTimeFilter.MONTHS6 -> "6 mesi"
-    VaccineListTimeFilter.YEAR1 -> "Ultimo anno"
-    VaccineListTimeFilter.CUSTOM -> "Personalizzato"
+private fun timeFilterLabel(context: android.content.Context, filter: VaccineListTimeFilter): String = when (filter) {
+    VaccineListTimeFilter.ALL -> context.getString(R.string.health_all_m)
+    VaccineListTimeFilter.MONTHS3 -> context.getString(R.string.health_3_months)
+    VaccineListTimeFilter.MONTHS6 -> context.getString(R.string.health_6_months)
+    VaccineListTimeFilter.YEAR1 -> context.getString(R.string.health_filter_1y)
+    VaccineListTimeFilter.CUSTOM -> context.getString(R.string.health_custom)
 }
 
 @Composable
@@ -98,6 +102,11 @@ fun MedicalVaccinesScreen(
     onOpen: (vaccineId: String) -> Unit,
     viewModel: MedicalVaccinesViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
+    val apptTitle = stringResource(R.string.health_appointment_set)
+    val administeredTitle = stringResource(R.string.health_administered_pl)
+    val toScheduleTitle = stringResource(R.string.health_to_schedule)
+    val notDoneTitle = stringResource(R.string.health_not_done)
     val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var isSelecting by remember { mutableStateOf(false) }
@@ -146,7 +155,7 @@ fun MedicalVaccinesScreen(
                     } else {
                         HealthListAddBottomButton(
                             tint = SALMON,
-                            label = "Aggiungi vaccino",
+                            label = stringResource(R.string.health_add_vaccine),
                             onClick = onAdd,
                         )
                     }
@@ -173,7 +182,7 @@ fun MedicalVaccinesScreen(
             )
 
             Text(
-                "Vaccini",
+                stringResource(R.string.health_vaccines),
                 fontSize = 32.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = kb.title,
@@ -182,7 +191,7 @@ fun MedicalVaccinesScreen(
 
             if (state.timeFilter != VaccineListTimeFilter.ALL) {
                 VaccineFilterActivePill(
-                    label = timeFilterLabel(state.timeFilter),
+                    label = timeFilterLabel(context, state.timeFilter),
                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
                     onClear = { viewModel.setTimeFilter(VaccineListTimeFilter.ALL) },
                 )
@@ -216,7 +225,7 @@ fun MedicalVaccinesScreen(
             ) {
                 item { Spacer(Modifier.height(4.dp)) }
                 vaccineSectionIos(
-                    title = "Appuntamento fissato",
+                    title = apptTitle,
                     icon = Icons.Default.Event,
                     iconTint = BLUE,
                     items = appointments,
@@ -228,7 +237,7 @@ fun MedicalVaccinesScreen(
                     onOpen = onOpen,
                 )
                 vaccineSectionIos(
-                    title = "Somministrati",
+                    title = administeredTitle,
                     icon = Icons.Default.CheckCircle,
                     iconTint = GREEN,
                     items = state.administered,
@@ -240,7 +249,7 @@ fun MedicalVaccinesScreen(
                     onOpen = onOpen,
                 )
                 vaccineSectionIos(
-                    title = "Da programmare",
+                    title = toScheduleTitle,
                     icon = Icons.AutoMirrored.Filled.HelpOutline,
                     iconTint = ORANGE,
                     items = state.planned,
@@ -252,7 +261,7 @@ fun MedicalVaccinesScreen(
                     onOpen = onOpen,
                 )
                 vaccineSectionIos(
-                    title = "Non eseguiti",
+                    title = notDoneTitle,
                     icon = Icons.Outlined.Cancel,
                     iconTint = Color(0xFF616161),
                     items = state.skipped,
@@ -272,29 +281,29 @@ fun MedicalVaccinesScreen(
     if (showFilterDialog) {
         AlertDialog(
             onDismissRequest = { showFilterDialog = false },
-            title = { Text("Periodo") },
+            title = { Text(stringResource(R.string.health_period)) },
             text = {
                 Column {
-                    FilterOptionRow("Tutti", VaccineListTimeFilter.ALL, state.timeFilter) {
+                    FilterOptionRow(stringResource(R.string.health_all_m), VaccineListTimeFilter.ALL, state.timeFilter) {
                         viewModel.setTimeFilter(VaccineListTimeFilter.ALL)
                         showFilterDialog = false
                     }
-                    FilterOptionRow("3 mesi", VaccineListTimeFilter.MONTHS3, state.timeFilter) {
+                    FilterOptionRow(stringResource(R.string.health_3_months), VaccineListTimeFilter.MONTHS3, state.timeFilter) {
                         viewModel.setTimeFilter(VaccineListTimeFilter.MONTHS3)
                         showFilterDialog = false
                     }
-                    FilterOptionRow("6 mesi", VaccineListTimeFilter.MONTHS6, state.timeFilter) {
+                    FilterOptionRow(stringResource(R.string.health_6_months), VaccineListTimeFilter.MONTHS6, state.timeFilter) {
                         viewModel.setTimeFilter(VaccineListTimeFilter.MONTHS6)
                         showFilterDialog = false
                     }
-                    FilterOptionRow("Ultimo anno", VaccineListTimeFilter.YEAR1, state.timeFilter) {
+                    FilterOptionRow(stringResource(R.string.health_filter_1y), VaccineListTimeFilter.YEAR1, state.timeFilter) {
                         viewModel.setTimeFilter(VaccineListTimeFilter.YEAR1)
                         showFilterDialog = false
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showFilterDialog = false }) { Text("Chiudi") }
+                TextButton(onClick = { showFilterDialog = false }) { Text(stringResource(R.string.health_close)) }
             },
         )
     }
@@ -303,7 +312,7 @@ fun MedicalVaccinesScreen(
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("Eliminare ${selectedIds.size} vaccin${if (selectedIds.size == 1) "o" else "i"}?") },
-            text = { Text("I vaccini verranno rimossi da tutti i dispositivi.") },
+            text = { Text(stringResource(R.string.health_vaccines_removed_all)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -312,10 +321,10 @@ fun MedicalVaccinesScreen(
                         isSelecting = false
                         showDeleteConfirm = false
                     },
-                ) { Text("Elimina", color = RED) }
+                ) { Text(stringResource(R.string.health_delete), color = RED) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Annulla") }
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.health_cancel)) }
             },
         )
     }
@@ -344,7 +353,7 @@ private fun VaccineFilterActivePill(
             Spacer(Modifier.weight(1f))
             Icon(
                 Icons.Default.Close,
-                contentDescription = "Rimuovi filtro",
+                contentDescription = stringResource(R.string.health_remove_filter),
                 tint = kb.subtitle,
                 modifier = Modifier
                     .size(22.dp)
@@ -520,7 +529,7 @@ private fun VaccineRowIos(
                 )
                 if (dateMillis != null) {
                     Text(
-                        DATE_FMT_VACCINE_ROW.format(Date(dateMillis)),
+                        DATE_FMT_VACCINE_ROW().format(Date(dateMillis)),
                         fontSize = 11.sp,
                         color = kb.subtitle,
                     )
@@ -570,7 +579,7 @@ private fun VaccinesEmptyState(modifier: Modifier = Modifier, onAdd: () -> Unit)
         }
         Spacer(Modifier.height(20.dp))
         Text(
-            "Libretto vaccinale vuoto",
+            stringResource(R.string.health_vaccine_book_empty),
             fontSize = 20.sp,
             fontWeight = FontWeight.SemiBold,
             color = kb.title,
@@ -591,7 +600,7 @@ private fun VaccinesEmptyState(modifier: Modifier = Modifier, onAdd: () -> Unit)
                 .clickable(onClick = onAdd),
         ) {
             Text(
-                "Aggiungi vaccino",
+                stringResource(R.string.health_add_vaccine),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 14.dp),
@@ -622,14 +631,14 @@ private fun VaccinesEmptyFilterState(modifier: Modifier = Modifier, onClearFilte
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            "Nessun vaccino nel periodo selezionato",
+            stringResource(R.string.health_no_vaccines_period),
             fontSize = 14.sp,
             color = kb.subtitle,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(16.dp))
         TextButton(onClick = onClearFilter) {
-            Text("Rimuovi filtro", color = SALMON, fontWeight = FontWeight.Medium)
+            Text(stringResource(R.string.health_remove_filter), color = SALMON, fontWeight = FontWeight.Medium)
         }
     }
 }

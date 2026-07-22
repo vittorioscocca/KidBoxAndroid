@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Nudge: suggerimenti in-app su aree mai usate (NudgeCatalog.kt) -->
+    <string name="nudge_family_invite_title">KidBox prend tout son sens en famille</string>
+    <string name="nudge_family_invite_body">Invitez l\'autre parent ou les autres membres : documents, wallet, santé, dépenses et calendrier deviennent partagés et à jour pour tout le monde, en temps réel.</string>
+    <string name="nudge_documents_title">Vos documents, toujours avec vous</string>
+    <string name="nudge_documents_body">Importez un document une seule fois : toute la famille le voit aussitôt, sans avoir à le demander à personne.</string>
+    <string name="nudge_wallet_title">Cartes d\'identité et billets dans le Wallet</string>
+    <string name="nudge_wallet_body">Conservez vos papiers d\'identité et de voyage, et recevez un rappel une semaine avant leur expiration.</string>
+    <string name="nudge_health_title">La santé de vos enfants, au même endroit</string>
+    <string name="nudge_health_body">Consultations, examens, traitements et dossier médical : l\'historique complet, partagé avec ceux qui s\'en occupent avec vous.</string>
+    <string name="nudge_ai_title">Demandez, au lieu de chercher</string>
+    <string name="nudge_ai_body">L\'assistant connaît ce que vous gardez dans KidBox : posez une question, il peut même créer des rappels et des événements pour vous.</string>
+    <string name="nudge_chat_title">La discussion de famille</string>
+    <string name="nudge_chat_body">Un seul endroit pour en parler, à côté des documents et des photos dont vous parlez.</string>
+    <string name="nudge_calendar_title">Un calendrier que vous voyez à deux</string>
+    <string name="nudge_calendar_body">Rendez-vous, sport, anniversaires : qui y va, quand, et qui s\'en charge. Sans se courir après par messages.</string>
+    <string name="settings_notif_tips">Conseils KidBox</string>
+    <string name="settings_notif_tips_sub">Suggestions occasionnelles sur les fonctions que vous n\'avez pas encore essayées.</string>
+</resources>

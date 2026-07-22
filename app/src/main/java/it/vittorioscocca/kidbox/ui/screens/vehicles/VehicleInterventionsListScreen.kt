@@ -45,6 +45,9 @@ import it.vittorioscocca.kidbox.ui.theme.KidBoxColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.NumberFormat
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,7 +84,7 @@ fun VehicleInterventionsListScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Interventi", color = kb.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.vehicles_services), color = kb.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         vehicle?.name?.let { n ->
                             Text(n, color = kb.subtitle, style = MaterialTheme.typography.bodySmall)
                         }
@@ -112,7 +115,7 @@ fun VehicleInterventionsListScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 12.dp),
-                placeholder = { Text("Cerca per titolo, tipo, officina…", color = kb.subtitle) },
+                placeholder = { Text(stringResource(R.string.vehicles_search_hint), color = kb.subtitle) },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = kb.subtitle) },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
@@ -126,9 +129,9 @@ fun VehicleInterventionsListScreen(
             if (filtered.isEmpty()) {
                 Text(
                     if (events.isEmpty()) {
-                        "Nessun intervento registrato."
+                        stringResource(R.string.vehicles_no_services_dot)
                     } else {
-                        "Nessun risultato per la ricerca."
+                        stringResource(R.string.vehicles_no_results)
                     },
                     color = kb.subtitle,
                     style = MaterialTheme.typography.bodyMedium,
@@ -160,7 +163,7 @@ fun VehicleInterventionsListScreen(
 }
 
 private fun formatInterventionCostEuro(value: Double): String {
-    val nf = NumberFormat.getCurrencyInstance(Locale.ITALY)
+    val nf = NumberFormat.getCurrencyInstance(KBLocale.current())
     nf.minimumFractionDigits = 0
     nf.maximumFractionDigits = 2
     return nf.format(value)

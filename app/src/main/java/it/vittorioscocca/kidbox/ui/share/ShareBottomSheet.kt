@@ -30,11 +30,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun ShareBottomSheet(
@@ -66,13 +68,13 @@ fun ShareBottomSheet(
                     .size(width = 44.dp, height = 5.dp)
                     .background(Color(0x33000000), RoundedCornerShape(99.dp)),
             )
-            Text("Condividi in KidBox", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.share_sheet_title), style = MaterialTheme.typography.titleLarge)
             SharePreview(contentType)
             OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
                 value = title,
                 onValueChange = onTitleChange,
-                label = { Text("Titolo (opzionale)") },
+                label = { Text(stringResource(R.string.share_sheet_title_field_label)) },
                 maxLines = 1,
             )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -80,8 +82,8 @@ fun ShareBottomSheet(
                     val aiHighlighted = aiSuggestedDestination == destination
                     AssistChip(
                         onClick = { onSelectDestination(destination) },
-                        label = { Text(destination.labelIt) },
-                        leadingIcon = { Icon(destination.icon, contentDescription = destination.labelIt) },
+                        label = { Text(stringResource(destination.labelRes)) },
+                        leadingIcon = { Icon(destination.icon, contentDescription = stringResource(destination.labelRes)) },
                         colors = AssistChipDefaults.assistChipColors(
                             containerColor = when {
                                 selectedDestination == destination -> Color(0xFFF26010)
@@ -102,11 +104,11 @@ fun ShareBottomSheet(
                 if (isSubmitting) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
                 } else {
-                    Text("Conferma")
+                    Text(stringResource(R.string.share_sheet_confirm))
                 }
             }
             TextButton(modifier = Modifier.align(Alignment.CenterHorizontally), onClick = onCancel, enabled = !isSubmitting) {
-                Text("Annulla")
+                Text(stringResource(R.string.share_sheet_cancel))
             }
         }
     }
@@ -125,16 +127,19 @@ private fun SharePreview(contentType: ShareContentType) {
             PreviewImage(contentType.uri)
         }
         is ShareContentType.VideoContent -> {
-            PreviewFileRow(name = "Video condiviso", subtitle = contentType.uri.lastPathSegment.orEmpty())
+            PreviewFileRow(name = stringResource(R.string.share_preview_video_name), subtitle = contentType.uri.lastPathSegment.orEmpty())
         }
         is ShareContentType.PdfContent -> {
-            PreviewFileRow(name = "Documento PDF", subtitle = contentType.uri.lastPathSegment.orEmpty())
+            PreviewFileRow(name = stringResource(R.string.share_preview_pdf_name), subtitle = contentType.uri.lastPathSegment.orEmpty())
         }
         is ShareContentType.FileContent -> {
-            PreviewFileRow(name = "File condiviso", subtitle = contentType.uri.lastPathSegment ?: contentType.mimeType)
+            PreviewFileRow(name = stringResource(R.string.share_preview_file_name), subtitle = contentType.uri.lastPathSegment ?: contentType.mimeType)
         }
         ShareContentType.Unknown -> {
-            PreviewFileRow(name = "Contenuto non riconosciuto", subtitle = "Puoi comunque inviarlo in chat.")
+            PreviewFileRow(
+                name = stringResource(R.string.share_preview_unknown_name),
+                subtitle = stringResource(R.string.share_preview_unknown_subtitle),
+            )
         }
     }
 }
@@ -160,7 +165,7 @@ private fun PreviewText(text: String) {
 private fun PreviewImage(uri: Uri) {
     AsyncImage(
         model = uri,
-        contentDescription = "Anteprima immagine",
+        contentDescription = stringResource(R.string.share_preview_image_desc),
         modifier = Modifier
             .fillMaxWidth()
             .height(180.dp)

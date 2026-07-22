@@ -100,9 +100,13 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
 import org.json.JSONArray
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.platform.LocalContext
 
-private val DATE_ROW = SimpleDateFormat("d MMM yyyy, HH:mm", Locale.ITALIAN)
-private val DATE_SHORT = SimpleDateFormat("dd/MM/yy", Locale.ITALIAN)
+private fun DATE_ROW() = SimpleDateFormat("d MMM yyyy, HH:mm", KBLocale.current())
+private fun DATE_SHORT() = SimpleDateFormat("dd/MM/yy", KBLocale.current())
 /** iOS PediatricVisitsView tint (0.35, 0.6, 0.85). */
 private val VISIT_TINT = Color(0xFF5996D9)
 
@@ -116,6 +120,7 @@ fun MedicalVisitsScreen(
     onOpenVisitsListAiChat: (subjectName: String, visitIdsJson: String) -> Unit = { _, _ -> },
     viewModel: MedicalVisitsViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val isAiGloballyEnabled by viewModel.isAiGloballyEnabled.collectAsStateWithLifecycle()
@@ -153,17 +158,17 @@ fun MedicalVisitsScreen(
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("Eliminare $n visit${if (n == 1) "a" else "e"}?") },
-            text = { Text("Le visite verranno rimosse da tutti i dispositivi.") },
+            text = { Text(stringResource(R.string.health_visits_removed_all)) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         viewModel.deleteSelected()
                         showDeleteConfirm = false
                     },
-                ) { Text("Elimina", color = Color(0xFFD32F2F)) }
+                ) { Text(stringResource(R.string.health_delete), color = Color(0xFFD32F2F)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Annulla") }
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.health_cancel)) }
             },
         )
     }
@@ -187,7 +192,7 @@ fun MedicalVisitsScreen(
                 } else {
                     HealthListAddBottomButton(
                         tint = VISIT_TINT,
-                        label = "Aggiungi nuova visita",
+                        label = stringResource(R.string.health_visit_add_new),
                         onClick = onAdd,
                     )
                 }
@@ -215,7 +220,7 @@ fun MedicalVisitsScreen(
             )
 
             Text(
-                "Visita Medica",
+                stringResource(R.string.health_visit_medical),
                 fontSize = 32.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = kb.title,
@@ -228,7 +233,7 @@ fun MedicalVisitsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 18.dp, vertical = 8.dp),
-                placeholder = { Text("Cerca visita", color = kb.subtitle) },
+                placeholder = { Text(stringResource(R.string.health_visit_search), color = kb.subtitle) },
                 leadingIcon = {
                     Icon(Icons.Default.Search, contentDescription = null, tint = kb.subtitle)
                 },
@@ -242,7 +247,7 @@ fun MedicalVisitsScreen(
 
             if (state.periodFilter != VisitPeriodFilter.ALL) {
                 VisitFilterActivePill(
-                    label = visitFilterPillLabel(state),
+                    label = visitFilterPillLabel(context, state),
                     onClear = { viewModel.setPeriodFilter(VisitPeriodFilter.ALL) },
                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp),
                 )
@@ -326,7 +331,7 @@ fun MedicalVisitsScreen(
             }
             }
 
-            val displayName = state.childName.ifBlank { "Profilo" }
+            val displayName = state.childName.ifBlank { stringResource(R.string.health_profile) }
             val showVisitsAiFab = isAiGloballyEnabled &&
                 !state.isSelecting &&
                 !state.isLoading &&
@@ -373,13 +378,13 @@ private fun VisitFilterActivePill(label: String, onClear: () -> Unit, modifier: 
     }
 }
 
-private fun visitFilterPillLabel(state: MedicalVisitsState): String = when (state.periodFilter) {
-    VisitPeriodFilter.ALL -> "Tutto"
-    VisitPeriodFilter.THREE_MONTHS -> "Ultimi 3 mesi"
-    VisitPeriodFilter.SIX_MONTHS -> "Ultimi 6 mesi"
-    VisitPeriodFilter.ONE_YEAR -> "Ultimo anno"
+private fun visitFilterPillLabel(context: android.content.Context, state: MedicalVisitsState): String = when (state.periodFilter) {
+    VisitPeriodFilter.ALL -> context.getString(R.string.health_filter_all)
+    VisitPeriodFilter.THREE_MONTHS -> context.getString(R.string.health_filter_3m)
+    VisitPeriodFilter.SIX_MONTHS -> context.getString(R.string.health_filter_6m)
+    VisitPeriodFilter.ONE_YEAR -> context.getString(R.string.health_filter_1y)
     VisitPeriodFilter.CUSTOM ->
-        "${DATE_SHORT.format(Date(state.customFilterStartEpoch))} – ${DATE_SHORT.format(Date(state.customFilterEndEpoch))}"
+        "${DATE_SHORT().format(Date(state.customFilterStartEpoch))} – ${DATE_SHORT().format(Date(state.customFilterEndEpoch))}"
 }
 
 @Composable
@@ -404,11 +409,11 @@ private fun VisitFilterSheetContent(
 
     Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("Filtra per periodo", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = kb.title)
-            TextButton(onClick = onDismiss) { Text("Chiudi") }
+            Text(stringResource(R.string.health_filter_period), fontWeight = FontWeight.Bold, fontSize = 17.sp, color = kb.title)
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.health_close)) }
         }
         Spacer(Modifier.height(8.dp))
-        Text("Periodo rapido", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = kb.subtitle, letterSpacing = 0.8.sp)
+        Text(stringResource(R.string.health_quick_period), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = kb.subtitle, letterSpacing = 0.8.sp)
         Spacer(Modifier.height(6.dp))
         VisitPeriodFilter.entries.filter { it != VisitPeriodFilter.CUSTOM }.forEach { f ->
             Row(
@@ -419,7 +424,7 @@ private fun VisitFilterSheetContent(
                     .padding(vertical = 12.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(f.displayLabel, color = kb.title, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                Text(stringResource(f.displayLabelRes), color = kb.title, fontSize = 15.sp, modifier = Modifier.weight(1f))
                 if (state.periodFilter == f) {
                     Icon(Icons.Default.CheckCircle, contentDescription = null, tint = VISIT_TINT, modifier = Modifier.size(20.dp))
                 }
@@ -428,7 +433,7 @@ private fun VisitFilterSheetContent(
         Spacer(Modifier.height(16.dp))
         HorizontalDivider()
         Spacer(Modifier.height(12.dp))
-        Text("Personalizzato", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = kb.subtitle, letterSpacing = 0.8.sp)
+        Text(stringResource(R.string.health_custom), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = kb.subtitle, letterSpacing = 0.8.sp)
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             VisitDateChip("Da", customStart) { showStartPicker = true }
@@ -440,7 +445,7 @@ private fun VisitFilterSheetContent(
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(containerColor = VISIT_TINT),
         ) {
-            Text("Applica", color = Color.White)
+            Text(stringResource(R.string.health_apply), color = Color.White)
         }
         Spacer(Modifier.height(24.dp))
     }
@@ -456,7 +461,7 @@ private fun VisitFilterSheetContent(
                     },
                 ) { Text("OK") }
             },
-            dismissButton = { TextButton(onClick = { showStartPicker = false }) { Text("Annulla") } },
+            dismissButton = { TextButton(onClick = { showStartPicker = false }) { Text(stringResource(R.string.health_cancel)) } },
         ) { DatePicker(state = startPickerState) }
     }
     if (showEndPicker) {
@@ -470,7 +475,7 @@ private fun VisitFilterSheetContent(
                     },
                 ) { Text("OK") }
             },
-            dismissButton = { TextButton(onClick = { showEndPicker = false }) { Text("Annulla") } },
+            dismissButton = { TextButton(onClick = { showEndPicker = false }) { Text(stringResource(R.string.health_cancel)) } },
         ) { DatePicker(state = endPickerState) }
     }
 }
@@ -486,7 +491,7 @@ private fun VisitDateChip(label: String, epochMillis: Long, onClick: () -> Unit)
     ) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
             Text(label, fontSize = 11.sp, color = kb.subtitle)
-            Text(DATE_SHORT.format(Date(epochMillis)), fontSize = 14.sp, color = kb.title, fontWeight = FontWeight.Medium)
+            Text(DATE_SHORT().format(Date(epochMillis)), fontSize = 14.sp, color = kb.title, fontWeight = FontWeight.Medium)
         }
     }
 }
@@ -512,7 +517,7 @@ private fun EmptyVisitsBody(childName: String, modifier: Modifier = Modifier) {
             }
             Spacer(Modifier.height(16.dp))
             Text(
-                "Nessuna visita registrata",
+                stringResource(R.string.health_no_visits),
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
                 color = kb.title,
@@ -536,14 +541,14 @@ private fun EmptyVisitFilterBody(modifier: Modifier = Modifier, onClear: () -> U
             Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(40.dp))
             Spacer(Modifier.height(12.dp))
             Text(
-                "Nessuna visita nel periodo selezionato",
+                stringResource(R.string.health_no_visits_period),
                 fontSize = 14.sp,
                 color = kb.subtitle,
                 fontWeight = FontWeight.Medium,
             )
             Spacer(Modifier.height(12.dp))
             TextButton(onClick = onClear) {
-                Text("Rimuovi filtro", color = VISIT_TINT, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.health_remove_filter), color = VISIT_TINT, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -575,7 +580,7 @@ private fun LazyListScope.visitSection(
     if (items.isEmpty()) return
     item {
         VisitSectionHeader(
-            displayLabel = status.displayLabel,
+            displayLabel = stringResource(status.displayLabelRes),
             icon = visitStatusIcon(status),
             tint = visitStatusColor(status),
             count = items.size,
@@ -603,7 +608,7 @@ private fun VisitSectionHeader(displayLabel: String, icon: ImageVector, tint: Co
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(6.dp))
         Text(
-            displayLabel.uppercase(Locale.ITALIAN),
+            displayLabel.uppercase(KBLocale.current()),
             fontWeight = FontWeight.Bold,
             fontSize = 11.sp,
             color = tint,
@@ -670,7 +675,7 @@ private fun VisitRow(
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    visit.reason.ifBlank { "Visita" },
+                    visit.reason.ifBlank { stringResource(R.string.health_visit) },
                     fontWeight = FontWeight.SemiBold,
                     color = kb.title,
                     fontSize = 15.sp,
@@ -683,7 +688,7 @@ private fun VisitRow(
                 }
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    DATE_ROW.format(Date(visit.dateEpochMillis)),
+                    DATE_ROW().format(Date(visit.dateEpochMillis)),
                     fontSize = 12.sp,
                     color = kb.subtitle,
                 )
@@ -697,7 +702,7 @@ private fun VisitRow(
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        badgeStatus.displayLabel,
+                        stringResource(badgeStatus.displayLabelRes),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = statusColor,
@@ -752,7 +757,7 @@ fun VisitStatusBadge(status: KBVisitStatus) {
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
         Text(
-            status.displayLabel,
+            stringResource(status.displayLabelRes),
             fontSize = 11.sp,
             color = textColor,
             fontWeight = FontWeight.SemiBold,

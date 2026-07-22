@@ -28,6 +28,10 @@ data class KBWalletTicketEntity(
     val location: String?,
     val seat: String?,
     val bookingCode: String?,
+    /** Luogo di arrivo (`location` resta il luogo di partenza). */
+    val arrivalLocation: String? = null,
+    /** Nome del titolare del biglietto (letto via AI o inserito a mano). */
+    val holderName: String? = null,
     val notes: String?,
     val emitter: String?,
     val pdfStorageURL: String?,

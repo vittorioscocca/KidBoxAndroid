@@ -3,6 +3,8 @@ package it.vittorioscocca.kidbox.ui.screens.ai.planning
 import android.content.Context
 import it.vittorioscocca.kidbox.ai.DailyBriefingPrefs
 import it.vittorioscocca.kidbox.ai.HealthPatternPrefs
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 /**
  * Dopo BOOT_COMPLETED gli AlarmManager vanno persi: ripianifica briefing/settimanale
@@ -18,7 +20,7 @@ object AiScheduledNotificationsRestorer {
     fun restoreAfterBoot(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val familyId = prefs.getString("active_family_id", null)?.takeIf { it.isNotBlank() } ?: return
-        val familyName = prefs.getString("active_family_name", "la tua famiglia") ?: "la tua famiglia"
+        val familyName = prefs.getString("active_family_name", context.getString(R.string.ai_your_family)) ?: context.getString(R.string.ai_your_family)
 
         if (prefs.getBoolean(DailyBriefingPrefs.WORKER_KEY_ENABLED, true)) {
             prefs.getString(PREF_DAILY_TEXT, null)?.takeIf { it.isNotBlank() }?.let { text ->

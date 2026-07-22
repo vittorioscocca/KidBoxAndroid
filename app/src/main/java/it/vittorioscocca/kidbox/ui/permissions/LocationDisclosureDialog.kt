@@ -3,6 +3,8 @@ package it.vittorioscocca.kidbox.ui.permissions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 import androidx.compose.runtime.Composable
 
 /**
@@ -26,25 +28,20 @@ fun LocationDisclosureDialog(
 
     AlertDialog(
         onDismissRequest = onDecline,
-        title = { Text("KidBox usa la tua posizione") },
+        title = { Text(stringResource(R.string.permissions_location_dialog_title)) },
         text = {
             Text(
-                purpose +
-                    "\n\nLa posizione viene raccolta solo quando lo richiedi tu e viene " +
-                    "usata esclusivamente per questa funzione: non la vendiamo e non la " +
-                    "usiamo per pubblicità." +
-                    "\n\nNella schermata successiva Android ti chiederà di consentire " +
-                    "l'accesso alla posizione.",
+                purpose + stringResource(R.string.permissions_location_dialog_body_suffix),
             )
         },
         confirmButton = {
             TextButton(onClick = onAccept) {
-                Text("Continua")
+                Text(stringResource(R.string.permissions_location_dialog_accept))
             }
         },
         dismissButton = {
             TextButton(onClick = onDecline) {
-                Text("No, grazie")
+                Text(stringResource(R.string.permissions_location_dialog_decline))
             }
         },
     )

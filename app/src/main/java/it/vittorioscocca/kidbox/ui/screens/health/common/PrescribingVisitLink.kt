@@ -33,6 +33,9 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 data class PrescribingVisitSummary(
     val visitId: String,
@@ -40,7 +43,7 @@ data class PrescribingVisitSummary(
     val dateEpochMillis: Long,
 )
 
-private val visitDateFmt = SimpleDateFormat("d MMMM yyyy", Locale.ITALIAN)
+private fun visitDateFmt() = SimpleDateFormat("d MMMM yyyy", KBLocale.current())
 
 /** Card «Visita prescrittrice» (stile iOS). */
 @Composable
@@ -81,9 +84,9 @@ fun PrescribingVisitLinkCard(
             }
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("Visita prescrittrice", fontSize = 12.sp, color = kb.subtitle)
+                Text(stringResource(R.string.health_prescribing_visit), fontSize = 12.sp, color = kb.subtitle)
                 Text(
-                    summary.reason.ifBlank { "Visita" },
+                    summary.reason.ifBlank { stringResource(R.string.health_visit) },
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = kb.title,
@@ -91,7 +94,7 @@ fun PrescribingVisitLinkCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    visitDateFmt.format(Date(summary.dateEpochMillis)),
+                    visitDateFmt().format(Date(summary.dateEpochMillis)),
                     fontSize = 12.sp,
                     color = kb.subtitle,
                 )

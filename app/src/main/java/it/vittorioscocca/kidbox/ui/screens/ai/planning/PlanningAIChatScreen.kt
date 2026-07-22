@@ -96,6 +96,9 @@ import it.vittorioscocca.kidbox.ui.screens.ai.common.rememberStreamScrollTick
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun PlanningAIChatScreen(
@@ -105,6 +108,7 @@ fun PlanningAIChatScreen(
     onNavigateToHealth: () -> Unit,
     onNavigateToUpgrade: () -> Unit,
 ) {
+    val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val recapTick by NotificationDeepLinkRouter.recapTick.collectAsStateWithLifecycle()
     val kb = MaterialTheme.kidBoxColors
@@ -173,7 +177,7 @@ fun PlanningAIChatScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Assistente KidBox", color = kb.title, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.ai_kidbox_assistant), color = kb.title, fontWeight = FontWeight.Bold)
                         AssistChip(
                             onClick = {},
                             enabled = false,
@@ -188,21 +192,21 @@ fun PlanningAIChatScreen(
                 actions = {
                     Box {
                         IconButton(onClick = { showMenu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = kb.title)
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.ai_menu), tint = kb.title)
                         }
                         DropdownMenu(
                             expanded = showMenu,
                             onDismissRequest = { showMenu = false },
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Nuova conversazione", color = Color(0xFFD32F2F)) },
+                                text = { Text(stringResource(R.string.ai_new_conversation), color = Color(0xFFD32F2F)) },
                                 onClick = {
                                     showMenu = false
                                     showClearDialog = true
                                 },
                             )
                             DropdownMenuItem(
-                                text = { Text("Impostazioni AI") },
+                                text = { Text(stringResource(R.string.ai_settings)) },
                                 onClick = {
                                     showMenu = false
                                     onNavigateToUpgrade()
@@ -223,8 +227,14 @@ fun PlanningAIChatScreen(
                     .navigationBarsPadding()
                     .padding(10.dp),
             ) {
+                val quick = listOf(
+                    stringResource(R.string.ai_q_this_week),
+                    stringResource(R.string.ai_q_create_event),
+                    stringResource(R.string.ai_q_add_todo),
+                    stringResource(R.string.ai_q_child_meds),
+                    stringResource(R.string.ai_q_expenses),
+                )
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val quick = listOf("Cosa ho questa settimana?", "Crea un evento", "Aggiungi to-do", "Cosa deve prendere mio figlio?", "Riepilogo spese")
                     items(quick) { chip ->
                         AssistChip(onClick = { viewModel.onInputChanged(chip) }, label = { Text(chip) })
                     }
@@ -235,7 +245,7 @@ fun PlanningAIChatScreen(
                         value = state.inputText,
                         onValueChange = viewModel::onInputChanged,
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("Chiedi qualcosa...") },
+                        placeholder = { Text(stringResource(R.string.ai_ask_something)) },
                         shape = RoundedCornerShape(24.dp),
                         maxLines = 4,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -249,7 +259,7 @@ fun PlanningAIChatScreen(
                         onClick = { viewModel.send(contextInput) },
                         enabled = state.inputText.isNotBlank() && !state.isLoading,
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Invia", tint = Color(0xFF598FDB))
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.chat_send), tint = Color(0xFF598FDB))
                     }
                 }
             }
@@ -293,7 +303,7 @@ fun PlanningAIChatScreen(
                         ) {
                             Text(state.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.weight(1f))
                             IconButton(onClick = viewModel::clearError) {
-                                Icon(Icons.Default.Close, contentDescription = "Chiudi")
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.chat_close))
                             }
                         }
                     }
@@ -316,6 +326,7 @@ fun PlanningAIChatScreen(
                                 msg.id !in state.autoExecutedMessageIds
                             ) {
                                 val actions = PlanningActionParser.parse(
+                                    context,
                                     text = msg.content,
                                     openTodos = state.parserOpenTodos,
                                     visits = state.parserVisits,
@@ -375,7 +386,7 @@ fun PlanningAIChatScreen(
                 ) {
                     CircularProgressIndicator()
                     Spacer(Modifier.height(12.dp))
-                    Text("Preparazione contesto…", fontSize = 14.sp, color = kb.subtitle)
+                    Text(stringResource(R.string.ai_preparing_context_dots), fontSize = 14.sp, color = kb.subtitle)
                 }
             }
 
@@ -391,9 +402,9 @@ fun PlanningAIChatScreen(
                     ) {
                         Text("\uD83E\uDD16", fontSize = 32.sp)
                         Spacer(Modifier.height(10.dp))
-                        Text("Assistente AI disponibile con il piano Pro", fontWeight = FontWeight.Bold, color = kb.title)
+                        Text(stringResource(R.string.ai_available_pro), fontWeight = FontWeight.Bold, color = kb.title)
                         Spacer(Modifier.height(10.dp))
-                        TextButton(onClick = onNavigateToUpgrade) { Text("Scopri i piani") }
+                        TextButton(onClick = onNavigateToUpgrade) { Text(stringResource(R.string.ai_discover_plans)) }
                     }
                 }
             }
@@ -403,8 +414,8 @@ fun PlanningAIChatScreen(
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
-            title = { Text("Nuova conversazione") },
-            text = { Text("La cronologia verrà eliminata e il contesto verrà ricostruito.") },
+            title = { Text(stringResource(R.string.ai_new_conversation)) },
+            text = { Text(stringResource(R.string.ai_history_reset)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -412,7 +423,7 @@ fun PlanningAIChatScreen(
                         showClearDialog = false
                     },
                 ) {
-                    Text("Conferma", color = Color(0xFFD32F2F))
+                    Text(stringResource(R.string.ai_confirm), color = Color(0xFFD32F2F))
                 }
             },
             dismissButton = {
@@ -548,13 +559,13 @@ fun PlanningActionCard(
                 modifier = Modifier.border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(16.dp)),
             ) {
                 Text(
-                    if (done) "Fatto ✓" else when (action.kind) {
-                        PlanningActionKind.CREATE_EVENT -> "Crea"
-                        PlanningActionKind.CREATE_TODO -> "Aggiungi"
-                        PlanningActionKind.CREATE_GROCERY -> "Aggiungi"
-                        PlanningActionKind.CREATE_NOTE -> "Salva"
-                        PlanningActionKind.SET_REMINDER -> "Attiva"
-                        PlanningActionKind.NAVIGATE -> "Vai"
+                    if (done) stringResource(R.string.ai_done_check) else when (action.kind) {
+                        PlanningActionKind.CREATE_EVENT -> stringResource(R.string.ai_create)
+                        PlanningActionKind.CREATE_TODO -> stringResource(R.string.ai_add)
+                        PlanningActionKind.CREATE_GROCERY -> stringResource(R.string.ai_add)
+                        PlanningActionKind.CREATE_NOTE -> stringResource(R.string.chat_save)
+                        PlanningActionKind.SET_REMINDER -> stringResource(R.string.ai_activate)
+                        PlanningActionKind.NAVIGATE -> stringResource(R.string.ai_go)
                     },
                 )
             }

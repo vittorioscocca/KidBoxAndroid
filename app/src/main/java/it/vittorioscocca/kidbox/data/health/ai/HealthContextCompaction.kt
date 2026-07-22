@@ -14,18 +14,20 @@ enum class HealthContextSendPreference(val storageValue: String) {
     COMPACT_SUMMARY("compact_summary"),
     ;
 
-    val displayName: String
+    @get:androidx.annotation.StringRes
+    val displayNameRes: Int
         get() = when (this) {
-            ASK_EACH_TIME -> "Chiedi ogni volta"
-            FULL_ACCURACY -> "Massima accuratezza"
-            COMPACT_SUMMARY -> "Contesto riassunto"
+            ASK_EACH_TIME -> it.vittorioscocca.kidbox.R.string.settings_ai_ctx_ask_title
+            FULL_ACCURACY -> it.vittorioscocca.kidbox.R.string.settings_ai_ctx_full_title
+            COMPACT_SUMMARY -> it.vittorioscocca.kidbox.R.string.settings_ai_ctx_summary_title
         }
 
-    val detail: String
+    @get:androidx.annotation.StringRes
+    val detailRes: Int
         get() = when (this) {
-            ASK_EACH_TIME -> "Con contesto ampio mostra la scelta prima di ogni invio."
-            FULL_ACCURACY -> "Invia sempre tutti i referti e i dati sanitari completi."
-            COMPACT_SUMMARY -> "Usa un riassunto del profilo sanitario per risparmiare messaggi."
+            ASK_EACH_TIME -> it.vittorioscocca.kidbox.R.string.settings_ai_ctx_ask_detail
+            FULL_ACCURACY -> it.vittorioscocca.kidbox.R.string.settings_ai_ctx_full_detail
+            COMPACT_SUMMARY -> it.vittorioscocca.kidbox.R.string.settings_ai_ctx_summary_detail
         }
 
     val sendMode: HealthContextSendMode?
