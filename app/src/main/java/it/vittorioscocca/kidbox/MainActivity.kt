@@ -39,6 +39,7 @@ import it.vittorioscocca.kidbox.notifications.NotificationDeepLinkRouter
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.navigation.AppNavGraph
 import it.vittorioscocca.kidbox.ui.theme.KidBoxTheme
+import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import it.vittorioscocca.kidbox.util.CrashAnalyzer
 import javax.inject.Inject
 
@@ -114,10 +115,15 @@ class MainActivity : AppCompatActivity() {
                         // strisce sotto le barre di sistema. Serve perché da
                         // API 35 `window.statusBarColor` e `navigationBarColor`
                         // sono no-op: le barre sono trasparenti e sotto si vede
-                        // quello che disegna l'app. Senza questo si vedrebbe
-                        // `windowBackground` del tema XML, che non segue il tema
-                        // scelto in-app (chiaro/scuro/sistema).
-                        .background(MaterialTheme.colorScheme.background)
+                        // quello che disegna l'app.
+                        //
+                        // `kidBoxColors` e NON `MaterialTheme.colorScheme`:
+                        // quest'ultimo è lo schema Material di default (il tema
+                        // passa `lightColorScheme()`/`darkColorScheme()` senza
+                        // personalizzarli), il cui `background` è un bianco
+                        // tendente al lilla. Il fondo vero dell'app è
+                        // #F5F3EE / #1C1C1E e vive in `kidBoxColors`.
+                        .background(MaterialTheme.kidBoxColors.background)
                         .then(
                             if (fullBleed) {
                                 Modifier
