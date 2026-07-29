@@ -463,4 +463,9 @@
     <string name="health_status_done_m">Effectué</string>
     <string name="health_filter_all_n">Tout</string>
     <string name="health_filter_1y_short">1 an</string>
+    <string name="ai_upgrade_health_home">En activant l\'IA, tu peux demander l\'état de santé général, des informations sur les visites et examens, ou demander le dossier médical complet.</string>
+    <string name="ai_upgrade_visits_home">En activant l\'IA, tu peux demander l\'état de toutes les visites médicales et obtenir un résumé complet.</string>
+    <string name="ai_upgrade_visit_detail">En activant l\'IA, tu peux obtenir des informations sur cette visite en fonction des données saisies et du rapport joint.</string>
+    <string name="ai_upgrade_exams_home">En activant l\'IA, tu peux demander l\'état de tous les examens et obtenir un résumé complet.</string>
+    <string name="ai_upgrade_exam_detail">En activant l\'IA, tu peux obtenir des informations sur cet examen en fonction des données saisies et du rapport joint.</string>
 </resources>

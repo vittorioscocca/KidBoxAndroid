@@ -6,11 +6,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -19,31 +16,32 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.BuildConfig
+import it.vittorioscocca.kidbox.domain.model.KBPlan
 
 @Composable
 fun AskAiButton(
     modifier: Modifier = Modifier,
-    isEnabled: Boolean = true,
+    upgradeSubtitle: String? = null,
     contentDescription: String = "Chiedi all'AI",
     onTap: () -> Unit,
 ) {
     val context = LocalContext.current
     val aiSettings = remember(context) { context.getAiSettingsFromApp() }
     val consentGiven by aiSettings.consentGiven.collectAsStateWithLifecycle(initialValue = false)
+    val currentPlan by CurrentPlanStore.plan.collectAsStateWithLifecycle()
+    val isLocked = currentPlan == KBPlan.FREE
+    val upgradeAction = LocalUpgradeAction.current
 
-    var showUpgradeDialog by remember { mutableStateOf(false) }
     var showConsentDialog by remember { mutableStateOf(false) }
 
     FloatingActionButton(
         onClick = {
-            if (!isEnabled) return@FloatingActionButton
-            if (!BuildConfig.AI_ENABLED) {
-                showUpgradeDialog = true
+            if (isLocked || !BuildConfig.AI_ENABLED) {
+                upgradeAction(upgradeSubtitle)
                 return@FloatingActionButton
             }
             if (!consentGiven) {
@@ -56,8 +54,7 @@ fun AskAiButton(
             .navigationBarsPadding()
             .padding(end = 4.dp, bottom = 4.dp)
             .size(56.dp)
-            .shadow(14.dp, CircleShape, clip = false)
-            .graphicsLayer(alpha = if (isEnabled) 1f else 0.4f),
+            .shadow(14.dp, CircleShape, clip = false),
         shape = CircleShape,
         containerColor = Color(0xFFFF6B00),
         contentColor = Color.White,
@@ -70,12 +67,6 @@ fun AskAiButton(
         )
     }
 
-    if (showUpgradeDialog) {
-        UpgradeDialogStub(
-            onDismiss = { showUpgradeDialog = false },
-        )
-    }
-
     if (showConsentDialog) {
         AiConsentDialog(
             onAccept = {
@@ -85,25 +76,4 @@ fun AskAiButton(
             onDismiss = { showConsentDialog = false },
         )
     }
-}
-
-@Composable
-private fun UpgradeDialogStub(
-    onDismiss: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Funzione AI premium") },
-        text = { Text("Per usare l'assistente AI è richiesto un piano con AI abilitata.") },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("OK")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Annulla")
-            }
-        },
-    )
 }

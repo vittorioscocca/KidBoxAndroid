@@ -125,7 +125,6 @@ fun MedicalVisitDetailScreen(
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val isAiGloballyEnabled by viewModel.isAiGloballyEnabled.collectAsStateWithLifecycle()
     var showAiChat by remember { mutableStateOf(false) }
 
     LaunchedEffect(familyId, childId, visitId) { viewModel.bind(familyId, childId, visitId) }
@@ -432,16 +431,14 @@ fun MedicalVisitDetailScreen(
                     }
                 }
 
-                if (isAiGloballyEnabled) {
-                    AskAiButton(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(end = 20.dp, bottom = 92.dp),
-                        isEnabled = true,
-                        contentDescription = stringResource(R.string.health_ask_ai_visit),
-                        onTap = { showAiChat = true },
-                    )
-                }
+                AskAiButton(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 20.dp, bottom = 92.dp),
+                    upgradeSubtitle = stringResource(R.string.ai_upgrade_visit_detail),
+                    contentDescription = stringResource(R.string.health_ask_ai_visit),
+                    onTap = { showAiChat = true },
+                )
             }
         }
     }

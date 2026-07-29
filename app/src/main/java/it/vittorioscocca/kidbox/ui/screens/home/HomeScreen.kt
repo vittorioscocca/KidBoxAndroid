@@ -335,7 +335,6 @@ fun HomeScreen(
 
         // Stesso pulsante AI della card Salute (AskAiButton condiviso).
         AskAiButton(
-            isEnabled = state.familyPlan != KBPlan.FREE,
             contentDescription = stringResource(R.string.home_ai_assistant_desc),
             onTap = { onNavigate(AppDestination.AiChat.createRoute(state.familyId)) },
             modifier = Modifier

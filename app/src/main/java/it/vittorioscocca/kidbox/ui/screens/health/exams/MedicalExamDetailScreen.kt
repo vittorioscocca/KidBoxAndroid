@@ -120,7 +120,6 @@ fun MedicalExamDetailScreen(
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val isAiGloballyEnabled by viewModel.isAiGloballyEnabled.collectAsStateWithLifecycle()
     var showAiChat by remember { mutableStateOf(false) }
 
     LaunchedEffect(familyId, childId, examId) { viewModel.bind(familyId, childId, examId) }
@@ -350,17 +349,15 @@ fun MedicalExamDetailScreen(
                     }
                 }
 
-                if (isAiGloballyEnabled) {
-                    val examLabel = exam.name.ifBlank { "esame" }
-                    AskAiButton(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(end = 20.dp, bottom = 92.dp),
-                        isEnabled = true,
-                        contentDescription = "Chiedi all'AI sull'analisi $examLabel",
-                        onTap = { showAiChat = true },
-                    )
-                }
+                val examLabel = exam.name.ifBlank { "esame" }
+                AskAiButton(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 20.dp, bottom = 92.dp),
+                    upgradeSubtitle = stringResource(R.string.ai_upgrade_exam_detail),
+                    contentDescription = "Chiedi all'AI sull'analisi $examLabel",
+                    onTap = { showAiChat = true },
+                )
             }
         }
     }

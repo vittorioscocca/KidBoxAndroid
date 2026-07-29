@@ -1,9 +1,11 @@
 package it.vittorioscocca.kidbox.util
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.media.MediaMetadataRetriever
 import androidx.exifinterface.media.ExifInterface
+import java.io.File
 import java.io.InputStream
 
 /**
@@ -59,6 +61,40 @@ fun fixBitmapOrientationFromStream(bitmap: Bitmap, stream: InputStream): Bitmap 
             .getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
         applyExifOrientation(bitmap, orientation)
     }.getOrDefault(bitmap)
+
+/**
+ * Decodes a JPEG/PNG file downsampled so that neither dimension exceeds [maxPx].
+ * Uses a two-pass approach (inJustDecodeBounds + inSampleSize) to avoid loading
+ * the full-resolution bitmap into memory unnecessarily.
+ */
+fun decodeSampledFromFile(file: File, maxPx: Int): Bitmap? {
+    val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.absolutePath, opts)
+    opts.inSampleSize = calcInSampleSize(opts, maxPx)
+    opts.inJustDecodeBounds = false
+    return runCatching { BitmapFactory.decodeFile(file.absolutePath, opts) }.getOrNull()
+}
+
+/**
+ * Decodes a JPEG/PNG byte array downsampled so that neither dimension exceeds [maxPx].
+ */
+fun decodeSampledFromBytes(bytes: ByteArray, maxPx: Int): Bitmap? {
+    val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+    opts.inSampleSize = calcInSampleSize(opts, maxPx)
+    opts.inJustDecodeBounds = false
+    return runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts) }.getOrNull()
+}
+
+private fun calcInSampleSize(opts: BitmapFactory.Options, maxPx: Int): Int {
+    val h = opts.outHeight
+    val w = opts.outWidth
+    var sample = 1
+    while ((h / (sample * 2)) >= maxPx || (w / (sample * 2)) >= maxPx) {
+        sample *= 2
+    }
+    return sample
+}
 
 /**
  * Applies the rotation stored in the video container's [MediaMetadataRetriever] to [bitmap].

@@ -6,21 +6,17 @@ import it.vittorioscocca.kidbox.ai.AskAiButton
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 
-/**
- * [AskAiButton] per la Home Salute: descrizione accessibile e abilitazione lato app
- * (es. [it.vittorioscocca.kidbox.ai.AiSettings.isEnabled] + dati presenti).
- */
 @Composable
 fun HealthAskAiButton(
     subjectName: String,
-    isEnabled: Boolean,
+    upgradeSubtitle: String,
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val display = subjectName.ifBlank { stringResource(R.string.health_profile) }
     AskAiButton(
         modifier = modifier,
-        isEnabled = isEnabled,
+        upgradeSubtitle = upgradeSubtitle,
         contentDescription = "Chiedi all'AI sulla salute di $display",
         onTap = onTap,
     )

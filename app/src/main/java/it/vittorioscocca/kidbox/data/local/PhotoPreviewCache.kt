@@ -2,7 +2,7 @@ package it.vittorioscocca.kidbox.data.local
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import it.vittorioscocca.kidbox.util.decodeSampledFromFile
 import java.io.File
 
 /**
@@ -23,7 +23,7 @@ object PhotoPreviewCache {
     fun load(context: Context, photoId: String, bucket: Int): Bitmap? {
         val f = fileFor(context, photoId, bucket)
         if (!f.exists()) return null
-        return runCatching { BitmapFactory.decodeFile(f.absolutePath) }.getOrNull()
+        return decodeSampledFromFile(f, 1024)
     }
 
     fun store(context: Context, bytes: ByteArray, photoId: String, bucket: Int) {

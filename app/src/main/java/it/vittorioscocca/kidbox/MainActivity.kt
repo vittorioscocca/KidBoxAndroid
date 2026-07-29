@@ -1,7 +1,6 @@
 package it.vittorioscocca.kidbox
 
 import android.content.res.Configuration
-import android.graphics.Color
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
@@ -176,17 +175,9 @@ class MainActivity : AppCompatActivity() {
         }
 
     private fun applySystemBarAppearance(darkTheme: Boolean) {
-        val background = if (darkTheme) COLOR_BACKGROUND_DARK else COLOR_BACKGROUND_LIGHT
-        window.statusBarColor = background
-        window.navigationBarColor = background
         WindowInsetsControllerCompat(window, window.decorView).apply {
             isAppearanceLightStatusBars = !darkTheme
             isAppearanceLightNavigationBars = !darkTheme
         }
-    }
-
-    private companion object {
-        private val COLOR_BACKGROUND_LIGHT = Color.parseColor("#FFF5F3EE")
-        private val COLOR_BACKGROUND_DARK = Color.parseColor("#FF1C1C1E")
     }
 }

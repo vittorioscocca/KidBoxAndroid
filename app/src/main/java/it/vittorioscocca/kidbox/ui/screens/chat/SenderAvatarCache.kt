@@ -2,8 +2,9 @@ package it.vittorioscocca.kidbox.ui.screens.chat
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import com.google.firebase.storage.FirebaseStorage
+import it.vittorioscocca.kidbox.util.decodeSampledFromBytes
+import it.vittorioscocca.kidbox.util.decodeSampledFromFile
 import com.google.firebase.storage.StorageException
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -44,9 +45,7 @@ internal object SenderAvatarCache {
 
         val disk = diskFile(context, uid)
         if (disk.exists()) {
-            runCatching {
-                BitmapFactory.decodeFile(disk.absolutePath)
-            }.getOrNull()?.let { bitmap ->
+            decodeSampledFromFile(disk, 256)?.let { bitmap ->
                 memory[uid] = Entry.Image(bitmap)
                 return bitmap
             }
@@ -64,7 +63,7 @@ internal object SenderAvatarCache {
             for (path in paths) {
                 val bitmap = runCatching {
                     val bytes = storage.reference.child(path).getBytes(5L * 1024L * 1024L).await()
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.also { bmp ->
+                    decodeSampledFromBytes(bytes, 256)?.also { bmp ->
                         disk.parentFile?.mkdirs()
                         runCatching { disk.writeBytes(bytes) }
                         memory[uid] = Entry.Image(bmp)

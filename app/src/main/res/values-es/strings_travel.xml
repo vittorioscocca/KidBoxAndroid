@@ -164,6 +164,12 @@
     <string name="onboarding_copied">¡Copiado!</string>
     <string name="onboarding_copy_code">Copiar código</string>
     <string name="onboarding_invite_later">También puedes hacerlo después desde Ajustes → Invitar a la pareja</string>
+    <string name="onboarding_invite_title">Envía el enlace a tu pareja</string>
+    <string name="onboarding_invite_subtitle">Envía por WhatsApp o SMS — puede unirse después, no hace falta estar cerca.</string>
+    <string name="onboarding_share_link">Enviar enlace a la pareja</string>
+    <string name="onboarding_show_qr">O muestra el código QR si estáis cerca</string>
+    <string name="onboarding_did_share">He enviado el enlace</string>
+    <string name="onboarding_skip_invite">Hacerlo después →</string>
     <string name="onboarding_how_start">¿Cómo quieres empezar?</string>
     <string name="onboarding_choose_hint">Elige si crear una familia nueva o unirte a una existente.</string>
     <string name="onboarding_creator_hint">Serás el creador y podrás invitar a tu pareja.</string>

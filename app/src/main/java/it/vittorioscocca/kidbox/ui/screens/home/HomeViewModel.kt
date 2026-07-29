@@ -381,6 +381,7 @@ class HomeViewModel @Inject constructor(
                 }
                 subscriptionRepository.planFlow(familyId, uid).collectLatest { plan ->
                     _uiState.value = _uiState.value.copy(familyPlan = plan)
+                    it.vittorioscocca.kidbox.ai.CurrentPlanStore.update(plan)
                 }
             }
         }

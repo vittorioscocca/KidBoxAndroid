@@ -75,7 +75,6 @@ fun HealthHomeScreen(
     val context = LocalContext.current
     val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val isAiGloballyEnabled by viewModel.isAiGloballyEnabled.collectAsStateWithLifecycle()
 
     LaunchedEffect(familyId, childId) { viewModel.load(familyId, childId) }
 
@@ -248,12 +247,9 @@ fun HealthHomeScreen(
                 .align(Alignment.BottomEnd)
                 .padding(end = 20.dp, bottom = 20.dp),
         ) {
-            val askEnabled = isAiGloballyEnabled &&
-                (state.visitCount > 0 || state.examCount > 0 ||
-                    state.activeTreatmentCount > 0 || state.vaccineCount > 0)
             HealthAskAiButton(
                 subjectName = state.subjectName,
-                isEnabled = askEnabled,
+                upgradeSubtitle = stringResource(R.string.ai_upgrade_health_home),
                 onTap = {
                     val subjectLabel = state.subjectName.ifBlank { context.getString(R.string.health_profile) }
                     onNavigate(

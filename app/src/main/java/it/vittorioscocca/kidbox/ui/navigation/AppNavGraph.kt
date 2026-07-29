@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox.ui.navigation
 
 import it.vittorioscocca.kidbox.util.KBLog
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -10,6 +11,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.hilt.navigation.compose.hiltViewModel
+import it.vittorioscocca.kidbox.ai.LocalUpgradeAction
+import it.vittorioscocca.kidbox.ai.UpgradeMessageStore
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.NavHostController
@@ -146,6 +149,13 @@ fun AppNavGraph(
         navController.navigate(route) { launchSingleTop = true }
         NotificationDeepLinkRouter.clear()
     }
+
+    CompositionLocalProvider(
+        LocalUpgradeAction provides { msg ->
+            UpgradeMessageStore.set(msg)
+            navController.navigate(AppDestination.Plans.route) { launchSingleTop = true }
+        },
+    ) {
 
     // Annuncio dalla console admin: non è una destinazione, quindi vive sopra il
     // NavHost e non tocca il back stack.
@@ -1844,6 +1854,7 @@ fun AppNavGraph(
 
         composable(
             route = AppDestination.AiChat.route,
+
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
         ) { backStackEntry ->
             val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
@@ -1894,6 +1905,8 @@ fun AppNavGraph(
             )
         }
     }
+
+    } // end CompositionLocalProvider
 }
 
 @Composable

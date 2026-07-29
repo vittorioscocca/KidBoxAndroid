@@ -123,7 +123,6 @@ fun MedicalVisitsScreen(
     val context = LocalContext.current
     val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val isAiGloballyEnabled by viewModel.isAiGloballyEnabled.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     var showFilterSheet by remember { mutableStateOf(false) }
@@ -332,17 +331,14 @@ fun MedicalVisitsScreen(
             }
 
             val displayName = state.childName.ifBlank { stringResource(R.string.health_profile) }
-            val showVisitsAiFab = isAiGloballyEnabled &&
-                !state.isSelecting &&
-                !state.isLoading &&
-                state.filteredVisitCount > 0
+            val showVisitsAiFab = !state.isSelecting && state.filteredVisitCount > 0
             if (showVisitsAiFab) {
                 AskAiButton(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(end = 20.dp, bottom = 0.dp)
                         .offset(y = 16.dp),
-                    isEnabled = true,
+                    upgradeSubtitle = stringResource(R.string.ai_upgrade_visits_home),
                     contentDescription = "Chiedi all'AI sulle visite di $displayName",
                     onTap = {
                         val ids = (

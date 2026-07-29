@@ -463,4 +463,9 @@
     <string name="health_status_done_m">Done</string>
     <string name="health_filter_all_n">All</string>
     <string name="health_filter_1y_short">1 year</string>
+    <string name="ai_upgrade_health_home">With AI enabled, you can ask about overall health status, visit and exam results, or request the complete clinical record.</string>
+    <string name="ai_upgrade_visits_home">With AI enabled, you can ask about the status of all medical visits and get a full summary.</string>
+    <string name="ai_upgrade_visit_detail">With AI enabled, you can ask about this specific visit based on the entered data and attached report.</string>
+    <string name="ai_upgrade_exams_home">With AI enabled, you can ask about the status of all exams and get a full summary.</string>
+    <string name="ai_upgrade_exam_detail">With AI enabled, you can ask about this specific exam based on the entered data and attached report.</string>
 </resources>

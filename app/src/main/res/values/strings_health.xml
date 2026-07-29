@@ -463,4 +463,9 @@
     <string name="health_status_done_m">Eseguito</string>
     <string name="health_filter_all_n">Tutto</string>
     <string name="health_filter_1y_short">1 anno</string>
+    <string name="ai_upgrade_health_home">Attivando l\'AI puoi chiedere lo stato di salute complessivo, informazioni sulle visite e sugli esami o richiedere la cartella clinica completa.</string>
+    <string name="ai_upgrade_visits_home">Attivando l\'AI puoi chiedere lo stato di tutte le visite mediche e ottenere un riepilogo completo.</string>
+    <string name="ai_upgrade_visit_detail">Attivando l\'AI puoi chiedere informazioni sulla singola visita in base ai dati inseriti e al referto allegato.</string>
+    <string name="ai_upgrade_exams_home">Attivando l\'AI puoi chiedere lo stato di tutti gli esami e ottenere un riepilogo completo.</string>
+    <string name="ai_upgrade_exam_detail">Attivando l\'AI puoi chiedere informazioni sul singolo esame in base ai dati inseriti e al referto allegato.</string>
 </resources>

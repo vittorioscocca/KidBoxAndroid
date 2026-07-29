@@ -10,7 +10,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -107,15 +106,6 @@ fun KidBoxTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            // NIENTE `setDecorFitsSystemWindows` qui. Girava a ogni
-            // ricomposizione e annullava l'edge-to-edge impostato in
-            // `MainActivity`: il proprietario di quell'impostazione dev'essere
-            // uno solo. `statusBarColor`/`navigationBarColor` restano perché
-            // servono ancora sotto API 35 — sopra sono no-op e il colore lo
-            // dipinge la radice della UI.
-            val bg = kidBoxColors.background.toArgb()
-            window.statusBarColor = bg
-            window.navigationBarColor = bg
             val controller = WindowInsetsControllerCompat(window, view)
             controller.isAppearanceLightStatusBars = !darkTheme
             controller.isAppearanceLightNavigationBars = !darkTheme

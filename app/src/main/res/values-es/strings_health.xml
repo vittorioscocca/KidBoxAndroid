@@ -463,4 +463,9 @@
     <string name="health_status_done_m">Realizado</string>
     <string name="health_filter_all_n">Todo</string>
     <string name="health_filter_1y_short">1 año</string>
+    <string name="ai_upgrade_health_home">Activando la IA puedes consultar el estado de salud general, información sobre visitas y análisis, o solicitar el historial médico completo.</string>
+    <string name="ai_upgrade_visits_home">Activando la IA puedes consultar el estado de todas las visitas médicas y obtener un resumen completo.</string>
+    <string name="ai_upgrade_visit_detail">Activando la IA puedes consultar información sobre esta visita concreta según los datos introducidos y el informe adjunto.</string>
+    <string name="ai_upgrade_exams_home">Activando la IA puedes consultar el estado de todos los análisis y obtener un resumen completo.</string>
+    <string name="ai_upgrade_exam_detail">Activando la IA puedes consultar información sobre este análisis concreto según los datos introducidos y el informe adjunto.</string>
 </resources>

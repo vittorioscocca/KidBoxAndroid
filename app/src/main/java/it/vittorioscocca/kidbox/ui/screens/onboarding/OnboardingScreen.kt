@@ -215,6 +215,7 @@ fun OnboardingScreen(
                     )
                     else -> InvitePartnerPageContent(
                         familyId = createdFamilyId.orEmpty(),
+                        onFinish = { onFamilyCreated(createdFamilyId.orEmpty()) },
                     )
                 }
             }
@@ -235,6 +236,7 @@ fun OnboardingScreen(
             }
 
             val isJoinPage = currentPage == 4 && familyPath == FamilyPath.Join
+            val isInvitePage = currentPage == 5 && familyPath == FamilyPath.Create
             val ctaEnabled = when (currentPage) {
                 3 -> familyPath != null
                 4 -> when (familyPath) {
@@ -247,7 +249,7 @@ fun OnboardingScreen(
             }
             val ctaLabel = if (currentPage == totalPages - 1) stringResource(R.string.onboarding_start) else stringResource(R.string.travel_continue)
 
-            if (isJoinPage) {
+            if (isJoinPage || isInvitePage) {
                 Spacer(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -694,7 +696,10 @@ private fun formatBirthLabel(millis: Long): String {
 }
 
 @Composable
-private fun InvitePartnerPageContent(familyId: String) {
+private fun InvitePartnerPageContent(
+    familyId: String,
+    onFinish: () -> Unit,
+) {
     val context = LocalContext.current
     val viewModel: InviteCodeViewModel = hiltViewModel()
     val isBusy by viewModel.isBusy.collectAsStateWithLifecycle()
@@ -702,6 +707,7 @@ private fun InvitePartnerPageContent(familyId: String) {
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val code by viewModel.code.collectAsStateWithLifecycle()
     var didCopy by remember { mutableStateOf(false) }
+    var showQr by remember { mutableStateOf(false) }
 
     LaunchedEffect(familyId) {
         if (familyId.isNotBlank()) {
@@ -715,8 +721,10 @@ private fun InvitePartnerPageContent(familyId: String) {
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
     ) {
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // ── Header ──
         Box(
             modifier = Modifier
                 .size(72.dp)
@@ -724,124 +732,63 @@ private fun InvitePartnerPageContent(familyId: String) {
                 .background(OrangeAccent.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                Icons.Filled.People,
-                contentDescription = null,
-                tint = OrangeAccent,
-                modifier = Modifier.size(32.dp),
-            )
+            Icon(Icons.Filled.People, contentDescription = null, tint = OrangeAccent, modifier = Modifier.size(32.dp))
         }
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            stringResource(R.string.onboarding_add_partner),
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Bold,
-            color = BlackText,
-            textAlign = TextAlign.Center,
+            stringResource(R.string.onboarding_invite_title),
+            fontSize = 26.sp, fontWeight = FontWeight.Bold, color = BlackText, textAlign = TextAlign.Center,
         )
         Text(
-            stringResource(R.string.onboarding_scan_hint),
-            fontSize = 17.sp,
-            color = GraySubtitle,
-            textAlign = TextAlign.Center,
-            lineHeight = 24.sp,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
+            stringResource(R.string.onboarding_invite_subtitle),
+            fontSize = 16.sp, color = GraySubtitle, textAlign = TextAlign.Center, lineHeight = 23.sp,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
         )
+        Spacer(modifier = Modifier.height(8.dp))
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(Color.White)
-                .shadow(
-                    elevation = 12.dp,
-                    shape = RoundedCornerShape(20.dp),
-                    spotColor = OrangeAccent.copy(alpha = 0.12f),
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            when {
-                isBusy -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 28.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        CircularProgressIndicator(color = OrangeAccent)
-                        Text(stringResource(R.string.onboarding_generating_qr), color = GraySubtitle, fontSize = 14.sp)
-                    }
-                }
-                qrPayload != null -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        QRCodeView(
-                            payload = qrPayload.orEmpty(),
-                            modifier = Modifier.size(156.dp),
-                        )
-                        Text(stringResource(R.string.onboarding_valid_24h), fontSize = 13.sp, color = GrayCaption)
-                    }
-                }
-                errorMessage != null -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 24.dp, horizontal = 20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Warning,
-                            contentDescription = null,
-                            tint = Color(0xFFFF9800),
-                            modifier = Modifier.size(28.dp),
-                        )
-                        Text(
-                            text = errorMessage.orEmpty(),
-                            color = GraySubtitle,
-                            fontSize = 14.sp,
-                            textAlign = TextAlign.Center,
-                        )
-                        TextButton(onClick = viewModel::generateInviteCode) {
-                            Text(stringResource(R.string.onboarding_retry), color = OrangeAccent)
-                        }
-                    }
-                }
-                else -> {
-                    Spacer(modifier = Modifier.height(180.dp))
+        // ── Pulsante condividi (primario) ──
+        when {
+            isBusy -> {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(GrayCaption.copy(alpha = 0.08f))
+                        .padding(vertical = 16.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = OrangeAccent)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(stringResource(R.string.onboarding_generating_qr), fontSize = 14.sp, color = GraySubtitle)
                 }
             }
-        }
-
-        if (qrPayload != null) {
-            Spacer(modifier = Modifier.height(20.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                OutlinedSoftButton(
-                    modifier = Modifier.weight(1f),
-                    containerColor = OrangeAccent.copy(alpha = 0.10f),
-                    contentColor = OrangeAccent,
-                    icon = Icons.Filled.Share,
-                    label = stringResource(R.string.onboarding_share),
-                    onClick = {
-                        val shareText = "KidBox — codice invito: ${code.orEmpty()}"
-                        val send = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, shareText)
+            !code.isNullOrBlank() -> {
+                val shareText = "KidBox — codice invito: ${code.orEmpty()}"
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(16.dp), spotColor = OrangeAccent.copy(alpha = 0.35f))
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Brush.horizontalGradient(listOf(Color(0xFFFFBF40), OrangeAccent)))
+                        .clickable {
+                            val send = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, shareText)
+                            }
+                            context.startActivity(Intent.createChooser(send, context.getString(R.string.onboarding_share_link)))
                         }
-                        context.startActivity(Intent.createChooser(send, context.getString(R.string.onboarding_share)))
-                    },
-                )
+                        .padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Icon(Icons.Filled.Share, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                        Text(stringResource(R.string.onboarding_share_link), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
                 OutlinedSoftButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     containerColor = GraySubtitle.copy(alpha = 0.08f),
                     contentColor = if (didCopy) SuccessGreen else GraySubtitle,
                     icon = if (didCopy) Icons.Filled.CheckCircle else Icons.Filled.ContentCopy,
@@ -852,27 +799,90 @@ private fun InvitePartnerPageContent(familyId: String) {
                             runCatching {
                                 val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                 cm.setPrimaryClip(ClipData.newPlainText("kidbox_invite_code", value))
-                            }.onSuccess {
-                                didCopy = true
-                            }
+                            }.onSuccess { didCopy = true }
                         }
                     },
                 )
+                LaunchedEffect(didCopy) {
+                    if (didCopy) { kotlinx.coroutines.delay(2000); didCopy = false }
+                }
             }
-            LaunchedEffect(didCopy) {
-                if (didCopy) {
-                    kotlinx.coroutines.delay(2000)
-                    didCopy = false
+            errorMessage != null -> {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(Icons.Filled.Warning, contentDescription = null, tint = Color(0xFFFF9800), modifier = Modifier.size(28.dp))
+                    Text(errorMessage.orEmpty(), color = GraySubtitle, fontSize = 14.sp, textAlign = TextAlign.Center)
+                    TextButton(onClick = viewModel::generateInviteCode) {
+                        Text(stringResource(R.string.onboarding_retry), color = OrangeAccent)
+                    }
                 }
             }
         }
-        Text(
-            stringResource(R.string.onboarding_invite_later),
-            fontSize = 12.sp,
-            color = GrayCaption,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 16.dp, bottom = 24.dp),
-        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ── QR collassabile (secondario) ──
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showQr = !showQr }
+                    .padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.onboarding_show_qr),
+                    fontSize = 14.sp, color = GraySubtitle,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    if (showQr) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                    contentDescription = null, tint = GrayCaption, modifier = Modifier.size(20.dp),
+                )
+            }
+            if (showQr && qrPayload != null) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.White)
+                        .padding(vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    QRCodeView(payload = qrPayload.orEmpty(), modifier = Modifier.size(140.dp))
+                    Text(stringResource(R.string.onboarding_valid_24h), fontSize = 12.sp, color = GrayCaption)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        androidx.compose.material3.HorizontalDivider(color = GrayFieldBorder)
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ── Bottoni di completamento ──
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Brush.horizontalGradient(listOf(Color(0xFFFFBF40), OrangeAccent)))
+                .clickable { onFinish() }
+                .padding(vertical = 16.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                Text(stringResource(R.string.onboarding_did_share), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+            }
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        TextButton(onClick = onFinish, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.onboarding_skip_invite), fontSize = 15.sp, color = GrayCaption)
+        }
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 
