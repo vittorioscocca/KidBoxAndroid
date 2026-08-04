@@ -18,4 +18,10 @@
     <string name="nudge_calendar_body">Appointments, sports, birthdays: who\'s going, when, and who\'s taking care of it. Without chasing each other over messages.</string>
     <string name="settings_notif_tips">KidBox tips</string>
     <string name="settings_notif_tips_sub">Occasional suggestions about features you haven\'t tried yet.</string>
+    <string name="settings_notif_blocked">Notifications blocked</string>
+    <string name="settings_notif_blocked_sub">KidBox can\'t send you notifications because they\'re turned off in your system settings. Tap to re-enable them.</string>
+    <string name="push_priming_title">Stay in sync with your family</string>
+    <string name="push_priming_body">We\'ll let you know when someone uploads a document, adds an expense, sends a chat message or a deadline is coming up. You can choose which notifications to receive in Settings.</string>
+    <string name="push_priming_enable">Turn on notifications</string>
+    <string name="push_priming_later">Not now</string>
 </resources>

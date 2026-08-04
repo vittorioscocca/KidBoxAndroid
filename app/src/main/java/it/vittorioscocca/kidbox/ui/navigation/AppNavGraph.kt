@@ -23,6 +23,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
 import it.vittorioscocca.kidbox.notifications.NotificationDeepLinkRouter
 import it.vittorioscocca.kidbox.notifications.nudge.NudgeDestination
+import it.vittorioscocca.kidbox.ui.PushPrimingGate
+import androidx.navigation.compose.currentBackStackEntryAsState
 import it.vittorioscocca.kidbox.ui.BroadcastMessageDialog
 import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
 import it.vittorioscocca.kidbox.ui.family.FamilySwitcherViewModel
@@ -156,6 +158,17 @@ fun AppNavGraph(
             navController.navigate(AppDestination.Plans.route) { launchSingleTop = true }
         },
     ) {
+
+    // Priming permesso notifiche al primo accesso. Solo quando l'utente è
+    // "dentro": su Login/Onboarding non ha ancora senso chiederlo, e non c'è
+    // token da registrare finché non è autenticato con una famiglia.
+    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+    if (currentRoute != null &&
+        currentRoute != AppDestination.Login.route &&
+        currentRoute != AppDestination.Onboarding.route
+    ) {
+        PushPrimingGate()
+    }
 
     // Annuncio dalla console admin: non è una destinazione, quindi vive sopra il
     // NavHost e non tocca il back stack.

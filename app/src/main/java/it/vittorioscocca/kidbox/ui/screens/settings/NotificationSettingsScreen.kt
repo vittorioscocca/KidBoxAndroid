@@ -35,6 +35,11 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.core.app.NotificationManagerCompat
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -67,6 +72,24 @@ fun NotificationSettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var pendingEnableKey by remember { mutableStateOf<String?>(null) }
     var isNotificationChannelSilent by remember { mutableStateOf(false) }
+    // Permesso notifiche di sistema negato (Android 13+) o notifiche disattivate
+    // dalle impostazioni di sistema. In quel caso non arriva niente, comunque
+    // siano le preferenze qui sotto: toggle spenti e disabilitati, banner col
+    // vero motivo. `areNotificationsEnabled` copre anche <33, dove non c'è
+    // permesso runtime ma l'utente può comunque averle disattivate a mano.
+    var systemDenied by remember {
+        mutableStateOf(!NotificationManagerCompat.from(context).areNotificationsEnabled())
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                systemDenied = !NotificationManagerCompat.from(context).areNotificationsEnabled()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -130,6 +153,46 @@ fun NotificationSettingsScreen(
             )
         }
         Spacer(Modifier.height(12.dp))
+        if (systemDenied) {
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = kb.card),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            // Impostazioni notifiche dell'app: da qui l'utente
+                            // riattiva il permesso di sistema.
+                            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_notif_blocked),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = kb.title,
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_notif_blocked_sub),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = kb.subtitle,
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_notif_open),
+                        color = Color(0xFFFF6B00),
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
         Card(
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = kb.card),
@@ -174,8 +237,8 @@ fun NotificationSettingsScreen(
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_documents),
                 subtitle = stringResource(R.string.settings_notif_documents_sub),
-                checked = state.notifyOnNewDocs,
-                enabled = !state.isLoading && pendingEnableKey == null,
+                checked = state.notifyOnNewDocs && !systemDenied,
+                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
                 onCheckedChange = { enabled ->
                     updatePreferenceWithPermission(
                         key = PreferenceKeys.NOTIFY_ON_NEW_DOCS,
@@ -194,8 +257,8 @@ fun NotificationSettingsScreen(
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_chat),
                 subtitle = stringResource(R.string.settings_notif_chat_sub),
-                checked = state.notifyOnNewMessages,
-                enabled = !state.isLoading && pendingEnableKey == null,
+                checked = state.notifyOnNewMessages && !systemDenied,
+                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
                 onCheckedChange = { enabled ->
                     updatePreferenceWithPermission(
                         key = PreferenceKeys.NOTIFY_ON_NEW_MESSAGES,
@@ -214,8 +277,8 @@ fun NotificationSettingsScreen(
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_location),
                 subtitle = stringResource(R.string.settings_notif_location_sub),
-                checked = state.notifyOnLocationSharing,
-                enabled = !state.isLoading && pendingEnableKey == null,
+                checked = state.notifyOnLocationSharing && !systemDenied,
+                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
                 onCheckedChange = { enabled ->
                     updatePreferenceWithPermission(
                         key = PreferenceKeys.NOTIFY_ON_LOCATION_SHARING,
@@ -234,8 +297,8 @@ fun NotificationSettingsScreen(
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_todo),
                 subtitle = stringResource(R.string.settings_notif_todo_sub),
-                checked = state.notifyOnTodoAssigned,
-                enabled = !state.isLoading && pendingEnableKey == null,
+                checked = state.notifyOnTodoAssigned && !systemDenied,
+                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
                 onCheckedChange = { enabled ->
                     updatePreferenceWithPermission(
                         key = PreferenceKeys.NOTIFY_ON_TODO_ASSIGNED,
@@ -254,8 +317,8 @@ fun NotificationSettingsScreen(
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_shopping),
                 subtitle = stringResource(R.string.settings_notif_shopping_sub),
-                checked = state.notifyOnNewGroceryItem,
-                enabled = !state.isLoading && pendingEnableKey == null,
+                checked = state.notifyOnNewGroceryItem && !systemDenied,
+                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
                 onCheckedChange = { enabled ->
                     updatePreferenceWithPermission(
                         key = PreferenceKeys.NOTIFY_ON_NEW_GROCERY_ITEM,
@@ -274,8 +337,8 @@ fun NotificationSettingsScreen(
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_notes),
                 subtitle = stringResource(R.string.settings_notif_notes_sub),
-                checked = state.notifyOnNewNote,
-                enabled = !state.isLoading && pendingEnableKey == null,
+                checked = state.notifyOnNewNote && !systemDenied,
+                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
                 onCheckedChange = { enabled ->
                     updatePreferenceWithPermission(
                         key = PreferenceKeys.NOTIFY_ON_NEW_NOTE,
@@ -294,8 +357,8 @@ fun NotificationSettingsScreen(
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_calendar),
                 subtitle = stringResource(R.string.settings_notif_calendar_sub),
-                checked = state.notifyOnNewCalendarEvent,
-                enabled = !state.isLoading && pendingEnableKey == null,
+                checked = state.notifyOnNewCalendarEvent && !systemDenied,
+                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
                 onCheckedChange = { enabled ->
                     updatePreferenceWithPermission(
                         key = PreferenceKeys.NOTIFY_ON_NEW_CALENDAR_EVENT,
@@ -314,8 +377,8 @@ fun NotificationSettingsScreen(
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_expenses),
                 subtitle = stringResource(R.string.settings_notif_expenses_sub),
-                checked = state.notifyOnNewExpense,
-                enabled = !state.isLoading && pendingEnableKey == null,
+                checked = state.notifyOnNewExpense && !systemDenied,
+                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
                 onCheckedChange = { enabled ->
                     updatePreferenceWithPermission(
                         key = PreferenceKeys.NOTIFY_ON_NEW_EXPENSE,
@@ -334,18 +397,18 @@ fun NotificationSettingsScreen(
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_tips),
                 subtitle = stringResource(R.string.settings_notif_tips_sub),
-                checked = state.nudgesEnabled,
+                checked = state.nudgesEnabled && !systemDenied,
                 // Non passa da `updatePreferenceWithPermission`: spegnere non
                 // richiede alcun permesso, e riaccendere non deve chiederlo a
                 // freddo — il motore verifica da sé se può notificare.
-                enabled = !state.isLoading,
+                enabled = !state.isLoading && !systemDenied,
                 onCheckedChange = { viewModel.setNudgesEnabled(it) },
             )
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_wallet),
                 subtitle = stringResource(R.string.settings_notif_wallet_sub),
-                checked = state.notifyOnWalletReminder,
-                enabled = !state.isLoading && pendingEnableKey == null,
+                checked = state.notifyOnWalletReminder && !systemDenied,
+                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
                 onCheckedChange = { enabled ->
                     if (!enabled) {
                         viewModel.setWalletReminderLocal(false)

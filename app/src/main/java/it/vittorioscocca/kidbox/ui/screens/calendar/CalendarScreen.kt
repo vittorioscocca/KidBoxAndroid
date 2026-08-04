@@ -284,7 +284,7 @@ private fun CalendarMonthView(
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-            listOf("D", "L", "M", "M", "G", "V", "S").forEach { d ->
+            listOf("L", "M", "M", "G", "V", "S", "D").forEach { d ->
                 Text(
                     text = d,
                     modifier = Modifier.weight(1f),
@@ -1081,8 +1081,8 @@ private fun calendarTextFieldColors() = TextFieldDefaults.colors(
 )
 
 private fun monthGridDays(monthFirstDate: LocalDate): List<LocalDate?> {
-    // iOS usa prima colonna Domenica (D)
-    val leadingEmpty = monthFirstDate.dayOfWeek.value % 7
+    // Prima colonna Lunedì (L), come iOS e convenzione italiana.
+    val leadingEmpty = monthFirstDate.dayOfWeek.value - 1
     val daysInMonth = monthFirstDate.lengthOfMonth()
     val result = mutableListOf<LocalDate?>()
     repeat(leadingEmpty) { result.add(null) }

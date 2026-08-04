@@ -18,4 +18,10 @@
     <string name="nudge_calendar_body">Citas, deporte, cumpleaños: quién va, cuándo y quién se encarga. Sin perseguiros a mensajes.</string>
     <string name="settings_notif_tips">Consejos de KidBox</string>
     <string name="settings_notif_tips_sub">Sugerencias ocasionales sobre funciones que aún no has probado.</string>
+    <string name="settings_notif_blocked">Notificaciones bloqueadas</string>
+    <string name="settings_notif_blocked_sub">KidBox no puede enviarte notificaciones porque están desactivadas en los ajustes del sistema. Toca para reactivarlas.</string>
+    <string name="push_priming_title">Mantente al día con tu familia</string>
+    <string name="push_priming_body">Te avisamos cuando un miembro sube un documento, añade un gasto, escribe en el chat o se acerca un vencimiento. Podrás elegir qué notificaciones recibir en Ajustes.</string>
+    <string name="push_priming_enable">Activar notificaciones</string>
+    <string name="push_priming_later">Ahora no</string>
 </resources>
