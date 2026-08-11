@@ -112,6 +112,8 @@ import it.vittorioscocca.kidbox.ui.screens.travel.TravelCategoryResultsScreen
 import it.vittorioscocca.kidbox.ui.screens.travel.TravelDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.travel.TravelItineraryStopContext
 import it.vittorioscocca.kidbox.ui.screens.travel.TravelPlaceDetailScreen
+import it.vittorioscocca.kidbox.ui.screens.travel.TravelPlaceInfoScreen
+import it.vittorioscocca.kidbox.ui.screens.travel.TravelPlacesMapScreen
 import it.vittorioscocca.kidbox.ui.screens.travel.decodeNavArg
 import it.vittorioscocca.kidbox.ui.screens.travel.TravelDestinationDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.travel.TravelDiscoverScreen
@@ -1833,6 +1835,26 @@ fun AppNavGraph(
         }
 
         composable(
+            route = AppDestination.TravelPlacesMap.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("tripId") { type = NavType.StringType },
+                navArgument("kind") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val tripId = backStackEntry.arguments?.getString("tripId").orEmpty()
+            val kind = backStackEntry.arguments?.getString("kind").orEmpty()
+            TravelPlacesMapScreen(
+                familyId = familyId,
+                tripId = tripId,
+                kind = kind,
+                navController = navController,
+                backStackEntry = backStackEntry,
+            )
+        }
+
+        composable(
             route = AppDestination.TravelPlaceDetail.route,
             arguments = listOf(
                 navArgument("familyId") { type = NavType.StringType },
@@ -1858,6 +1880,22 @@ fun AppNavGraph(
             )
             TravelPlaceDetailScreen(
                 context = context,
+                familyId = familyId,
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.TravelPlaceInfo.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("placeName") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val placeName = decodeNavArg(backStackEntry.arguments?.getString("placeName"))
+            TravelPlaceInfoScreen(
+                placeName = placeName,
                 familyId = familyId,
                 onBack = { navController.popBackStack() },
             )

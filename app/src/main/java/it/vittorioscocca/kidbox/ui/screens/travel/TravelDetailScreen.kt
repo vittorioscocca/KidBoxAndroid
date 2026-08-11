@@ -106,6 +106,13 @@ fun TravelDetailScreen(
         }
     }
 
+    val deleteTripError by viewModel.deleteTripError.collectAsStateWithLifecycle()
+    LaunchedEffect(deleteTripError) {
+        deleteTripError?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
     LaunchedEffect(dayRegenerateSuccess) {
         dayRegenerateSuccess?.let { message ->
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
@@ -235,6 +242,11 @@ fun TravelDetailScreen(
                             onActivitiesClick = {
                                 navController.navigate(
                                     AppDestination.TravelCategoryResults.createRoute(familyId, tripId, "activities"),
+                                )
+                            },
+                            onPlaceInfoClick = {
+                                navController.navigate(
+                                    AppDestination.TravelPlaceInfo.createRoute(familyId, overview.destinationTitle),
                                 )
                             },
                             onStopClick = { stopContext ->

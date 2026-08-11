@@ -101,13 +101,21 @@ class TripRemoteStore @Inject constructor(
         syncSubcollections(familyId, trip.id)
     }
 
-    suspend fun deleteTrip(trip: KBTripEntity) {
-        runCatching {
+    /**
+     * @return `false` se la cancellazione remota del documento viaggio non è
+     *   riuscita: in quel caso NON si tocca il locale, altrimenti il viaggio
+     *   sparisce dal device ma resta su Firestore e torna al primo snapshot
+     *   del listener — sembrando che Elimina non abbia funzionato.
+     */
+    suspend fun deleteTrip(trip: KBTripEntity): Boolean {
+        return try {
             deleteTripRemote(trip)
-        }.onFailure { err ->
+            deleteTripLocally(trip.id)
+            true
+        } catch (err: Exception) {
             KBLog.data.error("Trip remote delete failed tripId=${trip.id}", TAG, err)
+            false
         }
-        deleteTripLocally(trip.id)
     }
 
     private suspend fun deleteTripRemote(trip: KBTripEntity) {
@@ -116,11 +124,23 @@ class TripRemoteStore @Inject constructor(
             .collection("trips")
             .document(trip.id)
 
-        deleteCollection(tripRef.collection("legs"))
-        deleteCollection(tripRef.collection("dayPlans"))
-        deleteCollection(tripRef.collection("packingItems"))
-        deleteCollection(tripRef.collection("expenses"))
+        // Il documento PRIMA delle sottocollezioni.
+        //
+        // Prima era il contrario, e bastava che una sottocollezione fallisse
+        // a metà perché il delete del documento non venisse mai raggiunto:
+        // il viaggio restava su Firestore e riappariva al primo snapshot.
+        // Cancellando prima il padre la sparizione è garantita; se la pulizia
+        // successiva fallisce restano sottocollezioni orfane, invisibili
+        // perché si elencano i viaggi dal documento padre — spazio sprecato,
+        // meglio di un delete che non cancella.
         tripRef.delete().await()
+
+        for (name in listOf("legs", "dayPlans", "packingItems", "expenses")) {
+            runCatching { deleteCollection(tripRef.collection(name)) }
+                .onFailure { err ->
+                    KBLog.data.warning("Trip cleanup: $name failed tripId=${trip.id} err=${err.message}", TAG)
+                }
+        }
     }
 
     private suspend fun deleteCollection(

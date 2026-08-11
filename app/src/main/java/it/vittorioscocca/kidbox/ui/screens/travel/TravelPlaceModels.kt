@@ -28,6 +28,28 @@ data class TravelPlaceDetails(
     val hasCoordinates: Boolean get() = latitude != 0.0 || longitude != 0.0
 }
 
+enum class TravelPlaceSearchKind(val rawValue: String) {
+    RESTAURANT("restaurant"),
+    HOTEL("hotel"),
+    ATTRACTION("attraction"),
+}
+
+data class TravelPlaceSummary(
+    val placeId: String,
+    val name: String,
+    val address: String,
+    val category: String,
+    val rating: Double?,
+    val reviewCount: Int,
+    val latitude: Double?,
+    val longitude: Double?,
+    val googleMapsUri: String?,
+) {
+    /** Coordinata utilizzabile sulla mappa, quando Google l'ha restituita. */
+    val hasCoordinates: Boolean
+        get() = latitude != null && longitude != null && (latitude != 0.0 || longitude != 0.0)
+}
+
 sealed class TravelPlacesServiceError(message: String) : Exception(message) {
     data object NotConfigured : TravelPlacesServiceError(
         "",

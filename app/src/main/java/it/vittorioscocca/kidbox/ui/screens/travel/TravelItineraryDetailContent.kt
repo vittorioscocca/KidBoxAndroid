@@ -60,6 +60,7 @@ fun TravelItineraryDetailContent(
     onHotelsClick: (() -> Unit)? = null,
     onRestaurantsClick: (() -> Unit)? = null,
     onActivitiesClick: (() -> Unit)? = null,
+    onPlaceInfoClick: (() -> Unit)? = null,
     onStopClick: ((TravelItineraryStopContext) -> Unit)? = null,
     onRegenerateDayClick: ((TravelItineraryDay) -> Unit)? = null,
     regeneratingDayIndex: Int? = null,
@@ -104,6 +105,7 @@ fun TravelItineraryDetailContent(
                 onHotelsClick,
                 onRestaurantsClick,
                 onActivitiesClick,
+                onPlaceInfoClick,
             )
             introduction?.trim()?.takeIf { it.isNotEmpty() }?.let { text ->
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -157,6 +159,7 @@ private fun BudgetCategorySection(
     onHotelsClick: (() -> Unit)?,
     onRestaurantsClick: (() -> Unit)?,
     onActivitiesClick: (() -> Unit)?,
+    onPlaceInfoClick: (() -> Unit)?,
 ) {
     val nights = maxOf(overview.dayCount - 1, 1)
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -216,6 +219,25 @@ private fun BudgetCategorySection(
                 }
             } else {
                 BudgetCompact("🎯", stringResource(R.string.travel_activities), overview.budget.activities, overview.currency, Modifier.weight(1f), kb)
+            }
+        }
+        // Storia e territorio: riga intera e non compact card, perché non ha
+        // un importo da mostrare — le compact card sono voci di budget.
+        if (onPlaceInfoClick != null) {
+            Surface(
+                onClick = onPlaceInfoClick,
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, kb.subtitle.copy(alpha = 0.15f)),
+            ) {
+                BudgetRowContent(
+                    "🏛️",
+                    stringResource(R.string.travel_place_info),
+                    stringResource(R.string.travel_place_info_subtitle, overview.destinationTitle),
+                    stringResource(R.string.travel_place_info_discover),
+                    kb,
+                    tappable = true,
+                )
             }
         }
     }

@@ -9,7 +9,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.remote.ai.AIService
 import it.vittorioscocca.kidbox.data.remote.ai.TravelPlanRequest
 import it.vittorioscocca.kidbox.data.remote.travel.TripRemoteStore
+import it.vittorioscocca.kidbox.data.repository.NoteRepository
 import it.vittorioscocca.kidbox.data.repository.PhotoVideoRepository
+import it.vittorioscocca.kidbox.data.repository.TodoRepository
 import it.vittorioscocca.kidbox.data.repository.TripRepository
 import it.vittorioscocca.kidbox.data.travel.TravelTripAlbumTitles
 import it.vittorioscocca.kidbox.data.travel.TravelTripExtrasRepository
@@ -73,6 +75,8 @@ class TravelDetailViewModel @Inject constructor(
     private val extrasRepository: TravelTripExtrasRepository,
     private val tripRepository: TripRepository,
     private val photoVideoRepository: PhotoVideoRepository,
+    private val noteRepository: NoteRepository,
+    private val todoRepository: TodoRepository,
     private val tripRemoteStore: TripRemoteStore,
     private val aiService: AIService,
 ) : ViewModel() {
@@ -126,6 +130,12 @@ class TravelDetailViewModel @Inject constructor(
     private val _extrasState = MutableStateFlow(TravelTripExtrasUiState())
     val extrasState: StateFlow<TravelTripExtrasUiState> = _extrasState.asStateFlow()
 
+    private val _deleteTripError = MutableStateFlow<String?>(null)
+    val deleteTripError: StateFlow<String?> = _deleteTripError.asStateFlow()
+
+    private val _isDeletingTrip = MutableStateFlow(false)
+    val isDeletingTrip: StateFlow<Boolean> = _isDeletingTrip.asStateFlow()
+
     init {
         viewModelScope.launch {
             combine(trip, children) { currentTrip, kids -> currentTrip to kids }.collect { (currentTrip, kids) ->
@@ -141,8 +151,11 @@ class TravelDetailViewModel @Inject constructor(
             if (uid.isBlank()) return@launch
             extrasRepository.ensureAlbum(trip, uid)
             extrasRepository.ensureNote(trip, uid, userDisplayName)
+            // Solo riaggancio: aprire la scheda del viaggio non è una
+            // richiesta di creare una lista todo, e se l'utente l'ha
+            // cancellata non deve tornare da sola.
             children.value.firstOrNull()?.id?.let { childId ->
-                extrasRepository.ensureTodoList(trip, childId)
+                extrasRepository.ensureTodoList(trip, childId, createIfMissing = false)
             }
             refreshExtras(tripDao.observeById(trip.id).first() ?: trip, children.value.firstOrNull()?.id)
         }
@@ -397,8 +410,46 @@ class TravelDetailViewModel @Inject constructor(
 
     fun deleteTrip(trip: KBTripEntity, onDeleted: () -> Unit) {
         viewModelScope.launch {
-            tripRepository.deleteTrip(trip)
-            onDeleted()
+            _isDeletingTrip.value = true
+            // Prima le entità collegate: i loro id stanno sul trip, quindi
+            // dopo la cancellazione non ci sarebbe più modo di risalirci.
+            deleteAttachedEntities(trip)
+            val deleted = tripRepository.deleteTrip(trip)
+            _isDeletingTrip.value = false
+            if (deleted) {
+                onDeleted()
+            } else {
+                // Si resta sul viaggio: uscire dopo un fallimento faceva
+                // credere che fosse cancellato, e poi ricompariva in lista.
+                _deleteTripError.value = "Non è stato possibile eliminare il viaggio. Controlla la connessione e riprova."
+            }
+        }
+    }
+
+    /**
+     * Cancella album foto, nota e lista todo (con i suoi todo) collegati al
+     * viaggio. Da chiamare PRIMA di cancellare il viaggio: i riferimenti
+     * stanno su `KBTripEntity` (`photoAlbumId`, `notesNoteId`, `todoListId`),
+     * quindi una volta rimosso il viaggio non c'è più modo di risalire a cosa
+     * cancellare. Senza questa pulizia restavano visibili in Foto, Note e
+     * Todo un album, una nota e una lista intestati a un viaggio che non
+     * esiste più.
+     *
+     * Le foto dentro l'album NON si cancellano — cancellare media altrui
+     * sarebbe un danno irreversibile — solo il contenitore.
+     */
+    private suspend fun deleteAttachedEntities(trip: KBTripEntity) {
+        trip.photoAlbumId?.takeIf { it.isNotBlank() }?.let { albumId ->
+            runCatching { photoVideoRepository.deleteAlbum(albumId) }
+                .onFailure { KBLog.data.warning("Trip cleanup: deleteAlbum failed albumId=$albumId", TAG) }
+        }
+        trip.notesNoteId?.takeIf { it.isNotBlank() }?.let { noteId ->
+            runCatching { noteRepository.softDelete(trip.familyId, noteId) }
+                .onFailure { KBLog.data.warning("Trip cleanup: softDelete note failed noteId=$noteId", TAG) }
+        }
+        trip.todoListId?.takeIf { it.isNotBlank() }?.let { listId ->
+            runCatching { todoRepository.deleteList(listId) }
+                .onFailure { KBLog.data.warning("Trip cleanup: deleteList failed listId=$listId", TAG) }
         }
     }
 }

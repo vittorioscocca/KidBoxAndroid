@@ -62,6 +62,18 @@ class TravelTripExtrasRepository @Inject constructor(
                 return existing
             }
         }
+
+        // Album già esistente dello stesso viaggio, rimasto scollegato: si
+        // riaggancia invece di crearne un altro. Stessa fragilità di nota e
+        // lista todo — l'unico legame è `trip.photoAlbumId`, e se si perde si
+        // accumulano duplicati.
+        val orphanAlbum = photoAlbumDao.getAllByFamilyId(currentTrip.familyId)
+            .firstOrNull { !it.isDeleted && it.title.trim() == expectedTitle.trim() }
+        if (orphanAlbum != null) {
+            tripDao.upsert(currentTrip.copy(photoAlbumId = orphanAlbum.id, updatedAtEpoch = System.currentTimeMillis()))
+            return orphanAlbum.id
+        }
+
         val sortOrder = photoAlbumDao.getAllByFamilyId(currentTrip.familyId).size
         val album = KBPhotoAlbumEntity(
             id = UUID.randomUUID().toString(),
@@ -101,8 +113,18 @@ class TravelTripExtrasRepository @Inject constructor(
         if (userId.isBlank()) return null
         val existing = trip.notesNoteId?.takeIf { it.isNotBlank() }
         if (existing != null) {
-            noteDao.getById(existing)?.let { return existing }
+            noteDao.getById(existing)?.takeIf { !it.isDeleted }?.let { return existing }
         }
+
+        // Nota già esistente di questo viaggio, rimasta scollegata: si
+        // riaggancia per titolo invece di crearne un'altra.
+        val orphanNote = noteDao.observeByFamilyId(trip.familyId).first()
+            .firstOrNull { !it.isDeleted && it.title.trim() == trip.name.trim() }
+        if (orphanNote != null) {
+            tripDao.upsert(trip.copy(notesNoteId = orphanNote.id, updatedAtEpoch = System.currentTimeMillis()))
+            return orphanNote.id
+        }
+
         val now = System.currentTimeMillis()
         val note = KBNoteEntity(
             id = UUID.randomUUID().toString(),
@@ -138,7 +160,15 @@ class TravelTripExtrasRepository @Inject constructor(
         return body.isNotEmpty() && body != template
     }
 
-    suspend fun ensureTodoList(trip: KBTripEntity, childId: String): String? {
+    /**
+     * @param createIfMissing `false` quando la chiamata non nasce da un gesto
+     *   dell'utente (per esempio l'apertura della scheda viaggio). Senza
+     *   questo freno, una lista cancellata dalla sezione Todo tornava da sola
+     *   al primo sguardo al viaggio: `getById` non la trova più (cancellata
+     *   con hard delete), si cade nel ramo "crea nuova lista" e la voce
+     *   riappare con un id diverso — sembrando che Elimina non facesse nulla.
+     */
+    suspend fun ensureTodoList(trip: KBTripEntity, childId: String, createIfMissing: Boolean = true): String? {
         if (childId.isBlank()) return null
         val existing = trip.todoListId?.takeIf { it.isNotBlank() }
         if (existing != null) {
@@ -154,6 +184,18 @@ class TravelTripExtrasRepository @Inject constructor(
                 return existing
             }
         }
+
+        // Lista già esistente di questo viaggio, rimasta scollegata: si
+        // riaggancia invece di crearne un'altra.
+        val orphanList = todoListDao.getByFamilyAndChild(trip.familyId, childId)
+            .firstOrNull { it.name.trim() == trip.name.trim() }
+        if (orphanList != null) {
+            tripDao.upsert(trip.copy(todoListId = orphanList.id, updatedAtEpoch = System.currentTimeMillis()))
+            return orphanList.id
+        }
+
+        if (!createIfMissing) return null
+
         val now = System.currentTimeMillis()
         val list = KBTodoListEntity(
             id = UUID.randomUUID().toString(),

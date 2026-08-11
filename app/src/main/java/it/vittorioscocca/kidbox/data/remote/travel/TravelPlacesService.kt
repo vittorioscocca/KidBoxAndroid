@@ -4,7 +4,10 @@ import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
 import it.vittorioscocca.kidbox.ui.screens.travel.TravelPlaceDetails
 import it.vittorioscocca.kidbox.ui.screens.travel.TravelPlaceReview
+import it.vittorioscocca.kidbox.ui.screens.travel.TravelPlaceSearchKind
+import it.vittorioscocca.kidbox.ui.screens.travel.TravelPlaceSummary
 import it.vittorioscocca.kidbox.ui.screens.travel.TravelPlacesServiceError
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
@@ -50,6 +53,50 @@ class TravelPlacesService @Inject constructor() {
         }
         throw TravelPlacesServiceError.Network(error.localizedMessage ?: "Errore di rete")
     }
+
+    /**
+     * Luoghi reali di una categoria nella località (Places Text Search).
+     *
+     * Sostituisce l'estrazione dal testo dell'itinerario: quei "nomi" erano
+     * frasi o spezzoni, e per definizione non erano cercabili su Google —
+     * quindi niente voti. Qui i risultati sono locali esistenti e il voto
+     * arriva nella stessa risposta, senza una chiamata per riga.
+     */
+    suspend fun searchPlaces(
+        locationContext: String,
+        kind: TravelPlaceSearchKind,
+        familyId: String,
+    ): List<TravelPlaceSummary> = runCatching {
+        val payload = hashMapOf(
+            "locationContext" to locationContext,
+            "kind" to kind.rawValue,
+            "languageCode" to PLACES_LANGUAGE_CODE,
+        )
+        @Suppress("UNCHECKED_CAST")
+        val data = functions
+            .getHttpsCallable("searchTravelPlaces")
+            .call(payload)
+            .await()
+            .getData() as? Map<String, Any?> ?: return@runCatching emptyList()
+
+        @Suppress("UNCHECKED_CAST")
+        val raw = data["places"] as? List<Map<String, Any?>> ?: emptyList()
+        raw.mapNotNull { dict ->
+            val name = dict["name"] as? String ?: return@mapNotNull null
+            if (name.isBlank()) return@mapNotNull null
+            TravelPlaceSummary(
+                placeId = dict["placeId"] as? String ?: UUID.randomUUID().toString(),
+                name = name,
+                address = dict["address"] as? String ?: "",
+                category = dict["category"] as? String ?: "",
+                rating = (dict["rating"] as? Number)?.toDouble(),
+                reviewCount = (dict["reviewCount"] as? Number)?.toInt() ?: 0,
+                latitude = (dict["latitude"] as? Number)?.toDouble(),
+                longitude = (dict["longitude"] as? Number)?.toDouble(),
+                googleMapsUri = dict["googleMapsUri"] as? String,
+            )
+        }
+    }.getOrElse { emptyList() }
 
     private fun parsePlace(dict: Map<String, Any?>): TravelPlaceDetails {
         val name = dict["name"] as? String ?: ""

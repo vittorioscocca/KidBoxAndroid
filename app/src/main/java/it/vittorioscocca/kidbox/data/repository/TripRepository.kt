@@ -56,9 +56,7 @@ class TripRepository @Inject constructor(
         }
     }
 
-    suspend fun deleteTrip(trip: KBTripEntity) {
-        remoteStore.deleteTrip(trip)
-    }
+    suspend fun deleteTrip(trip: KBTripEntity): Boolean = remoteStore.deleteTrip(trip)
 
     private fun stopRealtimeLocked() {
         tripsListener?.remove()

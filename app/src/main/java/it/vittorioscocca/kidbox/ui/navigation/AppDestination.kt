@@ -460,6 +460,16 @@ sealed class AppDestination(val route: String) {
             "travel/$familyId/detail/$tripId/places/$kind"
     }
 
+    data object TravelPlacesMap : AppDestination("travel/{familyId}/detail/{tripId}/places/{kind}/map") {
+        fun createRoute(familyId: String, tripId: String, kind: String): String =
+            "travel/$familyId/detail/$tripId/places/$kind/map"
+    }
+
+    data object TravelPlaceInfo : AppDestination("travel/{familyId}/place-info/{placeName}") {
+        fun createRoute(familyId: String, placeName: String): String =
+            "travel/$familyId/place-info/${java.net.URLEncoder.encode(placeName, Charsets.UTF_8.name())}"
+    }
+
     data object TravelPlaceDetail : AppDestination(
         "travel/{familyId}/place?placeName={placeName}&locationContext={locationContext}&scheduleBadge={scheduleBadge}&time={time}&staySummary={staySummary}&costSummary={costSummary}&nextStopTitle={nextStopTitle}",
     ) {
