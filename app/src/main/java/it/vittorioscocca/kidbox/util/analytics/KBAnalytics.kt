@@ -191,6 +191,43 @@ object KBAnalytics {
     }
 
     /**
+     * Registra un passo della checklist "Per iniziare".
+     *
+     * Servono quattro numeri per sapere se la checklist funziona, e sono
+     * esattamente le quattro azioni: `shown` (quanti la vedono — una volta per
+     * passo per utente, altrimenti si conterebbero le aperture della Home),
+     * `tapped` (quanti la usano come navigazione), `completed` (quanti chiudono
+     * il passo) e `dismissed` sulla card intera. Senza il quarto si finirebbe
+     * per ottimizzare l'attivazione senza accorgersi di star infastidendo tutti
+     * gli altri.
+     *
+     * `step` è l'id di un passo del catalogo, non un dato della famiglia: dice
+     * *quale suggerimento*, mai cosa quella famiglia ha in casa. L'evento si
+     * chiama `onboarding_step` e resta fuori da `VALUE_EVENTS` del rollup:
+     * spuntare un passo non è di per sé un utente attivo, e contarlo gonfierebbe
+     * il DAU proprio sulla coorte che stiamo misurando.
+     *
+     * @param action `shown`, `tapped`, `completed` o `dismissed`.
+     */
+    fun logOnboarding(action: String, step: String) {
+        val uid = currentUid() ?: return
+        val familyId = currentFamilyId() ?: return
+        scope.launch {
+            write(
+                listOf(
+                    event(
+                        name = "onboarding_step",
+                        uid = uid,
+                        familyId = familyId,
+                        feature = "onboarding",
+                        props = mapOf("action" to action, "step" to step),
+                    )
+                )
+            )
+        }
+    }
+
+    /**
      * Scarica il buffer in un unico batch. Svuota prima di scrivere, così un
      * fallimento non duplica gli eventi al flush successivo.
      */

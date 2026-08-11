@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
@@ -122,14 +123,18 @@ private fun rememberLoginScreenMetrics(): LoginScreenMetrics {
     }
 }
 
+// In forma compatta resta il solo nome del provider: è un nome proprio, uguale
+// in tutte le lingue, e su schermi stretti la frase intera non ci sta.
+@Composable
 private fun socialLoginLabel(provider: SocialProvider, compact: Boolean): String = when (provider) {
-    SocialProvider.APPLE -> if (compact) "Apple" else "Continua con Apple"
-    SocialProvider.GOOGLE -> if (compact) "Google" else "Continua con Google"
-    SocialProvider.FACEBOOK -> if (compact) "Facebook" else "Continua con Facebook"
+    SocialProvider.APPLE -> if (compact) "Apple" else stringResource(R.string.login_continue_apple)
+    SocialProvider.GOOGLE -> if (compact) "Google" else stringResource(R.string.login_continue_google)
+    SocialProvider.FACEBOOK -> if (compact) "Facebook" else stringResource(R.string.login_continue_facebook)
 }
 
+@Composable
 private fun emailLoginLabel(compact: Boolean): String =
-    if (compact) "Email" else "Continua con email"
+    if (compact) stringResource(R.string.login_field_email) else stringResource(R.string.login_continue_email)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -180,7 +185,7 @@ fun LoginScreen(
             // Logo
             Image(
                 painter = painterResource(id = R.drawable.kidbox_symbol_orange),
-                contentDescription = "KidBox Logo",
+                contentDescription = stringResource(R.string.login_logo_desc),
                 modifier = Modifier.size(80.dp),
             )
 
@@ -199,7 +204,7 @@ fun LoginScreen(
 
             // Sottotitolo
             Text(
-                text = "La tua famiglia,\nin un'unica app.",
+                text = stringResource(R.string.onboarding_slide1_title),
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = BlackButton,
@@ -306,7 +311,7 @@ fun LoginScreen(
 
             if (registrationPending) {
                 Text(
-                    text = "Controlla la posta: ti abbiamo inviato un link per verificare l'account.",
+                    text = stringResource(R.string.login_registration_pending),
                     color = Color(0xFF666666),
                     style = MaterialTheme.typography.bodySmall,
                     textAlign = TextAlign.Center,
@@ -317,8 +322,8 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             LoginTermsFooter(
-                onTermsClick = { uriHandler.openUri("https://vittorioscocca.github.io/KidBox/terms/") },
-                onPrivacyClick = { uriHandler.openUri("https://vittorioscocca.github.io/KidBox/privacy/") },
+                onTermsClick = { uriHandler.openUri("https://kidbox-landing.web.app/terms.html") },
+                onPrivacyClick = { uriHandler.openUri("https://kidbox-landing.web.app/privacy.html") },
             )
 
             Spacer(modifier = Modifier.height(40.dp))
@@ -336,7 +341,7 @@ fun LoginScreen(
                             CircularProgressIndicator(color = OrangeAccent)
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                "Accesso in corso…",
+                                stringResource(R.string.login_in_progress),
                                 color = BlackButton,
                                 style = MaterialTheme.typography.bodyMedium,
                             )
@@ -476,20 +481,23 @@ private fun LoginTermsFooter(
     onTermsClick: () -> Unit,
     onPrivacyClick: () -> Unit,
 ) {
+    // La frase è una sola risorsa con due segnaposto, non cinque frammenti
+    // concatenati: l'ordine delle parole cambia da lingua a lingua, e concatenare
+    // pezzi tradotti separatamente produce frasi sgrammaticate. I due link si
+    // ritrovano per posizione dentro la frase già composta.
+    val termsLabel = stringResource(R.string.login_terms_link)
+    val privacyLabel = stringResource(R.string.login_privacy_link)
+    val sentence = stringResource(R.string.login_terms_footer, termsLabel, privacyLabel)
+
     val footerText = buildAnnotatedString {
-        append("Continuando, accetti i ")
-        pushStringAnnotation(tag = TERMS_TAG, annotation = TERMS_TAG)
-        withStyle(SpanStyle(color = OrangeAccent)) {
-            append("Termini di Servizio")
+        append(sentence)
+        listOf(TERMS_TAG to termsLabel, PRIVACY_TAG to privacyLabel).forEach { (tag, label) ->
+            val start = sentence.indexOf(label)
+            if (start < 0) return@forEach
+            val end = start + label.length
+            addStyle(SpanStyle(color = OrangeAccent), start, end)
+            addStringAnnotation(tag = tag, annotation = tag, start = start, end = end)
         }
-        pop()
-        append(" e la ")
-        pushStringAnnotation(tag = PRIVACY_TAG, annotation = PRIVACY_TAG)
-        withStyle(SpanStyle(color = OrangeAccent)) {
-            append("Privacy Policy")
-        }
-        pop()
-        append(" di KidBox.")
     }
     ClickableText(
         text = footerText,
@@ -542,14 +550,16 @@ private fun EmailAuthSheetContent(
             .verticalScroll(rememberScrollState()),
     ) {
         Text(
-            if (isRegistering) "Crea account" else "Accedi",
+            stringResource(if (isRegistering) R.string.login_sheet_title_register else R.string.login_sheet_title_signin),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = BlackButton,
         )
         Text(
-            if (isRegistering) "Inserisci email e password per registrarti."
-            else "Inserisci le tue credenziali per accedere.",
+            stringResource(
+                if (isRegistering) R.string.login_sheet_subtitle_register
+                else R.string.login_sheet_subtitle_signin
+            ),
             style = MaterialTheme.typography.bodyMedium,
             color = Color(0xFF888888),
             modifier = Modifier.padding(top = 4.dp, bottom = 24.dp),
@@ -558,7 +568,7 @@ private fun EmailAuthSheetContent(
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
-            label = { Text("Email") },
+            label = { Text(stringResource(R.string.login_field_email)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
@@ -571,7 +581,7 @@ private fun EmailAuthSheetContent(
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("Password (min. 6 caratteri)") },
+            label = { Text(stringResource(R.string.login_field_password)) },
             singleLine = true,
             visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {
@@ -594,7 +604,7 @@ private fun EmailAuthSheetContent(
             OutlinedTextField(
                 value = confirmPwd,
                 onValueChange = { confirmPwd = it },
-                label = { Text("Conferma password") },
+                label = { Text(stringResource(R.string.login_field_confirm_password)) },
                 singleLine = true,
                 visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
@@ -606,7 +616,7 @@ private fun EmailAuthSheetContent(
             )
             if (confirmPwd.isNotEmpty() && password != confirmPwd) {
                 Text(
-                    "Le password non coincidono.",
+                    stringResource(R.string.login_passwords_mismatch),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.padding(top = 4.dp),
@@ -624,7 +634,7 @@ private fun EmailAuthSheetContent(
         }
         if (resetSent) {
             Text(
-                "Email inviata: controlla la posta per reimpostare la password.",
+                stringResource(R.string.login_reset_email_sent),
                 color = OrangeAccent,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 8.dp),
@@ -647,7 +657,7 @@ private fun EmailAuthSheetContent(
             ),
         ) {
             Text(
-                if (isRegistering) "Registrati" else "Accedi",
+                stringResource(if (isRegistering) R.string.login_cta_register else R.string.login_cta_signin),
                 fontWeight = FontWeight.SemiBold,
             )
         }
@@ -657,7 +667,7 @@ private fun EmailAuthSheetContent(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
-                if (isRegistering) "Hai già un account? Accedi" else "Non hai un account? Registrati",
+                stringResource(if (isRegistering) R.string.login_toggle_to_signin else R.string.login_toggle_to_register),
                 color = OrangeAccent,
             )
         }
@@ -666,10 +676,10 @@ private fun EmailAuthSheetContent(
             enabled = emailOk && !isBusy,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Password dimenticata", color = OrangeAccent)
+            Text(stringResource(R.string.login_forgot_password), color = OrangeAccent)
         }
         TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-            Text("Chiudi", color = Color(0xFF888888))
+            Text(stringResource(R.string.login_close), color = Color(0xFF888888))
         }
     }
 }

@@ -19,6 +19,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Cake
+import androidx.compose.material.icons.filled.MonitorWeight
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -121,7 +124,7 @@ fun HealthConnectAppScreen(
 
         SectionLabel(stringResource(R.string.health_data_imported), kb.subtitle)
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = kb.card),
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier
                 .fillMaxWidth()
@@ -129,9 +132,27 @@ fun HealthConnectAppScreen(
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 val snapshot = state.snapshot
+                // `hasCardiacOrActivity` non guarda il peso: chi in Health
+                // Connect ha solo quello vedeva "nessun dato recente" pur
+                // avendo un dato appena letto. Il riepilogo vale la pena anche
+                // per un campo solo.
+                val hasAnything = snapshot != null && (
+                    snapshot.hasCardiacOrActivity ||
+                        snapshot.weightKg != null ||
+                        state.childWeightKg != null ||
+                        !state.ageDescription.isNullOrBlank()
+                    )
                 when {
-                    snapshot != null && snapshot.hasCardiacOrActivity -> {
-                        HealthDetailedMetrics(snapshot)
+                    snapshot != null && hasAnything -> {
+                        HealthMetricsSummary(
+                            snapshot = snapshot,
+                            ageDescription = state.ageDescription,
+                            childWeightKg = state.childWeightKg,
+                        )
+                        if (snapshot.hasCardiacOrActivity) {
+                            Spacer(Modifier.height(20.dp))
+                            HealthDetailedMetrics(snapshot)
+                        }
                     }
                     snapshot != null -> {
                         Text(
@@ -154,7 +175,7 @@ fun HealthConnectAppScreen(
         Spacer(Modifier.height(16.dp))
         SectionLabel(stringResource(R.string.health_profile_from_health), kb.subtitle)
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = kb.card),
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier
                 .fillMaxWidth()
@@ -329,5 +350,192 @@ private fun HealthDetailedMetrics(snapshot: HealthImportSnapshot) {
                 }
             }
         }
+    }
+}
+
+// ── Riepilogo in stile iOS ───────────────────────────────────────────────────
+//
+// Gemello di `AppleHealthDashboardView`. Dopo l'abbinamento serve una risposta
+// immediata alla domanda "cosa ha letto?": un elenco di righe la dà solo a chi
+// lo legge tutto, un riquadro di caselle la dà a colpo d'occhio. Il dettaglio
+// resta sotto, per chi vuole i singoli campioni.
+//
+// La griglia è costruita a mano con delle Row invece che con LazyVGrid perché
+// questa schermata è già dentro un `verticalScroll`: annidare due contenitori
+// scrollabili sullo stesso asse è un errore a runtime, non una scelta di stile.
+
+@Composable
+private fun HealthMetricsSummary(
+    snapshot: HealthImportSnapshot,
+    ageDescription: String?,
+    childWeightKg: Double?,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    val locale = KBLocale.current()
+    val syncFmt = remember { SimpleDateFormat("d MMM, HH:mm", KBLocale.current()) }
+
+    // Il peso di Health Connect ha la precedenza su quello inserito a mano: è il
+    // dato appena letto, ed è la ragione per cui si è premuto "aggiorna".
+    val weight = snapshot.weightKg ?: childWeightKg
+
+    val tiles = buildList {
+        snapshot.stepsToday?.takeIf { it > 0 }?.let {
+            add(
+                MetricTileData(
+                    title = stringResource(R.string.health_metric_steps),
+                    value = "$it",
+                    subtitle = stringResource(R.string.health_metric_steps_sub),
+                    icon = Icons.Default.DirectionsWalk,
+                    tint = Color(0xFF34C759),
+                )
+            )
+        }
+        weight?.let {
+            add(
+                MetricTileData(
+                    title = stringResource(R.string.health_metric_weight),
+                    value = String.format(locale, "%.1f kg", it),
+                    subtitle = stringResource(R.string.health_metric_weight_sub),
+                    icon = Icons.Default.MonitorWeight,
+                    tint = Color(0xFF5A8DEA),
+                )
+            )
+        }
+        snapshot.heartRateBpm?.let {
+            add(
+                MetricTileData(
+                    title = stringResource(R.string.health_metric_heart),
+                    value = String.format(locale, "%.0f", it),
+                    subtitle = stringResource(R.string.health_metric_heart_sub),
+                    icon = Icons.Default.Favorite,
+                    tint = Color(0xFFFF2D55),
+                )
+            )
+        }
+        snapshot.restingHeartRateBpm?.let {
+            add(
+                MetricTileData(
+                    title = stringResource(R.string.health_metric_resting),
+                    value = String.format(locale, "%.0f", it),
+                    subtitle = stringResource(R.string.health_metric_resting_sub),
+                    icon = Icons.Default.MonitorHeart,
+                    tint = Color(0xFFD94080),
+                )
+            )
+        }
+        snapshot.activeEnergyKcal?.takeIf { it > 0 }?.let {
+            add(
+                MetricTileData(
+                    title = stringResource(R.string.health_metric_energy),
+                    value = String.format(locale, "%.0f kcal", it),
+                    subtitle = stringResource(R.string.health_metric_energy_sub),
+                    icon = Icons.Default.LocalFireDepartment,
+                    tint = Color(0xFFFF9500),
+                )
+            )
+        }
+        add(
+            MetricTileData(
+                title = stringResource(R.string.health_metric_workouts),
+                value = "${snapshot.recentWorkouts.size}",
+                subtitle = when {
+                    snapshot.recentWorkouts.isEmpty() ->
+                        stringResource(R.string.health_metric_workouts_none)
+                    snapshot.weeklyExerciseMinutesAvg != null -> stringResource(
+                        R.string.health_metric_workouts_avg,
+                        String.format(locale, "%.0f", snapshot.weeklyExerciseMinutesAvg),
+                    )
+                    else -> stringResource(R.string.health_metric_workouts_recent)
+                },
+                icon = Icons.Default.DirectionsRun,
+                tint = Color(0xFF8B5CF6),
+            )
+        )
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (!ageDescription.isNullOrBlank()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(kb.background)
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Default.Cake,
+                    contentDescription = null,
+                    tint = Color(0xFFFF9500),
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    Text(
+                        stringResource(R.string.health_metric_age_source),
+                        fontSize = 12.sp,
+                        color = kb.subtitle,
+                    )
+                    Text(
+                        "${stringResource(R.string.health_metric_age)}: $ageDescription",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = kb.title,
+                    )
+                }
+            }
+        }
+
+        Text(
+            stringResource(R.string.health_metrics_title),
+            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp,
+            color = kb.title,
+        )
+
+        tiles.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { tile ->
+                    MetricTile(data = tile, modifier = Modifier.weight(1f))
+                }
+                // Riga dispari: la casella singola non deve allargarsi a tutta
+                // la larghezza, altrimenti stona con quelle sopra.
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+
+        Text(
+            stringResource(
+                R.string.health_metrics_synced,
+                syncFmt.format(Date(snapshot.syncedAtEpochMillis)),
+            ),
+            fontSize = 12.sp,
+            color = kb.subtitle,
+        )
+    }
+}
+
+private data class MetricTileData(
+    val title: String,
+    val value: String,
+    val subtitle: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val tint: Color,
+)
+
+@Composable
+private fun MetricTile(data: MetricTileData, modifier: Modifier = Modifier) {
+    val kb = MaterialTheme.kidBoxColors
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(kb.background)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(data.icon, contentDescription = null, tint = data.tint, modifier = Modifier.size(20.dp))
+        Text(data.value, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = kb.title)
+        Text(data.title, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = kb.title)
+        Text(data.subtitle, fontSize = 11.sp, color = kb.subtitle)
     }
 }

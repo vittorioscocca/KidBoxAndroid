@@ -35,7 +35,12 @@ class OnboardingViewModel @Inject constructor(
     ) {
         val name = familyName.trim()
         val child = childName.trim()
-        if (name.isEmpty() || child.isEmpty()) return
+        // Solo il nome della famiglia è obbligatorio: senza, non c'è niente da
+        // creare. Il figlio è facoltativo — il repository scarta da sé i nomi
+        // vuoti, quindi la famiglia nasce semplicemente senza figli e se ne
+        // aggiungono dopo. Bloccare qui il wizard costringeva a inventare un
+        // nome per superare la schermata.
+        if (name.isEmpty()) return
         viewModelScope.launch {
             _isCreatingFamily.value = true
             _createFamilyError.value = null

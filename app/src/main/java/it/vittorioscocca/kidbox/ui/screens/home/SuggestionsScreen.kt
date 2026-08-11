@@ -19,7 +19,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Divider
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -34,12 +37,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Checklist
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.screens.home.onboarding.OnboardingChecklistState
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
 private val suggestionOrder = listOf(
@@ -70,17 +77,29 @@ private val suggestionTexts = mapOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SuggestionsScreen(onBack: () -> Unit) {
+fun SuggestionsScreen(
+    onBack: () -> Unit,
+    familyId: String = "",
+    onNavigate: (String) -> Unit = {},
+) {
     BackHandler { onBack() }
 
     val context = LocalContext.current
-    val items = remember(context) {
-        val allFeatures = featureItems(context = context, familyId = "", state = HomeUiState())
+    // Il familyId serve davvero: le rotte delle sezioni lo contengono, e con la
+    // stringa vuota il pulsante "Vai" porterebbe a una schermata senza famiglia.
+    val items = remember(context, familyId) {
+        val allFeatures = featureItems(context = context, familyId = familyId, state = HomeUiState())
         val byId = allFeatures.associateBy { it.id }
         suggestionOrder.mapNotNull { id -> byId[id] }
     }
 
     var selected by remember { mutableStateOf<FeatureItem?>(null) }
+
+    // Ricalcolato all'apertura: la checklist può essere stata chiusa o
+    // completata dopo che questa schermata è stata istanziata.
+    var canRestoreChecklist by remember {
+        mutableStateOf(OnboardingChecklistState.isRestorable(context))
+    }
 
     Column(
         modifier = Modifier
@@ -97,6 +116,50 @@ fun SuggestionsScreen(onBack: () -> Unit) {
             color = MaterialTheme.kidBoxColors.title,
         )
         Spacer(modifier = Modifier.height(16.dp))
+
+        // Il recupero vive qui e non nelle Impostazioni: è la stessa domanda dei
+        // suggerimenti ("cosa posso fare con quest'app?"), e chi ha chiuso la
+        // card per sbaglio la cerca dove cerca l'aiuto.
+        if (canRestoreChecklist) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.kidBoxColors.card,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .clickable {
+                            OnboardingChecklistState.restore(context)
+                            canRestoreChecklist = false
+                            onBack()
+                        }
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(Color(0xFFFF6B00).copy(alpha = 0.14f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.Checklist,
+                            contentDescription = null,
+                            tint = Color(0xFFFF6B00),
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    Spacer(modifier = Modifier.size(12.dp))
+                    Text(
+                        text = stringResource(R.string.onboarding_checklist_restore),
+                        fontSize = 16.sp,
+                        color = MaterialTheme.kidBoxColors.title,
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         Surface(
             shape = RoundedCornerShape(16.dp),
@@ -155,6 +218,48 @@ fun SuggestionsScreen(onBack: () -> Unit) {
                     lineHeight = 21.sp,
                     color = MaterialTheme.kidBoxColors.subtitle,
                 )
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Leggere cosa si può fare in una sezione e poi doverla cercare
+                // a mano nella Home è il punto in cui il suggerimento smette di
+                // essere utile: da qui ci si va direttamente.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(
+                        onClick = { selected = null },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.suggestions_close),
+                            color = MaterialTheme.kidBoxColors.subtitle,
+                            fontSize = 15.sp,
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            selected = null
+                            onNavigate(item.route)
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = item.iconColor,
+                            contentColor = Color.White,
+                        ),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.suggestions_go),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp,
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(12.dp))
             }
         }

@@ -24,4 +24,46 @@
     <string name="push_priming_body">Nous vous prévenons quand un membre importe un document, ajoute une dépense, écrit dans le chat ou qu\'une échéance approche. Vous pourrez choisir quelles notifications recevoir dans les Réglages.</string>
     <string name="push_priming_enable">Activer les notifications</string>
     <string name="push_priming_later">Plus tard</string>
+
+    <!-- Schermata di login -->
+    <string name="login_continue_apple">Continuer avec Apple</string>
+    <string name="login_continue_google">Continuer avec Google</string>
+    <string name="login_continue_facebook">Continuer avec Facebook</string>
+    <string name="login_continue_email">Continuer avec l\'e-mail</string>
+    <string name="login_logo_desc">Logo KidBox</string>
+    <string name="login_registration_pending">Consultez votre boîte mail : nous vous avons envoyé un lien pour vérifier votre compte.</string>
+    <string name="login_in_progress">Connexion en cours…</string>
+    <string name="login_terms_footer">En continuant, vous acceptez les %1$s et la %2$s de KidBox.</string>
+    <string name="login_terms_link">Conditions d\'utilisation</string>
+    <string name="login_privacy_link">Politique de confidentialité</string>
+    <string name="login_sheet_title_register">Créer un compte</string>
+    <string name="login_sheet_title_signin">Se connecter</string>
+    <string name="login_sheet_subtitle_register">Saisissez un e-mail et un mot de passe pour vous inscrire.</string>
+    <string name="login_sheet_subtitle_signin">Saisissez vos identifiants pour vous connecter.</string>
+    <string name="login_field_email">E-mail</string>
+    <string name="login_field_password">Mot de passe (6 caractères min.)</string>
+    <string name="login_field_confirm_password">Confirmer le mot de passe</string>
+    <string name="login_passwords_mismatch">Les mots de passe ne correspondent pas.</string>
+    <string name="login_reset_email_sent">E-mail envoyé : consultez votre boîte mail pour réinitialiser votre mot de passe.</string>
+    <string name="login_cta_register">S\'inscrire</string>
+    <string name="login_cta_signin">Se connecter</string>
+    <string name="login_toggle_to_signin">Vous avez déjà un compte ? Connectez-vous</string>
+    <string name="login_toggle_to_register">Pas encore de compte ? Inscrivez-vous</string>
+    <string name="login_forgot_password">Mot de passe oublié</string>
+    <string name="login_close">Fermer</string>
+
+    <!-- Errori dei flussi di autenticazione -->
+    <string name="auth_error_missing_token">Jeton d\'accès manquant.</string>
+    <string name="auth_error_unknown">Erreur inconnue.</string>
+    <string name="auth_error_timed_out">Connexion non terminée. Réessayez.</string>
+    <string name="auth_error_apple_unavailable">Apple Sign-In n\'est pas disponible sur cet appareil.</string>
+    <string name="auth_error_account_exists_different_credential">Cette adresse e-mail est déjà enregistrée avec une autre méthode de connexion (Google, Apple ou e-mail). Utilisez le même bouton que la dernière fois, ou contactez le support pour fusionner les méthodes de connexion.</string>
+    <string name="auth_error_email_already_in_use">Cette adresse e-mail est déjà enregistrée. Essayez de vous connecter.</string>
+    <string name="auth_error_invalid_email">Adresse e-mail non valide.</string>
+    <string name="auth_error_weak_password">Le mot de passe est trop faible (6 caractères min.).</string>
+    <string name="auth_error_wrong_password">Mot de passe incorrect. Réessayez ou utilisez « Mot de passe oublié ».</string>
+    <string name="auth_error_user_not_found">Aucun compte trouvé avec cette adresse e-mail.</string>
+    <string name="auth_error_network">Erreur réseau. Vérifiez votre connexion.</string>
+    <string name="auth_error_too_many_requests">Trop de tentatives. Réessayez dans quelques minutes.</string>
+    <string name="auth_error_user_disabled">Compte désactivé. Contactez le support.</string>
 </resources>

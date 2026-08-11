@@ -395,7 +395,17 @@ fun AppNavGraph(
         }
 
         composable(AppDestination.Suggestions.route) {
-            SuggestionsScreen(onBack = { navController.popBackStack() })
+            SuggestionsScreen(
+                onBack = { navController.popBackStack() },
+                familyId = activeFamilyId.orEmpty(),
+                // Si esce dai Suggerimenti prima di entrare nella sezione: chi
+                // poi tocca "indietro" si aspetta la Home, non di rimbalzare
+                // nella schermata da cui è partito.
+                onNavigate = { route ->
+                    navController.popBackStack()
+                    navController.navigate(route)
+                },
+            )
         }
 
         composable(AppDestination.InviteCode.route) {

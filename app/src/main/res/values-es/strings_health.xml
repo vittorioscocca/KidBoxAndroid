@@ -468,4 +468,24 @@
     <string name="ai_upgrade_visit_detail">Activando la IA puedes consultar información sobre esta visita concreta según los datos introducidos y el informe adjunto.</string>
     <string name="ai_upgrade_exams_home">Activando la IA puedes consultar el estado de todos los análisis y obtener un resumen completo.</string>
     <string name="ai_upgrade_exam_detail">Activando la IA puedes consultar información sobre este análisis concreto según los datos introducidos y el informe adjunto.</string>
+
+    <!-- Riepilogo metriche Health Connect -->
+    <string name="health_metrics_title">Métricas</string>
+    <string name="health_metric_age">Edad</string>
+    <string name="health_metric_age_source">Del perfil de KidBox</string>
+    <string name="health_metric_steps">Pasos</string>
+    <string name="health_metric_steps_sub">Hoy</string>
+    <string name="health_metric_weight">Peso</string>
+    <string name="health_metric_weight_sub">Cuerpo</string>
+    <string name="health_metric_heart">Pulsaciones</string>
+    <string name="health_metric_heart_sub">Última FC</string>
+    <string name="health_metric_resting">FC en reposo</string>
+    <string name="health_metric_resting_sub">Cardíaca</string>
+    <string name="health_metric_energy">Energía</string>
+    <string name="health_metric_energy_sub">Hoy</string>
+    <string name="health_metric_workouts">Entrenamientos</string>
+    <string name="health_metric_workouts_none">Ninguno reciente</string>
+    <string name="health_metric_workouts_avg">%1$s min por semana</string>
+    <string name="health_metric_workouts_recent">Últimos 30 días</string>
+    <string name="health_metrics_synced">Actualizado %1$s · datos de Health Connect</string>
 </resources>

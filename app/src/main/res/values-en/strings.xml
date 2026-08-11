@@ -24,4 +24,46 @@
     <string name="push_priming_body">We\'ll let you know when someone uploads a document, adds an expense, sends a chat message or a deadline is coming up. You can choose which notifications to receive in Settings.</string>
     <string name="push_priming_enable">Turn on notifications</string>
     <string name="push_priming_later">Not now</string>
+
+    <!-- Schermata di login -->
+    <string name="login_continue_apple">Continue with Apple</string>
+    <string name="login_continue_google">Continue with Google</string>
+    <string name="login_continue_facebook">Continue with Facebook</string>
+    <string name="login_continue_email">Continue with email</string>
+    <string name="login_logo_desc">KidBox logo</string>
+    <string name="login_registration_pending">Check your inbox: we have sent you a link to verify your account.</string>
+    <string name="login_in_progress">Signing in…</string>
+    <string name="login_terms_footer">By continuing, you accept KidBox\'s %1$s and %2$s.</string>
+    <string name="login_terms_link">Terms of Service</string>
+    <string name="login_privacy_link">Privacy Policy</string>
+    <string name="login_sheet_title_register">Create account</string>
+    <string name="login_sheet_title_signin">Sign in</string>
+    <string name="login_sheet_subtitle_register">Enter an email and password to sign up.</string>
+    <string name="login_sheet_subtitle_signin">Enter your credentials to sign in.</string>
+    <string name="login_field_email">Email</string>
+    <string name="login_field_password">Password (min. 6 characters)</string>
+    <string name="login_field_confirm_password">Confirm password</string>
+    <string name="login_passwords_mismatch">The passwords do not match.</string>
+    <string name="login_reset_email_sent">Email sent: check your inbox to reset your password.</string>
+    <string name="login_cta_register">Sign up</string>
+    <string name="login_cta_signin">Sign in</string>
+    <string name="login_toggle_to_signin">Already have an account? Sign in</string>
+    <string name="login_toggle_to_register">No account yet? Sign up</string>
+    <string name="login_forgot_password">Forgot password</string>
+    <string name="login_close">Close</string>
+
+    <!-- Errori dei flussi di autenticazione -->
+    <string name="auth_error_missing_token">Access token missing.</string>
+    <string name="auth_error_unknown">Unknown error.</string>
+    <string name="auth_error_timed_out">Sign-in was not completed. Please try again.</string>
+    <string name="auth_error_apple_unavailable">Apple Sign-In is not available on this device.</string>
+    <string name="auth_error_account_exists_different_credential">This email is already registered with a different sign-in (Google, Apple or email). Use the same button as before, or contact support to merge the sign-in methods.</string>
+    <string name="auth_error_email_already_in_use">This email is already registered. Try signing in.</string>
+    <string name="auth_error_invalid_email">Invalid email address.</string>
+    <string name="auth_error_weak_password">The password is too weak (min. 6 characters).</string>
+    <string name="auth_error_wrong_password">Wrong password. Try again or use \"Forgot password\".</string>
+    <string name="auth_error_user_not_found">No account found with this email.</string>
+    <string name="auth_error_network">Network error. Check your connection.</string>
+    <string name="auth_error_too_many_requests">Too many attempts. Try again in a few minutes.</string>
+    <string name="auth_error_user_disabled">Account disabled. Contact support.</string>
 </resources>

@@ -13,6 +13,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.NudgeSignalsDao
+import it.vittorioscocca.kidbox.ui.screens.home.onboarding.OnboardingChecklistState
+import it.vittorioscocca.kidbox.ui.screens.home.onboarding.OnboardingStep
 import it.vittorioscocca.kidbox.util.KBLog
 import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
 import java.util.Calendar
@@ -175,7 +177,31 @@ class NudgeEngine @Inject constructor(
         r.familyMembersMax?.let { if (signals.familyMembers > it) return false }
         r.familyMembersMin?.let { if (signals.familyMembers < it) return false }
         r.featureUnused?.let { if (it !in signals.unusedFeatures) return false }
+        if (isCoveredByChecklist(campaign)) return false
         return true
+    }
+
+    /**
+     * Una richiesta già in vista nella Home non ha bisogno anche della push.
+     *
+     * È un rinvio, non un annullamento: la coda si ricostruisce a ogni
+     * foreground, quindi appena la checklist esce di scena — completata, chiusa
+     * o mai mostrata — la campagna torna ammissibile e riparte con le sue
+     * cadenze. Senza questo filtro `family_invite` scatterebbe il giorno dopo
+     * l'installazione per chiedere esattamente la cosa che l'utente si vede
+     * scritta in cima alla Home ogni volta che apre l'app.
+     */
+    private fun isCoveredByChecklist(campaign: NudgeCampaign): Boolean {
+        val step = when (campaign.destination) {
+            NudgeDestination.INVITE -> OnboardingStep.INVITE
+            NudgeDestination.DOCUMENTS -> OnboardingStep.DOCUMENT
+            NudgeDestination.CALENDAR -> OnboardingStep.CALENDAR_EVENT
+            // Wallet, salute, AI e chat non sono passi della checklist: nessuna
+            // sovrapposizione da evitare.
+            NudgeDestination.WALLET, NudgeDestination.HEALTH,
+            NudgeDestination.AI, NudgeDestination.CHAT, null -> return false
+        }
+        return step in OnboardingChecklistState.liveSteps(context)
     }
 
     /**

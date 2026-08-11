@@ -468,4 +468,24 @@
     <string name="ai_upgrade_visit_detail">With AI enabled, you can ask about this specific visit based on the entered data and attached report.</string>
     <string name="ai_upgrade_exams_home">With AI enabled, you can ask about the status of all exams and get a full summary.</string>
     <string name="ai_upgrade_exam_detail">With AI enabled, you can ask about this specific exam based on the entered data and attached report.</string>
+
+    <!-- Riepilogo metriche Health Connect -->
+    <string name="health_metrics_title">Metrics</string>
+    <string name="health_metric_age">Age</string>
+    <string name="health_metric_age_source">From the KidBox profile</string>
+    <string name="health_metric_steps">Steps</string>
+    <string name="health_metric_steps_sub">Today</string>
+    <string name="health_metric_weight">Weight</string>
+    <string name="health_metric_weight_sub">Body</string>
+    <string name="health_metric_heart">Heart rate</string>
+    <string name="health_metric_heart_sub">Latest</string>
+    <string name="health_metric_resting">Resting HR</string>
+    <string name="health_metric_resting_sub">Cardiac</string>
+    <string name="health_metric_energy">Energy</string>
+    <string name="health_metric_energy_sub">Today</string>
+    <string name="health_metric_workouts">Workouts</string>
+    <string name="health_metric_workouts_none">None recently</string>
+    <string name="health_metric_workouts_avg">%1$s min per week</string>
+    <string name="health_metric_workouts_recent">Last 30 days</string>
+    <string name="health_metrics_synced">Updated %1$s · data from Health Connect</string>
 </resources>

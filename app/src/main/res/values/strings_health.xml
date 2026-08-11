@@ -468,4 +468,24 @@
     <string name="ai_upgrade_visit_detail">Attivando l\'AI puoi chiedere informazioni sulla singola visita in base ai dati inseriti e al referto allegato.</string>
     <string name="ai_upgrade_exams_home">Attivando l\'AI puoi chiedere lo stato di tutti gli esami e ottenere un riepilogo completo.</string>
     <string name="ai_upgrade_exam_detail">Attivando l\'AI puoi chiedere informazioni sul singolo esame in base ai dati inseriti e al referto allegato.</string>
+
+    <!-- Riepilogo metriche Health Connect -->
+    <string name="health_metrics_title">Metriche</string>
+    <string name="health_metric_age">Età</string>
+    <string name="health_metric_age_source">Dal profilo di KidBox</string>
+    <string name="health_metric_steps">Passi</string>
+    <string name="health_metric_steps_sub">Oggi</string>
+    <string name="health_metric_weight">Peso</string>
+    <string name="health_metric_weight_sub">Corpo</string>
+    <string name="health_metric_heart">Battiti</string>
+    <string name="health_metric_heart_sub">Ultima FC</string>
+    <string name="health_metric_resting">FC a riposo</string>
+    <string name="health_metric_resting_sub">Cardiaca</string>
+    <string name="health_metric_energy">Energia</string>
+    <string name="health_metric_energy_sub">Oggi</string>
+    <string name="health_metric_workouts">Allenamenti</string>
+    <string name="health_metric_workouts_none">Nessuno di recente</string>
+    <string name="health_metric_workouts_avg">%1$s min a settimana</string>
+    <string name="health_metric_workouts_recent">Ultimi 30 giorni</string>
+    <string name="health_metrics_synced">Aggiornato %1$s · dati da Health Connect</string>
 </resources>

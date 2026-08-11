@@ -40,6 +40,7 @@ import it.vittorioscocca.kidbox.ui.navigation.AppNavGraph
 import it.vittorioscocca.kidbox.ui.theme.KidBoxTheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import it.vittorioscocca.kidbox.util.CrashAnalyzer
+import it.vittorioscocca.kidbox.util.KBLog
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -70,6 +71,7 @@ class MainActivity : AppCompatActivity() {
 
         val onboardingPreferences = OnboardingPreferences(applicationContext)
         NotificationDeepLinkRouter.handleLaunchIntent(this, intent)
+        showPrivacyPolicyIfRequestedByHealthConnect(intent)
 
         setContent {
             val appTheme by themePreference.getThemeFlow().collectAsStateWithLifecycle(
@@ -162,6 +164,36 @@ class MainActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         NotificationDeepLinkRouter.handleLaunchIntent(this, intent)
+        showPrivacyPolicyIfRequestedByHealthConnect(intent)
+    }
+
+    /**
+     * Health Connect apre l'app per far leggere l'informativa privacy prima di
+     * concedere i permessi sanitari, e si aspetta che l'app la mostri davvero.
+     * Dichiarare gli intent-filter senza rispondere farebbe comparire KidBox
+     * nell'elenco per poi non mostrare niente: la condizione per cui i permessi
+     * vengono elencati non è il filtro in sé, è che l'informativa esista.
+     *
+     * Due azioni per due epoche: `VIEW_PERMISSION_USAGE` da Android 14, dove
+     * Health Connect è parte del sistema; `ACTION_SHOW_PERMISSIONS_RATIONALE`
+     * prima, quando era un'app a parte.
+     */
+    private fun showPrivacyPolicyIfRequestedByHealthConnect(intent: Intent?) {
+        val action = intent?.action ?: return
+        val isHealthRationale = action == "android.intent.action.VIEW_PERMISSION_USAGE" ||
+            action == "androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"
+        if (!isHealthRationale) return
+
+        runCatching {
+            startActivity(
+                Intent(
+                    Intent.ACTION_VIEW,
+                    android.net.Uri.parse("https://kidbox-landing.web.app/privacy.html"),
+                )
+            )
+        }.onFailure {
+            KBLog.app.warning("Health Connect: impossibile aprire l'informativa: ${it.message}", "MainActivity")
+        }
     }
 
     private fun resolveDarkTheme(): Boolean =

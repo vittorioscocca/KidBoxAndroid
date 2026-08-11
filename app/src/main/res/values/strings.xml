@@ -35,4 +35,46 @@
     <string name="push_priming_body">Ti avvisiamo quando un membro carica un documento, aggiunge una spesa, scrive in chat o si avvicina una scadenza. Potrai scegliere quali notifiche ricevere dalle Impostazioni.</string>
     <string name="push_priming_enable">Attiva le notifiche</string>
     <string name="push_priming_later">Non ora</string>
+
+    <!-- Schermata di login -->
+    <string name="login_continue_apple">Continua con Apple</string>
+    <string name="login_continue_google">Continua con Google</string>
+    <string name="login_continue_facebook">Continua con Facebook</string>
+    <string name="login_continue_email">Continua con email</string>
+    <string name="login_logo_desc">Logo KidBox</string>
+    <string name="login_registration_pending">Controlla la posta: ti abbiamo inviato un link per verificare l\'account.</string>
+    <string name="login_in_progress">Accesso in corso…</string>
+    <string name="login_terms_footer">Continuando, accetti i %1$s e la %2$s di KidBox.</string>
+    <string name="login_terms_link">Termini di Servizio</string>
+    <string name="login_privacy_link">Privacy Policy</string>
+    <string name="login_sheet_title_register">Crea account</string>
+    <string name="login_sheet_title_signin">Accedi</string>
+    <string name="login_sheet_subtitle_register">Inserisci email e password per registrarti.</string>
+    <string name="login_sheet_subtitle_signin">Inserisci le tue credenziali per accedere.</string>
+    <string name="login_field_email">Email</string>
+    <string name="login_field_password">Password (min. 6 caratteri)</string>
+    <string name="login_field_confirm_password">Conferma password</string>
+    <string name="login_passwords_mismatch">Le password non coincidono.</string>
+    <string name="login_reset_email_sent">Email inviata: controlla la posta per reimpostare la password.</string>
+    <string name="login_cta_register">Registrati</string>
+    <string name="login_cta_signin">Accedi</string>
+    <string name="login_toggle_to_signin">Hai già un account? Accedi</string>
+    <string name="login_toggle_to_register">Non hai un account? Registrati</string>
+    <string name="login_forgot_password">Password dimenticata</string>
+    <string name="login_close">Chiudi</string>
+
+    <!-- Errori dei flussi di autenticazione -->
+    <string name="auth_error_missing_token">Token di accesso mancante.</string>
+    <string name="auth_error_unknown">Errore sconosciuto.</string>
+    <string name="auth_error_timed_out">Accesso non completato. Riprova.</string>
+    <string name="auth_error_apple_unavailable">Apple Sign-In non disponibile su questo dispositivo.</string>
+    <string name="auth_error_account_exists_different_credential">Questa email è già registrata con un altro accesso (Google, Apple o email). Usa lo stesso pulsante di prima oppure contatta il supporto per unire gli accessi.</string>
+    <string name="auth_error_email_already_in_use">Questa email è già registrata. Prova ad accedere.</string>
+    <string name="auth_error_invalid_email">Indirizzo email non valido.</string>
+    <string name="auth_error_weak_password">La password è troppo debole (min. 6 caratteri).</string>
+    <string name="auth_error_wrong_password">Password errata. Riprova o usa \"Password dimenticata\".</string>
+    <string name="auth_error_user_not_found">Nessun account trovato con questa email.</string>
+    <string name="auth_error_network">Errore di rete. Controlla la connessione.</string>
+    <string name="auth_error_too_many_requests">Troppi tentativi. Riprova tra qualche minuto.</string>
+    <string name="auth_error_user_disabled">Account disabilitato. Contatta il supporto.</string>
 </resources>

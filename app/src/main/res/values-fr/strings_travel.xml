@@ -164,7 +164,7 @@
     <string name="onboarding_create_family_hint">Donne un nom à ta famille et ajoute le premier enfant. Tu pourras tout modifier plus tard.</string>
     <string name="onboarding_family_name">Nom de la famille</string>
     <string name="onboarding_family_hint">Ex. Famille Martin</string>
-    <string name="onboarding_first_child">Premier enfant</string>
+    <string name="onboarding_first_child">Premier enfant (facultatif)</string>
     <string name="onboarding_child_name">Nom de l\'enfant</string>
     <string name="onboarding_birthdate_optional">Date de naissance (facultatif)</string>
     <string name="onboarding_family_created">Famille créée ! Continue pour inviter ton/ta partenaire.</string>
@@ -242,4 +242,15 @@
     <string name="travel_day_badge">JOUR %1$d · %2$s</string>
     <string name="travel_day1_preview">JOUR 1 · APERÇU</string>
     <string name="travel_selected_up">SÉLECTIONNÉS</string>
+    <string name="onboarding_slide1_title">Votre famille,\ndans une seule app.</string>
+    <string name="onboarding_slide2_title">Des souvenirs partagés\navec votre partenaire.</string>
+    <string name="onboarding_slide3_title">Santé, dépenses\net bien plus encore.</string>
+    <string name="onboarding_join_subtitle">Saisissez le code d\'invitation reçu ou scannez le QR code.</string>
+    <string name="onboarding_invite_code_label">Code d\'invitation</string>
+    <string name="onboarding_invite_code_placeholder">Ex. K7P4D2</string>
+    <string name="onboarding_scan_qr">Scanner le QR code</string>
+    <string name="onboarding_join_cta">Rejoindre</string>
+    <string name="onboarding_close">Fermer</string>
+    <string name="onboarding_scanner_hint">Visez le QR code</string>
+    <string name="onboarding_share_invite_text">KidBox — code d\'invitation : %1$s</string>
 </resources>

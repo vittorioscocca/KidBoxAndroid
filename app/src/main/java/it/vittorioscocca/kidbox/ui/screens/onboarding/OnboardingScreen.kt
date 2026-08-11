@@ -129,7 +129,7 @@ private fun introslides() = listOf(
         iconTint = Color(0xFFFFBF40),
         accent = OrangeAccent,
         glow = OrangeAccent.copy(alpha = 0.35f),
-        title = "La tua famiglia,\nin un'unica app.",
+        title = stringResource(R.string.onboarding_slide1_title),
         subtitle = stringResource(R.string.onboarding_slide1),
     ),
     IntroSlide(
@@ -137,7 +137,7 @@ private fun introslides() = listOf(
         iconTint = Color(0xFF9B7BC9),
         accent = PurpleAccent,
         glow = PurpleAccent.copy(alpha = 0.35f),
-        title = "Ricordi condivisi\ncon il tuo partner.",
+        title = stringResource(R.string.onboarding_slide2_title),
         subtitle = stringResource(R.string.onboarding_slide2),
     ),
     IntroSlide(
@@ -145,7 +145,7 @@ private fun introslides() = listOf(
         iconTint = Color(0xFF4CAF74),
         accent = GreenAccent,
         glow = GreenAccent.copy(alpha = 0.35f),
-        title = "Salute, spese\ne molto altro.",
+        title = stringResource(R.string.onboarding_slide3_title),
         subtitle = stringResource(R.string.onboarding_slide3),
     ),
 )
@@ -464,7 +464,8 @@ private fun CreateFamilyPageContent(
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
 
-    val canCreate = familyName.isNotBlank() && childName.isNotBlank() && !isCreating && !familyCreated
+    // Il nome del figlio è facoltativo: non entra nella condizione.
+    val canCreate = familyName.isNotBlank() && !isCreating && !familyCreated
 
     Column(
         modifier = Modifier
@@ -764,7 +765,7 @@ private fun InvitePartnerPageContent(
                 }
             }
             !code.isNullOrBlank() -> {
-                val shareText = "KidBox — codice invito: ${code.orEmpty()}"
+                val shareText = stringResource(R.string.onboarding_share_invite_text, code.orEmpty())
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1147,7 +1148,7 @@ private fun JoinFamilyPageContent(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            "Inserisci il codice invito ricevuto oppure scansiona il QR code.",
+            stringResource(R.string.onboarding_join_subtitle),
             fontSize = 15.sp,
             color = GraySubtitle,
             textAlign = TextAlign.Center,
@@ -1156,14 +1157,14 @@ private fun JoinFamilyPageContent(
         )
         Spacer(modifier = Modifier.height(20.dp))
 
-        FormFieldLabel("Codice invito")
+        FormFieldLabel(stringResource(R.string.onboarding_invite_code_label))
         OutlinedTextField(
             value = code,
             onValueChange = { code = it.uppercase(Locale.ROOT) },
             modifier = Modifier.fillMaxWidth(),
             enabled = !state.didJoin,
             singleLine = true,
-            placeholder = { Text("Es. K7P4D2", color = GrayCaption) },
+            placeholder = { Text(stringResource(R.string.onboarding_invite_code_placeholder), color = GrayCaption) },
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
             shape = RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -1195,7 +1196,7 @@ private fun JoinFamilyPageContent(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                "Scansiona QR code",
+                stringResource(R.string.onboarding_scan_qr),
                 color = PurpleAccent,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 14.sp,
@@ -1231,7 +1232,7 @@ private fun JoinFamilyPageContent(
                     strokeWidth = 2.dp,
                 )
             } else {
-                Text("Entra", fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.onboarding_join_cta), fontWeight = FontWeight.SemiBold)
             }
         }
 
@@ -1304,10 +1305,14 @@ private fun JoinFamilyPageContent(
                         .align(Alignment.TopEnd)
                         .padding(8.dp),
                 ) {
-                    Icon(Icons.Filled.Close, contentDescription = "Chiudi", tint = Color.White)
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = stringResource(R.string.onboarding_close),
+                        tint = Color.White,
+                    )
                 }
                 Text(
-                    "Inquadra il QR code",
+                    stringResource(R.string.onboarding_scanner_hint),
                     color = Color.White,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)

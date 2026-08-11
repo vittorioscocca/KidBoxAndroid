@@ -135,7 +135,7 @@ fun AIConsentBottomSheet(
                     onClick = {
                         runCatching {
                             context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse("https://kidbox.app/privacy")),
+                                Intent(Intent.ACTION_VIEW, Uri.parse("https://kidbox-landing.web.app/privacy.html")),
                             )
                         }
                     },

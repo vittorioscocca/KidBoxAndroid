@@ -128,6 +128,9 @@ import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.ui.components.KidBoxAvatar
 import it.vittorioscocca.kidbox.ui.family.FamilySwitcherBottomSheet
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
+import it.vittorioscocca.kidbox.ui.permissions.rememberNotificationPermissionRequester
+import it.vittorioscocca.kidbox.ui.screens.home.onboarding.OnboardingChecklistCard
+import it.vittorioscocca.kidbox.ui.screens.home.onboarding.OnboardingStep
 import it.vittorioscocca.kidbox.ui.theme.KidBoxDarkColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import it.vittorioscocca.kidbox.ui.util.rememberSingleImagePicker
@@ -142,6 +145,7 @@ fun HomeScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val homeViewMode by viewModel.homeViewMode.collectAsStateWithLifecycle()
+    val onboarding by viewModel.onboarding.collectAsStateWithLifecycle()
     var showFamilySwitcher by remember { mutableStateOf(false) }
     val familySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val snackbarHostState = remember { SnackbarHostState() }
@@ -162,6 +166,13 @@ fun HomeScreen(
     val photoPicker = rememberSingleImagePicker { uri: Uri? ->
         uri?.let { viewModel.onHeroPhotoSelected(it, context) }
     }
+
+    // Concesso o negato che sia, la checklist va riletta: è l'unico modo perché
+    // la riga "Abilita le notifiche" si spunti senza uscire dalla Home.
+    val requestNotifications = rememberNotificationPermissionRequester(
+        onDenied = { viewModel.refreshOnboarding() },
+        onGranted = { viewModel.refreshOnboarding() },
+    )
 
     // ── Cropper overlay (come iOS showHeroCropper sheet) ─────────────────────
     // Se c'è una URI pending, mostriamo il cropper a tutto schermo sopra la Home
@@ -271,6 +282,11 @@ fun HomeScreen(
                 onChangeHeroPhoto = {
                     photoPicker.launch(singleImageRequest())
                 },
+                // Finché la checklist è viva le slide promozionali restano
+                // fuori: sono due sistemi di suggerimento con lo stesso scopo, e
+                // uno sopra l'altro si annullano — il carosello, per di più,
+                // promuove anche cose che la checklist ha già spuntato.
+                showPromoSlides = !onboarding.isVisible,
             )
             if (state.isMembersSyncing) {
                 Row(
@@ -311,6 +327,28 @@ fun HomeScreen(
             }
 
             Spacer(modifier = Modifier.size(16.dp))
+
+            // Sopra le sezioni, non in fondo: il senso della checklist è farsi
+            // vedere da chi apre la Home e non sa da dove partire.
+            if (onboarding.isVisible) {
+                OnboardingChecklistCard(
+                    state = onboarding,
+                    onSelect = { step ->
+                        if (step == OnboardingStep.NOTIFICATIONS) {
+                            // Il permesso si chiede sul posto: mandare l'utente
+                            // in una schermata per poi mostrargli il dialog di
+                            // sistema aggiungerebbe un passaggio senza aggiungere
+                            // niente.
+                            viewModel.onOnboardingStepTapped(step)
+                            requestNotifications()
+                        } else {
+                            viewModel.onOnboardingStepTapped(step)?.let(onNavigate)
+                        }
+                    },
+                    onDismiss = { viewModel.dismissOnboarding() },
+                )
+                Spacer(modifier = Modifier.size(16.dp))
+            }
 
             if (homeViewMode == it.vittorioscocca.kidbox.data.local.HomeViewMode.GRID) {
                 HomeFreeGridSection(
@@ -583,6 +621,7 @@ private fun HomeHeroCarousel(
     state: HomeUiState,
     onNavigate: (String) -> Unit,
     onChangeHeroPhoto: () -> Unit,
+    showPromoSlides: Boolean = true,
 ) {
     val familyId = state.familyId
     val hasFamily = familyId.isNotBlank()
@@ -612,7 +651,7 @@ private fun HomeHeroCarousel(
         )
     }
 
-    if (!hasFamily) {
+    if (!hasFamily || !showPromoSlides) {
         photoSlide()
         return
     }

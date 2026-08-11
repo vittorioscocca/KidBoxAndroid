@@ -27,6 +27,11 @@
 
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
+        <!-- Su Android 14+ Health Connect non è un package a sé: la visibilità
+             passa dall'azione delle sue impostazioni. -->
+        <intent>
+            <action android:name="androidx.health.ACTION_HEALTH_CONNECT_SETTINGS" />
+        </intent>
     </queries>
 
     <application
@@ -64,7 +69,37 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/pdf" />
             </intent-filter>
+            <!--
+                Health Connect elenca sotto "Autorizzazioni app" solo le app che
+                sanno mostrare la propria informativa privacy. Senza questo
+                filtro le uses-permission android.permission.health.* vengono
+                ignorate e l'utente legge "Nessuna app compatibile installata",
+                senza alcun modo di concedere il permesso.
+
+                Questo è il canale per Android 13 e precedenti, dove Health
+                Connect è un'app separata.
+            -->
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
         </activity>
+
+        <!--
+            Da Android 14 Health Connect fa parte del sistema e usa un intent
+            diverso, protetto dal permesso START_VIEW_PERMISSION_USAGE così che
+            solo il sistema possa invocarlo. È un alias su MainActivity: l'app
+            si apre e mostra l'informativa.
+        -->
+        <activity-alias
+            android:name=".ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
 
         <activity
             android:name=".ui.share.ShareReceiverActivity"

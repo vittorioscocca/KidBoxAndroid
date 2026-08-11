@@ -256,4 +256,22 @@
     <string name="home_view_mode_list_desc">List view</string>
     <string name="home_view_mode_grid_desc">Grid view</string>
     <string name="settings_language_system">System language</string>
+
+    <!-- "Get started" checklist on Home -->
+    <string name="onboarding_checklist_title">Get started</string>
+    <string name="onboarding_checklist_title_done">All done 🎉</string>
+    <string name="onboarding_checklist_progress">%1$d of %2$d</string>
+    <string name="onboarding_checklist_hide">Hide the first steps</string>
+    <string name="onboarding_checklist_celebration">You are set. KidBox now works for your family.</string>
+    <string name="onboarding_checklist_restore">Review the first steps</string>
+    <string name="onboarding_step_notifications">Turn on notifications</string>
+    <string name="onboarding_step_invite">Invite a family member</string>
+    <string name="onboarding_step_document">Upload your first document</string>
+    <string name="onboarding_step_photo">Share your first photo</string>
+    <string name="onboarding_step_calendar_event">Add a calendar event</string>
+    <string name="onboarding_step_expense">Log your first expense</string>
+    <string name="onboarding_step_note">Write your first note</string>
+    <string name="onboarding_step_grocery">Add something to the shopping list</string>
+    <string name="suggestions_go">Go</string>
+    <string name="suggestions_close">Close</string>
 </resources>

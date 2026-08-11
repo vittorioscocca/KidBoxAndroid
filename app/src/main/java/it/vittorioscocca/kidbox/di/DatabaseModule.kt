@@ -55,6 +55,7 @@ import it.vittorioscocca.kidbox.data.local.dao.PasswordEntryDao
 import it.vittorioscocca.kidbox.data.local.dao.PasswordGroupDao
 import it.vittorioscocca.kidbox.data.local.dao.PwnedPrefixCacheDao
 import it.vittorioscocca.kidbox.data.local.dao.NudgeSignalsDao
+import it.vittorioscocca.kidbox.data.local.dao.OnboardingSignalsDao
 import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
 import javax.inject.Singleton
@@ -1245,6 +1246,10 @@ object DatabaseModule {
     @Provides
     fun provideNudgeSignalsDao(database: KidBoxDatabase): NudgeSignalsDao =
         database.nudgeSignalsDao()
+
+    @Provides
+    fun provideOnboardingSignalsDao(database: KidBoxDatabase): OnboardingSignalsDao =
+        database.onboardingSignalsDao()
 
     @Provides
     fun providePetDao(database: KidBoxDatabase): PetDao = database.petDao()

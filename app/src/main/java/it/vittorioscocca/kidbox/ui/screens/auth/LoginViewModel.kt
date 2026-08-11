@@ -18,6 +18,7 @@ import it.vittorioscocca.kidbox.data.local.PhotoPreviewCache
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
 import it.vittorioscocca.kidbox.data.user.UserProfileRepository
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.remote.auth.AuthError
 import it.vittorioscocca.kidbox.data.remote.auth.AuthFacade
 import it.vittorioscocca.kidbox.data.remote.auth.AuthPresentation
@@ -123,7 +124,8 @@ class LoginViewModel @Inject constructor(
                 when (e) {
                     is AuthError.Cancelled -> return@launch
                     is ActivityNotFoundException ->
-                        _errorMessage.value = "Apple Sign-In non disponibile su questo dispositivo."
+                        _errorMessage.value =
+                            appContext.getString(R.string.auth_error_apple_unavailable)
                     else -> _errorMessage.value = friendlyError(e)
                 }
             } finally {
@@ -322,25 +324,37 @@ class LoginViewModel @Inject constructor(
         return hasValidMembership
     }
 
+    /**
+     * Traduce un errore tecnico nel testo che l'utente legge.
+     *
+     * L'ordine conta: prima i nostri [AuthError], che sanno già quale stringa
+     * mostrare, poi i codici di FirebaseAuth. Il fallback resta il messaggio
+     * dell'eccezione — non è tradotto, ma è pur sempre meglio di una schermata
+     * che fallisce senza dire niente.
+     */
     private fun friendlyError(error: Throwable): String {
+        (error as? AuthError ?: error.cause as? AuthError)?.messageRes?.let {
+            return appContext.getString(it)
+        }
+
         val fe = error as? FirebaseAuthException ?: error.cause as? FirebaseAuthException
         if (fe == null) return error.localizedMessage.orEmpty()
-        return when (fe.errorCode) {
+        val res = when (fe.errorCode) {
             ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL ->
-                "Questa email è già registrata con un altro accesso (Google, Apple o email). " +
-                    "Usa lo stesso pulsante di prima oppure contatta il supporto per unire gli accessi."
-            ERROR_EMAIL_ALREADY_IN_USE ->
-                "Questa email è già registrata. Prova ad accedere."
-            ERROR_INVALID_EMAIL -> "Indirizzo email non valido."
-            ERROR_WEAK_PASSWORD -> "La password è troppo debole (min. 6 caratteri)."
-            ERROR_WRONG_PASSWORD ->
-                "Password errata. Riprova o usa \"Password dimenticata\"."
-            ERROR_USER_NOT_FOUND -> "Nessun account trovato con questa email."
-            ERROR_NETWORK_REQUEST_FAILED -> "Errore di rete. Controlla la connessione."
-            ERROR_TOO_MANY_REQUESTS -> "Troppi tentativi. Riprova tra qualche minuto."
-            ERROR_USER_DISABLED -> "Account disabilitato. Contatta il supporto."
-            else -> fe.localizedMessage ?: error.localizedMessage.orEmpty()
+                R.string.auth_error_account_exists_different_credential
+            ERROR_EMAIL_ALREADY_IN_USE -> R.string.auth_error_email_already_in_use
+            ERROR_INVALID_EMAIL -> R.string.auth_error_invalid_email
+            ERROR_WEAK_PASSWORD -> R.string.auth_error_weak_password
+            ERROR_WRONG_PASSWORD -> R.string.auth_error_wrong_password
+            ERROR_USER_NOT_FOUND -> R.string.auth_error_user_not_found
+            ERROR_NETWORK_REQUEST_FAILED -> R.string.auth_error_network
+            ERROR_TOO_MANY_REQUESTS -> R.string.auth_error_too_many_requests
+            ERROR_USER_DISABLED -> R.string.auth_error_user_disabled
+            else -> null
         }
+        return res?.let { appContext.getString(it) }
+            ?: fe.localizedMessage
+            ?: error.localizedMessage.orEmpty()
     }
 
     private companion object {

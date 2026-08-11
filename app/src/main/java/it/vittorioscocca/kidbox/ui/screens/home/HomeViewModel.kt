@@ -23,6 +23,7 @@ import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.dao.KBSharedLocationDao
+import it.vittorioscocca.kidbox.data.local.dao.OnboardingSignalsDao
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
 import it.vittorioscocca.kidbox.data.notification.CounterField
@@ -38,6 +39,12 @@ import it.vittorioscocca.kidbox.data.sync.MembershipSyncService
 import it.vittorioscocca.kidbox.domain.auth.LogoutUseCase
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.FamilyMemoryService
 import it.vittorioscocca.kidbox.ui.screens.home.HeroCrop
+import it.vittorioscocca.kidbox.ui.permissions.RuntimePermissions
+import it.vittorioscocca.kidbox.ui.screens.home.onboarding.OnboardingChecklistState
+import it.vittorioscocca.kidbox.ui.screens.home.onboarding.OnboardingChecklistUiState
+import it.vittorioscocca.kidbox.ui.screens.home.onboarding.OnboardingStep
+import it.vittorioscocca.kidbox.ui.screens.home.onboarding.computeOnboardingChecklist
+import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
 import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -51,6 +58,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -122,6 +131,7 @@ class HomeViewModel @Inject constructor(
     private val familyDao: KBFamilyDao,
     private val familyMemberDao: KBFamilyMemberDao,
     private val sharedLocationDao: KBSharedLocationDao,
+    private val onboardingSignalsDao: OnboardingSignalsDao,
     private val heroPhotoService: FamilyHeroPhotoService,
     private val familySyncCenter: FamilySyncCenter,
     private val membershipSyncService: MembershipSyncService,
@@ -161,12 +171,27 @@ class HomeViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    /**
+     * Checklist "Per iniziare". Sta nel ViewModel della Home e non in uno suo
+     * perché il suo unico momento utile è quello in cui l'utente guarda la Home
+     * e non sa cosa fare, e perché deve ricalcolarsi ogni volta che la Home
+     * torna visibile.
+     */
+    private val _onboarding = MutableStateFlow(OnboardingChecklistUiState())
+    val onboarding: StateFlow<OnboardingChecklistUiState> = _onboarding.asStateFlow()
+
     // ── Reactive observation — avviato una volta sola, sempre attivo ──────────
     // FIX principale: invece di one-shot con hasLoaded, osserviamo Room con un
     // Flow combine. Ogni volta che FamilySyncCenter aggiorna la famiglia in Room
     // (es. heroPhotoURL arriva da un altro device via Firestore), la UI si aggiorna.
     init {
         observeHomeData()
+        // La famiglia attiva arriva in modo asincrono (Room, poi eventuale
+        // bootstrap da Firestore): la checklist va ricalcolata quando cambia,
+        // non una volta sola alla costruzione del ViewModel.
+        viewModelScope.launch {
+            _uiState.map { it.familyId }.distinctUntilChanged().collectLatest { refreshOnboarding() }
+        }
         observeFamilyPlanFromFirestore()
         observeBadges()
         observeInitialSyncState()
@@ -455,6 +480,56 @@ class HomeViewModel @Inject constructor(
 
     fun onScreenVisible() {
         viewModelScope.launch { refreshAvatarUrl() }
+        // Il permesso notifiche può cambiare fuori dall'app, nelle impostazioni
+        // di sistema: al rientro va riletto, non dato per quello che era. Vale
+        // anche per i contenuti, creati in un'altra schermata e sincronizzati
+        // mentre la Home era in secondo piano.
+        refreshOnboarding()
+    }
+
+    // ── Checklist "Per iniziare" ─────────────────────────────────────────────
+
+    /**
+     * Ricalcola la checklist dai dati locali. Da chiamare a ogni ritorno in
+     * primo piano e al ritorno sulla Home: l'utente ha appena caricato il
+     * documento o creato l'evento, e la riga deve spuntarsi sotto i suoi occhi.
+     */
+    fun refreshOnboarding() {
+        viewModelScope.launch {
+            val familyId = _uiState.value.familyId
+            val authorized = RuntimePermissions.hasNotificationPermission(appContext)
+            val (state, events) = runCatching {
+                computeOnboardingChecklist(
+                    context = appContext,
+                    dao = onboardingSignalsDao,
+                    familyId = familyId,
+                    notificationsAuthorized = authorized,
+                )
+            }.getOrElse {
+                KBLog.ui.error("Onboarding: calcolo fallito: ${it.message}", TAG)
+                return@launch
+            }
+            _onboarding.value = state
+            events.forEach { (action, step) ->
+                KBAnalytics.logOnboarding(action = action, step = step.raw)
+            }
+        }
+    }
+
+    fun dismissOnboarding() {
+        OnboardingChecklistState.setDismissed(appContext, true)
+        _onboarding.value = OnboardingChecklistUiState()
+        KBAnalytics.logOnboarding(action = "dismissed", step = "card")
+    }
+
+    /**
+     * Registra il tap su una riga e restituisce la rotta da aprire, se il passo
+     * ne ha una. La navigazione resta responsabilità della Home, l'unica a
+     * possedere il NavController.
+     */
+    fun onOnboardingStepTapped(step: OnboardingStep): String? {
+        KBAnalytics.logOnboarding(action = "tapped", step = step.raw)
+        return step.route(_uiState.value.familyId)
     }
 
     private suspend fun refreshAvatarUrl() {

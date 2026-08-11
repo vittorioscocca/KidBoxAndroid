@@ -6,6 +6,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBAIConversationDao
 import it.vittorioscocca.kidbox.data.local.dao.KBAIMessageDao
 import it.vittorioscocca.kidbox.data.local.dao.KBHealthInsightDao
 import it.vittorioscocca.kidbox.data.local.dao.NudgeSignalsDao
+import it.vittorioscocca.kidbox.data.local.dao.OnboardingSignalsDao
 import it.vittorioscocca.kidbox.data.local.dao.KBMemoryFactDao
 import it.vittorioscocca.kidbox.data.local.dao.KBCalendarEventDao
 import it.vittorioscocca.kidbox.data.local.dao.KBChatMessageDao
@@ -209,4 +210,10 @@ abstract class KidBoxDatabase : RoomDatabase() {
      * nuove, quindi non serve una migrazione: legge tabelle che esistono già.
      */
     abstract fun nudgeSignalsDao(): NudgeSignalsDao
+
+    /**
+     * Come sopra, per la checklist "Per iniziare": solo conteggi su tabelle che
+     * esistono già, nessuna migrazione.
+     */
+    abstract fun onboardingSignalsDao(): OnboardingSignalsDao
 }
