@@ -53,15 +53,38 @@ data class UiChatMessage(
     val isDeleted: Boolean,
     val isDeletedForEveryone: Boolean,
     val syncStateRaw: Int,
-) {
-    val dayLabel: String
-        get() = daySeparatorLabel(createdAtMillis)
+    /** Etichetta del separatore giorno ("Oggi", "Ieri", "lunedì 3 mar"). */
+    val dayLabel: String,
+    /** Orario "HH:mm" mostrato nella bolla. */
+    val timeLabel: String,
+)
 
-    val timeLabel: String
-        get() = SimpleDateFormat("HH:mm", KBLocale.current()).format(Date(createdAtMillis))
+/**
+ * Formatter di data condivisi per un intero batch di mapping.
+ *
+ * Prima [UiChatMessage.dayLabel] e [UiChatMessage.timeLabel] erano getter calcolati: ogni
+ * lettura costruiva un [SimpleDateFormat] (parsing del pattern + DateFormatSymbols, una
+ * delle allocazioni più costose della stdlib) e chiamava [KBLocale.current]. `timeLabel`
+ * viene letto da ogni bolla ad ogni composizione, `dayLabel` da ogni messaggio nel groupBy.
+ *
+ * [SimpleDateFormat] non è thread-safe: creane uno per batch e usalo in modo sequenziale,
+ * come fa [KBChatMessage.toUi] dentro un unico `withContext`.
+ */
+internal class ChatLabelFormatters(private val locale: Locale = KBLocale.current()) {
+    private val time = SimpleDateFormat("HH:mm", locale)
+    private val day = SimpleDateFormat("EEEE d MMM", locale)
+
+    fun timeLabel(timestampMs: Long): String = time.format(Date(timestampMs))
+
+    fun dayLabel(timestampMs: Long): String = when {
+        DateUtils.isToday(timestampMs) -> "Oggi"
+        DateUtils.isToday(timestampMs + DateUtils.DAY_IN_MILLIS) -> "Ieri"
+        else -> day.format(Date(timestampMs))
+            .replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
+    }
 }
 
-internal fun KBChatMessage.toUi(): UiChatMessage {
+internal fun KBChatMessage.toUi(formatters: ChatLabelFormatters): UiChatMessage {
     val resolvedType = ChatMessageType.fromRaw(typeRaw)
     val displayText = when {
         resolvedType == ChatMessageType.DOCUMENT &&
@@ -96,6 +119,8 @@ internal fun KBChatMessage.toUi(): UiChatMessage {
         isDeleted = isDeleted,
         isDeletedForEveryone = isDeletedForEveryone,
         syncStateRaw = syncStateRaw,
+        dayLabel = formatters.dayLabel(createdAtEpochMillis),
+        timeLabel = formatters.timeLabel(createdAtEpochMillis),
     )
 }
 
@@ -202,12 +227,3 @@ private fun JSONArray?.toLabeledValues(): List<LabeledStringValue> {
     }
 }
 
-private fun daySeparatorLabel(timestampMs: Long): String {
-    val now = System.currentTimeMillis()
-    return when {
-        DateUtils.isToday(timestampMs) -> "Oggi"
-        DateUtils.isToday(timestampMs + DateUtils.DAY_IN_MILLIS) -> "Ieri"
-        else -> SimpleDateFormat("EEEE d MMM", KBLocale.current()).format(Date(timestampMs))
-            .replaceFirstChar { if (it.isLowerCase()) it.titlecase(KBLocale.current()) else it.toString() }
-    }
-}

@@ -22,6 +22,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -39,8 +40,34 @@ class ChatRepository @Inject constructor(
     private var listeningFamilyId: String? = null
     private val lastLocalMediaCleanupAtMs = mutableMapOf<String, Long>()
 
-    fun observeMessages(familyId: String): Flow<List<KBChatMessage>> =
-        chatDao.observeByFamilyId(familyId).map { list -> list.map { it.toDomain() } }
+    /**
+     * Osserva gli ultimi [limit] messaggi della famiglia.
+     *
+     * `flowOn(IO)` è essenziale, non cosmetico: gli operatori di Flow girano nel contesto
+     * del *collector* (qui `viewModelScope`, cioè il main thread), e [toDomain] fa uno
+     * `stat()` del filesystem per messaggio. Senza questo, ogni riemissione di Room
+     * eseguiva N syscall sul thread UI.
+     */
+    fun observeMessages(familyId: String, limit: Int): Flow<List<KBChatMessage>> =
+        chatDao.observeRecentByFamilyId(familyId, limit)
+            .map { list -> list.map { it.toDomain() } }
+            .flowOn(Dispatchers.IO)
+
+    suspend fun countMessages(familyId: String): Int = chatDao.countByFamilyId(familyId)
+
+    /**
+     * Carica messaggi puntuali per id, indipendentemente dalla finestra osservata.
+     *
+     * Serve alle anteprime di risposta: un messaggio recente può citarne uno molto vecchio,
+     * fuori dalla finestra caricata, e senza questo l'anteprima mostrerebbe
+     * "Messaggio non disponibile".
+     */
+    suspend fun getMessagesByIds(ids: List<String>): List<KBChatMessage> =
+        if (ids.isEmpty()) {
+            emptyList()
+        } else {
+            withContext(Dispatchers.IO) { chatDao.getByIds(ids).map { it.toDomain() } }
+        }
 
     fun scheduleLocalMediaCacheCleanup(
         familyId: String,
@@ -381,22 +408,29 @@ class ChatRepository @Inject constructor(
         if (messageIds.isEmpty()) return
 
         // Update locale immediato (optimistic), poi commit remoto.
-        messageIds.forEach { id ->
-            val local = chatDao.getById(id) ?: return@forEach
+        //
+        // Una sola upsertAll invece di una upsert per messaggio: ogni upsert separata è
+        // una transazione che fa scattare l'InvalidationTracker di Room, quindi 20 spunte
+        // di lettura significavano fino a 20 riemissioni dell'intera lista — ognuna con il
+        // costo pieno di mapping. È il loop di amplificazione principale della chat.
+        val locals = chatDao.getByIds(messageIds)
+        if (locals.isEmpty()) return
+        val updated = locals.mapNotNull { local ->
             val updatedReadBy = local.readByJSON.appendUniqueString(uid)
-            chatDao.upsert(local.copy(readByJSON = updatedReadBy))
+            // Salta le righe già marcate: riscriverle genererebbe una riemissione a vuoto.
+            if (updatedReadBy == local.readByJSON) null else local.copy(readByJSON = updatedReadBy)
         }
+        if (updated.isEmpty()) return
+        chatDao.upsertAll(updated)
 
         runCatching {
             remoteStore.markAsRead(familyId, messageIds, uid)
         }.onFailure { err ->
             // Best effort: non forziamo ERROR, i messaggi restano leggibili localmente.
-            messageIds.forEach { id ->
-                val local = chatDao.getById(id) ?: return@forEach
-                if (local.lastSyncError.isNullOrBlank()) {
-                    chatDao.upsert(local.copy(lastSyncError = err.message))
-                }
-            }
+            val withError = updated
+                .filter { it.lastSyncError.isNullOrBlank() }
+                .map { it.copy(lastSyncError = err.message) }
+            if (withError.isNotEmpty()) chatDao.upsertAll(withError)
         }
     }
 
@@ -492,7 +526,7 @@ class ChatRepository @Inject constructor(
         if (needsHydration.isEmpty()) return
 
         withContext(Dispatchers.IO) {
-            coroutineScope {
+            val hydrated = coroutineScope {
                 needsHydration.map { entity ->
                     async {
                         runCatching {
@@ -505,13 +539,16 @@ class ChatRepository @Inject constructor(
                                 fileName = fileName,
                                 bytes = bytes,
                             )
-                            chatDao.upsert(entity.copy(mediaLocalPath = localPath))
-                        }
+                            entity.copy(mediaLocalPath = localPath)
+                        }.getOrNull()
                         // Failures are swallowed per-message so one bad download
                         // does not abort the rest of the batch.
                     }
-                }.awaitAll()
+                }.awaitAll().filterNotNull()
             }
+            // Una sola scrittura per l'intero batch. Una upsert per download faceva
+            // riemettere la lista N volte durante l'idratazione all'apertura della chat.
+            if (hydrated.isNotEmpty()) chatDao.upsertAll(hydrated)
         }
     }
 
@@ -561,8 +598,12 @@ private fun String?.appendUniqueString(value: String): String {
     return arr.toString()
 }
 
-private fun KBChatMessageEntity.toDomain(): KBChatMessage =
-    KBChatMessage(
+private fun KBChatMessageEntity.toDomain(): KBChatMessage {
+    // Unico punto in cui si tocca il filesystem per decidere se il media è già in cache.
+    // Gira su Dispatchers.IO (vedi observeMessages) e il risultato viaggia fino alla UI,
+    // che quindi non deve più chiamare File.exists() durante la composizione degli item.
+    val cachedMediaPath = mediaLocalPath?.takeIf { it.isNotBlank() && File(it).exists() }
+    return KBChatMessage(
         id = id,
         familyId = familyId,
         senderId = senderId,
@@ -572,14 +613,13 @@ private fun KBChatMessageEntity.toDomain(): KBChatMessage =
         latitude = latitude,
         longitude = longitude,
         mediaStoragePath = mediaStoragePath,
-        mediaURL = mediaLocalPath
-            ?.takeIf { it.isNotBlank() && File(it).exists() }
+        mediaURL = cachedMediaPath
             ?.let { Uri.fromFile(File(it)).toString() }
             ?: mediaURL,
         mediaDurationSeconds = mediaDurationSeconds,
         mediaThumbnailURL = mediaThumbnailURL,
         replyToId = replyToId,
-        mediaLocalPath = mediaLocalPath,
+        mediaLocalPath = cachedMediaPath,
         mediaFileSize = mediaFileSize,
         mediaGroupURLsJSON = mediaGroupURLsJSON,
         mediaGroupTypesJSON = mediaGroupTypesJSON,
@@ -602,3 +642,4 @@ private fun KBChatMessageEntity.toDomain(): KBChatMessage =
         syncStateRaw = syncStateRaw,
         lastSyncError = lastSyncError,
     )
+}

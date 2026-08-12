@@ -11,6 +11,7 @@ import android.media.MediaPlayer
 import android.net.Uri
 import android.text.format.Formatter
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -83,6 +84,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
+import com.google.android.gms.maps.GoogleMapOptions
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
@@ -145,7 +147,10 @@ internal fun ChatBubble(
     val dragOffsetX = remember(message.id) { Animatable(0f) }
     val uiScope = rememberCoroutineScope()
     val swipeThresholdPx = 86f
-    val replyHintAlpha = (abs(dragOffsetX.value) / swipeThresholdPx).coerceIn(0f, 1f)
+    // NB: `dragOffsetX.value` non va letto qui. È snapshot state: leggerlo nel corpo di
+    // ChatBubble invaliderebbe l'intero sotto-albero della bolla ad ogni frame dello
+    // swipe. La lettura è confinata in SwipeReplyHint, che è l'unica cosa che deve
+    // ricomporsi durante il gesto.
 
     val avatarToBubbleGap = 6.dp
     val incomingLeadingInset = 12.dp + 32.dp + avatarToBubbleGap
@@ -182,16 +187,7 @@ internal fun ChatBubble(
                     modifier = Modifier.padding(end = avatarToBubbleGap),
                 )
                 // Icona swipe-to-reply: solo durante il gesto, così non occupa spazio fisso tra avatar e bubble.
-                if (replyHintAlpha > 0.01f) {
-                    Icon(
-                        imageVector = Icons.Default.Reply,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = replyHintAlpha),
-                        modifier = Modifier
-                            .padding(start = 2.dp, top = 6.dp)
-                            .size(16.dp),
-                    )
-                }
+                SwipeReplyHint(dragOffsetX = dragOffsetX, thresholdPx = swipeThresholdPx)
             }
             // Photo / video / mediaGroup / location without a reply context render
             // edge-to-edge — the media IS the bubble, no surrounding background or
@@ -363,15 +359,8 @@ internal fun ChatBubble(
                     }
                 }
             }
-            if (isOwn && replyHintAlpha > 0.01f) {
-                Icon(
-                    imageVector = Icons.Default.Reply,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = replyHintAlpha),
-                    modifier = Modifier
-                        .padding(start = 2.dp, top = 6.dp)
-                        .size(16.dp),
-                )
+            if (isOwn) {
+                SwipeReplyHint(dragOffsetX = dragOffsetX, thresholdPx = swipeThresholdPx)
             }
         }
 
@@ -403,6 +392,30 @@ internal fun ChatBubble(
             }
         }
     }
+}
+
+/**
+ * Icona di reply che compare durante lo swipe.
+ *
+ * Esiste come composable separato solo per contenere la lettura di [dragOffsetX]: essendo
+ * snapshot state, leggerlo direttamente in ChatBubble farebbe ricomporre tutta la bolla ad
+ * ogni frame del gesto. Qui l'invalidazione si ferma a queste poche righe.
+ */
+@Composable
+private fun SwipeReplyHint(
+    dragOffsetX: Animatable<Float, AnimationVector1D>,
+    thresholdPx: Float,
+) {
+    val alpha = (abs(dragOffsetX.value) / thresholdPx).coerceIn(0f, 1f)
+    if (alpha <= 0.01f) return
+    Icon(
+        imageVector = Icons.Default.Reply,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
+        modifier = Modifier
+            .padding(start = 2.dp, top = 6.dp)
+            .size(16.dp),
+    )
 }
 
 @Composable
@@ -685,8 +698,11 @@ private fun MediaContent(
     // Prefer the locally cached file over the Firebase Storage HTTPS URL —
     // reading from disk bypasses any network round-trip and is dramatically faster
     // than waiting for Coil's HTTP cache lookup.
+    // mediaLocalPath arriva già validato dal repository (su Dispatchers.IO): qui non si
+    // tocca il filesystem, altrimenti ogni bolla che entra nel viewport durante lo scroll
+    // pagherebbe una syscall stat() sul thread UI.
     val localFile = remember(message.mediaLocalPath) {
-        message.mediaLocalPath?.let { java.io.File(it) }?.takeIf { it.exists() }
+        message.mediaLocalPath?.let { java.io.File(it) }
     }
     val imageSource: Any? = localFile ?: message.mediaUrl
     val mediaUrl = message.mediaUrl   // kept for the fullscreen tap callback
@@ -924,6 +940,12 @@ private fun LocationContent(
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(LatLng(lat, lon), 15f)
     }
+    // Lite mode: la mappa viene renderizzata come bitmap statica invece di istanziare una
+    // MapView completa con superficie OpenGL e thread di rendering propri. In una LazyColumn
+    // che ricicla, ogni bolla posizione che entrava nel viewport creava una mappa interattiva
+    // intera — l'operazione più costosa possibile durante uno scroll. Qui l'interattività non
+    // serve: i gesti sono già tutti disabilitati e un overlay consuma i tocchi (vedi sotto).
+    val liteModeOptions = remember { GoogleMapOptions().liteMode(true) }
 
     Box(
         modifier = Modifier
@@ -940,6 +962,7 @@ private fun LocationContent(
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
+            googleMapOptionsFactory = { liteModeOptions },
             uiSettings = MapUiSettings(
                 scrollGesturesEnabled = false,
                 zoomGesturesEnabled = false,
@@ -1404,12 +1427,9 @@ private fun AudioContent(
     isTranscriptionEnabled: Boolean = true,
 ) {
     // File locale idrato da Storage: riproduzione affidabile anche se l'URL non risponde (token/App Check).
+    // Il path è già validato dal repository, quindi niente accesso al filesystem in composizione.
     val playbackSource = remember(message.mediaLocalPath, message.mediaUrl) {
-        message.mediaLocalPath
-            ?.let { java.io.File(it) }
-            ?.takeIf { it.exists() }
-            ?.absolutePath
-            ?: message.mediaUrl
+        message.mediaLocalPath ?: message.mediaUrl
     }
     var isPlaying by remember(playbackSource) { mutableStateOf(false) }
     var durationMs by remember(playbackSource) { mutableStateOf((message.mediaDurationSeconds ?: 0) * 1000) }
@@ -1508,7 +1528,7 @@ private fun AudioContent(
             )
         }
         AdaptiveRecordingWaveformView(
-            samples = List(14) { idx -> if (idx % 2 == 0) 8 else 14 },
+            samples = STATIC_AUDIO_WAVEFORM,
             color = textColor.copy(alpha = 0.85f),
         )
         Spacer(Modifier.width(2.dp))
@@ -1621,6 +1641,13 @@ private fun AudioContent(
         }
     }
 }
+
+/**
+ * Waveform decorativa fissa delle bolle audio. Costante di file e non `List(14) { … }`
+ * inline: quella allocava una lista nuova ad ogni composizione e, essendo `List` un tipo
+ * instabile, rendeva [AdaptiveRecordingWaveformView] non skippabile.
+ */
+private val STATIC_AUDIO_WAVEFORM: List<Int> = List(14) { idx -> if (idx % 2 == 0) 8 else 14 }
 
 private fun formatAudioTime(ms: Int): String {
     val sec = (ms / 1000).coerceAtLeast(0)

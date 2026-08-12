@@ -434,7 +434,7 @@ private fun GroceryEditDialog(
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(categories) { cat ->
+                    items(categories, key = { it.name }) { cat ->
                         val isSelected = GroceryCategory.fromStored(category) == cat
                         Surface(
                             shape = RoundedCornerShape(999.dp),

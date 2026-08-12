@@ -992,7 +992,7 @@ private fun KidBoxDocumentPickerSheet(
                         .height(320.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    items(visibleFolders) { folder ->
+                    items(visibleFolders, key = { "folder_${it.id}" }) { folder ->
                         Surface(
                             onClick = { currentFolderId = folder.id },
                             shape = RoundedCornerShape(12.dp),
@@ -1016,7 +1016,7 @@ private fun KidBoxDocumentPickerSheet(
                             }
                         }
                     }
-                    items(visibleDocuments) { doc ->
+                    items(visibleDocuments, key = { "doc_${it.id}" }) { doc ->
                         Surface(
                             onClick = { onSelect(doc) },
                             shape = RoundedCornerShape(12.dp),

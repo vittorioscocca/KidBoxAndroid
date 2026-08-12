@@ -25,7 +25,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -49,7 +51,11 @@ data class ChatUiState(
     val familyId: String = "",
     val currentUid: String = "",
     val messages: List<UiChatMessage> = emptyList(),
-    val inputText: String = "",
+    /**
+     * Messaggi citati da [messages] ma fuori dalla finestra caricata, indicizzati per id.
+     * Alimenta le anteprime di risposta ai messaggi vecchi.
+     */
+    val replyContexts: Map<String, UiChatMessage> = emptyMap(),
     val typingUsers: List<String> = emptyList(),
     val isLoadingOlder: Boolean = false,
     val hasMoreOlder: Boolean = true,
@@ -66,6 +72,7 @@ data class ChatUiState(
     val canMention: Boolean get() = mentionCandidates.size >= 2
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val familyDao: KBFamilyDao,
@@ -79,10 +86,28 @@ class ChatViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ChatUiState(currentUid = auth.currentUser?.uid.orEmpty()))
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
+    /**
+     * Testo del composer, tenuto **fuori** da [ChatUiState] di proposito.
+     *
+     * Stando nello stato unico, ogni carattere digitato emetteva un nuovo ChatUiState e
+     * ricomponeva l'intero ChatScreen (2000+ righe, item provider della LazyColumn incluso).
+     * Con un flow dedicato solo il composer si ricompone mentre si scrive.
+     */
+    private val _inputText = MutableStateFlow("")
+    val inputText: StateFlow<String> = _inputText.asStateFlow()
+
+    /**
+     * Quanti messaggi tenere in memoria dal DB locale. Cresce quando l'utente pagina
+     * all'indietro; senza questo Room riemetteva l'intera cronologia ad ogni scrittura.
+     */
+    private val messageWindow = MutableStateFlow(INITIAL_MESSAGE_WINDOW)
+
     private var typingRegistration: ListenerRegistration? = null
     private var oldestCursor: DocumentSnapshot? = null
     private var hasBoundFamily = false
     private var typingJob: Job? = null
+    /** True quando abbiamo già segnalato "sta scrivendo" e non serve ripeterlo. */
+    private var isTypingSignalled = false
     private var activeSendCount: Int = 0
     /** Job che osserva i family member per la famiglia attiva (per il picker @menzioni). */
     private var mentionsJob: Job? = null
@@ -232,15 +257,21 @@ class ChatViewModel @Inject constructor(
             }
         }
 
+        messageWindow.value = INITIAL_MESSAGE_WINDOW
         viewModelScope.launch {
-            chatRepository.observeMessages(familyId)
+            messageWindow
+                .flatMapLatest { limit -> chatRepository.observeMessages(familyId, limit) }
                 // Mapping KBChatMessage → UiChatMessage is CPU-only (JSON parsing, string ops)
                 // but for 50+ messages it's measurable on the main thread. Run it on Default
                 // so the UI thread stays free for rendering while the list is being prepared.
                 .map { messages ->
                     withContext(Dispatchers.Default) {
+                        // Un solo set di formatter per batch invece di due SimpleDateFormat
+                        // per ogni lettura di label. Uso sequenziale: SimpleDateFormat non
+                        // è thread-safe.
+                        val formatters = ChatLabelFormatters()
                         messages
-                            .map { it.toUi() }
+                            .map { it.toUi(formatters) }
                             // Hide messages deleted only for me (isDeleted=true, isDeletedForEveryone=false).
                             // Messages deleted for everyone (isDeletedForEveryone=true) are kept in the list
                             // so the bubble can render the "Messaggio eliminato" placeholder.
@@ -252,27 +283,53 @@ class ChatViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         messages = mappedMessages,
+                        replyContexts = loadMissingReplyContexts(mappedMessages),
                     )
                 }
         }
     }
 
+    /**
+     * Carica i messaggi citati che non rientrano nella finestra osservata.
+     *
+     * Nel caso comune (si risponde a messaggi recenti) la lista di id mancanti è vuota e
+     * non si tocca il DB, quindi il costo aggiuntivo è nullo.
+     */
+    private suspend fun loadMissingReplyContexts(
+        messages: List<UiChatMessage>,
+    ): Map<String, UiChatMessage> {
+        val inWindow = messages.mapTo(HashSet(messages.size)) { it.id }
+        val missing = messages.asSequence()
+            .mapNotNull { it.replyToId }
+            .filterNot { it in inWindow }
+            .distinct()
+            .toList()
+        if (missing.isEmpty()) return emptyMap()
+        val fetched = runCatching { chatRepository.getMessagesByIds(missing) }.getOrDefault(emptyList())
+        if (fetched.isEmpty()) return emptyMap()
+        return withContext(Dispatchers.Default) {
+            val formatters = ChatLabelFormatters()
+            fetched.associate { it.id to it.toUi(formatters) }
+        }
+    }
+
     fun onInputTextChange(text: String) {
-        _uiState.value = _uiState.value.copy(inputText = text)
+        _inputText.value = text
         triggerTypingSignal()
     }
 
     fun sendText() {
         val state = _uiState.value
         val familyId = state.familyId
-        val text = state.inputText.trim()
+        val text = _inputText.value.trim()
         if (familyId.isBlank() || text.isBlank()) return
 
         val replyToId = state.replyingToId
         val mentions = resolveMentionsFor(text, state.mentionCandidates)
         val mentionsJson = mentions.toMentionsJsonOrNull()
         pendingMentions.clear()
-        _uiState.value = state.copy(inputText = "", replyingToId = null)
+        _inputText.value = ""
+        _uiState.value = state.copy(replyingToId = null)
 
         viewModelScope.launch {
             setSending(true)
@@ -284,6 +341,8 @@ class ChatViewModel @Inject constructor(
                     replyToId = replyToId,
                     mentionsJSON = mentionsJson,
                 )
+                typingJob?.cancel()
+                isTypingSignalled = false
                 chatRepository.setTyping(familyId, false)
             }.onFailure { err ->
                 _uiState.value = _uiState.value.copy(errorText = err.message ?: "Invio non riuscito")
@@ -571,12 +630,22 @@ class ChatViewModel @Inject constructor(
     fun loadOlderMessages() {
         val state = _uiState.value
         if (state.familyId.isBlank() || state.isLoadingOlder || !state.hasMoreOlder) return
-        val cursor = oldestCursor ?: run {
-            _uiState.value = state.copy(hasMoreOlder = false)
-            return
-        }
         _uiState.value = state.copy(isLoadingOlder = true)
         viewModelScope.launch {
+            // Prima allarga la finestra locale: se Room ha già righe più vecchie fuori
+            // finestra (sessioni precedenti), bastano quelle e non serve toccare la rete.
+            val widened = messageWindow.value + MESSAGE_WINDOW_PAGE
+            messageWindow.value = widened
+            val localTotal = runCatching { chatRepository.countMessages(state.familyId) }.getOrDefault(0)
+            if (widened <= localTotal) {
+                _uiState.value = _uiState.value.copy(isLoadingOlder = false)
+                return@launch
+            }
+
+            val cursor = oldestCursor ?: run {
+                _uiState.value = _uiState.value.copy(isLoadingOlder = false, hasMoreOlder = false)
+                return@launch
+            }
             runCatching {
                 val (nextCursor, count) = chatRepository.fetchOlderMessages(
                     familyId = state.familyId,
@@ -607,19 +676,32 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Segnala "sta scrivendo" con un debounce vero.
+     *
+     * La versione precedente lanciava `setTyping(true)` *prima* del delay e si affidava a
+     * `typingJob.cancel()` per il throttling — ma il cancel arrivava quando la scrittura era
+     * già partita, quindi ogni singolo tasto premuto produceva una scrittura su Firestore.
+     * Qui il `true` parte una volta sola per raffica e solo il `false` è rimandato.
+     */
     private fun triggerTypingSignal() {
-        val state = _uiState.value
-        if (state.familyId.isBlank()) return
+        val familyId = _uiState.value.familyId
+        if (familyId.isBlank()) return
+        if (!isTypingSignalled) {
+            isTypingSignalled = true
+            viewModelScope.launch { runCatching { chatRepository.setTyping(familyId, true) } }
+        }
         typingJob?.cancel()
         typingJob = viewModelScope.launch {
-            chatRepository.setTyping(state.familyId, true)
-            delay(1200)
-            chatRepository.setTyping(state.familyId, false)
+            delay(TYPING_IDLE_MS)
+            isTypingSignalled = false
+            runCatching { chatRepository.setTyping(familyId, false) }
         }
     }
 
     private fun stopRealtime() {
         typingJob?.cancel()
+        isTypingSignalled = false
         mentionsJob?.cancel()
         mentionsJob = null
         typingRegistration?.remove()
@@ -635,5 +717,16 @@ class ChatViewModel @Inject constructor(
     private fun setSending(isStart: Boolean) {
         activeSendCount = if (isStart) activeSendCount + 1 else (activeSendCount - 1).coerceAtLeast(0)
         _uiState.value = _uiState.value.copy(isSending = activeSendCount > 0)
+    }
+
+    private companion object {
+        /** Messaggi tenuti in memoria all'apertura della chat. */
+        const val INITIAL_MESSAGE_WINDOW = 60
+
+        /** Di quanto cresce la finestra ad ogni paginazione all'indietro. */
+        const val MESSAGE_WINDOW_PAGE = 50
+
+        /** Inattività dopo la quale si segnala che l'utente ha smesso di scrivere. */
+        const val TYPING_IDLE_MS = 1200L
     }
 }

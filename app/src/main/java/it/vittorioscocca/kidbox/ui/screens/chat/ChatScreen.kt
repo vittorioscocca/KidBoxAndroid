@@ -176,6 +176,12 @@ import java.io.ByteArrayOutputStream
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 
+/** Quanti item oltre il primo visibile scaldare in cache (direzione di scroll in avanti). */
+private const val PREFETCH_AHEAD = 15
+
+/** Quanti item dietro al primo visibile tenere caldi, per lo scroll all'indietro. */
+private const val PREFETCH_BEHIND = 5
+
 @Composable
 fun ChatScreen(
     onBack: () -> Unit,
@@ -205,26 +211,14 @@ fun ChatScreen(
     val proximityManager = remember { ProximitySensorManager(context) }
     val inputBarViewModel = remember { ChatInputBarViewModel() }
     val inputBarState by inputBarViewModel.uiState.collectAsStateWithLifecycle()
-    var previousMessagesCount by remember { mutableStateOf(0) }
+    /** Id del messaggio più recente già visto, per distinguere "nuovo in fondo" da "paginazione". */
+    var newestMessageId by remember { mutableStateOf<String?>(null) }
     var didInitialBottomScroll by remember { mutableStateOf(false) }
     var showClearConfirm by remember { mutableStateOf(false) }
-    // derivedStateOf reads LazyListState snapshot state internally — no outer remember keys
-    // needed. Adding message size / index as remember keys would recreate the derivedState
-    // object on every list change instead of letting it evolve naturally, causing extra work.
-    val showScrollToBottomButton by remember {
-        derivedStateOf {
-            val total = listState.layoutInfo.totalItemsCount
-            if (total <= 1) return@derivedStateOf false
-            // With reverseLayout index 0 is visually the bottom (newest message).
-            // Show FAB whenever the user has scrolled up more than 2 items.
-            listState.firstVisibleItemIndex > 2
-        }
-    }
-    val shouldShowScrollToBottomFab by remember {
-        derivedStateOf {
-            showScrollToBottomButton && state.inputText.isBlank()
-        }
-    }
+    // NB: la visibilità della FAB dipende da posizione di scroll e testo del composer, ed
+    // è calcolata dentro ScrollToBottomFabHost. Tenerla qui significava leggere lo stato
+    // dello scroll e l'inputText nel corpo di ChatScreen, facendo ricomporre l'intera
+    // schermata (item provider della LazyColumn incluso) ad ogni scroll e ad ogni tasto.
 
     // Built once per messages snapshot so the initial-scroll LaunchedEffect and the
     // dispose handler can resolve message ids ↔︎ absolute LazyColumn indices without
@@ -257,35 +251,57 @@ fun ChatScreen(
     val reversedFlatItems = remember(flatItems) { flatItems.asReversed() }
     // O(1) reply-context lookup. Without this every ChatBubble that has a replyToId does a
     // linear scan through all messages — O(n) per bubble, O(n²) total per frame on large histories.
-    val messagesById = remember(state.messages) {
-        state.messages.associateBy { it.id }
+    // Include anche i messaggi citati che stanno fuori dalla finestra caricata, così
+    // rispondere a un messaggio vecchio continua a mostrarne l'anteprima.
+    val messagesById = remember(state.messages, state.replyContexts) {
+        buildMap(state.messages.size + state.replyContexts.size) {
+            putAll(state.replyContexts)
+            state.messages.forEach { put(it.id, it) }
+        }
     }
 
-    // Step 3 — Eager prefetch: warm Coil's memory cache for every PHOTO and MEDIA_GROUP thumb
-    // as soon as the message list changes so bubbles render without a loading placeholder.
-    // We enqueue (non-blocking) rather than await so the composable is never suspended here.
-    LaunchedEffect(state.messages.size, state.familyId) {
-        if (state.messages.isEmpty()) return@LaunchedEffect
+    // Prefetch delle anteprime PHOTO / MEDIA_GROUP per scaldare la cache di Coil poco
+    // prima che la bolla entri nel viewport, così non si vede il placeholder di caricamento.
+    //
+    // La versione precedente era agganciata a `state.messages.size` e ripercorreva **tutta**
+    // la lista ad ogni messaggio nuovo: con 300 messaggi in cronologia, 300 ImageRequest
+    // costruite e accodate per ogni messaggio ricevuto, più uno stat() del filesystem per
+    // messaggio sul thread UI. Qui si prefetcha solo la finestra intorno alla posizione di
+    // scroll, e il lavoro gira fuori dal main thread.
+    // Snapshot sempre aggiornato della lista renderizzata, condiviso con il prefetch e con
+    // il salvataggio dell'ancora di scroll in dispose.
+    val reversedFlatItemsState = rememberUpdatedState(reversedFlatItems)
+    LaunchedEffect(listState, state.familyId) {
         val loader = Coil.imageLoader(context)
-        state.messages.forEach { msg ->
-            val cacheKey = "msg_${msg.id}"
-            val source: Any? = when (msg.type) {
-                ChatMessageType.PHOTO -> {
-                    msg.mediaLocalPath?.let { java.io.File(it) }?.takeIf { it.exists() }
-                        ?: msg.mediaUrl
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .distinctUntilChanged()
+            .collectLatest { firstVisible ->
+                val items = reversedFlatItemsState.value
+                if (items.isEmpty()) return@collectLatest
+                withContext(Dispatchers.IO) {
+                    val from = (firstVisible - PREFETCH_BEHIND).coerceAtLeast(0)
+                    val to = (firstVisible + PREFETCH_AHEAD).coerceAtMost(items.lastIndex)
+                    for (i in from..to) {
+                        val msg = (items[i] as? ChatListItem.Message)?.message ?: continue
+                        val source: Any? = when (msg.type) {
+                            // mediaLocalPath è già validato dal repository.
+                            ChatMessageType.PHOTO -> msg.mediaLocalPath?.let { java.io.File(it) } ?: msg.mediaUrl
+                            ChatMessageType.MEDIA_GROUP -> msg.mediaGroupUrls.firstOrNull()
+                            else -> null
+                        } ?: continue
+                        val cacheKey = "msg_${msg.id}"
+                        loader.enqueue(
+                            ImageRequest.Builder(context)
+                                .data(source)
+                                .memoryCacheKey(cacheKey)
+                                .diskCacheKey(cacheKey)
+                                .size(Size(400, 400))
+                                .scale(Scale.FILL)
+                                .build(),
+                        )
+                    }
                 }
-                ChatMessageType.MEDIA_GROUP -> msg.mediaGroupUrls.firstOrNull()
-                else -> null
-            } ?: return@forEach
-            val request = ImageRequest.Builder(context)
-                .data(source)
-                .memoryCacheKey(cacheKey)
-                .diskCacheKey(cacheKey)
-                .size(Size(400, 400))
-                .scale(Scale.FILL)
-                .build()
-            loader.enqueue(request)
-        }
+            }
     }
 
     @SuppressLint("MissingPermission")
@@ -309,7 +325,6 @@ fun ChatScreen(
         }
     }
 
-    val reversedFlatItemsState = rememberUpdatedState(reversedFlatItems)
     val familyIdForAnchor = state.familyId
     DisposableEffect(familyIdForAnchor) {
         onDispose {
@@ -448,13 +463,16 @@ fun ChatScreen(
     // Reset per-family scroll state so we always re-anchor to bottom on family switch.
     LaunchedEffect(state.familyId) {
         didInitialBottomScroll = false
-        previousMessagesCount = 0
+        newestMessageId = null
     }
 
-    LaunchedEffect(state.messages.size, state.isLoadingOlder) {
-        val currentCount = state.messages.size
-        if (currentCount <= 0) {
-            previousMessagesCount = 0
+    // NB: "è arrivato un messaggio nuovo" si riconosce dall'id del messaggio più recente,
+    // non dalla crescita del conteggio. Il conteggio cresce anche quando si caricano
+    // messaggi *vecchi*, e usarlo faceva saltare in fondo mentre si paginava all'indietro.
+    LaunchedEffect(state.messages.size) {
+        val newest = state.messages.lastOrNull()
+        if (newest == null) {
+            newestMessageId = null
             return@LaunchedEffect
         }
 
@@ -462,17 +480,16 @@ fun ChatScreen(
             // With reverseLayout index 0 IS the bottom (newest message) — no flatItems math.
             listState.scrollToItem(0)
             didInitialBottomScroll = true
-            previousMessagesCount = currentCount
+            newestMessageId = newest.id
             viewModel.markVisibleAsRead(state.messages.takeLast(20).map { it.id })
             return@LaunchedEffect
         }
 
-        val countDelta = currentCount - previousMessagesCount
-        if (countDelta > 0 && !state.isLoadingOlder) {
+        if (newest.id != newestMessageId) {
             // New message arrived. With reverseLayout the new item lands at index 0 and the
             // LazyColumn automatically preserves the user's visual offset — we only need to
             // pull to bottom when the user is already there or the message is their own.
-            val isOwnMessage = state.messages.lastOrNull()?.senderId == state.currentUid
+            val isOwnMessage = newest.senderId == state.currentUid
             val wasAtBottom = listState.firstVisibleItemIndex <= 1
             if (isOwnMessage || wasAtBottom) {
                 listState.scrollToItem(0)
@@ -481,7 +498,7 @@ fun ChatScreen(
             // view stable while the new bubble slides in at the bottom.
         }
 
-        previousMessagesCount = currentCount
+        newestMessageId = newest.id
         viewModel.markVisibleAsRead(state.messages.takeLast(20).map { it.id })
     }
 
@@ -581,9 +598,13 @@ fun ChatScreen(
                         ) {
                             itemsIndexed(
                                 items = reversedFlatItems,
-                                key = { index, item ->
+                                // La key del separatore non deve contenere l'indice: paginando
+                                // all'indietro tutti gli indici slittano, quindi tutte le key
+                                // cambiavano e Compose distruggeva e ricreava ogni separatore.
+                                // Le label giorno sono già univoche nella lista.
+                                key = { _, item ->
                                     when (item) {
-                                        is ChatListItem.Separator -> "sep_${item.label}_$index"
+                                        is ChatListItem.Separator -> "sep_${item.label}"
                                         is ChatListItem.Message -> "msg_${item.message.id}"
                                     }
                                 },
@@ -633,8 +654,9 @@ fun ChatScreen(
                 // AnimatedVisibility is resolved without any ColumnScope in the implicit
                 // receiver chain (calling it directly inside Column>Box triggers the
                 // ColumnScope.AnimatedVisibility overload which the Compose compiler rejects).
-                ScrollToBottomFab(
-                    visible = shouldShowScrollToBottomFab,
+                ScrollToBottomFabHost(
+                    listState = listState,
+                    inputTextFlow = viewModel.inputText,
                     isDarkTheme = isDarkTheme,
                     onClick = {
                         scope.launch { listState.animateScrollToItem(0) }
@@ -737,7 +759,10 @@ fun ChatScreen(
                     inputBarViewModel.onResumeRecording()
                 },
                 onMentionPicked = viewModel::registerMention,
-                replyPreview = state.replyingToId?.let { id -> state.messages.firstOrNull { it.id == id } },
+                // Lookup O(1) sulla mappa già costruita: la firstOrNull era una scansione
+                // lineare rifatta ad ogni ricomposizione, quindi ad ogni tasto premuto.
+                replyPreview = state.replyingToId?.let { messagesById[it] },
+                inputTextFlow = viewModel.inputText,
             )
         }
     }
@@ -1140,8 +1165,12 @@ private fun ReplyComposerBar(
     onResumeRecording: () -> Unit,
     onMentionPicked: (ChatMentionCandidate) -> Unit,
     replyPreview: UiChatMessage?,
+    inputTextFlow: kotlinx.coroutines.flow.StateFlow<String>,
 ) {
     val context = LocalContext.current
+    // Il testo del composer viene raccolto qui, non in ChatScreen: così digitare ricompone
+    // solo la barra di input invece dell'intera schermata.
+    val inputText by inputTextFlow.collectAsStateWithLifecycle()
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1330,7 +1359,7 @@ private fun ReplyComposerBar(
         val mentionCandidates = if (state.canMention) state.mentionCandidates else emptyList()
 
         ChatInputBar(
-            text = state.inputText,
+            text = inputText,
             isSending = state.isSending,
             recordingState = inputBarState,
             recordingTimeLabel = inputBarTimeLabel,
@@ -1547,6 +1576,36 @@ private fun MessageActionDialog(
 // Extracted so AnimatedVisibility is resolved in a clean @Composable context —
 // no ColumnScope in the implicit receiver chain that would trigger the
 // ColumnScope.AnimatedVisibility overload and break compilation.
+/**
+ * Wrapper che isola le letture di stato della FAB.
+ *
+ * Posizione di scroll e testo del composer cambiano continuamente; leggendoli qui dentro
+ * l'invalidazione si ferma a questo composable invece di propagarsi a tutto ChatScreen.
+ */
+@Composable
+private fun ScrollToBottomFabHost(
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    inputTextFlow: kotlinx.coroutines.flow.StateFlow<String>,
+    isDarkTheme: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val inputText by inputTextFlow.collectAsStateWithLifecycle()
+    val isScrolledUp by remember(listState) {
+        derivedStateOf {
+            // With reverseLayout index 0 is visually the bottom (newest message).
+            // Show FAB whenever the user has scrolled up more than 2 items.
+            listState.layoutInfo.totalItemsCount > 1 && listState.firstVisibleItemIndex > 2
+        }
+    }
+    ScrollToBottomFab(
+        visible = isScrolledUp && inputText.isBlank(),
+        isDarkTheme = isDarkTheme,
+        onClick = onClick,
+        modifier = modifier,
+    )
+}
+
 @Composable
 private fun ScrollToBottomFab(
     visible: Boolean,

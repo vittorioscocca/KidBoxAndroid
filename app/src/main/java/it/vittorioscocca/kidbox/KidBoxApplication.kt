@@ -6,6 +6,10 @@ import android.os.Bundle
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.WorkManager
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.HiltAndroidApp
 import it.vittorioscocca.kidbox.data.location.GeofenceMonitorRestorer
@@ -25,7 +29,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 @HiltAndroidApp
-class KidBoxApplication : Application(), Configuration.Provider {
+class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFactory {
 
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
@@ -136,4 +140,36 @@ class KidBoxApplication : Application(), Configuration.Provider {
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
             .build()
+
+    /**
+     * ImageLoader condiviso dell'app.
+     *
+     * Senza questo Coil girava sui default, tarati su un'app generica: cache disco al 2%
+     * dello spazio libero e revalidazione HTTP su ogni immagine. KidBox è invece pesante di
+     * media (chat, foto di famiglia, documenti, wallet) e la stragrande maggioranza degli
+     * URL viene da Firebase Storage, dove il path cambia se cambia il contenuto.
+     *
+     * `respectCacheHeaders(false)` sfrutta proprio questo: gli URL sono di fatto immutabili,
+     * quindi si evitano round-trip di revalidazione. Il rovescio della medaglia riguarda le
+     * sole anteprime `og:image` dei link di terze parti, che possono restare in cache anche
+     * se il sito le aggiorna — accettabile per una thumbnail di anteprima.
+     */
+    override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
+        .memoryCache {
+            MemoryCache.Builder(this)
+                .maxSizePercent(0.25)
+                .build()
+        }
+        .diskCache {
+            DiskCache.Builder()
+                .directory(cacheDir.resolve("image_cache"))
+                .maxSizeBytes(256L * 1024L * 1024L)
+                .build()
+        }
+        .respectCacheHeaders(false)
+        // Usa RGB_565 (metà della memoria per pixel) solo per immagini senza canale alpha
+        // e solo quando il dispositivo è sotto pressione di memoria.
+        .allowRgb565(true)
+        .crossfade(true)
+        .build()
 }

@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "KidBox"
 include(":app")
+include(":baselineprofile")

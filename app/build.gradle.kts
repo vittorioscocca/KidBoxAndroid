@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.services)
+    alias(libs.plugins.baselineprofile)
 }
 
 val localProperties = Properties().apply {
@@ -31,8 +32,8 @@ android {
         applicationId = "it.vittorioscocca.kidbox"
         minSdk = 26
         targetSdk = 36
-        versionCode = 33
-        versionName = "2.1.1"
+        versionCode = 34
+        versionName = "2.1.2"
         manifestPlaceholders["googleMapsApiKey"] = mapsApiKey
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
         buildConfigField("Boolean", "AI_ENABLED", "true")
@@ -95,6 +96,11 @@ configurations.configureEach {
 }
 
 dependencies {
+    // Installa il Baseline Profile impacchettato nell'APK al primo avvio. Senza questa
+    // dipendenza il profilo generato da :baselineprofile non verrebbe mai applicato.
+    implementation(libs.profileinstaller)
+    baselineProfile(project(":baselineprofile"))
+
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.core:core-splashscreen:1.0.1")

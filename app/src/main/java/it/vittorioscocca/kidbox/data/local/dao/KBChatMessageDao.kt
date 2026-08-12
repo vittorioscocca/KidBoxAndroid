@@ -13,8 +13,31 @@ interface KBChatMessageDao {
     @Query("SELECT * FROM kb_chat_messages WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): KBChatMessageEntity?
 
-    @Query("SELECT * FROM kb_chat_messages WHERE familyId = :familyId ORDER BY createdAtEpochMillis ASC")
-    fun observeByFamilyId(familyId: String): Flow<List<KBChatMessageEntity>>
+    /**
+     * Finestra dei [limit] messaggi più recenti, riordinati ASC come si aspetta la UI.
+     *
+     * Senza LIMIT Room riemette l'intera cronologia della famiglia ad ogni scrittura —
+     * anche per una singola spunta di lettura — e il costo di mapping cresce senza limite
+     * con l'età della chat. La finestra viene allargata dal ViewModel man mano che
+     * l'utente pagina all'indietro.
+     */
+    @Query(
+        """
+        SELECT * FROM (
+            SELECT * FROM kb_chat_messages
+            WHERE familyId = :familyId
+            ORDER BY createdAtEpochMillis DESC
+            LIMIT :limit
+        ) ORDER BY createdAtEpochMillis ASC
+        """,
+    )
+    fun observeRecentByFamilyId(familyId: String, limit: Int): Flow<List<KBChatMessageEntity>>
+
+    @Query("SELECT COUNT(*) FROM kb_chat_messages WHERE familyId = :familyId")
+    suspend fun countByFamilyId(familyId: String): Int
+
+    @Query("SELECT * FROM kb_chat_messages WHERE id IN (:ids)")
+    suspend fun getByIds(ids: List<String>): List<KBChatMessageEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBChatMessageEntity)

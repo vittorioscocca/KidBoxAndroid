@@ -233,7 +233,7 @@ fun HealthHomeScreen(
                         bottom = if (state.hasAnyHealthData) 108.dp else 32.dp,
                     ),
                 ) {
-                    items(cards) { card -> HealthModuleCard(card) }
+                    items(cards, key = { it.title }) { card -> HealthModuleCard(card) }
                 }
             }
         }
