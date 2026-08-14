@@ -116,7 +116,7 @@
     <string name="ai_q_expenses">Resumen de gastos</string>
     <string name="ai_ask_something">Pregunta algo…</string>
     <string name="ai_preparing_context_dots">Preparando el contexto…</string>
-    <string name="ai_available_pro">Asistente de IA disponible con el plan Pro</string>
+    <string name="ai_available_pro">Has usado todos los mensajes de IA gratuitos del plan Free. Cambia a Pro para continuar.</string>
     <string name="ai_discover_plans">Ver planes</string>
     <string name="ai_history_reset">Se eliminará el historial y se reconstruirá el contexto.</string>
     <string name="ai_confirm">Confirmar</string>

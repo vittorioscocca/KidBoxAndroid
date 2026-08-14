@@ -650,6 +650,12 @@ object DatabaseModule {
      * generico), popolati da lettura AI o inseriti a mano. Nullable, nessun
      * backfill necessario.
      */
+    private val MIGRATION_35_36 = object : Migration(35, 36) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `vehicles` ADD COLUMN `reminderOffsetsJson` TEXT")
+        }
+    }
+
     private val MIGRATION_34_35 = object : Migration(34, 35) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE `kb_wallet_tickets` ADD COLUMN `arrivalLocation` TEXT")
@@ -1132,6 +1138,7 @@ object DatabaseModule {
         MIGRATION_32_33,
         MIGRATION_33_34,
         MIGRATION_34_35,
+        MIGRATION_35_36,
     )
         .fallbackToDestructiveMigration()
         .build()

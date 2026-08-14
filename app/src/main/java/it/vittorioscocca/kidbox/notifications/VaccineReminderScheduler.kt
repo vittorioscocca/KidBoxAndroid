@@ -9,6 +9,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.mapper.KBVaccineStatus
 import it.vittorioscocca.kidbox.data.local.mapper.computedStatus
 import it.vittorioscocca.kidbox.data.local.mapper.displayTitle
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.domain.model.KBVaccine
 import java.util.Calendar
 import javax.inject.Inject
@@ -28,7 +29,7 @@ class VaccineReminderScheduler @Inject constructor(
         val fireAt = dayBeforeAt9(target)
         if (fireAt <= System.currentTimeMillis()) return
 
-        val body = "Vaccino per $childName: ${vaccine.displayTitle()}"
+        val body = context.getString(R.string.vaccine_reminder_body_format, childName, vaccine.displayTitle())
         val pi = buildPendingIntent(vaccine.id, body, vaccine.familyId, vaccine.childId)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

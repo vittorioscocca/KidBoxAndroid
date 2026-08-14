@@ -124,7 +124,6 @@ import kotlin.math.sqrt
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.util.KBLocale
 import it.vittorioscocca.kidbox.data.notification.CounterField
-import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.ui.components.KidBoxAvatar
 import it.vittorioscocca.kidbox.ui.family.FamilySwitcherBottomSheet
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
@@ -934,7 +933,14 @@ private fun FeatureCard(item: FeatureItem, modifier: Modifier = Modifier, onClic
     }
 }
 
-internal fun featureItems(context: Context, familyId: String, state: HomeUiState): List<FeatureItem> = listOf(
+internal fun featureItems(
+    context: Context,
+    familyId: String,
+    state: HomeUiState,
+    // Default sullo stato reattivo, non sul piano: su Free l'AI resta sbloccata
+    // finché il bonus una tantum non è esaurito (vedi CurrentPlanStore).
+    aiAccessBlocked: Boolean = it.vittorioscocca.kidbox.ai.CurrentPlanStore.aiAccessBlocked.value,
+): List<FeatureItem> = listOf(
     FeatureItem("notes", context.getString(R.string.home_feature_notes_title), context.getString(R.string.home_feature_notes_subtitle), AppDestination.NotesHome.createRoute(familyId), Icons.AutoMirrored.Filled.Note, Color(0xFFFFF9E6), Color(0xFFF5A623), state.badgeNotes, CounterField.NOTES),
     FeatureItem("todo", context.getString(R.string.home_feature_todo_title), context.getString(R.string.home_feature_todo_subtitle), AppDestination.Todo.route, Icons.Filled.CheckCircle, Color(0xFFEBF3FF), Color(0xFF2E86FF), state.badgeTodos, CounterField.TODOS),
     FeatureItem("shopping", context.getString(R.string.home_feature_shopping_title), context.getString(R.string.home_feature_shopping_subtitle), AppDestination.ShoppingList.createRoute(familyId), Icons.Filled.LocalGroceryStore, Color(0xFFEDFAF3), Color(0xFF27AE60), state.badgeShopping, CounterField.SHOPPING),
@@ -1001,44 +1007,47 @@ internal fun featureItems(context: Context, familyId: String, state: HomeUiState
         context.getString(R.string.home_feature_vehicles_subtitle),
         AppDestination.Vehicles.createRoute(familyId),
         Icons.Filled.DirectionsCar,
-        Color(0xFFF0F0F0),
-        Color(0xFF1A1A1A),
+        Color(0xFFFFF3E8),
+        Color(0xFFFF6B00),
     ),
+    // "travel" e "ai" sono le due card che dipendono dall'assistente AI: il piano Free
+    // ora ha accesso all'AI finché non esaurisce il bonus di 5 messaggi una tantum, quindi
+    // il lock non è più legato al piano ma allo stato reattivo aiAccessBlocked.
     FeatureItem(
         id = "travel",
         title = context.getString(R.string.home_feature_travel_title),
-        subtitle = if (state.familyPlan == KBPlan.FREE) {
+        subtitle = if (aiAccessBlocked) {
             context.getString(R.string.home_feature_travel_subtitle_locked)
         } else {
             context.getString(R.string.home_feature_travel_subtitle_unlocked)
         },
         route = AppDestination.TravelList.createRoute(familyId),
-        icon = if (state.familyPlan == KBPlan.FREE) Icons.Filled.Lock else Icons.Filled.Luggage,
+        icon = if (aiAccessBlocked) Icons.Filled.Lock else Icons.Filled.Luggage,
         cardColor = Color(0xFFE0F7FA),
         iconColor = Color(0xFF00838F),
-        locked = state.familyPlan == KBPlan.FREE,
+        locked = aiAccessBlocked,
     ),
     FeatureItem(
         id = "ai",
-        title = if (state.familyPlan == KBPlan.FREE) {
+        title = if (aiAccessBlocked) {
             context.getString(R.string.home_feature_ai_title_locked)
         } else {
             context.getString(R.string.home_feature_ai_title_unlocked)
         },
-        subtitle = if (state.familyPlan == KBPlan.FREE) {
+        subtitle = if (aiAccessBlocked) {
             context.getString(R.string.home_feature_ai_subtitle_locked)
         } else {
             context.getString(R.string.home_feature_ai_subtitle_unlocked)
         },
-        route = if (state.familyPlan == KBPlan.FREE) {
+        route = if (aiAccessBlocked) {
             AppDestination.Plans.route
         } else {
             AppDestination.AiChat.createRoute(familyId)
         },
-        icon = if (state.familyPlan == KBPlan.FREE) Icons.Filled.Lock else Icons.Filled.Psychology,
+        icon = if (aiAccessBlocked) Icons.Filled.Lock else Icons.Filled.Psychology,
         cardColor = Color(0xFFEEF0FF),
         iconColor = Color(0xFF5C6BC0),
-        locked = state.familyPlan == KBPlan.FREE,
+        locked = aiAccessBlocked,
     ),
     FeatureItem(
         "passwords",
@@ -1064,7 +1073,8 @@ private fun HomeCategorySection(
 ) {
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
-    val features = featureItems(context, state.familyId, state)
+    val aiAccessBlocked by it.vittorioscocca.kidbox.ai.CurrentPlanStore.aiAccessBlocked.collectAsStateWithLifecycle()
+    val features = featureItems(context, state.familyId, state, aiAccessBlocked)
     val byId = remember(features) { features.associateBy { it.id } }
 
     // Assistente ("ai") escluso: è il bottone AI flottante.
@@ -1144,8 +1154,9 @@ private fun HomeFreeGridSection(
     onOrderChanged: (List<String>) -> Unit,
 ) {
     val context = LocalContext.current
-    val features = remember(context, state.familyId, state) {
-        featureItems(context, state.familyId, state).filter { it.id != "ai" }
+    val aiAccessBlocked by it.vittorioscocca.kidbox.ai.CurrentPlanStore.aiAccessBlocked.collectAsStateWithLifecycle()
+    val features = remember(context, state.familyId, state, aiAccessBlocked) {
+        featureItems(context, state.familyId, state, aiAccessBlocked).filter { it.id != "ai" }
     }
     val byId = remember(features) { features.associateBy { it.id } }
 

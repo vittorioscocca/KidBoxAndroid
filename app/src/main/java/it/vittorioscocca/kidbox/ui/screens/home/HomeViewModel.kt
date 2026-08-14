@@ -28,6 +28,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
 import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
+import it.vittorioscocca.kidbox.data.remote.ai.AIService
 import it.vittorioscocca.kidbox.data.remote.family.FamilyHeroPhotoService
 import it.vittorioscocca.kidbox.data.repository.PasswordsRepository
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
@@ -140,6 +141,7 @@ class HomeViewModel @Inject constructor(
     private val walletRepository: WalletRepository,
     private val passwordsRepository: PasswordsRepository,
     private val subscriptionRepository: SubscriptionRepository,
+    private val aiService: AIService,
     private val familyMemoryService: FamilyMemoryService,
     private val homeViewModePreference: it.vittorioscocca.kidbox.data.local.HomeViewModePreference,
     @ApplicationContext private val appContext: Context,
@@ -407,8 +409,23 @@ class HomeViewModel @Inject constructor(
                 subscriptionRepository.planFlow(familyId, uid).collectLatest { plan ->
                     _uiState.value = _uiState.value.copy(familyPlan = plan)
                     it.vittorioscocca.kidbox.ai.CurrentPlanStore.update(plan)
+                    // Equivalente Android di refreshAIQuotaStatus() su iOS: al caricamento
+                    // del piano, aggiorna subito lo stato AI (bonus Free esaurito o no).
+                    // Le chiamate AI successive lo terranno aggiornato in tempo reale.
+                    refreshAIQuotaStatus(familyId)
                 }
             }
+        }
+    }
+
+    /**
+     * Fail-open by design: se la fetch fallisce (rete assente, ecc.) non blocchiamo
+     * l'accesso all'AI — l'enforcement reale resta lato backend sulle callable.
+     */
+    private fun refreshAIQuotaStatus(familyId: String) {
+        if (familyId.isBlank()) return
+        viewModelScope.launch {
+            runCatching { aiService.fetchUsage(familyId) }
         }
     }
 

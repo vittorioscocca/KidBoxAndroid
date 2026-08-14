@@ -37,8 +37,8 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 val childId = intent.getStringExtra(EXTRA_CHILD_ID).orEmpty()
                 val dayOffset = intent.getIntExtra(EXTRA_DAY_OFFSET, 0)
                 val slotIndex = intent.getIntExtra(EXTRA_SLOT_INDEX, 0)
-                val title = intent.getStringExtra(EXTRA_TITLE) ?: "Promemoria cura"
-                val body = intent.getStringExtra(EXTRA_BODY) ?: "Orario di somministrazione"
+                val title = intent.getStringExtra(EXTRA_TITLE) ?: context.getString(R.string.treatment_reminder_notification_title)
+                val body = intent.getStringExtra(EXTRA_BODY) ?: context.getString(R.string.treatment_reminder_body_fallback)
 
                 val deepLink = Intent(context, MainActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -136,8 +136,8 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 )
                 val notification = NotificationCompat.Builder(context, CHANNEL_ID_HEALTH_REMINDERS)
                     .setSmallIcon(R.mipmap.ic_launcher)
-                    .setContentTitle("Promemoria vaccino")
-                    .setContentText(body.ifBlank { "Vaccino in programma domani" })
+                    .setContentTitle(context.getString(R.string.vaccine_reminder_notification_title))
+                    .setContentText(body.ifBlank { context.getString(R.string.vaccine_reminder_body_fallback) })
                     .setAutoCancel(true)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setContentIntent(pendingIntent)
@@ -148,17 +148,27 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 val vehicleId = intent.getStringExtra(EXTRA_VEHICLE_ID).orEmpty()
                 val familyId = intent.getStringExtra(EXTRA_FAMILY_ID).orEmpty()
                 val vehicleName = intent.getStringExtra(EXTRA_VEHICLE_NAME).orEmpty()
-                val titlePrefix = intent.getStringExtra(EXTRA_VEHICLE_TITLE_PREFIX).orEmpty()
+                val kindKey = intent.getStringExtra(EXTRA_VEHICLE_KIND).orEmpty()
                 val slot = intent.getStringExtra(EXTRA_VEHICLE_SLOT).orEmpty()
-                val body = if (slot == "week") {
-                    "Tra una settimana — apri Garage."
-                } else {
-                    "Scadenza oggi — apri Garage."
+                val offsetDays = if (slot.startsWith("offset")) slot.removePrefix("offset").toIntOrNull() else null
+                val kindLabel = when (kindKey) {
+                    "insurance" -> context.getString(R.string.vehicles_insurance)
+                    "revision" -> context.getString(R.string.vehicles_inspection)
+                    "tax" -> context.getString(R.string.vehicles_road_tax)
+                    "service" -> context.getString(R.string.vehicles_next_service)
+                    else -> null
                 }
+                val body = when (offsetDays) {
+                    0 -> context.getString(R.string.vehicles_reminder_body_same_day)
+                    2 -> context.getString(R.string.vehicles_reminder_body_2d)
+                    7 -> context.getString(R.string.vehicles_reminder_body_1w)
+                    else -> context.getString(R.string.vehicles_reminder_body_same_day)
+                }
+                val reminderWord = context.getString(R.string.vehicles_reminder)
                 val title = when {
-                    titlePrefix.isNotBlank() && vehicleName.isNotBlank() -> "$titlePrefix: $vehicleName"
-                    vehicleName.isNotBlank() -> "Garage: $vehicleName"
-                    else -> "Promemoria Garage"
+                    kindLabel != null && vehicleName.isNotBlank() -> "$reminderWord: $kindLabel: $vehicleName"
+                    vehicleName.isNotBlank() -> "$reminderWord Garage: $vehicleName"
+                    else -> "$reminderWord Garage"
                 }
 
                 val deepLink = Intent(context, MainActivity::class.java).apply {
@@ -167,7 +177,7 @@ class HealthReminderReceiver : BroadcastReceiver() {
                     putExtra("kb_familyId", familyId)
                     putExtra("kb_vehicleId", vehicleId)
                 }
-                val notifId = ("$vehicleId|$slot|${titlePrefix.hashCode()}").hashCode()
+                val notifId = ("$vehicleId|$slot|$kindKey").hashCode()
                 val pendingIntent = PendingIntent.getActivity(
                     context, notifId, deepLink,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
@@ -246,8 +256,10 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 val familyId = intent.getStringExtra(EXTRA_FAMILY_ID).orEmpty()
                 val childId = intent.getStringExtra(EXTRA_CHILD_ID).orEmpty()
                 val isExam = type == TYPE_EXAM_REMINDER
-                val notifTitle = if (isExam) "Promemoria esame" else "Promemoria visita"
-                val notifBody = body.ifBlank { if (isExam) "Esame in programma" else "Visita medica" }
+                val notifTitle = context.getString(if (isExam) R.string.exam_reminder_notification_title else R.string.visit_reminder_notification_title)
+                val notifBody = body.ifBlank {
+                    context.getString(if (isExam) R.string.exam_reminder_body_fallback else R.string.visit_reminder_body_fallback)
+                }
 
                 val deepLink = Intent(context, MainActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -289,9 +301,9 @@ class HealthReminderReceiver : BroadcastReceiver() {
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID_HEALTH_REMINDERS,
-                "Promemoria salute e Garage",
+                context.getString(R.string.health_garage_reminder_channel_name),
                 NotificationManager.IMPORTANCE_HIGH,
-            ).apply { description = "Promemoria locali visite, esami, cure e scadenze veicolo" },
+            ).apply { description = context.getString(R.string.health_garage_reminder_channel_description) },
         )
     }
 

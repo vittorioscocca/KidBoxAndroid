@@ -20,7 +20,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.BuildConfig
-import it.vittorioscocca.kidbox.domain.model.KBPlan
 
 @Composable
 fun AskAiButton(
@@ -32,8 +31,9 @@ fun AskAiButton(
     val context = LocalContext.current
     val aiSettings = remember(context) { context.getAiSettingsFromApp() }
     val consentGiven by aiSettings.consentGiven.collectAsStateWithLifecycle(initialValue = false)
-    val currentPlan by CurrentPlanStore.plan.collectAsStateWithLifecycle()
-    val isLocked = currentPlan == KBPlan.FREE
+    // Free ha accesso all'AI finché non esaurisce il bonus di 5 messaggi una tantum:
+    // il blocco è reattivo (CurrentPlanStore.aiAccessBlocked), non più legato al piano.
+    val isLocked by CurrentPlanStore.aiAccessBlocked.collectAsStateWithLifecycle()
     val upgradeAction = LocalUpgradeAction.current
 
     var showConsentDialog by remember { mutableStateOf(false) }

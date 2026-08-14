@@ -144,6 +144,13 @@
     <string name="vehicles_new_vehicle">New vehicle</string>
     <string name="vehicles_current_km_short">Current km</string>
     <string name="vehicles_reminder">Reminder</string>
+    <string name="vehicles_reminder_offset_same_day">Same day</string>
+    <string name="vehicles_reminder_offset_2d">2 days before</string>
+    <string name="vehicles_reminder_offset_1w">1 week before</string>
+    <string name="vehicles_reminder_body_same_day">Due today — open Garage.</string>
+    <string name="vehicles_reminder_body_2d">Due in 2 days — open Garage.</string>
+    <string name="vehicles_reminder_body_1w">Due in a week — open Garage.</string>
+    <string name="vehicles_reminder_alerts_label">Alerts</string>
     <string name="photos_years">Years</string>
     <string name="photos_months">Months</string>
     <string name="photos_days">Days</string>
@@ -218,6 +225,8 @@
     <string name="photos_album_add_hint">Add photos to this album from the library or take one with the camera.</string>
     <string name="photos_add_from_library">Add from library</string>
     <string name="photos_invalid_album">Invalid album</string>
+    <string name="todo_reminder_notification_title">To-Do reminder</string>
+    <string name="todo_reminder_channel_description">Local To-Do reminders</string>
     <string name="todo_overview">Overview</string>
     <string name="todo_today">Today</string>
     <string name="todo_all">All</string>

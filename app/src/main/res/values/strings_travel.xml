@@ -83,7 +83,7 @@
     <string name="travel_new_trip">Nuovo viaggio</string>
     <string name="travel_your_trips">I tuoi viaggi</string>
     <string name="travel_see_all">Vedi tutti</string>
-    <string name="travel_upgrade_hint">Passa a Pro o Max per pianificare viaggi con l\'AI.</string>
+    <string name="travel_upgrade_hint">Hai usato tutti i messaggi AI gratuiti del piano Free. Passa a Pro o Max per continuare a pianificare viaggi con l\'AI.</string>
     <string name="travel_plane">Aereo</string>
     <string name="travel_train">Treno</string>
     <string name="travel_ship">Nave</string>

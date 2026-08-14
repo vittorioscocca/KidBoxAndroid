@@ -8,6 +8,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import it.vittorioscocca.kidbox.data.local.entity.VehicleEntity
+import it.vittorioscocca.kidbox.data.vehicles.VehicleReminderOffsets
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
@@ -35,6 +36,7 @@ data class VehicleRemoteDto(
     val notes: String?,
     val photoURL: String?,
     val reminderEnabled: Boolean,
+    val reminderOffsetsJson: String?,
     val isDeleted: Boolean,
     val createdAtMillis: Long?,
     val updatedAtMillis: Long?,
@@ -104,6 +106,7 @@ class VehicleRemoteStore @Inject constructor(
                         notes = d["notes"] as? String,
                         photoURL = d["photoURL"] as? String,
                         reminderEnabled = d["reminderEnabled"] as? Boolean ?: false,
+                        reminderOffsetsJson = VehicleReminderOffsets.fromFirestoreMap(d["reminderOffsets"] as? Map<*, *>).encode(),
                         isDeleted = d["isDeleted"] as? Boolean ?: false,
                         createdAtMillis = (d["createdAt"] as? Timestamp)?.toDate()?.time,
                         updatedAtMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
@@ -128,6 +131,7 @@ class VehicleRemoteStore @Inject constructor(
             "name" to entity.name,
             "isDeleted" to false,
             "reminderEnabled" to entity.reminderEnabled,
+            "reminderOffsets" to VehicleReminderOffsets.decode(entity.reminderOffsetsJson).toFirestoreMap(),
             "updatedBy" to uid,
             "updatedAt" to FieldValue.serverTimestamp(),
         )

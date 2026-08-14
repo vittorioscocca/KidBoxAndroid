@@ -144,6 +144,13 @@
     <string name="vehicles_new_vehicle">Nuevo vehículo</string>
     <string name="vehicles_current_km_short">Km actuales</string>
     <string name="vehicles_reminder">Recordatorio</string>
+    <string name="vehicles_reminder_offset_same_day">Mismo día</string>
+    <string name="vehicles_reminder_offset_2d">2 días antes</string>
+    <string name="vehicles_reminder_offset_1w">1 semana antes</string>
+    <string name="vehicles_reminder_body_same_day">Vence hoy — abre Garage.</string>
+    <string name="vehicles_reminder_body_2d">Vence en 2 días — abre Garage.</string>
+    <string name="vehicles_reminder_body_1w">Vence en una semana — abre Garage.</string>
+    <string name="vehicles_reminder_alerts_label">Avisos</string>
     <string name="photos_years">Años</string>
     <string name="photos_months">Meses</string>
     <string name="photos_days">Días</string>
@@ -218,6 +225,8 @@
     <string name="photos_album_add_hint">Añade fotos a este álbum desde la galería o hazlas con la cámara.</string>
     <string name="photos_add_from_library">Añadir desde la galería</string>
     <string name="photos_invalid_album">Álbum no válido</string>
+    <string name="todo_reminder_notification_title">Recordatorio de tarea</string>
+    <string name="todo_reminder_channel_description">Recordatorios locales de tareas</string>
     <string name="todo_overview">Resumen</string>
     <string name="todo_today">Hoy</string>
     <string name="todo_all">Todos</string>

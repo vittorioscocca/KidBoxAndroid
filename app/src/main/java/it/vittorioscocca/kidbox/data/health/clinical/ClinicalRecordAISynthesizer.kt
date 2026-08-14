@@ -54,6 +54,7 @@ object ClinicalRecordAISynthesizer {
             dailyLimit = reply.dailyLimit,
             isLargeContext = reply.isLargeContext,
             totalPayloadChars = estimate.totalChars,
+            period = reply.period,
         )
         return EnhanceResult(
             report = parsed.copy(

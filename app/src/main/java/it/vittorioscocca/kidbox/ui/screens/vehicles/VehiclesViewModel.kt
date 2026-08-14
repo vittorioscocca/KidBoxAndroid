@@ -57,6 +57,7 @@ class VehiclesViewModel @Inject constructor(
         currentKm: Int?,
         notes: String?,
         reminderEnabled: Boolean,
+        reminderOffsetsJson: String? = null,
         presetVehicleId: String? = null,
         onError: (String) -> Unit,
     ) {
@@ -81,6 +82,7 @@ class VehiclesViewModel @Inject constructor(
                     currentKm = currentKm,
                     notes = notes,
                     reminderEnabled = reminderEnabled,
+                    reminderOffsetsJson = reminderOffsetsJson,
                     presetVehicleId = presetVehicleId,
                 )
             }.onFailure { onError(it.message ?: "Errore") }

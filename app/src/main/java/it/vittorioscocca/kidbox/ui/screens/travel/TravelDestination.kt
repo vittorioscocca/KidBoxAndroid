@@ -86,6 +86,7 @@ data class TravelSuggestionsResult(
     val profileSummary: String,
     val usageToday: Int,
     val dailyLimit: Int,
+    val period: it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod = it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod.DAILY,
 )
 
 fun TravelProfile.discoverSubtitle(context: android.content.Context): String {

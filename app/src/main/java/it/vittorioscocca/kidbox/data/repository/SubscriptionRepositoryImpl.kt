@@ -91,12 +91,18 @@ class SubscriptionRepositoryImpl @Inject constructor(
     ): Result<Unit> = runCatching {
         if (familyId.isBlank()) error("Famiglia non disponibile")
         if (uid.isBlank()) error("Utente non autenticato")
-        functions.getHttpsCallable("updatePlan")
+        if (purchaseToken.isBlank()) error("Token di acquisto non disponibile")
+        // `validatePurchase` verifica il token con Google Play prima di concedere
+        // il piano: non inviamo più il piano desiderato, lo deduce il server dal
+        // productId dell'acquisto verificato. (La vecchia callable "updatePlan"
+        // non è mai esistita lato server: gli acquisti non venivano registrati.)
+        functions.getHttpsCallable("validatePurchase")
             .call(
                 hashMapOf(
-                    "plan" to plan.rawValue,
-                    "transactionId" to purchaseToken,
                     "familyId" to familyId,
+                    "platform" to "android",
+                    "purchaseToken" to purchaseToken,
+                    "productId" to (plan.productId ?: error("Piano senza productId")),
                 ),
             )
             .await()

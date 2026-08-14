@@ -52,10 +52,11 @@ fun TravelListScreen(
     val trips by viewModel.trips.collectAsStateWithLifecycle()
     val recentTrips = trips.take(3)
     val legsByTripId by viewModel.legsByTripId.collectAsStateWithLifecycle()
-    val familyPlan by viewModel.familyPlan.collectAsStateWithLifecycle()
     val needsOnboarding by viewModel.needsOnboarding.collectAsStateWithLifecycle()
     val travelProfile by viewModel.travelProfile.collectAsStateWithLifecycle()
-    val aiAvailable = familyPlan.includesAI
+    // Free ha accesso all'AI finché non esaurisce il bonus di 5 messaggi una tantum.
+    val aiAccessBlocked by it.vittorioscocca.kidbox.ai.CurrentPlanStore.aiAccessBlocked.collectAsStateWithLifecycle()
+    val aiAvailable = !aiAccessBlocked
     val kb = MaterialTheme.kidBoxColors
 
     when (needsOnboarding) {

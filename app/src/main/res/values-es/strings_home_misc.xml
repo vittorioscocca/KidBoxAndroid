@@ -98,11 +98,11 @@
     <string name="home_feature_vehicles_title">Garaje</string>
     <string name="home_feature_vehicles_subtitle">Coches y vencimientos</string>
     <string name="home_feature_travel_title">Viajes</string>
-    <string name="home_feature_travel_subtitle_locked">Plan Pro o Max para la IA</string>
+    <string name="home_feature_travel_subtitle_locked">Bono de IA gratuito agotado</string>
     <string name="home_feature_travel_subtitle_unlocked">Planifica con la IA</string>
     <string name="home_feature_ai_title_locked">Asistente</string>
     <string name="home_feature_ai_title_unlocked">Asistente IA</string>
-    <string name="home_feature_ai_subtitle_locked">Disponible con Pro o Max</string>
+    <string name="home_feature_ai_subtitle_locked">Bono gratuito agotado</string>
     <string name="home_feature_ai_subtitle_unlocked">Pide ayuda</string>
     <string name="home_feature_passwords_title">Contraseñas</string>
     <string name="home_feature_passwords_subtitle">Credenciales de la familia</string>

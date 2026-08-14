@@ -111,12 +111,13 @@ private fun TravelProposalContent(
     val members by viewModel.members.collectAsStateWithLifecycle()
     val children by viewModel.children.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
-    val familyPlan by viewModel.familyPlan.collectAsStateWithLifecycle()
     val usageToday by viewModel.usageToday.collectAsStateWithLifecycle()
     val dailyLimit by viewModel.dailyLimit.collectAsStateWithLifecycle()
     val regeneratingDayIndex by viewModel.regeneratingDayIndex.collectAsStateWithLifecycle()
     val proposalRevision by viewModel.proposalRevision.collectAsStateWithLifecycle()
-    val aiAvailable = familyPlan.includesAI
+    // Free ha accesso all'AI finché non esaurisce il bonus di 5 messaggi una tantum.
+    val aiAccessBlocked by it.vittorioscocca.kidbox.ai.CurrentPlanStore.aiAccessBlocked.collectAsStateWithLifecycle()
+    val aiAvailable = !aiAccessBlocked
     val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(error) {

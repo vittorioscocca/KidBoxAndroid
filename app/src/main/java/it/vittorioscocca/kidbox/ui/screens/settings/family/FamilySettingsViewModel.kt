@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox.ui.screens.settings.family
 
 import it.vittorioscocca.kidbox.util.KBLog
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -9,6 +10,8 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
@@ -21,6 +24,7 @@ import it.vittorioscocca.kidbox.data.remote.family.FamilyLeaveService
 import it.vittorioscocca.kidbox.data.remote.family.FamilyFirestoreCreationRepository
 import it.vittorioscocca.kidbox.data.remote.family.InitialChild
 import it.vittorioscocca.kidbox.data.remote.family.InviteRemoteStore
+import it.vittorioscocca.kidbox.data.remote.family.isPermissionDenied
 import it.vittorioscocca.kidbox.data.sync.FamilySyncCenter
 import it.vittorioscocca.kidbox.data.sync.firstNonBlankString
 import it.vittorioscocca.kidbox.data.sync.userProfileDisplayName
@@ -75,6 +79,7 @@ sealed interface LeaveDialogState {
 
 @HiltViewModel
 class FamilySettingsViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val familyDao: KBFamilyDao,
     private val familyMemberDao: KBFamilyMemberDao,
     private val childDao: KBChildDao,
@@ -132,15 +137,6 @@ class FamilySettingsViewModel @Inject constructor(
         KBLog.ui.info("handleAccessRevokedByRemote: stato resettato, navigateAwayAfterLeave=true", TAG)
     }
 
-    private fun isPermissionDenied(t: Throwable): Boolean {
-        var e: Throwable? = t
-        while (e != null) {
-            val fs = e as? FirebaseFirestoreException
-            if (fs?.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) return true
-            e = e.cause
-        }
-        return false
-    }
 
     /**
      * Dopo una scrittura Firestore che cambia i permessi: invalida il token, attende la propagazione
@@ -845,6 +841,11 @@ class FamilySettingsViewModel @Inject constructor(
                         }
                 }
                 val msg = when {
+                    // `family == null` = ramo creazione nuova famiglia (un solo tentativo,
+                    // nessun retry): qui un permission-denied è quasi sempre firestore.rules
+                    // che rifiuta la 3ª famiglia, non un problema di token transitorio.
+                    family == null && isPermissionDenied(e) ->
+                        appContext.getString(R.string.settings_family_limit_reached)
                     isPermissionDenied(e) ->
                         "Salvataggio non riuscito dopo 5 tentativi. Riprova tra qualche secondo."
                     else -> e.localizedMessage ?: "Errore salvataggio"

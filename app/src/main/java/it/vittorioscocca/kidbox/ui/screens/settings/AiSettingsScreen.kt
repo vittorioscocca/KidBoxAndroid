@@ -175,11 +175,13 @@ fun AiSettingsScreen(
             CurrentPlanCard(
                 plan = state.plan,
                 usageToday = state.aiUsageToday,
+                period = state.aiQuotaPeriod,
+                aiAccessBlocked = state.aiAccessBlocked,
             )
 
             AIIntroCard()
 
-            if (!state.plan.includesAI) {
+            if (state.aiAccessBlocked) {
                 AILockedBanner(
                     onDiscoverPlans = onOpenPlans,
                     onRedeemOfferCode = {
@@ -197,7 +199,8 @@ fun AiSettingsScreen(
 
                 AIUsageCard(
                     usageToday = state.aiUsageToday,
-                    dailyLimit = state.plan.aiDailyLimit,
+                    dailyLimit = state.plan.aiMessageLimit,
+                    period = state.aiQuotaPeriod,
                 )
 
                 HealthContextSettingsCard(
@@ -236,6 +239,8 @@ fun AiSettingsScreen(
 private fun CurrentPlanCard(
     plan: KBPlan,
     usageToday: Int,
+    period: it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod,
+    aiAccessBlocked: Boolean,
 ) {
     val gradientColors = when (plan) {
         KBPlan.MAX -> listOf(Color(0xFF7C3AED), Color(0xFF4F46E5))
@@ -277,29 +282,38 @@ private fun CurrentPlanCard(
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                 )
-                if (plan.includesAI) {
-                    val availableToday = if (plan.aiDailyLimit == Int.MAX_VALUE) {
-                        null
-                    } else {
-                        (plan.aiDailyLimit - usageToday).coerceAtLeast(0)
-                    }
+                if (aiAccessBlocked) {
                     Text(
-                        if (plan.aiDailyLimit == Int.MAX_VALUE) stringResource(R.string.settings_ai_unlimited) else stringResource(R.string.settings_plan_ai_messages_per_day, plan.aiDailyLimit),
+                        stringResource(R.string.settings_ai_requires_plan),
                         color = Color.White.copy(alpha = 0.85f),
                         fontSize = 13.sp,
-                    )
-                    Text(
-                        if (availableToday == null) stringResource(R.string.settings_ai_available_today_unlimited) else "Disponibili oggi: $availableToday",
-                        color = Color.White.copy(alpha = 0.92f),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
                     )
                 } else {
+                    val isLifetime = period == it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod.LIFETIME
+                    val available = if (plan.aiMessageLimit == Int.MAX_VALUE) {
+                        null
+                    } else {
+                        (plan.aiMessageLimit - usageToday).coerceAtLeast(0)
+                    }
                     Text(
-                        stringResource(R.string.settings_ai_not_included),
+                        if (plan.aiMessageLimit == Int.MAX_VALUE) {
+                            stringResource(R.string.settings_ai_unlimited)
+                        } else if (isLifetime) {
+                            stringResource(R.string.settings_ai_free_messages_used, usageToday, plan.aiMessageLimit)
+                        } else {
+                            stringResource(R.string.settings_plan_ai_messages_per_day, plan.aiMessageLimit)
+                        },
                         color = Color.White.copy(alpha = 0.85f),
                         fontSize = 13.sp,
                     )
+                    if (!isLifetime) {
+                        Text(
+                            if (available == null) stringResource(R.string.settings_ai_available_today_unlimited) else "Disponibili oggi: $available",
+                            color = Color.White.copy(alpha = 0.92f),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
             }
         }
@@ -401,8 +415,13 @@ private fun AIToggleCard(
 }
 
 @Composable
-private fun AIUsageCard(usageToday: Int, dailyLimit: Int) {
+private fun AIUsageCard(
+    usageToday: Int,
+    dailyLimit: Int,
+    period: it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod = it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod.DAILY,
+) {
     val kb = MaterialTheme.kidBoxColors
+    val isLifetime = period == it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod.LIFETIME
     val isUnlimited = dailyLimit == Int.MAX_VALUE
     val availableToday = if (isUnlimited) Int.MAX_VALUE else (dailyLimit - usageToday).coerceAtLeast(0)
     val progress = if (isUnlimited) 0f else usageToday.toFloat() / dailyLimit.coerceAtLeast(1)
@@ -418,7 +437,7 @@ private fun AIUsageCard(usageToday: Int, dailyLimit: Int) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.BarChart, contentDescription = null, tint = progressColor, modifier = Modifier.size(18.dp))
                 Text(
-                    stringResource(R.string.settings_ai_messages_today),
+                    if (isLifetime) stringResource(R.string.settings_ai_bonus_free_title) else stringResource(R.string.settings_ai_messages_today),
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
                     color = kb.title,
@@ -437,6 +456,20 @@ private fun AIUsageCard(usageToday: Int, dailyLimit: Int) {
                     "$usageToday messaggi inviati oggi",
                     fontSize = 14.sp,
                     color = kb.subtitle,
+                )
+            } else if (isLifetime) {
+                Text(
+                    stringResource(R.string.settings_ai_free_messages_used, usageToday, dailyLimit),
+                    fontSize = 14.sp,
+                    color = kb.title,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { progress.coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                    color = progressColor,
+                    trackColor = progressColor.copy(alpha = 0.15f),
                 )
             } else {
                 Row(

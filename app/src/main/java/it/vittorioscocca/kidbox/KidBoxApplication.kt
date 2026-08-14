@@ -3,6 +3,7 @@ package it.vittorioscocca.kidbox
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.WorkManager
@@ -12,6 +13,8 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.HiltAndroidApp
+import it.vittorioscocca.kidbox.data.local.ThemePreference
+import it.vittorioscocca.kidbox.data.local.toNightMode
 import it.vittorioscocca.kidbox.data.location.GeofenceMonitorRestorer
 import it.vittorioscocca.kidbox.data.notification.PushNotificationManager
 import it.vittorioscocca.kidbox.notifications.KidBoxFirebaseMessagingService
@@ -43,13 +46,24 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
     @Inject
     lateinit var nudgeEngine: NudgeEngine
 
+    @Inject
+    lateinit var themePreference: ThemePreference
+
     private val appInitScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
+        // super.onCreate() prima di tutto: Hilt inietta i campi @Inject (incluso
+        // themePreference) dentro Hilt_KidBoxApplication.onCreate(), quindi usarli
+        // prima genera UninitializedPropertyAccessException e crash immediato.
+        super.onCreate()
         KidBoxApplicationHolder.applicationContext = applicationContext
         KBFileLogger.init(this)
         KBCrashHandler.install()
-        super.onCreate()
+        // Applicato subito dopo l'injection, prima di qualunque Activity: allinea da
+        // subito i componenti nativi (DatePickerDialog, notifiche, ecc.) alla preferenza
+        // scelta in Impostazioni. Senza, quei componenti seguono solo il tema di sistema,
+        // e mostrano un popup chiaro dentro un'app messa in scuro dall'utente (o viceversa).
+        AppCompatDelegate.setDefaultNightMode(themePreference.getTheme().toNightMode())
         WorkManager.initialize(this, workManagerConfiguration)
         KidBoxFirebaseMessagingService.createNotificationChannels(this)
         // Analytics utenti attivi — internal/analytics-active-users.md

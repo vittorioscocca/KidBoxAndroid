@@ -123,8 +123,10 @@
     <string name="settings_ai_daily_sub">Notification chaque matin à 8h00 avec le programme du jour</string>
     <string name="settings_ai_patterns">Tendances santé IA</string>
     <string name="settings_ai_patterns_sub">Analyse mensuelle de l\'historique de santé des enfants</string>
-    <string name="settings_ai_requires_plan">L\'assistant IA est disponible avec Pro ou Max</string>
-    <string name="settings_ai_upgrade_hint">Passe à Pro pour 20 messages/jour par membre, ou à Max pour 100.</string>
+    <string name="settings_ai_requires_plan">Messages IA gratuits épuisés</string>
+    <string name="settings_ai_upgrade_hint">Tu as utilisé les 5 messages IA gratuits inclus dans la formule Free. Passe à Pro pour continuer à utiliser l\'assistant.</string>
+    <string name="settings_ai_bonus_free_title">Bonus IA gratuit</string>
+    <string name="settings_ai_free_messages_used">%1$d messages gratuits utilisés sur %2$d</string>
     <string name="settings_ai_see_plans">Découvrir les formules</string>
     <string name="settings_ai_open">Ouvrir</string>
     <string name="settings_ai_health_context">Contexte du chat Santé</string>
@@ -249,4 +251,5 @@
     <string name="settings_ai_ctx_summary_detail">Utilise un résumé du profil de santé pour économiser des messages.</string>
     <string name="settings_plan_ai_per_day">%1$d msg IA/jour</string>
     <string name="settings_plan_ai_messages_per_day">IA : %1$d messages/jour</string>
+    <string name="settings_family_limit_reached">Tu as atteint la limite de 2 familles par compte. Supprime une famille existante pour en créer une nouvelle.</string>
 </resources>

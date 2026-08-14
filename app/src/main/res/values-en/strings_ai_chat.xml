@@ -116,7 +116,7 @@
     <string name="ai_q_expenses">Expense summary</string>
     <string name="ai_ask_something">Ask something…</string>
     <string name="ai_preparing_context_dots">Preparing context…</string>
-    <string name="ai_available_pro">AI Assistant available with the Pro plan</string>
+    <string name="ai_available_pro">You\'ve used all the free AI messages included in the Free plan. Upgrade to Pro to keep going.</string>
     <string name="ai_discover_plans">See plans</string>
     <string name="ai_history_reset">The history will be deleted and the context rebuilt.</string>
     <string name="ai_confirm">Confirm</string>

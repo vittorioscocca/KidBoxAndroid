@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.entity.VehicleEntity
+import it.vittorioscocca.kidbox.data.vehicles.VehicleReminderOffsets
 import it.vittorioscocca.kidbox.ui.screens.life.deadlineUrgencyColor
 import it.vittorioscocca.kidbox.ui.screens.life.earliestNonNull
 import it.vittorioscocca.kidbox.ui.screens.life.formatItDate
@@ -191,6 +192,7 @@ fun VehiclesScreen(
                     currentKm = fields.km,
                     notes = fields.notes,
                     reminderEnabled = fields.reminder,
+                    reminderOffsetsJson = fields.reminderOffsetsJson,
                 ) { err -> toast = err }
                 showAdd = false
             },
@@ -238,6 +240,7 @@ private data class VehicleFormFields(
     val km: Int?,
     val notes: String?,
     val reminder: Boolean,
+    val reminderOffsetsJson: String?,
 )
 
 @Composable
@@ -254,10 +257,14 @@ private fun AddVehicleDialog(
     var color by remember { mutableStateOf("") }
     var vin by remember { mutableStateOf("") }
     var ins by remember { mutableStateOf<Long?>(null) }
+    var insOffsets by remember { mutableStateOf(VehicleReminderOffsets.DEFAULT_OFFSETS.toSet()) }
     var rev by remember { mutableStateOf<Long?>(null) }
+    var revOffsets by remember { mutableStateOf(VehicleReminderOffsets.DEFAULT_OFFSETS.toSet()) }
     var tax by remember { mutableStateOf<Long?>(null) }
+    var taxOffsets by remember { mutableStateOf(VehicleReminderOffsets.DEFAULT_OFFSETS.toSet()) }
     var lastSvc by remember { mutableStateOf<Long?>(null) }
     var nextSvc by remember { mutableStateOf<Long?>(null) }
+    var nextSvcOffsets by remember { mutableStateOf(VehicleReminderOffsets.DEFAULT_OFFSETS.toSet()) }
     var kmText by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
     var reminder by remember { mutableStateOf(false) }
@@ -288,10 +295,34 @@ private fun AddVehicleDialog(
                 OutlinedTextField(value = color, onValueChange = { color = it }, label = { Text(stringResource(R.string.vehicles_color)) })
                 OutlinedTextField(value = vin, onValueChange = { vin = it }, label = { Text("VIN") })
                 TextButton(onClick = { pickIns(ins) }) { Text("Scad. assicurazione: ${ins?.let { formatItDate(it) } ?: "—"}") }
+                if (ins != null) {
+                    ReminderOffsetChips(
+                        selected = insOffsets,
+                        onToggle = { d -> insOffsets = if (d in insOffsets) insOffsets - d else insOffsets + d },
+                    )
+                }
                 TextButton(onClick = { pickRev(rev) }) { Text("Scad. revisione: ${rev?.let { formatItDate(it) } ?: "—"}") }
+                if (rev != null) {
+                    ReminderOffsetChips(
+                        selected = revOffsets,
+                        onToggle = { d -> revOffsets = if (d in revOffsets) revOffsets - d else revOffsets + d },
+                    )
+                }
                 TextButton(onClick = { pickTax(tax) }) { Text("Scad. bollo: ${tax?.let { formatItDate(it) } ?: "—"}") }
+                if (tax != null) {
+                    ReminderOffsetChips(
+                        selected = taxOffsets,
+                        onToggle = { d -> taxOffsets = if (d in taxOffsets) taxOffsets - d else taxOffsets + d },
+                    )
+                }
                 TextButton(onClick = { pickLast(lastSvc) }) { Text("Ultimo tagliando: ${lastSvc?.let { formatItDate(it) } ?: "—"}") }
                 TextButton(onClick = { pickNext(nextSvc) }) { Text("Prossimo tagliando: ${nextSvc?.let { formatItDate(it) } ?: "—"}") }
+                if (nextSvc != null) {
+                    ReminderOffsetChips(
+                        selected = nextSvcOffsets,
+                        onToggle = { d -> nextSvcOffsets = if (d in nextSvcOffsets) nextSvcOffsets - d else nextSvcOffsets + d },
+                    )
+                }
                 OutlinedTextField(value = kmText, onValueChange = { kmText = it }, label = { Text(stringResource(R.string.vehicles_current_km_short)) })
                 OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text(stringResource(R.string.life_notes)) })
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -322,6 +353,12 @@ private fun AddVehicleDialog(
                                 km = kmText.toIntOrNull(),
                                 notes = notes.trim().takeIf { it.isNotEmpty() },
                                 reminder = reminder,
+                                reminderOffsetsJson = VehicleReminderOffsets(
+                                    insurance = insOffsets.sorted(),
+                                    revision = revOffsets.sorted(),
+                                    tax = taxOffsets.sorted(),
+                                    service = nextSvcOffsets.sorted(),
+                                ).encode(),
                             ),
                         )
                     }

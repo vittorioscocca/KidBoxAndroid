@@ -68,7 +68,6 @@ import it.vittorioscocca.kidbox.domain.model.KBExpense
 import it.vittorioscocca.kidbox.domain.model.KBGroceryItem
 import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
 import it.vittorioscocca.kidbox.domain.model.KBNote
-import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.domain.model.KBTextExtractionStatus
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.domain.model.KBPediatricProfile
@@ -76,7 +75,9 @@ import it.vittorioscocca.kidbox.domain.model.KBRoutine
 import it.vittorioscocca.kidbox.domain.model.KBRoutineCheck
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import it.vittorioscocca.kidbox.domain.model.KBTodoItem
+import it.vittorioscocca.kidbox.ai.CurrentPlanStore
 import it.vittorioscocca.kidbox.domain.model.ai.AIMessageRole
+import it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod
 import it.vittorioscocca.kidbox.domain.model.ai.AIServiceError
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -98,6 +99,7 @@ data class PlanningChatUiState(
     val inputText: String = "",
     val usageToday: Int = 0,
     val dailyLimit: Int = 30,
+    val quotaPeriod: AIQuotaPeriod = AIQuotaPeriod.DAILY,
     val isSubscribed: Boolean = true,
     val conversationReady: Boolean = false,
     val familyName: String = "",
@@ -211,10 +213,12 @@ class PlanningAIChatViewModel @Inject constructor(
             }
             _uiState.update {
                 it.copy(
-                    // Temporary business override: FREE users are elevated to AI access too.
-                    // Keep paywall disabled here to match Health AI behavior.
-                    isSubscribed = true,
-                    dailyLimit = if (plan == KBPlan.MAX) 100 else 30,
+                    // Free ha accesso all'AI finché non esaurisce il bonus di 5 messaggi
+                    // una tantum: il blocco è reattivo (CurrentPlanStore.aiAccessBlocked),
+                    // non più legato staticamente al piano.
+                    isSubscribed = !CurrentPlanStore.aiAccessBlocked.value,
+                    dailyLimit = plan?.aiMessageLimit ?: 30,
+                    quotaPeriod = plan?.aiQuotaPeriod ?: AIQuotaPeriod.DAILY,
                 )
             }
             dailyLimit = _uiState.value.dailyLimit
@@ -322,6 +326,11 @@ class PlanningAIChatViewModel @Inject constructor(
                         streamingMessageId = AIChatStreamingDelivery.beginAssistantReveal(assistantMsg.id),
                         usageToday = reply.usageToday,
                         dailyLimit = reply.dailyLimit,
+                        quotaPeriod = reply.period,
+                        // Il bonus Free può esaurirsi proprio con questo messaggio: rifletti
+                        // subito lo stato aggiornato di CurrentPlanStore (già propagato da
+                        // AIService/AIUsageTracker prima di questo update).
+                        isSubscribed = !CurrentPlanStore.aiAccessBlocked.value,
                         actionExecutionSummary = executionSummary,
                         autoExecutedMessageIds = autoExecutedIds,
                         pendingGroceryCount = groceryItemDao.observeByFamilyId(effectiveFamilyId).first()
@@ -722,7 +731,11 @@ class PlanningAIChatViewModel @Inject constructor(
     private fun localizeError(error: Throwable): String {
         val mapped = (error as? AIServiceException)?.serviceError
         return when (mapped) {
-            AIServiceError.RateLimitReached -> "Limite giornaliero raggiunto."
+            AIServiceError.RateLimitReached -> if (_uiState.value.quotaPeriod == AIQuotaPeriod.LIFETIME) {
+                "Hai usato tutti i messaggi AI gratuiti inclusi nel piano Free. Passa a Pro per continuare a usare l'assistente."
+            } else {
+                "Limite giornaliero raggiunto."
+            }
             AIServiceError.NetworkError -> "Errore di rete."
             is AIServiceError.ServerError -> mapped.message
             null -> error.message ?: "Errore inatteso."

@@ -542,7 +542,8 @@ class MedicalVisitFormViewModel @Inject constructor(
             reminderScheduler.schedule(
                 reminderKey = "${visit.id}_next_reminder",
                 visitDateMillis = nextDate,
-                title = "Prossima visita: ${visit.reason}",
+                title = visit.reason,
+                isNextVisit = true,
                 visitId = visit.id,
                 familyId = visit.familyId,
                 childId = visit.childId,

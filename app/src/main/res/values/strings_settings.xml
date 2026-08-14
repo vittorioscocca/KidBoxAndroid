@@ -123,8 +123,10 @@
     <string name="settings_ai_daily_sub">Notifica ogni mattina alle 8:00 con gli impegni del giorno</string>
     <string name="settings_ai_patterns">Pattern salute AI</string>
     <string name="settings_ai_patterns_sub">Analisi mensile della storia sanitaria dei figli</string>
-    <string name="settings_ai_requires_plan">L\'assistente AI è disponibile con Pro o Max</string>
-    <string name="settings_ai_upgrade_hint">Passa a Pro per 20 messaggi/giorno per membro, o a Max per 100.</string>
+    <string name="settings_ai_requires_plan">Messaggi AI gratuiti terminati</string>
+    <string name="settings_ai_upgrade_hint">Hai usato tutti i 5 messaggi AI gratuiti inclusi nel piano Free. Passa a Pro per continuare a usare l\'assistente.</string>
+    <string name="settings_ai_bonus_free_title">Bonus AI gratuito</string>
+    <string name="settings_ai_free_messages_used">%1$d di %2$d messaggi gratuiti usati</string>
     <string name="settings_ai_see_plans">Scopri i piani</string>
     <string name="settings_ai_open">Apri</string>
     <string name="settings_ai_health_context">Contesto chat Salute</string>
@@ -249,4 +251,5 @@
     <string name="settings_ai_ctx_summary_detail">Usa un riassunto del profilo sanitario per risparmiare messaggi.</string>
     <string name="settings_plan_ai_per_day">%1$d msg AI/giorno</string>
     <string name="settings_plan_ai_messages_per_day">AI: %1$d messaggi/giorno</string>
+    <string name="settings_family_limit_reached">Hai raggiunto il limite di 2 famiglie per account. Elimina una famiglia esistente per crearne una nuova.</string>
 </resources>

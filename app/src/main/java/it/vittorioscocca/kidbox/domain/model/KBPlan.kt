@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.domain.model
 
+import it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod
+
 enum class KBPlan(val rawValue: String) {
     FREE("free"),
     PRO("pro"),
@@ -26,13 +28,29 @@ enum class KBPlan(val rawValue: String) {
         MAX -> 20L * 1024 * 1024 * 1024
     }
 
-    val aiDailyLimit: Int get() = when (this) {
-        FREE -> 0
+    /**
+     * Messaggi AI inclusi nel piano: per Free è un bonus UNA TANTUM per famiglia (mai
+     * più ricaricato una volta esaurito), per Pro/Max è la quota giornaliera invariata.
+     * Vedi [aiQuotaPeriod].
+     */
+    val aiMessageLimit: Int get() = when (this) {
+        FREE -> 5
         PRO -> 30
         MAX -> 100
     }
 
-    val includesAI: Boolean get() = this != FREE
+    // Alias retro-compatibile: molte schermate mostrano ancora "aiDailyLimit" come
+    // "limite della finestra di quota corrente" (nome mantenuto anche lato backend).
+    val aiDailyLimit: Int get() = aiMessageLimit
+
+    val aiQuotaPeriod: AIQuotaPeriod get() = if (this == FREE) AIQuotaPeriod.LIFETIME else AIQuotaPeriod.DAILY
+
+    /** Etichetta breve per le schermate informative (confronto piani, profilo). */
+    val aiQuotaLabel: String get() = when (this) {
+        FREE -> "5 msg AI una tantum"
+        PRO -> "30 msg AI/giorno"
+        MAX -> "100 msg AI/giorno"
+    }
 
     val productId: String? get() = when (this) {
         FREE -> null

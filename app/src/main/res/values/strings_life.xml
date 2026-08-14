@@ -144,6 +144,13 @@
     <string name="vehicles_new_vehicle">Nuovo veicolo</string>
     <string name="vehicles_current_km_short">Km attuali</string>
     <string name="vehicles_reminder">Promemoria</string>
+    <string name="vehicles_reminder_offset_same_day">Stesso giorno</string>
+    <string name="vehicles_reminder_offset_2d">2 giorni prima</string>
+    <string name="vehicles_reminder_offset_1w">1 settimana prima</string>
+    <string name="vehicles_reminder_body_same_day">Scade oggi — apri Garage.</string>
+    <string name="vehicles_reminder_body_2d">Scade tra 2 giorni — apri Garage.</string>
+    <string name="vehicles_reminder_body_1w">Scade tra una settimana — apri Garage.</string>
+    <string name="vehicles_reminder_alerts_label">Avvisi</string>
     <string name="photos_years">Anni</string>
     <string name="photos_months">Mesi</string>
     <string name="photos_days">Giorni</string>
@@ -218,6 +225,8 @@
     <string name="photos_album_add_hint">Aggiungi foto a questo album dalla libreria o scatta direttamente con la fotocamera.</string>
     <string name="photos_add_from_library">Aggiungi dalla libreria</string>
     <string name="photos_invalid_album">Album non valido</string>
+    <string name="todo_reminder_notification_title">Promemoria To-Do</string>
+    <string name="todo_reminder_channel_description">Promemoria locali dei To-Do</string>
     <string name="todo_overview">Panoramica</string>
     <string name="todo_today">Oggi</string>
     <string name="todo_all">Tutti</string>

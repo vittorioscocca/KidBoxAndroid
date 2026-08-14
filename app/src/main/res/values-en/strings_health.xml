@@ -488,4 +488,26 @@
     <string name="health_metric_workouts_avg">%1$s min per week</string>
     <string name="health_metric_workouts_recent">Last 30 days</string>
     <string name="health_metrics_synced">Updated %1$s · data from Health Connect</string>
+
+    <!-- Local reminders: visits, exams, vaccines, treatments -->
+    <string name="health_garage_reminder_channel_name">Health &amp; Garage reminders</string>
+    <string name="health_garage_reminder_channel_description">Local reminders for visits, exams, treatments and vehicle deadlines</string>
+    <string name="visit_reminder_notification_title">Visit reminder</string>
+    <string name="visit_reminder_body_fallback">Medical visit</string>
+    <string name="visit_next_reminder_title">Next visit: %1$s</string>
+    <string name="exam_reminder_notification_title">Exam reminder</string>
+    <string name="exam_reminder_body_fallback">Exam scheduled</string>
+    <string name="exam_reminder_body_format">Exam for %1$s: %2$s</string>
+    <string name="exam_reminder_body_urgent_suffix"> (urgent)</string>
+    <string name="vaccine_reminder_notification_title">Vaccine reminder</string>
+    <string name="vaccine_reminder_body_fallback">Vaccine scheduled tomorrow</string>
+    <string name="vaccine_reminder_body_format">Vaccine for %1$s: %2$s</string>
+    <string name="treatment_period_morning">Morning</string>
+    <string name="treatment_period_lunch">Lunch</string>
+    <string name="treatment_period_evening">Evening</string>
+    <string name="treatment_period_night">Night</string>
+    <string name="treatment_dose_n">Dose %1$d</string>
+    <string name="treatment_reminder_body_format">%1$s · %2$s %3$s for %4$s</string>
+    <string name="treatment_reminder_notification_title">Treatment reminder</string>
+    <string name="treatment_reminder_body_fallback">Time for a dose</string>
 </resources>

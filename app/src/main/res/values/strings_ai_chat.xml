@@ -129,7 +129,7 @@
     <string name="ai_q_expenses">Riepilogo spese</string>
     <string name="ai_ask_something">Chiedi qualcosa...</string>
     <string name="ai_preparing_context_dots">Preparazione contesto…</string>
-    <string name="ai_available_pro">Assistente AI disponibile con il piano Pro</string>
+    <string name="ai_available_pro">Hai usato tutti i messaggi AI gratuiti del piano Free. Passa a Pro per continuare.</string>
     <string name="ai_discover_plans">Scopri i piani</string>
     <string name="ai_history_reset">La cronologia verrà eliminata e il contesto verrà ricostruito.</string>
     <string name="ai_confirm">Conferma</string>

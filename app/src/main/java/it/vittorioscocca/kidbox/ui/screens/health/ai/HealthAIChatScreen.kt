@@ -432,7 +432,11 @@ fun HealthAIChatScreen(
                         Spacer(Modifier.width(1.dp))
                     }
                     Text(
-                        "${state.usageToday}/${state.dailyLimit}",
+                        if (state.quotaPeriod == it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod.LIFETIME) {
+                            "${state.usageToday}/${state.dailyLimit} gratuiti"
+                        } else {
+                            "${state.usageToday}/${state.dailyLimit}"
+                        },
                         fontSize = 11.sp,
                         color = usageColor,
                     )

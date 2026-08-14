@@ -83,7 +83,7 @@
     <string name="travel_new_trip">New trip</string>
     <string name="travel_your_trips">Your trips</string>
     <string name="travel_see_all">See all</string>
-    <string name="travel_upgrade_hint">Upgrade to Pro or Max to plan trips with AI.</string>
+    <string name="travel_upgrade_hint">You\'ve used all the free AI messages included in the Free plan. Upgrade to Pro or Max to keep planning trips with AI.</string>
     <string name="travel_plane">Plane</string>
     <string name="travel_train">Train</string>
     <string name="travel_ship">Ferry</string>

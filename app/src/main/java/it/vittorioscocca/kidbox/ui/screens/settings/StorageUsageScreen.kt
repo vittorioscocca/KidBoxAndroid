@@ -479,7 +479,9 @@ private fun PlanRow(
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                if (plan == KBPlan.FREE) stringResource(R.string.settings_storage_no_ai) else stringResource(R.string.settings_plan_ai_per_day, plan.aiDailyMessagesForUi()),
+                // Confronto piani puramente informativo: ogni piano ora include l'AI
+                // nominalmente, Free non è più marcato "senza AI".
+                plan.aiQuotaLabel,
                 color = kb.subtitle,
                 fontSize = 14.sp,
             )

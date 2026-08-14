@@ -3,6 +3,7 @@ package it.vittorioscocca.kidbox
 import android.content.res.Configuration
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
@@ -29,6 +30,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import it.vittorioscocca.kidbox.data.local.AppTheme
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
 import it.vittorioscocca.kidbox.data.local.ThemePreference
+import it.vittorioscocca.kidbox.data.local.toNightMode
 import it.vittorioscocca.kidbox.data.update.AppUpdateChecker
 import it.vittorioscocca.kidbox.ui.CrashReportConsentDialog
 import it.vittorioscocca.kidbox.ui.EdgeToEdgeController
@@ -82,6 +84,16 @@ class MainActivity : AppCompatActivity() {
                 AppTheme.DARK -> true
                 AppTheme.LIGHT -> false
                 AppTheme.SYSTEM -> systemDark
+            }
+
+            // Applicato una prima volta in KidBoxApplication.onCreate() prima che questa
+            // Activity esista, così i componenti nativi sono già corretti al cold start.
+            // Qui si riapplica solo per intercettare un cambio fatto dall'utente mentre
+            // l'app è aperta (schermata Impostazioni → Tema): se il modo effettivo cambia
+            // davvero, AppCompatDelegate ricrea l'Activity da sé per riallineare le risorse
+            // native ai qualifier values-night — è lo stesso meccanismo, non serve altro qui.
+            LaunchedEffect(appTheme) {
+                AppCompatDelegate.setDefaultNightMode(appTheme.toNightMode())
             }
 
             KidBoxTheme(darkTheme = darkTheme) {

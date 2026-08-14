@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.R
 import java.util.Calendar
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -27,10 +28,11 @@ class VisitReminderScheduler @Inject constructor(
      *
      * @param reminderKey Unique string key for this alarm (e.g. "{visitId}_reminder").
      * @param visitDateMillis The epoch millis of the visit date.
-     * @param title Notification title.
+     * @param title Notification title (visit reason, un-prefixed).
      * @param visitId Visit document id.
      * @param familyId Family id (for deep-link).
      * @param childId Child id (for deep-link).
+     * @param isNextVisit If true, prefixes [title] with the localized "Next visit: " label.
      */
     fun schedule(
         reminderKey: String,
@@ -39,11 +41,13 @@ class VisitReminderScheduler @Inject constructor(
         visitId: String,
         familyId: String,
         childId: String,
+        isNextVisit: Boolean = false,
     ) {
         val fireAt = dayBeforeAt9(visitDateMillis)
         if (fireAt <= System.currentTimeMillis()) return
 
-        val pi = buildPendingIntent(reminderKey, visitId, familyId, childId, title)
+        val resolvedTitle = if (isNextVisit) context.getString(R.string.visit_next_reminder_title, title) else title
+        val pi = buildPendingIntent(reminderKey, visitId, familyId, childId, resolvedTitle)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (alarmManager.canScheduleExactAlarms()) {

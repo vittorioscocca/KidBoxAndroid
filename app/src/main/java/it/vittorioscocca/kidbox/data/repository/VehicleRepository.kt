@@ -99,6 +99,7 @@ class VehicleRepository @Inject constructor(
         currentKm: Int?,
         notes: String?,
         reminderEnabled: Boolean,
+        reminderOffsetsJson: String? = null,
         presetVehicleId: String? = null,
     ) {
         val uid = auth.currentUser?.uid ?: "local"
@@ -124,6 +125,7 @@ class VehicleRepository @Inject constructor(
             notes = notes,
             photoURL = null,
             reminderEnabled = reminderEnabled,
+            reminderOffsetsJson = reminderOffsetsJson,
             isDeleted = false,
             createdAt = now,
             updatedAt = now,
@@ -238,6 +240,7 @@ class VehicleRepository @Inject constructor(
                             notes = dto.notes,
                             photoURL = dto.photoURL,
                             reminderEnabled = dto.reminderEnabled,
+                            reminderOffsetsJson = dto.reminderOffsetsJson,
                             isDeleted = false,
                             createdAt = local?.createdAt ?: (dto.createdAtMillis ?: now),
                             updatedAt = dto.updatedAtMillis ?: now,

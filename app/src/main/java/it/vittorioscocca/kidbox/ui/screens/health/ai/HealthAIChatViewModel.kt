@@ -35,6 +35,7 @@ import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
 import it.vittorioscocca.kidbox.domain.model.KBTextExtractionStatus
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import it.vittorioscocca.kidbox.domain.model.KBVaccine
+import it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod
 import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatStreamingDelivery
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.FamilyMemoryPromptSection
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.FamilyMemoryService
@@ -58,6 +59,7 @@ data class HealthAIChatState(
     val errorMessage: String? = null,
     val usageToday: Int = 0,
     val dailyLimit: Int = 0,
+    val quotaPeriod: AIQuotaPeriod = AIQuotaPeriod.DAILY,
     val subjectName: String = "",
     val activeTreatmentsCount: Int = 0,
     val vaccinesCount: Int = 0,
@@ -390,6 +392,7 @@ class HealthAIChatViewModel @Inject constructor(
                         ),
                         usageToday = result.reply.usageToday,
                         dailyLimit = result.reply.dailyLimit,
+                        quotaPeriod = result.reply.period,
                         actionExecutionSummary = result.executionSummary,
                         autoExecutedMessageIds = autoIds,
                     )

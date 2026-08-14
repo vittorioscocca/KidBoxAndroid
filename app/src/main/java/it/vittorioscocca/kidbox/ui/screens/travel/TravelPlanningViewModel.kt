@@ -33,6 +33,7 @@ import it.vittorioscocca.kidbox.data.travel.TravelTripExtrasRepository
 import it.vittorioscocca.kidbox.data.repository.PhotoVideoRepository
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.domain.model.KBPlan
+import it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -352,30 +353,38 @@ class TravelPlanningViewModel @Inject constructor(
             }
 
             _familyPlan.value = subscriptionRepository.getPlan(familyId)
-            if (!_familyPlan.value.includesAI) {
-                val message =
-                    "La pianificazione AI richiede Pro o Max sulla famiglia attiva " +
-                        "(campo planOverride o plan su Firestore). Verifica la console admin."
-                _error.value = message
-                _events.emit(Event.Error(message))
-                return@launch
-            }
 
             aiService.fetchUsage(familyId).getOrNull()?.let { usage ->
                 _usageToday.value = usage.usageToday
                 _dailyLimit.value = usage.dailyLimit
-                aiUsageTracker.apply(usage.usageToday, usage.dailyLimit)
+                aiUsageTracker.apply(usage.usageToday, usage.dailyLimit, usage.period)
             }
 
+            // Free ha accesso all'AI finché non esaurisce il bonus di 5 messaggi una
+            // tantum: qui non blocchiamo più solo perché il piano è Free, ma solo se
+            // la quota (lifetime per Free, giornaliera per Pro/Max) è già esaurita.
             val messageCost = TravelPlanningCountdown.messageCost(tripDayCount)
             val usageSnapshot = aiUsageTracker.state.value
+            if (usageSnapshot.period == AIQuotaPeriod.LIFETIME &&
+                usageSnapshot.dailyLimit > 0 &&
+                usageSnapshot.usageToday >= usageSnapshot.dailyLimit
+            ) {
+                val message = "Hai usato tutti i messaggi AI gratuiti inclusi nel piano Free. Passa a Pro per continuare a pianificare con l'AI."
+                _error.value = message
+                _events.emit(Event.Error(message))
+                return@launch
+            }
             if (usageSnapshot.dailyLimit > 0 &&
                 usageSnapshot.usageToday + messageCost > usageSnapshot.dailyLimit
             ) {
-                val message =
+                val remaining = (usageSnapshot.dailyLimit - usageSnapshot.usageToday).coerceAtLeast(0)
+                val message = if (usageSnapshot.period == AIQuotaPeriod.LIFETIME) {
+                    "Questo viaggio di $tripDayCount giorni richiede $messageCost messaggi AI, ma ti restano solo $remaining messaggi gratuiti. Accorcia il viaggio o passa a Pro."
+                } else {
                     "Questo viaggio di $tripDayCount giorni richiede $messageCost messaggi AI " +
                         "(${usageSnapshot.usageToday}/${usageSnapshot.dailyLimit} usati oggi). " +
                         "Accorcia il viaggio o riprova domani."
+                }
                 _error.value = message
                 _events.emit(Event.Error(message))
                 return@launch
@@ -445,7 +454,7 @@ class TravelPlanningViewModel @Inject constructor(
                 _proposalPlan.value = resolvedPlan
                 _usageToday.value = response.usageToday
                 _dailyLimit.value = response.dailyLimit
-                aiUsageTracker.apply(response.usageToday, response.dailyLimit)
+                aiUsageTracker.apply(response.usageToday, response.dailyLimit, response.period)
 
                 val hasPlan = resolvedPlan != null
                 val hasNarrative = !_proposalNarrative.value.isNullOrBlank()

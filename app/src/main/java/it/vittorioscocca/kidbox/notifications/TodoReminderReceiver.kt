@@ -38,7 +38,7 @@ class TodoReminderReceiver : BroadcastReceiver() {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_TODO_REMINDERS)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Promemoria To-Do")
+            .setContentTitle(context.getString(R.string.todo_reminder_notification_title))
             .setContentText(title)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -57,9 +57,9 @@ class TodoReminderReceiver : BroadcastReceiver() {
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID_TODO_REMINDERS,
-                "Promemoria To-Do",
+                context.getString(R.string.todo_reminder_notification_title),
                 NotificationManager.IMPORTANCE_HIGH,
-            ).apply { description = "Promemoria locali dei To-Do" },
+            ).apply { description = context.getString(R.string.todo_reminder_channel_description) },
         )
     }
 

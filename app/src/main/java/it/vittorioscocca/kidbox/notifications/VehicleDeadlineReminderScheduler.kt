@@ -8,6 +8,7 @@ import android.net.Uri
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.VehicleDao
 import it.vittorioscocca.kidbox.data.local.entity.VehicleEntity
+import it.vittorioscocca.kidbox.data.vehicles.VehicleReminderOffsets
 import java.time.Instant
 import java.time.ZoneId
 import javax.inject.Inject
@@ -15,7 +16,9 @@ import javax.inject.Singleton
 
 /**
  * Allarmi locali annuali per scadenze veicolo (stesso giorno ogni anno, ore 9 Europe/Rome).
- * Due slot: giorno scadenza e 7 giorni prima. Dopo ogni allarme viene schedulato il successivo (+1 anno).
+ * Fino a 3 avvisi per scadenza, scelti dall'utente tra: giorno stesso, 2 giorni prima,
+ * 1 settimana prima (`VehicleEntity.reminderOffsetsJson`). Dopo ogni allarme viene
+ * schedulato il successivo (+1 anno).
  */
 @Singleton
 class VehicleDeadlineReminderScheduler @Inject constructor(
@@ -34,44 +37,38 @@ class VehicleDeadlineReminderScheduler @Inject constructor(
         val name = entity.name
         val fid = entity.familyId
         val vid = entity.id
+        val offsets = VehicleReminderOffsets.decode(entity.reminderOffsetsJson)
 
-        data class Kind(val key: String, val deadlineMillis: Long?, val dueLabel: String, val weekLabel: String)
+        data class Kind(val key: String, val deadlineMillis: Long?, val label: String)
 
         listOf(
-            Kind("insurance", entity.insuranceExpiryDate, "Assicurazione", "Assicurazione (tra 7 giorni)"),
-            Kind("revision", entity.revisionExpiryDate, "Revisione", "Revisione (tra 7 giorni)"),
-            Kind("tax", entity.taxExpiryDate, "Bollo", "Bollo (tra 7 giorni)"),
-            Kind("service", entity.nextServiceDate, "Tagliando", "Tagliando (tra 7 giorni)"),
+            Kind("insurance", entity.insuranceExpiryDate, "Assicurazione"),
+            Kind("revision", entity.revisionExpiryDate, "Revisione"),
+            Kind("tax", entity.taxExpiryDate, "Bollo"),
+            Kind("service", entity.nextServiceDate, "Tagliando"),
         ).forEach { kind ->
             val deadline = kind.deadlineMillis ?: return@forEach
             val dueAnchor = startOfDayRomeMillis(deadline)
-            val earlyLocal = Instant.ofEpochMilli(dueAnchor).atZone(zone).toLocalDate().minusDays(7)
-            val earlyAnchor = earlyLocal.atStartOfDay(zone).toInstant().toEpochMilli()
 
-            scheduleInitial(
-                vehicleId = vid,
-                familyId = fid,
-                vehicleName = name,
-                kindKey = kind.key,
-                slot = SLOT_DUE,
-                titlePrefix = kind.dueLabel,
-                anchorDayMillis = dueAnchor,
-            )
-            scheduleInitial(
-                vehicleId = vid,
-                familyId = fid,
-                vehicleName = name,
-                kindKey = kind.key,
-                slot = SLOT_WEEK,
-                titlePrefix = kind.weekLabel,
-                anchorDayMillis = earlyAnchor,
-            )
+            offsets.offsets(kind.key).forEach { days ->
+                val fireLocal = Instant.ofEpochMilli(dueAnchor).atZone(zone).toLocalDate().minusDays(days.toLong())
+                val fireAnchor = fireLocal.atStartOfDay(zone).toInstant().toEpochMilli()
+                scheduleInitial(
+                    vehicleId = vid,
+                    familyId = fid,
+                    vehicleName = name,
+                    kindKey = kind.key,
+                    slot = offsetSlot(days),
+                    titlePrefix = kind.label,
+                    anchorDayMillis = fireAnchor,
+                )
+            }
         }
     }
 
     fun cancelForVehicle(vehicleId: String) {
         KIND_KEYS.forEach { kind ->
-            listOf(SLOT_DUE, SLOT_WEEK).forEach { slot ->
+            VehicleReminderOffsets.ALLOWED_OFFSETS.map { offsetSlot(it) }.forEach { slot ->
                 val cancelIntent = Intent(context, HealthReminderReceiver::class.java).apply {
                     data = alarmUri(vehicleId, kind, slot)
                 }
@@ -103,7 +100,7 @@ class VehicleDeadlineReminderScheduler @Inject constructor(
 
         val vehicleName = entity.name
         val titlePrefix = firedIntent.getStringExtra(HealthReminderReceiver.EXTRA_VEHICLE_TITLE_PREFIX)
-            ?: defaultTitlePrefix(kindKey, slot)
+            ?: defaultTitlePrefix(kindKey)
 
         val intent = baseIntent(
             vehicleId = vehicleId,
@@ -191,20 +188,17 @@ class VehicleDeadlineReminderScheduler @Inject constructor(
         }
     }
 
-    private fun defaultTitlePrefix(kindKey: String, slot: String): String {
-        val base = when (kindKey) {
-            "insurance" -> "Assicurazione"
-            "revision" -> "Revisione"
-            "tax" -> "Bollo"
-            "service" -> "Tagliando"
-            else -> "Scadenza"
-        }
-        return if (slot == SLOT_WEEK) "$base (tra 7 giorni)" else base
+    private fun defaultTitlePrefix(kindKey: String): String = when (kindKey) {
+        "insurance" -> "Assicurazione"
+        "revision" -> "Revisione"
+        "tax" -> "Bollo"
+        "service" -> "Tagliando"
+        else -> "Scadenza"
     }
 
+    private fun offsetSlot(days: Int): String = "offset$days"
+
     companion object {
-        private const val SLOT_DUE = "due"
-        private const val SLOT_WEEK = "week"
         private val KIND_KEYS = listOf("insurance", "revision", "tax", "service")
 
         fun requestCode(vehicleId: String, kindKey: String, slot: String): Int =

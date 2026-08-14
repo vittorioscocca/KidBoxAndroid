@@ -5,7 +5,6 @@ import android.os.Build
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.functions.FirebaseFunctions
 import it.vittorioscocca.kidbox.BuildConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,12 +16,16 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
 
 /**
- * Analisi log via Cloud Function analyzeLogs e upload opzionale su Firestore.
- * e upload opzionale su Firestore collection "crash_reports".
+ * Rilevamento crash via euristica locale (marker `[CRASH]`/`TEST: crash` nei log) e upload
+ * opzionale su Firestore collection "crash_reports".
+ *
+ * Non usa più una Cloud Function basata su Gemini per l'analisi "proattiva" (log senza crash
+ * conclamati): richiedeva una API key a pagamento. Su iOS l'equivalente gira on-device via
+ * Apple Intelligence (gratis); su Android non c'è un modello on-device comparabile per copertura
+ * di device, quindi qui resta solo il rilevamento euristico — identico a quello che scatta anche
+ * su iOS in assenza di Apple Intelligence.
  */
 object CrashAnalyzer {
 
@@ -43,16 +46,10 @@ object CrashAnalyzer {
         val rawLogs: String,
     )
 
-    private data class AnalysisResponse(
-        val hasIssues: Boolean,
-        val issues: List<IssueReport>,
-    )
-
     private const val MIN_LOG_BYTES = 2 * 1024
     private const val MAX_UPLOAD_LOG_BYTES = 50 * 1024
     private const val THROTTLE_MS = 6L * 60L * 60L * 1000L
 
-    private val functions = FirebaseFunctions.getInstance("europe-west1")
     private val uploadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _consentPrompt = MutableStateFlow<ConsentPrompt?>(null)
@@ -105,20 +102,11 @@ object CrashAnalyzer {
             return
         }
 
-        val parsed = analyzeWithCloudFunction(truncateLogs(rawLogs, 32 * 1024))
-
-        if (parsed == null) {
-            KBLog.app.warning("CrashAnalyzer: analisi non riuscita")
-            return
-        }
-
-        if (!parsed.hasIssues || parsed.issues.isEmpty()) {
-            KBLog.app.info("CrashAnalyzer: nessun problema rilevato nei log")
-            CrashReportPreferences.markAnalysisRun(context)
-            return
-        }
-
-        handlePermissionAndUpload(context, parsed.issues, rawLogs)
+        // Nessuna analisi "proattiva" AI-assisted su Android (nessun modello on-device
+        // comparabile ad Apple Intelligence con copertura device sufficiente, e niente
+        // servizi cloud a pagamento). Il rilevamento crash euristico sopra resta attivo.
+        KBLog.app.info("CrashAnalyzer: nessun crash rilevato nei log — skip (nessuna analisi AI su Android)")
+        CrashReportPreferences.markAnalysisRun(context)
     }
 
     private fun containsCrashMarkers(logs: String): Boolean =
@@ -183,46 +171,6 @@ object CrashAnalyzer {
         CrashReportPreferences.markAnalysisRun(context)
     }
 
-    private suspend fun analyzeWithCloudFunction(rawLogs: String): AnalysisResponse? =
-        withContext(Dispatchers.IO) {
-            try {
-                val result = functions
-                    .getHttpsCallable("analyzeLogs")
-                    .call(mapOf("logs" to rawLogs))
-                    .await()
-                val text = when (val data = result.getData()) {
-                    is String -> data
-                    is Map<*, *> -> data["text"] as? String ?: data["result"] as? String
-                    else -> null
-                } ?: return@withContext null
-                parseAnalysisResponse(text)
-            } catch (e: Exception) {
-                KBLog.app.error("CrashAnalyzer: Cloud Function fallita", e)
-                null
-            }
-        }
-
-    private suspend fun handlePermissionAndUpload(
-        context: Context,
-        issues: List<IssueReport>,
-        rawLogs: String,
-    ) {
-        if (CrashReportPreferences.isReportingEnabled(context)) {
-            uploadToFirestore(context, issues, rawLogs)
-            return
-        }
-        if (CrashReportPreferences.hasBeenAsked(context)) {
-            CrashReportPreferences.markAnalysisRun(context)
-            return
-        }
-        _consentPrompt.value = ConsentPrompt(
-            issueCount = issues.size,
-            issues = issues,
-            rawLogs = rawLogs,
-        )
-        _showConsentDialog.value = true
-    }
-
     private suspend fun uploadToFirestore(
         context: Context,
         issues: List<IssueReport>,
@@ -263,40 +211,6 @@ object CrashAnalyzer {
             KBLog.app.info("Crash report inviato: ${issues.size} issues")
         } catch (e: Exception) {
             KBLog.app.error("CrashAnalyzer: upload Firestore fallito", e)
-        }
-    }
-
-    private fun parseAnalysisResponse(text: String): AnalysisResponse? {
-        return try {
-            val trimmed = text.trim()
-            val start = trimmed.indexOf('{')
-            val end = trimmed.lastIndexOf('}')
-            if (start < 0 || end <= start) return null
-            val json = JSONObject(trimmed.substring(start, end + 1))
-            val hasIssues = json.optBoolean("hasIssues", false)
-            val issuesArray = json.optJSONArray("issues")
-                ?: return AnalysisResponse(hasIssues, emptyList())
-            val issues = buildList {
-                for (i in 0 until issuesArray.length()) {
-                    val item = issuesArray.optJSONObject(i) ?: continue
-                    add(
-                        IssueReport(
-                            type = item.optString("type", "error"),
-                            severity = item.optString("severity", "medium"),
-                            category = item.optString("category", "app"),
-                            affectedModule = item.optString("affectedModule", "unknown"),
-                            summary = item.optString("summary", ""),
-                            detail = item.optString("detail", ""),
-                            firstOccurrence = item.optString("firstOccurrence", ""),
-                            occurrences = item.optInt("occurrences", 1),
-                        ),
-                    )
-                }
-            }
-            AnalysisResponse(hasIssues, issues)
-        } catch (e: Exception) {
-            KBLog.app.error("CrashAnalyzer: parse JSON fallito", e)
-            null
         }
     }
 

@@ -16,6 +16,7 @@ import it.vittorioscocca.kidbox.data.remote.ai.AIRemotePreferences
 import it.vittorioscocca.kidbox.data.remote.ai.AIUsageTracker
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.domain.model.KBPlan
+import it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +32,9 @@ data class AiSettingsUiState(
     val consentGiven: Boolean = false,
     val consentDate: Long? = null,
     val aiUsageToday: Int = 0,
+    val aiQuotaPeriod: AIQuotaPeriod = AIQuotaPeriod.DAILY,
+    /** True solo per Free con il bonus di 5 messaggi una tantum esaurito. */
+    val aiAccessBlocked: Boolean = false,
     val isWeeklySummaryEnabled: Boolean = true,
     val isDailyBriefingEnabled: Boolean = true,
     val isHealthPatternEnabled: Boolean = true,
@@ -72,7 +76,15 @@ class AiSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             aiUsageTracker.state.collectLatest { snapshot ->
                 if (snapshot.dailyLimit > 0) {
-                    _uiState.update { it.copy(aiUsageToday = snapshot.usageToday) }
+                    _uiState.update {
+                        it.copy(
+                            aiUsageToday = snapshot.usageToday,
+                            aiQuotaPeriod = snapshot.period,
+                            aiAccessBlocked = it.plan == KBPlan.FREE &&
+                                snapshot.period == AIQuotaPeriod.LIFETIME &&
+                                snapshot.usageToday >= snapshot.dailyLimit,
+                        )
+                    }
                 }
             }
         }
@@ -86,16 +98,21 @@ class AiSettingsViewModel @Inject constructor(
         val remote = aiRemotePrefs.fetch()
         val usage = aiService.fetchUsage(familyId).getOrNull()
         val usageToday = usage?.usageToday ?: aiUsageTracker.state.value.usageToday
-        usage?.let { aiUsageTracker.apply(it.usageToday, it.dailyLimit) }
+        val period = usage?.period ?: aiUsageTracker.state.value.period
+        usage?.let { aiUsageTracker.apply(it.usageToday, it.dailyLimit, it.period) }
         remote?.healthContextSendPreference?.let { pref ->
             aiSettingsStore.setHealthContextSendPreference(pref)
         }
+        val limit = usage?.dailyLimit ?: aiUsageTracker.state.value.dailyLimit
         _uiState.update {
             it.copy(
                 isLoading = false,
                 plan = plan,
                 isEnabled = remote?.aiEnabled ?: it.isEnabled,
                 aiUsageToday = usageToday,
+                aiQuotaPeriod = period,
+                aiAccessBlocked = plan == KBPlan.FREE && period == AIQuotaPeriod.LIFETIME &&
+                    limit > 0 && usageToday >= limit,
                 healthContextSendPreference = remote?.healthContextSendPreference
                     ?: aiSettingsStore.getHealthContextSendPreference(),
             )
@@ -116,7 +133,7 @@ class AiSettingsViewModel @Inject constructor(
             return
         }
 
-        if (!_uiState.value.plan.includesAI) return
+        if (_uiState.value.aiAccessBlocked) return
 
         if (aiSettings.consentGiven.value) {
             aiSettings.setEnabled(true)

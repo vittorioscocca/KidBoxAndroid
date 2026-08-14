@@ -1,9 +1,13 @@
 package it.vittorioscocca.kidbox.ui.screens.onboarding
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.remote.family.FamilyFirestoreCreationRepository
+import it.vittorioscocca.kidbox.data.remote.family.isPermissionDenied
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,6 +16,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val familyCreation: FamilyFirestoreCreationRepository,
 ) : ViewModel() {
 
@@ -52,7 +57,14 @@ class OnboardingViewModel @Inject constructor(
                 )
                 _createdFamilyId.value = id
             } catch (e: Exception) {
-                _createFamilyError.value = e.localizedMessage ?: "Errore durante la creazione"
+                // Nessun retry in questo percorso: un permission-denied qui è
+                // firestore.rules che rifiuta la creazione per limite famiglie raggiunto
+                // (vedi ownedFamilyCount() in firestore.rules) — non un problema transitorio.
+                _createFamilyError.value = if (isPermissionDenied(e)) {
+                    appContext.getString(R.string.settings_family_limit_reached)
+                } else {
+                    e.localizedMessage ?: "Errore durante la creazione"
+                }
             } finally {
                 _isCreatingFamily.value = false
             }

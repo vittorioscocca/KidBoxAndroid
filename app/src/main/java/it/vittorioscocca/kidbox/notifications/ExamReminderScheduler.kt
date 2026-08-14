@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.domain.model.KBMedicalExam
 import java.util.Calendar
 import javax.inject.Inject
@@ -23,8 +24,8 @@ class ExamReminderScheduler @Inject constructor(
         if (fireAt <= System.currentTimeMillis()) return
 
         val body = buildString {
-            append("Esame per $childName: ${exam.name}")
-            if (exam.isUrgent) append(" (urgente)")
+            append(context.getString(R.string.exam_reminder_body_format, childName, exam.name))
+            if (exam.isUrgent) append(context.getString(R.string.exam_reminder_body_urgent_suffix))
         }
         val pi = buildPendingIntent(exam.id, body, exam.familyId, exam.childId)
 

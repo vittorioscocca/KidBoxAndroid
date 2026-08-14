@@ -37,6 +37,7 @@ data class VehicleEntity(
     val notes: String? = null,
     val photoURL: String? = null,
     val reminderEnabled: Boolean = false,
+    val reminderOffsetsJson: String? = null,
     val isDeleted: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),

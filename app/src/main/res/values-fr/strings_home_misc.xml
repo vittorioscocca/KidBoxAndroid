@@ -98,11 +98,11 @@
     <string name="home_feature_vehicles_title">Garage</string>
     <string name="home_feature_vehicles_subtitle">Voitures et échéances</string>
     <string name="home_feature_travel_title">Voyages</string>
-    <string name="home_feature_travel_subtitle_locked">Plan Pro ou Max pour l\'IA</string>
+    <string name="home_feature_travel_subtitle_locked">Bonus IA gratuit épuisé</string>
     <string name="home_feature_travel_subtitle_unlocked">Planifie avec l\'IA</string>
     <string name="home_feature_ai_title_locked">Assistant</string>
     <string name="home_feature_ai_title_unlocked">Assistant IA</string>
-    <string name="home_feature_ai_subtitle_locked">Disponible avec Pro ou Max</string>
+    <string name="home_feature_ai_subtitle_locked">Bonus gratuit épuisé</string>
     <string name="home_feature_ai_subtitle_unlocked">Demande de l\'aide</string>
     <string name="home_feature_passwords_title">Mots de passe</string>
     <string name="home_feature_passwords_subtitle">Identifiants de la famille</string>

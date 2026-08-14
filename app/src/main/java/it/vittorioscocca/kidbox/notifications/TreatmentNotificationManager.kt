@@ -8,9 +8,11 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.mapper.scheduleTimesList
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
-import it.vittorioscocca.kidbox.domain.model.schedulePeriodLabel
+import it.vittorioscocca.kidbox.domain.model.TreatmentSchedulePeriod
+import it.vittorioscocca.kidbox.domain.model.schedulePeriodForTime
 import java.time.temporal.ChronoUnit
 import java.util.Calendar
 import javax.inject.Inject
@@ -120,9 +122,9 @@ class TreatmentNotificationManager @Inject constructor(
                     continue@dayLoop
                 }
                 if (fireMillis > now) {
-                    val slotLabel = schedulePeriodLabel(timeStr, 0)
+                    val slotLabel = localizedSlotLabel(timeStr, 0)
                     val dosageStr = treatment.dosageValue.formatted()
-                    val body = "$slotLabel · $dosageStr ${treatment.dosageUnit} per $childName"
+                    val body = context.getString(R.string.treatment_reminder_body_format, slotLabel, dosageStr, treatment.dosageUnit, childName)
                     scheduleAlarm(treatment, dayOffset, 0, timeStr, fireMillis, body)
                     recordEntry(treatment.id, dayOffset, 0, fireMillis)
                     if (fireMillis > lastFireMillis) lastFireMillis = fireMillis
@@ -132,9 +134,9 @@ class TreatmentNotificationManager @Inject constructor(
                     val fireMillis = buildFireMillis(currentDay, timeStr) ?: continue
                     if (fireMillis <= now) continue
 
-                    val slotLabel = schedulePeriodLabel(timeStr, slotIndex)
+                    val slotLabel = localizedSlotLabel(timeStr, slotIndex)
                     val dosageStr = treatment.dosageValue.formatted()
-                    val body = "$slotLabel · $dosageStr ${treatment.dosageUnit} per $childName"
+                    val body = context.getString(R.string.treatment_reminder_body_format, slotLabel, dosageStr, treatment.dosageUnit, childName)
                     scheduleAlarm(treatment, dayOffset, slotIndex, timeStr, fireMillis, body)
                     recordEntry(treatment.id, dayOffset, slotIndex, fireMillis)
                     if (fireMillis > lastFireMillis) lastFireMillis = fireMillis
@@ -148,6 +150,16 @@ class TreatmentNotificationManager @Inject constructor(
         }
         KBLog.app.debug("scheduled window treatmentId=${treatment.id} start=$windowStartDay end=$endDay", TAG)
     }
+
+    /** Etichetta fascia oraria localizzata per il corpo della notifica (non tocca `labelIt`, usato nella UI). */
+    private fun localizedSlotLabel(scheduledTime: String, slotIndexFallback: Int): String =
+        when (schedulePeriodForTime(scheduledTime, slotIndexFallback)) {
+            TreatmentSchedulePeriod.MATTINA -> context.getString(R.string.treatment_period_morning)
+            TreatmentSchedulePeriod.PRANZO -> context.getString(R.string.treatment_period_lunch)
+            TreatmentSchedulePeriod.SERA -> context.getString(R.string.treatment_period_evening)
+            TreatmentSchedulePeriod.NOTTE -> context.getString(R.string.treatment_period_night)
+            null -> context.getString(R.string.treatment_dose_n, slotIndexFallback + 1)
+        }
 
     private fun scheduleAlarm(
         treatment: KBTreatment,

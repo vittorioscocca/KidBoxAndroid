@@ -3,6 +3,7 @@ package it.vittorioscocca.kidbox.ai
 import com.google.firebase.functions.FirebaseFunctionsException
 import it.vittorioscocca.kidbox.data.remote.ai.AIServiceException
 import it.vittorioscocca.kidbox.domain.model.KBPlan
+import it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod
 import it.vittorioscocca.kidbox.domain.model.ai.AIServiceError
 
 object AIGate {
@@ -10,23 +11,18 @@ object AIGate {
         error: Throwable,
         currentPlan: KBPlan,
         dailyLimit: Int? = null,
+        period: AIQuotaPeriod? = null,
     ): String {
         val serviceError = (error as? AIServiceException)?.serviceError
+        val isExhausted = serviceError == AIServiceError.RateLimitReached ||
+            (error is FirebaseFunctionsException && error.code == FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED)
+        val resolvedPeriod = period ?: currentPlan.aiQuotaPeriod
         return when {
-            serviceError == AIServiceError.RateLimitReached && currentPlan == KBPlan.FREE ->
-                "L'assistente AI è disponibile con i piani Pro e Max."
+            isExhausted && resolvedPeriod == AIQuotaPeriod.LIFETIME ->
+                "Hai usato tutti i ${dailyLimit ?: currentPlan.aiMessageLimit} messaggi AI gratuiti inclusi nel piano Free. Passa a Pro per continuare a usare l'assistente."
 
-            serviceError == AIServiceError.RateLimitReached ->
-                "La famiglia ha raggiunto il limite di ${dailyLimit ?: currentPlan.aiDailyLimit} messaggi AI per oggi. Riprova domani."
-
-            error is FirebaseFunctionsException &&
-                error.code == FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED &&
-                currentPlan == KBPlan.FREE ->
-                "L'assistente AI è disponibile con i piani Pro e Max."
-
-            error is FirebaseFunctionsException &&
-                error.code == FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED ->
-                "La famiglia ha raggiunto il limite di ${dailyLimit ?: currentPlan.aiDailyLimit} messaggi AI per oggi. Riprova domani."
+            isExhausted ->
+                "La famiglia ha raggiunto il limite di ${dailyLimit ?: currentPlan.aiMessageLimit} messaggi AI per oggi. Riprova domani."
 
             else -> error.localizedMessage ?: "Errore AI inatteso."
         }

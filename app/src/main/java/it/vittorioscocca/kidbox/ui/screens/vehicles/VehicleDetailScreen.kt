@@ -283,6 +283,7 @@ fun VehicleDetailScreen(
         ) {
             item {
                 Card(
+                    modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = kb.card),
                     shape = RoundedCornerShape(16.dp),
                 ) {
@@ -316,27 +317,6 @@ fun VehicleDetailScreen(
                         }
                     }
                 }
-            }
-            item {
-                Text(
-                    stringResource(R.string.section_attachments),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = kb.subtitle,
-                )
-            }
-            item {
-                HealthAttachmentsCard(
-                    attachments = vehicleAttachments,
-                    tintColor = orange,
-                    isUploading = attachmentUploading,
-                    onPickFile = { requestPickFile(GarageAttachmentPickTarget.DetailVehicle) },
-                    onPickPhoto = { requestPickPhoto(GarageAttachmentPickTarget.DetailVehicle) },
-                    onTakePhoto = { requestTakePhoto(GarageAttachmentPickTarget.DetailVehicle) },
-                    onOpenAttachment = { viewModel.openAttachment(it) },
-                    onDeleteAttachment = { viewModel.deleteAttachment(it) },
-                    onPickFromKidBoxDocuments = { requestKidBoxDocuments(GarageAttachmentPickTarget.DetailVehicle) },
-                )
             }
             item {
                 Text(stringResource(R.string.section_deadlines), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = kb.subtitle)
@@ -390,6 +370,27 @@ fun VehicleDetailScreen(
                         }
                     }
                 }
+            }
+            item {
+                Text(
+                    stringResource(R.string.section_attachments),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = kb.subtitle,
+                )
+            }
+            item {
+                HealthAttachmentsCard(
+                    attachments = vehicleAttachments,
+                    tintColor = orange,
+                    isUploading = attachmentUploading,
+                    onPickFile = { requestPickFile(GarageAttachmentPickTarget.DetailVehicle) },
+                    onPickPhoto = { requestPickPhoto(GarageAttachmentPickTarget.DetailVehicle) },
+                    onTakePhoto = { requestTakePhoto(GarageAttachmentPickTarget.DetailVehicle) },
+                    onOpenAttachment = { viewModel.openAttachment(it) },
+                    onDeleteAttachment = { viewModel.deleteAttachment(it) },
+                    onPickFromKidBoxDocuments = { requestKidBoxDocuments(GarageAttachmentPickTarget.DetailVehicle) },
+                )
             }
             item { Spacer(Modifier.height(24.dp)) }
         }
@@ -838,6 +839,13 @@ private fun EditVehicleDialog(
     var hasRev by remember(initial.id) { mutableStateOf(initial.revisionExpiryDate != null) }
     var hasTax by remember(initial.id) { mutableStateOf(initial.taxExpiryDate != null) }
     var hasNextSvc by remember(initial.id) { mutableStateOf(initial.nextServiceDate != null) }
+    val initialOffsets = remember(initial.id) {
+        it.vittorioscocca.kidbox.data.vehicles.VehicleReminderOffsets.decode(initial.reminderOffsetsJson)
+    }
+    var insOffsets by remember(initial.id) { mutableStateOf(initialOffsets.insurance.toSet()) }
+    var revOffsets by remember(initial.id) { mutableStateOf(initialOffsets.revision.toSet()) }
+    var taxOffsets by remember(initial.id) { mutableStateOf(initialOffsets.tax.toSet()) }
+    var nextSvcOffsets by remember(initial.id) { mutableStateOf(initialOffsets.service.toSet()) }
     var fuelMenuOpen by remember { mutableStateOf(false) }
 
     val fuels = listOf("benzina", "diesel", "elettrica", "ibrida", "gpl")
@@ -862,6 +870,12 @@ private fun EditVehicleDialog(
         val trimmedName = name.trim()
         if (trimmedName.isBlank()) return
         val reminderAuto = hasIns || hasRev || hasTax || hasNextSvc
+        val reminderOffsetsJson = it.vittorioscocca.kidbox.data.vehicles.VehicleReminderOffsets(
+            insurance = insOffsets.sorted(),
+            revision = revOffsets.sorted(),
+            tax = taxOffsets.sorted(),
+            service = nextSvcOffsets.sorted(),
+        ).encode()
         onConfirm(
             initial.copy(
                 name = trimmedName,
@@ -880,6 +894,7 @@ private fun EditVehicleDialog(
                 currentKm = kmText.trim().takeIf { it.isNotEmpty() }?.toIntOrNull(),
                 notes = notes.trim().takeIf { it.isNotEmpty() },
                 reminderEnabled = reminderAuto,
+                reminderOffsetsJson = reminderOffsetsJson,
             ),
         )
     }
@@ -1018,6 +1033,11 @@ private fun EditVehicleDialog(
                                     )
                                 }
                             }
+                            ReminderOffsetChips(
+                                selected = insOffsets,
+                                onToggle = { d -> insOffsets = if (d in insOffsets) insOffsets - d else insOffsets + d },
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            )
                         }
 
                         IosFormDivider(kb)
@@ -1060,6 +1080,11 @@ private fun EditVehicleDialog(
                                     )
                                 }
                             }
+                            ReminderOffsetChips(
+                                selected = revOffsets,
+                                onToggle = { d -> revOffsets = if (d in revOffsets) revOffsets - d else revOffsets + d },
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            )
                         }
 
                         IosFormDivider(kb)
@@ -1102,6 +1127,11 @@ private fun EditVehicleDialog(
                                     )
                                 }
                             }
+                            ReminderOffsetChips(
+                                selected = taxOffsets,
+                                onToggle = { d -> taxOffsets = if (d in taxOffsets) taxOffsets - d else taxOffsets + d },
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            )
                         }
 
                         IosFormDivider(kb)
@@ -1149,6 +1179,11 @@ private fun EditVehicleDialog(
                                     )
                                 }
                             }
+                            ReminderOffsetChips(
+                                selected = nextSvcOffsets,
+                                onToggle = { d -> nextSvcOffsets = if (d in nextSvcOffsets) nextSvcOffsets - d else nextSvcOffsets + d },
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            )
                         }
                     }
 

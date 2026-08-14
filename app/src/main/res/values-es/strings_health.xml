@@ -488,4 +488,26 @@
     <string name="health_metric_workouts_avg">%1$s min por semana</string>
     <string name="health_metric_workouts_recent">Últimos 30 días</string>
     <string name="health_metrics_synced">Actualizado %1$s · datos de Health Connect</string>
+
+    <!-- Recordatorios locales: visitas, exámenes, vacunas, tratamientos -->
+    <string name="health_garage_reminder_channel_name">Recordatorios de salud y Garaje</string>
+    <string name="health_garage_reminder_channel_description">Recordatorios locales de visitas, exámenes, tratamientos y vencimientos de vehículos</string>
+    <string name="visit_reminder_notification_title">Recordatorio de visita</string>
+    <string name="visit_reminder_body_fallback">Visita médica</string>
+    <string name="visit_next_reminder_title">Próxima visita: %1$s</string>
+    <string name="exam_reminder_notification_title">Recordatorio de examen</string>
+    <string name="exam_reminder_body_fallback">Examen programado</string>
+    <string name="exam_reminder_body_format">Examen para %1$s: %2$s</string>
+    <string name="exam_reminder_body_urgent_suffix"> (urgente)</string>
+    <string name="vaccine_reminder_notification_title">Recordatorio de vacuna</string>
+    <string name="vaccine_reminder_body_fallback">Vacuna programada para mañana</string>
+    <string name="vaccine_reminder_body_format">Vacuna para %1$s: %2$s</string>
+    <string name="treatment_period_morning">Mañana</string>
+    <string name="treatment_period_lunch">Comida</string>
+    <string name="treatment_period_evening">Tarde</string>
+    <string name="treatment_period_night">Noche</string>
+    <string name="treatment_dose_n">Dosis %1$d</string>
+    <string name="treatment_reminder_body_format">%1$s · %2$s %3$s para %4$s</string>
+    <string name="treatment_reminder_notification_title">Recordatorio de tratamiento</string>
+    <string name="treatment_reminder_body_fallback">Hora de la dosis</string>
 </resources>

@@ -98,11 +98,11 @@
     <string name="home_feature_vehicles_title">Garage</string>
     <string name="home_feature_vehicles_subtitle">Cars and deadlines</string>
     <string name="home_feature_travel_title">Trips</string>
-    <string name="home_feature_travel_subtitle_locked">Pro or Max plan for AI</string>
+    <string name="home_feature_travel_subtitle_locked">Free AI bonus used up</string>
     <string name="home_feature_travel_subtitle_unlocked">Plan with AI</string>
     <string name="home_feature_ai_title_locked">Assistant</string>
     <string name="home_feature_ai_title_unlocked">AI Assistant</string>
-    <string name="home_feature_ai_subtitle_locked">Available with Pro or Max</string>
+    <string name="home_feature_ai_subtitle_locked">Free bonus used up</string>
     <string name="home_feature_ai_subtitle_unlocked">Ask for help</string>
     <string name="home_feature_passwords_title">Passwords</string>
     <string name="home_feature_passwords_subtitle">Family credentials</string>

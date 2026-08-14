@@ -13,6 +13,8 @@ import it.vittorioscocca.kidbox.ui.screens.travel.toTravelPlanMap
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
 import it.vittorioscocca.kidbox.ui.screens.travel.TravelDestination
 import it.vittorioscocca.kidbox.ui.screens.travel.TravelSuggestionsResult
+import it.vittorioscocca.kidbox.ai.CurrentPlanStore
+import it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod
 import it.vittorioscocca.kidbox.domain.model.ai.AIResponse
 import it.vittorioscocca.kidbox.domain.model.ai.AIServiceError
 import javax.inject.Inject
@@ -65,11 +67,13 @@ class AIService @Inject constructor(
                 ?: error("Risposta AI non valida")
             val usageToday = (data["usageToday"] as? Number)?.toInt() ?: 0
             val dailyLimit = (data["dailyLimit"] as? Number)?.toInt() ?: 30
-            aiUsageTracker.apply(usageToday, dailyLimit)
+            val period = AIQuotaPeriod.fromRaw(data["period"] as? String)
+            aiUsageTracker.apply(usageToday, dailyLimit, period)
             AIResponse(
                 reply = data["reply"] as? String ?: "",
                 usageToday = usageToday,
                 dailyLimit = dailyLimit,
+                period = period,
             )
         }.mapError()
     }
@@ -83,11 +87,13 @@ class AIService @Inject constructor(
                 ?: error("Risposta usage non valida")
             val usageToday = (data["usageToday"] as? Number)?.toInt() ?: 0
             val dailyLimit = (data["dailyLimit"] as? Number)?.toInt() ?: 30
-            aiUsageTracker.apply(usageToday, dailyLimit)
+            val period = AIQuotaPeriod.fromRaw(data["period"] as? String)
+            aiUsageTracker.apply(usageToday, dailyLimit, period)
             AIResponse(
                 reply = "",
                 usageToday = usageToday,
                 dailyLimit = dailyLimit,
+                period = period,
             )
         }.mapError()
     }
@@ -98,8 +104,11 @@ class AIService @Inject constructor(
     ): Result<TravelSuggestionsResult> = withContext(Dispatchers.IO) {
         runCatching {
             val resolvedFamilyId = resolveFamilyId(familyId)
-            if (!subscriptionRepository.getPlan(resolvedFamilyId).includesAI) {
-                error("I suggerimenti AI richiedono un piano Pro o Max.")
+            // Il piano Free ora include l'AI: si blocca solo dopo l'esaurimento del
+            // bonus di 5 messaggi una tantum (stato reattivo in CurrentPlanStore,
+            // popolato dal caricamento del piano e da ogni chiamata AI).
+            if (!CurrentPlanStore.isAIAccessible) {
+                error("Hai usato tutti i messaggi AI gratuiti inclusi nel piano Free. Passa a Pro per continuare a usare l'assistente.")
             }
             val payload = hashMapOf(
                 "familyId" to resolvedFamilyId,
@@ -118,12 +127,14 @@ class AIService @Inject constructor(
             if (destinations.isEmpty()) error("Nessuna destinazione suggerita")
             val usageToday = (data["usageToday"] as? Number)?.toInt() ?: 0
             val dailyLimit = (data["dailyLimit"] as? Number)?.toInt() ?: 0
-            aiUsageTracker.apply(usageToday, dailyLimit)
+            val period = AIQuotaPeriod.fromRaw(data["period"] as? String)
+            aiUsageTracker.apply(usageToday, dailyLimit, period)
             TravelSuggestionsResult(
                 destinations = destinations,
                 profileSummary = data["profileSummary"] as? String ?: "",
                 usageToday = usageToday,
                 dailyLimit = dailyLimit,
+                period = period,
             )
         }.mapTravelCallableError()
     }
@@ -134,8 +145,8 @@ class AIService @Inject constructor(
     ): Result<TravelPlanResponse> = withContext(Dispatchers.IO) {
         runCatching {
             val resolvedFamilyId = resolveFamilyId(familyId)
-            if (!subscriptionRepository.getPlan(resolvedFamilyId).includesAI) {
-                error("La pianificazione AI richiede un piano Pro o Max.")
+            if (!CurrentPlanStore.isAIAccessible) {
+                error("Hai usato tutti i messaggi AI gratuiti inclusi nel piano Free. Passa a Pro per continuare a usare l'assistente.")
             }
             val payload = hashMapOf<String, Any>(
                 "familyId" to resolvedFamilyId,
@@ -156,7 +167,8 @@ class AIService @Inject constructor(
                 ?: error("Risposta viaggio AI non valida")
             val usageToday = (data["usageToday"] as? Number)?.toInt() ?: 0
             val dailyLimit = (data["dailyLimit"] as? Number)?.toInt() ?: 0
-            aiUsageTracker.apply(usageToday, dailyLimit)
+            val period = AIQuotaPeriod.fromRaw(data["period"] as? String)
+            aiUsageTracker.apply(usageToday, dailyLimit, period)
             val travelPlanMap = data["travelPlan"].toTravelPlanMap()
             val dayPlanCount = (travelPlanMap?.get("dayPlans") as? List<*>)?.size ?: 0
             val narrativeText = data["narrativeText"] as? String ?: ""
@@ -166,6 +178,7 @@ class AIService @Inject constructor(
                 narrativeText = narrativeText,
                 usageToday = usageToday,
                 dailyLimit = dailyLimit,
+                period = period,
             )
         }.onFailure { err ->
             KBLog.ai.error("generateTravelPlan failed", "AIService", err)
@@ -196,6 +209,7 @@ data class TravelPlanResponse(
     val narrativeText: String,
     val usageToday: Int,
     val dailyLimit: Int,
+    val period: AIQuotaPeriod = AIQuotaPeriod.DAILY,
 )
 
 private fun <T> Result<T>.mapTravelCallableError(): Result<T> =

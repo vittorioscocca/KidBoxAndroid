@@ -71,7 +71,10 @@ import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
-private val BackgroundColor = Color(0xFFF2F0EB)
+// Nero fisso, non da kidBoxColors: i bottoni Apple/Google/Facebook restano un pillola
+// nera con contenuto bianco in entrambi i temi, come il bottone nero di iOS — non sono
+// una superficie dell'app ma un elemento di brand a colore fisso (per Apple è anche un
+// requisito delle linee guida "Sign in with Apple").
 private val BlackButton = Color(0xFF1A1A1A)
 private val OrangeAccent = Color(0xFFFF6B00)
 
@@ -155,6 +158,7 @@ fun LoginScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val uriHandler = LocalUriHandler.current
     val metrics = rememberLoginScreenMetrics()
+    val kb = MaterialTheme.kidBoxColors
 
     LaunchedEffect(authCheckState) {
         when (val state = authCheckState) {
@@ -171,7 +175,7 @@ fun LoginScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(BackgroundColor),
+                    .background(kb.background),
             ) {
                 Column(
                     modifier = Modifier
@@ -196,7 +200,7 @@ fun LoginScreen(
                 text = "KidBox",
                 fontSize = 36.sp,
                 fontWeight = FontWeight.Bold,
-                color = BlackButton,
+                color = kb.title,
                 letterSpacing = 0.sp,
             )
 
@@ -207,7 +211,7 @@ fun LoginScreen(
                 text = stringResource(R.string.onboarding_slide1_title),
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
-                color = BlackButton,
+                color = kb.title,
                 textAlign = TextAlign.Center,
                 lineHeight = 28.sp,
             )
@@ -254,15 +258,15 @@ fun LoginScreen(
                     .padding(vertical = 20.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                HorizontalDivider(color = Color(0xFFCCCCCC))
+                HorizontalDivider(color = kb.divider)
                 Box(
                     modifier = Modifier
-                        .background(BackgroundColor)
+                        .background(kb.background)
                         .padding(horizontal = 12.dp),
                 ) {
                     Text(
                         "o",
-                        color = Color(0xFFAAAAAA),
+                        color = kb.subtitle,
                         fontSize = 14.sp,
                     )
                 }
@@ -280,15 +284,15 @@ fun LoginScreen(
                     .height(metrics.buttonHeight)
                     .border(
                         width = 1.dp,
-                        color = Color(0xFFCCCCCC),
+                        color = kb.divider,
                         shape = RoundedCornerShape(28.dp),
                     ),
                 shape = RoundedCornerShape(28.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = BackgroundColor,
-                    contentColor = BlackButton,
-                    disabledContainerColor = BackgroundColor,
-                    disabledContentColor = BlackButton.copy(alpha = 0.5f),
+                    containerColor = kb.background,
+                    contentColor = kb.title,
+                    disabledContainerColor = kb.background,
+                    disabledContentColor = kb.title.copy(alpha = 0.5f),
                 ),
             ) {
                 Text(
@@ -312,7 +316,7 @@ fun LoginScreen(
             if (registrationPending) {
                 Text(
                     text = stringResource(R.string.login_registration_pending),
-                    color = Color(0xFF666666),
+                    color = kb.subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 8.dp),
@@ -342,7 +346,7 @@ fun LoginScreen(
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
                                 stringResource(R.string.login_in_progress),
-                                color = BlackButton,
+                                color = kb.title,
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
@@ -503,7 +507,7 @@ private fun LoginTermsFooter(
         text = footerText,
         style = MaterialTheme.typography.bodySmall.copy(
             fontSize = 12.sp,
-            color = Color(0xFF888888),
+            color = MaterialTheme.kidBoxColors.subtitle,
             textAlign = TextAlign.Center,
             lineHeight = 18.sp,
         ),
@@ -537,6 +541,7 @@ private fun EmailAuthSheetContent(
     var password by remember { mutableStateOf("") }
     var confirmPwd by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
+    val kb = MaterialTheme.kidBoxColors
 
     val emailOk = email.contains('@') && email.contains('.')
     val formOk = emailOk && password.length >= 6 &&
@@ -553,7 +558,7 @@ private fun EmailAuthSheetContent(
             stringResource(if (isRegistering) R.string.login_sheet_title_register else R.string.login_sheet_title_signin),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            color = BlackButton,
+            color = kb.title,
         )
         Text(
             stringResource(
@@ -561,7 +566,7 @@ private fun EmailAuthSheetContent(
                 else R.string.login_sheet_subtitle_signin
             ),
             style = MaterialTheme.typography.bodyMedium,
-            color = Color(0xFF888888),
+            color = kb.subtitle,
             modifier = Modifier.padding(top = 4.dp, bottom = 24.dp),
         )
 
@@ -679,7 +684,7 @@ private fun EmailAuthSheetContent(
             Text(stringResource(R.string.login_forgot_password), color = OrangeAccent)
         }
         TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.login_close), color = Color(0xFF888888))
+            Text(stringResource(R.string.login_close), color = kb.subtitle)
         }
     }
 }
