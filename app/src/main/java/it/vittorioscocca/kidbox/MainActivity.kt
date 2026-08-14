@@ -149,7 +149,7 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     AppNavGraph(
                         navController = navController,
-                        startDestination = AppDestination.Login.route,
+                        startDestination = AppDestination.Splash.route,
                         onboardingPreferences = onboardingPreferences,
                     )
                     CrashReportConsentDialog(

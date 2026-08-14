@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.EdgeToEdgeController
 import kotlin.math.sin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -73,6 +74,7 @@ fun KidBoxSplashScreen(
     onFinished: () -> Unit,
     modifier: Modifier = Modifier.fillMaxSize(),
 ) {
+    EdgeToEdgeController.RequestFullBleed()
     val density = LocalDensity.current
     val context = LocalContext.current
     val view = LocalView.current
@@ -93,8 +95,13 @@ fun KidBoxSplashScreen(
     val ringOpacity = remember { Animatable(0f) }
     val glowScale = remember { Animatable(0.6f) }
     val glowOpacity = remember { Animatable(0f) }
-    val iconScale = remember { Animatable(0.55f) }
-    val iconOpacity = remember { Animatable(0f) }
+    // L'icona parte già alla dimensione/opacità finale: lo splash nativo di sistema
+    // (Theme.App.Starting) mostra la stessa icona a piena dimensione un istante prima
+    // che questo Composable prenda il controllo. Animarla da una scala ridotta qui
+    // creava un "reset" visibile — l'icona sembrava sparire e ricomparire. Restano
+    // animati solo gli elementi che nello splash nativo non c'erano (anelli, testo).
+    val iconScale = remember { Animatable(1f) }
+    val iconOpacity = remember { Animatable(1f) }
     val wordmarkOffsetY = remember {
         Animatable(18f * density.density)
     }
@@ -115,29 +122,6 @@ fun KidBoxSplashScreen(
                 launch { ringOpacity.animateTo(1f, tween(700, easing = FastOutSlowInEasing)) }
                 launch { glowScale.animateTo(1f, tween(700, easing = FastOutSlowInEasing)) }
                 launch { glowOpacity.animateTo(1f, tween(700, easing = FastOutSlowInEasing)) }
-            }
-        }
-        launch {
-            delay(250)
-            coroutineScope {
-                launch {
-                    iconScale.animateTo(
-                        1f,
-                        spring(
-                            dampingRatio = 0.62f,
-                            stiffness = Spring.StiffnessMediumLow,
-                        ),
-                    )
-                }
-                launch {
-                    iconOpacity.animateTo(
-                        1f,
-                        spring(
-                            dampingRatio = 0.62f,
-                            stiffness = Spring.StiffnessMediumLow,
-                        ),
-                    )
-                }
             }
         }
         launch {

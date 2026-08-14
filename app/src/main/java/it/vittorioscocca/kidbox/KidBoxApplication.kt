@@ -16,6 +16,7 @@ import dagger.hilt.android.HiltAndroidApp
 import it.vittorioscocca.kidbox.data.local.ThemePreference
 import it.vittorioscocca.kidbox.data.local.toNightMode
 import it.vittorioscocca.kidbox.data.location.GeofenceMonitorRestorer
+import it.vittorioscocca.kidbox.data.remote.AppCheckTokenCache
 import it.vittorioscocca.kidbox.data.notification.PushNotificationManager
 import it.vittorioscocca.kidbox.notifications.KidBoxFirebaseMessagingService
 import it.vittorioscocca.kidbox.notifications.nudge.NudgeEngine
@@ -59,6 +60,16 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
         KidBoxApplicationHolder.applicationContext = applicationContext
         KBFileLogger.init(this)
         KBCrashHandler.install()
+        // Installa il provider App Check (Play Integrity in release, Debug in debug)
+        // il prima possibile, prima di qualunque chiamata Firestore/Storage/Functions:
+        // da qui i token vengono generati e allegati alle richieste, ma nessuna Cloud
+        // Function li richiede ancora (enforceAppCheck non è attivo lato server) —
+        // quindi questo passo non può bloccare nulla, solo iniziare a raccogliere
+        // dati sull'adozione prima di un enforcement futuro.
+        AppCheckInstaller.install()
+        appInitScope.launch {
+            runCatching { AppCheckTokenCache.warmUp() }
+        }
         // Applicato subito dopo l'injection, prima di qualunque Activity: allinea da
         // subito i componenti nativi (DatePickerDialog, notifiche, ecc.) alla preferenza
         // scelta in Impostazioni. Senza, quei componenti seguono solo il tema di sistema,

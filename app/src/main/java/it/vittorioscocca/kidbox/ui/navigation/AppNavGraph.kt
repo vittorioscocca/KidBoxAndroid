@@ -29,6 +29,7 @@ import it.vittorioscocca.kidbox.ui.BroadcastMessageDialog
 import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
 import it.vittorioscocca.kidbox.ui.family.FamilySwitcherViewModel
 import it.vittorioscocca.kidbox.ui.screens.auth.LoginScreen
+import it.vittorioscocca.kidbox.ui.splash.KidBoxSplashScreen
 import it.vittorioscocca.kidbox.ui.screens.grocery.GroceryListScreen
 import it.vittorioscocca.kidbox.ui.screens.homeitems.HomeItemDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.homeitems.HomeItemsScreen
@@ -138,7 +139,10 @@ fun AppNavGraph(
     LaunchedEffect(pendingAiRoute, pendingFamilyId, activeFamilyId, navController.currentBackStackEntry) {
         val route = pendingAiRoute ?: return@LaunchedEffect
         val current = navController.currentDestination?.route ?: return@LaunchedEffect
-        if (current == AppDestination.Login.route || current == AppDestination.Onboarding.route) {
+        if (current == AppDestination.Splash.route ||
+            current == AppDestination.Login.route ||
+            current == AppDestination.Onboarding.route
+        ) {
             return@LaunchedEffect
         }
         val targetFamilyId = pendingFamilyId
@@ -166,6 +170,7 @@ fun AppNavGraph(
     // token da registrare finché non è autenticato con una famiglia.
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
     if (currentRoute != null &&
+        currentRoute != AppDestination.Splash.route &&
         currentRoute != AppDestination.Login.route &&
         currentRoute != AppDestination.Onboarding.route
     ) {
@@ -216,6 +221,16 @@ fun AppNavGraph(
         navController = navController,
         startDestination = startDestination,
     ) {
+        composable(AppDestination.Splash.route) {
+            KidBoxSplashScreen(
+                onFinished = {
+                    navController.navigate(AppDestination.Login.route) {
+                        popUpTo(AppDestination.Splash.route) { inclusive = true }
+                    }
+                },
+            )
+        }
+
         composable(AppDestination.Login.route) {
             LoginScreen(
                 onLoginSuccess = { hasFamily ->
