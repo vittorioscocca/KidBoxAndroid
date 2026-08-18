@@ -190,6 +190,12 @@
     <string name="onboarding_creator_hint">Tu seras le créateur et tu pourras inviter ton/ta partenaire.</string>
     <string name="onboarding_join_family">Rejoindre une famille</string>
     <string name="onboarding_join_hint">Tu as un QR code ou un code texte ? Utilise-le pour rejoindre.</string>
+    <string name="onboarding_name_title">Comment t&#8217;appelles-tu ?</string>
+    <string name="onboarding_name_subtitle">Ton nom est celui que les autres membres verront dans le chat, dans les rappels et sur la carte. Tu pourras le changer depuis le Profil.</string>
+    <string name="onboarding_name_first_label">Prénom</string>
+    <string name="onboarding_name_last_label">Nom</string>
+    <string name="onboarding_name_first_placeholder">Ex. Julie</string>
+    <string name="onboarding_name_last_placeholder">Ex. Martin</string>
     <string name="onboarding_enter_family">Rejoindre la famille</string>
     <string name="onboarding_joined">Tu as rejoint la famille !</string>
     <string name="onboarding_qr_code">QR code</string>

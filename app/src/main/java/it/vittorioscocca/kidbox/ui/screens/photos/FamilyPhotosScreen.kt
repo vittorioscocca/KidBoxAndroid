@@ -147,6 +147,8 @@ import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
 import it.vittorioscocca.kidbox.util.KBLocale
 import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.ui.components.FamilyKeyMissingGate
+import it.vittorioscocca.kidbox.ui.components.FamilyKeyMissingDialog
 import it.vittorioscocca.kidbox.R
 
 private enum class PhotosTab { LIBRARY, ALBUMS }
@@ -162,6 +164,9 @@ fun FamilyPhotosScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    // Copre in un colpo solo le decifrature che qui falliscono in silenzio.
+    FamilyKeyMissingGate(state.familyId)
     var currentTab by remember { mutableStateOf(PhotosTab.LIBRARY) }
     var showCreateAlbum by remember { mutableStateOf(false) }
     var viewerPhotoId by remember { mutableStateOf<String?>(null) }
@@ -196,11 +201,23 @@ fun FamilyPhotosScreen(
         }
     }
 
+    // Il messaggio della chiave mancante è lungo e va letto: in un Toast
+    // verrebbe troncato a due righe. Gli altri errori sono brevi e il Toast va
+    // ancora bene.
+    var keyMissingFromError by remember { mutableStateOf(false) }
+    val keyMissingText = stringResource(R.string.family_key_missing_short)
     LaunchedEffect(state.errorMessage) {
-        state.errorMessage?.let {
-            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+        state.errorMessage?.let { msg ->
+            if (msg == keyMissingText) {
+                keyMissingFromError = true
+            } else {
+                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            }
             viewModel.clearError()
         }
+    }
+    if (keyMissingFromError) {
+        FamilyKeyMissingDialog(onDismiss = { keyMissingFromError = false })
     }
     LaunchedEffect(state.filteredPhotos, viewerPhotoId) {
         val selectedId = viewerPhotoId ?: return@LaunchedEffect

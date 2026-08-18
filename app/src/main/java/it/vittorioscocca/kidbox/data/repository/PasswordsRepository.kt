@@ -18,7 +18,9 @@ import it.vittorioscocca.kidbox.data.remote.passwords.PasswordRemoteChange
 import it.vittorioscocca.kidbox.data.passwords.AutoFillSnapshotScheduler
 import it.vittorioscocca.kidbox.data.remote.passwords.PasswordRemoteStore
 import it.vittorioscocca.kidbox.data.crypto.FamilyKeyEscrow
+import it.vittorioscocca.kidbox.data.crypto.PasswordCypher
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
+import it.vittorioscocca.kidbox.notifications.PasswordExpiryReminderScheduler
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -40,6 +42,8 @@ class PasswordsRepository @Inject constructor(
     private val remoteStore: PasswordRemoteStore,
     private val auth: FirebaseAuth,
     private val autoFillSnapshotScheduler: AutoFillSnapshotScheduler,
+    private val passwordCypher: PasswordCypher,
+    private val passwordExpiryReminderScheduler: PasswordExpiryReminderScheduler,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val inboundMutex = Mutex()
@@ -198,7 +202,10 @@ class PasswordsRepository @Inject constructor(
         if (dto.deletedAtEpochMillis != null) {
             val existing = entryDao.getById(dto.id) ?: return
             val remoteTs = dto.updatedAtEpochMillis ?: 0L
-            if (remoteTs >= existing.updatedAtEpochMillis) entryDao.deleteById(dto.id)
+            if (remoteTs >= existing.updatedAtEpochMillis) {
+                entryDao.deleteById(dto.id)
+                passwordExpiryReminderScheduler.cancel(dto.id)
+            }
             return
         }
 
@@ -235,6 +242,7 @@ class PasswordsRepository @Inject constructor(
                     lastSyncError = null,
                 ),
             )
+            resyncPasswordExpiryReminder(dto.id, familyId, vis, dto.createdBy, uid, title, dto.expiresAtEpochMillis)
         } else {
             val created = dto.createdAtEpochMillis ?: remoteTs
             entryDao.upsert(
@@ -265,7 +273,24 @@ class PasswordsRepository @Inject constructor(
                     lastSyncError = null,
                 ),
             )
+            resyncPasswordExpiryReminder(dto.id, familyId, vis, dto.createdBy, uid, title, dto.expiresAtEpochMillis)
         }
+    }
+
+    /** Ridecifra il titolo (serve in chiaro per il corpo della notifica) e riallinea i promemoria scadenza. */
+    private fun resyncPasswordExpiryReminder(
+        entryId: String,
+        familyId: String,
+        visibility: String,
+        createdBy: String,
+        decryptingUid: String,
+        titleCipher: ByteArray,
+        expiresAtEpochMillis: Long?,
+    ) {
+        val title = runCatching {
+            passwordCypher.decrypt(titleCipher, familyId, visibility, createdBy, familyKeyUserId = decryptingUid)
+        }.getOrNull().orEmpty()
+        passwordExpiryReminderScheduler.sync(entryId, familyId, title, expiresAtEpochMillis)
     }
 
     private suspend fun applyGroupDto(dto: PasswordGroupRemoteDto, familyId: String, uid: String) {
@@ -344,6 +369,7 @@ class PasswordsRepository @Inject constructor(
             if (entry.createdBy != uid) return@forEach
             remoteStore.softDeleteEntry(familyId, id)
             entryDao.deleteById(id)
+            passwordExpiryReminderScheduler.cancel(id)
         }
         autoFillSnapshotScheduler.enqueue()
     }

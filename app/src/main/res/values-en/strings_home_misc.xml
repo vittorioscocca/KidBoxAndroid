@@ -7,6 +7,7 @@
 
     <!-- ═══ family ═══ -->
     <string name="family_switcher_title">Your families</string>
+    <string name="family_switcher_intro">Besides the family you share with your partner, here you can create the family you come from: your father, your mother, your brothers and sisters. Each family has its own data and stays separate from the others.</string>
     <string name="family_switcher_created_snackbar">Family created! Tap to switch to it.</string>
     <string name="family_switcher_create_button">Create new family</string>
     <string name="family_switcher_join_button">Join a family</string>

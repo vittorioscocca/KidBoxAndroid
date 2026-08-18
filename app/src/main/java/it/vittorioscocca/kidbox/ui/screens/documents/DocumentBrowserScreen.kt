@@ -9,7 +9,9 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
@@ -110,6 +112,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
+import it.vittorioscocca.kidbox.ui.components.FamilyKeyMissingGate
+import it.vittorioscocca.kidbox.ui.components.FamilyKeyMissingDialog
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentCategoryEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
@@ -150,6 +154,9 @@ fun DocumentBrowserScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // Copre in un colpo solo le decifrature che qui falliscono in silenzio.
+    FamilyKeyMissingGate(familyId)
     val currentUid = remember { FirebaseAuth.getInstance().currentUser?.uid }
     var showUploadVisibilityGate by remember { mutableStateOf(false) }
     var showUploadVisibilityPicker by remember { mutableStateOf(false) }
@@ -190,11 +197,23 @@ fun DocumentBrowserScreen(
             // Keep a safe non-null navigation default for folder route param.
         }
     }
+    // Il messaggio della chiave mancante è lungo e va letto: in un Toast
+    // verrebbe troncato a due righe. Gli altri errori sono brevi e il Toast va
+    // ancora bene.
+    var keyMissingFromError by remember { mutableStateOf(false) }
+    val keyMissingText = stringResource(R.string.family_key_missing_short)
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let { msg ->
-            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            if (msg == keyMissingText) {
+                keyMissingFromError = true
+            } else {
+                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            }
             viewModel.clearError()
         }
+    }
+    if (keyMissingFromError) {
+        FamilyKeyMissingDialog(onDismiss = { keyMissingFromError = false })
     }
 
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -222,7 +241,7 @@ fun DocumentBrowserScreen(
     val photoLibraryLauncher = rememberSingleImagePicker { uri ->
         uri?.let { u ->
             val mime = context.contentResolver.getType(u) ?: "image/jpeg"
-            val fileName = guessFileName(u.toString(), mime)
+            val fileName = resolveFileName(context, u, mime)
             val bytes = context.contentResolver.openInputStream(u)?.use { it.readBytes() } ?: ByteArray(0)
             if (bytes.isNotEmpty()) {
                 viewModel.importDocument(
@@ -246,7 +265,7 @@ fun DocumentBrowserScreen(
             )
         }
         val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
-        val fileName = guessFileName(uri.toString(), mime)
+        val fileName = resolveFileName(context, uri, mime)
         val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: ByteArray(0)
         if (bytes.isNotEmpty()) {
             viewModel.importDocument(
@@ -2057,15 +2076,51 @@ private fun iconForMime(mime: String): androidx.compose.ui.graphics.vector.Image
     else -> Icons.Default.Description
 }
 
+/**
+ * Nome reale del file scelto dall'utente.
+ *
+ * L'unica fonte attendibile è `OpenableColumns.DISPLAY_NAME` del provider:
+ * è il nome che l'utente vede nel selettore. Ricavarlo dall'URI non funziona
+ * con i content URI del Storage Access Framework, dove l'ultimo segmento è un
+ * id opaco del documento (`msf:1000000123`, `primary%3ADownload%2F…`): il file
+ * finiva così in archivio con un nome tecnico invece del suo.
+ *
+ * [guessFileName] resta solo come ripiego per i provider che non espongono la
+ * colonna. Stesso approccio già usato da `PhotoVideoRepository` e
+ * `WalletRepository`.
+ */
+private fun resolveFileName(context: Context, uri: Uri, mime: String): String {
+    val fromProvider = runCatching {
+        context.contentResolver
+            .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { c ->
+                val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (c.moveToFirst() && idx >= 0) c.getString(idx) else null
+            }
+    }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+
+    return fromProvider?.let { ensureExtension(it, mime) }
+        ?: guessFileName(uri.toString(), mime)
+}
+
+/** Estensione attesa per un mime type, usata solo quando il nome ne è privo. */
+private fun extensionFor(mime: String): String = when {
+    mime.contains("pdf") -> "pdf"
+    mime.contains("png") -> "png"
+    mime.contains("jpeg") || mime.contains("jpg") -> "jpg"
+    else -> "bin"
+}
+
+/**
+ * Alcuni provider restituiscono il nome senza estensione ("Scansione 3").
+ * Senza, il file viene salvato e riaperto come binario generico.
+ */
+private fun ensureExtension(name: String, mime: String): String =
+    if (name.substringAfterLast('.', "").isNotEmpty()) name else "$name.${extensionFor(mime)}"
+
 private fun guessFileName(uriText: String, mime: String): String {
-    val extension = when {
-        mime.contains("pdf") -> "pdf"
-        mime.contains("png") -> "png"
-        mime.contains("jpeg") || mime.contains("jpg") -> "jpg"
-        else -> "bin"
-    }
     val base = uriText.substringAfterLast('/').substringBefore('?').ifBlank { "document_${System.currentTimeMillis()}" }
-    return if (base.contains('.')) base else "$base.$extension"
+    return ensureExtension(base, mime)
 }
 
 private fun sortFolders(

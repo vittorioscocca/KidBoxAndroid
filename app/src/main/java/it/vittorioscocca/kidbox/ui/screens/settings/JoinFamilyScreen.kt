@@ -202,6 +202,29 @@ fun JoinFamilyScreen(
             Spacer(modifier = Modifier.height(12.dp))
             Text(stringResource(R.string.settings_join_success), color = Color(0xFF2E7D32), fontWeight = FontWeight.SemiBold)
         }
+
+        // Join riuscito ma senza chiave di cifratura: non è un errore rosso —
+        // la membership è valida — ma va detto, altrimenti l'utente trova
+        // Password, Documenti e Wallet vuoti senza capirne il motivo.
+        if (state.missingVaultKey) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                stringResource(R.string.settings_join_missing_key),
+                color = Color(0xFFB25E00),
+                fontSize = 13.sp,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = { viewModel.acknowledgeMissingVaultKey(onJoined) },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6B00)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    stringResource(R.string.settings_join_missing_key_continue),
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
     }
 
     // Bottom sheet con camera QR scanner

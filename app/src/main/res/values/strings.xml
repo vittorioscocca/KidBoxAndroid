@@ -55,6 +55,9 @@
     <string name="login_field_password">Password (min. 6 caratteri)</string>
     <string name="login_field_confirm_password">Conferma password</string>
     <string name="login_passwords_mismatch">Le password non coincidono.</string>
+    <string name="login_verify_email_title">Controlla la tua email!</string>
+    <string name="login_verify_email_body">Abbiamo inviato un link di verifica a %1$s. Verifica l\'indirizzo e poi accedi.</string>
+    <string name="login_verify_email_back">Torna al login</string>
     <string name="login_reset_email_sent">Email inviata: controlla la posta per reimpostare la password.</string>
     <string name="login_cta_register">Registrati</string>
     <string name="login_cta_signin">Accedi</string>
@@ -77,4 +80,7 @@
     <string name="auth_error_network">Errore di rete. Controlla la connessione.</string>
     <string name="auth_error_too_many_requests">Troppi tentativi. Riprova tra qualche minuto.</string>
     <string name="auth_error_user_disabled">Account disabilitato. Contatta il supporto.</string>
+    <string name="family_key_missing_title">Chiave di famiglia mancante</string>
+    <string name="family_key_missing_message">Su questo dispositivo manca la chiave che protegge i contenuti condivisi, quindi documenti, wallet, foto e allegati della chat non possono essere aperti.\n\nPer recuperarla, fatti invitare di nuovo da chi ha creato la famiglia e inquadra il codice QR che genera.</string>
+    <string name="family_key_missing_short">Manca la chiave di famiglia: fatti invitare di nuovo da chi ha creato la famiglia e inquadra il suo codice QR.</string>
 </resources>

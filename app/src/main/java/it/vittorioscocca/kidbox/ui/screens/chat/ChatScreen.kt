@@ -174,6 +174,7 @@ import it.vittorioscocca.kidbox.util.VideoCompressor
 import it.vittorioscocca.kidbox.util.fixVideoFrameOrientation
 import java.io.ByteArrayOutputStream
 import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.ui.components.FamilyKeyMissingGate
 import it.vittorioscocca.kidbox.R
 
 /** Quanti item oltre il primo visibile scaldare in cache (direzione di scroll in avanti). */
@@ -190,6 +191,9 @@ fun ChatScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val isDarkTheme = isSystemInDarkTheme()
+
+    // Copre in un colpo solo le decifrature che qui falliscono in silenzio.
+    FamilyKeyMissingGate(state.familyId)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()

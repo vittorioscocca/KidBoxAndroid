@@ -7,6 +7,7 @@
 
     <!-- ═══ family (FamilySwitcherBottomSheet, FamilySwitcherViewModel) ═══ -->
     <string name="family_switcher_title">Tes familles</string>
+    <string name="family_switcher_intro">En plus de la famille que tu partages avec ton partenaire, tu peux créer ici ta famille d\'origine : ton père, ta mère, tes frères et sœurs. Chaque famille a ses propres données et reste séparée des autres.</string>
     <string name="family_switcher_created_snackbar">Famille créée ! Touche pour y passer.</string>
     <string name="family_switcher_create_button">Créer une nouvelle famille</string>
     <string name="family_switcher_join_button">Rejoindre une famille</string>

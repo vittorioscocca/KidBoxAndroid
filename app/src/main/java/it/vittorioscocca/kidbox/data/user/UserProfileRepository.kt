@@ -135,6 +135,42 @@ class UserProfileRepository @Inject constructor(
         }
     }
 
+    /**
+     * Scrive il `displayName` corrente sul documento membro della famiglia indicata.
+     *
+     * Serve all'onboarding: il nome viene raccolto *prima* che la famiglia
+     * esista, quindi il ramo di [saveLocalProfile] che propaga al membro non
+     * può scattare. Va richiamata dopo la creazione o il join, altrimenti il
+     * membro resta senza nome per gli altri — sia `createFamilyWithChild` sia
+     * `addMember` scrivono il documento senza `displayName`.
+     *
+     * Best effort: un errore non deve invalidare una famiglia già creata.
+     * Gemello di `UserProfileWriter.propagateDisplayNameToMember` su iOS.
+     */
+    suspend fun propagateDisplayNameToMember(familyId: String) {
+        if (familyId.isBlank()) return
+        val uid = auth.currentUser?.uid ?: return
+        val displayName = canonicalDisplayNameForCurrentUser()
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() && it != "Utente" }
+            ?: return
+
+        runCatching {
+            memberProfileRemoteStore.upsertMyMemberProfileIfNeeded(familyId, displayName)
+        }
+
+        val member = familyMemberDao.getById(uid)
+        if (member != null && member.familyId == familyId && member.displayName != displayName) {
+            familyMemberDao.upsert(
+                member.copy(
+                    displayName = displayName,
+                    updatedAtEpochMillis = System.currentTimeMillis(),
+                    updatedBy = uid,
+                ),
+            )
+        }
+    }
+
     /** Campi opzionali da `users/{uid}` per precompilare la UI (come iOS loadRemoteUserProfile). */
     suspend fun fetchRemoteProfileFields(uid: String): RemoteUserProfileFields? {
         if (auth.currentUser?.uid != uid) return null

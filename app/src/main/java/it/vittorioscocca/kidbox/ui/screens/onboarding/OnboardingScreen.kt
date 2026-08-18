@@ -27,8 +27,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -49,6 +55,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Share
@@ -93,6 +100,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.ui.EdgeToEdgeController
 import it.vittorioscocca.kidbox.ui.screens.settings.CornerBrackets
 import it.vittorioscocca.kidbox.ui.screens.settings.JoinFamilyViewModel
 import it.vittorioscocca.kidbox.ui.screens.settings.QRScannerView
@@ -159,11 +167,23 @@ fun OnboardingScreen(
     viewModel: OnboardingViewModel = hiltViewModel(),
 ) {
     var familyPath by remember { mutableStateOf<FamilyPath?>(null) }
+    // Il wizard disegna sotto le barre di sistema: il gradiente d'accento parte
+    // dal bordo superiore e le pagine hanno già il loro `statusBarsPadding()`.
+    // Senza questa richiesta la radice della UI (MainActivity) applica il
+    // padding di `systemBars` a tutta la schermata e il wizard resta rientrato,
+    // con una fascia sopra e una sotto.
+    EdgeToEdgeController.RequestFullBleed()
+
 
     val pagerState = rememberPagerState(
-        pageCount = { if (familyPath == FamilyPath.Join) 5 else 6 },
+        // 0-2 intro · 3 scelta percorso · 4 nome e cognome ·
+        // 5 crea famiglia / entra con codice · 6 invita (solo percorso "crea").
+        pageCount = { if (familyPath == FamilyPath.Join) 6 else 7 },
     )
     val scope = rememberCoroutineScope()
+
+    val nameViewModel: OnboardingNameViewModel = hiltViewModel()
+    val nameState by nameViewModel.uiState.collectAsStateWithLifecycle()
 
     val createdFamilyId by viewModel.createdFamilyId.collectAsStateWithLifecycle()
     val isCreatingFamily by viewModel.isCreatingFamily.collectAsStateWithLifecycle()
@@ -173,6 +193,12 @@ fun OnboardingScreen(
     val accent = pageAccent(currentPage, familyPath)
     val iconTint = pageIconTint(currentPage, familyPath)
 
+    // Percorso "crea": il documento membro owner nasce senza displayName, quindi
+    // appena la famiglia esiste ci si porta il nome raccolto a pagina 4.
+    LaunchedEffect(createdFamilyId) {
+        createdFamilyId?.let { nameViewModel.propagateNameToMember(it) }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -181,7 +207,33 @@ fun OnboardingScreen(
         TopAccentGradient(accent = accent, pageIndex = currentPage)
 
         Column(
-            modifier = Modifier.fillMaxSize(),
+            // L'app è edge-to-edge (`setDecorFitsSystemWindows(window, false)`),
+            // quindi `adjustResize` da solo non rimpicciolisce il contenuto e la
+            // tastiera finisce sopra i campi — sulla pagina Nome copriva
+            // "Cognome". Applicato qui e non dentro la singola pagina così a
+            // salire sono anche indicatori e CTA, altrimenti il pulsante
+            // "Continua" resterebbe comunque sotto la tastiera.
+            //
+            // `union` e non modificatori separati in catena: si sommerebbero, e a
+            // tastiera aperta resterebbe un vuoto pari alla barra di navigazione.
+            // L'unione è per lato — sopra vale la status bar, sotto il maggiore
+            // fra tastiera e barra di navigazione — che è il comportamento
+            // corretto in tutti gli stati.
+            //
+            // Il padding sta QUI e non sul Box esterno di proposito: lo sfondo e
+            // il gradiente d'accento devono arrivare ai bordi dello schermo, solo
+            // il contenuto va tenuto dentro le barre. Copre anche le pagine che
+            // non hanno un `statusBarsPadding()` proprio (intro e invito); in
+            // quelle che ce l'hanno diventa inerte, perché l'inset è già
+            // consumato qui.
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(
+                    WindowInsets.ime
+                        .union(WindowInsets.navigationBars)
+                        .union(WindowInsets.statusBars)
+                        .union(WindowInsets.displayCutout),
+                ),
         ) {
             HorizontalPager(
                 state = pagerState,
@@ -196,7 +248,8 @@ fun OnboardingScreen(
                         selected = familyPath,
                         onSelect = { familyPath = it },
                     )
-                    page == 4 && familyPath == FamilyPath.Create -> CreateFamilyPageContent(
+                    page == 4 -> NamePageContent(state = nameState, viewModel = nameViewModel)
+                    page == 5 && familyPath == FamilyPath.Create -> CreateFamilyPageContent(
                         isCreating = isCreatingFamily,
                         errorText = createFamilyError,
                         familyCreated = createdFamilyId != null,
@@ -205,11 +258,16 @@ fun OnboardingScreen(
                             viewModel.createFamily(fam, child, birth)
                         },
                     )
-                    page == 4 && familyPath == FamilyPath.Join -> JoinFamilyPageContent(
-                        onJoined = { familyId -> onFamilyCreated(familyId) },
+                    page == 5 && familyPath == FamilyPath.Join -> JoinFamilyPageContent(
+                        onJoined = { familyId ->
+                            // `addMember` scrive il membro senza displayName:
+                            // il nome raccolto a pagina 4 va portato lì adesso.
+                            nameViewModel.propagateNameToMember(familyId)
+                            onFamilyCreated(familyId)
+                        },
                     )
                     // Fallback: familyPath == null (non dovrebbe succedere, il CTA pag.3 è disabled)
-                    page == 4 -> FamilyPathPickerPageContent(
+                    page == 5 -> FamilyPathPickerPageContent(
                         selected = familyPath,
                         onSelect = { familyPath = it },
                     )
@@ -220,7 +278,7 @@ fun OnboardingScreen(
                 }
             }
 
-            val totalPages = if (familyPath == FamilyPath.Join) 5 else 6
+            val totalPages = if (familyPath == FamilyPath.Join) 6 else 7
 
             Row(
                 modifier = Modifier
@@ -235,16 +293,17 @@ fun OnboardingScreen(
                 )
             }
 
-            val isJoinPage = currentPage == 4 && familyPath == FamilyPath.Join
-            val isInvitePage = currentPage == 5 && familyPath == FamilyPath.Create
+            val isJoinPage = currentPage == 5 && familyPath == FamilyPath.Join
+            val isInvitePage = currentPage == 6 && familyPath == FamilyPath.Create
             val ctaEnabled = when (currentPage) {
                 3 -> familyPath != null
-                4 -> when (familyPath) {
+                4 -> nameState.canSubmit
+                5 -> when (familyPath) {
                     FamilyPath.Create -> createdFamilyId != null
                     FamilyPath.Join -> false
                     null -> false
                 }
-                5 -> createdFamilyId != null
+                6 -> createdFamilyId != null
                 else -> true
             }
             val ctaLabel = if (currentPage == totalPages - 1) stringResource(R.string.onboarding_start) else stringResource(R.string.travel_continue)
@@ -255,7 +314,6 @@ fun OnboardingScreen(
                         .fillMaxWidth()
                         .height(56.dp)
                         .padding(horizontal = 28.dp)
-                        .navigationBarsPadding()
                         .padding(bottom = 12.dp),
                 )
             } else {
@@ -269,14 +327,21 @@ fun OnboardingScreen(
                             3 -> if (familyPath != null) {
                                 scope.launch { pagerState.animateScrollToPage(4) }
                             }
-                            4 -> when (familyPath) {
+                            // Si avanza solo a salvataggio riuscito: proseguire
+                            // dopo un errore lascerebbe l'utente convinto di aver
+                            // messo il nome, e la famiglia nascerebbe comunque
+                            // con un membro anonimo.
+                            4 -> nameViewModel.save {
+                                scope.launch { pagerState.animateScrollToPage(5) }
+                            }
+                            5 -> when (familyPath) {
                                 FamilyPath.Create -> if (createdFamilyId != null) {
-                                    scope.launch { pagerState.animateScrollToPage(5) }
+                                    scope.launch { pagerState.animateScrollToPage(6) }
                                 }
                                 FamilyPath.Join -> Unit
                                 null -> Unit
                             }
-                            5 -> createdFamilyId?.let { onFamilyCreated(it) }
+                            6 -> createdFamilyId?.let { onFamilyCreated(it) }
                             else -> scope.launch {
                                 pagerState.animateScrollToPage(currentPage + 1)
                             }
@@ -284,7 +349,6 @@ fun OnboardingScreen(
                     },
                     modifier = Modifier
                         .padding(horizontal = 28.dp)
-                        .navigationBarsPadding()
                         .padding(bottom = 12.dp),
                 )
             }
@@ -295,14 +359,14 @@ fun OnboardingScreen(
 private fun pageAccent(page: Int, familyPath: FamilyPath?): Color = when (page) {
     1 -> PurpleAccent
     2 -> GreenAccent
-    4 -> if (familyPath == FamilyPath.Join) PurpleAccent else OrangeAccent
+    5 -> if (familyPath == FamilyPath.Join) PurpleAccent else OrangeAccent
     else -> OrangeAccent
 }
 
 private fun pageIconTint(page: Int, familyPath: FamilyPath?): Color = when (page) {
     1 -> Color(0xFF9B7BC9)
     2 -> Color(0xFF4CAF74)
-    4 -> if (familyPath == FamilyPath.Join) Color(0xFF9B7BC9) else Color(0xFFFFBF40)
+    5 -> if (familyPath == FamilyPath.Join) Color(0xFF9B7BC9) else Color(0xFFFFBF40)
     else -> Color(0xFFFFBF40)
 }
 
@@ -444,6 +508,110 @@ private fun IconHeroCard(
                         scaleY = iconScale.value
                     },
                 tint = iconTint,
+            )
+        }
+    }
+}
+
+/**
+ * Pagina 4: nome e cognome dell'utente, prima dei dati della famiglia.
+ *
+ * Sta prima apposta: il documento membro nasce alla creazione/join, quindi
+ * avere già il nome permette di scriverlo lì subito invece di lasciare il
+ * membro anonimo agli altri finché non apre il Profilo.
+ * Gemello di `NameOnboardingCard` su iOS.
+ */
+@Composable
+private fun NamePageContent(state: OnboardingNameUiState, viewModel: OnboardingNameViewModel) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(start = 24.dp, top = 16.dp, end = 24.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(OrangeAccent.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Filled.Person,
+                contentDescription = null,
+                tint = OrangeAccent,
+                modifier = Modifier.size(28.dp),
+            )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            stringResource(R.string.onboarding_name_title),
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Bold,
+            color = BlackText,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            stringResource(R.string.onboarding_name_subtitle),
+            fontSize = 15.sp,
+            color = GraySubtitle,
+            textAlign = TextAlign.Center,
+            lineHeight = 22.sp,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        FormFieldLabel(stringResource(R.string.onboarding_name_first_label))
+        OutlinedTextField(
+            value = state.firstName,
+            onValueChange = viewModel::setFirstName,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !state.isSaving,
+            singleLine = true,
+            placeholder = {
+                Text(stringResource(R.string.onboarding_name_first_placeholder), color = GrayCaption)
+            },
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = OrangeAccent,
+                unfocusedBorderColor = GrayFieldBorder,
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+            ),
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        FormFieldLabel(stringResource(R.string.onboarding_name_last_label))
+        OutlinedTextField(
+            value = state.lastName,
+            onValueChange = viewModel::setLastName,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !state.isSaving,
+            singleLine = true,
+            placeholder = {
+                Text(stringResource(R.string.onboarding_name_last_placeholder), color = GrayCaption)
+            },
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = OrangeAccent,
+                unfocusedBorderColor = GrayFieldBorder,
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+            ),
+        )
+
+        if (!state.error.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                state.error,
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
             )
         }
     }
@@ -1265,6 +1433,36 @@ private fun JoinFamilyPageContent(
                     color = SuccessGreen,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
+                )
+            }
+        }
+
+        // Join senza chiave: qui l'uscita dall'onboarding è sospesa (il VM non
+        // pubblica `joinedFamilyId`), così l'avviso resta leggibile e l'utente
+        // prosegue solo dopo averlo visto.
+        if (state.missingVaultKey) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                stringResource(R.string.settings_join_missing_key),
+                color = Color(0xFFB25E00),
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = { viewModel.acknowledgeMissingVaultKey {} },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = PurpleAccent,
+                    contentColor = Color.White,
+                ),
+            ) {
+                Text(
+                    stringResource(R.string.settings_join_missing_key_continue),
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
         }

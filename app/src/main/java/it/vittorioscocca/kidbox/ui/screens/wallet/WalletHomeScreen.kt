@@ -2,6 +2,7 @@
 
 package it.vittorioscocca.kidbox.ui.screens.wallet
 
+import it.vittorioscocca.kidbox.ui.components.FamilyKeyMissingGate
 import it.vittorioscocca.kidbox.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
@@ -93,6 +94,9 @@ fun WalletHomeScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Copre in un colpo solo le decifrature che qui falliscono in silenzio.
+    FamilyKeyMissingGate(familyId)
     var showAddSheet by remember { mutableStateOf(false) }
     var selectedTab by rememberSaveable { mutableStateOf(0) }
 

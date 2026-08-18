@@ -5,7 +5,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -22,7 +21,10 @@ class SecurityNotifier @Inject constructor(
     fun notifyNewBreaches(newCount: Int) {
         if (newCount <= 0) return
         ensureChannel()
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("kidbox://passwords/security"), context, MainActivity::class.java)
+        val intent = Intent(context, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            putExtra("push_type", "password_security_summary")
+        }
         val pendingIntent = PendingIntent.getActivity(
             context,
             991100,

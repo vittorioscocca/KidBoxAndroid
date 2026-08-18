@@ -5,6 +5,7 @@ import android.util.Base64
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.crypto.FamilyKeyStore
+import it.vittorioscocca.kidbox.data.crypto.MissingFamilyKeyException
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
@@ -83,7 +84,7 @@ class ChatCryptoService @Inject constructor(
         val uid = auth.currentUser?.uid?.trim().orEmpty()
         require(uid.isNotBlank()) { "Not authenticated for chat crypto" }
         val keyBytes = FamilyKeyStore.loadFamilyKey(context, familyId, uid)
-            ?: throw IllegalStateException("Family key missing for familyId=$familyId uid=$uid")
+            ?: throw MissingFamilyKeyException(familyId)
         require(keyBytes.size == KEY_SIZE_BYTES) { "Invalid family key length=${keyBytes.size}" }
         return SecretKeySpec(keyBytes, "AES")
     }

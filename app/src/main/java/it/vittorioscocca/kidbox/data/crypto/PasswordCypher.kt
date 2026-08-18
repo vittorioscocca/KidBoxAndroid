@@ -55,6 +55,6 @@ class PasswordCypher @Inject constructor(
     private fun loadFamilyKey32(familyId: String, familyKeyUserId: String?): ByteArray {
         val uid = resolvedUid(familyKeyUserId)
         return FamilyKeyStore.loadFamilyKey(context, familyId, uid)
-            ?: error("Family key missing for familyId=$familyId uid=$uid")
+            ?: throw MissingFamilyKeyException(familyId)
     }
 }

@@ -16,11 +16,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MarkEmailUnread
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -367,6 +369,8 @@ fun LoginScreen(
                         resetSent = resetSent,
                         isBusy = isBusy,
                         errorMessage = errorMessage,
+                        registrationPending = registrationPending,
+                        onDismissRegistrationPending = viewModel::clearRegistrationPendingVerification,
                     )
                 }
             }
@@ -535,6 +539,8 @@ private fun EmailAuthSheetContent(
     resetSent: Boolean,
     isBusy: Boolean,
     errorMessage: String?,
+    registrationPending: Boolean,
+    onDismissRegistrationPending: () -> Unit,
 ) {
     var isRegistering by remember { mutableStateOf(false) }
     var email by remember { mutableStateOf("") }
@@ -646,6 +652,59 @@ private fun EmailAuthSheetContent(
             )
         }
 
+        // Registrazione inviata: l'account esiste ma è disconnesso finché non
+        // viene verificata l'email, quindi senza questo banner la schermata
+        // restava identica a prima dell'invio e sembrava non essere successo
+        // nulla. Stessa posizione e stesso contenuto della card iOS
+        // (EmailAuthView.swift), incluso il pulsante che riporta al login.
+        if (registrationPending) {
+            Spacer(modifier = Modifier.height(20.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        OrangeAccent.copy(alpha = 0.10f),
+                        RoundedCornerShape(12.dp),
+                    )
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Filled.MarkEmailUnread,
+                        contentDescription = null,
+                        tint = OrangeAccent,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        stringResource(R.string.login_verify_email_title),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    stringResource(R.string.login_verify_email_body, email),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = kb.subtitle,
+                    textAlign = TextAlign.Center,
+                )
+                TextButton(
+                    onClick = {
+                        onDismissRegistrationPending()
+                        isRegistering = false
+                    },
+                ) {
+                    Text(
+                        stringResource(R.string.login_verify_email_back),
+                        color = OrangeAccent,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(20.dp))
         Button(
             onClick = {
@@ -661,10 +720,23 @@ private fun EmailAuthSheetContent(
                 contentColor = Color.White,
             ),
         ) {
-            Text(
-                stringResource(if (isRegistering) R.string.login_cta_register else R.string.login_cta_signin),
-                fontWeight = FontWeight.SemiBold,
-            )
+            // Dopo l'accesso `isBusy` resta true per tutto il lavoro che segue
+            // — seeding profilo, reset del client Firestore, controllo famiglia —
+            // che dura più di un secondo. Senza spinner il pulsante sembrava
+            // semplicemente disabilitato e non si capiva che stava succedendo
+            // qualcosa. Come iOS, lo spinner prende il posto dell'etichetta.
+            if (isBusy) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Text(
+                    stringResource(if (isRegistering) R.string.login_cta_register else R.string.login_cta_signin),
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
 
         TextButton(

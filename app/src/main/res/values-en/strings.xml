@@ -44,6 +44,9 @@
     <string name="login_field_password">Password (min. 6 characters)</string>
     <string name="login_field_confirm_password">Confirm password</string>
     <string name="login_passwords_mismatch">The passwords do not match.</string>
+    <string name="login_verify_email_title">Check your email!</string>
+    <string name="login_verify_email_body">We sent a verification link to %1$s. Verify the address, then sign in.</string>
+    <string name="login_verify_email_back">Back to sign in</string>
     <string name="login_reset_email_sent">Email sent: check your inbox to reset your password.</string>
     <string name="login_cta_register">Sign up</string>
     <string name="login_cta_signin">Sign in</string>
@@ -66,4 +69,7 @@
     <string name="auth_error_network">Network error. Check your connection.</string>
     <string name="auth_error_too_many_requests">Too many attempts. Try again in a few minutes.</string>
     <string name="auth_error_user_disabled">Account disabled. Contact support.</string>
+    <string name="family_key_missing_title">Family key missing</string>
+    <string name="family_key_missing_message">This device doesn\'t have the key that protects your shared content, so documents, wallet, photos and chat attachments can\'t be opened.\n\nTo recover it, ask whoever created the family to invite you again and scan the QR code they generate.</string>
+    <string name="family_key_missing_short">Family key missing: ask whoever created the family to invite you again and scan their QR code.</string>
 </resources>

@@ -6,6 +6,7 @@ import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.crypto.FamilyKeyStore
+import it.vittorioscocca.kidbox.data.crypto.MissingFamilyKeyException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.crypto.Cipher
@@ -86,7 +87,7 @@ class DocumentCryptoManager @Inject constructor(
         val uid = auth.currentUser?.uid?.trim().orEmpty()
         require(uid.isNotBlank()) { "Not authenticated for document crypto" }
         val keyBytes = FamilyKeyStore.loadFamilyKey(context, familyId, uid)
-            ?: throw IllegalStateException("Family key missing for familyId=$familyId uid=$uid")
+            ?: throw MissingFamilyKeyException(familyId)
         require(keyBytes.size == 32) { "Invalid family key length=${keyBytes.size}" }
         return SecretKeySpec(keyBytes, "AES")
     }

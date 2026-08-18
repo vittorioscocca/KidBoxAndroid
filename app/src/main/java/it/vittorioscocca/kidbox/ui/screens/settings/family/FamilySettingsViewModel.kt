@@ -12,6 +12,8 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.data.crypto.FamilyKeyEscrow
+import it.vittorioscocca.kidbox.data.crypto.FamilyKeyStore
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
@@ -30,7 +32,9 @@ import it.vittorioscocca.kidbox.data.sync.firstNonBlankString
 import it.vittorioscocca.kidbox.data.sync.userProfileDisplayName
 import it.vittorioscocca.kidbox.data.user.UserProfileRepository
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -52,6 +56,13 @@ data class FamilySettingsUiState(
     /** Salvataggio famiglia/figli in corso (non sovrascritto dal flow combine). */
     val isSavingFamily: Boolean = false,
     val savingMessage: String? = null,
+    /**
+     * `true` quando [FamilySettingsViewModel.joinWithCode] ha creato la
+     * membership ma la master key della famiglia non è disponibile: Password,
+     * Documenti e Wallet condivisi restano illeggibili. Non è un errore — il
+     * join è valido — ma va mostrato con `R.string.settings_join_missing_key`.
+     */
+    val missingVaultKey: Boolean = false,
 ) {
     val canLeave: Boolean
         get() = members.size >= 2 || !isOwner
@@ -656,6 +667,26 @@ class FamilySettingsViewModel @Inject constructor(
             try {
                 val familyId = inviteRemoteStore.resolveInvite(code.trim())
                 inviteRemoteStore.addMember(familyId)
+
+                // Stesso controllo di JoinFamilyViewModel: questo path accetta solo
+                // il codice testuale, che non trasporta materiale crittografico.
+                // `ensureFamilyKeyAvailable` tenta il recupero dall'escrow (copre
+                // reinstallazione e cambio account); per un membro nuovo non esiste
+                // backup e la chiave resta assente.
+                val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+                if (uid.isNotBlank()) {
+                    val hasVaultKey = withContext(Dispatchers.IO) {
+                        FamilyKeyEscrow.ensureFamilyKeyAvailable(appContext, familyId, uid)
+                    } || FamilyKeyStore.hasFamilyKey(appContext, familyId, uid)
+                    if (!hasVaultKey) {
+                        KBLog.ui.error(
+                            "joinWithCode: membership code only — no vault key (use crypto invite QR) familyId=$familyId",
+                            TAG,
+                        )
+                        _uiState.value = _uiState.value.copy(missingVaultKey = true)
+                    }
+                }
+
                 observeJob?.cancel()
                 observeJob = null
                 observingFamilyId = null

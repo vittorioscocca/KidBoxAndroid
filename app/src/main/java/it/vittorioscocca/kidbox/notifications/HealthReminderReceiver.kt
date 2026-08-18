@@ -42,10 +42,10 @@ class HealthReminderReceiver : BroadcastReceiver() {
 
                 val deepLink = Intent(context, MainActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    putExtra("kb_deeplink_type", TYPE_TREATMENT_REMINDER)
-                    putExtra("kb_treatmentId", treatmentId)
-                    putExtra("kb_familyId", familyId)
-                    putExtra("kb_childId", childId)
+                    putExtra("push_type", TYPE_TREATMENT_REMINDER)
+                    putExtra("push_treatment_id", treatmentId)
+                    putExtra("push_family_id", familyId)
+                    putExtra("push_child_id", childId)
                     putExtra("kb_dayOffset", dayOffset)
                     putExtra("kb_slotIndex", slotIndex)
                 }
@@ -116,6 +116,32 @@ class HealthReminderReceiver : BroadcastReceiver() {
                     .build()
                 runCatching { NotificationManagerCompat.from(context).notify(notifId, notification) }
             }
+            TYPE_PASSWORD_EXPIRY -> {
+                val entryId = intent.getStringExtra(EXTRA_PASSWORD_ENTRY_ID).orEmpty()
+                val familyId = intent.getStringExtra(EXTRA_FAMILY_ID).orEmpty()
+                val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
+                val body = intent.getStringExtra(EXTRA_BODY).orEmpty()
+                val deepLink = Intent(context, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    putExtra("push_type", TYPE_PASSWORD_EXPIRY)
+                    putExtra("push_family_id", familyId)
+                    putExtra("push_entry_id", entryId)
+                }
+                val notifId = entryId.hashCode()
+                val pendingIntent = PendingIntent.getActivity(
+                    context, notifId, deepLink,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+                val notification = NotificationCompat.Builder(context, CHANNEL_ID_HEALTH_REMINDERS)
+                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setContentTitle(title.ifBlank { "Password in scadenza" })
+                    .setContentText(body)
+                    .setAutoCancel(true)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setContentIntent(pendingIntent)
+                    .build()
+                runCatching { NotificationManagerCompat.from(context).notify(notifId, notification) }
+            }
             TYPE_VACCINE_REMINDER -> {
                 val vaccineId = intent.getStringExtra(EXTRA_VACCINE_ID).orEmpty()
                 val familyId = intent.getStringExtra(EXTRA_FAMILY_ID).orEmpty()
@@ -124,10 +150,10 @@ class HealthReminderReceiver : BroadcastReceiver() {
 
                 val deepLink = Intent(context, MainActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    putExtra("kb_deeplink_type", TYPE_VACCINE_REMINDER)
-                    putExtra("kb_vaccineId", vaccineId)
-                    putExtra("kb_familyId", familyId)
-                    putExtra("kb_childId", childId)
+                    putExtra("push_type", TYPE_VACCINE_REMINDER)
+                    putExtra("push_vaccine_id", vaccineId)
+                    putExtra("push_family_id", familyId)
+                    putExtra("push_child_id", childId)
                 }
                 val notifId = vaccineId.hashCode()
                 val pendingIntent = PendingIntent.getActivity(
@@ -173,9 +199,9 @@ class HealthReminderReceiver : BroadcastReceiver() {
 
                 val deepLink = Intent(context, MainActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    putExtra("kb_deeplink_type", TYPE_VEHICLE_DEADLINE)
-                    putExtra("kb_familyId", familyId)
-                    putExtra("kb_vehicleId", vehicleId)
+                    putExtra("push_type", TYPE_VEHICLE_DEADLINE)
+                    putExtra("push_family_id", familyId)
+                    putExtra("push_vehicle_id", vehicleId)
                 }
                 val notifId = ("$vehicleId|$slot|$kindKey").hashCode()
                 val pendingIntent = PendingIntent.getActivity(
@@ -218,9 +244,9 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 }
                 val deepLink = Intent(context, MainActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    putExtra("kb_deeplink_type", TYPE_HOUSE_PAYMENT)
-                    putExtra("kb_familyId", familyId)
-                    putExtra("kb_house_payment_id", paymentId)
+                    putExtra("push_type", TYPE_HOUSE_PAYMENT)
+                    putExtra("push_family_id", familyId)
+                    putExtra("push_house_payment_id", paymentId)
                 }
                 val notifId = paymentId.hashCode()
                 val pendingIntent = PendingIntent.getActivity(
@@ -320,6 +346,8 @@ class HealthReminderReceiver : BroadcastReceiver() {
         const val EXTRA_FAMILY_ID = "extra_family_id"
         const val EXTRA_CHILD_ID = "extra_child_id"
         const val EXTRA_VACCINE_ID = "extra_vaccine_id"
+        const val TYPE_PASSWORD_EXPIRY = "password_expiry_reminder"
+        const val EXTRA_PASSWORD_ENTRY_ID = "extra_password_entry_id"
         const val TYPE_VISIT_REMINDER = "visit_reminder"
         const val TYPE_EXAM_REMINDER = "exam_reminder"
         const val TYPE_TREATMENT_REMINDER = "treatment_reminder"

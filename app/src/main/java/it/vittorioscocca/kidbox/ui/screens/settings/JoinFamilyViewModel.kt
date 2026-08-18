@@ -33,6 +33,17 @@ data class JoinFamilyUiState(
     /** Popolato solo dopo un join riuscito (QR o codice): serve all'onboarding
      *  per chiamare `onFamilyCreated(familyId)` e lasciare l'onboarding. */
     val joinedFamilyId: String? = null,
+    /**
+     * `true` quando il join è riuscito ma la master key della famiglia non è
+     * disponibile: l'utente è membro a tutti gli effetti, però Password,
+     * Documenti e Wallet condivisi restano illeggibili.
+     *
+     * Non è un errore — `error` resta null e `didJoin` è `true` — ma va detto
+     * all'utente, altrimenti scopre da solo che metà app è vuota senza capire
+     * perché. Prima questo caso finiva solo in un `KBLog.ui.error` invisibile.
+     * Gemello di `FamilyJoinOutcome.missingVaultKey` su iOS.
+     */
+    val missingVaultKey: Boolean = false,
 )
 
 /**
@@ -56,6 +67,9 @@ class JoinFamilyViewModel @Inject constructor(
 
     private val inviteRemote = InviteRemoteStore()
     private val joinWrapService = JoinWrapService()
+
+    /** familyId del join in corso, ripubblicato da [acknowledgeMissingVaultKey]. */
+    private var pendingFamilyId: String? = null
 
     private val _uiState = MutableStateFlow(JoinFamilyUiState())
     val uiState: StateFlow<JoinFamilyUiState> = _uiState.asStateFlow()
@@ -136,7 +150,38 @@ class JoinFamilyViewModel @Inject constructor(
             inviteRemote.addMember(familyId)
             KBLog.ui.debug("addMember OK", TAG)
             KBLog.ui.info("join OK familyId=$familyId", TAG)
-            _uiState.value = JoinFamilyUiState(didJoin = true, joinedFamilyId = familyId)
+
+            // ─────────────────────────────────────────────────────────────────
+            // VERIFICA CHIAVE — deve stare QUI, prima di pubblicare
+            // `joinedFamilyId`: l'onboarding esce dalla pagina osservando quel
+            // campo (OnboardingScreen.kt:1111), quindi un controllo fatto più
+            // tardi non riuscirebbe mai a mostrare l'avviso.
+            // Non dipende dal sync: la chiave arriva dall'unwrap del QR (già
+            // avvenuto) o dall'escrow, che richiede solo la membership appena
+            // creata.
+            // ─────────────────────────────────────────────────────────────────
+            val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+            var hasVaultKey = didCryptoUnwrap
+            if (uid.isNotBlank() && !hasVaultKey) {
+                hasVaultKey = withContext(Dispatchers.IO) {
+                    FamilyKeyEscrow.ensureFamilyKeyAvailable(getApplication(), familyId, uid)
+                } || FamilyKeyStore.hasFamilyKey(getApplication(), familyId, uid)
+            }
+            val vaultKeyMissing = uid.isNotBlank() && !hasVaultKey
+            if (vaultKeyMissing) {
+                KBLog.ui.error("join: membership code only — no vault key (use crypto invite QR) familyId=$familyId", TAG)
+            }
+
+            pendingFamilyId = familyId
+            _uiState.value = JoinFamilyUiState(
+                didJoin = true,
+                // Senza chiave l'uscita non è automatica: l'avviso deve restare
+                // leggibile. `joinedFamilyId` viene pubblicato dal pulsante
+                // "Ho capito, continua" via [acknowledgeMissingVaultKey].
+                joinedFamilyId = if (vaultKeyMissing) null else familyId,
+                missingVaultKey = vaultKeyMissing,
+            )
+
             // Reset FamilySyncCenter così startObserving() fa bootstrap della nuova famiglia
             familySyncCenter.stopSync()
             familySyncCenter.startSync(familyId)
@@ -145,31 +190,40 @@ class JoinFamilyViewModel @Inject constructor(
                 familySyncCenter.initialSyncDone.first { it }
             } ?: KBLog.ui.warning("initialSyncDone timeout after join familyId=$familyId — continuing", TAG)
 
-            val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-            if (uid.isNotBlank()) {
+            if (uid.isNotBlank() && hasVaultKey) {
                 withContext(Dispatchers.IO) {
-                    FamilyKeyEscrow.ensureFamilyKeyAvailable(getApplication(), familyId, uid)
+                    runCatching {
+                        passwordsRepository.hydratePasswordRoomFromServer(familyId)
+                    }.onFailure { e ->
+                        KBLog.ui.error("hydratePasswordRoomFromServer failed: ${e.message}", TAG, e)
+                    }
                 }
-                if (!FamilyKeyStore.hasFamilyKey(getApplication(), familyId, uid) && !didCryptoUnwrap) {
-                    KBLog.ui.error("join: membership code only — no vault key (use crypto invite QR) familyId=$familyId", TAG)
-                } else if (FamilyKeyStore.hasFamilyKey(getApplication(), familyId, uid)) {
-                    withContext(Dispatchers.IO) {
-                        runCatching {
-                            passwordsRepository.hydratePasswordRoomFromServer(familyId)
-                        }.onFailure { e ->
-                            KBLog.ui.error("hydratePasswordRoomFromServer failed: ${e.message}", TAG, e)
-                        }
-                    }
-                    withContext(Dispatchers.IO) {
-                        passwordsRepository.awaitForceRestartRealtime(familyId)
-                    }
+                withContext(Dispatchers.IO) {
+                    passwordsRepository.awaitForceRestartRealtime(familyId)
                 }
             }
+
+            if (vaultKeyMissing) return
+
             onJoined()
         } catch (e: Exception) {
             KBLog.ui.error("joinWithCode failed: ${e.message}", TAG)
             _uiState.value = JoinFamilyUiState(error = e.message ?: "Errore join")
         }
+    }
+
+    /**
+     * Chiamata dal pulsante "Ho capito, continua" mostrato con l'avviso di
+     * chiave mancante: sblocca l'avanzamento che [joinWithCodeInternal] aveva
+     * volutamente sospeso, pubblicando `joinedFamilyId` (che fa uscire
+     * l'onboarding) e invocando la callback usata dalla schermata Impostazioni.
+     */
+    fun acknowledgeMissingVaultKey(onJoined: () -> Unit) {
+        _uiState.value = _uiState.value.copy(
+            missingVaultKey = false,
+            joinedFamilyId = pendingFamilyId,
+        )
+        onJoined()
     }
 
     fun clearError() {

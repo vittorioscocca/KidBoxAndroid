@@ -181,6 +181,17 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Chiude il banner "controlla la tua email" mostrato dopo la registrazione.
+     *
+     * Serve al pulsante che riporta al login: senza, il banner resterebbe
+     * appeso anche dopo essere tornati alla modalità accesso.
+     * Gemello di `vm.registrationPendingVerification = false` su iOS.
+     */
+    fun clearRegistrationPendingVerification() {
+        _registrationPendingVerification.value = false
+    }
+
     fun resetPassword(email: String) {
         if (email.isBlank()) return
         viewModelScope.launch {

@@ -44,6 +44,9 @@
     <string name="login_field_password">Contraseña (mín. 6 caracteres)</string>
     <string name="login_field_confirm_password">Confirmar contraseña</string>
     <string name="login_passwords_mismatch">Las contraseñas no coinciden.</string>
+    <string name="login_verify_email_title">¡Revisa tu correo!</string>
+    <string name="login_verify_email_body">Hemos enviado un enlace de verificación a %1$s. Verifica la dirección y luego inicia sesión.</string>
+    <string name="login_verify_email_back">Volver a iniciar sesión</string>
     <string name="login_reset_email_sent">Correo enviado: revisa tu bandeja para restablecer la contraseña.</string>
     <string name="login_cta_register">Registrarse</string>
     <string name="login_cta_signin">Iniciar sesión</string>
@@ -66,4 +69,7 @@
     <string name="auth_error_network">Error de red. Comprueba la conexión.</string>
     <string name="auth_error_too_many_requests">Demasiados intentos. Inténtalo de nuevo en unos minutos.</string>
     <string name="auth_error_user_disabled">Cuenta desactivada. Contacta con soporte.</string>
+    <string name="family_key_missing_title">Falta la clave de la familia</string>
+    <string name="family_key_missing_message">Este dispositivo no tiene la clave que protege el contenido compartido, así que los documentos, el wallet, las fotos y los adjuntos del chat no se pueden abrir.\n\nPara recuperarla, pide a quien creó la familia que te invite de nuevo y escanea el código QR que genera.</string>
+    <string name="family_key_missing_short">Falta la clave de la familia: pide a quien creó la familia que te invite de nuevo y escanea su código QR.</string>
 </resources>

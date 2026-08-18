@@ -145,6 +145,8 @@
     <string name="settings_join_scan">Scansiona QR code</string>
     <string name="settings_join_enter">Entra</string>
     <string name="settings_join_success">Sei entrato nella famiglia! ✓</string>
+    <string name="settings_join_missing_key">Sei entrato nella famiglia, ma questo invito non conteneva la chiave di cifratura: Password, Documenti e Wallet condivisi resteranno illeggibili. Chiedi a chi ti ha invitato di aprire \"Invita\" e generare un codice QR, poi scansionalo da questa schermata.</string>
+    <string name="settings_join_missing_key_continue">Ho capito, continua</string>
     <string name="settings_common_close">Chiudi</string>
     <string name="settings_join_frame_qr">Inquadra il QR code</string>
     <string name="settings_family_title">Famiglia</string>

@@ -5,6 +5,7 @@ import it.vittorioscocca.kidbox.util.KBLog
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -57,6 +58,20 @@ class BootReceiver : BroadcastReceiver() {
                 val hpDao = ep.housePaymentDao()
                 val hpSched = ep.housePaymentReminderScheduler()
                 hpDao.listActiveByFamily(familyId).forEach { hpSched.syncPayment(it) }
+                runCatching {
+                    val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+                    if (uid.isNotEmpty()) {
+                        val pwDao = ep.passwordEntryDao()
+                        val pwCypher = ep.passwordCypher()
+                        val pwSched = ep.passwordExpiryReminderScheduler()
+                        pwDao.listVisibleForAutofill(familyId, uid).forEach { entry ->
+                            val title = runCatching {
+                                pwCypher.decrypt(entry.titleCipher, entry.familyId, entry.visibility, entry.createdBy, familyKeyUserId = uid)
+                            }.getOrNull().orEmpty()
+                            pwSched.sync(entry.id, entry.familyId, title, entry.expiresAtEpochMillis)
+                        }
+                    }
+                }
                 AiScheduledNotificationsRestorer.restoreAfterBoot(appCtx)
                 // Le geofence di sistema vengono azzerate dall'OS al reboot: ri-registrale da Room.
                 runCatching {

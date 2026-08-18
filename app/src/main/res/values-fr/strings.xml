@@ -44,6 +44,9 @@
     <string name="login_field_password">Mot de passe (6 caractères min.)</string>
     <string name="login_field_confirm_password">Confirmer le mot de passe</string>
     <string name="login_passwords_mismatch">Les mots de passe ne correspondent pas.</string>
+    <string name="login_verify_email_title">Consulte tes e-mails !</string>
+    <string name="login_verify_email_body">Nous avons envoyé un lien de vérification à %1$s. Vérifie l\'adresse, puis connecte-toi.</string>
+    <string name="login_verify_email_back">Retour à la connexion</string>
     <string name="login_reset_email_sent">E-mail envoyé : consultez votre boîte mail pour réinitialiser votre mot de passe.</string>
     <string name="login_cta_register">S\'inscrire</string>
     <string name="login_cta_signin">Se connecter</string>
@@ -66,4 +69,7 @@
     <string name="auth_error_network">Erreur réseau. Vérifiez votre connexion.</string>
     <string name="auth_error_too_many_requests">Trop de tentatives. Réessayez dans quelques minutes.</string>
     <string name="auth_error_user_disabled">Compte désactivé. Contactez le support.</string>
+    <string name="family_key_missing_title">Clé de famille manquante</string>
+    <string name="family_key_missing_message">Cet appareil n\'a pas la clé qui protège les contenus partagés : les documents, le wallet, les photos et les pièces jointes du chat ne peuvent pas être ouverts.\n\nPour la récupérer, demande à la personne qui a créé la famille de t\'inviter à nouveau et scanne le QR code qu\'elle génère.</string>
+    <string name="family_key_missing_short">Clé de famille manquante : demande à la personne qui a créé la famille de t\'inviter à nouveau et scanne son QR code.</string>
 </resources>

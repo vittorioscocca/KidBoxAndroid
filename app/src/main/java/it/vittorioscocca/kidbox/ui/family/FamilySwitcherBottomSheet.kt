@@ -118,6 +118,15 @@ fun FamilySwitcherBottomSheet(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = kb.title,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+
+            // Senza questa spiegazione la sezione è utile solo a chi ha già
+            // capito da sé che può appartenere a più di una famiglia.
+            Text(
+                text = stringResource(R.string.family_switcher_intro),
+                style = MaterialTheme.typography.bodySmall,
+                color = kb.subtitle,
                 modifier = Modifier.padding(bottom = 16.dp),
             )
 

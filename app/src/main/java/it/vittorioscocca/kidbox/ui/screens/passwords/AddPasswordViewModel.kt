@@ -13,6 +13,7 @@ import it.vittorioscocca.kidbox.data.local.entity.PasswordGroupEntity
 import it.vittorioscocca.kidbox.data.passwords.FaviconResolver
 import it.vittorioscocca.kidbox.data.repository.PasswordsRepository
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
+import it.vittorioscocca.kidbox.notifications.PasswordExpiryReminderScheduler
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -59,6 +60,7 @@ class AddPasswordViewModel @Inject constructor(
     private val passwordsRepository: PasswordsRepository,
     private val familyMemberDao: KBFamilyMemberDao,
     private val auth: FirebaseAuth,
+    private val passwordExpiryReminderScheduler: PasswordExpiryReminderScheduler,
 ) : ViewModel() {
 
     private val familyIdFlow = MutableStateFlow<String?>(null)
@@ -259,6 +261,7 @@ class AddPasswordViewModel @Inject constructor(
                     passwordEntryDao.upsert(merged)
                     passwordsRepository.pushUpsertEntry(merged)
                     passwordsRepository.scheduleAutofillSnapshotRebuild()
+                    passwordExpiryReminderScheduler.sync(merged.id, familyId, t, merged.expiresAtEpochMillis)
                     onDone()
                     return@launch
                 }
@@ -293,6 +296,7 @@ class AddPasswordViewModel @Inject constructor(
                 passwordEntryDao.upsert(entity)
                 passwordsRepository.pushUpsertEntry(entity)
                 passwordsRepository.scheduleAutofillSnapshotRebuild()
+                passwordExpiryReminderScheduler.sync(entity.id, familyId, t, entity.expiresAtEpochMillis)
                 onDone()
             } catch (e: Exception) {
                 onError(e.message ?: "Errore durante il salvataggio")

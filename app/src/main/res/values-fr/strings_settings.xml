@@ -145,6 +145,8 @@
     <string name="settings_join_scan">Scanner le QR code</string>
     <string name="settings_join_enter">Rejoindre</string>
     <string name="settings_join_success">Tu as rejoint la famille ! ✓</string>
+    <string name="settings_join_missing_key">Tu as rejoint la famille, mais cette invitation ne contenait pas la clé de chiffrement : les Mots de passe, Documents et Wallet partagés resteront illisibles. Demande à la personne qui t\'a envoyé l\'invitation d\'ouvrir \"Inviter\" et de générer un QR code, puis scanne-le depuis cet écran.</string>
+    <string name="settings_join_missing_key_continue">J\'ai compris, continuer</string>
     <string name="settings_common_close">Fermer</string>
     <string name="settings_join_frame_qr">Vise le QR code</string>
     <string name="settings_family_title">Famille</string>

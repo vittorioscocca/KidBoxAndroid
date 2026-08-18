@@ -215,6 +215,37 @@ object NotificationDeepLinkRouter {
                     AppDestination.MedicalExamDetail.route(fid, childId, examId)
                 }
             }
+            "vaccine_reminder" -> {
+                val childId = intent.getStringExtra("push_child_id") ?: intent.getStringExtra("childId")
+                val vaccineId = intent.getStringExtra("push_vaccine_id") ?: intent.getStringExtra("vaccineId")
+                if (childId.isNullOrBlank() || vaccineId.isNullOrBlank()) {
+                    KBLog.app.warning("NotificationDeepLink: vaccine payload incompleto", TAG)
+                    return
+                }
+                queueFamilyAwareRoute(resolvedType, familyId) { fid ->
+                    AppDestination.VaccineForm.routeEdit(fid, childId, vaccineId)
+                }
+            }
+            "vehicle_deadline_reminder" -> {
+                val vehicleId = intent.getStringExtra("push_vehicle_id")
+                if (vehicleId.isNullOrBlank()) {
+                    KBLog.app.warning("NotificationDeepLink: vehicleId mancante", TAG)
+                    return
+                }
+                queueFamilyAwareRoute(resolvedType, familyId) { fid ->
+                    AppDestination.VehicleDetail.createRoute(fid, vehicleId)
+                }
+            }
+            "house_payment_reminder" -> {
+                val paymentId = intent.getStringExtra("push_house_payment_id")
+                if (paymentId.isNullOrBlank()) {
+                    KBLog.app.warning("NotificationDeepLink: paymentId mancante", TAG)
+                    return
+                }
+                queueFamilyAwareRoute(resolvedType, familyId) { fid ->
+                    AppDestination.HousePaymentDetail.createRoute(fid, paymentId)
+                }
+            }
             "new_expense" -> {
                 val expenseId = intent.getStringExtra("push_expense_id") ?: intent.getStringExtra("expenseId")
                 queueFamilyAwareRoute(resolvedType, familyId) { fid ->
