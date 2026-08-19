@@ -192,10 +192,10 @@ class FamilySyncCenter @Inject constructor(
         if (familyId == currentFamilyId && familyListener != null && membersListener != null && !accessLostEmitted) {
             KBLog.sync.debug("startSync: listener già attivi per familyId=$familyId, skip restart", TAG)
             sessionPrefs.setActiveFamilyId(familyId)
-            // Segnala subito done se il sync precedente era già completato
-            if (!_initialSyncDone.value) {
-                // Il listener è vivo: aspettiamo la sua emissione naturale
-            }
+            // `_initialSyncDone` resta com'è: se il sync precedente era già
+            // finito vale true e NON viene riemesso (è uno StateFlow), quindi
+            // chi chiama deve rileggerne `.value` invece di aspettare
+            // un'emissione che non arriverà. Vedi HomeViewModel.startSync.
             return
         }
         ownerSyncRecoveryJob?.cancel()
@@ -469,6 +469,11 @@ class FamilySyncCenter @Inject constructor(
                             }
                         }
 
+                        // La riga famiglia deve esistere: i membri hanno una
+                        // foreign key su di essa e questo listener arriva spesso
+                        // prima di quello famiglia. Vedi ensureFamilyRowExists.
+                        ensureFamilyRowExists(familyId)
+
                         // Rimozioni solo dal delta (doc REMOVED non compare in snap.documents)
                         for (change in snap.documentChanges) {
                             if (change.type != DocumentChange.Type.REMOVED) continue
@@ -725,9 +730,60 @@ class FamilySyncCenter @Inject constructor(
      * Home contenga tutti i membri attivi anche quando la cache di Firestore è incompleta
      * (tipico quando un altro device ha aggiunto un membro mentre l'app era chiusa).
      */
+    /**
+     * Garantisce che la riga famiglia esista in Room PRIMA di scriverci contro i membri.
+     *
+     * `kb_family_members.familyId` è una foreign key su `kb_families.id`. Il prefetch
+     * e il listener dei membri corrono in parallelo al listener famiglia, quindi i
+     * membri arrivano regolarmente per primi: l'insert fallisce con
+     * SQLITE_CONSTRAINT_FOREIGNKEY, l'eccezione viene solo loggata, e quel membro
+     * resta fuori dalla lista finché un sync successivo non lo reinserisce.
+     *
+     * Si vede soprattutto entrando da invito: in Room la famiglia non esiste
+     * proprio, quindi cadono TUTTI i membri e il nuovo arrivato vede solo se stesso.
+     *
+     * Qui scriviamo una riga già corretta letta da Firestore; il listener famiglia
+     * la raffinerà comunque al primo snapshot.
+     */
+    private suspend fun ensureFamilyRowExists(familyId: String) {
+        if (familyDao.getById(familyId) != null) return
+        val docRef = db.collection("families").document(familyId)
+        val snap = runCatching { docRef.get(Source.SERVER).await() }
+            .recoverCatching { docRef.get(Source.CACHE).await() }
+            .getOrNull()
+        val data = snap?.data
+        if (data == null) {
+            KBLog.sync.warning("ensureFamilyRowExists: documento famiglia non leggibile familyId=$familyId", TAG)
+            return
+        }
+        val now = System.currentTimeMillis()
+        val hero = resolveHeroPhotoFields(data, null, familyId)
+        familyDao.upsert(
+            KBFamilyEntity(
+                id = familyId,
+                name = (data["name"] as? String).orEmpty(),
+                heroPhotoURL = data["heroPhotoURL"] as? String,
+                heroPhotoLocalPath = hero.localPath,
+                heroPhotoUpdatedAtEpochMillis = hero.updatedAtEpochMillis,
+                heroPhotoScale = hero.scale,
+                heroPhotoOffsetX = hero.offsetX,
+                heroPhotoOffsetY = hero.offsetY,
+                createdBy = ownershipUidFromFamilyFirestore(data).orEmpty(),
+                updatedBy = (data["updatedBy"] as? String).orEmpty(),
+                createdAtEpochMillis = now,
+                updatedAtEpochMillis = (data["updatedAt"] as? com.google.firebase.Timestamp)
+                    ?.toDate()?.time ?: now,
+                lastSyncAtEpochMillis = null,
+                lastSyncError = null,
+            ),
+        )
+        KBLog.sync.info("ensureFamilyRowExists: riga famiglia creata prima dei membri familyId=$familyId", TAG)
+    }
+
     private suspend fun prefetchMembersAndChildren(familyId: String) {
         val myUid = auth.currentUser?.uid.orEmpty()
         val now = System.currentTimeMillis()
+        ensureFamilyRowExists(familyId)
         try {
             val membersRef = db.collection("families")
                 .document(familyId)

@@ -77,6 +77,7 @@ import it.vittorioscocca.kidbox.ui.screens.passwords.PasswordGroupDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.passwords.PasswordsGroupsScreen
 import it.vittorioscocca.kidbox.ui.screens.passwords.PasswordsHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.passwords.PasswordsImportExportScreen
+import it.vittorioscocca.kidbox.ui.components.PendingInviteHandler
 import it.vittorioscocca.kidbox.ui.screens.passwords.PasswordsSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.passwords.PasswordsSecurityScreen
 import it.vittorioscocca.kidbox.ui.screens.notes.NoteDetailScreen
@@ -291,6 +292,18 @@ fun AppNavGraph(
         }
 
         composable(AppDestination.Home.route) {
+            // Invito arrivato da link mentre l'utente non era ancora autenticato:
+            // qui l'app è pronta e la sessione esiste. Il gate sta sulla Home e
+            // non sul Login perché il join richiede sia l'utente sia il DB
+            // locale inizializzati.
+            PendingInviteHandler(
+                onJoined = {
+                    navController.navigate(AppDestination.Home.route) {
+                        popUpTo(AppDestination.Home.route) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
+            )
             HomeScreen(
                 onNavigate = { route ->
                     navController.navigate(route) {

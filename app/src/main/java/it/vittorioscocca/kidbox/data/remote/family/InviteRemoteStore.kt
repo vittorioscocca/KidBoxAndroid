@@ -5,57 +5,19 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
-import java.util.Date
-import kotlin.random.Random
 
+/**
+ * Scrive la membership quando si entra in una famiglia.
+ *
+ * I codici invito testuali non esistono più: creavano membri privi della chiave
+ * di cifratura, incapaci di leggere password, documenti, wallet e allegati della
+ * chat. Si entra dal QR o dal link, che portano entrambi `familyId` e il
+ * materiale crittografico.
+ */
 class InviteRemoteStore(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
 ) {
     private val db get() = FirebaseFirestore.getInstance()
-    suspend fun createInviteCode(familyId: String, ttlDays: Int = 7): String {
-        val uid = auth.currentUser?.uid ?: error("Not authenticated")
-        repeat(10) {
-            val code = generateCode()
-            val ref = db.collection("invites").document(code)
-            try {
-                db.runTransaction { transaction ->
-                    val snap = transaction.get(ref)
-                    if (snap.exists()) {
-                        error("collision")
-                    }
-                    val expiresAt = Date(System.currentTimeMillis() + ttlDays * 24L * 3600L * 1000L)
-                    transaction.set(
-                        ref,
-                        mapOf(
-                            "familyId" to familyId,
-                            "createdBy" to uid,
-                            "revoked" to false,
-                            "usedAt" to null,
-                            "usedBy" to null,
-                            "createdAt" to Timestamp.now(),
-                            "expiresAt" to Timestamp(expiresAt),
-                        ),
-                    )
-                }.await()
-                return code
-            } catch (_: Exception) {
-                // Retry on collision/transient transaction failures.
-            }
-        }
-        error("Unable to generate unique invite code")
-    }
-
-    suspend fun resolveInvite(code: String): String {
-        auth.currentUser?.uid ?: error("Not authenticated")
-        val snap = db.collection("invites").document(code).get().await()
-        if (!snap.exists()) error("Codice non valido")
-        val data = snap.data ?: error("Codice non valido")
-        if (data["revoked"] == true) error("Codice revocato")
-        val expiresAt = data["expiresAt"] as? Timestamp
-        if (expiresAt != null && expiresAt.toDate().before(Date())) error("Codice scaduto")
-        return data["familyId"] as? String ?: error("Invite malformato")
-    }
-
     suspend fun addMember(familyId: String, role: String = "member") {
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
         val memberRef = db.collection("families")
@@ -98,10 +60,29 @@ class InviteRemoteStore(
         batch.commit().await()
     }
 
-    private fun generateCode(length: Int = 8): String {
-        val alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-        return buildString(length) {
-            repeat(length) { append(alphabet[Random.nextInt(alphabet.length)]) }
-        }
+    /** Info mostrabili PRIMA del join: nome famiglia e di chi ha invitato. */
+    data class InvitePreview(
+        val familyName: String?,
+        val inviterDisplayName: String?,
+    )
+
+    /**
+     * Legge il documento invito senza consumarlo, per mostrare a chi riceve
+     * il link "stai per entrare nella famiglia di…" prima che confermi.
+     *
+     * `families/{familyId}/invites/{inviteId}` è leggibile da ogni utente
+     * autenticato (non solo dai membri): è la stessa regola che permette a
+     * QR e link di funzionare per chi non è ancora dentro la famiglia.
+     */
+    suspend fun fetchInvitePreview(familyId: String, inviteId: String): InvitePreview {
+        return runCatching {
+            val doc = db.collection("families").document(familyId)
+                .collection("invites").document(inviteId)
+                .get().await()
+            InvitePreview(
+                familyName = doc.getString("familyName"),
+                inviterDisplayName = doc.getString("createdByDisplayName"),
+            )
+        }.getOrElse { InvitePreview(familyName = null, inviterDisplayName = null) }
     }
 }

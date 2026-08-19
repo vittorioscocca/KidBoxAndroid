@@ -43,6 +43,7 @@ import it.vittorioscocca.kidbox.ui.theme.KidBoxTheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import it.vittorioscocca.kidbox.util.CrashAnalyzer
 import it.vittorioscocca.kidbox.util.KBLog
+import it.vittorioscocca.kidbox.data.remote.family.PendingFamilyInvite
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -74,6 +75,7 @@ class MainActivity : AppCompatActivity() {
         val onboardingPreferences = OnboardingPreferences(applicationContext)
         NotificationDeepLinkRouter.handleLaunchIntent(this, intent)
         showPrivacyPolicyIfRequestedByHealthConnect(intent)
+        storePendingInviteIfAny(intent)
 
         setContent {
             val appTheme by themePreference.getThemeFlow().collectAsStateWithLifecycle(
@@ -172,11 +174,32 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+
+    /**
+     * Mette da parte un invito famiglia arrivato da App Link.
+     *
+     * Solo parcheggiato, non applicato qui: chi riceve il link di norma **non ha
+     * ancora un account**, e l'ingresso in famiglia richiede l'utente
+     * autenticato. Lo consuma la navigazione quando l'app è pronta.
+     * Vedi [PendingFamilyInvite].
+     */
+    private fun storePendingInviteIfAny(intent: Intent?) {
+        val uri = intent?.data ?: return
+        val invite = PendingFamilyInvite.parse(uri)
+        if (invite == null) {
+            KBLog.app.debug("App link ignorato (non è un invito): ${uri.path}", "MainActivity")
+            return
+        }
+        KBLog.app.info("App link invito ricevuto familyId=${invite.familyId}", "MainActivity")
+        PendingFamilyInvite.store(this, invite)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         NotificationDeepLinkRouter.handleLaunchIntent(this, intent)
         showPrivacyPolicyIfRequestedByHealthConnect(intent)
+        storePendingInviteIfAny(intent)
     }
 
     /**

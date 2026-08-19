@@ -144,7 +144,4 @@ class JoinWrapService(
             KBLog.data.error("keychain verify FAILED familyId=$familyId", TAG)
         }
     }
-
-    fun extractCode(payload: String): String? =
-        JoinPayloadParser.extractInviteCode(payload)
 }

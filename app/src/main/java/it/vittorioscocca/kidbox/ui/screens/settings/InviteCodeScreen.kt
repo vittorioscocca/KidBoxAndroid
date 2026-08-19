@@ -1,5 +1,10 @@
 package it.vittorioscocca.kidbox.ui.screens.settings
 
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+import android.content.Context
+import android.content.ClipboardManager
+import android.content.ClipData
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,6 +42,11 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 
+// Verde/ambra dell'avviso sicurezza sull'invito. Locali come gli accenti
+// delle altre schermate: la palette del tema non ha semantici per questi due.
+private val InviteSafeGreen = Color(0xFF3DA668)
+private val InviteCautionAmber = Color(0xFFB26A00)
+
 @Composable
 fun InviteCodeScreen(
     onBack: () -> Unit,
@@ -45,7 +56,8 @@ fun InviteCodeScreen(
     val isBusy by viewModel.isBusy.collectAsStateWithLifecycle()
     val qrPayload by viewModel.qrPayload.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
-    val code by viewModel.code.collectAsStateWithLifecycle()
+    val shareLink by viewModel.shareLink.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val currentInviteFamilyId by viewModel.currentInviteFamilyId.collectAsStateWithLifecycle()
     val currentInviteId by viewModel.currentInviteId.collectAsStateWithLifecycle()
 
@@ -73,7 +85,77 @@ fun InviteCodeScreen(
                 qrPayload != null -> {
                     QRCodeView(payload = qrPayload.orEmpty(), modifier = Modifier.size(220.dp))
                     Spacer(modifier = Modifier.size(8.dp))
-                    Text("Codice: ${code.orEmpty()}", color = MaterialTheme.kidBoxColors.title)
+
+                    // Perché il QR viene prima del link: stessa chiave, ma non
+                    // transita da nessun canale di terzi.
+                    Text(
+                        stringResource(R.string.invite_qr_safer_badge),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = InviteSafeGreen,
+                        textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        stringResource(R.string.invite_qr_safer),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.kidBoxColors.subtitle,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                    Spacer(modifier = Modifier.size(16.dp))
+
+                    // Il link resta per chi non è vicino: trasporta la stessa
+                    // chiave, ma dentro un messaggio che sopravvive all'invio.
+                    shareLink?.let { link ->
+                        Text(
+                            stringResource(R.string.invite_link_when_far),
+                            fontSize = 13.sp,
+                            color = MaterialTheme.kidBoxColors.subtitle,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Button(
+                            onClick = {
+                                context.startActivity(
+                                    Intent.createChooser(
+                                        Intent(Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            // I client di posta usano EXTRA_SUBJECT come
+                                            // oggetto: senza, l'invito parte con oggetto
+                                            // vuoto. Le app di messaggistica lo ignorano.
+                                            putExtra(
+                                                Intent.EXTRA_SUBJECT,
+                                                context.getString(R.string.settings_invite_share_subject),
+                                            )
+                                            putExtra(
+                                                Intent.EXTRA_TEXT,
+                                                context.getString(R.string.settings_invite_share_text, link),
+                                            )
+                                        },
+                                        null,
+                                    ),
+                                )
+                            },
+                        ) {
+                            Text(stringResource(R.string.settings_invite_send_link))
+                        }
+                        Spacer(modifier = Modifier.size(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(ClipData.newPlainText("KidBox", link))
+                            },
+                        ) {
+                            Text(stringResource(R.string.settings_invite_copy_link))
+                        }
+                        Text(
+                            stringResource(R.string.invite_link_caution),
+                            fontSize = 12.sp,
+                            color = InviteCautionAmber,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        )
+                    }
                     if (errorMessage != null) {
                         Spacer(modifier = Modifier.size(8.dp))
                         Text(errorMessage.orEmpty(), color = Color(0xFFE53E3E))

@@ -293,21 +293,31 @@ class HomeViewModel @Inject constructor(
                     }
                 }
 
+                // `initialSyncDone` è una sorgente del combine, non una lettura
+                // secca: prima `shouldSyncMembers` nasceva da una copia del flag
+                // dentro un collect che si risveglia SOLO quando cambia Room. Se
+                // il sync finiva dopo l'ultima emissione di Room — ed è la norma
+                // per chi entra da invito, perché il join avvia il sync e ne
+                // aspetta la fine PRIMA di arrivare in Home — quella riga non
+                // veniva più ricalcolata e lo spinner restava acceso per sempre.
                 combine(
                     familyDao.observeAll(),
                     familyMemberDao.observeActiveByFamilyId(familyId),
                     sharedLocationDao.observeActiveByFamilyId(familyId),
-                ) { fams, members, sharedUsers ->
+                    familySyncCenter.initialSyncDone,
+                ) { fams, members, sharedUsers, syncDone ->
                     Triple(
                         fams.firstOrNull { it.id == familyId },
                         members.size,
                         sharedUsers,
-                    )
-                }.collect { (fam, memberCount, sharedUsers) ->
+                    ) to syncDone
+                }.collect { (snapshot, syncDone) ->
+                    val (fam, memberCount, sharedUsers) = snapshot
+                    initialSyncCompleted = syncDone
                     homeBadgeManager.startListening(familyId)
                     walletRepository.startRealtime(familyId)
                     passwordsRepository.startRealtime(familyId)
-                    val shouldSyncMembers = !initialSyncCompleted || memberCount <= 0
+                    val shouldSyncMembers = !syncDone || memberCount <= 0
                     val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
                     val isLocationSharing = if (currentUid.isBlank()) {
                         // Avoid flicker when auth is briefly unavailable during resume/navigation.

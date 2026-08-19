@@ -108,29 +108,15 @@ fun JoinFamilyScreen(
         )
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Campo codice testuale
-        OutlinedTextField(
-            value = code,
-            onValueChange = { code = it.uppercase(Locale.ROOT) },
-            label = { Text(stringResource(R.string.settings_join_code_label)) },
-            placeholder = { Text("Es. K7P4D2") },
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Card con bottone QR + bottone Entra
+        // Il codice testuale non esiste più: entrava in famiglia senza
+        // trasportare la chiave di cifratura. Restano due strade complete —
+        // il link d'invito (che apre l'app da solo) e il QR qui sotto.
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
         ) {
-            // Bottone scanner QR — ora funzionante
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
+                modifier = Modifier.fillMaxWidth().padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -141,47 +127,19 @@ fun JoinFamilyScreen(
                     modifier = Modifier.size(22.dp),
                 )
                 Button(
-                    onClick = {
-                        permissionLauncher.launch(Manifest.permission.CAMERA)
-                    },
+                    onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                    enabled = !state.isBusy,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6B00)),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.settings_join_scan), fontWeight = FontWeight.SemiBold)
-                }
-            }
-
-            Spacer(
-                modifier = Modifier
-                    .height(1.dp)
-                    .fillMaxWidth()
-                    .background(MaterialTheme.kidBoxColors.divider),
-            )
-
-            // Bottone Entra con codice testuale
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Button(
-                    onClick = {
-                        if (code.isNotBlank()) viewModel.joinWithCode(code, onJoined)
-                    },
-                    enabled = !state.isBusy && code.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.inverseSurface,
-                        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-                    ),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (state.isBusy) {
                         CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.inverseOnSurface,
+                            color = Color.White,
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
                         )
                     } else {
-                        Text(stringResource(R.string.settings_join_enter))
+                        Text(stringResource(R.string.settings_join_scan), fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -203,28 +161,6 @@ fun JoinFamilyScreen(
             Text(stringResource(R.string.settings_join_success), color = Color(0xFF2E7D32), fontWeight = FontWeight.SemiBold)
         }
 
-        // Join riuscito ma senza chiave di cifratura: non è un errore rosso —
-        // la membership è valida — ma va detto, altrimenti l'utente trova
-        // Password, Documenti e Wallet vuoti senza capirne il motivo.
-        if (state.missingVaultKey) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                stringResource(R.string.settings_join_missing_key),
-                color = Color(0xFFB25E00),
-                fontSize = 13.sp,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Button(
-                onClick = { viewModel.acknowledgeMissingVaultKey(onJoined) },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6B00)),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    stringResource(R.string.settings_join_missing_key_continue),
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
     }
 
     // Bottom sheet con camera QR scanner

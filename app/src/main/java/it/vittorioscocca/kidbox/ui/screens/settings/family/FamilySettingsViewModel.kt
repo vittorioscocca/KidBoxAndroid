@@ -56,13 +56,6 @@ data class FamilySettingsUiState(
     /** Salvataggio famiglia/figli in corso (non sovrascritto dal flow combine). */
     val isSavingFamily: Boolean = false,
     val savingMessage: String? = null,
-    /**
-     * `true` quando [FamilySettingsViewModel.joinWithCode] ha creato la
-     * membership ma la master key della famiglia non è disponibile: Password,
-     * Documenti e Wallet condivisi restano illeggibili. Non è un errore — il
-     * join è valido — ma va mostrato con `R.string.settings_join_missing_key`.
-     */
-    val missingVaultKey: Boolean = false,
 ) {
     val canLeave: Boolean
         get() = members.size >= 2 || !isOwner
@@ -660,45 +653,6 @@ class FamilySettingsViewModel @Inject constructor(
     fun resetNavigateAway() {
         KBLog.ui.debug("resetNavigateAway", TAG)
         _navigateAwayAfterLeave.value = false
-    }
-
-    fun joinWithCode(code: String, onDone: () -> Unit) {
-        viewModelScope.launch {
-            try {
-                val familyId = inviteRemoteStore.resolveInvite(code.trim())
-                inviteRemoteStore.addMember(familyId)
-
-                // Stesso controllo di JoinFamilyViewModel: questo path accetta solo
-                // il codice testuale, che non trasporta materiale crittografico.
-                // `ensureFamilyKeyAvailable` tenta il recupero dall'escrow (copre
-                // reinstallazione e cambio account); per un membro nuovo non esiste
-                // backup e la chiave resta assente.
-                val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-                if (uid.isNotBlank()) {
-                    val hasVaultKey = withContext(Dispatchers.IO) {
-                        FamilyKeyEscrow.ensureFamilyKeyAvailable(appContext, familyId, uid)
-                    } || FamilyKeyStore.hasFamilyKey(appContext, familyId, uid)
-                    if (!hasVaultKey) {
-                        KBLog.ui.error(
-                            "joinWithCode: membership code only — no vault key (use crypto invite QR) familyId=$familyId",
-                            TAG,
-                        )
-                        _uiState.value = _uiState.value.copy(missingVaultKey = true)
-                    }
-                }
-
-                observeJob?.cancel()
-                observeJob = null
-                observingFamilyId = null
-                onDone()
-            } catch (e: Exception) {
-                if (!isPermissionDenied(e)) {
-                    _uiState.value = _uiState.value.copy(error = e.localizedMessage)
-                } else {
-                    KBLog.ui.warning("joinWithCode: PERMISSION_DENIED — ignorato", TAG)
-                }
-            }
-        }
     }
 
     fun saveFamilyName(name: String, onDone: () -> Unit) {

@@ -189,13 +189,14 @@
     <string name="onboarding_choose_hint">Scegli se creare una nuova famiglia o unirti a una esistente.</string>
     <string name="onboarding_creator_hint">Sarai il creatore e potrai invitare il tuo partner.</string>
     <string name="onboarding_join_family">Entra in una famiglia</string>
-    <string name="onboarding_join_hint">Hai un codice QR o un codice testuale? Usalo per unirti.</string>
+    <string name="onboarding_join_hint">Hai un link d\'invito o un codice QR? Usalo per unirti.</string>
     <string name="onboarding_name_title">Come ti chiami?</string>
     <string name="onboarding_name_subtitle">Il tuo nome è quello che gli altri membri vedranno in chat, nei promemoria e sulla mappa. Potrai cambiarlo dal Profilo.</string>
     <string name="onboarding_name_first_label">Nome</string>
     <string name="onboarding_name_last_label">Cognome</string>
     <string name="onboarding_name_first_placeholder">Es. Giulia</string>
     <string name="onboarding_name_last_placeholder">Es. Rossi</string>
+    <string name="onboarding_joining">Ingresso in corso…</string>
     <string name="onboarding_enter_family">Entra nella famiglia</string>
     <string name="onboarding_joined">Sei entrato nella famiglia!</string>
     <string name="onboarding_qr_code">Codice QR</string>
@@ -251,12 +252,14 @@
     <string name="onboarding_slide1_title">La tua famiglia,\nin un\'unica app.</string>
     <string name="onboarding_slide2_title">Ricordi condivisi\ncon il tuo partner.</string>
     <string name="onboarding_slide3_title">Salute, spese\ne molto altro.</string>
-    <string name="onboarding_join_subtitle">Inserisci il codice invito ricevuto oppure scansiona il QR code.</string>
-    <string name="onboarding_invite_code_label">Codice invito</string>
-    <string name="onboarding_invite_code_placeholder">Es. K7P4D2</string>
+    <string name="onboarding_join_subtitle">Apri il link d\'invito ricevuto oppure scansiona il QR code.</string>
     <string name="onboarding_scan_qr">Scansiona QR code</string>
-    <string name="onboarding_join_cta">Entra</string>
+    <string name="onboarding_link_invite_title">Stai per entrare nella famiglia di %1$s</string>
+    <string name="onboarding_link_invite_title_generic">Stai per entrare in una famiglia</string>
+    <string name="onboarding_link_invite_subtitle_by">Invitato da %1$s. Dicci come ti chiami ed entri subito.</string>
+    <string name="onboarding_link_invite_subtitle_generic">Dicci come ti chiami ed entri subito.</string>
+    <string name="onboarding_link_invite_join">Entra nella famiglia</string>
+    <string name="onboarding_link_invite_fallback">Non funziona? Passa al metodo manuale</string>
     <string name="onboarding_close">Chiudi</string>
     <string name="onboarding_scanner_hint">Inquadra il QR code</string>
-    <string name="onboarding_share_invite_text">KidBox — codice invito: %1$s</string>
 </resources>

@@ -7,13 +7,13 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
-import it.vittorioscocca.kidbox.data.crypto.FamilyKeyEscrow
-import it.vittorioscocca.kidbox.data.crypto.FamilyKeyStore
+import it.vittorioscocca.kidbox.data.remote.family.PendingFamilyInvite
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.remote.family.InviteRemoteStore
-import it.vittorioscocca.kidbox.data.remote.family.JoinPayloadParser
 import it.vittorioscocca.kidbox.data.remote.family.JoinWrapService
 import it.vittorioscocca.kidbox.data.repository.PasswordsRepository
 import it.vittorioscocca.kidbox.data.sync.FamilySyncCenter
+import it.vittorioscocca.kidbox.data.user.UserProfileRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,39 +30,24 @@ data class JoinFamilyUiState(
     val isBusy: Boolean = false,
     val didJoin: Boolean = false,
     val error: String? = null,
-    /** Popolato solo dopo un join riuscito (QR o codice): serve all'onboarding
-     *  per chiamare `onFamilyCreated(familyId)` e lasciare l'onboarding. */
+    /** Popolato solo dopo un join riuscito: serve all'onboarding per chiamare
+     *  `onFamilyCreated(familyId)` e lasciare l'onboarding. */
     val joinedFamilyId: String? = null,
-    /**
-     * `true` quando il join è riuscito ma la master key della famiglia non è
-     * disponibile: l'utente è membro a tutti gli effetti, però Password,
-     * Documenti e Wallet condivisi restano illeggibili.
-     *
-     * Non è un errore — `error` resta null e `didJoin` è `true` — ma va detto
-     * all'utente, altrimenti scopre da solo che metà app è vuota senza capire
-     * perché. Prima questo caso finiva solo in un `KBLog.ui.error` invisibile.
-     * Gemello di `FamilyJoinOutcome.missingVaultKey` su iOS.
-     */
-    val missingVaultKey: Boolean = false,
 )
 
 /**
- * Gestisce il join via QR code o codice testuale.
- * Logica identica a iOS JoinFamilyView + JoinWrapService:
+ * Gestisce l'ingresso in famiglia, da link d'invito o da QR.
  *
- * Via QR:
- * 1) JoinWrapService.join() — unwrap master key + salva in FamilyKeyStore
- * 2) JoinPayloadParser.extractInviteCode() — estrae membership code dal payload kidbox://join
- * 3) joinWithCode(code) — resolveInvite + addMember su Firestore
- *
- * Via codice testuale:
- * 1) joinWithCode(code) diretto
+ * Il codice testuale non esiste più: creava membri privi della chiave di
+ * cifratura, che poi non potevano leggere password, documenti, wallet e chat.
+ * Entrambe le strade rimaste trasportano la chiave.
  */
 @HiltViewModel
 class JoinFamilyViewModel @Inject constructor(
     application: Application,
     private val familySyncCenter: FamilySyncCenter,
     private val passwordsRepository: PasswordsRepository,
+    private val userProfileRepository: UserProfileRepository,
 ) : AndroidViewModel(application) {
 
     private val inviteRemote = InviteRemoteStore()
@@ -75,155 +60,81 @@ class JoinFamilyViewModel @Inject constructor(
     val uiState: StateFlow<JoinFamilyUiState> = _uiState.asStateFlow()
 
     /**
-     * Chiamato dopo che la camera ha letto un QR.
-     * Flusso identico a iOS JoinFamilyView.QRScannerSheet.onDetected.
+     * Chiamato dopo la lettura di un QR.
+     *
+     * Il codice testuale non esiste più: prima questo flusso sbloccava la chiave,
+     * poi estraeva un `code` dal payload per creare la membership — pur avendo già
+     * `familyId` sotto mano. Ora QR e link d'invito passano dallo stesso percorso.
      */
     fun onQRScanned(rawPayload: String, onJoined: () -> Unit) {
+        val invite = PendingFamilyInvite.parseQrPayload(rawPayload)
+        if (invite == null) {
+            _uiState.value = JoinFamilyUiState(
+                error = getApplication<Application>().getString(R.string.settings_join_invalid_qr),
+            )
+            return
+        }
+        joinFromInvite(invite, onJoined)
+    }
+
+    /**
+     * Entra in famiglia da un invito, che arrivi dal QR o dal link.
+     *
+     * L'ordine dei due passi non è indifferente: **prima la chiave, poi la
+     * membership**. `JoinWrapService` valida il segreto in transazione e marca
+     * l'invito come usato; se fallisce (scaduto, già usato, segreto errato) non
+     * si deve entrare affatto, altrimenti si ricadrebbe nello stato "membro
+     * senza chiave" che questo lavoro serve a eliminare.
+     */
+    fun joinFromInvite(invite: PendingFamilyInvite, onJoined: () -> Unit) {
         viewModelScope.launch {
             _uiState.value = JoinFamilyUiState(isBusy = true)
             try {
-                val raw = rawPayload.trim()
-                // Step 1: unwrap master key (secret Base64URL da kidbox://join) + salva in FamilyKeyStore
-                val parsedForFamilyCheck = joinWrapService.parse(raw)
-                joinWrapService.join(getApplication(), raw)
-                KBLog.ui.info("QR join: master key saved", TAG)
+                joinWrapService.join(getApplication(), invite.qrEquivalentPayload)
+                KBLog.ui.info("invito: master key sbloccata familyId=${invite.familyId}", TAG)
 
-                // Step 2: estrai membership code dal payload (URL kidbox://join o codice plain)
-                val code = JoinPayloadParser.extractInviteCode(raw)
-                if (code.isNullOrBlank()) {
-                    _uiState.value = JoinFamilyUiState(
-                        error = "QR valido ma senza codice invito."
-                    )
-                    return@launch
-                }
+                inviteRemote.addMember(invite.familyId)
+                KBLog.ui.info("invito: membership creata familyId=${invite.familyId}", TAG)
 
-                // Step 3: join tramite membership code (stesso casing dei doc `invites/{CODE}` su Firestore)
-                joinWithCodeInternal(
-                    code = code.trim().uppercase(),
-                    onJoined = onJoined,
-                    expectedFamilyIdFromInviteQr = parsedForFamilyCheck?.familyId,
-                    didCryptoUnwrap = true,
-                )
+                // `addMember` crea il membro senza `displayName`: senza questa
+                // riga chi entra resta anonimo per gli altri. Sta qui e non nei
+                // chiamanti perché questo è l'unico punto attraversato da tutte
+                // le strade di join (QR, link nel wizard, link ad app avviata).
+                runCatching { userProfileRepository.propagateDisplayNameToMember(invite.familyId) }
+                    .onFailure { KBLog.ui.error("propagazione nome fallita: ${it.message}", TAG, it) }
 
-            } catch (e: Exception) {
-                KBLog.ui.error("QR join failed: ${e.message}", TAG)
-                _uiState.value = JoinFamilyUiState(error = e.message ?: "Errore join QR")
-            }
-        }
-    }
-
-    /**
-     * Chiamato dal bottone "Entra" con codice testuale.
-     */
-    fun joinWithCode(code: String, onJoined: () -> Unit) {
-        viewModelScope.launch {
-            _uiState.value = JoinFamilyUiState(isBusy = true)
-            joinWithCodeInternal(
-                code = code.trim().uppercase(),
-                onJoined = onJoined,
-                expectedFamilyIdFromInviteQr = null,
-                didCryptoUnwrap = false,
-            )
-        }
-    }
-
-    private suspend fun joinWithCodeInternal(
-        code: String,
-        onJoined: () -> Unit,
-        expectedFamilyIdFromInviteQr: String?,
-        didCryptoUnwrap: Boolean,
-    ) {
-        try {
-            KBLog.ui.debug("resolveInvite start code=$code", TAG)
-            val familyId = inviteRemote.resolveInvite(code)
-            KBLog.ui.debug("resolveInvite OK familyId=$familyId", TAG)
-
-            if (expectedFamilyIdFromInviteQr != null && expectedFamilyIdFromInviteQr != familyId) {
-                KBLog.ui.error("join aborted: invite QR familyId=$expectedFamilyIdFromInviteQr != code familyId=$familyId", TAG)
+                pendingFamilyId = invite.familyId
                 _uiState.value = JoinFamilyUiState(
-                    error = "Invito incoerente: il codice non corrisponde al QR.",
+                    didJoin = true,
+                    joinedFamilyId = invite.familyId,
                 )
-                return
-            }
 
-            KBLog.ui.debug("addMember start familyId=$familyId", TAG)
-            inviteRemote.addMember(familyId)
-            KBLog.ui.debug("addMember OK", TAG)
-            KBLog.ui.info("join OK familyId=$familyId", TAG)
+                familySyncCenter.stopSync()
+                familySyncCenter.startSync(invite.familyId)
 
-            // ─────────────────────────────────────────────────────────────────
-            // VERIFICA CHIAVE — deve stare QUI, prima di pubblicare
-            // `joinedFamilyId`: l'onboarding esce dalla pagina osservando quel
-            // campo (OnboardingScreen.kt:1111), quindi un controllo fatto più
-            // tardi non riuscirebbe mai a mostrare l'avviso.
-            // Non dipende dal sync: la chiave arriva dall'unwrap del QR (già
-            // avvenuto) o dall'escrow, che richiede solo la membership appena
-            // creata.
-            // ─────────────────────────────────────────────────────────────────
-            val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-            var hasVaultKey = didCryptoUnwrap
-            if (uid.isNotBlank() && !hasVaultKey) {
-                hasVaultKey = withContext(Dispatchers.IO) {
-                    FamilyKeyEscrow.ensureFamilyKeyAvailable(getApplication(), familyId, uid)
-                } || FamilyKeyStore.hasFamilyKey(getApplication(), familyId, uid)
-            }
-            val vaultKeyMissing = uid.isNotBlank() && !hasVaultKey
-            if (vaultKeyMissing) {
-                KBLog.ui.error("join: membership code only — no vault key (use crypto invite QR) familyId=$familyId", TAG)
-            }
+                withTimeoutOrNull(30_000) {
+                    familySyncCenter.initialSyncDone.first { it }
+                } ?: KBLog.ui.warning("initialSyncDone timeout familyId=${invite.familyId}", TAG)
 
-            pendingFamilyId = familyId
-            _uiState.value = JoinFamilyUiState(
-                didJoin = true,
-                // Senza chiave l'uscita non è automatica: l'avviso deve restare
-                // leggibile. `joinedFamilyId` viene pubblicato dal pulsante
-                // "Ho capito, continua" via [acknowledgeMissingVaultKey].
-                joinedFamilyId = if (vaultKeyMissing) null else familyId,
-                missingVaultKey = vaultKeyMissing,
-            )
-
-            // Reset FamilySyncCenter così startObserving() fa bootstrap della nuova famiglia
-            familySyncCenter.stopSync()
-            familySyncCenter.startSync(familyId)
-
-            withTimeoutOrNull(30_000) {
-                familySyncCenter.initialSyncDone.first { it }
-            } ?: KBLog.ui.warning("initialSyncDone timeout after join familyId=$familyId — continuing", TAG)
-
-            if (uid.isNotBlank() && hasVaultKey) {
-                withContext(Dispatchers.IO) {
-                    runCatching {
-                        passwordsRepository.hydratePasswordRoomFromServer(familyId)
-                    }.onFailure { e ->
-                        KBLog.ui.error("hydratePasswordRoomFromServer failed: ${e.message}", TAG, e)
+                val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+                if (uid.isNotBlank()) {
+                    withContext(Dispatchers.IO) {
+                        runCatching { passwordsRepository.hydratePasswordRoomFromServer(invite.familyId) }
+                            .onFailure { e ->
+                                KBLog.ui.error("hydratePasswordRoomFromServer failed: ${e.message}", TAG, e)
+                            }
+                    }
+                    withContext(Dispatchers.IO) {
+                        passwordsRepository.awaitForceRestartRealtime(invite.familyId)
                     }
                 }
-                withContext(Dispatchers.IO) {
-                    passwordsRepository.awaitForceRestartRealtime(familyId)
-                }
+
+                onJoined()
+            } catch (e: Exception) {
+                KBLog.ui.error("invito fallito: ${e.message}", TAG, e)
+                _uiState.value = JoinFamilyUiState(error = e.localizedMessage ?: "Errore invito")
             }
-
-            if (vaultKeyMissing) return
-
-            onJoined()
-        } catch (e: Exception) {
-            KBLog.ui.error("joinWithCode failed: ${e.message}", TAG)
-            _uiState.value = JoinFamilyUiState(error = e.message ?: "Errore join")
         }
-    }
-
-    /**
-     * Chiamata dal pulsante "Ho capito, continua" mostrato con l'avviso di
-     * chiave mancante: sblocca l'avanzamento che [joinWithCodeInternal] aveva
-     * volutamente sospeso, pubblicando `joinedFamilyId` (che fa uscire
-     * l'onboarding) e invocando la callback usata dalla schermata Impostazioni.
-     */
-    fun acknowledgeMissingVaultKey(onJoined: () -> Unit) {
-        _uiState.value = _uiState.value.copy(
-            missingVaultKey = false,
-            joinedFamilyId = pendingFamilyId,
-        )
-        onJoined()
     }
 
     fun clearError() {

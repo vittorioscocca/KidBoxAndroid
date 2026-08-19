@@ -102,9 +102,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.EdgeToEdgeController
 import it.vittorioscocca.kidbox.ui.screens.settings.CornerBrackets
+import it.vittorioscocca.kidbox.data.remote.family.InviteRemoteStore
+import it.vittorioscocca.kidbox.data.remote.family.PendingFamilyInvite
 import it.vittorioscocca.kidbox.ui.screens.settings.JoinFamilyViewModel
 import it.vittorioscocca.kidbox.ui.screens.settings.QRScannerView
-import java.util.Locale
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
@@ -158,7 +159,16 @@ private fun introslides() = listOf(
     ),
 )
 
-private enum class FamilyPath { Create, Join }
+private enum class FamilyPath {
+    Create,
+    Join,
+
+    /**
+     * Impostato in automatico quando c'è un [PendingFamilyInvite] da link:
+     * sostituisce la scelta percorso con la conferma d'invito.
+     */
+    LinkJoin,
+}
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -176,9 +186,19 @@ fun OnboardingScreen(
 
 
     val pagerState = rememberPagerState(
-        // 0-2 intro · 3 scelta percorso · 4 nome e cognome ·
-        // 5 crea famiglia / entra con codice · 6 invita (solo percorso "crea").
-        pageCount = { if (familyPath == FamilyPath.Join) 6 else 7 },
+        // 0-2 intro · 3 scelta percorso (o conferma invito da link) ·
+        // 4 nome e cognome · 5 crea famiglia / entra con QR ·
+        // 6 invita (solo percorso "crea").
+        //
+        // Percorso LinkJoin: solo 4 pagine (0-2 intro + 3), perché la 3 chiede
+        // già nome e cognome e fa il join — non serve altro.
+        pageCount = {
+            when (familyPath) {
+                FamilyPath.LinkJoin -> 4
+                FamilyPath.Join -> 6
+                else -> 7
+            }
+        },
     )
     val scope = rememberCoroutineScope()
 
@@ -188,6 +208,21 @@ fun OnboardingScreen(
     val createdFamilyId by viewModel.createdFamilyId.collectAsStateWithLifecycle()
     val isCreatingFamily by viewModel.isCreatingFamily.collectAsStateWithLifecycle()
     val createFamilyError by viewModel.createFamilyError.collectAsStateWithLifecycle()
+
+    // Invito da link, se il wizard è partito da un App Link. Controllato una
+    // volta sola: `familyPath` diventa poi lo stato di navigazione, e un
+    // secondo tocco sul link a wizard già avviato non deve resettare la
+    // pagina in cui l'utente si trova.
+    val context = LocalContext.current
+    var pendingLinkInvite by remember { mutableStateOf<PendingFamilyInvite?>(null) }
+    var linkInvitePreview by remember { mutableStateOf<InviteRemoteStore.InvitePreview?>(null) }
+    LaunchedEffect(Unit) {
+        if (familyPath != null) return@LaunchedEffect
+        val invite = PendingFamilyInvite.load(context) ?: return@LaunchedEffect
+        pendingLinkInvite = invite
+        familyPath = FamilyPath.LinkJoin
+        linkInvitePreview = InviteRemoteStore().fetchInvitePreview(invite.familyId, invite.inviteId)
+    }
 
     val currentPage = pagerState.currentPage
     val accent = pageAccent(currentPage, familyPath)
@@ -244,6 +279,19 @@ fun OnboardingScreen(
             ) { page ->
                 when {
                     page in 0..2 -> IntroPageContent(slide = introslides()[page])
+                    page == 3 && familyPath == FamilyPath.LinkJoin && pendingLinkInvite != null ->
+                        LinkInviteConfirmPageContent(
+                            invite = pendingLinkInvite!!,
+                            preview = linkInvitePreview,
+                            nameState = nameState,
+                            nameViewModel = nameViewModel,
+                            onJoined = { familyId -> onFamilyCreated(familyId) },
+                            onFallbackToManual = {
+                                PendingFamilyInvite.clear(context)
+                                pendingLinkInvite = null
+                                familyPath = null
+                            },
+                        )
                     page == 3 -> FamilyPathPickerPageContent(
                         selected = familyPath,
                         onSelect = { familyPath = it },
@@ -260,9 +308,8 @@ fun OnboardingScreen(
                     )
                     page == 5 && familyPath == FamilyPath.Join -> JoinFamilyPageContent(
                         onJoined = { familyId ->
-                            // `addMember` scrive il membro senza displayName:
-                            // il nome raccolto a pagina 4 va portato lì adesso.
-                            nameViewModel.propagateNameToMember(familyId)
+                            // Il nome sul documento membro lo scrive
+                            // JoinFamilyViewModel, attraversato da ogni join.
                             onFamilyCreated(familyId)
                         },
                     )
@@ -278,7 +325,11 @@ fun OnboardingScreen(
                 }
             }
 
-            val totalPages = if (familyPath == FamilyPath.Join) 6 else 7
+            val totalPages = when (familyPath) {
+                FamilyPath.LinkJoin -> 4
+                FamilyPath.Join -> 6
+                else -> 7
+            }
 
             Row(
                 modifier = Modifier
@@ -295,12 +346,14 @@ fun OnboardingScreen(
 
             val isJoinPage = currentPage == 5 && familyPath == FamilyPath.Join
             val isInvitePage = currentPage == 6 && familyPath == FamilyPath.Create
+            val isLinkJoinPage = currentPage == 3 && familyPath == FamilyPath.LinkJoin
             val ctaEnabled = when (currentPage) {
                 3 -> familyPath != null
                 4 -> nameState.canSubmit
                 5 -> when (familyPath) {
                     FamilyPath.Create -> createdFamilyId != null
                     FamilyPath.Join -> false
+                    FamilyPath.LinkJoin -> false
                     null -> false
                 }
                 6 -> createdFamilyId != null
@@ -308,7 +361,7 @@ fun OnboardingScreen(
             }
             val ctaLabel = if (currentPage == totalPages - 1) stringResource(R.string.onboarding_start) else stringResource(R.string.travel_continue)
 
-            if (isJoinPage || isInvitePage) {
+            if (isJoinPage || isInvitePage || isLinkJoinPage) {
                 Spacer(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -339,6 +392,7 @@ fun OnboardingScreen(
                                     scope.launch { pagerState.animateScrollToPage(6) }
                                 }
                                 FamilyPath.Join -> Unit
+                                FamilyPath.LinkJoin -> Unit
                                 null -> Unit
                             }
                             6 -> createdFamilyId?.let { onFamilyCreated(it) }
@@ -617,6 +671,195 @@ private fun NamePageContent(state: OnboardingNameUiState, viewModel: OnboardingN
     }
 }
 
+/**
+ * Sostituisce la scelta percorso quando il wizard parte da un App Link:
+ * mostra la famiglia (e chi ha invitato, se noti), chiede nome e cognome e fa
+ * il join in un solo passaggio — niente QR, niente scelta manuale.
+ *
+ * Gemello di `LinkInviteConfirmCard` su iOS.
+ */
+@Composable
+private fun LinkInviteConfirmPageContent(
+    invite: PendingFamilyInvite,
+    preview: InviteRemoteStore.InvitePreview?,
+    nameState: OnboardingNameUiState,
+    nameViewModel: OnboardingNameViewModel,
+    onJoined: (familyId: String) -> Unit,
+    onFallbackToManual: () -> Unit,
+) {
+    val joinViewModel: JoinFamilyViewModel = hiltViewModel()
+    val joinState by joinViewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    // Il join ha già fatto `addMember`, quindi il membro nasce senza
+    // displayName: il nome raccolto qui va portato lì adesso.
+    //
+    // `PendingFamilyInvite.clear()` è indispensabile qui: questa vista lo
+    // ha caricato una volta e lo tiene in stato locale (`invite`), senza mai
+    // ripassare da `PendingFamilyInvite.load()`. Se non lo si toglie da
+    // SharedPreferences, appena si atterra in Home `PendingInviteHandler` lo
+    // trova ancora lì e lo rielabora — invito ormai marcato "usedAt" sul
+    // server, quindi il secondo tentativo fallisce con "Invito già
+    // utilizzato" e lo mostra come falso errore proprio dopo un join riuscito.
+    LaunchedEffect(joinState.didJoin, joinState.joinedFamilyId) {
+        val joinedId = joinState.joinedFamilyId
+        if (joinState.didJoin && joinedId != null) {
+            PendingFamilyInvite.clear(context)
+            onJoined(joinedId)
+        }
+    }
+
+    val isBusy = nameState.isSaving || joinState.isBusy
+    val canSubmit = nameState.firstName.isNotBlank() && nameState.lastName.isNotBlank() && !isBusy
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(start = 24.dp, top = 16.dp, end = 24.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(PurpleAccent.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Filled.People,
+                contentDescription = null,
+                tint = PurpleAccent,
+                modifier = Modifier.size(28.dp),
+            )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+
+        val familyName = preview?.familyName?.takeIf { it.isNotBlank() }
+        Text(
+            if (familyName != null) {
+                stringResource(R.string.onboarding_link_invite_title, familyName)
+            } else {
+                stringResource(R.string.onboarding_link_invite_title_generic)
+            },
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = BlackText,
+            textAlign = TextAlign.Center,
+        )
+
+        val inviterName = preview?.inviterDisplayName?.takeIf { it.isNotBlank() }
+        Text(
+            if (inviterName != null) {
+                stringResource(R.string.onboarding_link_invite_subtitle_by, inviterName)
+            } else {
+                stringResource(R.string.onboarding_link_invite_subtitle_generic)
+            },
+            fontSize = 15.sp,
+            color = GraySubtitle,
+            textAlign = TextAlign.Center,
+            lineHeight = 22.sp,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        FormFieldLabel(stringResource(R.string.onboarding_name_first_label))
+        OutlinedTextField(
+            value = nameState.firstName,
+            onValueChange = nameViewModel::setFirstName,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isBusy,
+            singleLine = true,
+            placeholder = {
+                Text(stringResource(R.string.onboarding_name_first_placeholder), color = GrayCaption)
+            },
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = PurpleAccent,
+                unfocusedBorderColor = GrayFieldBorder,
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+            ),
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        FormFieldLabel(stringResource(R.string.onboarding_name_last_label))
+        OutlinedTextField(
+            value = nameState.lastName,
+            onValueChange = nameViewModel::setLastName,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isBusy,
+            singleLine = true,
+            placeholder = {
+                Text(stringResource(R.string.onboarding_name_last_placeholder), color = GrayCaption)
+            },
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = PurpleAccent,
+                unfocusedBorderColor = GrayFieldBorder,
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+            ),
+        )
+
+        val errorText = nameState.error ?: joinState.error
+        if (!errorText.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                errorText,
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = {
+                nameViewModel.save {
+                    joinViewModel.joinFromInvite(invite) { /* stato osservato dal LaunchedEffect */ }
+                }
+            },
+            enabled = canSubmit,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = PurpleAccent,
+                disabledContainerColor = GrayDisabled.copy(alpha = 0.4f),
+                contentColor = Color.White,
+                disabledContentColor = Color.White.copy(alpha = 0.7f),
+            ),
+        ) {
+            if (isBusy) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Text(stringResource(R.string.onboarding_link_invite_join), fontWeight = FontWeight.SemiBold)
+            }
+        }
+
+        TextButton(onClick = onFallbackToManual, enabled = !isBusy) {
+            Text(
+                stringResource(R.string.onboarding_link_invite_fallback),
+                fontSize = 13.sp,
+                color = GraySubtitle,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CreateFamilyPageContent(
@@ -874,7 +1117,7 @@ private fun InvitePartnerPageContent(
     val isBusy by viewModel.isBusy.collectAsStateWithLifecycle()
     val qrPayload by viewModel.qrPayload.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
-    val code by viewModel.code.collectAsStateWithLifecycle()
+    val shareLink by viewModel.shareLink.collectAsStateWithLifecycle()
     var didCopy by remember { mutableStateOf(false) }
     var showQr by remember { mutableStateOf(false) }
 
@@ -932,8 +1175,13 @@ private fun InvitePartnerPageContent(
                     Text(stringResource(R.string.onboarding_generating_qr), fontSize = 14.sp, color = GraySubtitle)
                 }
             }
-            !code.isNullOrBlank() -> {
-                val shareText = stringResource(R.string.onboarding_share_invite_text, code.orEmpty())
+            !shareLink.isNullOrBlank() -> {
+                // Si condivide il link, non più il codice: il link porta anche la
+                // chiave di cifratura (nel frammento) e apre l'app da solo.
+                // Stesse stringhe delle impostazioni e di iOS: l'invito deve
+                // arrivare identico da qualunque punto lo si mandi.
+                val shareText = stringResource(R.string.settings_invite_share_text, shareLink.orEmpty())
+                val shareSubject = stringResource(R.string.settings_invite_share_subject)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -943,6 +1191,9 @@ private fun InvitePartnerPageContent(
                         .clickable {
                             val send = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
+                                // Oggetto per i client di posta; le app di
+                                // messaggistica lo ignorano.
+                                putExtra(Intent.EXTRA_SUBJECT, shareSubject)
                                 putExtra(Intent.EXTRA_TEXT, shareText)
                             }
                             context.startActivity(Intent.createChooser(send, context.getString(R.string.onboarding_share_link)))
@@ -961,13 +1212,13 @@ private fun InvitePartnerPageContent(
                     containerColor = GraySubtitle.copy(alpha = 0.08f),
                     contentColor = if (didCopy) SuccessGreen else GraySubtitle,
                     icon = if (didCopy) Icons.Filled.CheckCircle else Icons.Filled.ContentCopy,
-                    label = if (didCopy) stringResource(R.string.onboarding_copied) else stringResource(R.string.onboarding_copy_code),
+                    label = if (didCopy) stringResource(R.string.onboarding_copied) else stringResource(R.string.settings_invite_copy_link),
                     onClick = {
-                        val value = code.orEmpty()
+                        val value = shareLink.orEmpty()
                         if (value.isNotBlank()) {
                             runCatching {
                                 val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                cm.setPrimaryClip(ClipData.newPlainText("kidbox_invite_code", value))
+                                cm.setPrimaryClip(ClipData.newPlainText("kidbox_invite_link", value))
                             }.onSuccess { didCopy = true }
                         }
                     },
@@ -975,6 +1226,14 @@ private fun InvitePartnerPageContent(
                 LaunchedEffect(didCopy) {
                     if (didCopy) { kotlinx.coroutines.delay(2000); didCopy = false }
                 }
+                // Il segreto viaggia dentro il link: chi lo riceve entra.
+                Text(
+                    stringResource(R.string.invite_link_caution),
+                    fontSize = 11.sp,
+                    color = GrayCaption,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 8.dp, start = 8.dp, end = 8.dp),
+                )
             }
             errorMessage != null -> {
                 Column(
@@ -1007,6 +1266,13 @@ private fun InvitePartnerPageContent(
                     fontSize = 14.sp, color = GraySubtitle,
                     modifier = Modifier.weight(1f),
                 )
+                Text(
+                    stringResource(R.string.invite_qr_safer_badge),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = SuccessGreen,
+                    modifier = Modifier.padding(end = 8.dp),
+                )
                 Icon(
                     if (showQr) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                     contentDescription = null, tint = GrayCaption, modifier = Modifier.size(20.dp),
@@ -1024,6 +1290,13 @@ private fun InvitePartnerPageContent(
                 ) {
                     QRCodeView(payload = qrPayload.orEmpty(), modifier = Modifier.size(140.dp))
                     Text(stringResource(R.string.onboarding_valid_24h), fontSize = 12.sp, color = GrayCaption)
+                    Text(
+                        stringResource(R.string.invite_qr_safer),
+                        fontSize = 11.sp,
+                        color = GrayCaption,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
                 }
             }
         }
@@ -1266,7 +1539,6 @@ private fun JoinFamilyPageContent(
 ) {
     val viewModel: JoinFamilyViewModel = hiltViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var code by remember { mutableStateOf("") }
     var showScanner by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -1325,25 +1597,6 @@ private fun JoinFamilyPageContent(
         )
         Spacer(modifier = Modifier.height(20.dp))
 
-        FormFieldLabel(stringResource(R.string.onboarding_invite_code_label))
-        OutlinedTextField(
-            value = code,
-            onValueChange = { code = it.uppercase(Locale.ROOT) },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !state.didJoin,
-            singleLine = true,
-            placeholder = { Text(stringResource(R.string.onboarding_invite_code_placeholder), color = GrayCaption) },
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
-            shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = PurpleAccent,
-                unfocusedBorderColor = GrayFieldBorder,
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-            ),
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1371,48 +1624,28 @@ private fun JoinFamilyPageContent(
             )
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Button(
-            onClick = {
-                if (code.isNotBlank()) {
-                    viewModel.joinWithCode(code) {
-                        // Il LaunchedEffect sopra osserva didJoin + joinedFamilyId.
-                    }
-                }
-            },
-            enabled = !state.isBusy && !state.didJoin && code.isNotBlank(),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = PurpleAccent,
-                disabledContainerColor = GrayDisabled.copy(alpha = 0.4f),
-                contentColor = Color.White,
-                disabledContentColor = Color.White.copy(alpha = 0.7f),
-            ),
-        ) {
-            if (state.isBusy) {
+        if (state.isBusy) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(22.dp),
-                    color = Color.White,
+                    modifier = Modifier.size(20.dp),
+                    color = PurpleAccent,
                     strokeWidth = 2.dp,
                 )
-            } else {
-                Text(stringResource(R.string.onboarding_join_cta), fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    stringResource(R.string.onboarding_joining),
+                    color = GraySubtitle,
+                    fontSize = 14.sp,
+                )
             }
         }
 
-        state.error?.takeIf { it.isNotBlank() }?.let { err ->
-            Text(
-                err,
-                color = MaterialTheme.colorScheme.error,
-                fontSize = 13.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
+        Spacer(modifier = Modifier.height(12.dp))
 
         if (state.didJoin) {
             Spacer(modifier = Modifier.height(12.dp))
@@ -1433,36 +1666,6 @@ private fun JoinFamilyPageContent(
                     color = SuccessGreen,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
-                )
-            }
-        }
-
-        // Join senza chiave: qui l'uscita dall'onboarding è sospesa (il VM non
-        // pubblica `joinedFamilyId`), così l'avviso resta leggibile e l'utente
-        // prosegue solo dopo averlo visto.
-        if (state.missingVaultKey) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                stringResource(R.string.settings_join_missing_key),
-                color = Color(0xFFB25E00),
-                fontSize = 13.sp,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Button(
-                onClick = { viewModel.acknowledgeMissingVaultKey {} },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = PurpleAccent,
-                    contentColor = Color.White,
-                ),
-            ) {
-                Text(
-                    stringResource(R.string.settings_join_missing_key_continue),
-                    fontWeight = FontWeight.SemiBold,
                 )
             }
         }

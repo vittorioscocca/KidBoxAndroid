@@ -70,6 +70,31 @@
                 <data android:mimeType="application/pdf" />
             </intent-filter>
             <!--
+                Inviti famiglia via link (App Links).
+
+                `autoVerify` fa sì che Android verifichi assetlinks.json sul
+                dominio all'installazione: se combacia, il link apre l'app senza
+                chiedere nulla all'utente. Senza, comparirebbe il selettore
+                "apri con" ogni volta.
+
+                Il path è ristretto a /join: rivendicare l'intero dominio
+                dirotterebbe anche privacy, termini e le altre pagine, che devono
+                continuare ad aprirsi nel browser.
+
+                Il segreto dell'invito viaggia nel frammento (dopo #), che non
+                compare qui perché non fa parte del matching: Android lo consegna
+                comunque all'app dentro l'URI dell'intent.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="kidbox-landing.web.app"
+                    android:pathPrefix="/join" />
+            </intent-filter>
+            <!--
                 Health Connect elenca sotto "Autorizzazioni app" solo le app che
                 sanno mostrare la propria informativa privacy. Senza questo
                 filtro le uses-permission android.permission.health.* vengono

@@ -40,12 +40,49 @@ class InviteWrapService(
         val inviteId: String,
         val secretBase64url: String,
         val qrPayload: String,
+        /** App Link condivisibile (WhatsApp, mail, messaggi). */
+        val shareLink: String,
         val expiresAt: Date,
     )
 
+    companion object {
+        /**
+         * Dominio degli inviti. Deve combaciare con l'`intent-filter` in
+         * AndroidManifest e con `assetlinks.json` sul dominio.
+         */
+        const val INVITE_LINK_BASE_URL = "https://kidbox-landing.web.app/join"
+
+        /**
+         * Costruisce il link d'invito con il segreto nel **frammento**.
+         *
+         * Il segreto sta dopo `#` e non nella query per una ragione precisa: i
+         * browser non inviano mai il frammento al server. Così il materiale che
+         * sblocca la chiave di famiglia non finisce nei log di hosting né — cosa
+         * più importante — viene letto dai bot che generano le anteprime dei
+         * link. WhatsApp, Telegram e i client di posta scaricano l'URL condiviso
+         * per mostrare il riquadro di anteprima: con il segreto nella query lo
+         * manderemmo alla loro infrastruttura, con il frammento no.
+         *
+         * `familyId` e `inviteId` restano nella query: da soli non aprono nulla,
+         * perché senza segreto la chiave non è ricostruibile.
+         */
+        fun shareLink(familyId: String, inviteId: String, secretBase64url: String): String =
+            "$INVITE_LINK_BASE_URL?familyId=$familyId&inviteId=$inviteId#k=$secretBase64url"
+    }
+
+    /**
+     * `familyName`/`inviterDisplayName` sono denormalizzati sul documento
+     * invito così chi riceve il link può leggerli PRIMA di entrare — la
+     * regola di `families/{familyId}` richiede membership, ma quella di
+     * `invites/{inviteId}` è aperta a ogni utente autenticato. Informativi
+     * (nome famiglia, nome di chi invita), non materiale crittografico:
+     * nessun rischio nel renderli leggibili pre-join.
+     */
     suspend fun createInvite(
         context: Context,
         familyId: String,
+        familyName: String,
+        inviterDisplayName: String,
         ttlSeconds: Long = 24 * 3600,
     ): Result {
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
@@ -87,6 +124,8 @@ class InviteWrapService(
                     "createdAt" to Timestamp(now),
                     "createdBy" to uid,
                     "expiresAt" to Timestamp(expiresAt),
+                    "familyName" to familyName,
+                    "createdByDisplayName" to inviterDisplayName,
                     "secretHash" to secretHash,
                     "kdfSalt" to InviteCrypto.toBase64(salt),
                     "wrappedKeyCipher" to InviteCrypto.toBase64(wrapped.cipher),
@@ -109,6 +148,7 @@ class InviteWrapService(
             inviteId = inviteId,
             secretBase64url = secretB64url,
             qrPayload = qrPayload,
+            shareLink = shareLink(familyId, inviteId, secretB64url),
             expiresAt = expiresAt,
         )
     }
