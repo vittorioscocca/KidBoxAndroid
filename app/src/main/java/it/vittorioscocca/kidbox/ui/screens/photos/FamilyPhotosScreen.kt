@@ -25,6 +25,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -1191,6 +1197,92 @@ private fun LazyGridState.itemIndexAt(pos: Offset): Int? {
     return item?.index
 }
 
+/**
+ * Foto a schermo intero con pinch-to-zoom, trascinamento e doppio tap.
+ *
+ * **Il punto delicato è la convivenza con il pager.** La foto vive dentro un
+ * [HorizontalPager]: se la gesture consumasse sempre gli eventi, lo swipe
+ * orizzontale per cambiare foto smetterebbe di funzionare; se non li consumasse
+ * mai, non si potrebbe spostare la foto ingrandita perché il pager cambierebbe
+ * pagina. Qui si consuma **solo** quando la gesture è davvero nostra: pinch a
+ * due dita, oppure trascinamento a foto già ingrandita. Con una sola dita e a
+ * zoom 1 non si consuma nulla e lo swipe arriva al pager.
+ *
+ * Stesso criterio di [pinchZoom], che nella griglia consuma solo a due dita.
+ */
+@Composable
+private fun ZoomableAsyncImage(
+    model: Any?,
+    photoId: String,
+    modifier: Modifier = Modifier,
+) {
+    // `remember(photoId)`: cambiando foto lo zoom riparte da 1, altrimenti la
+    // successiva si aprirebbe con l'ingrandimento della precedente.
+    var scale by remember(photoId) { mutableFloatStateOf(1f) }
+    var offset by remember(photoId) { mutableStateOf(Offset.Zero) }
+    var boxSize by remember { mutableStateOf(IntSize.Zero) }
+
+    /** Tiene la foto dentro i bordi: ingrandita può spostarsi solo di quanto eccede. */
+    fun clamped(candidate: Offset, currentScale: Float): Offset {
+        if (currentScale <= 1f) return Offset.Zero
+        val maxX = boxSize.width * (currentScale - 1f) / 2f
+        val maxY = boxSize.height * (currentScale - 1f) / 2f
+        return Offset(
+            candidate.x.coerceIn(-maxX, maxX),
+            candidate.y.coerceIn(-maxY, maxY),
+        )
+    }
+
+    AsyncImage(
+        model = model,
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
+        modifier = modifier
+            .onSizeChanged { boxSize = it }
+            .pointerInput(photoId) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    do {
+                        val event = awaitPointerEvent()
+                        if (event.changes.size >= 2 || scale > 1f) {
+                            val newScale = (scale * event.calculateZoom())
+                                .coerceIn(1f, MAX_PHOTO_ZOOM)
+                            scale = newScale
+                            offset = if (newScale > 1f) {
+                                clamped(offset + event.calculatePan(), newScale)
+                            } else {
+                                Offset.Zero
+                            }
+                            event.changes.forEach { if (it.positionChanged()) it.consume() }
+                        }
+                    } while (event.changes.any { it.pressed })
+                }
+            }
+            .pointerInput(photoId) {
+                detectTapGestures(
+                    onDoubleTap = {
+                        if (scale > 1f) {
+                            scale = 1f
+                            offset = Offset.Zero
+                        } else {
+                            scale = DOUBLE_TAP_PHOTO_ZOOM
+                            offset = Offset.Zero
+                        }
+                    },
+                )
+            }
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                translationX = offset.x
+                translationY = offset.y
+            },
+    )
+}
+
+private const val MAX_PHOTO_ZOOM = 4f
+private const val DOUBLE_TAP_PHOTO_ZOOM = 2.5f
+
 private fun Modifier.pinchZoom(onZoom: (Float) -> Unit): Modifier = this.pointerInput(Unit) {
     awaitEachGesture {
         awaitFirstDown(requireUnconsumed = false)
@@ -2162,10 +2254,9 @@ internal fun PhotosFullscreenMediaViewer(
                             }
                         }
                     } else {
-                        AsyncImage(
+                        ZoomableAsyncImage(
                             model = localFile ?: photo.thumbnailBase64?.let { runCatching { Base64.decode(it, Base64.DEFAULT) }.getOrNull() },
-                            contentDescription = null,
-                            contentScale = ContentScale.Fit,
+                            photoId = photo.id,
                             modifier = Modifier.fillMaxSize(),
                         )
                     }

@@ -20,12 +20,41 @@ object FamilyKeyEscrow {
     private val db get() = FirebaseFirestore.getInstance()
 
     /**
-     * Se la chiave non è in [FamilyKeyStore], prova recupero dall'escrow e salva in locale.
-     * Idempotente: se la chiave c'è già, ritorna subito `true`.
+     * Coppie `familyId|userId` per cui il backup è già stato rinfrescato in
+     * questa sessione. Thread-safe: [ensureFamilyKeyAvailable] viene invocata
+     * da più coroutine (sync, schermate, repository) anche in parallelo.
+     */
+    private val backedUpThisSession = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * Assicura che la chiave di famiglia sia disponibile in locale.
+     *
+     * - Chiave già presente → `true`, rinfrescando il backup su escrow una volta
+     *   per sessione (vedi [backedUpThisSession]).
+     * - Chiave assente → tenta il recupero dall'escrow e la salva.
+     * - Recupero fallito → `false`. **Non genera mai una chiave nuova:** una
+     *   master key nasce solo alla creazione della famiglia, altrimenti si
+     *   otterrebbe una chiave divergente da quella degli altri membri.
      */
     suspend fun ensureFamilyKeyAvailable(context: Context, familyId: String, userId: String): Boolean {
         if (familyId.isBlank() || userId.isBlank()) return false
-        if (FamilyKeyStore.loadFamilyKey(context, familyId, userId) != null) return true
+        if (FamilyKeyStore.loadFamilyKey(context, familyId, userId) != null) {
+            // Chiave presente: si coglie l'occasione per assicurarsi che esista
+            // anche il backup su Firestore. Senza, la chiave del creatore
+            // arrivava sull'escrow solo generando un invito: chi creava una
+            // famiglia e reinstallava l'app senza aver mai invitato nessuno la
+            // perdeva per sempre. È il gemello del ramo "chiave presente →
+            // backup" di `MasterKeyMigration` su iOS.
+            //
+            // Una volta sola per processo e per coppia famiglia/utente: questo
+            // metodo è chiamato a ogni `startSync`, all'apertura di Documenti,
+            // Wallet, Chat e Foto e dal repository password — un backup a ogni
+            // chiamata sarebbe una scrittura Firestore sprecata a ripetizione.
+            if (backedUpThisSession.add("$familyId|$userId")) {
+                backup(context, familyId, userId)
+            }
+            return true
+        }
         KBLog.crypto.info("key missing locally, trying escrow recovery familyId=$familyId", TAG)
         val recovered = recover(familyId, userId) ?: run {
             KBLog.crypto.error("escrow recovery failed (no backup or bad data) familyId=$familyId", TAG)
@@ -36,6 +65,9 @@ object FamilyKeyEscrow {
             val ok = FamilyKeyStore.loadFamilyKey(context, familyId, userId) != null
             if (ok) {
                 KBLog.crypto.info("escrow recovery OK familyId=$familyId", TAG)
+                // Marca la sessione prima del backup: senza, la prossima chiamata
+                // troverebbe la chiave presente e riscriverebbe lo stesso backup.
+                backedUpThisSession.add("$familyId|$userId")
                 backup(context, familyId, userId)
             } else {
                 KBLog.crypto.error("escrow recovery save did not persist familyId=$familyId", TAG)

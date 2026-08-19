@@ -47,6 +47,7 @@ import kotlinx.coroutines.withContext
 
 private const val TAG = "FamilySyncCenter"
 
+
 @Singleton
 class FamilySyncCenter @Inject constructor(
     private val familyDao: KBFamilyDao,
@@ -337,16 +338,23 @@ class FamilySyncCenter @Inject constructor(
                         if (shouldUpdate) {
                             val remoteName = (data["name"] as? String).orEmpty()
                             KBLog.sync.debug("family upsert: name='$remoteName' remoteTs=$remoteUpdatedAt localTs=$localUpdatedAt", TAG)
+
+                            // Foto di famiglia: la scelta fra locale e remoto è
+                            // in `resolveHeroPhotoFields`, condivisa con
+                            // MembershipSyncService per non duplicare il confronto
+                            // sulle date e la tolleranza sugli orologi.
+                            val hero = resolveHeroPhotoFields(data, local, familyId)
+
                             familyDao.upsert(
                                 KBFamilyEntity(
                                     id = familyId,
                                     name = remoteName,
                                     heroPhotoURL = data["heroPhotoURL"] as? String,
-                                    heroPhotoLocalPath = local?.heroPhotoLocalPath,
-                                    heroPhotoUpdatedAtEpochMillis = local?.heroPhotoUpdatedAtEpochMillis,
-                                    heroPhotoScale = local?.heroPhotoScale,
-                                    heroPhotoOffsetX = local?.heroPhotoOffsetX,
-                                    heroPhotoOffsetY = local?.heroPhotoOffsetY,
+                                    heroPhotoLocalPath = hero.localPath,
+                                    heroPhotoUpdatedAtEpochMillis = hero.updatedAtEpochMillis,
+                                    heroPhotoScale = hero.scale,
+                                    heroPhotoOffsetX = hero.offsetX,
+                                    heroPhotoOffsetY = hero.offsetY,
                                     createdBy = remoteOwnershipUid
                                         ?: local?.createdBy.orEmpty(),
                                     updatedBy = (data["updatedBy"] as? String)

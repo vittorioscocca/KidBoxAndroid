@@ -153,15 +153,20 @@ class MembershipSyncService @Inject constructor(
                 ?.toDate()?.time
             val createdBy = ownershipUidFromFamilyFirestore(data) ?: local?.createdBy.orEmpty()
 
+            // Stesso confronto sulle date usato da FamilySyncCenter: senza, la foto
+            // delle famiglie mostrate nel selettore restava quella in cache anche
+            // dopo che un altro membro l'aveva cambiata.
+            val hero = resolveHeroPhotoFields(data, local, familyId)
+
             val entity = KBFamilyEntity(
                 id = familyId,
                 name = (data["name"] as? String).orEmpty(),
                 heroPhotoURL = data["heroPhotoURL"] as? String,
-                heroPhotoLocalPath = local?.heroPhotoLocalPath,
-                heroPhotoUpdatedAtEpochMillis = local?.heroPhotoUpdatedAtEpochMillis,
-                heroPhotoScale = local?.heroPhotoScale,
-                heroPhotoOffsetX = local?.heroPhotoOffsetX,
-                heroPhotoOffsetY = local?.heroPhotoOffsetY,
+                heroPhotoLocalPath = hero.localPath,
+                heroPhotoUpdatedAtEpochMillis = hero.updatedAtEpochMillis,
+                heroPhotoScale = hero.scale,
+                heroPhotoOffsetX = hero.offsetX,
+                heroPhotoOffsetY = hero.offsetY,
                 createdBy = createdBy,
                 updatedBy = (data["updatedBy"] as? String) ?: local?.updatedBy.orEmpty(),
                 createdAtEpochMillis = remoteCreatedAt ?: local?.createdAtEpochMillis ?: now,

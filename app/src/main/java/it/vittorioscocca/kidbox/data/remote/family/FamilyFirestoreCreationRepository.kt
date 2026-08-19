@@ -2,10 +2,15 @@ package it.vittorioscocca.kidbox.data.remote.family
 
 import it.vittorioscocca.kidbox.util.KBLog
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import it.vittorioscocca.kidbox.data.crypto.FamilyKeyEscrow
+import it.vittorioscocca.kidbox.data.crypto.FamilyKeyStore
+import it.vittorioscocca.kidbox.data.crypto.InviteCrypto
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.entity.KBChildEntity
@@ -29,6 +34,7 @@ class FamilyFirestoreCreationRepository @Inject constructor(
     private val auth: FirebaseAuth,
     private val familyDao: KBFamilyDao,
     private val childDao: KBChildDao,
+    @ApplicationContext private val appContext: Context,
 ) {
 
     private val db get() = FirebaseFirestore.getInstance()
@@ -135,6 +141,29 @@ class FamilyFirestoreCreationRepository @Inject constructor(
                     updatedAtEpochMillis = now,
                 ),
             )
+        }
+
+        // ── Master key della famiglia ──────────────────────────────────────
+        // Nasce QUI, insieme alla famiglia, come su iOS (SetupFamilyView e
+        // creazione da onboarding). Prima veniva creata pigramente da
+        // `InviteWrapService.createInvite`, cioè solo alla generazione del primo
+        // invito: una famiglia creata da Impostazioni restava senza chiave, e il
+        // creatore non poteva usare password, documenti, wallet e allegati chat
+        // — tutte operazioni che fallivano con `MissingFamilyKeyException`.
+        //
+        // Il backup su escrow è immediato e non rimandato al primo invito, così
+        // il creatore recupera la propria chiave anche se reinstalla l'app senza
+        // aver mai invitato nessuno.
+        //
+        // Best effort: se fallisce, la famiglia è comunque creata e
+        // `InviteWrapService` genererà la chiave al primo invito, come prima.
+        runCatching {
+            val newKey = InviteCrypto.generateFamilyKey()
+            FamilyKeyStore.saveFamilyKey(appContext, newKey, familyId, uid)
+            FamilyKeyEscrow.backupRawKey(newKey, familyId, uid)
+            KBLog.crypto.info("master key created and backed up familyId=$familyId", TAG)
+        }.onFailure {
+            KBLog.crypto.error("master key creation failed familyId=$familyId: ${it.message}", TAG, it)
         }
 
         KBLog.data.info("createFamilyWithChildren OK familyId=$familyId childrenWritten=${toSave.size}", TAG)

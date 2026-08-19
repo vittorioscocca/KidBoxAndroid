@@ -384,10 +384,19 @@ class PasswordsRepository @Inject constructor(
         checkedAtEpochMillis: Long,
     ) = withContext(Dispatchers.IO) {
         val existing = entryDao.getById(entryId) ?: return@withContext
+        // `updatedAtEpochMillis` NON si tocca: significa "quando l'utente ha
+        // modificato questa password", e l'esito di uno scan di sicurezza non è
+        // una modifica sua. La data del controllo ha già il suo campo,
+        // `pwnedCheckedAt`, aggiornato qui sopra.
+        //
+        // Non è cosmesi: la lista è ordinata per data di modifica decrescente
+        // (PasswordsHomeViewModel), quindi ogni verdetto faceva saltare quella
+        // voce in cima al gruppo e la lista si riordinava sotto gli occhi
+        // dell'utente per tutta la durata dello scan. Stessa correzione fatta su
+        // iOS in PasswordsSecurityScanner.
         val updated = existing.copy(
             pwnedCount = pwnedCount,
             pwnedCheckedAt = checkedAtEpochMillis,
-            updatedAtEpochMillis = checkedAtEpochMillis,
             syncStateRaw = 1,
         )
         entryDao.upsert(updated)
