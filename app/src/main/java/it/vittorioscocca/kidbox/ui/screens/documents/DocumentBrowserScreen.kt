@@ -134,6 +134,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 
 private const val TAG_DOC_OPEN = "KB_Doc_Open"
 private sealed interface ContextMenuTarget {
@@ -1996,6 +1997,10 @@ private suspend fun openDocument(
         createdAtEpochMillis = document.createdAtEpochMillis,
         entryPoint = KBAnalyticsOrigin.consume(),
     )
+    val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+    if (document.createdBy.isNotBlank() && document.createdBy != currentUid) {
+        AppAnalytics.contentSharedRead(context, "documents")
+    }
     try {
         KBLog.ui.debug("preparePreviewFile start docId=${document.id}", TAG_DOC_OPEN)
         val file = withTimeout(20_000L) { viewModel.preparePreviewFile(document) }

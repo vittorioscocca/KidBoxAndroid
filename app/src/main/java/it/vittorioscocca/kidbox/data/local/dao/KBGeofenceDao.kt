@@ -26,4 +26,7 @@ interface KBGeofenceDao {
 
     @Query("DELETE FROM kb_geofences WHERE familyId = :familyId")
     suspend fun deleteAllByFamily(familyId: String)
+
+    @Query("SELECT COUNT(*) FROM kb_geofences WHERE familyId = :familyId AND isDeleted = 0")
+    suspend fun countByFamilyId(familyId: String): Int
 }

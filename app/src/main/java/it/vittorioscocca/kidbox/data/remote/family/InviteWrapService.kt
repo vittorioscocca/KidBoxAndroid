@@ -10,6 +10,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import it.vittorioscocca.kidbox.data.crypto.FamilyKeyEscrow
 import it.vittorioscocca.kidbox.data.crypto.FamilyKeyStore
 import it.vittorioscocca.kidbox.data.crypto.InviteCrypto
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import kotlinx.coroutines.tasks.await
 import java.util.Date
 import java.util.UUID
@@ -137,6 +138,7 @@ class InviteWrapService(
             ).await()
 
         KBLog.data.info("Invite created inviteId=$inviteId familyId=$familyId", TAG)
+        AppAnalytics.inviteGenerated(context)
 
         FamilyKeyEscrow.backup(context, familyId, uid)
 

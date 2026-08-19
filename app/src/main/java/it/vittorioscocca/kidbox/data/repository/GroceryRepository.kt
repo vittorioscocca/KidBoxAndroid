@@ -1,13 +1,17 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
+import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.KBGroceryItemDao
+import it.vittorioscocca.kidbox.data.local.dao.OnboardingSignalsDao
 import it.vittorioscocca.kidbox.data.local.entity.KBGroceryItemEntity
 import it.vittorioscocca.kidbox.data.remote.grocery.GroceryRemoteChange
 import it.vittorioscocca.kidbox.data.remote.grocery.GroceryRemoteStore
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +27,8 @@ class GroceryRepository @Inject constructor(
     private val groceryDao: KBGroceryItemDao,
     private val remoteStore: GroceryRemoteStore,
     private val auth: FirebaseAuth,
+    private val onboardingSignalsDao: OnboardingSignalsDao,
+    @ApplicationContext private val appContext: Context,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val realtimeMutex = Mutex()
@@ -71,6 +77,7 @@ class GroceryRepository @Inject constructor(
     ) {
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()
+        val isFirstItem = onboardingSignalsDao.groceryItemCount(familyId) == 0
         val item = KBGroceryItemEntity(
             id = java.util.UUID.randomUUID().toString(),
             familyId = familyId,
@@ -89,6 +96,10 @@ class GroceryRepository @Inject constructor(
             lastSyncError = null,
         )
         groceryDao.upsert(item)
+        AppAnalytics.contentCreated(appContext, "grocery")
+        if (isFirstItem) {
+            AppAnalytics.featureFirstUse(appContext, feature = "grocery")
+        }
         runCatching { remoteStore.upsert(item) }
             .onSuccess {
                 groceryDao.upsert(

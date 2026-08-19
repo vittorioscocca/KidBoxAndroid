@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
@@ -18,6 +19,8 @@ import it.vittorioscocca.kidbox.data.remote.todo.TodoListRemoteChange
 import it.vittorioscocca.kidbox.data.remote.todo.TodoRemoteStore
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -37,6 +40,7 @@ class TodoRepository @Inject constructor(
     private val reminderScheduler: TodoReminderScheduler,
     private val familyDao: KBFamilyDao,
     private val childDao: KBChildDao,
+    @ApplicationContext private val appContext: Context,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val realtimeMutex = Mutex()
@@ -153,6 +157,7 @@ class TodoRepository @Inject constructor(
     ) {
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()
+        val isFirstUse = itemDao.countByFamilyId(familyId) == 0
         val normalizedScope = KBVisibilityScope.normalized(visibilityScope)
         val memberIdsJson = encodeStringList(
             if (normalizedScope == KBVisibilityScope.MEMBERS) visibilityMemberIds else emptyList(),
@@ -198,6 +203,10 @@ class TodoRepository @Inject constructor(
         itemDao.upsert(persisted)
         remoteStore.upsertTodo(persisted)
         itemDao.upsert(persisted.copy(syncStateRaw = KBSyncState.SYNCED.rawValue))
+        AppAnalytics.contentCreated(appContext, "todo")
+        if (isFirstUse) {
+            AppAnalytics.featureFirstUse(appContext, feature = "todo")
+        }
     }
 
     suspend fun updateTodo(

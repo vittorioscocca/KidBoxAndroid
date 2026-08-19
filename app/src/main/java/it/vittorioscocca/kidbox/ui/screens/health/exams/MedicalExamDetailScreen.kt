@@ -88,6 +88,8 @@ import java.util.Locale
 import it.vittorioscocca.kidbox.util.KBLocale
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
+import com.google.firebase.auth.FirebaseAuth
 
 private fun DATE_LONG_EXAM() = SimpleDateFormat("d MMMM yyyy", KBLocale.current())
 private fun DATE_CREATED_EXAM() = SimpleDateFormat("d MMM yyyy", KBLocale.current())
@@ -123,6 +125,13 @@ fun MedicalExamDetailScreen(
     var showAiChat by remember { mutableStateOf(false) }
 
     LaunchedEffect(familyId, childId, examId) { viewModel.bind(familyId, childId, examId) }
+    LaunchedEffect(state.exam?.id) {
+        val ex = state.exam ?: return@LaunchedEffect
+        val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        if (ex.createdBy.isNotBlank() && ex.createdBy != currentUid) {
+            AppAnalytics.contentSharedRead(context, "health")
+        }
+    }
     LaunchedEffect(state.deleted) { if (state.deleted) onBack() }
     LaunchedEffect(state.uploadError) {
         state.uploadError?.let { err ->
@@ -356,6 +365,7 @@ fun MedicalExamDetailScreen(
                         .padding(end = 20.dp, bottom = 92.dp),
                     upgradeSubtitle = stringResource(R.string.ai_upgrade_exam_detail),
                     contentDescription = "Chiedi all'AI sull'analisi $examLabel",
+                    analyticsContext = "health_exam_detail",
                     onTap = { showAiChat = true },
                 )
             }

@@ -70,6 +70,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
+import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -114,6 +116,15 @@ fun MedicalVaccineFormScreen(
     }
     LaunchedEffect(state.saveError) {
         state.saveError?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+    }
+    // Solo in modifica: aprire il form di un vaccino nuovo non è una lettura.
+    LaunchedEffect(isEditing, state.createdBy) {
+        if (!isEditing) return@LaunchedEffect
+        val createdBy = state.createdBy.orEmpty()
+        val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        if (createdBy.isNotBlank() && createdBy != currentUid) {
+            AppAnalytics.contentSharedRead(context, "health")
+        }
     }
 
     val isDark = isSystemInDarkTheme()

@@ -1,13 +1,16 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
+import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.PetDao
 import it.vittorioscocca.kidbox.data.local.entity.PetEntity
 import it.vittorioscocca.kidbox.data.remote.life.PetRemoteChange
 import it.vittorioscocca.kidbox.data.remote.life.PetRemoteStore
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +26,7 @@ class PetRepository @Inject constructor(
     private val petDao: PetDao,
     private val remoteStore: PetRemoteStore,
     private val auth: FirebaseAuth,
+    @ApplicationContext private val appContext: Context,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val realtimeMutex = Mutex()
@@ -90,6 +94,7 @@ class PetRepository @Inject constructor(
     ) {
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()
+        val isFirstUse = petDao.countByFamilyId(familyId) == 0
         val entity = PetEntity(
             id = java.util.UUID.randomUUID().toString(),
             familyId = familyId,
@@ -117,6 +122,10 @@ class PetRepository @Inject constructor(
                 petDao.upsert(entity.copy(syncState = KBSyncState.ERROR.rawValue))
                 throw it
             }
+        AppAnalytics.contentCreated(appContext, "pets")
+        if (isFirstUse) {
+            AppAnalytics.featureFirstUse(appContext, feature = "pets")
+        }
     }
 
     suspend fun updatePet(entity: PetEntity) {

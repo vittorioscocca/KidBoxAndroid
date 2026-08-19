@@ -18,6 +18,7 @@ import it.vittorioscocca.kidbox.data.local.PhotoPreviewCache
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyPhotoDao
 import it.vittorioscocca.kidbox.data.local.dao.KBPhotoAlbumDao
+import it.vittorioscocca.kidbox.data.local.dao.OnboardingSignalsDao
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyPhotoEntity
 import it.vittorioscocca.kidbox.util.fixBitmapOrientationFromBytes
@@ -30,6 +31,7 @@ import it.vittorioscocca.kidbox.data.remote.PhotoVideoStorageManager
 import it.vittorioscocca.kidbox.data.remote.RemoteFamilyPhotoDto
 import it.vittorioscocca.kidbox.data.remote.RemotePhotoAlbumDto
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
@@ -56,6 +58,7 @@ class PhotoVideoRepository @Inject constructor(
     private val storageManager: PhotoVideoStorageManager,
     private val auth: FirebaseAuth,
     @ApplicationContext private val context: Context,
+    private val onboardingSignalsDao: OnboardingSignalsDao,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val realtimeMutex = Mutex()
@@ -167,6 +170,7 @@ class PhotoVideoRepository @Inject constructor(
         ensureFamilyExists(familyId = familyId, updatedAtEpochMillis = System.currentTimeMillis(), updatedBy = auth.currentUser?.uid)
         val now = System.currentTimeMillis()
         val uid = auth.currentUser?.uid ?: "local"
+        val isFirstPhoto = onboardingSignalsDao.familyPhotoCount(familyId) == 0
         val id = UUID.randomUUID().toString()
         val name = fileName.ifBlank { fallbackFileName(mimeType, now) }
         val localFile = saveLocalMediaCopy(id, bytes, mimeType.ifBlank { "application/octet-stream" })
@@ -196,6 +200,10 @@ class PhotoVideoRepository @Inject constructor(
             lastSyncError = null,
         )
         photoDao.upsert(entity)
+        AppAnalytics.contentCreated(context, "photos")
+        if (isFirstPhoto) {
+            AppAnalytics.featureFirstUse(context, feature = "photos")
+        }
         if (!albumId.isNullOrBlank()) {
             setAlbumCoverIfNeeded(albumId, entity)
         }

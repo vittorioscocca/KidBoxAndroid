@@ -340,6 +340,7 @@ fun MedicalVisitsScreen(
                         .offset(y = 16.dp),
                     upgradeSubtitle = stringResource(R.string.ai_upgrade_visits_home),
                     contentDescription = "Chiedi all'AI sulle visite di $displayName",
+                    analyticsContext = "health_visits_list",
                     onTap = {
                         val ids = (
                             state.booked + state.pending +

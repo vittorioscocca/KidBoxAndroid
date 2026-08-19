@@ -1,11 +1,14 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
+import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBCalendarEventDao
+import it.vittorioscocca.kidbox.data.local.dao.OnboardingSignalsDao
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBCalendarEventEntity
 import it.vittorioscocca.kidbox.data.local.mapper.encodeStringList
@@ -13,6 +16,7 @@ import it.vittorioscocca.kidbox.data.remote.calendar.CalendarEventRemoteChange
 import it.vittorioscocca.kidbox.data.remote.calendar.CalendarRemoteStore
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -30,6 +34,8 @@ class CalendarRepository @Inject constructor(
     private val childDao: KBChildDao,
     private val remoteStore: CalendarRemoteStore,
     private val auth: FirebaseAuth,
+    private val onboardingSignalsDao: OnboardingSignalsDao,
+    @ApplicationContext private val appContext: Context,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val realtimeMutex = Mutex()
@@ -70,6 +76,8 @@ class CalendarRepository @Inject constructor(
     suspend fun upsertEventLocal(entity: KBCalendarEventEntity) {
         ensureFamilyExists(entity.familyId)
         val safeChildId = sanitizeChildId(entity.childId)
+        val isNewEvent = calendarDao.getById(entity.id) == null
+        val isFirstEvent = isNewEvent && onboardingSignalsDao.calendarEventCount(entity.familyId) == 0
         calendarDao.upsert(
             entity.copy(
                 childId = safeChildId,
@@ -80,6 +88,12 @@ class CalendarRepository @Inject constructor(
                 lastSyncError = null,
             ),
         )
+        if (isNewEvent) {
+            AppAnalytics.contentCreated(appContext, "calendar")
+            if (isFirstEvent) {
+                AppAnalytics.featureFirstUse(appContext, feature = "calendar")
+            }
+        }
     }
 
     suspend fun deleteEventLocal(entity: KBCalendarEventEntity) {

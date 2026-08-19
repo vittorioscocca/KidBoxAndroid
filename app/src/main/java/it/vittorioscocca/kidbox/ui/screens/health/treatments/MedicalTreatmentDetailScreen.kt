@@ -94,6 +94,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
+import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
@@ -251,6 +253,14 @@ fun MedicalTreatmentDetailScreen(
             Text(stringResource(R.string.health_treatment_not_found), color = kb.title)
         }
         return
+    }
+
+    LaunchedEffect(treatment.id) {
+        val createdBy = treatment.createdBy.orEmpty()
+        val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        if (createdBy.isNotBlank() && createdBy != currentUid) {
+            AppAnalytics.contentSharedRead(context, "health")
+        }
     }
 
     val dosageStr = if (treatment.dosageValue % 1.0 == 0.0) "%.0f".format(treatment.dosageValue) else "%.1f".format(treatment.dosageValue)

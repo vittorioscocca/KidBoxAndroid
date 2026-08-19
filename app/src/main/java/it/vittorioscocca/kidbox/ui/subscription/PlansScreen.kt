@@ -52,6 +52,7 @@ import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ai.UpgradeMessageStore
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 
 @Composable
 fun PlansScreen(
@@ -67,6 +68,11 @@ fun PlansScreen(
 
     LaunchedEffect(Unit) {
         viewModel.loadPlan()
+        AppAnalytics.paywallShown(
+            context,
+            triggerFeature = UpgradeMessageStore.consumeTrigger(),
+            planShown = "both",
+        )
     }
 
     state.purchaseError?.let { err ->

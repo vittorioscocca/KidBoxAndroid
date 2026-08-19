@@ -2,11 +2,14 @@ package it.vittorioscocca.kidbox.data.repository
 
 import it.vittorioscocca.kidbox.util.KBLog
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
+import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.KBExpenseCategoryDao
 import it.vittorioscocca.kidbox.data.local.dao.KBExpenseDao
+import it.vittorioscocca.kidbox.data.local.dao.OnboardingSignalsDao
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentCategoryEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBExpenseCategoryEntity
@@ -14,6 +17,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBExpenseEntity
 import it.vittorioscocca.kidbox.data.remote.expenses.ExpenseRemoteChange
 import it.vittorioscocca.kidbox.data.remote.expenses.ExpenseRemoteStore
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
@@ -41,6 +45,8 @@ class ExpenseRepository @Inject constructor(
     private val remoteStore: ExpenseRemoteStore,
     private val documentRepository: DocumentRepository,
     private val auth: FirebaseAuth,
+    private val onboardingSignalsDao: OnboardingSignalsDao,
+    @ApplicationContext private val appContext: Context,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val realtimeMutex = Mutex()
@@ -159,6 +165,7 @@ class ExpenseRepository @Inject constructor(
             familyId = familyId,
             attachedDocumentId = attachedDocumentId,
         )
+        val isFirstExpense = onboardingSignalsDao.expenseCount(familyId) == 0
         val entity = KBExpenseEntity(
             id = UUID.randomUUID().toString(),
             familyId = familyId,
@@ -178,6 +185,10 @@ class ExpenseRepository @Inject constructor(
             lastSyncError = null,
         )
         expenseDao.upsert(entity)
+        AppAnalytics.contentCreated(appContext, "expenses")
+        if (isFirstExpense) {
+            AppAnalytics.featureFirstUse(appContext, feature = "expenses")
+        }
         return entity
     }
 

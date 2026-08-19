@@ -72,6 +72,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
+import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -125,6 +127,14 @@ fun WalletDocumentDetailScreen(
         val msg = state.message ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(msg)
         viewModel.dismissMessage()
+    }
+
+    LaunchedEffect(item?.document?.id) {
+        val doc = item?.document ?: return@LaunchedEffect
+        val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        if (doc.createdBy.isNotBlank() && doc.createdBy != currentUid) {
+            AppAnalytics.contentSharedRead(context, "wallet")
+        }
     }
 
     if (showDeleteDialog && item != null) {

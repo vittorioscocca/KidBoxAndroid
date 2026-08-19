@@ -25,6 +25,7 @@ import it.vittorioscocca.kidbox.data.remote.auth.AuthPresentation
 import it.vittorioscocca.kidbox.data.remote.auth.AuthProvider
 import it.vittorioscocca.kidbox.data.remote.auth.EmailAuthService
 import it.vittorioscocca.kidbox.data.remote.auth.FacebookAuthService
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -95,12 +96,13 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             _isBusy.value = true
             _errorMessage.value = null
+            AppAnalytics.signupStarted(appContext, "google")
             try {
                 auth.signIn(
                     AuthProvider.GOOGLE,
                     AuthPresentation.ActivityContext(activity),
                 )
-                onSignedInSuccessfully()
+                onSignedInSuccessfully("google")
             } catch (e: Exception) {
                 if (e is AuthError.Cancelled) return@launch
                 _errorMessage.value = friendlyError(e)
@@ -114,12 +116,13 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             _isBusy.value = true
             _errorMessage.value = null
+            AppAnalytics.signupStarted(appContext, "apple")
             try {
                 auth.signIn(
                     AuthProvider.APPLE,
                     AuthPresentation.ActivityContext(activity),
                 )
-                onSignedInSuccessfully()
+                onSignedInSuccessfully("apple")
             } catch (e: Exception) {
                 when (e) {
                     is AuthError.Cancelled -> return@launch
@@ -138,9 +141,10 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             _isBusy.value = true
             _errorMessage.value = null
+            AppAnalytics.signupStarted(appContext, "facebook")
             try {
                 facebookAuth.signInWithFacebook(activity)
-                onSignedInSuccessfully()
+                onSignedInSuccessfully("facebook")
             } catch (e: Exception) {
                 if (e is AuthError.Cancelled) return@launch
                 _errorMessage.value = friendlyError(e)
@@ -215,8 +219,15 @@ class LoginViewModel @Inject constructor(
         }
     }
 
-    private suspend fun onSignedInSuccessfully() {
+    private suspend fun onSignedInSuccessfully(provider: String? = null) {
         val user = FirebaseAuth.getInstance().currentUser ?: return
+        if (provider != null) {
+            val metadata = user.metadata
+            val isNewUser = metadata != null && metadata.creationTimestamp == metadata.lastSignInTimestamp
+            if (isNewUser) {
+                AppAnalytics.signupCompleted(appContext, provider)
+            }
+        }
         userProfileRepository.ensureSeededFromAuth()
         writePlatformToFirestore(user.uid)
         resetFirestoreClientAfterAuthChange()

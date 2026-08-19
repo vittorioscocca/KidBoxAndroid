@@ -32,6 +32,9 @@ interface PasswordEntryDao {
     @Query("DELETE FROM password_entries WHERE id = :id")
     suspend fun deleteById(id: String)
 
+    @Query("SELECT COUNT(*) FROM password_entries WHERE familyId = :familyId AND deletedAtEpochMillis IS NULL")
+    suspend fun countByFamilyId(familyId: String): Int
+
     @Query(
         """
         SELECT * FROM password_entries

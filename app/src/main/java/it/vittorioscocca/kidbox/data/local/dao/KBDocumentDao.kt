@@ -136,4 +136,7 @@ interface KBDocumentDao {
 
     @Query("DELETE FROM kb_documents WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    @Query("SELECT COUNT(*) FROM kb_documents WHERE familyId = :familyId AND isDeleted = 0 AND notes LIKE 'kb_wallet_doc:%'")
+    suspend fun countWalletDocumentsByFamilyId(familyId: String): Int
 }

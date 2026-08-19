@@ -49,10 +49,13 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -81,6 +84,7 @@ import it.vittorioscocca.kidbox.ui.components.IosPlainTextFieldRow
 import it.vittorioscocca.kidbox.ui.components.KidBoxIosFormTopBar
 import it.vittorioscocca.kidbox.ui.theme.KidBoxColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -105,6 +109,15 @@ fun PetDetailScreen(
 
     val kb = MaterialTheme.kidBoxColors
     val orange = Color(0xFFFF6B00)
+    val context = LocalContext.current
+
+    LaunchedEffect(pet?.id) {
+        val p = pet ?: return@LaunchedEffect
+        val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        if (p.createdBy.isNotBlank() && p.createdBy != currentUid) {
+            AppAnalytics.contentSharedRead(context, "pets")
+        }
+    }
 
     Scaffold(
         containerColor = kb.background,

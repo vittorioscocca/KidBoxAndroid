@@ -1,12 +1,15 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
+import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.KBDocumentCategoryDao
 import it.vittorioscocca.kidbox.data.local.dao.KBDocumentDao
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import it.vittorioscocca.kidbox.data.remote.DocumentCryptoManager
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
 import it.vittorioscocca.kidbox.domain.model.WalletDocumentMetadata
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -26,6 +29,7 @@ class WalletDocumentRepository @Inject constructor(
     private val categoryDao: KBDocumentCategoryDao,
     private val cryptoManager: DocumentCryptoManager,
     private val auth: FirebaseAuth,
+    @ApplicationContext private val appContext: Context,
 ) {
     companion object {
         const val IDENTITY_FOLDER_TITLE = "Documenti d'identità"
@@ -94,6 +98,7 @@ class WalletDocumentRepository @Inject constructor(
         bytes: ByteArray,
         metadata: WalletDocumentMetadata,
     ): String {
+        val isFirstUse = documentDao.countWalletDocumentsByFamilyId(familyId) == 0
         val folderId = findOrCreateIdentityFolder(familyId)
         val docId = UUID.randomUUID().toString()
         documentRepository.uploadDocumentLocal(
@@ -109,6 +114,10 @@ class WalletDocumentRepository @Inject constructor(
             documentDao.upsert(doc.copy(childId = childId, title = title.trim().ifEmpty { doc.title }))
         }
         documentRepository.flushPending(familyId)
+        AppAnalytics.contentCreated(appContext, "wallet")
+        if (isFirstUse) {
+            AppAnalytics.featureFirstUse(appContext, feature = "wallet")
+        }
         return docId
     }
 

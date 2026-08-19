@@ -41,6 +41,7 @@ import androidx.navigation.NavHostController
 import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
@@ -68,6 +69,13 @@ fun TravelDetailScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+
+    LaunchedEffect(trip?.id) {
+        val t = trip ?: return@LaunchedEffect
+        if (t.createdBy.isNotBlank() && t.createdBy != uid) {
+            AppAnalytics.contentSharedRead(context, "travel")
+        }
+    }
 
     fun openTripPhotoAlbum(tripEntity: KBTripEntity) {
         scope.launch {

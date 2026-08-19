@@ -32,8 +32,8 @@ android {
         applicationId = "it.vittorioscocca.kidbox"
         minSdk = 26
         targetSdk = 36
-        versionCode = 38
-        versionName = "2.1.6"
+        versionCode = 39
+        versionName = "2.1.7"
         manifestPlaceholders["googleMapsApiKey"] = mapsApiKey
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
         buildConfigField("Boolean", "AI_ENABLED", "true")
@@ -138,6 +138,7 @@ dependencies {
     implementation(libs.firebase.storage)
     implementation("com.google.firebase:firebase-storage-ktx")
     implementation(libs.firebase.messaging)
+    implementation(libs.firebase.analytics)
     implementation("com.google.firebase:firebase-functions-ktx")
     implementation("com.google.firebase:firebase-appcheck")
 

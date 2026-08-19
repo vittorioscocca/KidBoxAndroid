@@ -36,4 +36,7 @@ interface KBTripDao {
 
     @Query("DELETE FROM kb_trips WHERE id = :tripId")
     suspend fun deleteById(tripId: String)
+
+    @Query("SELECT COUNT(*) FROM kb_trips WHERE familyId = :familyId")
+    suspend fun countByFamilyId(familyId: String): Int
 }

@@ -15,6 +15,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.entity.KBChildEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 import javax.inject.Inject
@@ -89,6 +90,7 @@ class FamilyFirestoreCreationRepository @Inject constructor(
             ),
         )
         batch1.commit().await()
+        AppAnalytics.familyCreated(appContext)
 
         val now = System.currentTimeMillis()
         familyDao.upsert(

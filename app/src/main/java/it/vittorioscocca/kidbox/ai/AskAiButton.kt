@@ -20,12 +20,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.BuildConfig
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 
 @Composable
 fun AskAiButton(
     modifier: Modifier = Modifier,
     upgradeSubtitle: String? = null,
     contentDescription: String = "Chiedi all'AI",
+    analyticsContext: String,
     onTap: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -41,6 +43,7 @@ fun AskAiButton(
     FloatingActionButton(
         onClick = {
             if (isLocked || !BuildConfig.AI_ENABLED) {
+                AppAnalytics.aiPaywallShown(context, analyticsContext)
                 upgradeAction(upgradeSubtitle)
                 return@FloatingActionButton
             }

@@ -28,4 +28,7 @@ interface HomeItemDao {
 
     @Query("DELETE FROM home_items WHERE familyId = :familyId")
     suspend fun deleteAllByFamily(familyId: String)
+
+    @Query("SELECT COUNT(*) FROM home_items WHERE familyId = :familyId AND isDeleted = 0")
+    suspend fun countByFamilyId(familyId: String): Int
 }

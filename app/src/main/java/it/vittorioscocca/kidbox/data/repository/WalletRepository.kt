@@ -24,6 +24,7 @@ import it.vittorioscocca.kidbox.data.wallet.WalletParsedData
 import it.vittorioscocca.kidbox.data.wallet.WalletPdfParser
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.notifications.WalletReminderScheduler
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -101,6 +102,7 @@ class WalletRepository @Inject constructor(
             val user = auth.currentUser ?: error("Non autenticato")
             val displayName = user.displayName?.trim().orEmpty().ifBlank { "Tu" }
             ensureFamilyExists(familyId)
+            val isFirstUse = walletTicketDao.countByFamilyId(familyId) == 0
 
             val ticketId = UUID.randomUUID().toString()
             val storagePath = "families/$familyId/wallet/$ticketId/ticket.pdf.kbenc"
@@ -155,6 +157,10 @@ class WalletRepository @Inject constructor(
             remoteStore.upsert(entity, displayName)
             walletTicketDao.upsert(entity.copy(syncStateRaw = 0))
             walletReminderScheduler.rescheduleForFamily(familyId)
+            AppAnalytics.contentCreated(context, "wallet")
+            if (isFirstUse) {
+                AppAnalytics.featureFirstUse(context, feature = "wallet")
+            }
             ticketId
         }
     }

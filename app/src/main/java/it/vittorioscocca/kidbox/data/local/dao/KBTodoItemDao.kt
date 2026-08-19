@@ -27,4 +27,7 @@ interface KBTodoItemDao {
 
     @Delete
     suspend fun delete(entity: KBTodoItemEntity)
+
+    @Query("SELECT COUNT(*) FROM kb_todo_items WHERE familyId = :familyId AND isDeleted = 0")
+    suspend fun countByFamilyId(familyId: String): Int
 }

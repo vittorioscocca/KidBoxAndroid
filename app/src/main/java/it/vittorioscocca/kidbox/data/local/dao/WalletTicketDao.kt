@@ -57,4 +57,7 @@ interface WalletTicketDao {
 
     @Query("SELECT * FROM kb_wallet_tickets WHERE syncStateRaw != 0")
     suspend fun getPending(): List<KBWalletTicketEntity>
+
+    @Query("SELECT COUNT(*) FROM kb_wallet_tickets WHERE familyId = :familyId AND isDeleted = 0")
+    suspend fun countByFamilyId(familyId: String): Int
 }

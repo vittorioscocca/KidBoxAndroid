@@ -18,6 +18,7 @@ fun HealthAskAiButton(
         modifier = modifier,
         upgradeSubtitle = upgradeSubtitle,
         contentDescription = "Chiedi all'AI sulla salute di $display",
+        analyticsContext = "health_agent",
         onTap = onTap,
     )
 }

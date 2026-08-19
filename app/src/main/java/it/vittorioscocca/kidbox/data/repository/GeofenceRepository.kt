@@ -1,12 +1,15 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import android.content.Context
 import com.google.firebase.firestore.ListenerRegistration
+import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.KBGeofenceDao
 import it.vittorioscocca.kidbox.data.local.entity.KBGeofenceEntity
 import it.vittorioscocca.kidbox.data.remote.location.GeofenceRemoteChange
 import it.vittorioscocca.kidbox.data.remote.location.GeofenceRemoteStore
 import it.vittorioscocca.kidbox.data.remote.location.geofenceEntityFromDto
 import it.vittorioscocca.kidbox.util.KBLog
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -21,6 +24,7 @@ import kotlinx.coroutines.sync.withLock
 class GeofenceRepository @Inject constructor(
     private val geofenceDao: KBGeofenceDao,
     private val remoteStore: GeofenceRemoteStore,
+    @ApplicationContext private val appContext: Context,
 ) {
     private companion object {
         const val TAG = "GeofenceRepository"
@@ -68,8 +72,16 @@ class GeofenceRepository @Inject constructor(
     }
 
     suspend fun upsert(entity: KBGeofenceEntity) {
+        val isNew = geofenceDao.getById(entity.id) == null
+        val isFirstUse = isNew && geofenceDao.countByFamilyId(entity.familyId) == 0
         geofenceDao.upsert(entity)
         remoteStore.upsertToFirestore(entity)
+        if (isNew) {
+            AppAnalytics.contentCreated(appContext, "location")
+            if (isFirstUse) {
+                AppAnalytics.featureFirstUse(appContext, feature = "location")
+            }
+        }
     }
 
     suspend fun setActive(entity: KBGeofenceEntity, active: Boolean) {

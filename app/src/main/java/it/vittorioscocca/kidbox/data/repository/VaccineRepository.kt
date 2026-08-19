@@ -1,12 +1,15 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
+import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.KBVaccineDao
 import it.vittorioscocca.kidbox.data.local.mapper.toDomain
 import it.vittorioscocca.kidbox.data.local.mapper.toEntity
 import it.vittorioscocca.kidbox.data.remote.health.RemoteVaccineDto
 import it.vittorioscocca.kidbox.data.remote.health.VaccineRemoteStore
 import it.vittorioscocca.kidbox.domain.model.KBVaccine
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +21,7 @@ import kotlinx.coroutines.withContext
 class VaccineRepository @Inject constructor(
     private val dao: KBVaccineDao,
     private val remote: VaccineRemoteStore,
+    @ApplicationContext private val appContext: Context,
 ) {
     private val auth = FirebaseAuth.getInstance()
 
@@ -29,6 +33,8 @@ class VaccineRepository @Inject constructor(
     }
 
     suspend fun upsert(vaccine: KBVaccine): KBVaccine = withContext(Dispatchers.IO) {
+        val isNew = dao.getById(vaccine.id) == null
+        val isFirstUse = isNew && dao.countByFamilyId(vaccine.familyId) == 0
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()
         val pending = vaccine.copy(
@@ -44,6 +50,13 @@ class VaccineRepository @Inject constructor(
             dao.upsert(pending.copy(syncStateRaw = 0).toEntity())
         }.onFailure { err ->
             dao.upsert(pending.copy(lastSyncError = err.message).toEntity())
+        }
+
+        if (isNew) {
+            AppAnalytics.contentCreated(appContext, "health")
+            if (isFirstUse) {
+                AppAnalytics.featureFirstUse(appContext, feature = "health")
+            }
         }
         pending
     }

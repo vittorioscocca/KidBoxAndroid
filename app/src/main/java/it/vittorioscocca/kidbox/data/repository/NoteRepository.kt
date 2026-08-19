@@ -1,10 +1,13 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
+import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBNoteDao
+import it.vittorioscocca.kidbox.data.local.dao.OnboardingSignalsDao
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBNoteEntity
 import it.vittorioscocca.kidbox.data.remote.notes.NoteRemoteChange
@@ -15,6 +18,7 @@ import it.vittorioscocca.kidbox.data.remote.notes.noteTitleForStorage
 import it.vittorioscocca.kidbox.domain.model.KBNote
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -32,6 +36,8 @@ class NoteRepository @Inject constructor(
     private val familyDao: KBFamilyDao,
     private val remoteStore: NoteRemoteStore,
     private val auth: FirebaseAuth,
+    private val onboardingSignalsDao: OnboardingSignalsDao,
+    @ApplicationContext private val appContext: Context,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val inboundMutex = Mutex()
@@ -89,6 +95,8 @@ class NoteRepository @Inject constructor(
         val uid = auth.currentUser?.uid ?: "local"
         val id = noteId ?: java.util.UUID.randomUUID().toString()
         val current = noteDao.getById(id)
+        val isNewNote = current == null
+        val isFirstNote = isNewNote && onboardingSignalsDao.noteCount(familyId) == 0
         val storedTitle = title.noteTitleForStorage()
         val storedBody = body.trimEnd()
         val scopeStored = KBVisibilityScope.normalized(visibilityScope ?: current?.visibilityScope)
@@ -113,6 +121,12 @@ class NoteRepository @Inject constructor(
             lastSyncError = null,
         )
         noteDao.upsert(target)
+        if (isNewNote) {
+            AppAnalytics.contentCreated(appContext, "notes")
+            if (isFirstNote) {
+                AppAnalytics.featureFirstUse(appContext, feature = "notes")
+            }
+        }
         runCatching {
             remoteStore.upsert(target)
             noteDao.upsert(

@@ -25,6 +25,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.domain.family.isFamilySubscriptionManager
 import it.vittorioscocca.kidbox.domain.model.KBPlan
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CompletableDeferred
@@ -81,6 +82,7 @@ class KBBillingManager @Inject constructor(
     private var currentFamilyId: String = ""
     private var currentUid: String = ""
     private var retryCount = 0
+    private val trialOfferByProductId = mutableMapOf<String, Boolean>()
 
     /** Completamento opzionale per schermate che devono attendere [onQueryPurchasesResponse]. */
     private val restoreAwaitLock = Any()
@@ -146,6 +148,8 @@ class KBBillingManager @Inject constructor(
             _purchaseError.value = "Offerta non disponibile per questo piano."
             return
         }
+        val hasTrial = firstOffer.pricingPhases.pricingPhaseList.any { it.priceAmountMicros == 0L }
+        trialOfferByProductId[product.productId] = hasTrial
         val params: BillingFlowParams.ProductDetailsParams = BillingFlowParams.ProductDetailsParams.newBuilder()
             .setProductDetails(product)
             .setOfferToken(offerToken)
@@ -314,7 +318,7 @@ class KBBillingManager @Inject constructor(
         scope.launch {
             _isLoading.value = true
             for (purchase: Purchase in purchases) {
-                processPurchase(purchase)
+                processPurchase(purchase, isNewPurchase = true)
             }
             _isLoading.value = false
         }
@@ -329,14 +333,14 @@ class KBBillingManager @Inject constructor(
         }
         scope.launch {
             for (purchase: Purchase in purchases) {
-                processPurchase(purchase)
+                processPurchase(purchase, isNewPurchase = false)
             }
             _isLoading.value = false
             completePendingRestoreAwaitIfNeeded()
         }
     }
 
-    private suspend fun processPurchase(purchase: Purchase) {
+    private suspend fun processPurchase(purchase: Purchase, isNewPurchase: Boolean) {
         if (purchase.purchaseState != Purchase.PurchaseState.PURCHASED) return
         val detectedPlan = mapPurchaseToPlan(purchase) ?: return
         val token = purchase.purchaseToken
@@ -350,6 +354,10 @@ class KBBillingManager @Inject constructor(
         if (updateResult.isFailure) {
             _purchaseError.value = updateResult.exceptionOrNull()?.localizedMessage ?: "Errore aggiornamento piano."
             return
+        }
+        if (isNewPurchase && !purchase.isAcknowledged) {
+            val hasTrialOffer = purchase.products.firstOrNull()?.let { trialOfferByProductId[it] } ?: false
+            AppAnalytics.subscriptionStarted(context, plan = detectedPlan.rawValue, trial = hasTrialOffer)
         }
         if (!purchase.isAcknowledged) {
             val ackParams: AcknowledgePurchaseParams = AcknowledgePurchaseParams.newBuilder()

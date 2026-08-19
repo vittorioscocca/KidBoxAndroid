@@ -52,6 +52,8 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun NoteDetailScreen(
@@ -81,6 +83,10 @@ fun NoteDetailScreen(
             createdAtEpochMillis = state.noteCreatedAtEpochMillis,
             entryPoint = KBAnalyticsOrigin.consume(),
         )
+        val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        if (state.noteCreatedBy.isNotBlank() && state.noteCreatedBy != currentUid) {
+            AppAnalytics.contentSharedRead(context, "notes")
+        }
     }
 
     BackHandler {

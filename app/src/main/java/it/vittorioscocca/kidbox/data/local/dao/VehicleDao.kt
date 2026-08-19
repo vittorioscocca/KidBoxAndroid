@@ -29,4 +29,7 @@ interface VehicleDao {
 
     @Query("DELETE FROM vehicles WHERE familyId = :familyId")
     suspend fun deleteAllByFamily(familyId: String)
+
+    @Query("SELECT COUNT(*) FROM vehicles WHERE familyId = :familyId AND isDeleted = 0")
+    suspend fun countByFamilyId(familyId: String): Int
 }

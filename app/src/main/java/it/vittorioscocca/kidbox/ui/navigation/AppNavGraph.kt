@@ -3,10 +3,13 @@ package it.vittorioscocca.kidbox.ui.navigation
 import it.vittorioscocca.kidbox.util.KBLog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
@@ -159,9 +162,25 @@ fun AppNavGraph(
         NotificationDeepLinkRouter.clear()
     }
 
+    val screenViewContext = LocalContext.current
+    DisposableEffect(navController) {
+        var lastFiredScreenName: String? = null
+        val listener = androidx.navigation.NavController.OnDestinationChangedListener { _, destination, _ ->
+            val screenName = screenNameFor(destination.route)
+            if (screenName != null && screenName != lastFiredScreenName) {
+                lastFiredScreenName = screenName
+                AppAnalytics.screenView(screenViewContext, screenName)
+            }
+        }
+        navController.addOnDestinationChangedListener(listener)
+        onDispose {
+            navController.removeOnDestinationChangedListener(listener)
+        }
+    }
+
     CompositionLocalProvider(
         LocalUpgradeAction provides { msg ->
-            UpgradeMessageStore.set(msg)
+            UpgradeMessageStore.set(msg, triggerFeature = "ai_lock")
             navController.navigate(AppDestination.Plans.route) { launchSingleTop = true }
         },
     ) {
@@ -306,6 +325,9 @@ fun AppNavGraph(
             )
             HomeScreen(
                 onNavigate = { route ->
+                    if (route == AppDestination.Plans.route) {
+                        UpgradeMessageStore.set(null, triggerFeature = "home_upsell")
+                    }
                     navController.navigate(route) {
                         when (route) {
                             AppDestination.Profile.route,
@@ -334,6 +356,7 @@ fun AppNavGraph(
                 },
                 onStorageUsage = { navController.navigate(AppDestination.StorageUsage.route) },
                 onOpenPlans = {
+                    UpgradeMessageStore.set(null, triggerFeature = "settings_upsell")
                     navController.navigate(AppDestination.Plans.route) {
                         launchSingleTop = true
                     }
@@ -384,6 +407,7 @@ fun AppNavGraph(
             AiSettingsScreen(
                 onBack = { navController.popBackStack() },
                 onOpenPlans = {
+                    UpgradeMessageStore.set(null, triggerFeature = "ai_settings")
                     navController.navigate(AppDestination.Plans.route) {
                         launchSingleTop = true
                     }
@@ -395,6 +419,7 @@ fun AppNavGraph(
             StorageUsageScreen(
                 onBack = { navController.popBackStack() },
                 onOpenPlans = {
+                    UpgradeMessageStore.set(null, triggerFeature = "storage_lock")
                     navController.navigate(AppDestination.Plans.route) {
                         launchSingleTop = true
                     }
@@ -1996,6 +2021,31 @@ fun AppNavGraph(
     }
 
     } // end CompositionLocalProvider
+}
+
+internal fun screenNameFor(route: String?): String? {
+    if (route == null) return null
+    return when {
+        route.startsWith("calendar/") -> "calendar"
+        route.startsWith("documents_home") -> "documents"
+        route == "chat" || route.startsWith("chat_media_gallery") -> "chat"
+        route.startsWith("health/") || route.startsWith("pediatric_child_selector/") -> "health"
+        route.startsWith("expenses_home") -> "expenses"
+        route.startsWith("passwords_") || route.startsWith("password_") -> "passwords"
+        route.startsWith("wallet_") -> "wallet"
+        route.startsWith("shopping_list/") -> "grocery"
+        route.startsWith("notes_home") || route.startsWith("note_detail") -> "notes"
+        route == "todo" || route.startsWith("todo_list") || route.startsWith("todo_smart") -> "todo"
+        route.startsWith("family_photos") || route.startsWith("photo_album") -> "photos"
+        route.startsWith("pets/") || route.startsWith("pet_detail") -> "pets"
+        route.startsWith("home_items") || route.startsWith("home_item_detail") ||
+            route.startsWith("house_payment_detail") || route.startsWith("vehicles/") ||
+            route.startsWith("vehicle_detail") || route.startsWith("vehicle_interventions") -> "home_vehicles"
+        route.startsWith("travel/") -> "travel"
+        route.startsWith("family_location") || route.startsWith("geofence_list") ||
+            route.startsWith("geofence_edit") -> "location"
+        else -> null
+    }
 }
 
 @Composable

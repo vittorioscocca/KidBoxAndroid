@@ -1,14 +1,18 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
+import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.data.local.dao.HomeItemDao
 import it.vittorioscocca.kidbox.data.local.dao.VehicleDao
 import it.vittorioscocca.kidbox.data.local.entity.VehicleEntity
 import it.vittorioscocca.kidbox.data.remote.life.VehicleRemoteChange
 import it.vittorioscocca.kidbox.data.remote.life.VehicleRemoteStore
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
 import it.vittorioscocca.kidbox.notifications.VehicleDeadlineReminderScheduler
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -25,6 +29,8 @@ class VehicleRepository @Inject constructor(
     private val remoteStore: VehicleRemoteStore,
     private val auth: FirebaseAuth,
     private val vehicleDeadlineReminderScheduler: VehicleDeadlineReminderScheduler,
+    private val homeItemDao: HomeItemDao,
+    @ApplicationContext private val appContext: Context,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val realtimeMutex = Mutex()
@@ -104,6 +110,7 @@ class VehicleRepository @Inject constructor(
     ) {
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()
+        val isFirstUse = vehicleDao.countByFamilyId(familyId) == 0 && homeItemDao.countByFamilyId(familyId) == 0
         val id = presetVehicleId?.trim()?.takeIf { it.isNotEmpty() } ?: java.util.UUID.randomUUID().toString()
         val entity = VehicleEntity(
             id = id,
@@ -147,6 +154,10 @@ class VehicleRepository @Inject constructor(
                 vehicleDeadlineReminderScheduler.syncVehicle(err)
                 throw it
             }
+        AppAnalytics.contentCreated(appContext, "home_vehicles")
+        if (isFirstUse) {
+            AppAnalytics.featureFirstUse(appContext, feature = "home_vehicles")
+        }
     }
 
     suspend fun updateVehicle(entity: VehicleEntity) {

@@ -11,6 +11,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.KBDocumentCategoryDao
 import it.vittorioscocca.kidbox.data.local.dao.KBDocumentDao
 import it.vittorioscocca.kidbox.data.local.dao.KBExpenseDao
+import it.vittorioscocca.kidbox.data.local.dao.OnboardingSignalsDao
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentCategoryEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
@@ -25,6 +26,7 @@ import it.vittorioscocca.kidbox.data.remote.chat.ChatStorageService
 import it.vittorioscocca.kidbox.domain.model.KBTextExtractionStatus
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import java.io.File
 import java.util.ArrayDeque
 import java.util.UUID
@@ -75,6 +77,7 @@ class DocumentRepository @Inject constructor(
     private val chatStorageService: ChatStorageService,
     private val auth: FirebaseAuth,
     @ApplicationContext private val context: Context,
+    private val onboardingSignalsDao: OnboardingSignalsDao,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val realtimeMutex = Mutex()
@@ -739,6 +742,7 @@ class DocumentRepository @Inject constructor(
             membersJson = encodeStringList(emptyList())
         }
         val storedCreatedBy = (createdBy?.takeIf { it.isNotBlank() } ?: uid).ifBlank { "local" }
+        val isFirstDocument = onboardingSignalsDao.documentCount(familyId) == 0
         val id = forcedId ?: UUID.randomUUID().toString()
         // Comprimi le immagini ad alta risoluzione prima di persistere/caricare.
         val compressed = DocumentImageCompressor.compressIfNeeded(bytes, fileName, mimeType)
@@ -775,6 +779,10 @@ class DocumentRepository @Inject constructor(
             lastSyncError = null,
         )
         documentDao.upsert(entity)
+        AppAnalytics.contentCreated(context, "documents")
+        if (isFirstDocument) {
+            AppAnalytics.featureFirstUse(context, feature = "documents")
+        }
     }
 
     suspend fun createExpenseAttachmentLocalAtomically(

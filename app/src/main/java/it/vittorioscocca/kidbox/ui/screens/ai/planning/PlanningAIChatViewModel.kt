@@ -76,6 +76,7 @@ import it.vittorioscocca.kidbox.domain.model.KBRoutineCheck
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import it.vittorioscocca.kidbox.domain.model.KBTodoItem
 import it.vittorioscocca.kidbox.ai.CurrentPlanStore
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import it.vittorioscocca.kidbox.domain.model.ai.AIMessageRole
 import it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod
 import it.vittorioscocca.kidbox.domain.model.ai.AIServiceError
@@ -317,6 +318,7 @@ class PlanningAIChatViewModel @Inject constructor(
                 } else {
                     _uiState.value.autoExecutedMessageIds
                 }
+                AppAnalytics.aiMessageSent(context, "assistente", CurrentPlanStore.plan.value.rawValue)
                 messagesInSession = reply.usageToday
                 dailyLimit = reply.dailyLimit
                 maybeCompactIfNeeded(conv.id, reply.usageToday, reply.dailyLimit)

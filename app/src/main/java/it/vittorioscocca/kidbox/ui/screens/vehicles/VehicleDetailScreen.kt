@@ -70,6 +70,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.platform.LocalContext
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
+import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -145,6 +147,13 @@ fun VehicleDetailScreen(
     val previewInterventions = remember(events) { events.take(4) }
     val showSeeAllInterventions = events.size > 4
 
+    LaunchedEffect(vehicle?.id) {
+        val v = vehicle ?: return@LaunchedEffect
+        val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        if (v.createdBy.isNotBlank() && v.createdBy != currentUid) {
+            AppAnalytics.contentSharedRead(context, "home_vehicles")
+        }
+    }
     LaunchedEffect(attachmentError) {
         attachmentError?.let { msg ->
             Toast.makeText(context, msg, Toast.LENGTH_LONG).show()

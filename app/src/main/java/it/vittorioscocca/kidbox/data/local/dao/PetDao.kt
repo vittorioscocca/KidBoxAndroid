@@ -29,4 +29,7 @@ interface PetDao {
 
     @Query("DELETE FROM pets WHERE familyId = :familyId")
     suspend fun deleteAllByFamily(familyId: String)
+
+    @Query("SELECT COUNT(*) FROM pets WHERE familyId = :familyId AND isDeleted = 0")
+    suspend fun countByFamilyId(familyId: String): Int
 }

@@ -30,6 +30,7 @@ import it.vittorioscocca.kidbox.domain.model.KBAIMessage
 import it.vittorioscocca.kidbox.domain.model.ai.AIMessageRole
 import it.vittorioscocca.kidbox.domain.model.ai.AIServiceError
 import it.vittorioscocca.kidbox.notifications.ExactAlarmScheduler
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -233,6 +234,8 @@ class DailyBriefingBroadcastReceiver : BroadcastReceiver() {
             .build()
         runCatching {
             NotificationManagerCompat.from(context).notify(("daily:$familyId").hashCode(), notification)
+        }.onSuccess {
+            AppAnalytics.aiBriefingReceived(context)
         }
 
         DailyBriefingService.scheduleDaily8amNotification(context, familyId, familyName, fullText)

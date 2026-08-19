@@ -39,6 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.screens.onboarding.InviteCodeViewModel
 import it.vittorioscocca.kidbox.ui.screens.onboarding.QRCodeView
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 
@@ -116,6 +117,7 @@ fun InviteCodeScreen(
                         Spacer(modifier = Modifier.size(8.dp))
                         Button(
                             onClick = {
+                                AppAnalytics.inviteShared(context, "system_share_sheet")
                                 context.startActivity(
                                     Intent.createChooser(
                                         Intent(Intent.ACTION_SEND).apply {
@@ -142,6 +144,7 @@ fun InviteCodeScreen(
                         Spacer(modifier = Modifier.size(8.dp))
                         OutlinedButton(
                             onClick = {
+                                AppAnalytics.inviteShared(context, "copy")
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                 clipboard.setPrimaryClip(ClipData.newPlainText("KidBox", link))
                             },

@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox.ui.screens.travel
 
 import it.vittorioscocca.kidbox.util.KBLog
 
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -9,6 +10,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.TravelProfilePreferences
 import it.vittorioscocca.kidbox.data.local.TravelStyle
@@ -34,6 +36,7 @@ import it.vittorioscocca.kidbox.data.repository.PhotoVideoRepository
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -67,6 +70,7 @@ class TravelPlanningViewModel @Inject constructor(
     private val travelProfilePreferences: TravelProfilePreferences,
     private val tripExtrasRepository: TravelTripExtrasRepository,
     private val photoVideoRepository: PhotoVideoRepository,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     private val _usageToday = MutableStateFlow(0)
@@ -455,6 +459,7 @@ class TravelPlanningViewModel @Inject constructor(
                 _usageToday.value = response.usageToday
                 _dailyLimit.value = response.dailyLimit
                 aiUsageTracker.apply(response.usageToday, response.dailyLimit, response.period)
+                AppAnalytics.aiMessageSent(appContext, "viaggi", it.vittorioscocca.kidbox.ai.CurrentPlanStore.plan.value.rawValue)
 
                 val hasPlan = resolvedPlan != null
                 val hasNarrative = !_proposalNarrative.value.isNullOrBlank()
@@ -514,6 +519,7 @@ class TravelPlanningViewModel @Inject constructor(
         val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
         val now = System.currentTimeMillis()
         val tripId = UUID.randomUUID().toString()
+        val isFirstUse = tripDao.countByFamilyId(familyId) == 0
 
         val trip = KBTripEntity(
             id = tripId,
@@ -604,6 +610,10 @@ class TravelPlanningViewModel @Inject constructor(
             _error.value = message
             _events.emit(Event.Error(message))
             return null
+        }
+        AppAnalytics.contentCreated(appContext, "travel")
+        if (isFirstUse) {
+            AppAnalytics.featureFirstUse(appContext, feature = "travel")
         }
         return tripId
     }

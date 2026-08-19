@@ -22,6 +22,9 @@ interface KBMedicalVisitDao {
     )
     suspend fun listRecentForChild(familyId: String, childId: String, limit: Int): List<KBMedicalVisitEntity>
 
+    @Query("SELECT COUNT(*) FROM kb_medical_visits WHERE familyId = :familyId AND isDeleted = 0")
+    suspend fun countByFamilyId(familyId: String): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBMedicalVisitEntity)
 

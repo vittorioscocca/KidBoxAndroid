@@ -1,6 +1,8 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
+import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.PetDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTreatmentDao
@@ -10,6 +12,7 @@ import it.vittorioscocca.kidbox.data.remote.health.RemoteTreatmentDto
 import it.vittorioscocca.kidbox.data.remote.health.TreatmentRemoteStore
 import it.vittorioscocca.kidbox.data.local.mapper.scheduleTimesList
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +26,7 @@ class TreatmentRepository @Inject constructor(
     private val remote: TreatmentRemoteStore,
     private val childDao: KBChildDao,
     private val petDao: PetDao,
+    @ApplicationContext private val appContext: Context,
 ) {
     private val auth = FirebaseAuth.getInstance()
 
@@ -48,6 +52,8 @@ class TreatmentRepository @Inject constructor(
     }
 
     suspend fun upsert(treatment: KBTreatment): KBTreatment = withContext(Dispatchers.IO) {
+        val isNew = dao.getById(treatment.id) == null
+        val isFirstUse = isNew && dao.countByFamilyId(treatment.familyId) == 0
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()
         val pending = treatment.copy(
@@ -65,6 +71,13 @@ class TreatmentRepository @Inject constructor(
             dao.upsert(pending.copy(syncStateRaw = 0).toEntity())
         }.onFailure { err ->
             dao.upsert(pending.copy(lastSyncError = err.message).toEntity())
+        }
+
+        if (isNew) {
+            AppAnalytics.contentCreated(appContext, "health")
+            if (isFirstUse) {
+                AppAnalytics.featureFirstUse(appContext, feature = "health")
+            }
         }
         pending
     }

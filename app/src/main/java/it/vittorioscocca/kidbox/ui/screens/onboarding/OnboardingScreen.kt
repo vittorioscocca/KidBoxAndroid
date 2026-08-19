@@ -84,7 +84,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
+import it.vittorioscocca.kidbox.util.analytics.OnboardingAnalyticsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -170,6 +173,16 @@ private enum class FamilyPath {
     LinkJoin,
 }
 
+private fun stepName(page: Int, familyPath: FamilyPath?): String = when (page) {
+    0 -> "info_0"
+    1 -> "info_1"
+    2 -> "info_2"
+    3 -> if (familyPath == FamilyPath.LinkJoin) "link_invite_confirm" else "path_picker"
+    4 -> "name"
+    5 -> if (familyPath == FamilyPath.Join) "join_family" else "create_family"
+    else -> "invite"
+}
+
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingScreen(
@@ -234,6 +247,21 @@ fun OnboardingScreen(
         createdFamilyId?.let { nameViewModel.propagateNameToMember(it) }
     }
 
+    val onboardingStartTime = rememberSaveable { System.currentTimeMillis() }
+
+    LaunchedEffect(currentPage, familyPath) {
+        val name = stepName(currentPage, familyPath)
+        AppAnalytics.onboardingStepShown(context, name, currentPage)
+        OnboardingAnalyticsState.lastStepSeen = name
+    }
+
+    val onFamilyCreatedTracked: (String) -> Unit = { familyId ->
+        val elapsedSeconds = ((System.currentTimeMillis() - onboardingStartTime) / 1000).toInt()
+        AppAnalytics.onboardingCompleted(context, elapsedSeconds)
+        OnboardingAnalyticsState.lastStepSeen = null
+        onFamilyCreated(familyId)
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -285,7 +313,7 @@ fun OnboardingScreen(
                             preview = linkInvitePreview,
                             nameState = nameState,
                             nameViewModel = nameViewModel,
-                            onJoined = { familyId -> onFamilyCreated(familyId) },
+                            onJoined = { familyId -> onFamilyCreatedTracked(familyId) },
                             onFallbackToManual = {
                                 PendingFamilyInvite.clear(context)
                                 pendingLinkInvite = null
@@ -310,7 +338,8 @@ fun OnboardingScreen(
                         onJoined = { familyId ->
                             // Il nome sul documento membro lo scrive
                             // JoinFamilyViewModel, attraversato da ogni join.
-                            onFamilyCreated(familyId)
+                            AppAnalytics.onboardingStepCompleted(context, "join_family")
+                            onFamilyCreatedTracked(familyId)
                         },
                     )
                     // Fallback: familyPath == null (non dovrebbe succedere, il CTA pag.3 è disabled)
@@ -320,7 +349,7 @@ fun OnboardingScreen(
                     )
                     else -> InvitePartnerPageContent(
                         familyId = createdFamilyId.orEmpty(),
-                        onFinish = { onFamilyCreated(createdFamilyId.orEmpty()) },
+                        onFinish = { onFamilyCreatedTracked(createdFamilyId.orEmpty()) },
                     )
                 }
             }
@@ -378,6 +407,7 @@ fun OnboardingScreen(
                     onClick = {
                         when (currentPage) {
                             3 -> if (familyPath != null) {
+                                AppAnalytics.onboardingStepCompleted(context, stepName(currentPage, familyPath))
                                 scope.launch { pagerState.animateScrollToPage(4) }
                             }
                             // Si avanza solo a salvataggio riuscito: proseguire
@@ -385,19 +415,27 @@ fun OnboardingScreen(
                             // messo il nome, e la famiglia nascerebbe comunque
                             // con un membro anonimo.
                             4 -> nameViewModel.save {
+                                AppAnalytics.onboardingStepCompleted(context, stepName(currentPage, familyPath))
                                 scope.launch { pagerState.animateScrollToPage(5) }
                             }
                             5 -> when (familyPath) {
                                 FamilyPath.Create -> if (createdFamilyId != null) {
+                                    AppAnalytics.onboardingStepCompleted(context, stepName(currentPage, familyPath))
                                     scope.launch { pagerState.animateScrollToPage(6) }
                                 }
                                 FamilyPath.Join -> Unit
                                 FamilyPath.LinkJoin -> Unit
                                 null -> Unit
                             }
-                            6 -> createdFamilyId?.let { onFamilyCreated(it) }
-                            else -> scope.launch {
-                                pagerState.animateScrollToPage(currentPage + 1)
+                            6 -> createdFamilyId?.let {
+                                AppAnalytics.onboardingStepCompleted(context, stepName(currentPage, familyPath))
+                                onFamilyCreatedTracked(it)
+                            }
+                            else -> {
+                                AppAnalytics.onboardingStepCompleted(context, stepName(currentPage, familyPath))
+                                scope.launch {
+                                    pagerState.animateScrollToPage(currentPage + 1)
+                                }
                             }
                         }
                     },
@@ -705,6 +743,7 @@ private fun LinkInviteConfirmPageContent(
         val joinedId = joinState.joinedFamilyId
         if (joinState.didJoin && joinedId != null) {
             PendingFamilyInvite.clear(context)
+            AppAnalytics.onboardingStepCompleted(context, "link_invite_confirm")
             onJoined(joinedId)
         }
     }
@@ -1121,6 +1160,10 @@ private fun InvitePartnerPageContent(
     var didCopy by remember { mutableStateOf(false) }
     var showQr by remember { mutableStateOf(false) }
 
+    LaunchedEffect(Unit) {
+        AppAnalytics.onboardingInviteStepShown(context)
+    }
+
     LaunchedEffect(familyId) {
         if (familyId.isNotBlank()) {
             viewModel.generateInviteCode(preferredFamilyId = familyId)
@@ -1321,7 +1364,13 @@ private fun InvitePartnerPageContent(
             }
         }
         Spacer(modifier = Modifier.height(10.dp))
-        TextButton(onClick = onFinish, modifier = Modifier.fillMaxWidth()) {
+        TextButton(
+            onClick = {
+                AppAnalytics.onboardingInviteStepSkipped(context)
+                onFinish()
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
             Text(stringResource(R.string.onboarding_skip_invite), fontSize = 15.sp, color = GrayCaption)
         }
         Spacer(modifier = Modifier.height(24.dp))

@@ -28,6 +28,9 @@ interface KBTreatmentDao {
     @Query("SELECT * FROM kb_treatments WHERE familyId = :familyId AND isDeleted = 0 AND isActive = 1 AND reminderEnabled = 1")
     suspend fun listActiveWithReminders(familyId: String): List<KBTreatmentEntity>
 
+    @Query("SELECT COUNT(*) FROM kb_treatments WHERE familyId = :familyId AND isDeleted = 0")
+    suspend fun countByFamilyId(familyId: String): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBTreatmentEntity)
 

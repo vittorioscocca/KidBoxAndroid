@@ -62,6 +62,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
+import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -121,6 +123,13 @@ fun HomeItemDetailScreen(
 
     val kb = MaterialTheme.kidBoxColors
 
+    LaunchedEffect(item?.id) {
+        val i = item ?: return@LaunchedEffect
+        val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        if (i.createdBy.isNotBlank() && i.createdBy != currentUid) {
+            AppAnalytics.contentSharedRead(context, "home_vehicles")
+        }
+    }
     LaunchedEffect(attachmentError) {
         attachmentError?.let {
             Toast.makeText(context, it, Toast.LENGTH_LONG).show()

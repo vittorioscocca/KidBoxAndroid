@@ -90,6 +90,7 @@ import kotlinx.coroutines.launch
 import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import it.vittorioscocca.kidbox.util.KBLocale
 
 @Composable
@@ -102,6 +103,7 @@ fun WalletTicketDetailScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val ticket = state.tickets.firstOrNull { it.id == ticketId }
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     // Aprire il dettaglio è il recupero vero: è per questo che il biglietto è
     // stato caricato. Non produce scritture, quindi il server non lo vede.
@@ -113,9 +115,12 @@ fun WalletTicketDetailScreen(
             createdAtEpochMillis = t.createdAtEpochMillis,
             entryPoint = KBAnalyticsOrigin.consume(),
         )
+        val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        if (t.createdBy.isNotBlank() && t.createdBy != currentUid) {
+            AppAnalytics.contentSharedRead(context, "wallet")
+        }
     }
     val coroutineScope = rememberCoroutineScope()
-    val context = LocalContext.current
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showVisibilityPicker by remember { mutableStateOf(false) }
     var draftVisibilityScope by remember { mutableStateOf(KBVisibilityScope.ONLY_CREATOR) }

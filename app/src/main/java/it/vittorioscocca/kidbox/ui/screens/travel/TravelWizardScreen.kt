@@ -65,8 +65,10 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
+import it.vittorioscocca.kidbox.ai.LocalUpgradeAction
 import it.vittorioscocca.kidbox.data.local.TravelStyle
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -96,6 +98,7 @@ fun TravelWizardScreen(
     // Free ha accesso all'AI finché non esaurisce il bonus di 5 messaggi una tantum.
     val aiAccessBlocked by it.vittorioscocca.kidbox.ai.CurrentPlanStore.aiAccessBlocked.collectAsStateWithLifecycle()
     val aiAvailable = !aiAccessBlocked
+    val upgradeAction = LocalUpgradeAction.current
     val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(familyId) {
@@ -184,7 +187,8 @@ fun TravelWizardScreen(
             val canContinue = when (step) {
                 3 -> selectedParticipantIds.isNotEmpty()
                 else -> viewModel.canProceed(step, members, children)
-            } && (step < TOTAL_STEPS - 1 || (aiAvailable && viewModel.canGenerate))
+            } && (step < TOTAL_STEPS - 1 || viewModel.canGenerate)
+            val upgradeMessage = stringResource(R.string.travel_plan_requires_pro)
             Button(
                 onClick = {
                     viewModel.syncTripFromWizardInputs()
@@ -193,7 +197,8 @@ fun TravelWizardScreen(
                     } else if (aiAvailable) {
                         viewModel.generatePlan()
                     } else {
-                        onOpenPlans()
+                        AppAnalytics.aiPaywallShown(context, "travel_wizard_build_step")
+                        upgradeAction(upgradeMessage)
                     }
                 },
                 enabled = canContinue,

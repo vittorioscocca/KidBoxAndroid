@@ -1,12 +1,15 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
+import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.KBMedicalExamDao
 import it.vittorioscocca.kidbox.data.local.mapper.toDomain
 import it.vittorioscocca.kidbox.data.local.mapper.toEntity
 import it.vittorioscocca.kidbox.data.remote.health.MedicalExamRemoteStore
 import it.vittorioscocca.kidbox.data.remote.health.RemoteExamDto
 import it.vittorioscocca.kidbox.domain.model.KBMedicalExam
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +21,7 @@ import kotlinx.coroutines.withContext
 class MedicalExamRepository @Inject constructor(
     private val dao: KBMedicalExamDao,
     private val remote: MedicalExamRemoteStore,
+    @ApplicationContext private val appContext: Context,
 ) {
     private val auth = FirebaseAuth.getInstance()
 
@@ -33,6 +37,8 @@ class MedicalExamRepository @Inject constructor(
     }
 
     suspend fun upsert(exam: KBMedicalExam): KBMedicalExam = withContext(Dispatchers.IO) {
+        val isNew = dao.getById(exam.id) == null
+        val isFirstUse = isNew && dao.countByFamilyId(exam.familyId) == 0
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()
         val pending = exam.copy(
@@ -48,6 +54,13 @@ class MedicalExamRepository @Inject constructor(
             dao.upsert(pending.copy(syncStateRaw = 0).toEntity())
         }.onFailure { err ->
             dao.upsert(pending.copy(lastSyncError = err.message).toEntity())
+        }
+
+        if (isNew) {
+            AppAnalytics.contentCreated(appContext, "health")
+            if (isFirstUse) {
+                AppAnalytics.featureFirstUse(appContext, feature = "health")
+            }
         }
         pending
     }

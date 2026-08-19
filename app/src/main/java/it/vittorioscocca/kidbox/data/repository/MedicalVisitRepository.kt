@@ -1,6 +1,8 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
+import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.KBMedicalVisitDao
 import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
 import it.vittorioscocca.kidbox.data.local.mapper.encodeStringList
@@ -9,6 +11,7 @@ import it.vittorioscocca.kidbox.data.local.mapper.toEntity
 import it.vittorioscocca.kidbox.data.remote.health.MedicalVisitRemoteStore
 import it.vittorioscocca.kidbox.data.remote.health.RemoteMedicalVisitDto
 import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -20,6 +23,7 @@ import kotlinx.coroutines.withContext
 class MedicalVisitRepository @Inject constructor(
     private val dao: KBMedicalVisitDao,
     private val remote: MedicalVisitRemoteStore,
+    @ApplicationContext private val appContext: Context,
 ) {
     private val auth = FirebaseAuth.getInstance()
 
@@ -47,6 +51,8 @@ class MedicalVisitRepository @Inject constructor(
      * Persist locally with PENDING_UPSERT, push to Firestore, then mark SYNCED.
      */
     suspend fun save(visit: KBMedicalVisit) = withContext(Dispatchers.IO) {
+        val isNew = dao.getById(visit.id) == null
+        val isFirstUse = isNew && dao.countByFamilyId(visit.familyId) == 0
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()
         val pending = visit.copy(
@@ -62,6 +68,13 @@ class MedicalVisitRepository @Inject constructor(
             dao.upsert(pending.copy(syncStateRaw = 0).toEntity()) // SYNCED
         }.onFailure { err ->
             dao.upsert(pending.copy(syncStateRaw = 1, lastSyncError = err.message).toEntity())
+        }
+
+        if (isNew) {
+            AppAnalytics.contentCreated(appContext, "health")
+            if (isFirstUse) {
+                AppAnalytics.featureFirstUse(appContext, feature = "health")
+            }
         }
     }
 

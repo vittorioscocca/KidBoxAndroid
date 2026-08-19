@@ -302,6 +302,7 @@ fun MedicalExamsScreen(
                         .offset(y = 16.dp),
                     upgradeSubtitle = stringResource(R.string.ai_upgrade_exams_home),
                     contentDescription = "Chiedi all'AI sugli esami di $displayName",
+                    analyticsContext = "health_exams_list",
                     onTap = {
                         val ids = (
                             state.pending + state.booked +

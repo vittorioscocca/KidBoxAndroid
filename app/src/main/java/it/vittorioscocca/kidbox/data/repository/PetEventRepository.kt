@@ -1,13 +1,16 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
+import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.PetEventDao
 import it.vittorioscocca.kidbox.data.local.entity.PetEventEntity
 import it.vittorioscocca.kidbox.data.remote.life.PetEventRemoteChange
 import it.vittorioscocca.kidbox.data.remote.life.PetEventRemoteStore
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +26,7 @@ class PetEventRepository @Inject constructor(
     private val petEventDao: PetEventDao,
     private val remoteStore: PetEventRemoteStore,
     private val auth: FirebaseAuth,
+    @ApplicationContext private val appContext: Context,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val realtimeMutex = Mutex()
@@ -117,6 +121,7 @@ class PetEventRepository @Inject constructor(
                 petEventDao.upsert(entity.copy(syncState = KBSyncState.ERROR.rawValue))
                 throw it
             }
+        AppAnalytics.contentCreated(appContext, "pets")
     }
 
     suspend fun updatePetEvent(entity: PetEventEntity) {

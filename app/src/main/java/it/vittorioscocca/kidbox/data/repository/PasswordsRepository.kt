@@ -21,6 +21,7 @@ import it.vittorioscocca.kidbox.data.crypto.FamilyKeyEscrow
 import it.vittorioscocca.kidbox.data.crypto.PasswordCypher
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.notifications.PasswordExpiryReminderScheduler
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -346,7 +347,15 @@ class PasswordsRepository @Inject constructor(
     }
 
     suspend fun pushUpsertEntry(entity: PasswordEntryEntity) = withContext(Dispatchers.IO) {
+        val isNew = entryDao.getById(entity.id) == null
+        val isFirstUse = isNew && entryDao.countByFamilyId(entity.familyId) == 0
         remoteStore.upsertEntry(entity)
+        if (isNew) {
+            AppAnalytics.contentCreated(appContext, "passwords")
+            if (isFirstUse) {
+                AppAnalytics.featureFirstUse(appContext, feature = "passwords")
+            }
+        }
     }
 
     suspend fun pushUpsertGroup(entity: PasswordGroupEntity) = withContext(Dispatchers.IO) {

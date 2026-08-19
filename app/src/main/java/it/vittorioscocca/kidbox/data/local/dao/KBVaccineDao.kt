@@ -25,6 +25,9 @@ interface KBVaccineDao {
     )
     suspend fun listByFamilyAndChild(familyId: String, childId: String): List<KBVaccineEntity>
 
+    @Query("SELECT COUNT(*) FROM kb_vaccines WHERE familyId = :familyId AND isDeleted = 0")
+    suspend fun countByFamilyId(familyId: String): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBVaccineEntity)
 

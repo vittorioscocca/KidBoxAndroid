@@ -95,6 +95,8 @@ import kotlinx.coroutines.delay
 import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
+import com.google.firebase.auth.FirebaseAuth
 
 private val PasswordsAccentPurple = Color(0xFF9973D9)
 
@@ -235,6 +237,10 @@ fun PasswordDetailScreen(
                         createdAtEpochMillis = state.createdAtEpochMillis,
                         entryPoint = retrievalOrigin,
                     )
+                    val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+                    if (state.createdBy.isNotBlank() && state.createdBy != currentUid) {
+                        AppAnalytics.contentSharedRead(context, "passwords")
+                    }
                 },
                 modifier = Modifier.weight(1f),
             )

@@ -373,6 +373,7 @@ fun HomeScreen(
         // Stesso pulsante AI della card Salute (AskAiButton condiviso).
         AskAiButton(
             contentDescription = stringResource(R.string.home_ai_assistant_desc),
+            analyticsContext = "assistant_icon",
             onTap = { onNavigate(AppDestination.AiChat.createRoute(state.familyId)) },
             modifier = Modifier
                 .align(Alignment.BottomEnd)

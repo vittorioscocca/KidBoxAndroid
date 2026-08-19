@@ -92,6 +92,8 @@ import java.util.Locale
 import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
+import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.util.KBLocale
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
@@ -137,6 +139,10 @@ fun MedicalVisitDetailScreen(
             createdAtEpochMillis = v.createdAtEpochMillis,
             entryPoint = KBAnalyticsOrigin.consume(),
         )
+        val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        if (v.createdBy.orEmpty().isNotBlank() && v.createdBy != currentUid) {
+            AppAnalytics.contentSharedRead(context, "health")
+        }
     }
     LaunchedEffect(state.deleted) { if (state.deleted) onBack() }
     LaunchedEffect(state.uploadError) {
@@ -437,6 +443,7 @@ fun MedicalVisitDetailScreen(
                         .padding(end = 20.dp, bottom = 92.dp),
                     upgradeSubtitle = stringResource(R.string.ai_upgrade_visit_detail),
                     contentDescription = stringResource(R.string.health_ask_ai_visit),
+                    analyticsContext = "health_visit_detail",
                     onTap = { showAiChat = true },
                 )
             }

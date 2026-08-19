@@ -7,13 +7,16 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.vittorioscocca.kidbox.data.crypto.FamilyKeyStore
 import it.vittorioscocca.kidbox.data.remote.family.PendingFamilyInvite
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.remote.family.InviteRemoteStore
+import it.vittorioscocca.kidbox.data.remote.family.JoinInviteError
 import it.vittorioscocca.kidbox.data.remote.family.JoinWrapService
 import it.vittorioscocca.kidbox.data.repository.PasswordsRepository
 import it.vittorioscocca.kidbox.data.sync.FamilySyncCenter
 import it.vittorioscocca.kidbox.data.user.UserProfileRepository
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -89,6 +92,7 @@ class JoinFamilyViewModel @Inject constructor(
     fun joinFromInvite(invite: PendingFamilyInvite, onJoined: () -> Unit) {
         viewModelScope.launch {
             _uiState.value = JoinFamilyUiState(isBusy = true)
+            AppAnalytics.familyJoinAttempted(getApplication())
             try {
                 joinWrapService.join(getApplication(), invite.qrEquivalentPayload)
                 KBLog.ui.info("invito: master key sbloccata familyId=${invite.familyId}", TAG)
@@ -129,9 +133,20 @@ class JoinFamilyViewModel @Inject constructor(
                     }
                 }
 
+                val vaultKeyAvailable = FamilyKeyStore.hasFamilyKey(getApplication(), invite.familyId, uid)
+                AppAnalytics.familyJoined(getApplication(), vaultKeyAvailable)
+
                 onJoined()
             } catch (e: Exception) {
                 KBLog.ui.error("invito fallito: ${e.message}", TAG, e)
+                val reason = when (e) {
+                    is JoinInviteError.InvalidPayload -> "invalid_payload"
+                    is JoinInviteError.Expired -> "expired"
+                    is JoinInviteError.InvalidSecret -> "invalid_secret"
+                    is JoinInviteError.AlreadyUsed -> "already_used"
+                    else -> "unknown"
+                }
+                AppAnalytics.familyJoinFailed(getApplication(), reason)
                 _uiState.value = JoinFamilyUiState(error = e.localizedMessage ?: "Errore invito")
             }
         }

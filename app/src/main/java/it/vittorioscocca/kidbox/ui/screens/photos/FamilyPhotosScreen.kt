@@ -151,6 +151,8 @@ import kotlinx.coroutines.withContext
 import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
+import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.util.KBLocale
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.ui.components.FamilyKeyMissingGate
@@ -243,6 +245,10 @@ fun FamilyPhotosScreen(
             createdAtEpochMillis = photo.createdAtEpochMillis,
             entryPoint = KBAnalyticsOrigin.consume(),
         )
+        val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        if (photo.createdBy.isNotBlank() && photo.createdBy != currentUid) {
+            AppAnalytics.contentSharedRead(context, "photos")
+        }
     }
     LaunchedEffect(state.filteredPhotos, currentTab) {
         if (currentTab != PhotosTab.LIBRARY) {

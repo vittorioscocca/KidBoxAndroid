@@ -1,5 +1,8 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.ai.CurrentPlanStore
 import it.vittorioscocca.kidbox.data.local.dao.KBAIConversationDao
 import it.vittorioscocca.kidbox.data.health.ai.HealthContextCompaction
 import it.vittorioscocca.kidbox.data.remote.ai.AIAskAIPayload
@@ -11,6 +14,7 @@ import it.vittorioscocca.kidbox.data.remote.ai.AiRepository
 import it.vittorioscocca.kidbox.domain.model.KBAIConversation
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.KidBoxAIActionPipeline
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -35,6 +39,7 @@ class HealthAIChatRepository @Inject constructor(
     private val messageDao: KBAIMessageDao,
     private val aiRepository: AiRepository,
     private val actionPipeline: KidBoxAIActionPipeline,
+    @ApplicationContext private val appContext: Context,
 ) {
 
     suspend fun getOrCreateConversation(
@@ -88,6 +93,7 @@ class HealthAIChatRepository @Inject constructor(
                 messageDao.deleteById(userMsg.id)
                 throw err
             }
+        AppAnalytics.aiMessageSent(appContext, "salute", CurrentPlanStore.plan.value.rawValue)
 
         val defaultChildId = conv.childId.takeIf {
             it.isNotBlank() && it != "health_visit" && !it.startsWith("health_")

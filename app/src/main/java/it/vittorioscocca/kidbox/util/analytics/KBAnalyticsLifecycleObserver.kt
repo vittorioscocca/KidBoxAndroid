@@ -25,6 +25,7 @@ class KBAnalyticsLifecycleObserver : Application.ActivityLifecycleCallbacks {
             // Foreground. `logSessionStart` applica da sé la finestra di 30 minuti:
             // rientri rapidi non contano come nuove sessioni.
             KBAnalytics.logSessionStart(KBAnalyticsEntryPoint.ICON)
+            AppAnalytics.trackAppOpen(activity.applicationContext)
         }
         startedActivities++
     }
@@ -36,6 +37,10 @@ class KBAnalyticsLifecycleObserver : Application.ActivityLifecycleCallbacks {
             // Le letture sono bufferizzate in memoria: qui è l'unico punto in cui
             // partono. Se si perde qualcosa è un costo accettabile.
             KBAnalytics.flush()
+
+            OnboardingAnalyticsState.lastStepSeen?.let { step ->
+                AppAnalytics.onboardingAbandoned(activity.applicationContext, step)
+            }
         }
     }
 
