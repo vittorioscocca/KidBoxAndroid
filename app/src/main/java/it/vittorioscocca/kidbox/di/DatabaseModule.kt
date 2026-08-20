@@ -57,6 +57,7 @@ import it.vittorioscocca.kidbox.data.local.dao.PwnedPrefixCacheDao
 import it.vittorioscocca.kidbox.data.local.dao.NudgeSignalsDao
 import it.vittorioscocca.kidbox.data.local.dao.OnboardingSignalsDao
 import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
+import it.vittorioscocca.kidbox.data.local.dao.LoyaltyCardDao
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
 import javax.inject.Singleton
 
@@ -68,6 +69,64 @@ object DatabaseModule {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE kb_chat_messages ADD COLUMN contactPayloadJSON TEXT")
             db.execSQL("ALTER TABLE kb_chat_messages ADD COLUMN deletedForJSON TEXT")
+        }
+    }
+
+    /**
+     * "Carte fedeltà" nel Wallet: mirror di `kb_wallet_tickets` ma senza cifratura
+     * né PDF, e con `visibilityScope` default `family` (condivisa con tutta la
+     * famiglia, a differenza dei biglietti che di default sono privati).
+     */
+    private val MIGRATION_36_37 = object : Migration(36, 37) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `kb_loyalty_cards` (
+                    `id` TEXT NOT NULL,
+                    `familyId` TEXT NOT NULL,
+                    `brandId` TEXT,
+                    `brandName` TEXT NOT NULL,
+                    `cardNumber` TEXT NOT NULL,
+                    `barcodeFormat` TEXT NOT NULL,
+                    `note` TEXT,
+                    `primaryColorHex` TEXT NOT NULL,
+                    `secondaryColorHex` TEXT NOT NULL,
+                    `logoURL` TEXT,
+                    `frontPhotoStorageURL` TEXT,
+                    `frontPhotoStoragePath` TEXT,
+                    `backPhotoStorageURL` TEXT,
+                    `backPhotoStoragePath` TEXT,
+                    `createdBy` TEXT NOT NULL,
+                    `createdByName` TEXT NOT NULL,
+                    `updatedBy` TEXT NOT NULL,
+                    `updatedByName` TEXT NOT NULL,
+                    `createdAtEpochMillis` INTEGER NOT NULL,
+                    `updatedAtEpochMillis` INTEGER NOT NULL,
+                    `isDeleted` INTEGER NOT NULL,
+                    `visibilityScope` TEXT NOT NULL DEFAULT 'family',
+                    `visibilityMemberIdsJson` TEXT NOT NULL DEFAULT '[]',
+                    `syncStateRaw` INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY(`id`),
+                    FOREIGN KEY(`familyId`) REFERENCES `kb_families`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_kb_loyalty_cards_familyId` ON `kb_loyalty_cards` (`familyId`)")
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_kb_loyalty_cards_familyId_isDeleted` ON `kb_loyalty_cards` (`familyId`, `isDeleted`)",
+            )
+        }
+    }
+
+    /**
+     * Promemoria per-biglietto: `null` = legacy (offset fisso 1h come oggi),
+     * `0` = nessuno, altro valore = ore prima dell'evento. Nessuna migrazione
+     * di dati: la colonna nuova nasce `NULL` per tutti i biglietti esistenti,
+     * che quindi non cambiano comportamento.
+     */
+    private val MIGRATION_37_38 = object : Migration(37, 38) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE kb_wallet_tickets ADD COLUMN reminderOffsetHours INTEGER")
         }
     }
 
@@ -1139,6 +1198,8 @@ object DatabaseModule {
         MIGRATION_33_34,
         MIGRATION_34_35,
         MIGRATION_35_36,
+        MIGRATION_36_37,
+        MIGRATION_37_38,
     )
         .fallbackToDestructiveMigration()
         .build()
@@ -1249,6 +1310,10 @@ object DatabaseModule {
     @Provides
     fun provideWalletTicketDao(database: KidBoxDatabase): WalletTicketDao =
         database.walletTicketDao()
+
+    @Provides
+    fun provideLoyaltyCardDao(database: KidBoxDatabase): LoyaltyCardDao =
+        database.loyaltyCardDao()
 
     @Provides
     fun provideNudgeSignalsDao(database: KidBoxDatabase): NudgeSignalsDao =

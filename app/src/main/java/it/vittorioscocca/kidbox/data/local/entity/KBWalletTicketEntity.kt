@@ -53,4 +53,13 @@ data class KBWalletTicketEntity(
     /** JSON array uid ([encodeStringList]) se [visibilityScope] == `"members"`. */
     val visibilityMemberIdsJson: String = "[]",
     val syncStateRaw: Int = 0,
+    /**
+     * Promemoria per QUESTO biglietto:
+     * - `null` (default, tutti i biglietti esistenti) → comportamento legacy,
+     *   1 ora prima dell'evento come sempre.
+     * - `0` → nessun promemoria, disattivato esplicitamente dall'utente.
+     * - `1`/`24`/`48` → un singolo promemoria quell'esatto numero di ore
+     *   prima dell'evento.
+     */
+    val reminderOffsetHours: Int? = null,
 )

@@ -57,6 +57,8 @@ data class WalletTicketRemoteDto(
     val updatedByName: String?,
     val visibilityScope: String = KBVisibilityScope.ONLY_CREATOR,
     val visibilityMemberIds: List<String> = emptyList(),
+    /** Plaintext, stesso trattamento di [emitter]. Vedi [KBWalletTicketEntity.reminderOffsetHours]. */
+    val reminderOffsetHours: Int? = null,
 )
 
 sealed interface WalletRemoteChange {
@@ -136,6 +138,12 @@ class WalletRemoteStore @Inject constructor(
                                     d["visibilityScope"] as? String,
                                 ),
                                 visibilityMemberIds = stringListField("visibilityMemberIds"),
+                                reminderOffsetHours = when (val v = d["reminderOffsetHours"]) {
+                                    is Long -> v.toInt()
+                                    is Int -> v
+                                    is Double -> v.toInt()
+                                    else -> null
+                                },
                             )
                             when (diff.type) {
                                 DocumentChange.Type.ADDED,
@@ -170,6 +178,7 @@ class WalletRemoteStore @Inject constructor(
             "barcodeTextEnc" to ticket.barcodeText?.let { encryptField(it, ticket.familyId) },
             "kind" to ticket.kindRaw,
             "emitter" to ticket.emitter,
+            "reminderOffsetHours" to ticket.reminderOffsetHours,
             "eventDate" to ticket.eventDateEpochMillis?.let { Timestamp(it / 1000, 0) },
             "eventEndDate" to ticket.eventEndDateEpochMillis?.let { Timestamp(it / 1000, 0) },
             "pdfStorageURL" to ticket.pdfStorageURL,

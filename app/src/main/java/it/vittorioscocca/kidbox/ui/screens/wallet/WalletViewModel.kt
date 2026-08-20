@@ -247,6 +247,24 @@ class WalletViewModel @Inject constructor(
         }
     }
 
+    fun updateTicketReminderOffset(ticketId: String, reminderOffsetHours: Int?) {
+        val familyId = _uiState.value.familyId
+        if (familyId.isBlank()) return
+        viewModelScope.launch {
+            val result = walletRepository.updateTicketReminderOffset(
+                ticketId = ticketId,
+                familyId = familyId,
+                reminderOffsetHours = reminderOffsetHours,
+            )
+            _uiState.value = _uiState.value.copy(
+                message = result.fold(
+                    onSuccess = { "Promemoria aggiornato" },
+                    onFailure = { it.message ?: "Aggiornamento non riuscito" },
+                ),
+            )
+        }
+    }
+
     fun openPdf(ticketId: String) {
         val familyId = _uiState.value.familyId
         if (familyId.isBlank()) return

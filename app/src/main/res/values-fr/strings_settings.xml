@@ -29,8 +29,6 @@
     <string name="settings_notif_silent_channel">Canal de notifications silencieux</string>
     <string name="settings_notif_silent_channel_sub">Touchez ici pour activer les alertes visibles (pop-up/son).</string>
     <string name="settings_notif_open">Ouvrir</string>
-    <string name="settings_notif_documents">Notifications nouveaux documents</string>
-    <string name="settings_notif_documents_sub">Quand un document partagé est ajouté</string>
     <string name="settings_notif_chat">Notifications nouveaux messages</string>
     <string name="settings_notif_chat_sub">Quand un membre envoie un message</string>
     <string name="settings_notif_location">Notifications de position</string>
@@ -45,8 +43,8 @@
     <string name="settings_notif_calendar_sub">Quand un événement est ajouté</string>
     <string name="settings_notif_expenses">Notifications nouvelles dépenses</string>
     <string name="settings_notif_expenses_sub">Quand une dépense familiale est enregistrée</string>
-    <string name="settings_notif_wallet">Rappels Wallet</string>
-    <string name="settings_notif_wallet_sub">Une heure avant l\'événement du billet (sur cet appareil uniquement)</string>
+    <string name="settings_notif_wallet">Notifications Wallet</string>
+    <string name="settings_notif_wallet_sub">Quand un nouveau contenu est ajouté à votre Wallet</string>
     <string name="settings_privacy_title">Confidentialité</string>
     <string name="settings_privacy_logs_title">Journaux techniques et rapports d\'erreur</string>
     <string name="settings_privacy_body1">KidBox enregistre des journaux techniques sur l\'appareil (démarrage, synchronisation, plantages).</string>

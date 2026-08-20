@@ -69,7 +69,6 @@ class PushNotificationManager @Inject constructor(
     private fun defaultEnabled(key: String): Boolean = true
 
     object PreferenceKeys {
-        const val NOTIFY_ON_NEW_DOCS = "notifyOnNewDocs"
         const val NOTIFY_ON_NEW_MESSAGES = "notifyOnNewMessages"
         const val NOTIFY_ON_LOCATION_SHARING = "notifyOnLocationSharing"
         const val NOTIFY_ON_TODO_ASSIGNED = "notifyOnTodoAssigned"
@@ -77,9 +76,15 @@ class PushNotificationManager @Inject constructor(
         const val NOTIFY_ON_NEW_NOTE = "notifyOnNewNote"
         const val NOTIFY_ON_NEW_CALENDAR_EVENT = "notifyOnNewCalendarEvent"
         const val NOTIFY_ON_NEW_EXPENSE = "notifyOnNewExpense"
+        /**
+         * Unico toggle Wallet: assorbe le vecchie `notifyOnNewDocs` (che
+         * copriva anche i documenti d'identità del Wallet, collezione
+         * Firestore condivisa) e `notifyOnNewWalletTicket`. Nome identico a
+         * iOS: path Firestore `notificationPrefs.notifyOnWallet`.
+         */
+        const val NOTIFY_ON_WALLET = "notifyOnWallet"
 
         val all: List<String> = listOf(
-            NOTIFY_ON_NEW_DOCS,
             NOTIFY_ON_NEW_MESSAGES,
             NOTIFY_ON_LOCATION_SHARING,
             NOTIFY_ON_TODO_ASSIGNED,
@@ -87,6 +92,7 @@ class PushNotificationManager @Inject constructor(
             NOTIFY_ON_NEW_NOTE,
             NOTIFY_ON_NEW_CALENDAR_EVENT,
             NOTIFY_ON_NEW_EXPENSE,
+            NOTIFY_ON_WALLET,
         )
     }
 }

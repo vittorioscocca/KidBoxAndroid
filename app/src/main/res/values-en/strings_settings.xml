@@ -29,8 +29,6 @@
     <string name="settings_notif_silent_channel">Silent notification channel</string>
     <string name="settings_notif_silent_channel_sub">Tap here to enable visible alerts (pop-up/sound).</string>
     <string name="settings_notif_open">Open</string>
-    <string name="settings_notif_documents">New document notifications</string>
-    <string name="settings_notif_documents_sub">When a shared document is uploaded</string>
     <string name="settings_notif_chat">New chat message notifications</string>
     <string name="settings_notif_chat_sub">When a family member sends a message</string>
     <string name="settings_notif_location">Location notifications</string>
@@ -45,8 +43,8 @@
     <string name="settings_notif_calendar_sub">When an event is added</string>
     <string name="settings_notif_expenses">New expense notifications</string>
     <string name="settings_notif_expenses_sub">When a family expense is recorded</string>
-    <string name="settings_notif_wallet">Wallet reminders</string>
-    <string name="settings_notif_wallet_sub">One hour before the ticket event (this device only)</string>
+    <string name="settings_notif_wallet">Wallet notifications</string>
+    <string name="settings_notif_wallet_sub">When new content is added to your Wallet</string>
     <string name="settings_privacy_title">Privacy</string>
     <string name="settings_privacy_logs_title">Technical logs and crash reports</string>
     <string name="settings_privacy_body1">KidBox stores technical logs on your device (app start-up, sync, crashes).</string>

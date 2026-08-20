@@ -176,6 +176,12 @@
     <string name="wallet_action_cannot_be_undone">Esta acción no se puede deshacer.</string>
     <string name="wallet_delete">Eliminar</string>
     <string name="wallet_visibility_who_can_see_ticket">Quién puede ver este billete</string>
+    <string name="wallet_reminder_label">Recordatorio</string>
+    <string name="wallet_reminder_default">Predeterminado</string>
+    <string name="wallet_reminder_none">Ninguno</string>
+    <string name="wallet_reminder_1h">1 hora antes</string>
+    <string name="wallet_reminder_1d">1 día antes</string>
+    <string name="wallet_reminder_2d">2 días antes</string>
     <string name="wallet_no_app_to_open_pdf">No hay ninguna app para abrir el PDF</string>
     <string name="wallet_ticket_detail_title">Detalle del billete</string>
     <string name="wallet_ticket_not_found">Billete no encontrado</string>
@@ -305,4 +311,54 @@
     <string name="wallet_document_notify_before_expiry">Avísame una semana antes de que caduque</string>
 
     <string name="wallet_document_delete_document_confirm">Se eliminará «%1$s». Esta acción no se puede deshacer.</string>
+
+    <string name="wallet_tab_loyalty_cards">Tarjetas</string>
+    <string name="wallet_loyalty_add_cd">Añadir tarjeta de fidelidad</string>
+    <string name="wallet_loyalty_search_placeholder">Buscar una tarjeta</string>
+    <string name="wallet_loyalty_add_button">Añadir una tarjeta</string>
+    <string name="wallet_loyalty_no_results">Sin resultados para «%1$s»</string>
+    <string name="wallet_loyalty_empty_title">Ninguna tarjeta de fidelidad</string>
+    <string name="wallet_loyalty_empty_subtitle">Añade las tarjetas de fidelidad del supermercado, de electrónica o de tu tienda favorita: serán visibles para toda la familia.</string>
+    <string name="wallet_loyalty_picker_title">Elige la tienda</string>
+    <string name="wallet_loyalty_search_store_placeholder">Buscar una tienda</string>
+    <string name="wallet_loyalty_popular_section">Tarjetas más populares</string>
+    <string name="wallet_loyalty_manual_entry_cta">¿Tarjeta no está en la lista? Añádela manualmente</string>
+    <string name="wallet_loyalty_default_brand_name">Tarjeta</string>
+    <string name="wallet_loyalty_new_card_title">Nueva tarjeta</string>
+    <string name="wallet_loyalty_logo_content_description">Logo de %1$s</string>
+    <string name="wallet_loyalty_store_name_label">Tienda</string>
+    <string name="wallet_loyalty_store_name_placeholder">Nombre de la tienda</string>
+    <string name="wallet_loyalty_color_label">Color de la tarjeta</string>
+    <string name="wallet_loyalty_card_number_label">Número de tarjeta</string>
+    <string name="wallet_loyalty_description_label">Descripción (opcional)</string>
+    <string name="wallet_loyalty_description_placeholder">Ej. tarjeta a nombre de...</string>
+    <string name="wallet_loyalty_scan_instructions">Encuadra el código de barras en el reverso de la tarjeta</string>
+    <string name="wallet_loyalty_scan_manual_fallback">¿El escaneo no funciona? Introduce los datos manualmente</string>
+    <string name="wallet_loyalty_delete_confirm_title">¿Eliminar esta tarjeta de fidelidad?</string>
+    <string name="wallet_loyalty_delete_confirm_text">Esta acción no se puede deshacer.</string>
+    <plurals name="wallet_loyalty_delete_selected_confirm_title">
+        <item quantity="one">¿Eliminar %1$d tarjeta de fidelidad?</item>
+        <item quantity="other">¿Eliminar %1$d tarjetas de fidelidad?</item>
+    </plurals>
+    <string name="wallet_loyalty_detail_title">Tarjeta de fidelidad</string>
+    <string name="wallet_loyalty_edit_cd">Editar</string>
+    <string name="wallet_loyalty_not_found">Tarjeta no encontrada</string>
+    <string name="wallet_loyalty_card_code_label">Código de la tarjeta</string>
+    <string name="wallet_loyalty_barcode_cd">Código de barras</string>
+    <string name="wallet_loyalty_note_label">Nota</string>
+    <!-- Fotos del anverso/reverso de la tarjeta física -->
+    <string name="wallet_loyalty_photos_section_title">Fotos de la tarjeta</string>
+    <string name="wallet_loyalty_photo_front">Anverso</string>
+    <string name="wallet_loyalty_photo_back">Reverso</string>
+    <string name="wallet_loyalty_photo_add_cd">Fotografiar la tarjeta: %1$s</string>
+    <string name="wallet_loyalty_photo_open_cd">Abrir la foto a pantalla completa: %1$s</string>
+    <string name="wallet_loyalty_photo_replace">Sustituir</string>
+    <string name="wallet_loyalty_photo_delete">Eliminar</string>
+    <string name="wallet_loyalty_photos_encrypted_hint">Las fotos están cifradas y solo son visibles para tu familia.</string>
+    <string name="wallet_loyalty_photo_upload_error">No se ha podido guardar la foto.</string>
+    <string name="wallet_loyalty_photo_delete_error">No se ha podido eliminar la foto.</string>
+    <string name="wallet_loyalty_delete_card_button">Eliminar tarjeta</string>
+    <string name="wallet_loyalty_save_error">Error al guardar</string>
+    <string name="wallet_loyalty_update_error">Actualización fallida</string>
+    <string name="wallet_loyalty_delete_error">Error al eliminar</string>
 </resources>

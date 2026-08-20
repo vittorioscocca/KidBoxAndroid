@@ -52,6 +52,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBTripDayPlanDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTripExpenseDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTripLegDao
 import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
+import it.vittorioscocca.kidbox.data.local.dao.LoyaltyCardDao
 import it.vittorioscocca.kidbox.data.local.entity.KBAIConversationEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBAIMessageEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBHealthInsightEntity
@@ -86,6 +87,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBTodoListEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTreatmentEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBVaccineEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBWalletTicketEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBLoyaltyCardEntity
 import it.vittorioscocca.kidbox.data.local.entity.HomeItemEntity
 import it.vittorioscocca.kidbox.data.local.entity.HousePaymentEntity
 import it.vittorioscocca.kidbox.data.local.entity.PetEntity
@@ -102,7 +104,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBTripExpenseEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTripLegEntity
 
 @Database(
-    version = 36,
+    version = 38,
     exportSchema = false,
     entities = [
         KBUserProfileEntity::class,
@@ -137,6 +139,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBTripLegEntity
         KBAIConversationEntity::class,
         KBAIMessageEntity::class,
         KBWalletTicketEntity::class,
+        KBLoyaltyCardEntity::class,
         PetEntity::class,
         PetEventEntity::class,
         HomeItemEntity::class,
@@ -188,6 +191,7 @@ abstract class KidBoxDatabase : RoomDatabase() {
     abstract fun aiConversationDao(): KBAIConversationDao
     abstract fun aiMessageDao(): KBAIMessageDao
     abstract fun walletTicketDao(): WalletTicketDao
+    abstract fun loyaltyCardDao(): LoyaltyCardDao
     abstract fun petDao(): PetDao
     abstract fun petEventDao(): PetEventDao
     abstract fun homeItemDao(): HomeItemDao

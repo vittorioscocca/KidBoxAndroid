@@ -207,6 +207,37 @@ class WalletRepository @Inject constructor(
         }
     }
 
+    /**
+     * Cambia il promemoria di UN biglietto. `null` = torna al comportamento
+     * legacy (1h prima, come oggi); `0`/`1`/`24`/`48` = scelta esplicita
+     * dell'utente. Vedi [KBWalletTicketEntity.reminderOffsetHours].
+     */
+    suspend fun updateTicketReminderOffset(
+        ticketId: String,
+        familyId: String,
+        reminderOffsetHours: Int?,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val user = auth.currentUser ?: error("Non autenticato")
+            val displayName = user.displayName?.trim().orEmpty().ifBlank { "Tu" }
+            val existing = walletTicketDao.getById(ticketId) ?: error("Biglietto non trovato")
+            if (existing.familyId != familyId) error("Famiglia non valida")
+
+            val now = System.currentTimeMillis()
+            val updated = existing.copy(
+                reminderOffsetHours = reminderOffsetHours,
+                updatedBy = user.uid,
+                updatedByName = displayName,
+                updatedAtEpochMillis = now,
+                syncStateRaw = 1,
+            )
+            walletTicketDao.upsert(updated)
+            remoteStore.upsert(updated, displayName)
+            walletTicketDao.upsert(updated.copy(syncStateRaw = 0))
+            walletReminderScheduler.rescheduleForFamily(familyId)
+        }
+    }
+
     suspend fun openPdf(familyId: String, ticketId: String): ByteArray = withContext(Dispatchers.IO) {
         val ticket = walletTicketDao.getById(ticketId)
             ?: error("Biglietto non trovato")
@@ -332,6 +363,7 @@ class WalletRepository @Inject constructor(
                                 visibilityScope = KBVisibilityScope.normalizedWallet(dto.visibilityScope),
                                 visibilityMemberIdsJson = encodeStringList(dto.visibilityMemberIds),
                                 syncStateRaw = 0,
+                                reminderOffsetHours = dto.reminderOffsetHours,
                             ),
                         )
                     }

@@ -74,6 +74,7 @@ import it.vittorioscocca.kidbox.ui.screens.location.geofence.GeofenceEditScreen
 import it.vittorioscocca.kidbox.ui.screens.location.geofence.GeofenceListScreen
 import it.vittorioscocca.kidbox.ui.screens.wallet.WalletHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.wallet.WalletTicketDetailScreen
+import it.vittorioscocca.kidbox.ui.screens.wallet.loyaltycards.LoyaltyCardDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.passwords.AddPasswordScreen
 import it.vittorioscocca.kidbox.ui.screens.passwords.PasswordDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.passwords.PasswordGroupDetailScreen
@@ -1551,7 +1552,26 @@ fun AppNavGraph(
                 onDocumentClick = { documentId ->
                     navController.navigate(AppDestination.WalletDocumentDetail.createRoute(familyId, documentId))
                 },
+                onLoyaltyCardClick = { cardId ->
+                    navController.navigate(AppDestination.WalletLoyaltyCardDetail.createRoute(familyId, cardId))
+                },
                 onUpgrade = { navController.navigate(AppDestination.Plans.route) },
+            )
+        }
+
+        composable(
+            route = AppDestination.WalletLoyaltyCardDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("cardId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val cardId = backStackEntry.arguments?.getString("cardId").orEmpty()
+            LoyaltyCardDetailScreen(
+                familyId = familyId,
+                cardId = cardId,
+                onBack = { navController.popBackStack() },
             )
         }
 

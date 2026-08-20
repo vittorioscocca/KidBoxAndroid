@@ -7,9 +7,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.notification.PushNotificationManager
 import it.vittorioscocca.kidbox.data.notification.PushNotificationManager.PreferenceKeys
-import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
-import it.vittorioscocca.kidbox.data.wallet.WalletReminderPrefs
-import it.vittorioscocca.kidbox.notifications.WalletReminderScheduler
 import it.vittorioscocca.kidbox.notifications.nudge.NudgeEngine
 import it.vittorioscocca.kidbox.notifications.nudge.NudgeState
 import javax.inject.Inject
@@ -20,7 +17,6 @@ import kotlinx.coroutines.launch
 
 data class NotificationSettingsUiState(
     val isLoading: Boolean = true,
-    val notifyOnNewDocs: Boolean = true,
     val notifyOnNewMessages: Boolean = true,
     val notifyOnLocationSharing: Boolean = true,
     val notifyOnTodoAssigned: Boolean = true,
@@ -28,7 +24,12 @@ data class NotificationSettingsUiState(
     val notifyOnNewNote: Boolean = true,
     val notifyOnNewCalendarEvent: Boolean = true,
     val notifyOnNewExpense: Boolean = true,
-    val notifyOnWalletReminder: Boolean = true,
+    /**
+     * Un solo toggle per tutto il Wallet (biglietti, documenti, carte
+     * fedeltà): assorbe le vecchie `notifyOnNewDocs` e
+     * `notifyOnNewWalletTicket`. Vedi [PreferenceKeys.NOTIFY_ON_WALLET].
+     */
+    val notifyOnWallet: Boolean = true,
     /** Suggerimenti su aree mai usate. Locale, indipendente dalle push. */
     val nudgesEnabled: Boolean = true,
     val message: String? = null,
@@ -37,9 +38,6 @@ data class NotificationSettingsUiState(
 @HiltViewModel
 class NotificationSettingsViewModel @Inject constructor(
     private val pushNotificationManager: PushNotificationManager,
-    private val walletReminderPrefs: WalletReminderPrefs,
-    private val familyDao: KBFamilyDao,
-    private val walletReminderScheduler: WalletReminderScheduler,
     @ApplicationContext private val appContext: Context,
     private val nudgeEngine: NudgeEngine,
 ) : ViewModel() {
@@ -53,7 +51,6 @@ class NotificationSettingsViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         nudgesEnabled = !NudgeState.isOptedOut(appContext),
-                        notifyOnNewDocs = prefs[PreferenceKeys.NOTIFY_ON_NEW_DOCS] ?: true,
                         notifyOnNewMessages = prefs[PreferenceKeys.NOTIFY_ON_NEW_MESSAGES] ?: true,
                         notifyOnLocationSharing = prefs[PreferenceKeys.NOTIFY_ON_LOCATION_SHARING] ?: true,
                         notifyOnTodoAssigned = prefs[PreferenceKeys.NOTIFY_ON_TODO_ASSIGNED] ?: true,
@@ -61,7 +58,7 @@ class NotificationSettingsViewModel @Inject constructor(
                         notifyOnNewNote = prefs[PreferenceKeys.NOTIFY_ON_NEW_NOTE] ?: true,
                         notifyOnNewCalendarEvent = prefs[PreferenceKeys.NOTIFY_ON_NEW_CALENDAR_EVENT] ?: true,
                         notifyOnNewExpense = prefs[PreferenceKeys.NOTIFY_ON_NEW_EXPENSE] ?: true,
-                        notifyOnWalletReminder = walletReminderPrefs.isReminderEnabled(),
+                        notifyOnWallet = prefs[PreferenceKeys.NOTIFY_ON_WALLET] ?: true,
                         message = null,
                     )
                 }
@@ -76,7 +73,6 @@ class NotificationSettingsViewModel @Inject constructor(
 
     fun setPreference(key: String, enabled: Boolean, registerToken: Boolean) {
         _uiState.value = when (key) {
-            PreferenceKeys.NOTIFY_ON_NEW_DOCS -> _uiState.value.copy(notifyOnNewDocs = enabled)
             PreferenceKeys.NOTIFY_ON_NEW_MESSAGES -> _uiState.value.copy(notifyOnNewMessages = enabled)
             PreferenceKeys.NOTIFY_ON_LOCATION_SHARING -> _uiState.value.copy(notifyOnLocationSharing = enabled)
             PreferenceKeys.NOTIFY_ON_TODO_ASSIGNED -> _uiState.value.copy(notifyOnTodoAssigned = enabled)
@@ -84,6 +80,7 @@ class NotificationSettingsViewModel @Inject constructor(
             PreferenceKeys.NOTIFY_ON_NEW_NOTE -> _uiState.value.copy(notifyOnNewNote = enabled)
             PreferenceKeys.NOTIFY_ON_NEW_CALENDAR_EVENT -> _uiState.value.copy(notifyOnNewCalendarEvent = enabled)
             PreferenceKeys.NOTIFY_ON_NEW_EXPENSE -> _uiState.value.copy(notifyOnNewExpense = enabled)
+            PreferenceKeys.NOTIFY_ON_WALLET -> _uiState.value.copy(notifyOnWallet = enabled)
             else -> _uiState.value
         }
         viewModelScope.launch {
@@ -113,14 +110,5 @@ class NotificationSettingsViewModel @Inject constructor(
 
     fun clearMessage() {
         _uiState.value = _uiState.value.copy(message = null)
-    }
-
-    fun setWalletReminderLocal(enabled: Boolean) {
-        _uiState.value = _uiState.value.copy(notifyOnWalletReminder = enabled)
-        walletReminderPrefs.setReminderEnabled(enabled)
-        viewModelScope.launch {
-            val familyId = familyDao.peekAnyFamilyId() ?: return@launch
-            walletReminderScheduler.rescheduleForFamily(familyId)
-        }
     }
 }

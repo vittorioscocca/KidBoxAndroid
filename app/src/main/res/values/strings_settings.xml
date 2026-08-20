@@ -29,8 +29,6 @@
     <string name="settings_notif_silent_channel">Canale notifiche silenzioso</string>
     <string name="settings_notif_silent_channel_sub">Tocca qui per attivare alert visibili (popup/suono).</string>
     <string name="settings_notif_open">Apri</string>
-    <string name="settings_notif_documents">Notifica nuovi documenti</string>
-    <string name="settings_notif_documents_sub">Quando viene caricato un documento condiviso</string>
     <string name="settings_notif_chat">Notifica nuovi messaggi in chat</string>
     <string name="settings_notif_chat_sub">Quando un membro invia un messaggio</string>
     <string name="settings_notif_location">Notifiche posizione</string>
@@ -45,8 +43,8 @@
     <string name="settings_notif_calendar_sub">Quando viene aggiunto un evento</string>
     <string name="settings_notif_expenses">Notifiche nuove spese</string>
     <string name="settings_notif_expenses_sub">Quando viene registrata una spesa famiglia</string>
-    <string name="settings_notif_wallet">Promemoria Wallet</string>
-    <string name="settings_notif_wallet_sub">Un’ora prima dell’evento del biglietto (solo su questo dispositivo)</string>
+    <string name="settings_notif_wallet">Notifiche Wallet</string>
+    <string name="settings_notif_wallet_sub">Quando viene aggiunto un nuovo contenuto al tuo Wallet</string>
     <string name="settings_privacy_title">Privacy</string>
     <string name="settings_privacy_logs_title">Log tecnici e report errori</string>
     <string name="settings_privacy_body1">KidBox salva log tecnici sul dispositivo (avvio app, sincronizzazione, crash).</string>

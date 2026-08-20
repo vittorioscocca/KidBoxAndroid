@@ -176,6 +176,12 @@
     <string name="wallet_action_cannot_be_undone">Cette action est irréversible.</string>
     <string name="wallet_delete">Supprimer</string>
     <string name="wallet_visibility_who_can_see_ticket">Qui peut voir ce billet</string>
+    <string name="wallet_reminder_label">Rappel</string>
+    <string name="wallet_reminder_default">Par défaut</string>
+    <string name="wallet_reminder_none">Aucun</string>
+    <string name="wallet_reminder_1h">1 heure avant</string>
+    <string name="wallet_reminder_1d">1 jour avant</string>
+    <string name="wallet_reminder_2d">2 jours avant</string>
     <string name="wallet_no_app_to_open_pdf">Aucune app pour ouvrir le PDF</string>
     <string name="wallet_ticket_detail_title">Détail du billet</string>
     <string name="wallet_ticket_not_found">Billet introuvable</string>
@@ -305,4 +311,54 @@
     <string name="wallet_document_notify_before_expiry">Me prévenir une semaine avant l\'expiration</string>
 
     <string name="wallet_document_delete_document_confirm">« %1$s » sera supprimé. Cette action est irréversible.</string>
+
+    <string name="wallet_tab_loyalty_cards">Cartes</string>
+    <string name="wallet_loyalty_add_cd">Ajouter une carte de fidélité</string>
+    <string name="wallet_loyalty_search_placeholder">Rechercher une carte</string>
+    <string name="wallet_loyalty_add_button">Ajouter une carte</string>
+    <string name="wallet_loyalty_no_results">Aucun résultat pour « %1$s »</string>
+    <string name="wallet_loyalty_empty_title">Aucune carte de fidélité</string>
+    <string name="wallet_loyalty_empty_subtitle">Ajoutez les cartes de fidélité du supermarché, du magasin d\'électronique ou de votre boutique préférée : elles seront visibles par toute la famille.</string>
+    <string name="wallet_loyalty_picker_title">Choisissez le magasin</string>
+    <string name="wallet_loyalty_search_store_placeholder">Rechercher un magasin</string>
+    <string name="wallet_loyalty_popular_section">Cartes les plus populaires</string>
+    <string name="wallet_loyalty_manual_entry_cta">Carte non répertoriée ? Ajoutez-la manuellement</string>
+    <string name="wallet_loyalty_default_brand_name">Carte</string>
+    <string name="wallet_loyalty_new_card_title">Nouvelle carte</string>
+    <string name="wallet_loyalty_logo_content_description">Logo %1$s</string>
+    <string name="wallet_loyalty_store_name_label">Magasin</string>
+    <string name="wallet_loyalty_store_name_placeholder">Nom du magasin</string>
+    <string name="wallet_loyalty_color_label">Couleur de la carte</string>
+    <string name="wallet_loyalty_card_number_label">Numéro de carte</string>
+    <string name="wallet_loyalty_description_label">Description (facultatif)</string>
+    <string name="wallet_loyalty_description_placeholder">Ex. carte au nom de...</string>
+    <string name="wallet_loyalty_scan_instructions">Cadrez le code-barres au dos de la carte</string>
+    <string name="wallet_loyalty_scan_manual_fallback">Le scan ne fonctionne pas ? Saisissez les données manuellement</string>
+    <string name="wallet_loyalty_delete_confirm_title">Supprimer cette carte de fidélité ?</string>
+    <string name="wallet_loyalty_delete_confirm_text">Cette action est irréversible.</string>
+    <plurals name="wallet_loyalty_delete_selected_confirm_title">
+        <item quantity="one">Supprimer %1$d carte de fidélité ?</item>
+        <item quantity="other">Supprimer %1$d cartes de fidélité ?</item>
+    </plurals>
+    <string name="wallet_loyalty_detail_title">Carte de fidélité</string>
+    <string name="wallet_loyalty_edit_cd">Modifier</string>
+    <string name="wallet_loyalty_not_found">Carte introuvable</string>
+    <string name="wallet_loyalty_card_code_label">Code de la carte</string>
+    <string name="wallet_loyalty_barcode_cd">Code-barres</string>
+    <string name="wallet_loyalty_note_label">Note</string>
+    <!-- Photos recto/verso de la carte physique -->
+    <string name="wallet_loyalty_photos_section_title">Photos de la carte</string>
+    <string name="wallet_loyalty_photo_front">Recto</string>
+    <string name="wallet_loyalty_photo_back">Verso</string>
+    <string name="wallet_loyalty_photo_add_cd">Photographier la carte : %1$s</string>
+    <string name="wallet_loyalty_photo_open_cd">Ouvrir la photo en plein écran : %1$s</string>
+    <string name="wallet_loyalty_photo_replace">Remplacer</string>
+    <string name="wallet_loyalty_photo_delete">Supprimer</string>
+    <string name="wallet_loyalty_photos_encrypted_hint">Les photos sont chiffrées et visibles uniquement par votre famille.</string>
+    <string name="wallet_loyalty_photo_upload_error">Impossible d\'enregistrer la photo.</string>
+    <string name="wallet_loyalty_photo_delete_error">Impossible de supprimer la photo.</string>
+    <string name="wallet_loyalty_delete_card_button">Supprimer la carte</string>
+    <string name="wallet_loyalty_save_error">Erreur d\'enregistrement</string>
+    <string name="wallet_loyalty_update_error">Échec de la mise à jour</string>
+    <string name="wallet_loyalty_delete_error">Erreur de suppression</string>
 </resources>

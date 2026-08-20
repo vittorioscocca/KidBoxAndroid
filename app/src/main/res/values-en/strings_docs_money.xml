@@ -176,6 +176,12 @@
     <string name="wallet_action_cannot_be_undone">This can\'t be undone.</string>
     <string name="wallet_delete">Delete</string>
     <string name="wallet_visibility_who_can_see_ticket">Who can see this ticket</string>
+    <string name="wallet_reminder_label">Reminder</string>
+    <string name="wallet_reminder_default">Default</string>
+    <string name="wallet_reminder_none">None</string>
+    <string name="wallet_reminder_1h">1 hour before</string>
+    <string name="wallet_reminder_1d">1 day before</string>
+    <string name="wallet_reminder_2d">2 days before</string>
     <string name="wallet_no_app_to_open_pdf">No app to open the PDF</string>
     <string name="wallet_ticket_detail_title">Ticket details</string>
     <string name="wallet_ticket_not_found">Ticket not found</string>
@@ -305,4 +311,54 @@
     <string name="wallet_document_notify_before_expiry">Remind me a week before it expires</string>
 
     <string name="wallet_document_delete_document_confirm">"%1$s" will be deleted. This can\'t be undone.</string>
+
+    <string name="wallet_tab_loyalty_cards">Cards</string>
+    <string name="wallet_loyalty_add_cd">Add loyalty card</string>
+    <string name="wallet_loyalty_search_placeholder">Search a card</string>
+    <string name="wallet_loyalty_add_button">Add a card</string>
+    <string name="wallet_loyalty_no_results">No results for \"%1$s\"</string>
+    <string name="wallet_loyalty_empty_title">No loyalty cards</string>
+    <string name="wallet_loyalty_empty_subtitle">Add loyalty cards for the supermarket, electronics store, or your favorite shop: they\'ll be visible to the whole family.</string>
+    <string name="wallet_loyalty_picker_title">Choose the store</string>
+    <string name="wallet_loyalty_search_store_placeholder">Search a store</string>
+    <string name="wallet_loyalty_popular_section">Most popular cards</string>
+    <string name="wallet_loyalty_manual_entry_cta">Card not listed? Add it manually</string>
+    <string name="wallet_loyalty_default_brand_name">Card</string>
+    <string name="wallet_loyalty_new_card_title">New card</string>
+    <string name="wallet_loyalty_logo_content_description">Logo %1$s</string>
+    <string name="wallet_loyalty_store_name_label">Store</string>
+    <string name="wallet_loyalty_store_name_placeholder">Store name</string>
+    <string name="wallet_loyalty_color_label">Card color</string>
+    <string name="wallet_loyalty_card_number_label">Card number</string>
+    <string name="wallet_loyalty_description_label">Description (optional)</string>
+    <string name="wallet_loyalty_description_placeholder">E.g. card registered to...</string>
+    <string name="wallet_loyalty_scan_instructions">Frame the barcode on the back of the card</string>
+    <string name="wallet_loyalty_scan_manual_fallback">Scanning not working? Enter the details manually</string>
+    <string name="wallet_loyalty_delete_confirm_title">Delete this loyalty card?</string>
+    <string name="wallet_loyalty_delete_confirm_text">This action can\'t be undone.</string>
+    <plurals name="wallet_loyalty_delete_selected_confirm_title">
+        <item quantity="one">Delete %1$d loyalty card?</item>
+        <item quantity="other">Delete %1$d loyalty cards?</item>
+    </plurals>
+    <string name="wallet_loyalty_detail_title">Loyalty card</string>
+    <string name="wallet_loyalty_edit_cd">Edit</string>
+    <string name="wallet_loyalty_not_found">Card not found</string>
+    <string name="wallet_loyalty_card_code_label">Card code</string>
+    <string name="wallet_loyalty_barcode_cd">Barcode</string>
+    <string name="wallet_loyalty_note_label">Note</string>
+    <!-- Front/back photos of the physical card -->
+    <string name="wallet_loyalty_photos_section_title">Card photos</string>
+    <string name="wallet_loyalty_photo_front">Front</string>
+    <string name="wallet_loyalty_photo_back">Back</string>
+    <string name="wallet_loyalty_photo_add_cd">Take a photo of the card: %1$s</string>
+    <string name="wallet_loyalty_photo_open_cd">Open photo full screen: %1$s</string>
+    <string name="wallet_loyalty_photo_replace">Replace</string>
+    <string name="wallet_loyalty_photo_delete">Delete</string>
+    <string name="wallet_loyalty_photos_encrypted_hint">Photos are encrypted and visible only to your family.</string>
+    <string name="wallet_loyalty_photo_upload_error">The photo could not be saved.</string>
+    <string name="wallet_loyalty_photo_delete_error">The photo could not be deleted.</string>
+    <string name="wallet_loyalty_delete_card_button">Delete card</string>
+    <string name="wallet_loyalty_save_error">Save error</string>
+    <string name="wallet_loyalty_update_error">Update failed</string>
+    <string name="wallet_loyalty_delete_error">Delete error</string>
 </resources>

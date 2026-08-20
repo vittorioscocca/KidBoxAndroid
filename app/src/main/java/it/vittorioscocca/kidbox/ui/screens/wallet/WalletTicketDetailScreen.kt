@@ -42,6 +42,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -270,6 +272,11 @@ fun WalletTicketDetailScreen(
                 }
             }
 
+            ReminderOffsetRow(
+                reminderOffsetHours = ticket.reminderOffsetHours,
+                onSelected = { viewModel.updateTicketReminderOffset(ticketId, it) },
+            )
+
             // Header card
             WalletTicketCard(
                 ticket = ticket,
@@ -318,6 +325,77 @@ fun WalletTicketDetailScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+/**
+ * `null` = predefinito (legacy, 1h prima); `0` = nessuno; `1`/`24`/`48` = ore
+ * prima dell'evento. Vedi [KBWalletTicketEntity.reminderOffsetHours].
+ */
+@Composable
+private fun ReminderOffsetRow(
+    reminderOffsetHours: Int?,
+    onSelected: (Int?) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val options = listOf<Int?>(null, 0, 1, 24, 48)
+    val defaultLabel = stringResource(R.string.wallet_reminder_default)
+    val noneLabel = stringResource(R.string.wallet_reminder_none)
+    val oneHourLabel = stringResource(R.string.wallet_reminder_1h)
+    val oneDayLabel = stringResource(R.string.wallet_reminder_1d)
+    val twoDaysLabel = stringResource(R.string.wallet_reminder_2d)
+    fun labelFor(value: Int?): String = when (value) {
+        null -> defaultLabel
+        0 -> noneLabel
+        1 -> oneHourLabel
+        24 -> oneDayLabel
+        48 -> twoDaysLabel
+        else -> value.toString()
+    }
+
+    Box {
+        Surface(
+            onClick = { expanded = true },
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text(
+                        stringResource(R.string.wallet_reminder_label),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        labelFor(reminderOffsetHours),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+                Icon(
+                    Icons.Filled.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { value ->
+                DropdownMenuItem(
+                    text = { Text(labelFor(value)) },
+                    onClick = {
+                        expanded = false
+                        onSelected(value)
+                    },
+                )
+            }
         }
     }
 }

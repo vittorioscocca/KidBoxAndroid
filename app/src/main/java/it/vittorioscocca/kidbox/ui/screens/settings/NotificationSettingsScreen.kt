@@ -96,11 +96,6 @@ fun NotificationSettingsScreen(
     ) { granted ->
         val key = pendingEnableKey
         if (key == null) return@rememberLauncherForActivityResult
-        if (key == LOCAL_WALLET_REMINDER_KEY) {
-            viewModel.setWalletReminderLocal(granted)
-            pendingEnableKey = null
-            return@rememberLauncherForActivityResult
-        }
         if (granted) {
             viewModel.setPreference(key = key, enabled = true, registerToken = true)
         } else {
@@ -234,26 +229,6 @@ fun NotificationSettingsScreen(
                     )
                 }
             }
-            NotificationToggleRow(
-                title = stringResource(R.string.settings_notif_documents),
-                subtitle = stringResource(R.string.settings_notif_documents_sub),
-                checked = state.notifyOnNewDocs && !systemDenied,
-                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
-                onCheckedChange = { enabled ->
-                    updatePreferenceWithPermission(
-                        key = PreferenceKeys.NOTIFY_ON_NEW_DOCS,
-                        enabled = enabled,
-                        context = context,
-                        setPendingKey = { pendingEnableKey = it },
-                        requestPermission = {
-                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        },
-                        onSet = { key, value, register ->
-                            viewModel.setPreference(key = key, enabled = value, registerToken = register)
-                        },
-                    )
-                },
-            )
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_chat),
                 subtitle = stringResource(R.string.settings_notif_chat_sub),
@@ -407,23 +382,19 @@ fun NotificationSettingsScreen(
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_wallet),
                 subtitle = stringResource(R.string.settings_notif_wallet_sub),
-                checked = state.notifyOnWalletReminder && !systemDenied,
+                checked = state.notifyOnWallet && !systemDenied,
                 enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
                 onCheckedChange = { enabled ->
-                    if (!enabled) {
-                        viewModel.setWalletReminderLocal(false)
-                        return@NotificationToggleRow
-                    }
                     updatePreferenceWithPermission(
-                        key = LOCAL_WALLET_REMINDER_KEY,
-                        enabled = true,
+                        key = PreferenceKeys.NOTIFY_ON_WALLET,
+                        enabled = enabled,
                         context = context,
                         setPendingKey = { pendingEnableKey = it },
                         requestPermission = {
                             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         },
-                        onSet = { _, value, _ ->
-                            if (value) viewModel.setWalletReminderLocal(true)
+                        onSet = { key, value, register ->
+                            viewModel.setPreference(key = key, enabled = value, registerToken = register)
                         },
                     )
                 },
@@ -479,8 +450,6 @@ private fun NotificationToggleRow(
         )
     }
 }
-
-private const val LOCAL_WALLET_REMINDER_KEY = "__local_wallet_reminder__"
 
 private fun updatePreferenceWithPermission(
     key: String,

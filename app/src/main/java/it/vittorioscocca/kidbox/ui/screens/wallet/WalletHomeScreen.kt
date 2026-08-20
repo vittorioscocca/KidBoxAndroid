@@ -55,6 +55,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import it.vittorioscocca.kidbox.ui.screens.wallet.documents.WalletDocumentsSectionContent
 import it.vittorioscocca.kidbox.ui.screens.wallet.documents.WalletDocumentsViewModel
+import it.vittorioscocca.kidbox.ui.screens.wallet.loyaltycards.LoyaltyCardsSectionContent
+import it.vittorioscocca.kidbox.ui.screens.wallet.loyaltycards.LoyaltyCardsViewModel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -89,6 +91,7 @@ fun WalletHomeScreen(
     onBack: () -> Unit,
     onTicketClick: (ticketId: String) -> Unit,
     onDocumentClick: (documentId: String) -> Unit = {},
+    onLoyaltyCardClick: (cardId: String) -> Unit = {},
     onUpgrade: () -> Unit = {},
     viewModel: WalletViewModel = hiltViewModel(),
 ) {
@@ -105,6 +108,14 @@ fun WalletHomeScreen(
     var showDocAddChoice by remember { mutableStateOf(false) }
     var showDocAddSheet by remember { mutableStateOf(false) }
     var showDocLinkSheet by remember { mutableStateOf(false) }
+    var showLoyaltyCardAddFlow by remember { mutableStateOf(false) }
+
+    // Stesso schema dei Documenti: il ViewModel della sezione vive qui, così i
+    // suoi controlli (Seleziona / + / Elimina) possono stare nella TopAppBar
+    // condivisa fra i tab invece che dentro il corpo della sezione.
+    val loyaltyCardsViewModel: LoyaltyCardsViewModel = hiltViewModel()
+    val loyaltyState by loyaltyCardsViewModel.uiState.collectAsStateWithLifecycle()
+    var showLoyaltyDeleteConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(familyId) {
         viewModel.bind(familyId)
@@ -168,6 +179,34 @@ fun WalletHomeScreen(
                             IconButton(onClick = { showAddSheet = true }) {
                                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.wallet_add_ticket_cd))
                             }
+                        } else if (selectedTab == 2) {
+                            if (loyaltyState.isSelecting) {
+                                TextButton(
+                                    onClick = { showLoyaltyDeleteConfirm = true },
+                                    enabled = loyaltyState.selectedIds.isNotEmpty(),
+                                ) {
+                                    Text(
+                                        stringResource(R.string.passwords_delete_count_button, loyaltyState.selectedIds.size),
+                                        color = if (loyaltyState.selectedIds.isEmpty()) {
+                                            MaterialTheme.colorScheme.error.copy(alpha = 0.38f)
+                                        } else {
+                                            MaterialTheme.colorScheme.error
+                                        },
+                                    )
+                                }
+                                TextButton(onClick = { loyaltyCardsViewModel.setSelecting(false) }) {
+                                    Text(stringResource(R.string.location_cancel_button))
+                                }
+                            } else {
+                                if (loyaltyState.cards.isNotEmpty()) {
+                                    TextButton(onClick = { loyaltyCardsViewModel.setSelecting(true) }) {
+                                        Text(stringResource(R.string.passwords_select_button))
+                                    }
+                                }
+                                IconButton(onClick = { showLoyaltyCardAddFlow = true }) {
+                                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.wallet_loyalty_add_cd))
+                                }
+                            }
                         } else {
                             if (docsState.isSelecting) {
                                 TextButton(onClick = { documentsViewModel.exitSelectionMode() }) { Text(stringResource(R.string.wallet_cancel)) }
@@ -194,11 +233,27 @@ fun WalletHomeScreen(
                 ) {
                     Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text(stringResource(R.string.wallet_tab_tickets)) })
                     Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text(stringResource(R.string.wallet_tab_documents)) })
+                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text(stringResource(R.string.wallet_tab_loyalty_cards)) })
                 }
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
+        if (selectedTab == 2) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                LoyaltyCardsSectionContent(
+                    familyId = familyId,
+                    onCardClick = onLoyaltyCardClick,
+                    showAddFlow = showLoyaltyCardAddFlow,
+                    onShowAddFlowChange = { showLoyaltyCardAddFlow = it },
+                    showDeleteConfirm = showLoyaltyDeleteConfirm,
+                    onShowDeleteConfirmChange = { showLoyaltyDeleteConfirm = it },
+                    viewModel = loyaltyCardsViewModel,
+                )
+            }
+            return@Scaffold
+        }
+
         if (selectedTab == 1) {
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                 WalletDocumentsSectionContent(
