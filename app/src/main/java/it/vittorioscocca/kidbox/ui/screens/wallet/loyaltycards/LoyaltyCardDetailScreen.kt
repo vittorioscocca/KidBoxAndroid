@@ -73,6 +73,7 @@ import com.google.zxing.common.BitMatrix
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.entity.KBLoyaltyCardEntity
 import it.vittorioscocca.kidbox.data.repository.LoyaltyCardPhotoSide
+import it.vittorioscocca.kidbox.ui.components.MaxScreenBrightnessWhileVisible
 import it.vittorioscocca.kidbox.ui.screens.wallet.documents.rememberWalletDocumentScannerLauncher
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
@@ -101,6 +102,12 @@ fun LoyaltyCardDetailScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var fullScreenPhoto by remember { mutableStateOf<Bitmap?>(null) }
+
+    // Schermo al massimo finché la carta è aperta: i lettori alla cassa
+    // faticano ad agganciare un codice su schermo poco luminoso. Ripristinato
+    // all'uscita dalla schermata e sospeso mentre un dialog copre il codice
+    // (i Dialog non smontano questa composizione).
+    MaxScreenBrightnessWhileVisible(isActive = !showEditDialog && fullScreenPhoto == null)
 
     fullScreenPhoto?.let { photo ->
         LoyaltyCardPhotoViewer(bitmap = photo, onDismiss = { fullScreenPhoto = null })
