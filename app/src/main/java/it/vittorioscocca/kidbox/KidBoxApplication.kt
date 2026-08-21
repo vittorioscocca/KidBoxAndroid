@@ -12,6 +12,7 @@ import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.HiltAndroidApp
 import it.vittorioscocca.kidbox.data.local.ThemePreference
 import it.vittorioscocca.kidbox.data.local.toNightMode
@@ -59,6 +60,13 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
         super.onCreate()
         KidBoxApplicationHolder.applicationContext = applicationContext
         KBFileLogger.init(this)
+        // Debug diagnostico temporaneo: dà visibilità sul traffico gRPC di Firestore
+        // (query inviate, stream di listen, risposte) sotto il tag logcat "Firestore".
+        // Solo debug build, va tolto una volta chiuso il problema di sync sulla
+        // famiglia senza bambino.
+        if (BuildConfig.DEBUG) {
+            FirebaseFirestore.setLoggingEnabled(true)
+        }
         KBCrashHandler.install()
         // Installa il provider App Check (Play Integrity in release, Debug in debug)
         // il prima possibile, prima di qualunque chiamata Firestore/Storage/Functions:

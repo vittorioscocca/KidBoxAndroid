@@ -95,7 +95,10 @@ class TodoListViewModel @Inject constructor(
                 listScoped.filter { !it.isDone && (it.dueAtEpochMillis ?: 0L) in dayStart until dayEnd }
             }
 
-            TodoSmartKind.ALL -> listScoped.filter { !it.isDone }
+            // Il badge "Tutti" in home conta solo i non completati (state.allCount),
+            // ma la lista che si apre mostra tutto, fatti compresi — coerente con iOS
+            // (TodoSmartListView.filteredTodos, case .all -> return visible).
+            TodoSmartKind.ALL -> listScoped
             TodoSmartKind.ASSIGNED_TO_ME -> listScoped.filter { !it.isDone && it.assignedTo == meUid }
             TodoSmartKind.COMPLETED -> listScoped.filter { it.isDone }
             TodoSmartKind.NOT_ASSIGNED_TO_ME -> listScoped.filter { !it.isDone && it.assignedTo != meUid }
@@ -139,7 +142,7 @@ class TodoListViewModel @Inject constructor(
         visibilityScope: String,
         visibilityMemberIds: List<String>,
     ) {
-        if (familyId.isBlank() || childId.isBlank() || listId.isBlank()) return
+        if (familyId.isBlank() || listId.isBlank()) return
         viewModelScope.launch {
             runCatching {
                 todoRepository.addTodo(

@@ -10,6 +10,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoItemDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoListDao
+import it.vittorioscocca.kidbox.data.local.entity.KBChildEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoItemEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoListEntity
@@ -19,6 +20,7 @@ import it.vittorioscocca.kidbox.data.remote.todo.TodoListRemoteChange
 import it.vittorioscocca.kidbox.data.remote.todo.TodoRemoteStore
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
+import it.vittorioscocca.kidbox.util.KBLog
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -68,17 +70,30 @@ class TodoRepository @Inject constructor(
                     listListener != null &&
                     todoListener != null
                 ) {
+                    KBLog.sync.debug(
+                        "startRealtime SKIP already bound familyId=$familyId childId=$childId",
+                        tag = "todo",
+                    )
                     return@withLock
                 }
                 stopRealtimeLocked()
                 listeningFamilyId = familyId
                 listeningChildId = childId
+                KBLog.sync.info("startRealtime ATTACH familyId=$familyId childId=$childId", tag = "todo")
 
                 listListener = remoteStore.listenTodoLists(
                     familyId = familyId,
                     childId = childId,
-                    onChange = { changes -> scope.launch { applyListInbound(changes) } },
+                    onChange = { changes ->
+                        KBLog.sync.debug("listenTodoLists onChange count=${changes.size}", tag = "todo")
+                        scope.launch { applyListInbound(changes) }
+                    },
                     onError = { err ->
+                        KBLog.sync.error(
+                            "listenTodoLists onError familyId=$familyId childId=$childId",
+                            tag = "todo",
+                            throwable = err,
+                        )
                         if (err is FirebaseFirestoreException && err.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
                             onPermissionDenied?.invoke()
                         }
@@ -88,8 +103,16 @@ class TodoRepository @Inject constructor(
                 todoListener = remoteStore.listenTodos(
                     familyId = familyId,
                     childId = childId,
-                    onChange = { changes -> scope.launch { applyTodoInbound(changes) } },
+                    onChange = { changes ->
+                        KBLog.sync.debug("listenTodos onChange count=${changes.size}", tag = "todo")
+                        scope.launch { applyTodoInbound(changes) }
+                    },
                     onError = { err ->
+                        KBLog.sync.error(
+                            "listenTodos onError familyId=$familyId childId=$childId",
+                            tag = "todo",
+                            throwable = err,
+                        )
                         if (err is FirebaseFirestoreException && err.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
                             onPermissionDenied?.invoke()
                         }
@@ -104,6 +127,8 @@ class TodoRepository @Inject constructor(
     }
 
     suspend fun addList(familyId: String, childId: String, name: String): String {
+        KBLog.sync.info("addList START familyId=$familyId childId=$childId", tag = "todo")
+        if (childId.isBlank()) ensureNoChildPlaceholder()
         val now = System.currentTimeMillis()
         val id = java.util.UUID.randomUUID().toString()
         val local = KBTodoListEntity(
@@ -115,8 +140,19 @@ class TodoRepository @Inject constructor(
             updatedAtEpochMillis = now,
             isDeleted = false,
         )
-        listDao.upsert(local)
-        remoteStore.upsertList(local)
+        try {
+            listDao.upsert(local)
+        } catch (e: Exception) {
+            KBLog.sync.error("addList Room upsert FAILED listId=$id familyId=$familyId childId=$childId", tag = "todo", throwable = e)
+            throw e
+        }
+        try {
+            remoteStore.upsertList(local)
+        } catch (e: Exception) {
+            KBLog.sync.error("addList remote upsert FAILED listId=$id", tag = "todo", throwable = e)
+            throw e
+        }
+        KBLog.sync.info("addList OK listId=$id", tag = "todo")
         return id
     }
 
@@ -155,6 +191,8 @@ class TodoRepository @Inject constructor(
         visibilityScope: String = KBVisibilityScope.FAMILY,
         visibilityMemberIds: List<String> = emptyList(),
     ) {
+        KBLog.sync.info("addTodo START familyId=$familyId childId=$childId listId=$listId", tag = "todo")
+        if (childId.isBlank()) ensureNoChildPlaceholder()
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()
         val isFirstUse = itemDao.countByFamilyId(familyId) == 0
@@ -200,9 +238,24 @@ class TodoRepository @Inject constructor(
             null
         }
         val persisted = todo.copy(reminderId = reminderId)
-        itemDao.upsert(persisted)
-        remoteStore.upsertTodo(persisted)
+        try {
+            itemDao.upsert(persisted)
+        } catch (e: Exception) {
+            KBLog.sync.error(
+                "addTodo Room upsert FAILED todoId=${persisted.id} familyId=$familyId childId=$childId",
+                tag = "todo",
+                throwable = e,
+            )
+            throw e
+        }
+        try {
+            remoteStore.upsertTodo(persisted)
+        } catch (e: Exception) {
+            KBLog.sync.error("addTodo remote upsert FAILED todoId=${persisted.id}", tag = "todo", throwable = e)
+            throw e
+        }
         itemDao.upsert(persisted.copy(syncStateRaw = KBSyncState.SYNCED.rawValue))
+        KBLog.sync.info("addTodo OK todoId=${persisted.id}", tag = "todo")
         AppAnalytics.contentCreated(appContext, "todo")
         if (isFirstUse) {
             AppAnalytics.featureFirstUse(appContext, feature = "todo")
@@ -296,46 +349,78 @@ class TodoRepository @Inject constructor(
     }
 
     private suspend fun applyListInbound(changes: List<TodoListRemoteChange>) {
+        KBLog.sync.debug("applyListInbound START changes=${changes.size}", tag = "todo")
         changes.forEach { change ->
-            when (change) {
-                is TodoListRemoteChange.Remove -> listDao.deleteById(change.id)
-                is TodoListRemoteChange.Upsert -> {
-                    val dto = change.dto
-                    if (dto.isDeleted) {
-                        listDao.deleteById(dto.id)
-                        return@forEach
+            try {
+                when (change) {
+                    is TodoListRemoteChange.Remove -> {
+                        KBLog.sync.debug("applyListInbound REMOVE id=${change.id}", tag = "todo")
+                        listDao.deleteById(change.id)
                     }
-                    ensureFamilyExists(dto.familyId)
-                    if (childDao.getById(dto.childId) == null) {
-                        return@forEach
+                    is TodoListRemoteChange.Upsert -> {
+                        val dto = change.dto
+                        KBLog.sync.debug(
+                            "applyListInbound UPSERT id=${dto.id} familyId=${dto.familyId} childId=${dto.childId} isDeleted=${dto.isDeleted}",
+                            tag = "todo",
+                        )
+                        if (dto.isDeleted) {
+                            listDao.deleteById(dto.id)
+                            return@forEach
+                        }
+                        ensureFamilyExists(dto.familyId)
+                        // childId può essere "" quando la famiglia non ha ancora un bambino:
+                        // non è un riferimento rotto, è lo stesso scoping valido usato da iOS/web.
+                        // Il controllo serve solo a scartare un childId reale ma non ancora
+                        // sincronizzato localmente — non a bloccare il caso "nessun bambino".
+                        if (dto.childId.isBlank()) {
+                            ensureNoChildPlaceholder()
+                        } else if (childDao.getById(dto.childId) == null) {
+                            KBLog.sync.debug(
+                                "applyListInbound SKIP unknown local child childId=${dto.childId}",
+                                tag = "todo",
+                            )
+                            return@forEach
+                        }
+                        val local = listDao.getById(dto.id)
+                        if (local != null && (dto.updatedAtEpochMillis ?: 0L) < local.updatedAtEpochMillis) {
+                            return@forEach
+                        }
+                        val now = System.currentTimeMillis()
+                        listDao.upsert(
+                            KBTodoListEntity(
+                                id = dto.id,
+                                familyId = dto.familyId,
+                                childId = dto.childId,
+                                name = dto.name,
+                                createdAtEpochMillis = local?.createdAtEpochMillis ?: (dto.updatedAtEpochMillis ?: now),
+                                updatedAtEpochMillis = dto.updatedAtEpochMillis ?: now,
+                                isDeleted = false,
+                            ),
+                        )
+                        KBLog.sync.debug("applyListInbound SAVED id=${dto.id}", tag = "todo")
                     }
-                    val local = listDao.getById(dto.id)
-                    if (local != null && (dto.updatedAtEpochMillis ?: 0L) < local.updatedAtEpochMillis) {
-                        return@forEach
-                    }
-                    val now = System.currentTimeMillis()
-                    listDao.upsert(
-                        KBTodoListEntity(
-                            id = dto.id,
-                            familyId = dto.familyId,
-                            childId = dto.childId,
-                            name = dto.name,
-                            createdAtEpochMillis = local?.createdAtEpochMillis ?: (dto.updatedAtEpochMillis ?: now),
-                            updatedAtEpochMillis = dto.updatedAtEpochMillis ?: now,
-                            isDeleted = false,
-                        ),
-                    )
                 }
+            } catch (e: Exception) {
+                KBLog.sync.error("applyListInbound FAILED change=$change", tag = "todo", throwable = e)
             }
         }
     }
 
     private suspend fun applyTodoInbound(changes: List<TodoItemRemoteChange>) {
+        KBLog.sync.debug("applyTodoInbound START changes=${changes.size}", tag = "todo")
         changes.forEach { change ->
+            try {
             when (change) {
-                is TodoItemRemoteChange.Remove -> itemDao.deleteById(change.id)
+                is TodoItemRemoteChange.Remove -> {
+                    KBLog.sync.debug("applyTodoInbound REMOVE id=${change.id}", tag = "todo")
+                    itemDao.deleteById(change.id)
+                }
                 is TodoItemRemoteChange.Upsert -> {
                     val dto = change.dto
+                    KBLog.sync.debug(
+                        "applyTodoInbound UPSERT id=${dto.id} familyId=${dto.familyId} childId=${dto.childId} isDeleted=${dto.isDeleted} isDone=${dto.isDone}",
+                        tag = "todo",
+                    )
                     if (dto.isDeleted) {
                         itemDao.deleteById(dto.id)
                         return@forEach
@@ -361,7 +446,13 @@ class TodoRepository @Inject constructor(
                         return@forEach
                     }
                     ensureFamilyExists(dto.familyId)
-                    if (childDao.getById(dto.childId) == null) {
+                    if (dto.childId.isBlank()) {
+                        ensureNoChildPlaceholder()
+                    } else if (childDao.getById(dto.childId) == null) {
+                        KBLog.sync.debug(
+                            "applyTodoInbound SKIP unknown local child childId=${dto.childId} todoId=${dto.id}",
+                            tag = "todo",
+                        )
                         return@forEach
                     }
                     val now = System.currentTimeMillis()
@@ -395,7 +486,11 @@ class TodoRepository @Inject constructor(
                             visibilityMemberIdsJson = encodeStringList(remoteMemberIds),
                         ),
                     )
+                    KBLog.sync.debug("applyTodoInbound SAVED id=${dto.id}", tag = "todo")
                 }
+            }
+            } catch (e: Exception) {
+                KBLog.sync.error("applyTodoInbound FAILED change=$change", tag = "todo", throwable = e)
             }
         }
     }
@@ -430,6 +525,42 @@ class TodoRepository @Inject constructor(
                 lastSyncError = null,
             ),
         )
+    }
+
+    /**
+     * `childId` può essere "" quando la famiglia non ha ancora un bambino (coerente con
+     * iOS/web). Ma `kb_todo_items.childId` e `kb_todo_lists.childId` hanno una foreign key
+     * reale su `kb_children.id`: senza una riga con id="" l'insert fallisce con
+     * SQLiteConstraintException e il to-do/lista non viene mai salvato, né in locale né
+     * verso remoto. Questo crea/garantisce quella riga segnaposto (nessun familyId
+     * specifico: la FK è a singola colonna, va bene per qualunque famiglia).
+     */
+    private suspend fun ensureNoChildPlaceholder() {
+        if (childDao.getById("") != null) {
+            KBLog.sync.debug("ensureNoChildPlaceholder already present", tag = "todo")
+            return
+        }
+        val now = System.currentTimeMillis()
+        try {
+            childDao.upsert(
+                KBChildEntity(
+                    id = "",
+                    familyId = null,
+                    name = "",
+                    birthDateEpochMillis = null,
+                    weightKg = null,
+                    heightCm = null,
+                    createdBy = "local",
+                    createdAtEpochMillis = now,
+                    updatedBy = null,
+                    updatedAtEpochMillis = null,
+                ),
+            )
+            KBLog.sync.info("ensureNoChildPlaceholder CREATED", tag = "todo")
+        } catch (e: Exception) {
+            KBLog.sync.error("ensureNoChildPlaceholder FAILED", tag = "todo", throwable = e)
+            throw e
+        }
     }
 
     private fun stopRealtimeLocked() {

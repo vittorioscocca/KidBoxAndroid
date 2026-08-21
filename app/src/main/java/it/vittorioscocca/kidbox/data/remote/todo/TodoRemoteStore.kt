@@ -84,31 +84,38 @@ class TodoRemoteStore @Inject constructor(
                     if (err != null) {
                         onError(err)
                     } else if (snap != null) {
-                        val changes = snap.documentChanges.mapNotNull { diff ->
-                            val doc = diff.document
-                            val d = doc.data
+                        // Deriviamo gli upsert da `snap.documents` (il risultato COMPLETO
+                        // e corrente della query), non da `snap.documentChanges` (il DELTA
+                        // rispetto all'ultima snapshot di QUESTO listener). Con persistenza
+                        // locale attiva, Firestore può risolvere una query riusando una
+                        // snapshot già in cache e confermarla "invariata" col server tramite
+                        // existence filter, senza inviare alcun document_change — in quel
+                        // caso `documentChanges` risulta vuoto anche se la query ha risultati
+                        // reali, e il listener non chiamava mai onChange. Le rimozioni
+                        // restano sul delta, che per quelle risulta affidabile.
+                        val upserts = snap.documents.mapNotNull { doc ->
+                            val d = doc.data ?: return@mapNotNull null
                             val name = (d["name"] as? String)?.trim().orEmpty()
                             val cid = (d["childId"] as? String)?.trim().orEmpty()
-                            if (name.isEmpty() || cid.isEmpty()) {
+                            if (name.isEmpty()) {
                                 null
                             } else {
-                                val dto = TodoListRemoteDto(
-                                    id = doc.id,
-                                    familyId = familyId,
-                                    childId = cid,
-                                    name = name,
-                                    isDeleted = d["isDeleted"] as? Boolean ?: false,
-                                    updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
+                                TodoListRemoteChange.Upsert(
+                                    TodoListRemoteDto(
+                                        id = doc.id,
+                                        familyId = familyId,
+                                        childId = cid,
+                                        name = name,
+                                        isDeleted = d["isDeleted"] as? Boolean ?: false,
+                                        updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
+                                    ),
                                 )
-                                when (diff.type) {
-                                    DocumentChange.Type.ADDED,
-                                    DocumentChange.Type.MODIFIED,
-                                    -> TodoListRemoteChange.Upsert(dto)
-
-                                    DocumentChange.Type.REMOVED -> TodoListRemoteChange.Remove(doc.id)
-                                }
                             }
                         }
+                        val removes = snap.documentChanges
+                            .filter { it.type == DocumentChange.Type.REMOVED }
+                            .map { TodoListRemoteChange.Remove(it.document.id) }
+                        val changes = upserts + removes
                         if (changes.isNotEmpty()) onChange(changes)
                     }
                 },
@@ -130,43 +137,47 @@ class TodoRemoteStore @Inject constructor(
                     if (err != null) {
                         onError(err)
                     } else if (snap != null) {
-                        val changes = snap.documentChanges.mapNotNull { diff ->
-                            val doc = diff.document
+                        // Vedi commento in listenTodoLists: upsert dal risultato completo
+                        // (`snap.documents`), non dal delta (`documentChanges`), perché con
+                        // persistenza locale una query può risolversi da cache confermata
+                        // "invariata" dal server (existence filter) senza alcun
+                        // document_change — in quel caso il delta è vuoto pur avendo la
+                        // query risultati reali. Le rimozioni restano sul delta.
+                        val upserts = snap.documents.mapNotNull { doc ->
                             val d = doc.data ?: return@mapNotNull null
                             val title = (d["title"] as? String)?.trim().orEmpty()
                             val cid = (d["childId"] as? String)?.trim().orEmpty()
-                            if (title.isEmpty() || cid.isEmpty()) {
+                            if (title.isEmpty()) {
                                 null
                             } else {
-                                val dto = TodoItemRemoteDto(
-                                    id = doc.id,
-                                    familyId = familyId,
-                                    childId = cid,
-                                    title = title,
-                                    listId = (d["listId"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
-                                    isDone = d["isDone"] as? Boolean ?: false,
-                                    isDeleted = d["isDeleted"] as? Boolean ?: false,
-                                    notes = (d["notes"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
-                                    dueAtEpochMillis = (d["dueAt"] as? Timestamp)?.toDate()?.time,
-                                    doneAtEpochMillis = (d["doneAt"] as? Timestamp)?.toDate()?.time,
-                                    doneBy = d["doneBy"] as? String,
-                                    updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
-                                    updatedBy = d["updatedBy"] as? String,
-                                    assignedTo = d["assignedTo"] as? String,
-                                    createdBy = d["createdBy"] as? String,
-                                    priorityRaw = (d["priority"] as? Number)?.toInt(),
-                                    visibilityScope = d["visibilityScope"] as? String,
-                                    visibilityMemberIds = readFirestoreTodoStringIds(d, "visibilityMemberIds"),
+                                TodoItemRemoteChange.Upsert(
+                                    TodoItemRemoteDto(
+                                        id = doc.id,
+                                        familyId = familyId,
+                                        childId = cid,
+                                        title = title,
+                                        listId = (d["listId"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                                        isDone = d["isDone"] as? Boolean ?: false,
+                                        isDeleted = d["isDeleted"] as? Boolean ?: false,
+                                        notes = (d["notes"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                                        dueAtEpochMillis = (d["dueAt"] as? Timestamp)?.toDate()?.time,
+                                        doneAtEpochMillis = (d["doneAt"] as? Timestamp)?.toDate()?.time,
+                                        doneBy = d["doneBy"] as? String,
+                                        updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
+                                        updatedBy = d["updatedBy"] as? String,
+                                        assignedTo = d["assignedTo"] as? String,
+                                        createdBy = d["createdBy"] as? String,
+                                        priorityRaw = (d["priority"] as? Number)?.toInt(),
+                                        visibilityScope = d["visibilityScope"] as? String,
+                                        visibilityMemberIds = readFirestoreTodoStringIds(d, "visibilityMemberIds"),
+                                    ),
                                 )
-                                when (diff.type) {
-                                    DocumentChange.Type.ADDED,
-                                    DocumentChange.Type.MODIFIED,
-                                    -> TodoItemRemoteChange.Upsert(dto)
-
-                                    DocumentChange.Type.REMOVED -> TodoItemRemoteChange.Remove(doc.id)
-                                }
                             }
                         }
+                        val removes = snap.documentChanges
+                            .filter { it.type == DocumentChange.Type.REMOVED }
+                            .map { TodoItemRemoteChange.Remove(it.document.id) }
+                        val changes = upserts + removes
                         if (changes.isNotEmpty()) onChange(changes)
                     }
                 },

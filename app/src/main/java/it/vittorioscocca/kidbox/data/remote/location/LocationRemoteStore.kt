@@ -23,45 +23,150 @@ data class RemoteSharedLocationDto(
     val avatarUrl: String?,
 )
 
+/**
+ * `ListenerRegistration` composito: alla `remove()` chiude sia il listener
+ * principale sia tutti quelli aperti in fan-out, così il chiamante continua a
+ * vedere un singolo handle da tenere e rilasciare.
+ */
+private class FanOutListenerRegistration(
+    private val onRemove: () -> Unit,
+) : ListenerRegistration {
+    private var removed = false
+
+    override fun remove() {
+        if (removed) return
+        removed = true
+        onRemove()
+    }
+}
+
 @Singleton
 class LocationRemoteStore @Inject constructor(
     private val auth: FirebaseAuth,
 ) {
     private val firestore get() = FirebaseFirestore.getInstance()
 
+    private data class Status(
+        val isSharing: Boolean,
+        val name: String,
+        val modeRaw: String,
+        val startedAtEpochMillis: Long?,
+        val expiresAtEpochMillis: Long?,
+        val avatarUrl: String?,
+    )
+
+    private data class Coords(
+        val lat: Double,
+        val lon: Double,
+        val accuracy: Double?,
+        val lastUpdateAtEpochMillis: Long?,
+    )
+
+    /**
+     * Ascolta lo stato condivisione di tutta la famiglia (`locations/{uid}`,
+     * scritture rare) e apre/chiude in fan-out un listener di coordinate per
+     * ogni utente attualmente in sharing (`locations/{uid}/live/current`,
+     * scritture frequenti). I due stream vengono uniti a ogni cambiamento
+     * dell'uno o dell'altro. `isSharing=false` continua a essere emesso (non
+     * filtrato) perché `FamilyLocationRepository.applyInbound` se ne serve
+     * per cancellare l'entry locale — stesso contratto di prima.
+     */
     fun listen(
         familyId: String,
         onChange: (List<RemoteSharedLocationDto>) -> Unit,
         onError: (Throwable) -> Unit,
-    ): ListenerRegistration = firestore
-        .collection("families")
-        .document(familyId)
-        .collection("locations")
-        .addSnapshotListener { snap, err ->
-            if (err != null) {
-                onError(err)
-                return@addSnapshotListener
+    ): ListenerRegistration {
+
+        val statusByUid = mutableMapOf<String, Status>()
+        val coordListeners = mutableMapOf<String, ListenerRegistration>()
+        val coordByUid = mutableMapOf<String, Coords>()
+
+        fun emit() {
+            val dtos = statusByUid.map { (uid, status) ->
+                val coords = coordByUid[uid]
+                RemoteSharedLocationDto(
+                    id = uid,
+                    isSharing = status.isSharing,
+                    name = status.name,
+                    modeRaw = status.modeRaw,
+                    latitude = coords?.lat,
+                    longitude = coords?.lon,
+                    accuracyMeters = coords?.accuracy,
+                    startedAtEpochMillis = status.startedAtEpochMillis,
+                    expiresAtEpochMillis = status.expiresAtEpochMillis,
+                    lastUpdateAtEpochMillis = coords?.lastUpdateAtEpochMillis,
+                    avatarUrl = status.avatarUrl,
+                )
             }
-            val docs = snap?.documents.orEmpty()
-            onChange(
-                docs.map { doc ->
+            onChange(dtos)
+        }
+
+        fun syncCoordListeners() {
+            // Solo chi sta condividendo ha bisogno di un listener sulle
+            // coordinate: per gli altri non arriveranno mai scritture lì.
+            val wanted = statusByUid.filterValues { it.isSharing }.keys
+
+            val toRemove = coordListeners.keys - wanted
+            toRemove.forEach { uid ->
+                coordListeners.remove(uid)?.remove()
+                coordByUid.remove(uid)
+            }
+
+            val toAdd = wanted - coordListeners.keys
+            toAdd.forEach { uid ->
+                val reg = liveLocationRef(familyId, uid)
+                    .addSnapshotListener { snap, _ ->
+                        val data = snap?.data
+                        val lat = data?.numberOrNull("lat")?.toDouble()
+                        val lon = data?.numberOrNull("lon")?.toDouble()
+                        if (lat == null || lon == null) {
+                            coordByUid.remove(uid)
+                        } else {
+                            coordByUid[uid] = Coords(
+                                lat = lat,
+                                lon = lon,
+                                accuracy = data.numberOrNull("accuracy")?.toDouble(),
+                                lastUpdateAtEpochMillis = data.timestampOrNull("lastUpdateAt"),
+                            )
+                        }
+                        emit()
+                    }
+                coordListeners[uid] = reg
+            }
+        }
+
+        val statusReg = firestore
+            .collection("families")
+            .document(familyId)
+            .collection("locations")
+            .addSnapshotListener { snap, err ->
+                if (err != null) {
+                    onError(err)
+                    return@addSnapshotListener
+                }
+                val docs = snap?.documents.orEmpty()
+                statusByUid.clear()
+                docs.forEach { doc ->
                     val data = doc.data.orEmpty()
-                    RemoteSharedLocationDto(
-                        id = doc.id,
+                    statusByUid[doc.id] = Status(
                         isSharing = data["isSharing"] as? Boolean ?: false,
                         name = data["name"] as? String ?: "",
                         modeRaw = data["mode"] as? String ?: "realtime",
-                        latitude = data.numberOrNull("lat")?.toDouble(),
-                        longitude = data.numberOrNull("lon")?.toDouble(),
-                        accuracyMeters = data.numberOrNull("accuracy")?.toDouble(),
                         startedAtEpochMillis = data.timestampOrNull("startedAt"),
                         expiresAtEpochMillis = data.timestampOrNull("expiresAt"),
-                        lastUpdateAtEpochMillis = data.timestampOrNull("lastUpdateAt"),
                         avatarUrl = data["avatarURL"] as? String,
                     )
-                },
-            )
+                }
+                syncCoordListeners()
+                emit()
+            }
+
+        return FanOutListenerRegistration {
+            statusReg.remove()
+            coordListeners.values.forEach { it.remove() }
+            coordListeners.clear()
         }
+    }
 
     suspend fun startSharing(
         familyId: String,
@@ -95,24 +200,29 @@ class LocationRemoteStore @Inject constructor(
             .await()
     }
 
+    /**
+     * Aggiorna solo le coordinate, su un documento SEPARATO da quello di
+     * stato (`locations/{uid}`). Il fix GPS arriva ogni 5 secondi — se
+     * scrivesse sullo stesso documento di `startSharing`/`stopSharing`, ogni
+     * aggiornamento farebbe scattare `notifyLocationSharingChanged` lato
+     * server (che osserva quel documento): con la condivisione attiva era
+     * arrivata a essere il 94% di tutte le invocazioni Cloud Functions del
+     * progetto. Scrivendo altrove, il trigger dello stato smette di vedere
+     * questi aggiornamenti — non serve toccare `index.js`.
+     */
     suspend fun updateLocation(
         familyId: String,
         uid: String,
         lat: Double,
         lon: Double,
         accuracy: Double?,
-        displayName: String,
     ) {
-        firestore.collection("families")
-            .document(familyId)
-            .collection("locations")
-            .document(uid)
+        liveLocationRef(familyId, uid)
             .set(
                 mapOf(
                     "lat" to lat,
                     "lon" to lon,
                     "accuracy" to accuracy,
-                    "name" to displayName,
                     "lastUpdateAt" to FieldValue.serverTimestamp(),
                 ),
                 SetOptions.merge(),
@@ -156,6 +266,14 @@ class LocationRemoteStore @Inject constructor(
             )
             .await()
     }
+
+    private fun liveLocationRef(familyId: String, uid: String) =
+        firestore.collection("families")
+            .document(familyId)
+            .collection("locations")
+            .document(uid)
+            .collection("live")
+            .document("current")
 
     private suspend fun fetchUserAvatarUrl(uid: String): String? {
         // Avatar custom caricato dall'utente (users/{uid}.avatarURL).

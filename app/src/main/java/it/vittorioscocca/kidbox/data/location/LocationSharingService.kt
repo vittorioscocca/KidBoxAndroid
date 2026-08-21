@@ -110,7 +110,6 @@ class LocationSharingService : Service() {
                             latitude = last.latitude,
                             longitude = last.longitude,
                             accuracy = last.accuracy.toDouble(),
-                            displayName = displayName,
                         )
                     }.onFailure { err ->
                         KBLog.data.error("LocationSharingService: updateMyLocation fallito: ${err.message}", TAG, err)

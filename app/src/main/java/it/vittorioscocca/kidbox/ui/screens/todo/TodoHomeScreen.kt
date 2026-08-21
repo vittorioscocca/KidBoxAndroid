@@ -148,7 +148,7 @@ fun TodoHomeScreen(
                                         imageVector = card.icon,
                                         contentDescription = null,
                                         tint = card.iconColor,
-                                        modifier = Modifier.size(18.dp),
+                                        modifier = Modifier.size(28.dp),
                                     )
                                     Text(card.title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = kb.title)
                                 }

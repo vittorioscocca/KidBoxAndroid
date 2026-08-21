@@ -53,15 +53,10 @@ class TodoHomeViewModel @Inject constructor(
                     stateBacking.value = TodoHomeUiState(isLoading = false, errorMessage = "Nessuna famiglia attiva")
                     return@collect
                 }
+                // childId può essere "" se la famiglia non ha ancora un bambino: non è un
+                // errore, è un valore di scoping valido come un altro (coerente con iOS).
                 val child = childDao.getChildrenByFamilyId(familyId).firstOrNull()
                 val childId = child?.id.orEmpty()
-                if (childId.isBlank()) {
-                    boundScopeKey = null
-                    observeJob?.cancel()
-                    todoRepository.stopRealtime()
-                    stateBacking.value = TodoHomeUiState(familyId = familyId, isLoading = false, errorMessage = "Nessun profilo bambino trovato")
-                    return@collect
-                }
                 val scopeKey = "$familyId-$childId"
                 if (boundScopeKey == scopeKey) return@collect
                 observeJob?.cancel()
@@ -136,7 +131,7 @@ class TodoHomeViewModel @Inject constructor(
 
     fun createList(name: String) {
         val state = stateBacking.value
-        if (state.familyId.isBlank() || state.childId.isBlank()) return
+        if (state.familyId.isBlank()) return
         viewModelScope.launch {
             runCatching { todoRepository.addList(state.familyId, state.childId, name.trim()) }
                 .onFailure { error.value = it.message ?: "Errore durante la creazione lista" }

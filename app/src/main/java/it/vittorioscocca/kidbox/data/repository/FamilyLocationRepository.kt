@@ -102,7 +102,6 @@ class FamilyLocationRepository @Inject constructor(
         latitude: Double,
         longitude: Double,
         accuracy: Double?,
-        displayName: String,
     ) {
         val uid = auth.currentUser?.uid ?: return
         remoteStore.updateLocation(
@@ -111,7 +110,6 @@ class FamilyLocationRepository @Inject constructor(
             lat = latitude,
             lon = longitude,
             accuracy = accuracy,
-            displayName = displayName,
         )
     }
 
