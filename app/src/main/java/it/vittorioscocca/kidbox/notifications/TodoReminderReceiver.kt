@@ -22,7 +22,14 @@ class TodoReminderReceiver : BroadcastReceiver() {
         val listId = intent.getStringExtra(EXTRA_LIST_ID)
 
         val deepLink = Intent(context, MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            // NEW_TASK necessario: parte da un BroadcastReceiver (AlarmManager), un
+            // contesto non-Activity. Senza, con l'app in background Android può aprire
+            // un secondo task invece di riportare avanti quello esistente.
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP,
+            )
             putExtra("push_type", "todo_due_changed")
             putExtra("push_family_id", familyId)
             putExtra("push_child_id", childId)

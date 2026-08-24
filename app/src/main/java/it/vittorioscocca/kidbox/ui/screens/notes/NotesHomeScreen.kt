@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -25,10 +26,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.PinDrop
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
@@ -36,6 +38,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -51,6 +54,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -68,6 +72,8 @@ import java.util.Calendar
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import it.vittorioscocca.kidbox.notifications.AppSection
+import it.vittorioscocca.kidbox.notifications.TrackSectionPresence
 
 private enum class NoteSection {
     PINNED,
@@ -93,6 +99,7 @@ fun NotesHomeScreen(
     viewModel: NotesHomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    TrackSectionPresence(AppSection.NOTES, familyId)
     val kb = MaterialTheme.kidBoxColors
     val context = androidx.compose.ui.platform.LocalContext.current
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -125,9 +132,13 @@ fun NotesHomeScreen(
         pinnedIds = prefs.getStringSet("pinned_$familyId", emptySet()).orEmpty()
     }
 
-    fun persistPinned(ids: Set<String>) {
+    val pinToastText = stringResource(R.string.notes_pin_toast)
+    fun persistPinned(ids: Set<String>, justPinned: Boolean) {
         pinnedIds = ids
         prefs.edit().putStringSet("pinned_$familyId", ids).apply()
+        if (justPinned) {
+            android.widget.Toast.makeText(context, pinToastText, android.widget.Toast.LENGTH_SHORT).show()
+        }
     }
 
     val sectioned = remember(state.notes, searchQuery, pinnedIds) {
@@ -184,17 +195,20 @@ fun NotesHomeScreen(
                         },
                 )
                 NoteHeaderCircleButton(
-                    icon = Icons.Default.Add,
+                    icon = Icons.Filled.EditNote,
                     onClick = {
-                        viewModel.createEmptyNote { noteId ->
-                            onNavigate(
-                                AppDestination.NoteDetail.createRoute(
-                                    familyId = familyId,
-                                    noteId = noteId,
-                                    isNewNote = true,
-                                ),
-                            )
-                        }
+                        // Nessuna scrittura sul repository qui: si naviga subito con
+                        // un id generato lato client, esattamente come fa iOS
+                        // (`createNewNote()`). La nota viene creata solo al primo
+                        // salvataggio nell'editor — altrimenti la navigazione resta
+                        // ferma finché non torna la rete (vedi NoteDetailViewModel).
+                        onNavigate(
+                            AppDestination.NoteDetail.createRoute(
+                                familyId = familyId,
+                                noteId = java.util.UUID.randomUUID().toString(),
+                                isNewNote = true,
+                            ),
+                        )
                     },
                 )
             }
@@ -208,23 +222,28 @@ fun NotesHomeScreen(
             modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
         )
 
-        TextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text(stringResource(R.string.notes_search_placeholder)) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            singleLine = true,
-            shape = RoundedCornerShape(16.dp),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = kb.card,
-                unfocusedContainerColor = kb.card,
-                disabledContainerColor = kb.card,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent,
-            ),
-        )
+        // La ricerca non ha senso finché non c'è nemmeno una nota: mostrarla
+        // comunque suggerirebbe una funzione utilizzabile su una lista vuota
+        // (stesso comportamento di iOS).
+        if (state.notes.isNotEmpty()) {
+            TextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text(stringResource(R.string.notes_search_placeholder)) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = kb.card,
+                    unfocusedContainerColor = kb.card,
+                    disabledContainerColor = kb.card,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                ),
+            )
+        }
 
         if (isSelecting) {
             Row(
@@ -284,8 +303,14 @@ fun NotesHomeScreen(
             }
 
             state.notes.isEmpty() -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.notes_empty_state), color = kb.subtitle)
+                NotesEmptyState {
+                    onNavigate(
+                        AppDestination.NoteDetail.createRoute(
+                            familyId = familyId,
+                            noteId = java.util.UUID.randomUUID().toString(),
+                            isNewNote = true,
+                        ),
+                    )
                 }
             }
 
@@ -365,14 +390,6 @@ fun NotesHomeScreen(
                                                         },
                                                 )
                                             }
-                                            Icon(
-                                                imageVector = if (isPinned) Icons.Default.PinDrop else Icons.AutoMirrored.Filled.Note,
-                                                contentDescription = null,
-                                                tint = pinTint,
-                                                modifier = Modifier
-                                                    .size(16.dp)
-                                                    .padding(end = 6.dp),
-                                            )
                                             Text(
                                                 text = note.title.ifBlank { stringResource(R.string.notes_untitled) },
                                                 color = kb.title,
@@ -384,31 +401,32 @@ fun NotesHomeScreen(
                                             )
                                             if (!isSelecting) {
                                                 IconButton(
-                                                    modifier = Modifier
-                                                        .size(30.dp),
+                                                    modifier = Modifier.size(36.dp),
                                                     onClick = {
                                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                        val nowPinned = !isPinned
                                                         persistPinned(
-                                                            if (isPinned) pinnedIds - note.id else pinnedIds + note.id,
+                                                            if (nowPinned) pinnedIds + note.id else pinnedIds - note.id,
+                                                            justPinned = nowPinned,
                                                         )
                                                     },
                                                 ) {
                                                     Icon(
-                                                        Icons.Default.PinDrop,
+                                                        Icons.Filled.PushPin,
                                                         contentDescription = stringResource(R.string.notes_pin_cd),
                                                         tint = pinTint,
-                                                        modifier = Modifier.size(16.dp),
+                                                        modifier = Modifier.size(20.dp),
                                                     )
                                                 }
                                                 IconButton(
-                                                    modifier = Modifier.size(30.dp),
+                                                    modifier = Modifier.size(36.dp),
                                                     onClick = { viewModel.deleteNote(note.id) },
                                                 ) {
                                                     Icon(
                                                         Icons.Default.Delete,
                                                         contentDescription = stringResource(R.string.notes_delete_cd),
                                                         tint = kb.subtitle,
-                                                        modifier = Modifier.size(17.dp),
+                                                        modifier = Modifier.size(20.dp),
                                                     )
                                                 }
                                             }
@@ -420,12 +438,36 @@ fun NotesHomeScreen(
                                             maxLines = 2,
                                             fontSize = 14.sp,
                                         )
-                                        Spacer(Modifier.height(8.dp))
-                                        Text(
-                                            text = formatDate(note.updatedAtEpochMillis, stringResource(R.string.notes_yesterday)),
-                                            color = kb.subtitle,
-                                            fontSize = 12.sp,
-                                        )
+                                        Spacer(Modifier.height(6.dp))
+                                        // Orario e chi ha creato/condiviso la nota sulla
+                                        // stessa riga, allineati a sinistra (icona cartella +
+                                        // nome, stesso stile di iOS). Il nome è risolto dai
+                                        // membri famiglia via uid — non dal campo denormalizzato
+                                        // `updatedByName`, che alla creazione è sempre vuoto.
+                                        val editorName = state.memberNames[note.updatedBy].orEmpty().trim()
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = formatDate(note.updatedAtEpochMillis, stringResource(R.string.notes_yesterday)),
+                                                color = kb.subtitle,
+                                                fontSize = 12.sp,
+                                            )
+                                            if (editorName.isNotEmpty()) {
+                                                Spacer(Modifier.width(6.dp))
+                                                Icon(
+                                                    Icons.Filled.Folder,
+                                                    contentDescription = null,
+                                                    tint = kb.subtitle,
+                                                    modifier = Modifier
+                                                        .size(12.dp)
+                                                        .padding(end = 4.dp),
+                                                )
+                                                Text(
+                                                    text = editorName,
+                                                    color = kb.subtitle,
+                                                    fontSize = 11.sp,
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -458,6 +500,67 @@ private fun formatDate(epochMillis: Long, yesterdayLabel: String): String {
             yesterdayLabel
 
         else -> SimpleDateFormat("dd/MM/yyyy HH:mm", KBLocale.current()).format(date)
+    }
+}
+
+// Stessa struttura dell'empty state iOS (NotesEmptyStateView): icona, titolo,
+// sottotitolo, bottone "Nuova nota" con la stessa icona matita-su-nota usata
+// nell'header.
+@Composable
+private fun NotesEmptyState(onNewNote: () -> Unit) {
+    val kb = MaterialTheme.kidBoxColors
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.Note,
+            contentDescription = null,
+            tint = kb.subtitle,
+            modifier = Modifier.size(52.dp),
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.notes_empty_state_title),
+            color = kb.title,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.notes_empty_state),
+            color = kb.subtitle,
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(20.dp))
+        Surface(
+            onClick = onNewNote,
+            shape = RoundedCornerShape(999.dp),
+            color = Color(0xFF007AFF),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.EditNote,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.notes_new_note_button),
+                    color = Color.White,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp,
+                )
+            }
+        }
     }
 }
 

@@ -84,9 +84,12 @@ class TodoRepository @Inject constructor(
                 listListener = remoteStore.listenTodoLists(
                     familyId = familyId,
                     childId = childId,
-                    onChange = { changes ->
-                        KBLog.sync.debug("listenTodoLists onChange count=${changes.size}", tag = "todo")
-                        scope.launch { applyListInbound(changes) }
+                    onChange = { changes, snapshotIds ->
+                        KBLog.sync.debug(
+                            "listenTodoLists onChange count=${changes.size} snapshotIds=${snapshotIds?.size ?: "cache"}",
+                            tag = "todo",
+                        )
+                        scope.launch { applyListInbound(changes, snapshotIds, familyId, childId) }
                     },
                     onError = { err ->
                         KBLog.sync.error(
@@ -103,9 +106,12 @@ class TodoRepository @Inject constructor(
                 todoListener = remoteStore.listenTodos(
                     familyId = familyId,
                     childId = childId,
-                    onChange = { changes ->
-                        KBLog.sync.debug("listenTodos onChange count=${changes.size}", tag = "todo")
-                        scope.launch { applyTodoInbound(changes) }
+                    onChange = { changes, snapshotIds ->
+                        KBLog.sync.debug(
+                            "listenTodos onChange count=${changes.size} snapshotIds=${snapshotIds?.size ?: "cache"}",
+                            tag = "todo",
+                        )
+                        scope.launch { applyTodoInbound(changes, snapshotIds, familyId, childId) }
                     },
                     onError = { err ->
                         KBLog.sync.error(
@@ -348,7 +354,12 @@ class TodoRepository @Inject constructor(
         itemDao.deleteById(todoId)
     }
 
-    private suspend fun applyListInbound(changes: List<TodoListRemoteChange>) {
+    private suspend fun applyListInbound(
+        changes: List<TodoListRemoteChange>,
+        snapshotIds: Set<String>?,
+        familyId: String,
+        childId: String,
+    ) {
         KBLog.sync.debug("applyListInbound START changes=${changes.size}", tag = "todo")
         changes.forEach { change ->
             try {
@@ -404,9 +415,30 @@ class TodoRepository @Inject constructor(
                 KBLog.sync.error("applyListInbound FAILED change=$change", tag = "todo", throwable = e)
             }
         }
+
+        // Riconciliazione: una lista soft-deleted mentre l'app era chiusa esce dalla query
+        // senza generare un REMOVED al riaggancio, quindi resterebbe in Room per sempre.
+        // Tutto ciò che non è più nel result set confermato dal server va rimosso.
+        if (snapshotIds != null) {
+            runCatching {
+                listDao.getByFamilyAndChild(familyId, childId)
+                    .filter { it.id !in snapshotIds }
+                    .forEach { stale ->
+                        KBLog.sync.info("applyListInbound RECONCILE delete listId=${stale.id}", tag = "todo")
+                        listDao.deleteById(stale.id)
+                    }
+            }.onFailure {
+                KBLog.sync.error("applyListInbound RECONCILE failed", tag = "todo", throwable = it)
+            }
+        }
     }
 
-    private suspend fun applyTodoInbound(changes: List<TodoItemRemoteChange>) {
+    private suspend fun applyTodoInbound(
+        changes: List<TodoItemRemoteChange>,
+        snapshotIds: Set<String>?,
+        familyId: String,
+        childId: String,
+    ) {
         KBLog.sync.debug("applyTodoInbound START changes=${changes.size}", tag = "todo")
         changes.forEach { change ->
             try {
@@ -491,6 +523,27 @@ class TodoRepository @Inject constructor(
             }
             } catch (e: Exception) {
                 KBLog.sync.error("applyTodoInbound FAILED change=$change", tag = "todo", throwable = e)
+            }
+        }
+
+        // Riconciliazione (vedi applyListInbound). Qui in più si saltano i to-do con
+        // scritture locali ancora da inviare: non sono nel result set remoto perché non
+        // ci sono ancora arrivati, non perché siano stati cancellati.
+        if (snapshotIds != null) {
+            runCatching {
+                itemDao.getByFamilyAndChild(familyId, childId)
+                    .filter { local ->
+                        if (local.id in snapshotIds) return@filter false
+                        val sync = KBSyncState.fromRaw(local.syncStateRaw ?: 0)
+                        sync != KBSyncState.PENDING_UPSERT && sync != KBSyncState.ERROR
+                    }
+                    .forEach { stale ->
+                        KBLog.sync.info("applyTodoInbound RECONCILE delete todoId=${stale.id}", tag = "todo")
+                        reminderScheduler.cancel(stale.reminderId)
+                        itemDao.deleteById(stale.id)
+                    }
+            }.onFailure {
+                KBLog.sync.error("applyTodoInbound RECONCILE failed", tag = "todo", throwable = it)
             }
         }
     }

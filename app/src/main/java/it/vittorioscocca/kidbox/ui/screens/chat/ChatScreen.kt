@@ -2,6 +2,8 @@
 
 package it.vittorioscocca.kidbox.ui.screens.chat
 
+import it.vittorioscocca.kidbox.notifications.AppSection
+import it.vittorioscocca.kidbox.notifications.TrackSectionPresence
 import it.vittorioscocca.kidbox.ui.permissions.LocationDisclosureDialog
 import it.vittorioscocca.kidbox.ui.permissions.RuntimePermissions
 import it.vittorioscocca.kidbox.ui.permissions.rememberCameraPermissionRequester
@@ -194,6 +196,9 @@ fun ChatScreen(
 
     // Copre in un colpo solo le decifrature che qui falliscono in silenzio.
     FamilyKeyMissingGate(state.familyId)
+
+    // Niente notifica per un messaggio che l'utente sta già leggendo.
+    TrackSectionPresence(AppSection.CHAT, state.familyId)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()

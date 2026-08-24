@@ -74,6 +74,12 @@ import java.util.Calendar
 import it.vittorioscocca.kidbox.util.KBLocale
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.lazy.rememberLazyListState
+import kotlinx.coroutines.delay
+import it.vittorioscocca.kidbox.notifications.AppSection
+import it.vittorioscocca.kidbox.notifications.TrackSectionPresence
 
 @Composable
 fun TodoListScreen(
@@ -86,6 +92,41 @@ fun TodoListScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showEditor by remember { mutableStateOf(false) }
     var editingTodo by remember { mutableStateOf<KBTodoItemEntity?>(null) }
+
+    // Niente notifica per un to-do creato nella lista che è già a schermo.
+    // Lo scope è il `listId`: essere in una lista non deve zittire gli avvisi
+    // delle altre.
+    TrackSectionPresence(
+        section = AppSection.TODO_LIST,
+        familyId = state.familyId,
+        scopeId = state.listId,
+    )
+
+    // Flash sul todo arrivato da notifica: scorre fino a lui, lo evidenzia e
+    // dopo un attimo lo spegne. Gemello di `applyHighlightIfNeeded` in
+    // TodoListView su iOS — prima qui l'evidenziazione era un giallo fisso che
+    // non si spegneva mai e non portava in vista la riga.
+    val todoListState = rememberLazyListState()
+    var flashingTodoId by remember { mutableStateOf<String?>(null) }
+    // `highlightTodoId` arriva dagli argomenti di navigazione e resta lì per
+    // sempre: senza ricordare di averlo già mostrato, ogni successivo
+    // aggiornamento della lista (una modifica, una sincronizzazione) rifarebbe
+    // partire il flash a distanza di minuti. Equivale al `consumeIfMatches`
+    // di iOS.
+    var alreadyFlashedTodoId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(state.highlightTodoId, state.filteredTodos) {
+        val target = state.highlightTodoId ?: return@LaunchedEffect
+        if (alreadyFlashedTodoId == target) return@LaunchedEffect
+        // La lista può non contenerlo ancora: la sincronizzazione arriva dopo la
+        // push. Si riprova a ogni aggiornamento di `filteredTodos`.
+        val index = state.filteredTodos.indexOfFirst { it.id == target }
+        if (index < 0) return@LaunchedEffect
+        alreadyFlashedTodoId = target
+        todoListState.animateScrollToItem(index)
+        flashingTodoId = target
+        delay(HIGHLIGHT_HOLD_MS)
+        flashingTodoId = null
+    }
     var pendingSaveAfterPermission by remember { mutableStateOf<TodoEditForm?>(null) }
     var pendingSnackbarMessage by remember { mutableStateOf<String?>(null) }
 
@@ -191,7 +232,11 @@ fun TodoListScreen(
             Text(state.listName, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold, color = kb.title)
             Spacer(Modifier.height(16.dp))
 
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                state = todoListState,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxSize(),
+            ) {
                 if (state.filteredTodos.isEmpty()) {
                     item {
                         Card(
@@ -211,7 +256,7 @@ fun TodoListScreen(
                         TodoRow(
                             todo = todo,
                             assigneeName = state.members.firstOrNull { it.uid == todo.assignedTo }?.displayName,
-                            highlighted = state.highlightTodoId == todo.id,
+                            highlighted = flashingTodoId == todo.id,
                             onToggle = { viewModel.toggleDone(todo.id) },
                             onEdit = {
                                 editingTodo = todo
@@ -292,13 +337,21 @@ private fun TodoRow(
     onDelete: () -> Unit,
 ) {
     val isUrgent = (todo.priorityRaw ?: 0) == 1
+    // Il giallo entra di scatto e si spegne in dissolvenza, come il flash iOS:
+    // l'accensione istantanea è ciò che fa notare la riga, la scomparsa lenta
+    // evita che l'evidenziazione sembri uno stato permanente del todo.
+    val highlightColor by animateColorAsState(
+        targetValue = if (highlighted) Color(0xFFFFF8D8) else MaterialTheme.kidBoxColors.card,
+        animationSpec = tween(durationMillis = if (highlighted) 0 else 450),
+        label = "todoHighlight",
+    )
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .alpha(if (todo.isDone) 0.8f else 1f)
             .clickable(onClick = onEdit),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = if (highlighted) Color(0xFFFFF8D8) else MaterialTheme.kidBoxColors.card),
+        colors = CardDefaults.cardColors(containerColor = highlightColor),
     ) {
         Row(
             modifier = Modifier
@@ -712,3 +765,6 @@ private fun HeaderCircleButton(
         }
     }
 }
+
+/** Quanto resta acceso il flash prima di dissolversi (iOS: 1,5 s). */
+private const val HIGHLIGHT_HOLD_MS = 1500L

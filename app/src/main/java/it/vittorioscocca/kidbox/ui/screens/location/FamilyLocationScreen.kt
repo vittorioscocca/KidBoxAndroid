@@ -90,6 +90,8 @@ import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
 import it.vittorioscocca.kidbox.util.KBLocale
+import it.vittorioscocca.kidbox.notifications.AppSection
+import it.vittorioscocca.kidbox.notifications.TrackSectionPresence
 
 @Composable
 fun FamilyLocationScreen(
@@ -99,6 +101,7 @@ fun FamilyLocationScreen(
     viewModel: FamilyLocationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    TrackSectionPresence(AppSection.FAMILY_LOCATION, familyId)
     val context = LocalContext.current
     val isDarkTheme = isSystemInDarkTheme()
     val darkMapStyle = remember(isDarkTheme, context) {

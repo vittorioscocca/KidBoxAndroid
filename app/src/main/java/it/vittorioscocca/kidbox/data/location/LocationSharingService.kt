@@ -50,6 +50,11 @@ class LocationSharingService : Service() {
     private var familyId: String = ""
     private var displayName: String = "Utente"
 
+    // Il `LocationRequest` sotto già garantisce un fix al massimo ogni 45s (gate
+    // temporale). Qui si aggiunge il gate di distanza: se in 45s ci si è mossi
+    // meno di 10m, non ha senso riscrivere la stessa posizione su Firestore.
+    private var lastWrittenLocation: android.location.Location? = null
+
     override fun onCreate() {
         super.onCreate()
         fusedClient = LocationServices.getFusedLocationProviderClient(this)
@@ -103,6 +108,13 @@ class LocationSharingService : Service() {
             override fun onLocationResult(result: LocationResult) {
                 val last = result.lastLocation ?: return
                 if (familyId.isBlank()) return
+
+                val previous = lastWrittenLocation
+                if (previous != null && last.distanceTo(previous) < MIN_DISTANCE_METERS) {
+                    return
+                }
+                lastWrittenLocation = last
+
                 scope.launch {
                     runCatching {
                         repository.updateMyLocation(
@@ -117,8 +129,8 @@ class LocationSharingService : Service() {
                 }
             }
         }
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 10_000L)
-            .setMinUpdateIntervalMillis(5_000L)
+        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 45_000L)
+            .setMinUpdateIntervalMillis(45_000L)
             .build()
         locationCallback = callback
         runCatching {
@@ -134,6 +146,7 @@ class LocationSharingService : Service() {
     private fun stopLocationUpdates() {
         locationCallback?.let { runCatching { fusedClient.removeLocationUpdates(it) } }
         locationCallback = null
+        lastWrittenLocation = null
     }
 
     private fun startForegroundCompat() {
@@ -148,7 +161,12 @@ class LocationSharingService : Service() {
             this,
             0,
             Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                // NEW_TASK necessario: parte da un Service (contesto non-Activity). Senza,
+                // con l'app in background Android può aprire un secondo task invece di
+                // riportare avanti quello esistente.
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -200,6 +218,7 @@ class LocationSharingService : Service() {
         private const val TAG = "LocationSharingSvc"
         private const val CHANNEL_ID = "location_sharing"
         private const val NOTIFICATION_ID = 4711
+        private const val MIN_DISTANCE_METERS = 10f
         const val ACTION_STOP = "it.vittorioscocca.kidbox.action.STOP_LOCATION_SHARING"
         const val EXTRA_FAMILY_ID = "extra_family_id"
         const val EXTRA_DISPLAY_NAME = "extra_display_name"

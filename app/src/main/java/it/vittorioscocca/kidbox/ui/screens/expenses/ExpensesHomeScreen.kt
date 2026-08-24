@@ -104,6 +104,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentCategoryEntity
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import it.vittorioscocca.kidbox.ui.permissions.rememberCameraPermissionRequester
 import it.vittorioscocca.kidbox.ui.util.rememberSingleImagePicker
 import it.vittorioscocca.kidbox.ui.util.singleImageRequest
 import java.io.ByteArrayOutputStream
@@ -118,6 +119,8 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import it.vittorioscocca.kidbox.util.KBLocale
+import it.vittorioscocca.kidbox.notifications.AppSection
+import it.vittorioscocca.kidbox.notifications.TrackSectionPresence
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -130,6 +133,7 @@ fun ExpensesHomeScreen(
     viewModel: ExpensesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    TrackSectionPresence(AppSection.EXPENSES, familyId)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var showEditor by rememberSaveable { mutableStateOf(false) }
@@ -179,6 +183,12 @@ fun ExpensesHomeScreen(
             bytes = stream.toByteArray(),
         )
     }
+    val requestExpenseCamera = rememberCameraPermissionRequester(
+        onDenied = {
+            Toast.makeText(context, context.getString(R.string.documents_camera_permission_required), Toast.LENGTH_SHORT).show()
+        },
+        onLaunchCamera = { cameraLauncher.launch(null) },
+    )
     val galleryLauncher = rememberSingleImagePicker { uri ->
         uri?.let { u ->
             val mime = context.contentResolver.getType(u) ?: "image/jpeg"
@@ -317,7 +327,7 @@ fun ExpensesHomeScreen(
                 pendingAttachment = null
                 selectedKidBoxDocumentId = null
             },
-            onPickCamera = { cameraLauncher.launch(null) },
+            onPickCamera = { requestExpenseCamera() },
             onPickPhoto = {
                 galleryLauncher.launch(singleImageRequest())
             },

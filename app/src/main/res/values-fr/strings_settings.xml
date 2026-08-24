@@ -165,6 +165,10 @@
     <string name="settings_family_no_children">Aucun enfant configuré.</string>
     <string name="settings_family_members">Membres</string>
     <string name="settings_family_loading_members">Chargement des membres…</string>
+    <plurals name="settings_family_members_connected">
+        <item quantity="one">%1$d membre connecté.</item>
+        <item quantity="other">%1$d membres connectés.</item>
+    </plurals>
     <string name="settings_family_member">Membre</string>
     <string name="settings_family_owner">Propriétaire</string>
     <string name="settings_family_invite_other">Invite l\'autre parent ou un autre membre de la famille</string>

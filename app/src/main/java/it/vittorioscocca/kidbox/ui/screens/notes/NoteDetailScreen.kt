@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -36,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import android.content.Context
+import android.content.Intent
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -54,6 +56,7 @@ import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import com.google.firebase.auth.FirebaseAuth
+import androidx.compose.material3.CircularProgressIndicator
 
 @Composable
 fun NoteDetailScreen(
@@ -121,22 +124,36 @@ fun NoteDetailScreen(
                 fontWeight = FontWeight.Bold,
                 fontSize = 22.sp,
             )
-            // Slot a larghezza fissa per non far saltare il titolo "Nota"
-            // quando la spunta scompare (la Row usa SpaceBetween).
-            Box(
-                modifier = Modifier.size(48.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (state.isDirty) {
-                    IconButton(
-                        onClick = {
-                            viewModel.save(onDone = {})
-                            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-                            imm.hideSoftInputFromWindow(view.windowToken, 0)
-                        },
-                        enabled = !state.isSaving,
-                    ) {
-                        Icon(Icons.Default.Check, contentDescription = stringResource(R.string.notes_detail_save_cd), tint = kb.title)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Come su iOS: la condivisione resta sempre visibile (disabilitata
+                // se la nota è vuota), la spunta compare solo con modifiche non salvate.
+                IconButton(
+                    onClick = { shareNote(context, state.title, state.body) },
+                    enabled = state.title.htmlToPlainText().isNotBlank() || state.body.htmlToPlainText().isNotBlank(),
+                ) {
+                    Icon(
+                        Icons.Default.Share,
+                        contentDescription = stringResource(R.string.notes_detail_share_cd),
+                        tint = kb.title,
+                    )
+                }
+                // Slot a larghezza fissa per non far saltare gli altri bottoni
+                // quando la spunta scompare.
+                Box(
+                    modifier = Modifier.size(48.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (state.isDirty) {
+                        IconButton(
+                            onClick = {
+                                viewModel.save(onDone = {})
+                                val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                                imm.hideSoftInputFromWindow(view.windowToken, 0)
+                            },
+                            enabled = !state.isSaving,
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = stringResource(R.string.notes_detail_save_cd), tint = kb.title)
+                        }
                     }
                 }
             }
@@ -158,15 +175,32 @@ fun NoteDetailScreen(
             )
         }
         Spacer(Modifier.height(12.dp))
-        RichNoteEditor(
-            title = state.title,
-            onTitleChange = viewModel::updateTitle,
-            body = state.body,
-            onBodyChange = viewModel::updateBody,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-        )
+        if (state.isLoading) {
+            // Nota aperta da notifica e non ancora sincronizzata: mostrare
+            // l'editor adesso significherebbe mostrarlo VUOTO, facendo credere
+            // che la nota non abbia contenuto. Meglio dichiarare l'attesa.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(28.dp),
+                    strokeWidth = 2.dp,
+                )
+            }
+        } else {
+            RichNoteEditor(
+                title = state.title,
+                onTitleChange = viewModel::updateTitle,
+                body = state.body,
+                onBodyChange = viewModel::updateBody,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            )
+        }
         if (!state.errorMessage.isNullOrBlank()) {
             Spacer(Modifier.height(8.dp))
             Text(
@@ -204,6 +238,22 @@ fun NoteDetailScreen(
             },
         )
     }
+}
+
+/**
+ * Stesso comportamento di `presentShareSheet()` su iOS: titolo e corpo in
+ * plain text (HTML ripulito), uniti da una riga vuota, condivisi come testo.
+ */
+private fun shareNote(context: Context, title: String, bodyHtml: String) {
+    val plainTitle = title.htmlToPlainText().trim()
+    val plainBody = bodyHtml.htmlToPlainText().trim()
+    val text = listOf(plainTitle, plainBody).filter { it.isNotBlank() }.joinToString("\n\n")
+    if (text.isBlank()) return
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    context.startActivity(Intent.createChooser(intent, null))
 }
 
 @Composable

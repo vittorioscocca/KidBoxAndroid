@@ -47,9 +47,12 @@
     <string name="home_members_syncing">Synchronisation des membres…</string>
     <string name="home_ai_assistant_desc">Assistant IA</string>
     <string name="home_hero_default_family_name">Ta famille</string>
-    <string name="home_hero_members_count">%1$d membres</string>
-    <string name="home_hero_change_photo">Changer la photo</string>
-    <string name="home_hero_add_photo">Ajouter une photo</string>
+    <plurals name="home_hero_members_count">
+        <item quantity="one">%1$d membre</item>
+        <item quantity="other">%1$d membres</item>
+    </plurals>
+    <string name="home_hero_change_photo">Touchez pour changer la photo</string>
+    <string name="home_hero_add_photo">Ajouter une photo de famille</string>
 
     <!-- ═══ home: promo carousel (9 slides) ═══ -->
     <string name="home_promo_invite_title">Agrandis ton cercle. Invite de nouveaux membres</string>
@@ -168,6 +171,7 @@
 
     <!-- ═══ home: SuggestionsScreen ═══ -->
     <string name="home_suggestions_title">Astuces</string>
+    <string name="home_suggestions_chat_body">Discutez avec votre famille en temps réel : texte, photos, audio, vidéo et réactions. Les conversations sont chiffrées de bout en bout et chaque membre voit les nouveaux messages instantanément.</string>
     <string name="home_suggestions_notes_body">Écris des notes libres ou mises en forme (gras, italique, listes) et choisis de les partager avec toute la famille ou de les garder pour toi.</string>
     <string name="home_suggestions_todo_body">Crée des listes de tâches et attribue-les à un membre de la famille. Dès que quelqu\'un coche une tâche, tout le monde la voit mise à jour à l\'instant.</string>
     <string name="home_suggestions_shopping_body">La liste de courses est partagée en temps réel : si un proche coche un produit au supermarché, tu le vois aussitôt. Les produits sont classés par rayon pour faire les courses plus vite.</string>

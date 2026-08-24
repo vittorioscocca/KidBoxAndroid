@@ -70,6 +70,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBFamilyPhotoEntity
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import it.vittorioscocca.kidbox.ui.util.imageAndVideoRequest
 import it.vittorioscocca.kidbox.ui.util.rememberMultiMediaPicker
+import it.vittorioscocca.kidbox.ui.permissions.rememberCameraPermissionRequester
 import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -104,13 +105,22 @@ fun PhotoAlbumDetailScreen(
         }
     }
 
+    val requestPhotoCamera = rememberCameraPermissionRequester(
+        onDenied = {
+            Toast.makeText(context, context.getString(R.string.documents_camera_permission_required), Toast.LENGTH_SHORT).show()
+        },
+        onLaunchCamera = {
+            val uri = photosCreateCaptureUri(context) ?: run {
+                Toast.makeText(context, context.getString(R.string.photos_camera_error), Toast.LENGTH_LONG).show()
+                return@rememberCameraPermissionRequester
+            }
+            pendingCaptureUri = uri
+            takePictureLauncher.launch(uri)
+        },
+    )
+
     fun openCamera() {
-        val uri = photosCreateCaptureUri(context) ?: run {
-            Toast.makeText(context, context.getString(R.string.photos_camera_error), Toast.LENGTH_LONG).show()
-            return
-        }
-        pendingCaptureUri = uri
-        takePictureLauncher.launch(uri)
+        requestPhotoCamera()
     }
 
     LaunchedEffect(state.errorMessage) {

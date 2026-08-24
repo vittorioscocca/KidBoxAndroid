@@ -36,7 +36,12 @@ class NudgeReceiver : BroadcastReceiver() {
         // Stesse chiavi `push_*` che usa il router per i deep link push: il tap
         // su un nudge e il tap su un annuncio devono finire nello stesso posto.
         val tapIntent = Intent(context, MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            // NEW_TASK necessario: parte da un BroadcastReceiver, un contesto non-Activity.
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP,
+            )
             putExtra("push_type", "nudge")
             putExtra("push_campaign_id", campaignId)
             putExtra("push_title", title)

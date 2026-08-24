@@ -91,6 +91,7 @@ import it.vittorioscocca.kidbox.ui.screens.photos.PhotoAlbumDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.chat.ChatMediaGalleryScreen
 import it.vittorioscocca.kidbox.ui.screens.chat.ChatScreen
 import it.vittorioscocca.kidbox.ui.screens.chat.ChatViewModel
+import it.vittorioscocca.kidbox.ui.screens.todo.TodoDeepLinkResolverViewModel
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoListScreen
 import it.vittorioscocca.kidbox.ui.screens.health.HealthSubjectSelectorScreen
@@ -130,6 +131,21 @@ import it.vittorioscocca.kidbox.ui.screens.travel.TravelProposalRoute
 import it.vittorioscocca.kidbox.ui.screens.travel.TravelWizardScreen
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.Modifier
 
 @Composable
 fun AppNavGraph(
@@ -141,13 +157,24 @@ fun AppNavGraph(
     val pendingFamilyId by NotificationDeepLinkRouter.pendingFamilyId.collectAsStateWithLifecycle()
     val familySwitcherVm: FamilySwitcherViewModel = hiltViewModel()
     val activeFamilyId by familySwitcherVm.activeFamilyId.collectAsStateWithLifecycle()
-    LaunchedEffect(pendingAiRoute, pendingFamilyId, activeFamilyId, navController.currentBackStackEntry) {
+    // `currentBackStackEntryAsState()` e NON `navController.currentBackStackEntry`:
+    // il secondo è una lettura semplice, non uno State osservabile, quindi da solo
+    // non farebbe ripartire l'effetto al cambio di destinazione. Serve con l'app
+    // killata: l'intent della notifica arriva in `onCreate`, quando la nav è ancora
+    // su Splash/Login, e il ramo qui sotto lo lascia in coda — senza un retry
+    // guidato da stato osservabile la navigazione non avverrebbe mai.
+    val currentEntry by navController.currentBackStackEntryAsState()
+    LaunchedEffect(pendingAiRoute, pendingFamilyId, activeFamilyId, currentEntry) {
         val route = pendingAiRoute ?: return@LaunchedEffect
-        val current = navController.currentDestination?.route ?: return@LaunchedEffect
+        val current = currentEntry?.destination?.route ?: return@LaunchedEffect
         if (current == AppDestination.Splash.route ||
             current == AppDestination.Login.route ||
             current == AppDestination.Onboarding.route
         ) {
+            KBLog.navigation.debug(
+                "DeepLink: route in coda, attendo di uscire da $current",
+                "NotificationDeepLink",
+            )
             return@LaunchedEffect
         }
         val targetFamilyId = pendingFamilyId
@@ -161,6 +188,30 @@ fun AppNavGraph(
         }
         navController.navigate(route) { launchSingleTop = true }
         NotificationDeepLinkRouter.clear()
+    }
+
+    // Todo da notifica senza childId/listId: si risale alla lista leggendo il
+    // todo da Room (con retry, perché la push può precedere la sincronizzazione)
+    // e la si impila sopra la sezione To-Do già aperta.
+    val pendingTodoId by NotificationDeepLinkRouter.pendingTodoId.collectAsStateWithLifecycle()
+    val todoDeepLinkResolver: TodoDeepLinkResolverViewModel = hiltViewModel()
+    LaunchedEffect(pendingTodoId) {
+        val todoId = pendingTodoId ?: return@LaunchedEffect
+        val location = todoDeepLinkResolver.resolveLocation(todoId)
+        if (location == null) {
+            KBLog.navigation.info(
+                "DeepLink: lista del todo non risolta todoId=$todoId — resto sulla sezione To-Do",
+                "NotificationDeepLink",
+            )
+            NotificationDeepLinkRouter.clearPendingTodoId()
+            return@LaunchedEffect
+        }
+        NotificationDeepLinkRouter.queueResolvedTodoList(
+            familyId = location.familyId,
+            childId = location.childId,
+            listId = location.listId,
+            todoId = todoId,
+        )
     }
 
     val screenViewContext = LocalContext.current
@@ -196,6 +247,35 @@ fun AppNavGraph(
         currentRoute != AppDestination.Onboarding.route
     ) {
         PushPrimingGate()
+    }
+
+    // Attesa della sincronizzazione del to-do arrivato da notifica: senza un
+    // segnale visibile l'utente resta fermo sulla panoramica To-Do senza capire
+    // che sta per succedere qualcosa. È un Dialog e non un overlay perché così
+    // galleggia sopra il NavHost senza richiederne la ristrutturazione.
+    // Toccando fuori si annulla l'attesa: azzerare `pendingTodoId` cambia la
+    // chiave del LaunchedEffect qui sopra, che quindi viene cancellato.
+    val currentRouteForTodoWait = currentEntry?.destination?.route
+    val isBootRoute = currentRouteForTodoWait == null ||
+        currentRouteForTodoWait == AppDestination.Splash.route ||
+        currentRouteForTodoWait == AppDestination.Login.route ||
+        currentRouteForTodoWait == AppDestination.Onboarding.route
+    if (pendingTodoId != null && !isBootRoute) {
+        Dialog(onDismissRequest = { NotificationDeepLinkRouter.clearPendingTodoId() }) {
+            Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.kidBoxColors.card) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(14.dp))
+                    Text(
+                        text = stringResource(R.string.todo_deeplink_opening),
+                        color = MaterialTheme.kidBoxColors.title,
+                    )
+                }
+            }
+        }
     }
 
     // Annuncio dalla console admin: non è una destinazione, quindi vive sopra il
@@ -2045,25 +2125,85 @@ fun AppNavGraph(
 
 internal fun screenNameFor(route: String?): String? {
     if (route == null) return null
+    val base = route.substringBefore('?')
+
+    if (base.startsWith("health/") || base.startsWith("pediatric_child_selector/")) {
+        return screenNameForHealth(base)
+    }
+    if (base.startsWith("travel/")) {
+        return screenNameForTravel(base)
+    }
+
     return when {
-        route.startsWith("calendar/") -> "calendar"
-        route.startsWith("documents_home") -> "documents"
-        route == "chat" || route.startsWith("chat_media_gallery") -> "chat"
-        route.startsWith("health/") || route.startsWith("pediatric_child_selector/") -> "health"
-        route.startsWith("expenses_home") -> "expenses"
-        route.startsWith("passwords_") || route.startsWith("password_") -> "passwords"
-        route.startsWith("wallet_") -> "wallet"
-        route.startsWith("shopping_list/") -> "grocery"
-        route.startsWith("notes_home") || route.startsWith("note_detail") -> "notes"
-        route == "todo" || route.startsWith("todo_list") || route.startsWith("todo_smart") -> "todo"
-        route.startsWith("family_photos") || route.startsWith("photo_album") -> "photos"
-        route.startsWith("pets/") || route.startsWith("pet_detail") -> "pets"
-        route.startsWith("home_items") || route.startsWith("home_item_detail") ||
-            route.startsWith("house_payment_detail") || route.startsWith("vehicles/") ||
-            route.startsWith("vehicle_detail") || route.startsWith("vehicle_interventions") -> "home_vehicles"
-        route.startsWith("travel/") -> "travel"
-        route.startsWith("family_location") || route.startsWith("geofence_list") ||
-            route.startsWith("geofence_edit") -> "location"
+        base == "home" -> "home"
+        base.startsWith("calendar/") -> "calendario"
+        base.startsWith("documents_home") -> "documenti"
+        base == "chat" || base.startsWith("chat_media_gallery") -> "chat_famiglia"
+        base == "support_chat" -> "chat_supporto"
+        base.startsWith("ai_chat/") || base.startsWith("planning_ai_chat/") -> "assistente_ai"
+        base.startsWith("expenses_home") -> "spese"
+        base.startsWith("shopping_list/") -> "lista_spesa"
+        base.startsWith("passwords_") || base.startsWith("password_") -> "password"
+        base.startsWith("wallet_") -> "wallet"
+        base.startsWith("notes_home") || base.startsWith("note_detail") -> "note"
+        base == "todo" || base.startsWith("todo_list") || base.startsWith("todo_smart") -> "todo"
+        base.startsWith("family_photos") || base.startsWith("photo_album") -> "foto"
+        base.startsWith("pets/") || base.startsWith("pet_detail") -> "animali"
+        base.startsWith("home_items") || base.startsWith("home_item_detail") ||
+            base.startsWith("house_payment_detail") -> "casa"
+        base.startsWith("vehicles/") || base.startsWith("vehicle_detail") ||
+            base.startsWith("vehicle_interventions") -> "veicoli"
+        base.startsWith("family_location") || base.startsWith("geofence_list") ||
+            base.startsWith("geofence_edit") -> "posizione"
+        base == "family_settings" -> "impostazioni_famiglia"
+        else -> null
+    }
+}
+
+// Route pattern (destination.route, con i placeholder {xxx} letterali) del sottoalbero /health,
+// enumerato 1:1 su AppDestination.kt. La discesa in "salute" copre health-connect-app e ogni
+// eventuale nuova leaf non ancora mappata esplicitamente.
+private fun screenNameForHealth(base: String): String {
+    if (base.startsWith("pediatric_child_selector/")) return "salute"
+    return when (base) {
+        "health/{familyId}/{childId}" -> "salute"
+        "health/{familyId}/{childId}/medical-record",
+        "health/{familyId}/{childId}/clinical-record" -> "salute_cartella_clinica"
+        "health/{familyId}/{childId}/visits" -> "salute_visite"
+        "health/{familyId}/{childId}/visits/form" -> "salute_visite"
+        "health/{familyId}/{childId}/visits/{visitId}" -> "salute_visita_dettaglio"
+        "health/{familyId}/{childId}/visits/list_ai_chat",
+        "health/{familyId}/{childId}/visits/{visitId}/visit_ai_chat" -> "salute_ai"
+        "health/{familyId}/{childId}/exams" -> "salute_esami"
+        "health/{familyId}/{childId}/exams/form" -> "salute_esami"
+        "health/{familyId}/{childId}/exams/{examId}" -> "salute_esame_dettaglio"
+        "health/{familyId}/{childId}/exams/list_ai_chat",
+        "health/{familyId}/{childId}/exams/{examId}/exam_ai_chat" -> "salute_ai"
+        "health/{familyId}/{childId}/vaccines",
+        "health/{familyId}/{childId}/vaccines/form" -> "salute_vaccini"
+        "health/{familyId}/{childId}/treatments" -> "salute_trattamenti"
+        "health/{familyId}/{childId}/treatments/form" -> "salute_trattamenti"
+        "health/{familyId}/{childId}/treatments/{treatmentId}" -> "salute_trattamento_dettaglio"
+        "health/{familyId}/{childId}/timeline" -> "salute_timeline"
+        "health/{familyId}/{childId}/ai-chat" -> "salute_ai"
+        else -> "salute"
+    }
+}
+
+// Route pattern del sottoalbero /travel, enumerato 1:1 su AppDestination.kt.
+private fun screenNameForTravel(base: String): String? {
+    return when (base) {
+        "travel/{familyId}" -> "viaggi"
+        "travel/{familyId}/all" -> "viaggi_tutti"
+        "travel/{familyId}/discover" -> "viaggi_scopri"
+        "travel/{familyId}/destination/{destinationId}" -> "viaggi_destinazione"
+        "travel/{familyId}/wizard" -> "viaggi_wizard"
+        "travel/{familyId}/proposal" -> "viaggi_wizard"
+        "travel/{familyId}/detail/{tripId}" -> "viaggi_dettaglio"
+        "travel/{familyId}/detail/{tripId}/places/{kind}" -> "viaggi_categoria"
+        "travel/{familyId}/detail/{tripId}/places/{kind}/map" -> "viaggi_mappa"
+        "travel/{familyId}/place-info/{placeName}" -> "viaggi_luogo"
+        "travel/{familyId}/place" -> "viaggi_luogo"
         else -> null
     }
 }

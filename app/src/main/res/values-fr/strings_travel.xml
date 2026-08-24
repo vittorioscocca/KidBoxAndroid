@@ -156,6 +156,7 @@
     <string name="travel_requires_pro">Nécessite une formule Pro ou Max.</string>
     <string name="travel_ai_notes_optional">Notes pour l\'IA (facultatif)</string>
     <string name="travel_complete_all">Complète la destination, les voyageurs, les styles et le budget pour générer le plan.</string>
+    <string name="onboarding_back">Retour</string>
     <string name="onboarding_slide1">Tout ce qui concerne tes enfants — organisé, partagé et toujours à portée de main.</string>
     <string name="onboarding_slide2">Photos, vidéos et moments spéciaux dans une galerie privée, chiffrée et synchronisée en temps réel.</string>
     <string name="onboarding_slide3">Consultations, vaccins, dépenses familiales et liste de courses. Tout reste à jour entre vous deux.</string>

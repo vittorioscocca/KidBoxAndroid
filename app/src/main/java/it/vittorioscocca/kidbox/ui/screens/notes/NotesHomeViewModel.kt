@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
 import it.vittorioscocca.kidbox.data.repository.NoteRepository
@@ -13,11 +14,21 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+
+data class NoteAuthor(
+    val uid: String,
+    val displayName: String,
+)
 
 data class NotesHomeUiState(
     val familyId: String = "",
     val notes: List<KBNote> = emptyList(),
+    // Chiave = uid, valore = nome da mostrare. Risolto dai membri famiglia
+    // correnti (non dal campo denormalizzato `updatedByName`, che alla
+    // creazione resta vuoto — stessa logica di `resolvedName(uid:)` su iOS).
+    val memberNames: Map<String, String> = emptyMap(),
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
 )
@@ -25,6 +36,7 @@ data class NotesHomeUiState(
 @HiltViewModel
 class NotesHomeViewModel @Inject constructor(
     private val noteRepository: NoteRepository,
+    private val familyMemberDao: KBFamilyMemberDao,
     private val badgeManager: HomeBadgeManager,
     private val auth: FirebaseAuth,
 ) : ViewModel() {
@@ -54,30 +66,25 @@ class NotesHomeViewModel @Inject constructor(
 
         observeJob?.cancel()
         observeJob = viewModelScope.launch {
-            noteRepository.observeByFamilyId(familyId).collect { notes ->
-                val uid = auth.currentUser?.uid
-                val visible = notes.filter { it.isVisibleTo(uid) }.sortedByDescending { it.updatedAtEpochMillis }
-                _uiState.value = _uiState.value.copy(
-                    familyId = familyId,
-                    notes = visible,
-                    isLoading = false,
-                )
-            }
-        }
-    }
-
-    fun createEmptyNote(
-        onCreated: (String) -> Unit,
-    ) {
-        val familyId = _uiState.value.familyId
-        if (familyId.isBlank()) return
-        viewModelScope.launch {
-            val noteId = noteRepository.upsertNote(
-                familyId = familyId,
-                title = "",
-                body = "",
-            )
-            onCreated(noteId)
+            combine(
+                noteRepository.observeByFamilyId(familyId),
+                familyMemberDao.observeActiveByFamilyId(familyId),
+            ) { notes, members -> notes to members }
+                .collect { (notes, members) ->
+                    val uid = auth.currentUser?.uid
+                    val visible = notes.filter { it.isVisibleTo(uid) }.sortedByDescending { it.updatedAtEpochMillis }
+                    val names = members.associate { m ->
+                        val name = m.displayName?.trim()?.takeIf { it.isNotEmpty() }
+                            ?: m.email?.trim().orEmpty()
+                        m.userId to name
+                    }
+                    _uiState.value = _uiState.value.copy(
+                        familyId = familyId,
+                        notes = visible,
+                        memberNames = names,
+                        isLoading = false,
+                    )
+                }
         }
     }
 

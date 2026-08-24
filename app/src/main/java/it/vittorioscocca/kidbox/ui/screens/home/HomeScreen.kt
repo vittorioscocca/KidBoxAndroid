@@ -104,6 +104,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
@@ -552,7 +553,7 @@ private fun FamilyHeroCard(
                     shape = RoundedCornerShape(20.dp),
                 ) {
                     Text(
-                        stringResource(R.string.home_hero_members_count, members),
+                        pluralStringResource(R.plurals.home_hero_members_count, members, members),
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         color = Color.White,
                         fontSize = 12.sp,

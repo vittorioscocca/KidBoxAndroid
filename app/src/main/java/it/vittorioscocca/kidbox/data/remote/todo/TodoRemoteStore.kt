@@ -69,10 +69,17 @@ class TodoRemoteStore @Inject constructor(
 ) {
     private val db get() = FirebaseFirestore.getInstance()
 
+    /**
+     * @param onChange riceve i cambiamenti e, quando lo snapshot è confermato dal server
+     *   (non solo cache), l'insieme COMPLETO degli id attualmente nel result set. Serve al
+     *   repository per riconciliare: un documento soft-deleted mentre l'app era chiusa esce
+     *   dalla query (`isDeleted == false`) senza generare alcun evento REMOVED al riaggancio,
+     *   quindi l'unico modo per accorgersene è confrontare col set corrente.
+     */
     fun listenTodoLists(
         familyId: String,
         childId: String,
-        onChange: (List<TodoListRemoteChange>) -> Unit,
+        onChange: (List<TodoListRemoteChange>, Set<String>?) -> Unit,
         onError: (Exception) -> Unit,
     ): ListenerRegistration {
         return db.collection("families").document(familyId).collection("todoLists")
@@ -116,16 +123,22 @@ class TodoRemoteStore @Inject constructor(
                             .filter { it.type == DocumentChange.Type.REMOVED }
                             .map { TodoListRemoteChange.Remove(it.document.id) }
                         val changes = upserts + removes
-                        if (changes.isNotEmpty()) onChange(changes)
+                        val snapshotIds =
+                            if (snap.metadata.isFromCache) null
+                            else snap.documents.map { it.id }.toSet()
+                        if (changes.isNotEmpty() || snapshotIds != null) {
+                            onChange(changes, snapshotIds)
+                        }
                     }
                 },
             )
     }
 
+    /** Vedi [listenTodoLists] per il significato del secondo parametro di `onChange`. */
     fun listenTodos(
         familyId: String,
         childId: String,
-        onChange: (List<TodoItemRemoteChange>) -> Unit,
+        onChange: (List<TodoItemRemoteChange>, Set<String>?) -> Unit,
         onError: (Exception) -> Unit,
     ): ListenerRegistration {
         return db.collection("families").document(familyId).collection("todos")
@@ -178,7 +191,12 @@ class TodoRemoteStore @Inject constructor(
                             .filter { it.type == DocumentChange.Type.REMOVED }
                             .map { TodoItemRemoteChange.Remove(it.document.id) }
                         val changes = upserts + removes
-                        if (changes.isNotEmpty()) onChange(changes)
+                        val snapshotIds =
+                            if (snap.metadata.isFromCache) null
+                            else snap.documents.map { it.id }.toSet()
+                        if (changes.isNotEmpty() || snapshotIds != null) {
+                            onChange(changes, snapshotIds)
+                        }
                     }
                 },
             )

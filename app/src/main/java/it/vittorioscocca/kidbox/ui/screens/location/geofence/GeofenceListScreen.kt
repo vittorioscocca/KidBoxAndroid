@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.location.geofence
 
 import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -151,12 +152,12 @@ private fun GeofenceRow(
     val monitored = decodeStringList(geofence.monitoredMemberIdsJson)
     val arriveWord = stringResource(R.string.location_arrive_word)
     val leaveWord = stringResource(R.string.location_leave_word)
-    val membersWord = stringResource(R.string.location_members_count_suffix)
+    val monitoredMembersText = pluralStringResource(R.plurals.location_geofence_members_count, monitored.size, monitored.size)
     val subtitle = buildString {
         append("${geofence.radius.toInt()} m")
         if (geofence.notifyOnArrive) append(" · " + arriveWord)
         if (geofence.notifyOnLeave) append(" · " + leaveWord)
-        if (monitored.isNotEmpty()) append(" · ${monitored.size} " + membersWord)
+        if (monitored.isNotEmpty()) append(" · " + monitoredMembersText)
     }
     Card(
         modifier = Modifier

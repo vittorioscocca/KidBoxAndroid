@@ -45,6 +45,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -240,6 +241,11 @@ fun OnboardingScreen(
     val currentPage = pagerState.currentPage
     val accent = pageAccent(currentPage, familyPath)
     val iconTint = pageIconTint(currentPage, familyPath)
+
+    // Una volta creata la famiglia (o completato un join) non si torna più
+    // indietro: la scrittura su Firestore è già avvenuta, e riproporre le
+    // pagine precedenti farebbe pensare all'utente di poterla ancora annullare.
+    val canGoBack = currentPage > 0 && !nameState.isSaving && createdFamilyId == null
 
     // Percorso "crea": il documento membro owner nasce senza displayName, quindi
     // appena la famiglia esiste ci si porta il nome raccolto a pagina 4.
@@ -445,6 +451,23 @@ fun OnboardingScreen(
                 )
             }
         }
+
+        // Dichiarato DOPO la Column apposta: in un Box, l'ultimo figlio è quello
+        // in cima nello z-order e riceve i tap per primo. Prima stava sopra
+        // TopAccentGradient ma sotto la Column con l'HorizontalPager — restava
+        // visibile (la Column è trasparente) ma i tap in quell'angolo venivano
+        // intercettati dallo scroll gesture della pagina sottostante, quindi il
+        // pulsante appariva ma non rispondeva.
+        if (canGoBack) {
+            OnboardingBackButton(
+                accent = accent,
+                onClick = { scope.launch { pagerState.animateScrollToPage(currentPage - 1) } },
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(start = 20.dp, top = 8.dp),
+            )
+        }
     }
 }
 
@@ -478,6 +501,30 @@ private fun TopAccentGradient(accent: Color, pageIndex: Int) {
                 ),
             ),
     )
+}
+
+@Composable
+private fun OnboardingBackButton(
+    accent: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .size(36.dp)
+            .shadow(elevation = 8.dp, shape = CircleShape, spotColor = accent.copy(alpha = 0.12f))
+            .clip(CircleShape)
+            .background(Color.White)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.AutoMirrored.Filled.ArrowBack,
+            contentDescription = stringResource(R.string.onboarding_back),
+            tint = accent,
+            modifier = Modifier.size(18.dp),
+        )
+    }
 }
 
 @Composable

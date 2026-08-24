@@ -65,6 +65,8 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.notifications.AppSection
+import it.vittorioscocca.kidbox.notifications.TrackSectionPresence
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,6 +80,7 @@ fun GroceryListScreen(
     val grocerySection = kb.subtitle
     val groceryTextMuted = kb.subtitle
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    TrackSectionPresence(AppSection.SHOPPING_LIST, state.familyId)
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var showAddDialog by remember { mutableStateOf(false) }

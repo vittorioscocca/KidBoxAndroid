@@ -59,6 +59,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 
@@ -186,7 +187,7 @@ fun FamilySettingsScreen(
                             if (showMembersLoading) {
                                 stringResource(R.string.settings_family_loading_members)
                             } else {
-                                "${state.members.size} membri collegati."
+                                pluralStringResource(R.plurals.settings_family_members_connected, state.members.size, state.members.size)
                             },
                             color = MaterialTheme.kidBoxColors.subtitle,
                             fontSize = 13.sp,

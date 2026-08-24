@@ -72,6 +72,7 @@ class LoginViewModel @Inject constructor(
             val user = FirebaseAuth.getInstance().currentUser
             if (user != null) {
                 userProfileRepository.ensureSeededFromAuth()
+                runCatching { userProfileRepository.hydrateFromFirestore() }
                 writePlatformToFirestore(user.uid)
                 resetFirestoreClientAfterAuthChange()
             }
@@ -229,6 +230,7 @@ class LoginViewModel @Inject constructor(
             }
         }
         userProfileRepository.ensureSeededFromAuth()
+        runCatching { userProfileRepository.hydrateFromFirestore() }
         writePlatformToFirestore(user.uid)
         resetFirestoreClientAfterAuthChange()
         _authCheckState.value = AuthCheckState.Authenticated(checkHasFamily())

@@ -85,6 +85,8 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.util.KBLocale
+import it.vittorioscocca.kidbox.notifications.AppSection
+import it.vittorioscocca.kidbox.notifications.TrackSectionPresence
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,6 +96,7 @@ fun CalendarScreen(
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    TrackSectionPresence(AppSection.CALENDAR, familyId)
     var showForm by remember { mutableStateOf(false) }
     var editingEvent by remember { mutableStateOf<KBCalendarEventEntity?>(null) }
     val currentUid = remember { FirebaseAuth.getInstance().currentUser?.uid }

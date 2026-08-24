@@ -171,6 +171,51 @@ class UserProfileRepository @Inject constructor(
         }
     }
 
+    /**
+     * Allinea il profilo locale (Room) con `users/{uid}` su Firestore dopo il login.
+     *
+     * `ensureSeededFromAuth` crea la riga solo dai dati di FirebaseAuth (che dopo un
+     * logout+wipe non ha firstName/lastName), quindi `canonicalDisplayNameForCurrentUser`
+     * restava vuoto finché l'utente non apriva manualmente il Profilo: il chat sender
+     * name arrivava vuoto e il backend mostrava "Qualcuno" al posto del nome.
+     * Gemello di `UserProfileRemoteSync.mergeFirestoreUserIntoLocal` su iOS.
+     */
+    suspend fun hydrateFromFirestore() {
+        val uid = auth.currentUser?.uid ?: return
+        val snap = try {
+            db.collection("users").document(uid).get().await()
+        } catch (_: Exception) {
+            return
+        }
+        val d = snap.data ?: return
+
+        val remoteFirst = (d["firstName"] as? String)?.trim().orEmpty()
+        val remoteLast = (d["lastName"] as? String)?.trim().orEmpty()
+        var remoteDisplay = (d["displayName"] as? String)?.trim().orEmpty()
+        if (remoteDisplay.isEmpty()) {
+            remoteDisplay = "$remoteFirst $remoteLast".trim()
+        }
+        val remoteAddress = (d["familyAddress"] as? String)?.trim()
+        val remoteEmail = (d["email"] as? String)?.trim().orEmpty()
+
+        val existing = userProfileDao.getByUid(uid) ?: return
+        val now = System.currentTimeMillis()
+        userProfileDao.upsert(
+            existing.copy(
+                email = remoteEmail.ifEmpty { existing.email },
+                displayName = if (remoteDisplay.isNotEmpty() && remoteDisplay != "Utente") {
+                    remoteDisplay
+                } else {
+                    existing.displayName
+                },
+                firstName = remoteFirst.ifEmpty { existing.firstName },
+                lastName = remoteLast.ifEmpty { existing.lastName },
+                familyAddress = remoteAddress?.takeIf { it.isNotEmpty() } ?: existing.familyAddress,
+                updatedAtEpochMillis = now,
+            ),
+        )
+    }
+
     /** Campi opzionali da `users/{uid}` per precompilare la UI (come iOS loadRemoteUserProfile). */
     suspend fun fetchRemoteProfileFields(uid: String): RemoteUserProfileFields? {
         if (auth.currentUser?.uid != uid) return null

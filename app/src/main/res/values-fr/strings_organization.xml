@@ -3,6 +3,7 @@
     <!-- ============ NOTES ============ -->
     <string name="notes_detail_title">Note</string>
     <string name="notes_detail_save_cd">Enregistrer</string>
+    <string name="notes_detail_share_cd">Partager</string>
     <string name="notes_visibility_section_title">Qui peut voir cette note</string>
     <string name="notes_visibility_locked_title">Visibilité verrouillée</string>
     <string name="notes_visibility_locked_message">Seule la personne qui a créé la note peut modifier sa visibilité.</string>
@@ -22,9 +23,12 @@
     <string name="notes_select_all">Tout sélectionner</string>
     <string name="notes_delete_selection_cd">Supprimer la sélection</string>
     <string name="notes_loading">Chargement des notes…</string>
-    <string name="notes_empty_state">Pas encore de notes. Touche + pour en créer une.</string>
+    <string name="notes_empty_state_title">Aucune note</string>
+    <string name="notes_empty_state">Créez votre première note. Vous pouvez choisir de la partager avec toute la famille, avec des membres spécifiques, ou de la garder privée. Chaque note est chiffrée de bout en bout.</string>
+    <string name="notes_new_note_button">Nouvelle note</string>
     <string name="notes_no_results">Aucun résultat</string>
-    <string name="notes_pin_cd">Épingler</string>
+    <string name="notes_pin_cd">Mettre en avant</string>
+    <string name="notes_pin_toast">Note mise en avant</string>
     <string name="notes_delete_cd">Supprimer</string>
     <string name="notes_untitled">Sans titre</string>
     <string name="notes_no_content">Aucun contenu</string>
@@ -51,6 +55,7 @@
     <string name="todo_card_not_completed">Pas terminées</string>
     <string name="todo_my_lists_title">Mes listes</string>
     <string name="todo_no_lists">Pas encore de liste</string>
+    <string name="todo_empty_state_body">Créez des listes de tâches et attribuez-les à un membre de la famille. Choisissez de les partager avec tout le monde, avec des membres spécifiques, ou de les garder privées. Chaque tâche est chiffrée de bout en bout.</string>
     <string name="todo_new_list_title">Nouvelle liste</string>
     <string name="todo_edit_list_title">Modifier la liste</string>
     <string name="todo_list_name_placeholder">Nom de la liste</string>
@@ -165,4 +170,5 @@
     <string name="calendar_add_event_button">Ajouter l\'événement</string>
     <string name="calendar_save_event_button">Enregistrer l\'événement</string>
     <string name="calendar_visibility_section_title">Qui peut voir cet événement ?</string>
+    <string name="todo_deeplink_opening">Ouverture de la tâche…</string>
 </resources>

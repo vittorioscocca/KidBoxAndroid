@@ -47,9 +47,12 @@
     <string name="home_members_syncing">Syncing members...</string>
     <string name="home_ai_assistant_desc">AI Assistant</string>
     <string name="home_hero_default_family_name">Your family</string>
-    <string name="home_hero_members_count">%1$d members</string>
-    <string name="home_hero_change_photo">Change photo</string>
-    <string name="home_hero_add_photo">Add photo</string>
+    <plurals name="home_hero_members_count">
+        <item quantity="one">%1$d member</item>
+        <item quantity="other">%1$d members</item>
+    </plurals>
+    <string name="home_hero_change_photo">Tap to change photo</string>
+    <string name="home_hero_add_photo">Add family photo</string>
 
     <!-- ═══ home: promo carousel ═══ -->
     <string name="home_promo_invite_title">Grow your circle. Invite new members</string>
@@ -168,6 +171,7 @@
 
     <!-- ═══ home: SuggestionsScreen ═══ -->
     <string name="home_suggestions_title">Tips</string>
+    <string name="home_suggestions_chat_body">Chat with your family in real time: text, photos, audio, video and reactions. Conversations are end-to-end encrypted and every member sees new messages instantly.</string>
     <string name="home_suggestions_notes_body">Write free-form or formatted notes (bold, italics, lists) and choose whether to share them with the whole family or keep them just for you.</string>
     <string name="home_suggestions_todo_body">Create to-do lists and assign them to a family member. When someone checks off a task, everyone sees the update instantly.</string>
     <string name="home_suggestions_shopping_body">The shopping list is shared in real time: if a family member checks off an item at the supermarket, you see it right away too. Items are organized by category so you can shop faster.</string>

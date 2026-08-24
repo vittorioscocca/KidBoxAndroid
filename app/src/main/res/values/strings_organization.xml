@@ -3,6 +3,7 @@
     <!-- ============ NOTES ============ -->
     <string name="notes_detail_title">Nota</string>
     <string name="notes_detail_save_cd">Salva</string>
+    <string name="notes_detail_share_cd">Condividi</string>
     <string name="notes_visibility_section_title">Chi può vedere questa nota</string>
     <string name="notes_visibility_locked_title">Visibilità bloccata</string>
     <string name="notes_visibility_locked_message">Solo chi ha creato la nota può modificare la visibilità.</string>
@@ -22,9 +23,12 @@
     <string name="notes_select_all">Seleziona tutto</string>
     <string name="notes_delete_selection_cd">Elimina selezione</string>
     <string name="notes_loading">Caricamento note...</string>
-    <string name="notes_empty_state">Nessuna nota. Tocca + per crearne una.</string>
+    <string name="notes_empty_state_title">Nessuna nota</string>
+    <string name="notes_empty_state">Crea la prima nota. Puoi scegliere se condividerla con tutta la famiglia, con membri specifici, oppure mantenerla privata. Ogni nota è crittografata end-to-end.</string>
+    <string name="notes_new_note_button">Nuova nota</string>
     <string name="notes_no_results">Nessun risultato</string>
-    <string name="notes_pin_cd">Pin</string>
+    <string name="notes_pin_cd">Metti in evidenza</string>
+    <string name="notes_pin_toast">Nota messa in evidenza</string>
     <string name="notes_delete_cd">Elimina</string>
     <string name="notes_untitled">Senza titolo</string>
     <string name="notes_no_content">Nessun contenuto</string>
@@ -51,6 +55,7 @@
     <string name="todo_card_not_completed">Non completati</string>
     <string name="todo_my_lists_title">Le mie liste</string>
     <string name="todo_no_lists">Nessuna lista</string>
+    <string name="todo_empty_state_body">Crea liste di attività e assegnale a un membro della famiglia. Scegli se condividerle con tutti, con membri specifici o tenerle private. Ogni attività è crittografata end-to-end.</string>
     <string name="todo_new_list_title">Nuova lista</string>
     <string name="todo_edit_list_title">Modifica lista</string>
     <string name="todo_list_name_placeholder">Nome lista</string>
@@ -165,4 +170,5 @@
     <string name="calendar_add_event_button">Aggiungi evento</string>
     <string name="calendar_save_event_button">Salva evento</string>
     <string name="calendar_visibility_section_title">Chi può vedere questo evento?</string>
+    <string name="todo_deeplink_opening">Apro il to-do…</string>
 </resources>

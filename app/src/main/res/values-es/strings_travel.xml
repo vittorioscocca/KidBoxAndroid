@@ -156,6 +156,7 @@
     <string name="travel_requires_pro">Requiere plan Pro o Max.</string>
     <string name="travel_ai_notes_optional">Notas para la IA (opcional)</string>
     <string name="travel_complete_all">Completa destino, viajeros, estilos y presupuesto para generar el plan.</string>
+    <string name="onboarding_back">Atrás</string>
     <string name="onboarding_slide1">Todo lo relacionado con tus hijos: organizado, compartido y siempre a mano.</string>
     <string name="onboarding_slide2">Fotos, vídeos y momentos especiales en una galería privada, cifrada y sincronizada en tiempo real.</string>
     <string name="onboarding_slide3">Consultas médicas, vacunas, gastos familiares y lista de la compra. Todo actualizado entre los dos.</string>

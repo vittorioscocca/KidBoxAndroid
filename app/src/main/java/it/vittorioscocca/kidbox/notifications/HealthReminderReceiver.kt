@@ -41,7 +41,15 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 val body = intent.getStringExtra(EXTRA_BODY) ?: context.getString(R.string.treatment_reminder_body_fallback)
 
                 val deepLink = Intent(context, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    // NEW_TASK necessario: parte da un BroadcastReceiver (AlarmManager), un
+                    // contesto non-Activity. Senza, con l'app in background Android può aprire
+                    // un secondo task invece di riportare avanti quello esistente — vedi lo
+                    // stesso fix in KidBoxFirebaseMessagingService.
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                    )
                     putExtra("push_type", TYPE_TREATMENT_REMINDER)
                     putExtra("push_treatment_id", treatmentId)
                     putExtra("push_family_id", familyId)
@@ -70,7 +78,15 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
                 val body = intent.getStringExtra(EXTRA_BODY).orEmpty()
                 val deepLink = Intent(context, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    // NEW_TASK necessario: parte da un BroadcastReceiver (AlarmManager), un
+                    // contesto non-Activity. Senza, con l'app in background Android può aprire
+                    // un secondo task invece di riportare avanti quello esistente — vedi lo
+                    // stesso fix in KidBoxFirebaseMessagingService.
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                    )
                     putExtra("push_type", "wallet_ticket_reminder")
                     putExtra("push_family_id", familyId)
                     putExtra("ticketId", ticketId)
@@ -96,7 +112,15 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
                 val body = intent.getStringExtra(EXTRA_BODY).orEmpty()
                 val deepLink = Intent(context, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    // NEW_TASK necessario: parte da un BroadcastReceiver (AlarmManager), un
+                    // contesto non-Activity. Senza, con l'app in background Android può aprire
+                    // un secondo task invece di riportare avanti quello esistente — vedi lo
+                    // stesso fix in KidBoxFirebaseMessagingService.
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                    )
                     putExtra("push_type", "wallet_document_reminder")
                     putExtra("push_family_id", familyId)
                     putExtra("documentId", documentId)
@@ -122,7 +146,15 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
                 val body = intent.getStringExtra(EXTRA_BODY).orEmpty()
                 val deepLink = Intent(context, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    // NEW_TASK necessario: parte da un BroadcastReceiver (AlarmManager), un
+                    // contesto non-Activity. Senza, con l'app in background Android può aprire
+                    // un secondo task invece di riportare avanti quello esistente — vedi lo
+                    // stesso fix in KidBoxFirebaseMessagingService.
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                    )
                     putExtra("push_type", TYPE_PASSWORD_EXPIRY)
                     putExtra("push_family_id", familyId)
                     putExtra("push_entry_id", entryId)
@@ -149,7 +181,15 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 val body = intent.getStringExtra(EXTRA_TITLE).orEmpty()
 
                 val deepLink = Intent(context, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    // NEW_TASK necessario: parte da un BroadcastReceiver (AlarmManager), un
+                    // contesto non-Activity. Senza, con l'app in background Android può aprire
+                    // un secondo task invece di riportare avanti quello esistente — vedi lo
+                    // stesso fix in KidBoxFirebaseMessagingService.
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                    )
                     putExtra("push_type", TYPE_VACCINE_REMINDER)
                     putExtra("push_vaccine_id", vaccineId)
                     putExtra("push_family_id", familyId)
@@ -198,7 +238,15 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 }
 
                 val deepLink = Intent(context, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    // NEW_TASK necessario: parte da un BroadcastReceiver (AlarmManager), un
+                    // contesto non-Activity. Senza, con l'app in background Android può aprire
+                    // un secondo task invece di riportare avanti quello esistente — vedi lo
+                    // stesso fix in KidBoxFirebaseMessagingService.
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                    )
                     putExtra("push_type", TYPE_VEHICLE_DEADLINE)
                     putExtra("push_family_id", familyId)
                     putExtra("push_vehicle_id", vehicleId)
@@ -243,7 +291,15 @@ class HealthReminderReceiver : BroadcastReceiver() {
                     "Tra 3 giorni — apri Casa."
                 }
                 val deepLink = Intent(context, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    // NEW_TASK necessario: parte da un BroadcastReceiver (AlarmManager), un
+                    // contesto non-Activity. Senza, con l'app in background Android può aprire
+                    // un secondo task invece di riportare avanti quello esistente — vedi lo
+                    // stesso fix in KidBoxFirebaseMessagingService.
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                    )
                     putExtra("push_type", TYPE_HOUSE_PAYMENT)
                     putExtra("push_family_id", familyId)
                     putExtra("push_house_payment_id", paymentId)
@@ -288,7 +344,15 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 }
 
                 val deepLink = Intent(context, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    // NEW_TASK necessario: parte da un BroadcastReceiver (AlarmManager), un
+                    // contesto non-Activity. Senza, con l'app in background Android può aprire
+                    // un secondo task invece di riportare avanti quello esistente — vedi lo
+                    // stesso fix in KidBoxFirebaseMessagingService.
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                    )
                     putExtra("push_type", type)
                     putExtra("push_family_id", familyId)
                     putExtra("push_child_id", childId)

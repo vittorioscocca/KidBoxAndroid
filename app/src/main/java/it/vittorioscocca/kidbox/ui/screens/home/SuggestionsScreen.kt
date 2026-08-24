@@ -50,12 +50,13 @@ import it.vittorioscocca.kidbox.ui.screens.home.onboarding.OnboardingChecklistSt
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
 private val suggestionOrder = listOf(
-    "notes", "todo", "shopping", "calendar", "health", "documents", "expenses",
+    "chat", "notes", "todo", "shopping", "calendar", "health", "documents", "expenses",
     "wallet", "passwords", "location", "photos", "family", "pets", "home_items",
     "vehicles", "travel", "ai",
 )
 
 private val suggestionTexts = mapOf(
+    "chat" to R.string.home_suggestions_chat_body,
     "notes" to R.string.home_suggestions_notes_body,
     "todo" to R.string.home_suggestions_todo_body,
     "shopping" to R.string.home_suggestions_shopping_body,

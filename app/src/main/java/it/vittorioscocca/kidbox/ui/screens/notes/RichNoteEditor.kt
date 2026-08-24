@@ -146,6 +146,20 @@ fun RichNoteEditor(
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
     val editTextRef = remember { arrayOfNulls<EditText>(1) }
+    // Il round-trip HTML→Spanned→HTML non è garantito idempotente byte-per-byte
+    // (entità, spazi, markup liste): un `setText()` programmatico nell'`update`
+    // qui sotto può quindi produrre un `spannedToHtml` leggermente diverso dal
+    // `body` appena impostato, e il TextWatcher lo scambierebbe per una modifica
+    // vera dell'utente — rialzando `isDirty` subito dopo un salvataggio e
+    // facendo ricomparire il bottone "conferma" che dovrebbe restare nascosto.
+    // Questo flag disattiva `onBodyChange` per il solo giro di TextWatcher
+    // generato da un `setText()` nostro, non da una digitazione reale.
+    val suppressNextBodyChange = remember { booleanArrayOf(false) }
+    // Guardia di rientranza per `renumberNumberedLists`: ogni `editable.replace()`
+    // che fa per correggere un numero ritrigghera `afterTextChanged` (comportamento
+    // standard di Android sui TextWatcher); senza questo flag il passaggio di
+    // rinumerazione richiamerebbe se stesso ricorsivamente.
+    val isRenumbering = remember { booleanArrayOf(false) }
     var toolbarState by remember { mutableStateOf(RichToolbarState()) }
     var isAaExpanded by remember { mutableStateOf(false) }
     var isBodyFocused by remember { mutableStateOf(false) }
@@ -259,6 +273,20 @@ fun RichNoteEditor(
                                     override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
                                     override fun afterTextChanged(s: Editable?) {
                                         toolbarState = buildToolbarState(this@apply)
+                                        if (suppressNextBodyChange[0]) {
+                                            suppressNextBodyChange[0] = false
+                                            return
+                                        }
+                                        if (!isRenumbering[0] && s != null) {
+                                            isRenumbering[0] = true
+                                            val changed = renumberNumberedLists(s)
+                                            isRenumbering[0] = false
+                                            // Ogni replace() del passaggio qui sopra ha già
+                                            // ritriggerato afterTextChanged e chiamato
+                                            // onBodyChange con il testo aggiornato: non
+                                            // richiamarlo di nuovo con lo stesso contenuto.
+                                            if (changed) return
+                                        }
                                         onBodyChange(spannedToHtml(s ?: ""))
                                     }
                                 },
@@ -305,6 +333,7 @@ fun RichNoteEditor(
                         val targetBody = body
                         if (currentBody != targetBody) {
                             val sel = editText.selectionStart.coerceAtLeast(0)
+                            suppressNextBodyChange[0] = true
                             editText.setText(bodyHtmlToSpanned(targetBody))
                             val textLength = editText.text?.length ?: 0
                             editText.setSelection(sel.coerceAtMost(textLength))
@@ -660,6 +689,56 @@ private fun buildToolbarState(
         isChecklist = line.startsWith("○ ") || line.startsWith("◉ "),
         isQuote = line.startsWith("> "),
     )
+}
+
+/**
+ * Rinumera in sequenza (1, 2, 3, …) i blocchi contigui di righe che iniziano
+ * con un marcatore numerato ("12. testo"). I numeri sono caratteri letterali
+ * scritti nel testo (non calcolati dal layout), quindi senza questo passaggio
+ * cancellare un elemento in mezzo alla lista lascia un "buco" (es. 1, 3, 4
+ * invece di 1, 2, 3). Chiamata a ogni modifica — idempotente: se la
+ * numerazione è già corretta non tocca l'Editable. Ritorna `true` se ha
+ * corretto almeno un numero.
+ */
+private fun renumberNumberedLists(editable: Editable): Boolean {
+    val ns = editable.toString()
+    if (ns.isEmpty()) return false
+    val markerRegex = Regex("^([0-9]+)([.][ \t])")
+
+    data class Fix(val start: Int, val endExclusive: Int, val newValue: String)
+    val fixes = mutableListOf<Fix>()
+
+    var idx = 0
+    var expectedNumber = 1
+    while (idx <= ns.length) {
+        val lineEnd = ns.indexOf('\n', idx).let { if (it == -1) ns.length else it }
+        val line = ns.substring(idx, lineEnd)
+        val match = markerRegex.find(line)
+        if (match != null) {
+            val numberGroup = match.groups[1]!!
+            val expectedStr = expectedNumber.toString()
+            if (numberGroup.value != expectedStr) {
+                fixes += Fix(
+                    start = idx + numberGroup.range.first,
+                    endExclusive = idx + numberGroup.range.last + 1,
+                    newValue = expectedStr,
+                )
+            }
+            expectedNumber += 1
+        } else {
+            expectedNumber = 1
+        }
+        if (lineEnd >= ns.length) break
+        idx = lineEnd + 1
+    }
+
+    if (fixes.isEmpty()) return false
+    // Dall'ultima riga alla prima: gli offset delle righe precedenti restano
+    // validi anche quando la larghezza del numero cambia (es. "10." -> "3.").
+    for (fix in fixes.asReversed()) {
+        editable.replace(fix.start, fix.endExclusive, fix.newValue)
+    }
+    return true
 }
 
 private fun EditText.handleEnterKey(

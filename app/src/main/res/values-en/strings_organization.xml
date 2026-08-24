@@ -3,6 +3,7 @@
     <!-- ============ NOTES ============ -->
     <string name="notes_detail_title">Note</string>
     <string name="notes_detail_save_cd">Save</string>
+    <string name="notes_detail_share_cd">Share</string>
     <string name="notes_visibility_section_title">Who can see this note</string>
     <string name="notes_visibility_locked_title">Visibility locked</string>
     <string name="notes_visibility_locked_message">Only the person who created the note can change its visibility.</string>
@@ -22,9 +23,12 @@
     <string name="notes_select_all">Select all</string>
     <string name="notes_delete_selection_cd">Delete selection</string>
     <string name="notes_loading">Loading notes…</string>
-    <string name="notes_empty_state">No notes yet. Tap + to create one.</string>
+    <string name="notes_empty_state_title">No notes</string>
+    <string name="notes_empty_state">Create your first note. You can choose to share it with the whole family, with specific members, or keep it private. Every note is end-to-end encrypted.</string>
+    <string name="notes_new_note_button">New note</string>
     <string name="notes_no_results">No results</string>
-    <string name="notes_pin_cd">Pin</string>
+    <string name="notes_pin_cd">Pin note</string>
+    <string name="notes_pin_toast">Note pinned</string>
     <string name="notes_delete_cd">Delete</string>
     <string name="notes_untitled">Untitled</string>
     <string name="notes_no_content">No content</string>
@@ -51,6 +55,7 @@
     <string name="todo_card_not_completed">Not completed</string>
     <string name="todo_my_lists_title">My lists</string>
     <string name="todo_no_lists">No lists yet</string>
+    <string name="todo_empty_state_body">Create task lists and assign them to a family member. Choose to share them with everyone, with specific members, or keep them private. Every task is end-to-end encrypted.</string>
     <string name="todo_new_list_title">New list</string>
     <string name="todo_edit_list_title">Edit list</string>
     <string name="todo_list_name_placeholder">List name</string>
@@ -165,4 +170,5 @@
     <string name="calendar_add_event_button">Add event</string>
     <string name="calendar_save_event_button">Save event</string>
     <string name="calendar_visibility_section_title">Who can see this event?</string>
+    <string name="todo_deeplink_opening">Opening the to-do…</string>
 </resources>

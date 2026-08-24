@@ -54,6 +54,18 @@ object NotificationDeepLinkRouter {
     private val _pendingRoute = MutableStateFlow<String?>(null)
     val pendingRoute: StateFlow<String?> = _pendingRoute.asStateFlow()
 
+    /**
+     * `todoId` di cui va ancora individuata la lista che lo contiene.
+     *
+     * Valorizzato quando la notifica non porta `childId`/`listId`: lo consuma
+     * [it.vittorioscocca.kidbox.ui.screens.todo.TodoDeepLinkResolverViewModel],
+     * che legge il todo da Room e poi chiama [queueResolvedTodoList].
+     * Volutamente NON azzerato da [clear], che scatta dopo la navigazione alla
+     * sezione To-Do: la risoluzione della lista deve sopravvivere a quel passo.
+     */
+    private val _pendingTodoId = MutableStateFlow<String?>(null)
+    val pendingTodoId: StateFlow<String?> = _pendingTodoId.asStateFlow()
+
     /** `messageId` del messaggio chat da evidenziare dopo la navigazione (menzioni). */
     private val _pendingChatMessageId = MutableStateFlow<String?>(null)
     val pendingChatMessageId: StateFlow<String?> = _pendingChatMessageId.asStateFlow()
@@ -118,6 +130,7 @@ object NotificationDeepLinkRouter {
             "new_chat_message",
             "chat_mention" -> {
                 val messageId = intent.getStringExtra("push_message_id")
+                    ?: intent.getStringExtra("messageId")
                 _pendingChatMessageId.value = messageId
                 queueFamilyAwareRoute(resolvedType, familyId) { _ ->
                     AppDestination.Chat.route
@@ -144,19 +157,50 @@ object NotificationDeepLinkRouter {
                 val childId = intent.getStringExtra("push_child_id") ?: intent.getStringExtra("childId")
                 val listId = intent.getStringExtra("push_list_id") ?: intent.getStringExtra("listId")
                 val todoId = intent.getStringExtra("push_todo_id") ?: intent.getStringExtra("todoId")
-                if (childId.isNullOrBlank() || listId.isNullOrBlank()) {
-                    KBLog.app.warning(
-                        "NotificationDeepLink: todo payload incompleto type=$resolvedType",
+                // Con il `todoId` si passa SEMPRE dall'attesa, anche quando il
+                // payload porta già `listId`.
+                //
+                // Non è un giro inutile: la push arriva PRIMA che la
+                // sincronizzazione abbia portato il to-do in Room, quindi
+                // entrare subito nella lista la mostra senza l'elemento appena
+                // creato — che è esattamente ciò che l'utente andava a vedere.
+                // [TodoDeepLinkResolverViewModel] aspetta che il to-do esista
+                // davvero (mostrando lo spinner) e solo allora si entra, con
+                // `listId` e `childId` presi dal to-do stesso, che sono la
+                // fonte autorevole se il payload fosse stale.
+                //
+                // Intanto si apre la sezione To-Do, che diventa anche il livello
+                // a cui torna il tasto indietro — stesso stack di
+                // `openTodoFromPush` su iOS (.todo → .todoList).
+                if (!todoId.isNullOrBlank()) {
+                    _pendingTodoId.value = todoId
+                    KBLog.app.info(
+                        "NotificationDeepLink: attendo il to-do in locale todoId=$todoId",
                         TAG,
                     )
+                    queueFamilyAwareRoute(resolvedType, familyId) { _ ->
+                        AppDestination.Todo.route
+                    }
+                    return
+                }
+                // Senza `todoId` non c'è niente da attendere né da evidenziare:
+                // se si conosce la lista ci si entra, altrimenti resta la
+                // panoramica To-Do. `childId` vuoto va bene, la rotta lo regge.
+                if (listId.isNullOrBlank()) {
+                    KBLog.app.warning(
+                        "NotificationDeepLink: todo senza listId né todoId — apro la sezione To-Do",
+                        TAG,
+                    )
+                    queueFamilyAwareRoute(resolvedType, familyId) { _ ->
+                        AppDestination.Todo.route
+                    }
                     return
                 }
                 queueFamilyAwareRoute(resolvedType, familyId) { fid ->
                     AppDestination.TodoList.createRoute(
                         familyId = fid,
-                        childId = childId,
+                        childId = childId.orEmpty(),
                         listId = listId,
-                        highlightTodoId = todoId,
                     )
                 }
             }
@@ -265,6 +309,17 @@ object NotificationDeepLinkRouter {
                 }
                 queueFamilyAwareRoute(resolvedType, familyId) { fid ->
                     AppDestination.WalletDetail.createRoute(familyId = fid, ticketId = ticketId)
+                }
+            }
+            "new_loyalty_card" -> {
+                KBAnalyticsOrigin.set(KBAnalyticsEntryPoint.NOTIFICATION)
+                val cardId = intent.getStringExtra("cardId")
+                if (cardId.isNullOrBlank()) {
+                    KBLog.app.warning("NotificationDeepLink: cardId mancante", TAG)
+                    return
+                }
+                queueFamilyAwareRoute(resolvedType, familyId) { fid ->
+                    AppDestination.WalletLoyaltyCardDetail.createRoute(familyId = fid, cardId = cardId)
                 }
             }
             "wallet_document_reminder" -> {
@@ -394,6 +449,38 @@ object NotificationDeepLinkRouter {
 
     fun clearChatMessageId() {
         _pendingChatMessageId.value = null
+    }
+
+    /**
+     * Accoda la lista che contiene il todo, una volta risolta da Room.
+     *
+     * Arriva DOPO che si è già navigato alla sezione To-Do, quindi la lista si
+     * impila sopra: indietro riporta alla panoramica To-Do, come su iOS.
+     */
+    fun queueResolvedTodoList(
+        familyId: String,
+        childId: String,
+        listId: String,
+        todoId: String,
+    ) {
+        _pendingTodoId.value = null
+        if (familyId.isBlank()) return
+        _pendingFamilyId.value = familyId
+        _pendingRoute.value = AppDestination.TodoList.createRoute(
+            familyId = familyId,
+            childId = childId,
+            listId = listId,
+            highlightTodoId = todoId,
+        )
+        KBLog.app.info(
+            "NotificationDeepLink: lista del todo risolta → ${_pendingRoute.value}",
+            TAG,
+        )
+    }
+
+    /** Risoluzione fallita (todo mai arrivato in locale, o senza lista). */
+    fun clearPendingTodoId() {
+        _pendingTodoId.value = null
     }
 
     /**

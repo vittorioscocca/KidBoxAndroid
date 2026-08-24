@@ -157,6 +157,7 @@ import it.vittorioscocca.kidbox.util.KBLocale
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.ui.components.FamilyKeyMissingGate
 import it.vittorioscocca.kidbox.ui.components.FamilyKeyMissingDialog
+import it.vittorioscocca.kidbox.ui.permissions.rememberCameraPermissionRequester
 import it.vittorioscocca.kidbox.R
 
 private enum class PhotosTab { LIBRARY, ALBUMS }
@@ -208,6 +209,19 @@ fun FamilyPhotosScreen(
             viewModel.importMedia(uri, state.selectedAlbumId)
         }
     }
+    val requestPhotoCamera = rememberCameraPermissionRequester(
+        onDenied = {
+            Toast.makeText(context, context.getString(R.string.documents_camera_permission_required), Toast.LENGTH_SHORT).show()
+        },
+        onLaunchCamera = {
+            val uri = photosCreateCaptureUri(context) ?: run {
+                Toast.makeText(context, context.getString(R.string.photos_camera_error), Toast.LENGTH_LONG).show()
+                return@rememberCameraPermissionRequester
+            }
+            pendingCaptureUri = uri
+            takePictureLauncher.launch(uri)
+        },
+    )
 
     // Il messaggio della chiave mancante è lungo e va letto: in un Toast
     // verrebbe troncato a due righe. Gli altri errori sono brevi e il Toast va
@@ -305,14 +319,7 @@ fun FamilyPhotosScreen(
                         isAlbumSelectionMode = true
                     }
                 },
-                onCamera = {
-                    val uri = photosCreateCaptureUri(context) ?: run {
-                        Toast.makeText(context, context.getString(R.string.photos_camera_error), Toast.LENGTH_LONG).show()
-                        return@TopHeader
-                    }
-                    pendingCaptureUri = uri
-                    takePictureLauncher.launch(uri)
-                },
+                onCamera = { requestPhotoCamera() },
                 onPlus = {
                     if (currentTab == PhotosTab.ALBUMS) {
                         showCreateAlbum = true
@@ -428,14 +435,7 @@ fun FamilyPhotosScreen(
                         onEmptyPick = {
                             multiMediaPicker.launch(imageAndVideoRequest())
                         },
-                        onEmptyCamera = {
-                            val uri = photosCreateCaptureUri(context) ?: run {
-                                Toast.makeText(context, context.getString(R.string.photos_camera_error), Toast.LENGTH_LONG).show()
-                                return@LibraryContent
-                            }
-                            pendingCaptureUri = uri
-                            takePictureLauncher.launch(uri)
-                        },
+                        onEmptyCamera = { requestPhotoCamera() },
                         onPhotoTap = { photo ->
                             if (isSelectionMode) {
                                 selectedPhotoIds = if (selectedPhotoIds.contains(photo.id)) {

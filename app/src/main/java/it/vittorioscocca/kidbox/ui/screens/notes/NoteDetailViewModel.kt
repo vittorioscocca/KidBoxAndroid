@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 data class NoteDetailUiState(
     val familyId: String = "",
@@ -54,6 +55,13 @@ class NoteDetailViewModel @Inject constructor(
     private var observeJob: Job? = null
     private var boundKey: Triple<String, String, Boolean>? = null
 
+    /**
+     * Scaduta l'attesa della sincronizzazione, si smette di mostrare il
+     * caricamento anche se la nota non è mai arrivata.
+     */
+    private var syncTimeoutJob: Job? = null
+    private var syncWaitExpired = false
+
     fun bind(
         familyId: String,
         noteId: String,
@@ -75,6 +83,42 @@ class NoteDetailViewModel @Inject constructor(
             isLoading = true,
             currentUid = auth.currentUser?.uid.orEmpty(),
         )
+        // Il listener delle note lo avviava SOLO la schermata elenco: arrivando
+        // qui da una notifica quella schermata non viene mai aperta, quindi
+        // nessuno scaricava la nota e l'attesa non sarebbe mai finita. Avviarlo
+        // anche qui è ciò che rende la nota effettivamente recuperabile.
+        // È idempotente: se l'elenco l'ha già agganciato per questa famiglia,
+        // `startRealtime` esce subito.
+        noteRepository.startRealtime(
+            familyId = familyId,
+            onPermissionDenied = {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "Accesso Note negato per questa famiglia",
+                )
+            },
+        )
+        // Aprendo una nota da notifica si arriva PRIMA che la sincronizzazione
+        // l'abbia portata in locale: senza attendere si mostrerebbe un editor
+        // vuoto al posto della nota. Si resta in caricamento finché non arriva,
+        // e l'observer qui sotto la applica appena compare.
+        syncWaitExpired = false
+        syncTimeoutJob?.cancel()
+        syncTimeoutJob = if (isNewRoute) {
+            null
+        } else {
+            viewModelScope.launch {
+                delay(SYNC_WAIT_TIMEOUT_MS)
+                syncWaitExpired = true
+                val cur = _uiState.value
+                if (cur.isLoading) {
+                    _uiState.value = cur.copy(
+                        isLoading = false,
+                        errorMessage = "Nota non disponibile",
+                    )
+                }
+            }
+        }
         observeJob?.cancel()
         observeJob = viewModelScope.launch {
             combine(
@@ -95,8 +139,16 @@ class NoteDetailViewModel @Inject constructor(
             }.collect { (note, pickerMembers) ->
                 val cur = _uiState.value
                 if (note == null) {
-                    _uiState.value = cur.copy(isLoading = false, pickerMembersExcludingSelf = pickerMembers)
+                    // Non ancora sincronizzata: si resta in caricamento invece di
+                    // mostrare un editor vuoto. Per una nota NUOVA l'editor vuoto
+                    // è invece la cosa giusta, e non c'è nulla da attendere.
+                    val stillWaiting = !cur.isNewRoute && !syncWaitExpired
+                    _uiState.value = cur.copy(
+                        isLoading = stillWaiting,
+                        pickerMembersExcludingSelf = pickerMembers,
+                    )
                 } else {
+                    syncTimeoutJob?.cancel()
                     if (cur.isDirty) {
                         _uiState.value = cur.copy(
                             isLoading = false,
@@ -222,3 +274,9 @@ class NoteDetailViewModel @Inject constructor(
         }
     }
 }
+
+/**
+ * Quanto si attende che la sincronizzazione porti una nota aperta da
+ * notifica. Stesso ordine di grandezza dell'attesa dei to-do.
+ */
+private const val SYNC_WAIT_TIMEOUT_MS = 25_000L

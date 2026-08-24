@@ -58,6 +58,30 @@ class PushNotificationManager @Inject constructor(
     }
 
     /**
+     * Rimuove un token dal documento `fcmTokens` di uno specifico utente.
+     *
+     * Usato al cambio account: senza questo il token del dispositivo resta
+     * associato all'utente precedente e, se ancora membro della stessa
+     * famiglia, continua a ricevere le sue notifiche (incluse quelle dei
+     * messaggi che l'utente attuale invia da questo stesso device).
+     * Gemello di `removeFCMToken` su iOS.
+     */
+    suspend fun removeToken(token: String, uid: String) {
+        if (token.isBlank()) return
+        db.collection("users")
+            .document(uid)
+            .collection("fcmTokens")
+            .document(token)
+            .delete()
+            .await()
+    }
+
+    /** Forza la rotazione del token FCM al cambio account. Gemello di `deleteCurrentFCMToken` su iOS. */
+    suspend fun deleteCurrentToken() {
+        FirebaseMessaging.getInstance().deleteToken().await()
+    }
+
+    /**
      * Tutte le preferenze nascono ATTIVE.
      *
      * Non è una scelta di gusto: è il server a decidere se inviare, e la sua

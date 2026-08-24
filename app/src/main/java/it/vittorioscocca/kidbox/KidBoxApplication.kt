@@ -13,6 +13,7 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.messaging.FirebaseMessaging
 import dagger.hilt.android.HiltAndroidApp
 import it.vittorioscocca.kidbox.data.local.ThemePreference
 import it.vittorioscocca.kidbox.data.local.toNightMode
@@ -32,6 +33,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 @HiltAndroidApp
 class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFactory {
@@ -138,26 +140,59 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
     }
 
     /**
-     * Ripersiste il token FCM a ogni sessione autenticata.
+     * Ripersiste il token FCM a ogni sessione autenticata e ne allinea la
+     * proprietà quando cambia l'utente loggato.
      *
-     * Senza questo il token si salva solo in `onNewToken` e al toggle di una
-     * preferenza in Impostazioni. `onNewToken` scatta però *prima* del login al
-     * primo avvio: lì `uid` è null, il token viene scartato e non viene mai più
-     * ritentato, quindi il dispositivo resta invisibile al server per sempre.
+     * Senza la parte di persistenza il token si salva solo in `onNewToken` e
+     * al toggle di una preferenza in Impostazioni. `onNewToken` scatta però
+     * *prima* del login al primo avvio: lì `uid` è null, il token viene
+     * scartato e non viene mai più ritentato, quindi il dispositivo resta
+     * invisibile al server per sempre.
      *
-     * Il listener copre sia l'avvio con sessione già attiva sia il login.
-     * `persistFcmToken` fa `set(merge)` sul documento con id = token, quindi
-     * riscrivere lo stesso token è un no-op idempotente.
+     * Senza la parte di pulizia, al cambio account (es. due membri della
+     * stessa famiglia che si alternano sullo stesso device per test) il
+     * token restava associato all'utente precedente: se quello era ancora
+     * membro della famiglia, il device continuava a ricevere le sue notifiche
+     * — compresa quella dei messaggi che l'utente attuale inviava da questo
+     * stesso telefono, apparendo come "notifica a se stessi".
      *
-     * Gemello di `startAuthStateObserver` su iOS — che in più cancella il token
-     * dell'utente precedente al cambio account. Qui quella pulizia manca
-     * ancora: token vecchi restano finché non falliscono l'invio e vengono
-     * potati lato server.
+     * Gemello di `startAuthStateObserver` su iOS.
      */
     private fun startFcmTokenOwnershipObserver() {
+        var observedUid: String? = FirebaseAuth.getInstance().currentUser?.uid
         FirebaseAuth.getInstance().addAuthStateListener { auth ->
-            if (auth.currentUser == null) return@addAuthStateListener
+            val newUid = auth.currentUser?.uid
+            val oldUid = observedUid
+            if (oldUid == newUid) return@addAuthStateListener
+            observedUid = newUid
+
             appInitScope.launch {
+                val currentToken = runCatching {
+                    FirebaseMessaging.getInstance().token.await()
+                }.getOrNull()
+
+                if (oldUid != null && !currentToken.isNullOrBlank()) {
+                    runCatching { pushNotificationManager.removeToken(currentToken, oldUid) }
+                        .onFailure {
+                            KBLog.app.warning(
+                                "Rimozione token utente precedente fallita: ${it.message}",
+                                "PushToken",
+                            )
+                        }
+                }
+
+                // Forza la rotazione del token così il nuovo utente (se presente)
+                // non eredita lo stesso token già eventualmente visto altrove.
+                runCatching { pushNotificationManager.deleteCurrentToken() }
+                    .onFailure {
+                        KBLog.app.warning(
+                            "Rotazione token al cambio account fallita: ${it.message}",
+                            "PushToken",
+                        )
+                    }
+
+                if (newUid == null) return@launch
+
                 runCatching { pushNotificationManager.registerCurrentFcmToken() }
                     .onFailure {
                         KBLog.app.warning(

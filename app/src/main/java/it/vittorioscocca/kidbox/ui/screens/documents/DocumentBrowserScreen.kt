@@ -135,6 +135,8 @@ import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
+import it.vittorioscocca.kidbox.notifications.AppSection
+import it.vittorioscocca.kidbox.notifications.TrackSectionPresence
 
 private const val TAG_DOC_OPEN = "KB_Doc_Open"
 private sealed interface ContextMenuTarget {
@@ -153,6 +155,7 @@ fun DocumentBrowserScreen(
     viewModel: DocumentsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    TrackSectionPresence(AppSection.DOCUMENTS, familyId)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 

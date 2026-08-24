@@ -50,18 +50,73 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
             ?: remoteMessage.data["deep_link"]
             ?: remoteMessage.data["route"]
             ?: ""
+        // L'utente è già dentro la sezione in cui è appena stato creato il
+        // contenuto: niente notifica e niente badge, lo vede comparire da solo.
+        // Qui si arriva solo con l'app in foreground — in background/killed la
+        // notifica la mostra il sistema e questo codice non gira, ma in quel
+        // caso l'utente per definizione non sta guardando nulla.
+        if (isAlreadyOnScreen(type, remoteMessage.data)) return
         // Le menzioni hanno la stessa forma di un new_chat_message ma con un
         // titolo dedicato per dare priorità visiva al messaggio diretto.
         val senderName = remoteMessage.data["senderName"].orEmpty()
-        val rawTitle = remoteMessage.notification?.title
+        // Tutte le push del server sono ormai messaggi dati puri (niente `notification`,
+        // di proposito: vedi commento su `buildDataOnlyMessage` in functions/index.js),
+        // quindi `remoteMessage.notification` è sempre null — titolo/corpo viaggiano
+        // dentro `data`. Il fallback a `remoteMessage.notification` resta solo per le
+        // poche push non ancora convertite (es. broadcast/nudge).
+        val rawTitle = remoteMessage.data["title"] ?: remoteMessage.notification?.title
         val title = when {
             type == "chat_mention" && senderName.isNotBlank() -> "$senderName ti ha menzionato"
             type == "chat_mention" -> "Sei stato menzionato"
+            // La chat non manda `title`/`body` in chiaro dentro `data`: il titolo va
+            // ricavato dal solo `senderName`.
+            type == "new_chat_message" && senderName.isNotBlank() -> senderName
             !rawTitle.isNullOrBlank() -> rawTitle
             else -> "KidBox"
         }
-        val body = remoteMessage.notification?.body ?: "Nuova notifica"
+        val body = remoteMessage.data["body"]
+            ?: remoteMessage.data["fallbackBody"]
+            ?: remoteMessage.notification?.body
+            ?: "Nuova notifica"
         showNotification(title, body, remoteMessage.data, type)
+    }
+
+    /**
+     * True se la notifica riguarda la sezione che l'utente ha già davanti.
+     *
+     * I to-do sono gli unici con `scoped = true`: stare in una lista non deve
+     * zittire le notifiche delle altre liste, quindi si sopprime solo quando
+     * combacia anche il `listId`.
+     *
+     * I tipi non elencati (promemoria, menzioni di scadenza, annunci) non
+     * vengono mai soppressi: non nascono da qualcosa che stai guardando
+     * comparire, quindi vale la pena mostrarli comunque.
+     */
+    private fun isAlreadyOnScreen(type: String, data: Map<String, String>): Boolean {
+        val familyId = data["familyId"]
+        fun viewing(section: AppSection) =
+            ScreenPresenceTracker.isViewing(section, familyId)
+
+        return when (type) {
+            // Le menzioni si vedono comunque a schermo come i messaggi normali.
+            "new_chat_message", "chat_mention" -> viewing(AppSection.CHAT)
+            "todo_assigned", "todo_reassigned", "todo_due_changed" ->
+                ScreenPresenceTracker.isViewing(
+                    section = AppSection.TODO_LIST,
+                    familyId = familyId,
+                    scopeId = data["listId"],
+                    scoped = true,
+                )
+            "new_grocery_item" -> viewing(AppSection.SHOPPING_LIST)
+            "new_calendar_event", "calendar_event" -> viewing(AppSection.CALENDAR)
+            "new_note" -> viewing(AppSection.NOTES)
+            "new_expense" -> viewing(AppSection.EXPENSES)
+            "new_document" -> viewing(AppSection.DOCUMENTS)
+            "new_wallet_ticket", "new_loyalty_card" -> viewing(AppSection.WALLET)
+            "location_sharing_started", "location_sharing_stopped", "geofenceEvent" ->
+                viewing(AppSection.FAMILY_LOCATION)
+            else -> false
+        }
     }
 
     private fun showNotification(
@@ -73,7 +128,16 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
         ensureChannel()
         val unreadCount = NotificationBadgeStore.increment(this)
         val deepLinkIntent = Intent(this, MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            // NEW_TASK è necessario perché il tap parte dal system tray, un contesto
+            // non-Activity: senza, con l'app in background Android a volte apre un
+            // SECONDO task con una MainActivity nuova invece di riportare avanti quello
+            // esistente — sembra un riavvio completo dell'app e l'intent, finendo in una
+            // istanza mai esistita prima, non passa da onNewIntent quindi non naviga.
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP,
+            )
             putExtra("push_type", type)
             putExtra("push_family_id", data["familyId"])
             putExtra("push_child_id", data["childId"])
@@ -89,6 +153,7 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
             putExtra("push_exam_id", data["examId"])
             putExtra("push_entry_id", data["entryId"])
             putExtra("ticketId", data["ticketId"])
+            putExtra("cardId", data["cardId"])
             putExtra("push_deep_link", data["deep_link"] ?: data["route"])
             putExtra("push_message_id", data["messageId"])
             // Annunci dalla console admin: il testo integrale sta in `data`,

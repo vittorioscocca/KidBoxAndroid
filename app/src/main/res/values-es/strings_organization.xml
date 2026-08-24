@@ -3,6 +3,7 @@
     <!-- ============ NOTES ============ -->
     <string name="notes_detail_title">Nota</string>
     <string name="notes_detail_save_cd">Guardar</string>
+    <string name="notes_detail_share_cd">Compartir</string>
     <string name="notes_visibility_section_title">Quién puede ver esta nota</string>
     <string name="notes_visibility_locked_title">Visibilidad bloqueada</string>
     <string name="notes_visibility_locked_message">Solo quien creó la nota puede cambiar su visibilidad.</string>
@@ -22,9 +23,12 @@
     <string name="notes_select_all">Seleccionar todo</string>
     <string name="notes_delete_selection_cd">Eliminar selección</string>
     <string name="notes_loading">Cargando notas…</string>
-    <string name="notes_empty_state">Aún no hay notas. Toca + para crear una.</string>
+    <string name="notes_empty_state_title">Sin notas</string>
+    <string name="notes_empty_state">Crea tu primera nota. Puedes elegir compartirla con toda la familia, con miembros específicos o mantenerla privada. Cada nota está cifrada de extremo a extremo.</string>
+    <string name="notes_new_note_button">Nueva nota</string>
     <string name="notes_no_results">Sin resultados</string>
-    <string name="notes_pin_cd">Fijar</string>
+    <string name="notes_pin_cd">Destacar nota</string>
+    <string name="notes_pin_toast">Nota destacada</string>
     <string name="notes_delete_cd">Eliminar</string>
     <string name="notes_untitled">Sin título</string>
     <string name="notes_no_content">Sin contenido</string>
@@ -51,6 +55,7 @@
     <string name="todo_card_not_completed">Sin completar</string>
     <string name="todo_my_lists_title">Mis listas</string>
     <string name="todo_no_lists">Aún no hay listas</string>
+    <string name="todo_empty_state_body">Crea listas de tareas y asígnalas a un miembro de la familia. Elige si compartirlas con todos, con miembros específicos o mantenerlas privadas. Cada tarea está cifrada de extremo a extremo.</string>
     <string name="todo_new_list_title">Nueva lista</string>
     <string name="todo_edit_list_title">Editar lista</string>
     <string name="todo_list_name_placeholder">Nombre de la lista</string>
@@ -165,4 +170,5 @@
     <string name="calendar_add_event_button">Añadir evento</string>
     <string name="calendar_save_event_button">Guardar evento</string>
     <string name="calendar_visibility_section_title">Quién puede ver este evento</string>
+    <string name="todo_deeplink_opening">Abriendo la tarea…</string>
 </resources>

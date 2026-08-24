@@ -84,6 +84,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import it.vittorioscocca.kidbox.util.KBLocale
+import it.vittorioscocca.kidbox.notifications.AppSection
+import it.vittorioscocca.kidbox.notifications.TrackSectionPresence
 
 @Composable
 fun WalletHomeScreen(
@@ -96,6 +98,7 @@ fun WalletHomeScreen(
     viewModel: WalletViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    TrackSectionPresence(AppSection.WALLET, familyId)
     val snackbarHostState = remember { SnackbarHostState() }
 
     // Copre in un colpo solo le decifrature che qui falliscono in silenzio.

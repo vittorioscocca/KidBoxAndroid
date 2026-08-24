@@ -8,6 +8,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBChatMessageDao
 import it.vittorioscocca.kidbox.data.local.entity.KBChatMessageEntity
 import it.vittorioscocca.kidbox.data.remote.chat.ChatRemoteStore
 import it.vittorioscocca.kidbox.data.remote.chat.ChatStorageService
+import it.vittorioscocca.kidbox.data.user.UserProfileRepository
 import it.vittorioscocca.kidbox.domain.model.KBChatMessage
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
 import java.io.File
@@ -34,6 +35,7 @@ class ChatRepository @Inject constructor(
     private val remoteStore: ChatRemoteStore,
     private val storageService: ChatStorageService,
     private val auth: FirebaseAuth,
+    private val userProfileRepository: UserProfileRepository,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var listener: ListenerRegistration? = null
@@ -131,7 +133,7 @@ class ChatRepository @Inject constructor(
         mentionsJSON: String? = null,
     ): String {
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
-        val senderName = auth.currentUser?.displayName.orEmpty()
+        val senderName = userProfileRepository.canonicalDisplayNameForCurrentUser().orEmpty()
         val now = System.currentTimeMillis()
         val messageId = UUID.randomUUID().toString()
 
@@ -233,7 +235,7 @@ class ChatRepository @Inject constructor(
     ): String {
         require(items.isNotEmpty()) { "sendMediaGroupMessage requires at least one item" }
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
-        val senderName = auth.currentUser?.displayName.orEmpty()
+        val senderName = userProfileRepository.canonicalDisplayNameForCurrentUser().orEmpty()
         val now = System.currentTimeMillis()
         val messageId = UUID.randomUUID().toString()
         val capped = items.take(10)
@@ -317,7 +319,7 @@ class ChatRepository @Inject constructor(
         isTyping: Boolean,
     ) {
         val uid = auth.currentUser?.uid ?: return
-        val displayName = auth.currentUser?.displayName.orEmpty()
+        val displayName = userProfileRepository.canonicalDisplayNameForCurrentUser().orEmpty()
         remoteStore.setTyping(
             isTyping = isTyping,
             familyId = familyId,

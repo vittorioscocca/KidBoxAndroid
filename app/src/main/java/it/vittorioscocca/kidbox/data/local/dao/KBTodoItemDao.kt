@@ -13,6 +13,7 @@ interface KBTodoItemDao {
     @Query("SELECT * FROM kb_todo_items WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): KBTodoItemEntity?
 
+
     @Query("SELECT * FROM kb_todo_items WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 ORDER BY dueAtEpochMillis")
     fun observeByFamilyAndChild(familyId: String, childId: String): Flow<List<KBTodoItemEntity>>
 

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,8 +23,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.List
@@ -104,6 +107,14 @@ fun TodoHomeScreen(
             Spacer(Modifier.height(12.dp))
             Text("To-Do", fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, color = kb.title)
             Spacer(Modifier.height(18.dp))
+
+            if (state.lists.isEmpty()) {
+                TodoEmptyState {
+                    editingListId = null
+                    listNameDraft = ""
+                    showNewList = true
+                }
+            } else {
             Text(stringResource(R.string.todo_overview), fontWeight = FontWeight.SemiBold, fontSize = 24.sp, color = kb.title)
             Spacer(Modifier.height(12.dp))
 
@@ -179,43 +190,40 @@ fun TodoHomeScreen(
             Spacer(Modifier.height(8.dp))
             Text(stringResource(R.string.todo_my_lists), fontWeight = FontWeight.SemiBold, fontSize = 24.sp, color = kb.title)
             Spacer(Modifier.height(12.dp))
-            if (state.lists.isEmpty()) {
-                EmptyCard(stringResource(R.string.todo_no_lists))
-            } else {
-                state.lists.forEach { list ->
-                    Card(
+            state.lists.forEach { list ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 10.dp)
+                        .todoListClickable(
+                            onClick = {
+                                onNavigate(
+                                    AppDestination.TodoList.createRoute(
+                                        familyId = list.familyId,
+                                        childId = list.childId,
+                                        listId = list.id,
+                                    ),
+                                )
+                            },
+                            onLongClick = {
+                                longPressListId = list.id
+                                longPressListName = list.name
+                            },
+                        ),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = kb.card),
+                ) {
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 10.dp)
-                            .todoListClickable(
-                                onClick = {
-                                    onNavigate(
-                                        AppDestination.TodoList.createRoute(
-                                            familyId = list.familyId,
-                                            childId = list.childId,
-                                            listId = list.id,
-                                        ),
-                                    )
-                                },
-                                onLongClick = {
-                                    longPressListId = list.id
-                                    longPressListName = list.name
-                                },
-                            ),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = kb.card),
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(list.name, fontSize = 16.sp, color = kb.title, modifier = Modifier.weight(1f))
-                        }
+                        Text(list.name, fontSize = 16.sp, color = kb.title, modifier = Modifier.weight(1f))
                     }
                 }
             }
+            } // fine else (state.lists non vuota)
             Spacer(Modifier.height(30.dp))
         }
     }
@@ -321,17 +329,62 @@ private fun HeaderCircleButton(
     }
 }
 
+// Stessa struttura dell'empty state Note (NotesEmptyState): icona, titolo,
+// testo descrittivo, pulsante di creazione. Sostituisce l'intera sezione
+// (card "Panoramica" incluse) quando non c'è ancora nessuna lista.
 @Composable
-private fun EmptyCard(text: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
+private fun TodoEmptyState(onNewList: () -> Unit) {
+    val kb = MaterialTheme.kidBoxColors
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(16.dp),
-            color = MaterialTheme.kidBoxColors.subtitle,
+        Icon(
+            imageVector = Icons.Filled.Checklist,
+            contentDescription = null,
+            tint = kb.subtitle,
+            modifier = Modifier.size(52.dp),
         )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.todo_no_lists),
+            color = kb.title,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.todo_empty_state_body),
+            color = kb.subtitle,
+            fontSize = 14.sp,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        Spacer(Modifier.height(20.dp))
+        androidx.compose.material3.Surface(
+            onClick = onNewList,
+            shape = RoundedCornerShape(999.dp),
+            color = Color(0xFF007AFF),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.AddCircle,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.todo_new_list),
+                    color = Color.White,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp,
+                )
+            }
+        }
     }
 }
