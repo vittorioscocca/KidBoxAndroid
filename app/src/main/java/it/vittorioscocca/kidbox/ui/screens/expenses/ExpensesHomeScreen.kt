@@ -52,6 +52,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.LocalGroceryStore
 import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.MenuBook
@@ -121,6 +122,9 @@ import kotlinx.coroutines.withTimeout
 import it.vittorioscocca.kidbox.util.KBLocale
 import it.vittorioscocca.kidbox.notifications.AppSection
 import it.vittorioscocca.kidbox.notifications.TrackSectionPresence
+import it.vittorioscocca.kidbox.ui.components.KBEmptyState
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.ReceiptLong
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -231,6 +235,8 @@ fun ExpensesHomeScreen(
         }
     }
 
+    val hasAnyExpense = state.expenses.isNotEmpty()
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -265,32 +271,36 @@ fun ExpensesHomeScreen(
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.kidBoxColors.title,
             )
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                ExpensePeriod.entries.forEach { p ->
-                    PeriodPill(
-                        label = stringResource(p.labelRes),
-                        selected = state.period == p,
-                        onClick = { viewModel.setPeriod(p) },
-                    )
+            if (hasAnyExpense) {
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    ExpensePeriod.entries.forEach { p ->
+                        PeriodPill(
+                            label = stringResource(p.labelRes),
+                            selected = state.period == p,
+                            onClick = { viewModel.setPeriod(p) },
+                        )
+                    }
                 }
+                Spacer(Modifier.height(12.dp))
+                ExpenseTotalCard(
+                    total = state.totalAmount,
+                    count = state.visibleExpenses.size,
+                )
+                Spacer(Modifier.height(12.dp))
+                MonthlyChartCard(bars = state.monthlyBars)
+                Spacer(Modifier.height(12.dp))
+                CategoryChartCard(slices = state.categorySlices)
             }
             Spacer(Modifier.height(12.dp))
-            ExpenseTotalCard(
-                total = state.totalAmount,
-                count = state.visibleExpenses.size,
-            )
-            Spacer(Modifier.height(12.dp))
-            MonthlyChartCard(bars = state.monthlyBars)
-            Spacer(Modifier.height(12.dp))
-            CategoryChartCard(slices = state.categorySlices)
-            Spacer(Modifier.height(12.dp))
             ExpenseListCard(
+                showChrome = hasAnyExpense,
+                onAddExpense = { showEditor = true },
                 expenses = state.visibleExpenses,
                 categories = state.categories,
                 selecting = isSelectingExpenses,
@@ -596,7 +606,20 @@ private fun ExpenseListCard(
     onToggleExpenseSelection: (KBExpenseEntity) -> Unit,
     onDeleteSelected: () -> Unit,
     onSelect: (KBExpenseEntity) -> Unit,
+    onAddExpense: () -> Unit,
+    showChrome: Boolean,
 ) {
+    if (!showChrome) {
+        KBEmptyState(
+            icon = Icons.Filled.ReceiptLong,
+            title = stringResource(R.string.empty_expenses_title),
+            body = stringResource(R.string.empty_expenses_body),
+            primaryIcon = Icons.Filled.AddCircle,
+            primaryLabel = stringResource(R.string.empty_expenses_action),
+            onPrimary = onAddExpense,
+        )
+        return
+    }
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
@@ -635,7 +658,14 @@ private fun ExpenseListCard(
             }
             Spacer(Modifier.height(10.dp))
             if (expenses.isEmpty()) {
-                Text(stringResource(R.string.expenses_no_expenses_in_period), color = MaterialTheme.kidBoxColors.subtitle)
+                KBEmptyState(
+                    icon = Icons.Filled.ReceiptLong,
+                    title = stringResource(R.string.empty_expenses_title),
+                    body = stringResource(R.string.empty_expenses_body),
+                    primaryIcon = Icons.Filled.AddCircle,
+                    primaryLabel = stringResource(R.string.empty_expenses_action),
+                    onPrimary = onAddExpense,
+                )
             } else {
                 expenses.forEachIndexed { index, expense ->
                     val category = categories.firstOrNull { it.id == expense.categoryId }
@@ -1503,6 +1533,10 @@ private fun categoryIcon(category: KBExpenseCategoryEntity?): androidx.compose.u
     return when {
         raw.contains("cart") || name.contains("spesa") -> Icons.Default.LocalGroceryStore
         raw.contains("house") || name.contains("casa") -> Icons.Default.Home
+        // Prima di "car": l'icona dell'auto è `fuelpump.fill`, ma la regola sotto
+        // intercetta qualunque `raw` contenente "car" e la manderebbe su
+        // DirectionsCar, rendendo le due categorie indistinguibili.
+        raw.contains("fuelpump") || name.contains("automobil") -> Icons.Default.LocalGasStation
         raw.contains("car") || name.contains("trasport") -> Icons.Default.DirectionsCar
         raw.contains("heart") || name.contains("salute") -> Icons.Default.Favorite
         raw.contains("book") || name.contains("istruz") -> Icons.Default.MenuBook

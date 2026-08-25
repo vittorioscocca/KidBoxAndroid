@@ -145,4 +145,10 @@
     <string name="ai_weekly_summary_sub">The family\'s automatic weekly recap</string>
     <string name="ai_quiet_week">A quiet week! No urgent deadlines.</string>
     <string name="ai_open_weekly">Open the weekly recap</string>
+    <string name="chat_media_source_title">Where do you want to pick from?</string>
+    <string name="chat_media_source_gallery">Phone gallery</string>
+    <string name="chat_media_source_kidbox">KidBox Photos &amp; Videos</string>
+    <string name="chat_kidbox_picker_title">Pick from KidBox</string>
+    <string name="chat_kidbox_picker_empty">There are no photos or videos in KidBox yet.</string>
+    <string name="chat_kidbox_picker_send">Send</string>
 </resources>

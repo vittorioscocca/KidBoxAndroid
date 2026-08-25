@@ -38,6 +38,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.AppLanguage
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import it.vittorioscocca.kidbox.ui.components.KBBackButton
 
 private data class LanguageRow(
     val title: String,
@@ -69,6 +70,8 @@ fun LanguageScreen(
             .statusBarsPadding()
             .padding(top = 24.dp, start = 16.dp, end = 16.dp),
     ) {
+        KBBackButton(onClick = onBack)
+        Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = stringResource(R.string.settings_language_title),
             fontSize = 34.sp,

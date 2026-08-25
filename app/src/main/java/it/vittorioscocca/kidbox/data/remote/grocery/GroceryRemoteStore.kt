@@ -6,6 +6,7 @@ import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.SetOptions
 import it.vittorioscocca.kidbox.data.local.entity.KBGroceryItemEntity
 import javax.inject.Inject
@@ -43,50 +44,67 @@ class GroceryRemoteStore @Inject constructor(
         .collection("groceries")
         .document(itemId)
 
+    /**
+     * @param onChange riceve le modifiche e, quando la snapshot arriva dal server,
+     *   l'insieme completo degli id remoti — serve al chiamante per riconciliare
+     *   le righe locali sparite altrove.
+     */
     fun listenGroceries(
         familyId: String,
-        onChange: (List<GroceryRemoteChange>) -> Unit,
+        onChange: (List<GroceryRemoteChange>, Set<String>?) -> Unit,
         onError: (Exception) -> Unit,
     ): ListenerRegistration {
         return db.collection("families")
             .document(familyId)
             .collection("groceries")
             .whereEqualTo("isDeleted", false)
-            .addSnapshotListener { snap, err ->
+            .addSnapshotListener(MetadataChanges.INCLUDE) { snap, err ->
                 if (err != null) {
                     onError(err)
                     return@addSnapshotListener
                 }
                 if (snap == null) return@addSnapshotListener
-                val changes = snap.documentChanges.mapNotNull { diff ->
-                    val doc = diff.document
-                    val d = doc.data
+                // Gli upsert si derivano dal risultato COMPLETO (`snap.documents`),
+                // non dal delta (`snap.documentChanges`): con la persistenza locale
+                // una query può risolversi da cache e farsi confermare "invariata"
+                // dal server via existence filter, senza emettere alcun
+                // document_change. In quel caso il delta è vuoto pur avendo la query
+                // risultati reali, e gli articoli creati sugli altri dispositivi non
+                // arrivavano mai. Stesso fix di TodoRemoteStore. Le rimozioni invece
+                // sul delta sono affidabili.
+                val upserts = snap.documents.mapNotNull { doc ->
+                    val d = doc.data ?: return@mapNotNull null
                     val name = (d["name"] as? String)?.trim().orEmpty()
                     if (name.isEmpty()) return@mapNotNull null
-                    when (diff.type) {
-                        DocumentChange.Type.ADDED,
-                        DocumentChange.Type.MODIFIED,
-                        -> GroceryRemoteChange.Upsert(
-                            GroceryRemoteDto(
-                                id = doc.id,
-                                familyId = familyId,
-                                name = name,
-                                category = (d["category"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
-                                notes = (d["notes"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
-                                isPurchased = d["isPurchased"] as? Boolean ?: false,
-                                isDeleted = d["isDeleted"] as? Boolean ?: false,
-                                purchasedAtEpochMillis = (d["purchasedAt"] as? Timestamp)?.toDate()?.time,
-                                purchasedBy = d["purchasedBy"] as? String,
-                                updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
-                                updatedBy = d["updatedBy"] as? String,
-                                createdBy = d["createdBy"] as? String,
-                            ),
-                        )
-
-                        DocumentChange.Type.REMOVED -> GroceryRemoteChange.Remove(doc.id)
-                    }
+                    GroceryRemoteChange.Upsert(
+                        GroceryRemoteDto(
+                            id = doc.id,
+                            familyId = familyId,
+                            name = name,
+                            category = (d["category"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                            notes = (d["notes"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                            isPurchased = d["isPurchased"] as? Boolean ?: false,
+                            isDeleted = d["isDeleted"] as? Boolean ?: false,
+                            purchasedAtEpochMillis = (d["purchasedAt"] as? Timestamp)?.toDate()?.time,
+                            purchasedBy = d["purchasedBy"] as? String,
+                            updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
+                            updatedBy = d["updatedBy"] as? String,
+                            createdBy = d["createdBy"] as? String,
+                        ),
+                    )
                 }
-                if (changes.isNotEmpty()) onChange(changes)
+                val removes = snap.documentChanges
+                    .filter { it.type == DocumentChange.Type.REMOVED }
+                    .map { GroceryRemoteChange.Remove(it.document.id) }
+                val changes = upserts + removes
+                // `null` da cache: non si riconcilia su una snapshot che potrebbe
+                // essere parziale, si cancellerebbero righe ancora valide.
+                val snapshotIds =
+                    if (snap.metadata.isFromCache) null
+                    else snap.documents.map { it.id }.toSet()
+                if (changes.isNotEmpty() || snapshotIds != null) {
+                    onChange(changes, snapshotIds)
+                }
             }
     }
 

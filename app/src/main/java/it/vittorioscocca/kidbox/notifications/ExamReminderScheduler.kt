@@ -4,7 +4,6 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.domain.model.KBMedicalExam
@@ -15,6 +14,7 @@ import javax.inject.Singleton
 @Singleton
 class ExamReminderScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val alarmRegistry: ReminderAlarmRegistry,
 ) {
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
@@ -27,24 +27,40 @@ class ExamReminderScheduler @Inject constructor(
             append(context.getString(R.string.exam_reminder_body_format, childName, exam.name))
             if (exam.isUrgent) append(context.getString(R.string.exam_reminder_body_urgent_suffix))
         }
-        val pi = buildPendingIntent(exam.id, body, exam.familyId, exam.childId)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt, pi)
-            } else {
-                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt, pi)
-            }
-        } else {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt, pi)
-        }
+        alarmRegistry.arm(
+            ReminderAlarmRegistry.AlarmSpec(
+                key = ReminderAlarmRegistry.examKey(exam.id),
+                target = ReminderAlarmRegistry.Target.HEALTH,
+                requestCode = ("exam:${exam.id}").hashCode(),
+                fireAtMillis = fireAt,
+                action = examAction(exam.id),
+                stringExtras = mapOf(
+                    HealthReminderReceiver.EXTRA_TYPE to HealthReminderReceiver.TYPE_EXAM_REMINDER,
+                    HealthReminderReceiver.EXTRA_EXAM_ID to exam.id,
+                    HealthReminderReceiver.EXTRA_TITLE to body,
+                    HealthReminderReceiver.EXTRA_FAMILY_ID to exam.familyId,
+                    HealthReminderReceiver.EXTRA_CHILD_ID to exam.childId,
+                ),
+            ),
+        )
     }
 
     fun cancelExamReminder(examId: String) {
-        val pi = buildPendingIntent(examId, "", "", "")
+        alarmRegistry.forget(ReminderAlarmRegistry.examKey(examId))
+        val intent = Intent(context, HealthReminderReceiver::class.java).apply {
+            action = examAction(examId)
+        }
+        val pi = PendingIntent.getBroadcast(
+            context,
+            ("exam:$examId").hashCode(),
+            intent,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+        ) ?: return
         alarmManager.cancel(pi)
         pi.cancel()
     }
+
+    private fun examAction(examId: String) = "kb.health.exam_reminder.$examId"
 
     private fun dayBeforeAt9(deadlineMillis: Long): Long =
         Calendar.getInstance().apply {
@@ -56,25 +72,4 @@ class ExamReminderScheduler @Inject constructor(
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
 
-    private fun buildPendingIntent(
-        examId: String,
-        body: String,
-        familyId: String,
-        childId: String,
-    ): PendingIntent {
-        val intent = Intent(context, HealthReminderReceiver::class.java).apply {
-            action = "kb.health.exam_reminder.$examId"
-            putExtra(HealthReminderReceiver.EXTRA_TYPE, HealthReminderReceiver.TYPE_EXAM_REMINDER)
-            putExtra(HealthReminderReceiver.EXTRA_EXAM_ID, examId)
-            putExtra(HealthReminderReceiver.EXTRA_TITLE, body)
-            putExtra(HealthReminderReceiver.EXTRA_FAMILY_ID, familyId)
-            putExtra(HealthReminderReceiver.EXTRA_CHILD_ID, childId)
-        }
-        return PendingIntent.getBroadcast(
-            context,
-            ("exam:$examId").hashCode(),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-    }
 }

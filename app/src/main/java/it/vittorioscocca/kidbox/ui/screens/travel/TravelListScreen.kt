@@ -11,19 +11,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.ui.components.KBSectionHeader
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
@@ -69,6 +65,7 @@ fun TravelListScreen(
         true -> {
             TravelOnboardingScreen(
                 onComplete = { profile -> viewModel.completeOnboarding(profile) },
+                onExit = onNavigateBack,
             )
             return
         }
@@ -78,20 +75,12 @@ fun TravelListScreen(
     Scaffold(
         containerColor = kb.background,
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.travel_title), color = kb.title) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = kb.title)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = kb.background),
+            KBSectionHeader(
+                title = stringResource(R.string.travel_title),
+                onBack = onNavigateBack,
+                onAdd = onOpenWizard,
+                addContentDescription = stringResource(R.string.travel_new_trip),
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = onOpenWizard) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.travel_new_trip))
-            }
         },
     ) { padding ->
         LazyColumn(

@@ -31,4 +31,10 @@ data class KBTodoListEntity(
     val createdAtEpochMillis: Long,
     val updatedAtEpochMillis: Long,
     val isDeleted: Boolean,
+    /**
+     * Chi ha creato la lista. Nullable perché le liste esistenti prima di questo
+     * campo non lo hanno: in quel caso [TodoListExposure] le tratta come
+     * pubbliche, per non farle sparire a chi le usa già.
+     */
+    val createdBy: String? = null,
 )

@@ -90,8 +90,15 @@ sealed class AppDestination(val route: String) {
     data object ShoppingList : AppDestination("shopping_list/{familyId}") {
         fun createRoute(familyId: String): String = "shopping_list/$familyId"
     }
-    data object Calendar : AppDestination("calendar/{familyId}") {
-        fun createRoute(familyId: String): String = "calendar/$familyId"
+    data object Calendar : AppDestination("calendar/{familyId}?openEventId={openEventId}") {
+        /**
+         * @param openEventId evento da aprire subito nel dettaglio, arrivando da
+         *     una notifica. `null` per la normale apertura del calendario.
+         */
+        fun createRoute(familyId: String, openEventId: String? = null): String {
+            val base = "calendar/$familyId"
+            return if (openEventId.isNullOrBlank()) base else "$base?openEventId=$openEventId"
+        }
     }
     data object PediatricChildSelector : AppDestination("pediatric_child_selector/{familyId}") {
         fun createRoute(familyId: String): String = "pediatric_child_selector/$familyId"

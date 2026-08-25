@@ -21,6 +21,7 @@ import javax.inject.Singleton
 @Singleton
 class PasswordExpiryReminderScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val alarmRegistry: ReminderAlarmRegistry,
 ) {
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
@@ -38,22 +39,28 @@ class PasswordExpiryReminderScheduler @Inject constructor(
             val fireAt = nineAmDaysBefore(expiryDayStart, days)
             if (fireAt <= now + 5_000L) return@forEach
 
-            val intent = baseIntent(entryId, familyId, days).apply {
-                putExtra(HealthReminderReceiver.EXTRA_TITLE, "Password in scadenza")
-                putExtra(HealthReminderReceiver.EXTRA_BODY, bodyFor(days, displayTitle, expiresAtEpochMillis))
-            }
-            val pi = PendingIntent.getBroadcast(
-                context,
-                requestCode(entryId, days),
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            alarmRegistry.arm(
+                ReminderAlarmRegistry.AlarmSpec(
+                    key = ReminderAlarmRegistry.passwordExpiryKey(entryId, days),
+                    target = ReminderAlarmRegistry.Target.HEALTH,
+                    requestCode = requestCode(entryId, days),
+                    fireAtMillis = fireAt,
+                    dataUri = alarmUri(entryId, days),
+                    stringExtras = mapOf(
+                        HealthReminderReceiver.EXTRA_TYPE to HealthReminderReceiver.TYPE_PASSWORD_EXPIRY,
+                        HealthReminderReceiver.EXTRA_PASSWORD_ENTRY_ID to entryId,
+                        HealthReminderReceiver.EXTRA_FAMILY_ID to familyId,
+                        HealthReminderReceiver.EXTRA_TITLE to "Password in scadenza",
+                        HealthReminderReceiver.EXTRA_BODY to bodyFor(days, displayTitle, expiresAtEpochMillis),
+                    ),
+                ),
             )
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt, pi)
         }
     }
 
     fun cancel(entryId: String) {
         ALLOWED_OFFSETS.forEach { days ->
+            alarmRegistry.forget(ReminderAlarmRegistry.passwordExpiryKey(entryId, days))
             val intent = baseIntent(entryId, familyId = "", days = days)
             val pi = PendingIntent.getBroadcast(
                 context,
@@ -66,9 +73,11 @@ class PasswordExpiryReminderScheduler @Inject constructor(
         }
     }
 
+    private fun alarmUri(entryId: String, days: Int): String = "kidbox://password-expiry/$entryId/$days"
+
     private fun baseIntent(entryId: String, familyId: String, days: Int): Intent =
         Intent(context, HealthReminderReceiver::class.java).apply {
-            data = Uri.parse("kidbox://password-expiry/$entryId/$days")
+            data = Uri.parse(alarmUri(entryId, days))
             putExtra(HealthReminderReceiver.EXTRA_TYPE, HealthReminderReceiver.TYPE_PASSWORD_EXPIRY)
             putExtra(HealthReminderReceiver.EXTRA_PASSWORD_ENTRY_ID, entryId)
             putExtra(HealthReminderReceiver.EXTRA_FAMILY_ID, familyId)

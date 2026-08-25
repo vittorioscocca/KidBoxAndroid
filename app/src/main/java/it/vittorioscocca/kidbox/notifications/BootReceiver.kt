@@ -29,6 +29,17 @@ class BootReceiver : BroadcastReceiver() {
         val appCtx = context.applicationContext
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
+                // To-do, salute, terapie e Wallet: promemoria *del device*, quindi si
+                // ri-armano dal registro locale e non da Room — rileggere Room
+                // resusciterebbe anche gli elementi arrivati dal sync, che su questo
+                // dispositivo non devono avvisare. Non dipende dalla famiglia attiva,
+                // quindi va prima del guard qui sotto. Vedi [ReminderAlarmRegistry].
+                runCatching {
+                    EntryPointAccessors.fromApplication(appCtx, VehicleReminderEntryPoint::class.java)
+                        .reminderAlarmRegistry()
+                        .restoreAll()
+                }
+
                 val familyId = appCtx.getSharedPreferences("kidbox_prefs", Context.MODE_PRIVATE)
                     .getString("active_family_id", null)
                 if (familyId.isNullOrBlank()) {
@@ -79,7 +90,7 @@ class BootReceiver : BroadcastReceiver() {
                         .geofenceMonitorRestorer()
                         .restore()
                 }
-                KBLog.app.debug("BOOT_COMPLETED — vehicle, house payment, AI briefing, geofence refreshed", "BootReceiver")
+                KBLog.app.debug("BOOT_COMPLETED — veicoli, pagamenti casa, password, AI, geofence e registro promemoria ripristinati", "BootReceiver")
             } finally {
                 pendingResult.finish()
             }

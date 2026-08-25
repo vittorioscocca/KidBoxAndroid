@@ -178,6 +178,9 @@ import java.io.ByteArrayOutputStream
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.ui.components.FamilyKeyMissingGate
 import it.vittorioscocca.kidbox.R
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.ui.text.style.TextAlign
+import it.vittorioscocca.kidbox.ui.components.KBBackButton
 
 /** Quanti item oltre il primo visibile scaldare in cache (direzione di scroll in avanti). */
 private const val PREFETCH_AHEAD = 15
@@ -206,6 +209,8 @@ fun ChatScreen(
     // Unified gallery request: (urls, types, startIndex). Single-media taps produce a 1-item list.
     var galleryRequest by remember { mutableStateOf<Triple<List<String>, List<String>, Int>?>(null) }
     var showAttachmentSheet by remember { mutableStateOf(false) }
+    var showMediaSourceSheet by remember { mutableStateOf(false) }
+    var showKidBoxPicker by remember { mutableStateOf(false) }
     // (Uri, isVideo) items staged for review before sending
     var pendingMedia by remember { mutableStateOf<List<Pair<Uri, Boolean>>>(emptyList()) }
     // True while bytes are being read from the staged URIs (before isSending kicks in).
@@ -659,6 +664,17 @@ fun ChatScreen(
                     }
                 }
 
+                // Con un solo membro in famiglia la chat non ha destinatari: invece di
+                // una schermata vuota mostriamo la spiegazione dei suggerimenti (lampadina
+                // in Home), così è chiaro a cosa serve e cosa manca.
+                if (state.isSoloFamily && state.messages.isEmpty()) {
+                    ChatSoloFamilyHint(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(horizontal = 32.dp),
+                    )
+                }
+
                 // Scroll-to-bottom FAB — extracted to a private composable so
                 // AnimatedVisibility is resolved without any ColumnScope in the implicit
                 // receiver chain (calling it directly inside Column>Box triggers the
@@ -878,6 +894,33 @@ fun ChatScreen(
             },
         )
     }
+    if (showMediaSourceSheet) {
+        MediaSourceSheet(
+            onDismiss = { showMediaSourceSheet = false },
+            onPickPhoneGallery = {
+                showMediaSourceSheet = false
+                galleryMultiPicker.launch(imageAndVideoRequest())
+            },
+            onPickKidBox = {
+                showMediaSourceSheet = false
+                showKidBoxPicker = true
+            },
+        )
+    }
+    if (showKidBoxPicker) {
+        KidBoxMediaPickerSheet(
+            familyId = state.familyId,
+            onDismiss = { showKidBoxPicker = false },
+            onConfirm = { photoIds ->
+                showKidBoxPicker = false
+                // Stessa coda della galleria: il tetto di 10 vale sul totale,
+                // non per sorgente.
+                scope.launch {
+                    pendingMedia = (pendingMedia + viewModel.resolveKidBoxMedia(photoIds)).take(10)
+                }
+            },
+        )
+    }
     if (showAttachmentSheet) {
         ComposerAttachmentSheet(
             onDismiss = { showAttachmentSheet = false },
@@ -885,17 +928,9 @@ fun ChatScreen(
                 showAttachmentSheet = false
                 requestCameraCapture()
             },
-            onPickImage = {
-                showAttachmentSheet = false
-                galleryMultiPicker.launch(singleImageRequest())
-            },
-            onPickVideo = {
-                showAttachmentSheet = false
-                galleryMultiPicker.launch(videoOnlyRequest())
-            },
             onPickMediaGroup = {
                 showAttachmentSheet = false
-                galleryMultiPicker.launch(imageAndVideoRequest())
+                showMediaSourceSheet = true
             },
             onPickDocument = {
                 showAttachmentSheet = false
@@ -990,14 +1025,17 @@ private fun Header(
             .padding(start = 4.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Back / close
-        IconButton(onClick = if (isSearchActive) onSearchToggle else onBack) {
-            Icon(
-                imageVector = if (isSearchActive) Icons.Default.Close
-                              else Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = if (isSearchActive) stringResource(R.string.chat_close_search) else "Indietro",
-                tint = MaterialTheme.kidBoxColors.title,
-            )
+        // Back / close — fuori dalla ricerca è lo stesso tondo delle altre sezioni.
+        if (isSearchActive) {
+            IconButton(onClick = onSearchToggle) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = stringResource(R.string.chat_close_search),
+                    tint = MaterialTheme.kidBoxColors.title,
+                )
+            }
+        } else {
+            KBBackButton(onClick = onBack, modifier = Modifier.padding(horizontal = 4.dp))
         }
 
         if (isSearchActive) {
@@ -1180,10 +1218,17 @@ private fun ReplyComposerBar(
     // Il testo del composer viene raccolto qui, non in ChatScreen: così digitare ricompone
     // solo la barra di input invece dell'intera schermata.
     val inputText by inputTextFlow.collectAsStateWithLifecycle()
+    // Barra disattivata (famiglia con un solo membro): niente fascia «card»
+    // bianca staccata, si fonde con lo sfondo della pagina che porta il messaggio.
+    val composerBackground = if (state.isSoloFamily) {
+        MaterialTheme.kidBoxColors.background
+    } else {
+        MaterialTheme.kidBoxColors.card
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.kidBoxColors.card)
+            .background(composerBackground)
             .padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
         AnimatedVisibility(
@@ -1384,6 +1429,10 @@ private fun ReplyComposerBar(
             onResumeRecording = onResumeRecording,
             mentionCandidates = mentionCandidates,
             onMentionPicked = onMentionPicked,
+            // Con un solo membro in famiglia non c'è nessun destinatario: la barra
+            // resta visibile ma inerte, in coerenza col messaggio mostrato sopra.
+            enabled = !state.isSoloFamily,
+            containerColor = composerBackground,
         )
     }
 }
@@ -1392,8 +1441,6 @@ private fun ReplyComposerBar(
 private fun ComposerAttachmentSheet(
     onDismiss: () -> Unit,
     onPickCamera: () -> Unit,
-    onPickImage: () -> Unit,
-    onPickVideo: () -> Unit,
     onPickMediaGroup: () -> Unit,
     onPickDocument: () -> Unit,
     onPickLocation: () -> Unit,
@@ -1417,18 +1464,6 @@ private fun ComposerAttachmentSheet(
                 text = stringResource(R.string.chat_camera),
                 textColor = MaterialTheme.kidBoxColors.title,
                 onClick = onPickCamera,
-            )
-            ActionSheetRow(
-                icon = Icons.Default.Image,
-                text = stringResource(R.string.chat_photos_max),
-                textColor = MaterialTheme.kidBoxColors.title,
-                onClick = onPickImage,
-            )
-            ActionSheetRow(
-                icon = Icons.Default.VideoFile,
-                text = stringResource(R.string.chat_videos_max),
-                textColor = MaterialTheme.kidBoxColors.title,
-                onClick = onPickVideo,
             )
             ActionSheetRow(
                 icon = Icons.Default.Image,
@@ -2262,4 +2297,39 @@ private tailrec fun android.content.Context.findActivity(): Activity? = when (th
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
+}
+
+/**
+ * Messaggio mostrato quando la famiglia ha un solo membro: stesso testo del
+ * suggerimento «Chat» della lampadina in Home.
+ */
+@Composable
+private fun ChatSoloFamilyHint(modifier: Modifier = Modifier) {
+    val kb = MaterialTheme.kidBoxColors
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.Chat,
+            contentDescription = null,
+            tint = kb.subtitle,
+            modifier = Modifier.size(52.dp),
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.chat_solo_family_title),
+            color = kb.title,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.home_suggestions_chat_body),
+            color = kb.subtitle,
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center,
+        )
+    }
 }

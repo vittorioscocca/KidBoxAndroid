@@ -89,6 +89,7 @@ class TodoHomeViewModel @Inject constructor(
                         listId = list.id,
                         todosForChild = todosInChild,
                         currentUid = uidForVis,
+                        listCreatedBy = list.createdBy,
                     )
                 }
                 val visibleTodos = todos.filter { todo ->

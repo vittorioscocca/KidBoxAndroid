@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox.ui.screens.ai.planning
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -201,6 +202,28 @@ object WeeklySummaryService {
             return if (retry) Result.retry() else Result.failure()
         }
     }
+
+    /**
+     * Annulla l'allarme e il lavoro periodico. Serve al logout: senza questo la
+     * notifica generata per la famiglia precedente continuerebbe ad arrivare.
+     */
+    fun cancelScheduledNotification(context: Context, familyId: String) {
+        val intent = Intent(context, WeeklySummaryBroadcastReceiver::class.java).apply {
+            action = WeeklySummaryBroadcastReceiver.ACTION_WEEKLY_SUMMARY
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            ("weekly:$familyId").hashCode(),
+            intent,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+        )
+        if (pendingIntent != null) {
+            (context.getSystemService(Context.ALARM_SERVICE) as AlarmManager).cancel(pendingIntent)
+            pendingIntent.cancel()
+        }
+        WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
+    }
+
 }
 
 class WeeklySummaryBroadcastReceiver : BroadcastReceiver() {
@@ -254,4 +277,5 @@ class WeeklySummaryBroadcastReceiver : BroadcastReceiver() {
         const val CHANNEL_ID = "kb_weekly_summary"
         const val ACTION_WEEKLY_SUMMARY = "it.vittorioscocca.kidbox.WEEKLY_SUMMARY"
     }
+
 }

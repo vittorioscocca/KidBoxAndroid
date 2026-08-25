@@ -25,6 +25,9 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.data.local.dao.PasswordGroupDao
 
 sealed class PasswordHomeFilter {
     data object All : PasswordHomeFilter()
@@ -76,6 +79,8 @@ data class PasswordsHomeUiState(
     val isSelecting: Boolean = false,
     val selectedIds: Set<String> = emptySet(),
     val securityIssuesCount: Int = 0,
+    /** False finché la famiglia non ha nemmeno una password attiva: la home resta il solo empty state. */
+    val hasAnyPassword: Boolean = false,
 )
 
 @HiltViewModel
@@ -86,6 +91,8 @@ class PasswordsHomeViewModel @Inject constructor(
     private val auth: FirebaseAuth,
     private val securityScanScheduler: SecurityScanScheduler,
     private val securityPreferences: PasswordSecurityPreferences,
+    private val passwordGroupDao: PasswordGroupDao,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     private val familyIdFlow = MutableStateFlow<String?>(null)
@@ -197,6 +204,7 @@ class PasswordsHomeViewModel @Inject constructor(
             isSelecting = selecting,
             selectedIds = selected,
             securityIssuesCount = active.count { (it.pwnedCount ?: 0) > 0 },
+            hasAnyPassword = active.isNotEmpty(),
         )
     }
 
@@ -326,6 +334,19 @@ class PasswordsHomeViewModel @Inject constructor(
         }.getOrElse { "" }
 
     fun bind(familyId: String) {
+        // I gruppi predefiniti li creava solo iOS: su un account nato su Android
+        // la lista gruppi restava vuota. La semina è idempotente e salta quelli
+        // già arrivati via sync, quindi si può invocare a ogni ingresso.
+        viewModelScope.launch {
+            PasswordDefaultGroups.seedIfNeeded(
+                context = appContext,
+                familyId = familyId,
+                uid = auth.currentUser?.uid?.trim().orEmpty(),
+                passwordGroupDao = passwordGroupDao,
+                passwordCypher = passwordCypher,
+                passwordsRepository = passwordsRepository,
+            )
+        }
         viewModelScope.launch {
             if (securityPreferences.weeklyScanEnabled.first()) {
                 securityScanScheduler.enqueueWeekly()

@@ -76,6 +76,17 @@ import java.util.Calendar
 import java.util.Locale
 import kotlinx.coroutines.launch
 import it.vittorioscocca.kidbox.util.KBLocale
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Work
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.AlertDialog
 
 private val PasswordsAccentPurple = Color(0xFF9973D9)
 
@@ -147,6 +158,8 @@ fun AddPasswordScreen(
 
     var showVisibilitySheet by remember { mutableStateOf(false) }
     var showGroupSheet by remember { mutableStateOf(false) }
+    var showNewGroupDialog by remember { mutableStateOf(false) }
+    var newGroupName by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
 
     var saving by remember { mutableStateOf(false) }
@@ -549,6 +562,13 @@ fun AddPasswordScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(selected = selectedGroupId == null, onClick = null)
+                        Icon(
+                            imageVector = passwordGroupIcon("tray"),
+                            contentDescription = null,
+                            tint = parsePasswordGroupColor("#8E8E93"),
+                            modifier = Modifier.size(22.dp),
+                        )
+                        Spacer(Modifier.width(12.dp))
                         Text(stringResource(R.string.passwords_unassigned_group_label), style = MaterialTheme.typography.bodyLarge)
                     }
                 }
@@ -564,11 +584,80 @@ fun AddPasswordScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(selected = selectedGroupId == g.id, onClick = null)
+                        Icon(
+                            imageVector = passwordGroupIcon(g.icon),
+                            contentDescription = null,
+                            tint = parsePasswordGroupColor(g.colorHex),
+                            modifier = Modifier.size(22.dp),
+                        )
+                        Spacer(Modifier.width(12.dp))
                         Text(g.label, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+                // Creare il gruppo senza uscire dal form: prima, se mancava, si
+                // doveva abbandonare la compilazione e ricominciare da capo.
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showGroupSheet = false
+                                newGroupName = ""
+                                showNewGroupDialog = true
+                            }
+                            .padding(horizontal = 20.dp, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            stringResource(R.string.passwords_new_group_action),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
                     }
                 }
             }
         }
+    }
+
+    if (showNewGroupDialog) {
+        AlertDialog(
+            onDismissRequest = { showNewGroupDialog = false },
+            title = { Text(stringResource(R.string.passwords_new_group_dialog_title)) },
+            text = {
+                OutlinedTextField(
+                    value = newGroupName,
+                    onValueChange = { newGroupName = it },
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.passwords_new_group_name_hint)) },
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = newGroupName.isNotBlank(),
+                    onClick = {
+                        val name = newGroupName
+                        showNewGroupDialog = false
+                        scope.launch {
+                            // Il gruppo appena creato viene anche selezionato:
+                            // averlo creato da qui significa volerlo usare adesso.
+                            viewModel.createGroup(name)?.let { selectedGroupId = it }
+                        }
+                    },
+                ) { Text(stringResource(R.string.passwords_ok_button)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewGroupDialog = false }) {
+                    Text(stringResource(R.string.location_cancel_button))
+                }
+            },
+        )
     }
 
     if (showDatePicker) {
@@ -675,3 +764,24 @@ private fun groupLabel(
     if (selectedGroupId == unassigned) return stringResource(R.string.passwords_unassigned_group_label)
     return groups.find { it.id == selectedGroupId }?.label ?: stringResource(R.string.passwords_group_fallback_label)
 }
+
+/**
+ * Traduce il nome icona in stile SF Symbol scritto da iOS nell'equivalente
+ * Material. I gruppi sono condivisi via Firestore, quindi l'icona arriva sempre
+ * nella forma Apple anche quando il gruppo è nato su Android.
+ */
+private fun passwordGroupIcon(raw: String?): ImageVector = when {
+    raw == null -> Icons.Default.Folder
+    raw.startsWith("tray") -> Icons.Default.Inbox
+    raw.startsWith("briefcase") -> Icons.Default.Work
+    raw.startsWith("person") -> Icons.Default.Person
+    raw.startsWith("bubble") -> Icons.Default.Forum
+    raw.startsWith("creditcard") -> Icons.Default.CreditCard
+    raw.startsWith("house") -> Icons.Default.Home
+    else -> Icons.Default.Folder
+}
+
+/** Colore del gruppo; ricade sul viola di default se il valore non è leggibile. */
+private fun parsePasswordGroupColor(hex: String?): Color =
+    runCatching { Color(android.graphics.Color.parseColor(hex ?: "#7C6FDE")) }
+        .getOrDefault(Color(0xFF7C6FDE))

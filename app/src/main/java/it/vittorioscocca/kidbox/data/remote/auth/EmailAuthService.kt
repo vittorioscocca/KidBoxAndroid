@@ -26,6 +26,7 @@ class EmailAuthService @Inject constructor(
      */
     suspend fun registerEmail(email: String, password: String) {
         AppAnalytics.signupStarted(appContext, "email")
+        AppAnalytics.signupMethodSelected(appContext, "email")
         val result = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
         AppAnalytics.signupCompleted(appContext, "email")
         result.user?.sendEmailVerification()?.await()

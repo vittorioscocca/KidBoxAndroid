@@ -137,6 +137,9 @@ import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import it.vittorioscocca.kidbox.notifications.AppSection
 import it.vittorioscocca.kidbox.notifications.TrackSectionPresence
+import it.vittorioscocca.kidbox.ui.components.KBEmptyState
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.FolderOpen
 
 private const val TAG_DOC_OPEN = "KB_Doc_Open"
 private sealed interface ContextMenuTarget {
@@ -287,6 +290,8 @@ fun DocumentBrowserScreen(
         sortDocuments(state.documents, state.sort, state.sortAscending)
     }
     val selectedCount = state.selectedFolderIds.size + state.selectedDocumentIds.size
+    // Cartella vuota: restano solo icona, testo e pulsante dell'empty state.
+    val isEmptyBrowser = sortedFolders.isEmpty() && sortedDocuments.isEmpty()
 
     Box(
         modifier = Modifier
@@ -306,6 +311,7 @@ fun DocumentBrowserScreen(
                 })
                 Spacer(modifier = Modifier.weight(1f))
                 SelectionHeaderPill(
+                    showSelectAction = !isEmptyBrowser,
                     selecting = state.isSelecting,
                     selectedCount = selectedCount,
                     onToggleSelection = { viewModel.toggleSelectionMode() },
@@ -335,6 +341,7 @@ fun DocumentBrowserScreen(
                 color = MaterialTheme.kidBoxColors.title,
             )
 
+            if (!isEmptyBrowser) {
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 ModeButton(
@@ -386,9 +393,20 @@ fun DocumentBrowserScreen(
                     onClick = { viewModel.setSort(DocumentsSort.SIZE) },
                 )
             }
+            }
 
             Spacer(Modifier.height(10.dp))
-            if (state.mode == DocumentsViewMode.GRID) {
+            if (isEmptyBrowser) {
+                KBEmptyState(
+                    modifier = Modifier.fillMaxSize(),
+                    icon = Icons.Filled.FolderOpen,
+                    title = stringResource(R.string.empty_documents_title),
+                    body = stringResource(R.string.empty_documents_body),
+                    primaryIcon = Icons.Filled.AddCircle,
+                    primaryLabel = stringResource(R.string.empty_documents_action),
+                    onPrimary = { showUploadSheet = true },
+                )
+            } else if (state.mode == DocumentsViewMode.GRID) {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
                     modifier = Modifier.fillMaxSize(),
@@ -1078,7 +1096,16 @@ private fun DocumentUploadBottomSheet(
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(stringResource(R.string.documents_add_document_title), fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            Text(
+                stringResource(R.string.documents_add_document_title),
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                // Il foglio è tinto con un colore del tema e non con uno schema
+                // Material: senza colore esplicito il titolo eredita il nero di
+                // default e in tema scuro sparisce. Le voci qui sotto lo
+                // impostavano già, questo era rimasto indietro.
+                color = MaterialTheme.kidBoxColors.title,
+            )
             SheetAction(stringResource(R.string.documents_take_photo), icon = Icons.Default.Image, onClick = onCamera)
             SheetAction(stringResource(R.string.documents_upload_photo), icon = Icons.Default.Image, onClick = onPhotoLibrary)
             SheetAction(stringResource(R.string.documents_upload_file), icon = Icons.Default.Description, onClick = onFile)
@@ -1408,34 +1435,37 @@ private fun SelectionHeaderPill(
     selectedCount: Int,
     onToggleSelection: () -> Unit,
     onAdd: () -> Unit,
+    showSelectAction: Boolean = true,
 ) {
     Surface(
         shape = RoundedCornerShape(999.dp),
         color = MaterialTheme.kidBoxColors.card,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = if (selecting) {
-                    if (selectedCount > 0) {
-                        stringResource(R.string.documents_selection_done_with_count, selectedCount)
+            if (showSelectAction) {
+                Text(
+                    text = if (selecting) {
+                        if (selectedCount > 0) {
+                            stringResource(R.string.documents_selection_done_with_count, selectedCount)
+                        } else {
+                            stringResource(R.string.documents_selection_done)
+                        }
                     } else {
-                        stringResource(R.string.documents_selection_done)
-                    }
-                } else {
-                    stringResource(R.string.documents_selection_select)
-                },
-                modifier = Modifier
-                    .clickable(onClick = onToggleSelection)
-                    .padding(horizontal = 14.dp, vertical = 9.dp),
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.kidBoxColors.title,
-            )
-            Box(
-                modifier = Modifier
-                    .height(26.dp)
-                    .width(1.dp)
-                    .background(MaterialTheme.kidBoxColors.divider),
-            )
+                        stringResource(R.string.documents_selection_select)
+                    },
+                    modifier = Modifier
+                        .clickable(onClick = onToggleSelection)
+                        .padding(horizontal = 14.dp, vertical = 9.dp),
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.kidBoxColors.title,
+                )
+                Box(
+                    modifier = Modifier
+                        .height(26.dp)
+                        .width(1.dp)
+                        .background(MaterialTheme.kidBoxColors.divider),
+                )
+            }
             Icon(
                 imageVector = Icons.Default.Add,
                 contentDescription = stringResource(R.string.documents_add_content_description),
@@ -1582,7 +1612,12 @@ private fun MoveSelectionBottomSheet(
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(title ?: stringResource(R.string.documents_move_items_title), fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            Text(
+                title ?: stringResource(R.string.documents_move_items_title),
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                color = MaterialTheme.kidBoxColors.title,
+            )
             SheetAction(stringResource(R.string.documents_root_folder), icon = Icons.Default.Folder, onClick = { onMoveTo(null) })
             folders.forEach { folder ->
                 SheetAction(folder.title, icon = Icons.Default.Folder, onClick = { onMoveTo(folder.id) })
@@ -1631,6 +1666,7 @@ private fun MergePdfBottomSheet(
                     text = stringResource(R.string.documents_merge_pdf_title),
                     fontWeight = FontWeight.Bold,
                     fontSize = 28.sp,
+                    color = MaterialTheme.kidBoxColors.title,
                     modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
                 )
                 CapsuleActionButton(
@@ -1772,9 +1808,10 @@ private fun UnlockPdfBottomSheet(
                     modifier = Modifier.width(92.dp),
                 )
                 Text(
-                    text = "Sblocca PDF",
+                    text = stringResource(R.string.documents_unlock_pdf_title),
                     fontWeight = FontWeight.Bold,
                     fontSize = 28.sp,
+                    color = MaterialTheme.kidBoxColors.title,
                     modifier = Modifier
                         .weight(1f)
                         .padding(horizontal = 10.dp),

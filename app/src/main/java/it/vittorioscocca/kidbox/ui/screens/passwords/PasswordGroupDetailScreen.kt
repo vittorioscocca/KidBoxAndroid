@@ -85,7 +85,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
-private val IosBg = Color(0xFFF2F2F7)
 
 private data class GroupIconOption(val raw: String, val icon: ImageVector)
 
@@ -145,7 +144,7 @@ fun PasswordGroupDetailScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(IosBg)
+            .background(kb.background)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 6.dp),
@@ -334,13 +333,17 @@ private fun HeaderPill(
         onClick = onClick,
         enabled = enabled,
         shape = RoundedCornerShape(999.dp),
-        color = Color.White,
+        color = MaterialTheme.kidBoxColors.card,
         shadowElevation = 1.dp,
     ) {
         Text(
             text,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 11.dp),
             style = MaterialTheme.typography.titleMedium,
+            // "Annulla" e "Salva": senza colore esplicito restavano neri anche
+            // in tema scuro, perché la Surface è tinta con un colore del tema e
+            // non con uno schema Material che porti con sé un contentColor.
+            color = MaterialTheme.kidBoxColors.title,
         )
     }
 }
@@ -360,7 +363,7 @@ private fun SectionTitle(text: String) {
 private fun RoundedCard(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         shape = RoundedCornerShape(20.dp),
-        color = Color.White,
+        color = MaterialTheme.kidBoxColors.card,
         shadowElevation = 1.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {

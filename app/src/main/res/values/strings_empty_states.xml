@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Schermate di sezione vuota: icona, titolo, testo esplicativo, pulsante. -->
+    <string name="empty_calendar_title">Nessun evento</string>
+    <string name="empty_calendar_body">Segna appuntamenti, impegni e ricorrenze della famiglia. Ogni evento ha una categoria e un colore, così capisci a colpo d\'occhio di chi è la giornata piena.</string>
+    <string name="empty_calendar_action">Nuovo evento</string>
+    <string name="empty_documents_title">Nessun documento</string>
+    <string name="empty_documents_body">Conserva referti, contratti, certificati e ricevute in un posto solo, organizzati in cartelle. I file sono cifrati end-to-end: solo la tua famiglia può aprirli.</string>
+    <string name="empty_documents_action">Aggiungi documento</string>
+    <string name="empty_expenses_title">Nessuna spesa</string>
+    <string name="empty_expenses_body">Tieni traccia di quanto esce e per cosa, diviso per categoria. Vedi subito l\'andamento del mese e chi ha pagato che cosa.</string>
+    <string name="empty_expenses_action">Nuova spesa</string>
+    <string name="empty_grocery_title">Lista vuota</string>
+    <string name="empty_grocery_body">Aggiungi quello che manca e spuntalo mentre sei al supermercato. La lista è condivisa: se qualcuno prende il latte, lo vedi sparire dal tuo telefono.</string>
+    <string name="empty_grocery_action">Aggiungi articolo</string>
+    <string name="empty_homeitems_title">Casa è ancora vuota</string>
+    <string name="empty_homeitems_body">Registra elettrodomestici, garanzie e manutenzioni, e tieni sotto controllo le scadenze ricorrenti come affitto, bollette e condominio.</string>
+    <string name="empty_homeitems_action">Nuovo elemento</string>
+    <string name="empty_homeitems_action_secondary">Nuova scadenza</string>
+    <string name="empty_passwords_title">Nessuna password</string>
+    <string name="empty_passwords_body">Salva le credenziali di casa e condividile solo con chi decidi tu. Tutto è cifrato end-to-end e KidBox può compilarle per te nelle app e sul web.</string>
+    <string name="empty_passwords_action">Nuova password</string>
+    <string name="empty_pets_title">Nessun animale</string>
+    <string name="empty_pets_body">Aggiungi cani, gatti e tutti gli altri di casa: libretto sanitario, vaccini, terapie e visite dal veterinario, sempre a portata di mano.</string>
+    <string name="empty_pets_action">Aggiungi animale</string>
+    <string name="empty_photos_title">Nessuna foto</string>
+    <string name="empty_photos_body">Raccogli le foto e i video di famiglia in album condivisi, senza affidarli a un social. Tutto è cifrato end-to-end e resta solo tra voi.</string>
+    <string name="empty_photos_action">Aggiungi foto</string>
+    <string name="empty_vehicles_title">Nessun veicolo</string>
+    <string name="empty_vehicles_body">Aggiungi auto, moto e bici: assicurazione, revisione, bollo e tagliando in un colpo d\'occhio, con il promemoria prima di ogni scadenza.</string>
+    <string name="empty_vehicles_action">Aggiungi veicolo</string>
+    <string name="empty_wallet_tickets_title">Nessun biglietto</string>
+    <string name="empty_wallet_tickets_body">Salva biglietti di viaggio, concerti e cinema: li ritrovi qui anche offline, con il promemoria che arriva prima della partenza. Tutto cifrato end-to-end.</string>
+    <string name="empty_wallet_tickets_action">Aggiungi biglietto</string>
+    <string name="empty_wallet_documents_title">Nessun documento</string>
+    <string name="empty_wallet_documents_body">Carta d\'identità, patente, tessera sanitaria e passaporto di tutta la famiglia, sempre con te. Cifrati end-to-end, con l\'avviso prima della scadenza.</string>
+    <string name="empty_wallet_documents_action">Aggiungi documento</string>
+    <string name="empty_loyalty_title">Nessuna carta</string>
+    <string name="empty_loyalty_body">Raccogli le carte fedeltà dei negozi e mostra il codice a barre alla cassa, senza portarti dietro il portafoglio. Le foto delle carte sono cifrate end-to-end.</string>
+    <string name="empty_loyalty_action">Aggiungi carta</string>
+</resources>

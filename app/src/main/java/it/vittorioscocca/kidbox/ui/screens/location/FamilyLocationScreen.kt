@@ -103,7 +103,10 @@ fun FamilyLocationScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     TrackSectionPresence(AppSection.FAMILY_LOCATION, familyId)
     val context = LocalContext.current
-    val isDarkTheme = isSystemInDarkTheme()
+    // Il tema DELL'APP, non quello di sistema: con `isSystemInDarkTheme()` una
+    // preferenza "chiaro" scelta in Impostazioni veniva ignorata dalla mappa, che
+    // restava scura dentro una schermata chiara (e viceversa).
+    val isDarkTheme = MaterialTheme.kidBoxColors.isDark
     val darkMapStyle = remember(isDarkTheme, context) {
         if (!isDarkTheme) {
             null
@@ -284,7 +287,10 @@ fun FamilyLocationScreen(
                 .statusBarsPadding()
                 .align(Alignment.TopCenter)
                 .padding(top = 16.dp),
-            color = Color.Black,
+            // Il titolo galleggia sulla mappa, che in tema scuro usa lo stile
+            // scuro: lasciarlo nero lo rendeva illeggibile. `title` è bianco in
+            // scuro e quasi nero in chiaro, quindi segue la mappa in entrambi.
+            color = MaterialTheme.kidBoxColors.title,
             fontSize = 34.sp,
             fontWeight = FontWeight.ExtraBold,
         )
@@ -1032,7 +1038,13 @@ private fun ShareActionButton(
 @Composable
 private fun KBSharedLocationEntity.statusSnippet(): String {
     if (modeRaw == LocationShareMode.TEMPORARY.raw && expiresAtEpochMillis != null) {
-        return "Temporaneamente fino alle ${formatHour(expiresAtEpochMillis)}"
+        // Descrive un ALTRO membro sul marker della mappa, quindi non si può
+        // riusare `location_sharing_temporary_until`, che è in prima persona
+        // ("Stai condividendo…") ed è pensata per il proprio stato.
+        return stringResource(
+            R.string.location_temporary_until_short,
+            formatHour(expiresAtEpochMillis),
+        )
     }
     return stringResource(R.string.location_realtime_option)
 }

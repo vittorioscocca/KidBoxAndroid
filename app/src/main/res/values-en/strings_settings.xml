@@ -12,8 +12,8 @@
     <string name="settings_row_privacy">Privacy</string>
     <string name="settings_row_privacy_sub">Crash reports and technical logs</string>
     <string name="settings_row_storage">Storage usage</string>
-    <string name="settings_row_autofill">Autofill</string>
-    <string name="settings_row_autofill_sub">Passwords, biometrics, system services</string>
+    <string name="settings_row_autofill">Password</string>
+    <string name="settings_row_autofill_sub">AutoFill and automatic filling</string>
     <string name="settings_row_support">Help &amp; Support</string>
     <string name="settings_row_support_sub">Questions, issues and feedback</string>
     <string name="settings_row_guide">User guide</string>
@@ -157,7 +157,7 @@
     <string name="settings_join_invalid_qr">This QR code isn’t a valid KidBox invite.</string>
     <string name="settings_join_frame_qr">Point at the QR code</string>
     <string name="settings_family_title">Family</string>
-    <string name="settings_family_intro">Manage your family and invite the other parent here.</string>
+    <string name="settings_family_intro">KidBox works best when the whole family is on board: as soon as you invite the other parent, calendar, expenses, lists, documents and chat update for everyone in real time. On your own you only see half of the picture.</string>
     <string name="settings_family_none">No family set up</string>
     <string name="settings_family_create">Create a family</string>
     <string name="settings_family_configure">Set up your family</string>

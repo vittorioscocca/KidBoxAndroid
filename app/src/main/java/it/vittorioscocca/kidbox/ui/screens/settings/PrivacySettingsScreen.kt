@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.sp
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.components.KBBackButton
+import androidx.compose.foundation.layout.width
 
 @Composable
 fun PrivacySettingsScreen(onBack: () -> Unit) {
@@ -44,25 +46,20 @@ fun PrivacySettingsScreen(onBack: () -> Unit) {
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.settings_common_back),
-                    tint = kb.title,
-                )
-            }
+            KBBackButton(onClick = onBack)
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = stringResource(R.string.settings_privacy_title),
-                fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontSize = 34.sp,
+                fontWeight = FontWeight.ExtraBold,
                 color = kb.title,
             )
+            Spacer(modifier = Modifier.height(4.dp))
         }
 
         Column(

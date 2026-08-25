@@ -4,7 +4,6 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
@@ -55,6 +54,7 @@ class WalletReminderScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
     private val walletTicketDao: WalletTicketDao,
     private val auth: FirebaseAuth,
+    private val alarmRegistry: ReminderAlarmRegistry,
 ) {
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
@@ -74,22 +74,22 @@ class WalletReminderScheduler @Inject constructor(
                 if (fireAt <= now) continue
                 val title = t.title.ifBlank { "Biglietto" }
                 val body = "Tra poco: $title"
-                val pi = buildPendingIntent(
-                    ticketId = t.id,
-                    offsetMinutes = offsetMinutes,
-                    familyId = familyId,
-                    title = title,
-                    body = body,
+                alarmRegistry.arm(
+                    ReminderAlarmRegistry.AlarmSpec(
+                        key = ReminderAlarmRegistry.walletTicketKey(t.id, offsetMinutes),
+                        target = ReminderAlarmRegistry.Target.HEALTH,
+                        requestCode = ("wallet:${t.id}:$offsetMinutes").hashCode(),
+                        fireAtMillis = fireAt,
+                        action = ticketAction(t.id, offsetMinutes),
+                        stringExtras = mapOf(
+                            HealthReminderReceiver.EXTRA_TYPE to HealthReminderReceiver.TYPE_WALLET_REMINDER,
+                            HealthReminderReceiver.EXTRA_WALLET_TICKET_ID to t.id,
+                            HealthReminderReceiver.EXTRA_FAMILY_ID to familyId,
+                            HealthReminderReceiver.EXTRA_TITLE to title,
+                            HealthReminderReceiver.EXTRA_BODY to body,
+                        ),
+                    ),
                 )
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (alarmManager.canScheduleExactAlarms()) {
-                        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt, pi)
-                    } else {
-                        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt, pi)
-                    }
-                } else {
-                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt, pi)
-                }
             }
         }
     }
@@ -110,32 +110,22 @@ class WalletReminderScheduler @Inject constructor(
 
     fun cancelTicket(ticketId: String) {
         for (offsetMinutes in ALL_POSSIBLE_OFFSETS_MINUTES) {
-            val pi = buildPendingIntent(ticketId, offsetMinutes, "", "", "")
+            alarmRegistry.forget(ReminderAlarmRegistry.walletTicketKey(ticketId, offsetMinutes))
+            val intent = Intent(context, HealthReminderReceiver::class.java).apply {
+                action = ticketAction(ticketId, offsetMinutes)
+            }
+            val pi = PendingIntent.getBroadcast(
+                context,
+                ("wallet:$ticketId:$offsetMinutes").hashCode(),
+                intent,
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+            ) ?: continue
             alarmManager.cancel(pi)
             pi.cancel()
         }
     }
 
-    private fun buildPendingIntent(
-        ticketId: String,
-        offsetMinutes: Long,
-        familyId: String,
-        title: String,
-        body: String,
-    ): PendingIntent {
-        val intent = Intent(context, HealthReminderReceiver::class.java).apply {
-            action = "kb.wallet.reminder.$ticketId.$offsetMinutes"
-            putExtra(HealthReminderReceiver.EXTRA_TYPE, HealthReminderReceiver.TYPE_WALLET_REMINDER)
-            putExtra(HealthReminderReceiver.EXTRA_WALLET_TICKET_ID, ticketId)
-            putExtra(HealthReminderReceiver.EXTRA_FAMILY_ID, familyId)
-            putExtra(HealthReminderReceiver.EXTRA_TITLE, title)
-            putExtra(HealthReminderReceiver.EXTRA_BODY, body)
-        }
-        return PendingIntent.getBroadcast(
-            context,
-            ("wallet:$ticketId:$offsetMinutes").hashCode(),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-    }
+    private fun ticketAction(ticketId: String, offsetMinutes: Long) =
+        "kb.wallet.reminder.$ticketId.$offsetMinutes"
+
 }

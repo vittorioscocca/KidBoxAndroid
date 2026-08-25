@@ -87,9 +87,15 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import kotlinx.coroutines.launch
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsEntryPoint
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
+import it.vittorioscocca.kidbox.ui.components.KBEmptyState
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.Lock
 
 /** Tint allineato a iOS `KBTheme` per chip attivi e FAB password. */
 private val PasswordsAccentPurple = Color(0xFF9973D9)
+
+/** Blu del pulsante «Nuova Password» dell'empty state (KBEmptyState ACCENT): il «+» usa lo stesso. */
+private val PasswordsAddButtonBlue = Color(0xFF007AFF)
 
 /** FAB 56dp + margine: senza questo il + copre l’ultima riga in fondo alla lista. */
 private val PasswordsHomeListFabClearance = 72.dp
@@ -250,6 +256,9 @@ fun PasswordsHomeScreen(
                 color = kb.title,
             )
 
+            // Senza nemmeno una password i filtri non filtrano nulla: nella schermata
+            // iniziale restano solo testo, icona e pulsante.
+            if (state.hasAnyPassword) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -299,6 +308,7 @@ fun PasswordsHomeScreen(
                     )
                 }
             }
+            }
 
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 val hasNoRows = state.sections.isEmpty() ||
@@ -308,6 +318,7 @@ fun PasswordsHomeScreen(
                         filter = state.filter,
                         searchQuery = state.searchQuery,
                         kb = kb,
+                        onAddPassword = { onAddPassword?.invoke() },
                     )
                     else -> {
                         val listBottomExtra = if (state.isSelecting) 0.dp else PasswordsHomeListFabClearance
@@ -431,9 +442,9 @@ fun PasswordsHomeScreen(
                 Surface(
                     modifier = Modifier
                         .size(56.dp)
-                        .shadow(10.dp, CircleShape, ambientColor = PasswordsAccentPurple.copy(alpha = 0.35f)),
+                        .shadow(10.dp, CircleShape, ambientColor = PasswordsAddButtonBlue.copy(alpha = 0.35f)),
                     shape = CircleShape,
-                    color = PasswordsAccentPurple,
+                    color = PasswordsAddButtonBlue,
                     onClick = {
                         val add = onAddPassword
                         if (add != null) {
@@ -790,7 +801,25 @@ private fun PasswordsEmptyState(
     filter: PasswordHomeFilter,
     searchQuery: String,
     kb: KidBoxColorScheme,
+    onAddPassword: () -> Unit,
 ) {
+    // Solo la sezione davvero vuota merita il messaggio di benvenuto col
+    // pulsante: filtri e ricerca senza risultati sono un'altra cosa e tengono
+    // il messaggio breve di prima.
+    if (searchQuery.isBlank() && filter !is PasswordHomeFilter.Favorites &&
+        filter !is PasswordHomeFilter.FamilyShared && filter !is PasswordHomeFilter.OnlyMineVisibility
+    ) {
+        KBEmptyState(
+            modifier = Modifier.fillMaxSize(),
+            icon = Icons.Filled.Lock,
+            title = stringResource(R.string.empty_passwords_title),
+            body = stringResource(R.string.empty_passwords_body),
+            primaryIcon = Icons.Filled.AddCircle,
+            primaryLabel = stringResource(R.string.empty_passwords_action),
+            onPrimary = onAddPassword,
+        )
+        return
+    }
     val title = when {
         searchQuery.isNotBlank() -> stringResource(R.string.passwords_empty_no_results)
         filter is PasswordHomeFilter.Favorites -> stringResource(R.string.passwords_empty_no_favorites)

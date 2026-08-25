@@ -222,8 +222,13 @@ object NotificationDeepLinkRouter {
             }
             "new_calendar_event",
             "calendar_event" -> {
+                KBAnalyticsOrigin.set(KBAnalyticsEntryPoint.NOTIFICATION)
+                // Con l'id si apre direttamente il dettaglio dell'evento appena
+                // creato; senza, resta la vista mese.
+                val eventId = intent.getStringExtra("push_event_id")
+                    ?: intent.getStringExtra("eventId")
                 queueFamilyAwareRoute(resolvedType, familyId) { fid ->
-                    AppDestination.Calendar.createRoute(fid)
+                    AppDestination.Calendar.createRoute(fid, openEventId = eventId)
                 }
             }
             "visit_reminder" -> {

@@ -57,6 +57,7 @@ import it.vittorioscocca.kidbox.data.local.AppTheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.components.KBBackButton
 
 private data class SettingRowItem(
     val title: String,
@@ -140,18 +141,20 @@ fun SettingsScreen(
             showChevron = true,
             onClick = onPrivacySettings,
         ),
-        SettingRowItem(
-            title = stringResource(R.string.settings_row_storage),
-            icon = Icons.Filled.Storage,
-            showChevron = true,
-            onClick = onStorageUsage,
-        ),
+        // Subito dopo Privacy, come su iOS: le due voci trattano entrambe la
+        // protezione dei dati e vanno lette una di seguito all'altra.
         SettingRowItem(
             title = stringResource(R.string.settings_row_autofill),
             subtitle = stringResource(R.string.settings_row_autofill_sub),
             icon = Icons.Filled.Key,
             showChevron = true,
             onClick = onAutoFillSettings,
+        ),
+        SettingRowItem(
+            title = stringResource(R.string.settings_row_storage),
+            icon = Icons.Filled.Storage,
+            showChevron = true,
+            onClick = onStorageUsage,
         ),
         SettingRowItem(
             title = stringResource(R.string.settings_row_support),
@@ -176,6 +179,8 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState())
             .padding(top = 24.dp, start = 16.dp, end = 16.dp),
     ) {
+        KBBackButton(onClick = onBack)
+        Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = stringResource(R.string.settings_title),
             fontSize = 34.sp,

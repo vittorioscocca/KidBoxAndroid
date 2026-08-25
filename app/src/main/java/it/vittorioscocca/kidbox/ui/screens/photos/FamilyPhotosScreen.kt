@@ -159,6 +159,10 @@ import it.vittorioscocca.kidbox.ui.components.FamilyKeyMissingGate
 import it.vittorioscocca.kidbox.ui.components.FamilyKeyMissingDialog
 import it.vittorioscocca.kidbox.ui.permissions.rememberCameraPermissionRequester
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.components.KBEmptyState
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.PhotoCamera
 
 private enum class PhotosTab { LIBRARY, ALBUMS }
 private enum class PhotoGrouping(@androidx.annotation.StringRes val labelRes: Int) {
@@ -1721,63 +1725,19 @@ private fun EmptyLibraryState(
     onPick: () -> Unit,
     onCamera: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(top = 40.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top,
-    ) {
-        Text(
-            text = stringResource(R.string.photos_none),
-            color = MaterialTheme.kidBoxColors.title,
-            fontWeight = FontWeight.Bold,
-            fontSize = 30.sp,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.photos_none_hint),
-            color = MaterialTheme.kidBoxColors.subtitle,
-            fontSize = 14.sp,
-        )
-        Spacer(Modifier.height(24.dp))
-        Surface(
-            onClick = onPick,
-            shape = RoundedCornerShape(999.dp),
-            color = Color(0xFFFF2D6F),
-        ) {
-            Text(
-                text = stringResource(R.string.photos_add_media),
-                color = Color.White,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
-            )
-        }
-        Spacer(Modifier.height(12.dp))
-        Surface(
-            onClick = onCamera,
-            shape = RoundedCornerShape(999.dp),
-            color = Color(0xFFFF2D6F).copy(alpha = 0.15f),
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.CameraAlt,
-                    contentDescription = null,
-                    tint = Color(0xFFFF2D6F),
-                    modifier = Modifier.size(16.dp),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = stringResource(R.string.photos_take_photo),
-                    color = Color(0xFFFF2D6F),
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
-    }
+    KBEmptyState(
+        modifier = Modifier.fillMaxSize(),
+        icon = Icons.Filled.PhotoLibrary,
+        title = stringResource(R.string.empty_photos_title),
+        body = stringResource(R.string.empty_photos_body),
+        primaryIcon = Icons.Filled.AddCircle,
+        primaryLabel = stringResource(R.string.empty_photos_action),
+        accent = Color(0xFFFF2D6F),
+        onPrimary = onPick,
+        secondaryIcon = Icons.Filled.PhotoCamera,
+        secondaryLabel = stringResource(R.string.photos_take_photo),
+        onSecondary = onCamera,
+    )
 }
 
 @Composable

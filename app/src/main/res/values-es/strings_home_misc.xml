@@ -172,6 +172,7 @@
     <!-- ═══ home: SuggestionsScreen ═══ -->
     <string name="home_suggestions_title">Sugerencias</string>
     <string name="home_suggestions_chat_body">Chatea con tu familia en tiempo real: texto, fotos, audio, vídeo y reacciones. Las conversaciones están cifradas de extremo a extremo y cada miembro ve los mensajes nuevos al instante.</string>
+    <string name="chat_solo_family_title">Invita a tu familia para empezar</string>
     <string name="home_suggestions_notes_body">Escribe notas libres o con formato (negrita, cursiva, listas) y decide si compartirlas con toda la familia o guardarlas solo para ti.</string>
     <string name="home_suggestions_todo_body">Crea listas de tareas y asígnalas a un miembro de la familia. Cuando alguien marca una tarea, todos la ven actualizada al instante.</string>
     <string name="home_suggestions_shopping_body">La lista de la compra se comparte en tiempo real: si un familiar marca un producto en el súper, tú lo ves al momento. Los productos se organizan por categoría para hacer la compra más rápido.</string>
@@ -279,4 +280,7 @@
     <string name="onboarding_step_grocery">Añade algo a la lista de la compra</string>
     <string name="suggestions_go">Ir</string>
     <string name="suggestions_close">Cerrar</string>
+    <string name="home_profile_remove_photo">Quitar foto</string>
+    <string name="home_profile_remove_photo_title">¿Quitar la foto de perfil?</string>
+    <string name="home_profile_remove_photo_message">La foto se quitará de inmediato, también para los demás miembros de la familia.</string>
 </resources>

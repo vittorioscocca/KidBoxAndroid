@@ -413,6 +413,9 @@ class ExpenseRepository @Inject constructor(
             DefaultExpenseCategory("spesa", "Spesa", "cart.fill", "#4CAF50"),
             DefaultExpenseCategory("casa", "Casa", "house.fill", "#2196F3"),
             DefaultExpenseCategory("trasporti", "Trasporti", "car.fill", "#FF9800"),
+            // Distinta da "Trasporti" (biglietti, mezzi pubblici): qui vanno i
+            // costi dell'auto — carburante, assicurazione, manutenzione.
+            DefaultExpenseCategory("automobile", "Automobile", "fuelpump.fill", "#D32F2F"),
             DefaultExpenseCategory("salute", "Salute", "heart.fill", "#E91E63"),
             DefaultExpenseCategory("istruzione", "Istruzione", "book.fill", "#9C27B0"),
             DefaultExpenseCategory("sport", "Sport", "figure.run", "#00BCD4"),

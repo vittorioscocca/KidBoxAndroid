@@ -57,6 +57,7 @@ private val TravelAccent = Color(0xFFF2611A)
 @Composable
 fun TravelOnboardingScreen(
     onComplete: (TravelProfile) -> Unit,
+    onExit: () -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
     var step by remember { mutableIntStateOf(0) }
@@ -82,12 +83,10 @@ fun TravelOnboardingScreen(
                 .padding(top = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (step > 0) {
-                TextButton(onClick = { step -= 1 }) {
-                    Text(stringResource(R.string.travel_back), color = kb.title)
-                }
-            } else {
-                Spacer(modifier = Modifier.width(72.dp))
+            // Al primo step «Indietro» esce dalla sezione Viaggi: senza, la
+            // configurazione iniziale non ha alcuna via d'uscita.
+            TextButton(onClick = { if (step > 0) step -= 1 else onExit() }) {
+                Text(stringResource(R.string.travel_back), color = kb.title)
             }
             Spacer(modifier = Modifier.weight(1f))
             Text("${step + 1} di 3", color = kb.subtitle, fontSize = 14.sp)

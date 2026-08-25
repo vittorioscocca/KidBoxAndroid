@@ -23,6 +23,7 @@ data class TodoListRemoteDto(
     val childId: String,
     val name: String,
     val isDeleted: Boolean,
+    val createdBy: String? = null,
     val updatedAtEpochMillis: Long?,
 )
 
@@ -114,6 +115,7 @@ class TodoRemoteStore @Inject constructor(
                                         childId = cid,
                                         name = name,
                                         isDeleted = d["isDeleted"] as? Boolean ?: false,
+                                        createdBy = (d["createdBy"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
                                         updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
                                     ),
                                 )
@@ -210,6 +212,8 @@ class TodoRemoteStore @Inject constructor(
                     "childId" to list.childId,
                     "name" to list.name,
                     "isDeleted" to false,
+                    // Serve a decidere chi vede una lista ancora vuota.
+                    "createdBy" to (list.createdBy ?: uid),
                     "updatedBy" to uid,
                     "updatedAt" to FieldValue.serverTimestamp(),
                 ),

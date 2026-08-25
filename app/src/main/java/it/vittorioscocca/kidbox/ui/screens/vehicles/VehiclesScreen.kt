@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DirectionsCar
@@ -24,9 +23,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -34,8 +31,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,6 +53,9 @@ import it.vittorioscocca.kidbox.ui.screens.life.vehicleFuelLabelIt
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.components.KBEmptyState
+import it.vittorioscocca.kidbox.ui.components.KBSectionHeader
+import androidx.compose.material.icons.filled.AddCircle
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -77,50 +75,31 @@ fun VehiclesScreen(
     Scaffold(
         containerColor = kb.background,
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.vehicles_garage), color = kb.title) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = kb.title)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = kb.background,
-                    titleContentColor = kb.title,
-                    navigationIconContentColor = kb.title,
-                    actionIconContentColor = kb.title,
-                ),
+            KBSectionHeader(
+                title = stringResource(R.string.vehicles_garage),
+                onBack = onNavigateBack,
+                onAdd = { showAdd = true },
+                addContentDescription = stringResource(R.string.vehicles_add),
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showAdd = true }, containerColor = orange, contentColor = Color.White) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.vehicles_add))
-            }
         },
     ) { padding ->
         if (vehicles.isEmpty()) {
             Column(
                 Modifier
                     .fillMaxSize()
-                    .padding(padding)
-                    .padding(24.dp),
+                    .padding(padding),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Icon(Icons.Filled.DirectionsCar, contentDescription = null, tint = kb.title)
-                Text(stringResource(R.string.vehicles_none), color = kb.title, style = MaterialTheme.typography.titleMedium)
-                Surface(
-                    onClick = { showAdd = true },
-                    color = orange,
-                    shape = RoundedCornerShape(999.dp),
-                ) {
-                    Text(
-                        stringResource(R.string.vehicles_add_vehicle),
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
-                    )
-                }
+                KBEmptyState(
+                    icon = Icons.Filled.DirectionsCar,
+                    title = stringResource(R.string.empty_vehicles_title),
+                    body = stringResource(R.string.empty_vehicles_body),
+                    primaryIcon = Icons.Filled.AddCircle,
+                    primaryLabel = stringResource(R.string.empty_vehicles_action),
+                    accent = orange,
+                    onPrimary = { showAdd = true },
+                )
             }
         } else {
             LazyColumn(

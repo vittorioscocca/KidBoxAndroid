@@ -251,6 +251,62 @@ class ProfileViewModel @Inject constructor(
         it.copy(pickedAvatar = bytes, saveSucceeded = false)
     }
 
+    /**
+     * Elimina la foto profilo corrente.
+     *
+     * Agisce SUBITO, senza attendere il "Salva": una foto è un contenuto già
+     * pubblicato agli altri membri, e chi la rimuove si aspetta che sparisca
+     * adesso, non alla prossima conferma del modulo.
+     *
+     * Se c'era solo una foto scelta e non ancora caricata, basta scartarla.
+     */
+    fun removeAvatar() {
+        val hadPicked = _uiState.value.pickedAvatar != null
+        updateAndRecompute { it.copy(pickedAvatar = null, saveSucceeded = false) }
+        if (_uiState.value.avatarUrl.isNullOrBlank()) return
+        if (hadPicked && _uiState.value.avatarUrl.isNullOrBlank()) return
+
+        viewModelScope.launch {
+            val uid = auth.currentUser?.uid ?: return@launch
+            _uiState.update { it.copy(isSaving = true, saveError = null) }
+            try {
+                val familyId = ActiveFamilyResolver.resolveFamilyId(
+                    familyDao.observeAll().first(),
+                    familySessionPreferences.getActiveFamilyId(),
+                ).ifBlank { null }
+
+                // Prima si sgancia il riferimento, poi si cancella il file: se
+                // fallisse la cancellazione resterebbe un file orfano — spiacevole
+                // ma invisibile — mentre l'ordine inverso lascerebbe i client a
+                // puntare a un'immagine che non esiste più.
+                db.collection("users").document(uid).set(
+                    mapOf("avatarURL" to "", "updatedAt" to FieldValue.serverTimestamp()),
+                    com.google.firebase.firestore.SetOptions.merge(),
+                ).await()
+                if (familyId != null) {
+                    db.collection("families").document(familyId)
+                        .collection("locations").document(uid)
+                        .set(
+                            mapOf("avatarURL" to ""),
+                            com.google.firebase.firestore.SetOptions.merge(),
+                        ).await()
+                }
+                avatarRemoteStore.deleteAvatar(uid, familyId)
+
+                // `savedSnapshot` non è nullable: si aggiorna solo se esiste già,
+                // altrimenti il confronto per lo stato "modificato" perde la base.
+                savedSnapshot.let { snap ->
+                    savedSnapshot = snap.copy(avatarUrl = null, avatarFingerprint = -1)
+                }
+                _uiState.update {
+                    it.copy(avatarUrl = null, pickedAvatar = null, isSaving = false)
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isSaving = false, saveError = e.message) }
+            }
+        }
+    }
+
     fun requestCurrentLocation() {
         val hasFine = ContextCompat.checkSelfPermission(
             getApplication(),

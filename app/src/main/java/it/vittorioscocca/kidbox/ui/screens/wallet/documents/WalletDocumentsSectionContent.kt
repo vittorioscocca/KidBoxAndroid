@@ -34,6 +34,9 @@ import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
+import it.vittorioscocca.kidbox.ui.components.KBEmptyState
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.Badge
 
 /**
  * Contenuto embeddato della sezione "Documenti" del Wallet (usato dentro
@@ -62,23 +65,17 @@ fun WalletDocumentsSectionContent(
         when {
             state.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             state.items.isEmpty() -> Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 32.dp),
+                modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Icon(
-                    Icons.Filled.CreditCard,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    "Acquisisci la Tessera Sanitaria o un altro documento d'identità.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                KBEmptyState(
+                    icon = Icons.Filled.Badge,
+                    title = stringResource(R.string.empty_wallet_documents_title),
+                    body = stringResource(R.string.empty_wallet_documents_body),
+                    primaryIcon = Icons.Filled.AddCircle,
+                    primaryLabel = stringResource(R.string.empty_wallet_documents_action),
+                    onPrimary = { onShowAddSheetChange(true) },
                 )
             }
             else -> LazyColumn(

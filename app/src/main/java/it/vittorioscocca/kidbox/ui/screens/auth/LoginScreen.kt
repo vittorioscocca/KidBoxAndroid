@@ -40,7 +40,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import androidx.compose.runtime.getValue
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.mutableStateOf
@@ -157,19 +159,29 @@ fun LoginScreen(
     val registrationPending by viewModel.registrationPendingVerification.collectAsStateWithLifecycle()
 
     var showEmailSheet by remember { mutableStateOf(false) }
+    var emailFormReachedSuccess by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val uriHandler = LocalUriHandler.current
     val metrics = rememberLoginScreenMetrics()
     val kb = MaterialTheme.kidBoxColors
 
+    LaunchedEffect(Unit) {
+        AppAnalytics.preSignupScreenShown(context, "login")
+    }
+
     LaunchedEffect(authCheckState) {
         when (val state = authCheckState) {
             is LoginViewModel.AuthCheckState.Authenticated -> {
+                emailFormReachedSuccess = true
                 delay(500)
                 onLoginSuccess(state.hasFamily)
             }
             else -> Unit
         }
+    }
+
+    LaunchedEffect(registrationPending) {
+        if (registrationPending) emailFormReachedSuccess = true
     }
 
     when (authCheckState) {
@@ -278,6 +290,7 @@ fun LoginScreen(
             Button(
                 onClick = {
                     viewModel.clearError()
+                    emailFormReachedSuccess = false
                     showEmailSheet = true
                 },
                 enabled = !isBusy,
@@ -361,6 +374,16 @@ fun LoginScreen(
                     onDismissRequest = { showEmailSheet = false },
                     sheetState = sheetState,
                 ) {
+                    LaunchedEffect(Unit) {
+                        AppAnalytics.preSignupScreenShown(context, "email_form")
+                    }
+                    DisposableEffect(Unit) {
+                        onDispose {
+                            if (!emailFormReachedSuccess) {
+                                AppAnalytics.preSignupScreenDismissed(context, "email_form")
+                            }
+                        }
+                    }
                     EmailAuthSheetContent(
                         onDismiss = { showEmailSheet = false },
                         onSignIn = { email, pwd -> viewModel.signInEmail(email, pwd) },

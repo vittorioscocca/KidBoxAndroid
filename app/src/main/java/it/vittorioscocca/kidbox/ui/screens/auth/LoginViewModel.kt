@@ -97,7 +97,7 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             _isBusy.value = true
             _errorMessage.value = null
-            AppAnalytics.signupStarted(appContext, "google")
+            AppAnalytics.loginAttempted(appContext, "google")
             try {
                 auth.signIn(
                     AuthProvider.GOOGLE,
@@ -117,7 +117,7 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             _isBusy.value = true
             _errorMessage.value = null
-            AppAnalytics.signupStarted(appContext, "apple")
+            AppAnalytics.loginAttempted(appContext, "apple")
             try {
                 auth.signIn(
                     AuthProvider.APPLE,
@@ -142,7 +142,7 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             _isBusy.value = true
             _errorMessage.value = null
-            AppAnalytics.signupStarted(appContext, "facebook")
+            AppAnalytics.loginAttempted(appContext, "facebook")
             try {
                 facebookAuth.signInWithFacebook(activity)
                 onSignedInSuccessfully("facebook")
@@ -226,6 +226,8 @@ class LoginViewModel @Inject constructor(
             val metadata = user.metadata
             val isNewUser = metadata != null && metadata.creationTimestamp == metadata.lastSignInTimestamp
             if (isNewUser) {
+                AppAnalytics.signupStarted(appContext, provider)
+                AppAnalytics.signupMethodSelected(appContext, provider)
                 AppAnalytics.signupCompleted(appContext, provider)
             }
         }

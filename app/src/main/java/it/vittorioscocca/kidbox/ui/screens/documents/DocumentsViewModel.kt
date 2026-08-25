@@ -560,11 +560,16 @@ class DocumentsViewModel @Inject constructor(
                 if (parentId == null) {
                     val expenseRootId = repository.expensesRootFolderId(familyId)
                     val hasExpenseRoot = data.folders.any { it.id == expenseRootId && !it.isDeleted }
+                    // La root «Spese» deve esistere solo se c'è davvero qualcosa di spese:
+                    // senza spese non la si crea né la si attende (niente cartella di default).
+                    val hasExpenseContent = runCatching {
+                        repository.hasExpenseContent(familyId)
+                    }.getOrDefault(true)
                     val hasCriticalInstability = runCatching {
                         repository.hasCriticalExpenseHierarchyInstability(familyId)
                     }.getOrDefault(false)
                     val withinAntiFlashWindow = (System.currentTimeMillis() - rootGateStartedAtMillis) <= 1_200L
-                    if ((!hasExpenseRoot || hasCriticalInstability) && withinAntiFlashWindow) {
+                    if (((!hasExpenseRoot && hasExpenseContent) || hasCriticalInstability) && withinAntiFlashWindow) {
                         scheduleDebouncedHeal(familyId)
                         _uiState.value = _uiState.value.copy(
                             isStabilizingHierarchy = true,
@@ -576,8 +581,17 @@ class DocumentsViewModel @Inject constructor(
                         scheduleDebouncedHeal(familyId)
                     }
                 }
+                val visibleFolders = if (parentId == null) {
+                    val expenseRootId = repository.expensesRootFolderId(familyId)
+                    val keepExpenseRoot = runCatching {
+                        repository.hasExpenseContent(familyId)
+                    }.getOrDefault(true)
+                    if (keepExpenseRoot) data.folders else data.folders.filterNot { it.id == expenseRootId }
+                } else {
+                    data.folders
+                }
                 _uiState.value = _uiState.value.copy(
-                    folders = data.folders,
+                    folders = visibleFolders,
                     documents = data.documents,
                     isStabilizingHierarchy = false,
                     isLoading = false,

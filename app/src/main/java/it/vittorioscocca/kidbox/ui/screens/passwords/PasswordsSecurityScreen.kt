@@ -44,7 +44,6 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Refresh
 
-private val PasswordsIosBackgroundLight = Color(0xFFF2F2F7)
 
 @Composable
 fun PasswordsSecurityScreen(
@@ -64,7 +63,7 @@ fun PasswordsSecurityScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(PasswordsIosBackgroundLight)
+            .background(kb.background)
             .statusBarsPadding()
             .padding(horizontal = 16.dp),
     ) {
@@ -74,9 +73,16 @@ fun PasswordsSecurityScreen(
                 .padding(top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Surface(shape = CircleShape, color = Color.White, shadowElevation = 1.dp) {
+            Surface(shape = CircleShape, color = kb.card, shadowElevation = 1.dp) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.location_back_content_description))
+                    // Senza tint esplicito eredita il nero di default: la
+                    // Surface qui sotto usa un colore del tema, non uno schema
+                    // Material, quindi non fornisce un contentColor coerente.
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.location_back_content_description),
+                        tint = kb.title,
+                    )
                 }
             }
             Spacer(modifier = Modifier.weight(1f))
@@ -84,7 +90,7 @@ fun PasswordsSecurityScreen(
                 onClick = viewModel::rescan,
                 shape = RoundedCornerShape(999.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White,
+                    containerColor = kb.card,
                     contentColor = kb.title,
                 ),
             ) {
@@ -172,9 +178,10 @@ private fun SecurityCardList(
     showWarningIcon: Boolean = false,
     onOpenPassword: (String) -> Unit = {},
 ) {
+    val kb = MaterialTheme.kidBoxColors
     Surface(
         shape = RoundedCornerShape(20.dp),
-        color = Color.White,
+        color = kb.card,
         shadowElevation = 1.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -230,7 +237,7 @@ private fun DuplicateClusterCard(cluster: PasswordDuplicateClusterUi) {
     val kb = MaterialTheme.kidBoxColors
     Surface(
         shape = RoundedCornerShape(20.dp),
-        color = Color.White,
+        color = kb.card,
         shadowElevation = 1.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -264,7 +271,7 @@ private fun EmptySectionCard(message: String) {
     val kb = MaterialTheme.kidBoxColors
     Surface(
         shape = RoundedCornerShape(20.dp),
-        color = Color.White,
+        color = kb.card,
         shadowElevation = 1.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {

@@ -70,6 +70,7 @@ import java.util.concurrent.Executors
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.components.KBBackButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,6 +100,8 @@ fun JoinFamilyScreen(
             .statusBarsPadding()
             .padding(16.dp),
     ) {
+        KBBackButton(onClick = onBack)
+        Spacer(modifier = Modifier.height(12.dp))
         Text(stringResource(R.string.settings_join_title), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.kidBoxColors.title)
         Spacer(modifier = Modifier.height(8.dp))
         Text(

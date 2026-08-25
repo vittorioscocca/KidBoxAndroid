@@ -295,6 +295,10 @@ internal fun ChatBubble(
                             Text(
                                 text = if (read) "✓✓" else "✓",
                                 fontSize = 11.sp,
+                                // Le due spunte sono un unico testo: la spaziatura
+                                // naturale del font le distanziava troppo per
+                                // leggerle come un segno solo.
+                                letterSpacing = ChatTicksLetterSpacing,
                                 color = Color.White.copy(alpha = 0.9f),
                             )
                         }
@@ -354,7 +358,12 @@ internal fun ChatBubble(
                         Text(message.timeLabel, fontSize = 10.sp, color = subtitleColor)
                         if (isOwn) {
                             val read = message.readBy.any { it != currentUid }
-                            Text(if (read) "✓✓" else "✓", fontSize = 11.sp, color = subtitleColor)
+                            Text(
+                                text = if (read) "✓✓" else "✓",
+                                fontSize = 11.sp,
+                                letterSpacing = ChatTicksLetterSpacing,
+                                color = subtitleColor,
+                            )
                         }
                     }
                 }
@@ -1655,3 +1664,6 @@ private fun formatAudioTime(ms: Int): String {
     val ss = (sec % 60).toString().padStart(2, '0')
     return "$mm:$ss"
 }
+
+/** Avvicina le due spunte di lettura, che col passo naturale del font risultano staccate. */
+private val ChatTicksLetterSpacing = (-2).sp

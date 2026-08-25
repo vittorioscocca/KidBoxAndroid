@@ -22,6 +22,36 @@ object AppAnalytics {
         }
     }
 
+    /**
+     * Tap su un provider OAuth (Google/Apple/Facebook): a differenza di
+     * `signupStarted`, scatta sempre, anche per un login di un utente già
+     * esistente — non si può sapere se è un nuovo account finché Firebase non
+     * risponde con `isNewUser`.
+     */
+    fun loginAttempted(context: Context, method: String) {
+        log(context, "login_attempted") {
+            putString("method", method)
+        }
+    }
+
+    fun signupMethodSelected(context: Context, method: String) {
+        log(context, "signup_method_selected") {
+            putString("method", method)
+        }
+    }
+
+    fun preSignupScreenShown(context: Context, screenName: String) {
+        log(context, "pre_signup_screen_shown") {
+            putString("screen_name", screenName)
+        }
+    }
+
+    fun preSignupScreenDismissed(context: Context, screenName: String) {
+        log(context, "pre_signup_screen_dismissed") {
+            putString("screen_name", screenName)
+        }
+    }
+
     fun onboardingStepShown(context: Context, stepName: String, stepNumber: Int) {
         log(context, "onboarding_step_shown") {
             putString("step_name", stepName)

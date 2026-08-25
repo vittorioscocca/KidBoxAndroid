@@ -4,7 +4,6 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.wallet.WalletReminderPrefs
 import java.time.LocalDate
@@ -25,6 +24,7 @@ import javax.inject.Singleton
 class WalletDocumentReminderScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
     private val walletReminderPrefs: WalletReminderPrefs,
+    private val alarmRegistry: ReminderAlarmRegistry,
 ) {
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
@@ -41,48 +41,39 @@ class WalletDocumentReminderScheduler @Inject constructor(
         if (fireAtMillis <= now) return
 
         val body = title.ifBlank { "Documento" }
-        val pi = buildPendingIntent(
-            documentId = documentId,
-            familyId = familyId,
-            title = "Documento in scadenza tra una settimana",
-            body = body,
+        alarmRegistry.arm(
+            ReminderAlarmRegistry.AlarmSpec(
+                key = ReminderAlarmRegistry.walletDocumentKey(documentId),
+                target = ReminderAlarmRegistry.Target.HEALTH,
+                requestCode = ("walletdoc:$documentId").hashCode(),
+                fireAtMillis = fireAtMillis,
+                action = documentAction(documentId),
+                stringExtras = mapOf(
+                    HealthReminderReceiver.EXTRA_TYPE to HealthReminderReceiver.TYPE_WALLET_DOCUMENT_REMINDER,
+                    HealthReminderReceiver.EXTRA_WALLET_DOCUMENT_ID to documentId,
+                    HealthReminderReceiver.EXTRA_FAMILY_ID to familyId,
+                    HealthReminderReceiver.EXTRA_TITLE to "Documento in scadenza tra una settimana",
+                    HealthReminderReceiver.EXTRA_BODY to body,
+                ),
+            ),
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAtMillis, pi)
-            } else {
-                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAtMillis, pi)
-            }
-        } else {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAtMillis, pi)
-        }
     }
 
     fun cancel(documentId: String) {
-        val pi = buildPendingIntent(documentId, "", "", "")
+        alarmRegistry.forget(ReminderAlarmRegistry.walletDocumentKey(documentId))
+        val intent = Intent(context, HealthReminderReceiver::class.java).apply {
+            action = documentAction(documentId)
+        }
+        val pi = PendingIntent.getBroadcast(
+            context,
+            ("walletdoc:$documentId").hashCode(),
+            intent,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+        ) ?: return
         alarmManager.cancel(pi)
         pi.cancel()
     }
 
-    private fun buildPendingIntent(
-        documentId: String,
-        familyId: String,
-        title: String,
-        body: String,
-    ): PendingIntent {
-        val intent = Intent(context, HealthReminderReceiver::class.java).apply {
-            action = "kb.wallet.document.reminder.$documentId"
-            putExtra(HealthReminderReceiver.EXTRA_TYPE, HealthReminderReceiver.TYPE_WALLET_DOCUMENT_REMINDER)
-            putExtra(HealthReminderReceiver.EXTRA_WALLET_DOCUMENT_ID, documentId)
-            putExtra(HealthReminderReceiver.EXTRA_FAMILY_ID, familyId)
-            putExtra(HealthReminderReceiver.EXTRA_TITLE, title)
-            putExtra(HealthReminderReceiver.EXTRA_BODY, body)
-        }
-        return PendingIntent.getBroadcast(
-            context,
-            ("walletdoc:$documentId").hashCode(),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-    }
+    private fun documentAction(documentId: String) = "kb.wallet.document.reminder.$documentId"
+
 }

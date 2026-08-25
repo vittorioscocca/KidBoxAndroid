@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -51,8 +52,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import it.vittorioscocca.kidbox.ui.screens.wallet.documents.WalletDocumentsSectionContent
 import it.vittorioscocca.kidbox.ui.screens.wallet.documents.WalletDocumentsViewModel
 import it.vittorioscocca.kidbox.ui.screens.wallet.loyaltycards.LoyaltyCardsSectionContent
@@ -86,6 +85,9 @@ import java.util.Locale
 import it.vittorioscocca.kidbox.util.KBLocale
 import it.vittorioscocca.kidbox.notifications.AppSection
 import it.vittorioscocca.kidbox.notifications.TrackSectionPresence
+import it.vittorioscocca.kidbox.ui.components.KBEmptyState
+import it.vittorioscocca.kidbox.ui.components.KBHeaderCircleButton
+import androidx.compose.material.icons.filled.AddCircle
 
 @Composable
 fun WalletHomeScreen(
@@ -114,7 +116,7 @@ fun WalletHomeScreen(
     var showLoyaltyCardAddFlow by remember { mutableStateOf(false) }
 
     // Stesso schema dei Documenti: il ViewModel della sezione vive qui, così i
-    // suoi controlli (Seleziona / + / Elimina) possono stare nella TopAppBar
+    // suoi controlli (Seleziona / + / Elimina) possono stare nell'header
     // condivisa fra i tab invece che dentro il corpo della sezione.
     val loyaltyCardsViewModel: LoyaltyCardsViewModel = hiltViewModel()
     val loyaltyState by loyaltyCardsViewModel.uiState.collectAsStateWithLifecycle()
@@ -160,30 +162,34 @@ fun WalletHomeScreen(
         containerColor = MaterialTheme.kidBoxColors.background,
         topBar = {
             Column {
-                TopAppBar(
-                    modifier = Modifier.statusBarsPadding(),
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.kidBoxColors.background,
-                    ),
-                    title = {
-                        Text(
-                            stringResource(R.string.wallet_title),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.wallet_back))
+                // Stesso header delle altre sezioni (Calendario, Lista della spesa,
+                // Garage, Animali, Casa): tondo «indietro» a sinistra, tondo «+» a
+                // destra, titolo grande sotto. Le azioni di selezione dei tab
+                // Documenti/Carte restano accanto al «+».
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        KBHeaderCircleButton(onClick = onBack) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.wallet_back),
+                                tint = MaterialTheme.kidBoxColors.title,
+                            )
                         }
-                    },
-                    actions = {
-                        if (selectedTab == 0) {
-                            IconButton(onClick = { showAddSheet = true }) {
-                                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.wallet_add_ticket_cd))
+                        Spacer(Modifier.weight(1f))
+                        when (selectedTab) {
+                            0 -> KBHeaderCircleButton(onClick = { showAddSheet = true }) {
+                                Icon(
+                                    Icons.Filled.Add,
+                                    contentDescription = stringResource(R.string.wallet_add_ticket_cd),
+                                    tint = MaterialTheme.kidBoxColors.title,
+                                )
                             }
-                        } else if (selectedTab == 2) {
-                            if (loyaltyState.isSelecting) {
+                            2 -> if (loyaltyState.isSelecting) {
                                 TextButton(
                                     onClick = { showLoyaltyDeleteConfirm = true },
                                     enabled = loyaltyState.selectedIds.isNotEmpty(),
@@ -205,13 +211,17 @@ fun WalletHomeScreen(
                                     TextButton(onClick = { loyaltyCardsViewModel.setSelecting(true) }) {
                                         Text(stringResource(R.string.passwords_select_button))
                                     }
+                                    Spacer(Modifier.width(4.dp))
                                 }
-                                IconButton(onClick = { showLoyaltyCardAddFlow = true }) {
-                                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.wallet_loyalty_add_cd))
+                                KBHeaderCircleButton(onClick = { showLoyaltyCardAddFlow = true }) {
+                                    Icon(
+                                        Icons.Filled.Add,
+                                        contentDescription = stringResource(R.string.wallet_loyalty_add_cd),
+                                        tint = MaterialTheme.kidBoxColors.title,
+                                    )
                                 }
                             }
-                        } else {
-                            if (docsState.isSelecting) {
+                            else -> if (docsState.isSelecting) {
                                 TextButton(onClick = { documentsViewModel.exitSelectionMode() }) { Text(stringResource(R.string.wallet_cancel)) }
                                 IconButton(
                                     onClick = { documentsViewModel.deleteSelected() },
@@ -222,14 +232,28 @@ fun WalletHomeScreen(
                             } else {
                                 if (docsState.items.isNotEmpty()) {
                                     TextButton(onClick = { documentsViewModel.enterSelectionMode() }) { Text(stringResource(R.string.wallet_select)) }
+                                    Spacer(Modifier.width(4.dp))
                                 }
-                                IconButton(onClick = { showDocAddChoice = true }) {
-                                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.wallet_add_document_cd))
+                                KBHeaderCircleButton(onClick = { showDocAddChoice = true }) {
+                                    Icon(
+                                        Icons.Filled.Add,
+                                        contentDescription = stringResource(R.string.wallet_add_document_cd),
+                                        tint = MaterialTheme.kidBoxColors.title,
+                                    )
                                 }
                             }
                         }
-                    },
-                )
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        stringResource(R.string.wallet_title),
+                        style = MaterialTheme.typography.headlineLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 40.sp,
+                        ),
+                        color = MaterialTheme.kidBoxColors.title,
+                    )
+                }
                 PrimaryTabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = MaterialTheme.kidBoxColors.background,
@@ -321,23 +345,17 @@ fun WalletHomeScreen(
 
             if (state.tickets.isEmpty() && !state.hasQueuedSharePdf) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 32.dp),
+                    modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Icon(
-                        Icons.Filled.ConfirmationNumber,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        stringResource(R.string.wallet_no_tickets_empty),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.kidBoxColors.subtitle,
+                    KBEmptyState(
+                        icon = Icons.Filled.ConfirmationNumber,
+                        title = stringResource(R.string.empty_wallet_tickets_title),
+                        body = stringResource(R.string.empty_wallet_tickets_body),
+                        primaryIcon = Icons.Filled.AddCircle,
+                        primaryLabel = stringResource(R.string.empty_wallet_tickets_action),
+                        onPrimary = { showAddSheet = true },
                     )
                 }
             } else {

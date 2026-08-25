@@ -6,7 +6,6 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.mapper.scheduleTimesList
@@ -26,6 +25,7 @@ private const val PREFS_NAME = "kb_treatment_alarms"
 @Singleton
 class TreatmentNotificationManager @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val alarmRegistry: ReminderAlarmRegistry,
 ) {
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     private val prefs by lazy { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
@@ -52,25 +52,19 @@ class TreatmentNotificationManager @Inject constructor(
         KBLog.app.debug("cancelled slot treatmentId=$treatmentId day=$dayOffset slot=$slotIndex", TAG)
     }
 
+    /**
+     * Estende la finestra scorrevole quando restano pochi alarm pendenti.
+     * Invocata dalla sentinella in [HealthReminderReceiver] appena l'ultimo
+     * alarm della finestra corrente è scattato: senza questo aggancio una cura
+     * lunga smetterebbe di avvisare dopo [WINDOW_DAYS] giorni.
+     */
     fun rescheduleIfNeeded(treatment: KBTreatment, childName: String) {
         val now = System.currentTimeMillis()
-        val pending = getEntries(treatment.id).mapNotNull { parseEntry(it) }
-            .count { (_, _, _, fireMillis) -> fireMillis > now }
-        if (pending <= RESCHEDULE_THRESHOLD) {
-            val latest = getEntries(treatment.id).mapNotNull { parseEntry(it) }
-                .maxOfOrNull { (_, _, _, fireMillis) -> fireMillis }
-            scheduleWindow(treatment, childName, windowStartMillis = latest?.plus(86_400_000L))
-        }
-    }
-
-    fun rescheduleAllActive() {
-        // Called on app cold start and BOOT_COMPLETED — no familyId filter here;
-        // individual families populate treatments lazily from sync, so we only
-        // reschedule what's already in the SharedPrefs key set.
-        // Real reschedule happens via TreatmentRepository observers in the UI.
-        // This method is intentionally a no-op stub: the sync centers + ViewModel
-        // cascade do the work when the family session is re-established.
-        KBLog.app.debug("rescheduleAllActive called (delegated to sync centers on session restore)", TAG)
+        val entries = pruneFiredEntries(treatment.id, now)
+        val pending = entries.count { it.fireMillis > now }
+        if (pending > RESCHEDULE_THRESHOLD) return
+        val latest = entries.maxOfOrNull { it.fireMillis }
+        scheduleWindow(treatment, childName, windowStartMillis = latest?.plus(86_400_000L))
     }
 
     private fun scheduleWindow(
@@ -169,60 +163,49 @@ class TreatmentNotificationManager @Inject constructor(
         fireMillis: Long,
         body: String,
     ) {
-        val intent = Intent(context, HealthReminderReceiver::class.java).apply {
-            action = "kb.health.treatment_reminder.${treatment.id}.$dayOffset.$slotIndex"
-            putExtra(HealthReminderReceiver.EXTRA_TYPE, HealthReminderReceiver.TYPE_TREATMENT_REMINDER)
-            putExtra(HealthReminderReceiver.EXTRA_TREATMENT_ID, treatment.id)
-            putExtra(HealthReminderReceiver.EXTRA_FAMILY_ID, treatment.familyId)
-            putExtra(HealthReminderReceiver.EXTRA_CHILD_ID, treatment.childId)
-            putExtra(HealthReminderReceiver.EXTRA_DAY_OFFSET, dayOffset)
-            putExtra(HealthReminderReceiver.EXTRA_SLOT_INDEX, slotIndex)
-            putExtra(HealthReminderReceiver.EXTRA_TITLE, "💊 ${treatment.drugName}")
-            putExtra(HealthReminderReceiver.EXTRA_BODY, body)
-        }
-        val pi = PendingIntent.getBroadcast(
-            context,
-            alarmRequestCode(treatment.id, dayOffset, slotIndex),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        alarmRegistry.arm(
+            ReminderAlarmRegistry.AlarmSpec(
+                key = ReminderAlarmRegistry.treatmentKey(treatment.id, dayOffset, slotIndex),
+                target = ReminderAlarmRegistry.Target.HEALTH,
+                requestCode = alarmRequestCode(treatment.id, dayOffset, slotIndex),
+                fireAtMillis = fireMillis,
+                action = reminderAction(treatment.id, dayOffset, slotIndex),
+                stringExtras = mapOf(
+                    HealthReminderReceiver.EXTRA_TYPE to HealthReminderReceiver.TYPE_TREATMENT_REMINDER,
+                    HealthReminderReceiver.EXTRA_TREATMENT_ID to treatment.id,
+                    HealthReminderReceiver.EXTRA_FAMILY_ID to treatment.familyId,
+                    HealthReminderReceiver.EXTRA_CHILD_ID to treatment.childId,
+                    HealthReminderReceiver.EXTRA_TITLE to "💊 ${treatment.drugName}",
+                    HealthReminderReceiver.EXTRA_BODY to body,
+                ),
+                intExtras = mapOf(
+                    HealthReminderReceiver.EXTRA_DAY_OFFSET to dayOffset,
+                    HealthReminderReceiver.EXTRA_SLOT_INDEX to slotIndex,
+                ),
+            ),
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireMillis, pi)
-            } else {
-                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireMillis, pi)
-            }
-        } else {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireMillis, pi)
-        }
     }
 
     private fun scheduleSentinel(treatmentId: String, fireMillis: Long) {
-        val intent = Intent(context, HealthReminderReceiver::class.java).apply {
-            action = "kb.health.treatment_sentinel.$treatmentId"
-            putExtra(HealthReminderReceiver.EXTRA_TYPE, HealthReminderReceiver.TYPE_TREATMENT_SENTINEL)
-            putExtra(HealthReminderReceiver.EXTRA_TREATMENT_ID, treatmentId)
-        }
-        val pi = PendingIntent.getBroadcast(
-            context,
-            "sentinel:$treatmentId".hashCode(),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        alarmRegistry.arm(
+            ReminderAlarmRegistry.AlarmSpec(
+                key = ReminderAlarmRegistry.treatmentSentinelKey(treatmentId),
+                target = ReminderAlarmRegistry.Target.HEALTH,
+                requestCode = "sentinel:$treatmentId".hashCode(),
+                fireAtMillis = fireMillis,
+                action = sentinelAction(treatmentId),
+                stringExtras = mapOf(
+                    HealthReminderReceiver.EXTRA_TYPE to HealthReminderReceiver.TYPE_TREATMENT_SENTINEL,
+                    HealthReminderReceiver.EXTRA_TREATMENT_ID to treatmentId,
+                ),
+            ),
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireMillis, pi)
-            } else {
-                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireMillis, pi)
-            }
-        } else {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireMillis, pi)
-        }
     }
 
     private fun cancelSentinel(treatmentId: String) {
+        alarmRegistry.forget(ReminderAlarmRegistry.treatmentSentinelKey(treatmentId))
         val intent = Intent(context, HealthReminderReceiver::class.java).apply {
-            action = "kb.health.treatment_sentinel.$treatmentId"
+            action = sentinelAction(treatmentId)
         }
         val pi = PendingIntent.getBroadcast(
             context,
@@ -235,8 +218,9 @@ class TreatmentNotificationManager @Inject constructor(
     }
 
     private fun cancelAlarmIntent(treatmentId: String, dayOffset: Int, slotIndex: Int) {
+        alarmRegistry.forget(ReminderAlarmRegistry.treatmentKey(treatmentId, dayOffset, slotIndex))
         val intent = Intent(context, HealthReminderReceiver::class.java).apply {
-            action = "kb.health.treatment_reminder.$treatmentId.$dayOffset.$slotIndex"
+            action = reminderAction(treatmentId, dayOffset, slotIndex)
         }
         val pi = PendingIntent.getBroadcast(
             context,
@@ -246,6 +230,16 @@ class TreatmentNotificationManager @Inject constructor(
         ) ?: return
         alarmManager.cancel(pi)
         pi.cancel()
+    }
+
+    private fun reminderAction(treatmentId: String, dayOffset: Int, slotIndex: Int) =
+        "kb.health.treatment_reminder.$treatmentId.$dayOffset.$slotIndex"
+
+    private fun sentinelAction(treatmentId: String) = "kb.health.treatment_sentinel.$treatmentId"
+
+    /** Svuota il registro delle dosi armate. Usato al logout. */
+    fun clearAllRecords() {
+        prefs.edit().clear().apply()
     }
 
     // ── SharedPreferences helpers ──────────────────────────────────────────────
@@ -267,6 +261,25 @@ class TreatmentNotificationManager @Inject constructor(
         val current = getEntries(treatmentId).toMutableSet()
         current.removeAll { it.startsWith("$treatmentId|$dayOffset|$slotIndex|") }
         prefs.edit().putStringSet(key, current).apply()
+    }
+
+    /**
+     * Scarta i record degli alarm già scattati e restituisce quelli superstiti.
+     * Senza questa potatura lo `StringSet` di una cura a lungo termine
+     * crescerebbe senza limite, un record per ogni dose mai schedulata.
+     */
+    private fun pruneFiredEntries(treatmentId: String, now: Long): List<EntryParts> {
+        val parsed = getEntries(treatmentId).mapNotNull { parseEntry(it) }
+        val survivors = parsed.filter { it.fireMillis > now }
+        if (survivors.size != parsed.size) {
+            prefs.edit()
+                .putStringSet(
+                    prefsKey(treatmentId),
+                    survivors.map { "${it.treatmentId}|${it.dayOffset}|${it.slotIndex}|${it.fireMillis}" }.toSet(),
+                )
+                .apply()
+        }
+        return survivors
     }
 
     private fun removeAllEntries(treatmentId: String) {

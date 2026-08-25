@@ -41,6 +41,7 @@ import it.vittorioscocca.kidbox.data.local.AppTheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.components.KBBackButton
 
 private data class ThemeRow(
     val title: String,
@@ -69,6 +70,8 @@ fun ThemeScreen(
             .statusBarsPadding()
             .padding(top = 24.dp, start = 16.dp, end = 16.dp),
     ) {
+        KBBackButton(onClick = onBack)
+        Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = stringResource(R.string.settings_row_theme),
             fontSize = 34.sp,

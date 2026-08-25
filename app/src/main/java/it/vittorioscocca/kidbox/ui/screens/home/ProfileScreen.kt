@@ -105,6 +105,7 @@ fun ProfileScreen(
     val requestLocationPermission by viewModel.requestLocationPermission.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     var showLogoutConfirm by remember { mutableStateOf(false) }
+    var showRemoveAvatarDialog by remember { mutableStateOf(false) }
     var showDeleteSheet by remember { mutableStateOf(false) }
     var deleteConfirmText by remember { mutableStateOf("") }
     val deleteSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -210,6 +211,30 @@ fun ProfileScreen(
                 }
             }
         }
+    }
+
+    if (showRemoveAvatarDialog) {
+        AlertDialog(
+            onDismissRequest = { showRemoveAvatarDialog = false },
+            title = { Text(stringResource(R.string.home_profile_remove_photo_title)) },
+            text = { Text(stringResource(R.string.home_profile_remove_photo_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showRemoveAvatarDialog = false
+                    viewModel.removeAvatar()
+                }) {
+                    Text(
+                        stringResource(R.string.home_profile_remove_photo),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRemoveAvatarDialog = false }) {
+                    Text(stringResource(R.string.location_cancel_button))
+                }
+            },
+        )
     }
 
     if (showLogoutConfirm) {
@@ -355,6 +380,21 @@ fun ProfileScreen(
                         ) {
                             Icon(Icons.Default.CameraAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
                         }
+                    }
+                }
+
+                // Compare solo se c'è davvero una foto da togliere: offrire
+                // "Rimuovi" su un avatar già vuoto sarebbe un comando inerte.
+                if (state.pickedAvatar != null || !state.avatarUrl.isNullOrBlank()) {
+                    TextButton(
+                        onClick = { showRemoveAvatarDialog = true },
+                        enabled = !state.isSaving,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    ) {
+                        Text(
+                            stringResource(R.string.home_profile_remove_photo),
+                            color = MaterialTheme.colorScheme.error,
+                        )
                     }
                 }
 

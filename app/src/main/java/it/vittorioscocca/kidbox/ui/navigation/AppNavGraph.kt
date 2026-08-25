@@ -853,11 +853,19 @@ fun AppNavGraph(
 
         composable(
             route = AppDestination.Calendar.route,
-            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("openEventId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
         ) { backStackEntry ->
             val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
             CalendarScreen(
                 familyId = familyId,
+                openEventId = backStackEntry.arguments?.getString("openEventId"),
                 onBack = { navController.popBackStack() },
             )
         }
@@ -872,6 +880,15 @@ fun AppNavGraph(
                 onBack = { navController.popBackStack() },
                 onSelect = { childId ->
                     navController.navigate(AppDestination.HealthHome.route(familyId, childId))
+                },
+                onAutoSelect = { childId ->
+                    // Unico soggetto: il selettore non ha nulla da mostrare, quindi
+                    // esce dallo stack. Senza questo, «indietro» da Salute tornava
+                    // qui e veniva rilanciata subito la stessa navigazione.
+                    navController.navigate(AppDestination.HealthHome.route(familyId, childId)) {
+                        popUpTo(AppDestination.PediatricChildSelector.route) { inclusive = true }
+                        launchSingleTop = true
+                    }
                 },
             )
         }

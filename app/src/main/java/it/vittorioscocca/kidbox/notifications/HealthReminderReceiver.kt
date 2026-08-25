@@ -12,6 +12,8 @@ import androidx.core.app.NotificationManagerCompat
 import dagger.hilt.android.EntryPointAccessors
 import it.vittorioscocca.kidbox.MainActivity
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.data.local.mapper.toDomain
+import it.vittorioscocca.kidbox.util.KBLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -26,10 +28,20 @@ class HealthReminderReceiver : BroadcastReceiver() {
 
         when (type) {
             TYPE_TREATMENT_SENTINEL -> {
-                // Sentinel: do NOT post a notification. The TreatmentNotificationManager
-                // rescheduleIfNeeded is called from the ViewModel/session restore path instead,
-                // since receivers cannot inject Hilt singletons reliably across process death.
-                return
+                // Sentinella: non mostra nulla. Scatta un minuto dopo l'ultima dose
+                // della finestra corrente e serve solo a estenderla, altrimenti una
+                // cura lunga smetterebbe di avvisare dopo la fine della finestra.
+                val treatmentId = intent.getStringExtra(EXTRA_TREATMENT_ID).orEmpty()
+                if (treatmentId.isEmpty()) return
+                val pendingResult = goAsync()
+                val appCtx = context.applicationContext
+                CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+                    try {
+                        extendTreatmentWindow(appCtx, treatmentId)
+                    } finally {
+                        pendingResult.finish()
+                    }
+                }
             }
             TYPE_TREATMENT_REMINDER -> {
                 val treatmentId = intent.getStringExtra(EXTRA_TREATMENT_ID).orEmpty()
@@ -381,6 +393,30 @@ class HealthReminderReceiver : BroadcastReceiver() {
                     .build()
                 runCatching { NotificationManagerCompat.from(context).notify(notifId, notification) }
             }
+        }
+    }
+
+    /**
+     * Ricarica la cura da Room e allunga la finestra di alarm. La cura può essere
+     * stata sospesa, chiusa o cancellata da un altro membro dopo l'ultima
+     * schedulazione: in quel caso non si ri-arma nulla.
+     */
+    private suspend fun extendTreatmentWindow(appCtx: Context, treatmentId: String) {
+        runCatching {
+            val ep = EntryPointAccessors.fromApplication(
+                appCtx,
+                VehicleReminderEntryPoint::class.java,
+            )
+            val entity = ep.treatmentDao().getById(treatmentId) ?: return
+            if (entity.isDeleted || !entity.isActive || !entity.reminderEnabled) return
+            val subjectName = if (entity.petId.isNotBlank()) {
+                ep.petDao().getById(entity.petId)?.name
+            } else {
+                ep.childDao().getById(entity.childId)?.name
+            }.orEmpty()
+            ep.treatmentNotificationManager().rescheduleIfNeeded(entity.toDomain(), subjectName)
+        }.onFailure {
+            KBLog.app.error("sentinella: estensione finestra fallita treatmentId=$treatmentId", "HealthReminderReceiver", it)
         }
     }
 

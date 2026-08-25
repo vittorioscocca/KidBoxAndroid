@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -43,7 +44,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -54,10 +54,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -146,6 +144,7 @@ fun RichNoteEditor(
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
     val editTextRef = remember { arrayOfNulls<EditText>(1) }
+    val titleEditTextRef = remember { arrayOfNulls<EditText>(1) }
     // Il round-trip HTML→Spanned→HTML non è garantito idempotente byte-per-byte
     // (entità, spazi, markup liste): un `setText()` programmatico nell'`update`
     // qui sotto può quindi produrre un `spannedToHtml` leggermente diverso dal
@@ -169,6 +168,7 @@ fun RichNoteEditor(
     DisposableEffect(Unit) {
         onDispose {
             editTextRef[0] = null
+            titleEditTextRef[0] = null
         }
     }
 
@@ -182,41 +182,88 @@ fun RichNoteEditor(
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         ) {
             Column(Modifier.fillMaxSize()) {
-                androidx.compose.material3.TextField(
-                    value = title,
-                    onValueChange = onTitleChange,
+                // Titolo come EditText nativo e NON come TextField Compose.
+                // Con il titolo in Compose, passare al corpo faceva scendere e
+                // risalire la tastiera: Compose, quando il suo TextField perde
+                // il focus, manda un hide della IME, e quell'ordine arriva
+                // dopo lo show del tap sull'EditText. Non è un ordine che si
+                // possa disattivare — l'unico modo per non farlo partire è che
+                // il focus non lasci mai il mondo View. Così il passaggio
+                // titolo → corpo è un semplice restartInput: la tastiera non
+                // si muove.
+                AndroidView(
+                    // Geometria identica al TextField Material che c'era prima:
+                    // stesso padding esterno (8dp / 4dp) e stessa altezza della
+                    // casella. L'altezza si impone QUI e non con `minHeight`
+                    // sulla View: `heightIn` è un vincolo di misura che Compose
+                    // passa direttamente all'AndroidView, quindi vale sempre,
+                    // mentre il `minHeight` della TextView dipende da come lo
+                    // stile AppCompat la misura. Senza, l'EditText si stringe
+                    // sul testo e la casella del titolo risulta più bassa.
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    placeholder = {
-                        Text(
-                            stringResource(R.string.notes_editor_title_placeholder),
-                            color = kb.subtitle,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .heightIn(min = TITLE_HEIGHT_DP.dp),
+                    factory = {
+                        AppCompatEditText(
+                            ContextThemeWrapper(context, androidx.appcompat.R.style.Theme_AppCompat),
+                        ).apply {
+                            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                            gravity = Gravity.CENTER_VERTICAL or Gravity.START
+                            includeFontPadding = false
+                            // 16dp orizzontali come il padding interno di un
+                            // TextField Material; verticali zero, ci pensa la
+                            // gravity a centrare il testo nella casella.
+                            val sidePadding = (TITLE_SIDE_PADDING_DP * resources.displayMetrics.density).toInt()
+                            setPadding(sidePadding, 0, sidePadding, 0)
+                            hint = context.getString(R.string.notes_editor_title_placeholder)
+                            setTextColor(kb.title.toArgb())
+                            setHintTextColor(kb.subtitle.toArgb())
+                            textSize = 22f
+                            // `sans-serif-medium` ≈ il SemiBold di headlineSmall che il titolo aveva prima.
+                            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                            setSingleLine(true)
+                            inputType = InputType.TYPE_CLASS_TEXT or
+                                InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                            // "Avanti" invece di "Invio": da titolo a corpo
+                            // senza far passare la tastiera dallo stato chiuso.
+                            imeOptions = EditorInfo.IME_ACTION_NEXT or
+                                EditorInfo.IME_FLAG_NO_EXTRACT_UI
+                            setText(title)
+                            setSelection(text?.length ?: 0)
+                            addTextChangedListener(
+                                object : TextWatcher {
+                                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+                                    override fun afterTextChanged(s: Editable?) {
+                                        onTitleChange(s?.toString().orEmpty())
+                                    }
+                                },
+                            )
+                            setOnEditorActionListener { _, actionId, _ ->
+                                if (actionId == EditorInfo.IME_ACTION_NEXT) {
+                                    editTextRef[0]?.requestFocus()
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
+                            titleEditTextRef[0] = this
+                        }
                     },
-                    textStyle = MaterialTheme.typography.headlineSmall.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 22.sp,
-                        color = kb.title,
-                    ),
-                    singleLine = true,
-                    colors = TextFieldDefaults.colors(
-                        focusedTextColor = kb.title,
-                        unfocusedTextColor = kb.title,
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent,
-                        errorContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        disabledIndicatorColor = Color.Transparent,
-                        errorIndicatorColor = Color.Transparent,
-                        cursorColor = kb.title,
-                        focusedPlaceholderColor = kb.subtitle,
-                        unfocusedPlaceholderColor = kb.subtitle,
-                    ),
+                    update = { editText ->
+                        titleEditTextRef[0] = editText
+                        editText.setTextColor(kb.title.toArgb())
+                        editText.setHintTextColor(kb.subtitle.toArgb())
+                        // Si riscrive solo se il testo è davvero diverso: un
+                        // setText() a ogni ricomposizione riporterebbe il
+                        // cursore a inizio riga mentre si sta digitando.
+                        if (editText.text?.toString() != title) {
+                            val sel = editText.selectionStart.coerceAtLeast(0)
+                            editText.setText(title)
+                            editText.setSelection(sel.coerceAtMost(title.length))
+                        }
+                    },
                 )
 
                 HorizontalDivider(
@@ -956,3 +1003,13 @@ private fun spannedToHtml(
     )
 }
 
+/**
+ * Altezza della casella titolo. Non è il minimo teorico di 56dp del TextField
+ * Material che sostituisce: con il testo a 22sp quel campo si misurava a 62dp,
+ * valore verificato sul device (186px a densità 480dpi). Il TextField è sparito
+ * ma la casella deve restare identica a com'era.
+ */
+private const val TITLE_HEIGHT_DP = 62
+
+/** Padding interno orizzontale del titolo, come quello di un TextField Material. */
+private const val TITLE_SIDE_PADDING_DP = 16

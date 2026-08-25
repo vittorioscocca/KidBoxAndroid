@@ -254,6 +254,9 @@ class NudgeEngine @Inject constructor(
         }
     }
 
+    /** Annulla ogni nudge pianificato. Pubblico perché serve anche al logout. */
+    fun cancelAllScheduled() = cancelAll()
+
     private fun cancelAll() {
         for (campaign in NudgeConfig.BUILT_IN.campaigns) {
             val pi = pendingIntent(campaign, 0L)

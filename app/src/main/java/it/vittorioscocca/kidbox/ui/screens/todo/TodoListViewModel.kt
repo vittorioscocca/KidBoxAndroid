@@ -86,7 +86,12 @@ class TodoListViewModel @Inject constructor(
             it.familyId == familyId && it.childId == childId && !it.isDeleted
         }
         val listAccessDenied = kind == null && listId.isNotBlank() &&
-            !TodoListExposure.memberCanSeeListRow(listId, todosForChild, uidForVis)
+            !TodoListExposure.memberCanSeeListRow(
+                listId = listId,
+                todosForChild = todosForChild,
+                currentUid = uidForVis,
+                listCreatedBy = lists.firstOrNull { it.id == listId }?.createdBy,
+            )
         val listScoped = if (kind == null) todosVisible.filter { it.listId == listId } else todosVisible
         val filtered = when (kind) {
             TodoSmartKind.TODAY -> {

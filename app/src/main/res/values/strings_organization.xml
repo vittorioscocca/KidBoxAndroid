@@ -171,4 +171,6 @@
     <string name="calendar_save_event_button">Salva evento</string>
     <string name="calendar_visibility_section_title">Chi può vedere questo evento?</string>
     <string name="todo_deeplink_opening">Apro il to-do…</string>
+    <string name="calendar_deeplink_opening">Apro l\'evento…</string>
+    <string name="calendar_previous_month_cd">Mese precedente</string>
 </resources>

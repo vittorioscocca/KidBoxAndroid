@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import it.vittorioscocca.kidbox.data.repository.PhotoVideoRepository
 
 /**
  * Membri della famiglia disponibili come destinatari di una @menzione nella chat.
@@ -67,7 +68,12 @@ data class ChatUiState(
     val isSearchActive: Boolean = false,
     val searchQuery: String = "",
     val mentionCandidates: List<ChatMentionCandidate> = emptyList(),
+    /** Membri attivi della famiglia, per capire se la chat ha davvero un destinatario. */
+    val familyMemberCount: Int = 0,
 ) {
+    /** Con un solo membro non c'è nessuno con cui chattare: la chat resta inerte. */
+    val isSoloFamily: Boolean get() = familyMemberCount in 1..1
+
     /** `true` se la chat ha più di due partecipanti (sender incluso). */
     val canMention: Boolean get() = mentionCandidates.size >= 2
 }
@@ -82,6 +88,8 @@ class ChatViewModel @Inject constructor(
     private val badgeManager: HomeBadgeManager,
     private val auth: FirebaseAuth,
     private val messageSettingsPreferences: MessageSettingsPreferences,
+    private val photoVideoRepository: PhotoVideoRepository,
+    private val photoDao: it.vittorioscocca.kidbox.data.local.dao.KBFamilyPhotoDao,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ChatUiState(currentUid = auth.currentUser?.uid.orEmpty()))
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
@@ -253,7 +261,10 @@ class ChatViewModel @Inject constructor(
                     }
                     .sortedBy { it.displayName.lowercase() }
                     .toList()
-                _uiState.value = _uiState.value.copy(mentionCandidates = candidates)
+                _uiState.value = _uiState.value.copy(
+                    mentionCandidates = candidates,
+                    familyMemberCount = members.count { it.userId.isNotBlank() },
+                )
             }
         }
 
@@ -414,6 +425,34 @@ class ChatViewModel @Inject constructor(
     }
 
     /** Sends multiple photos/videos as a single MEDIA_GROUP message. Max 10 items. */
+    /**
+     * Risolve media della libreria KidBox in URI di file locali.
+     *
+     * NON invia: i media entrano nella stessa coda `pendingMedia` usata dalla
+     * galleria del telefono, così anteprima, rimozione di un singolo elemento,
+     * compressione video e scelta fra invio singolo e gruppo restano identici a
+     * prescindere da dove arriva il media. Prima venivano spediti subito,
+     * saltando tutto quel percorso.
+     *
+     * `preparePreviewFile` usa il file locale se c'è, altrimenti scarica e
+     * decifra l'originale una volta sola.
+     *
+     * I media illeggibili vengono saltati: meglio portarne avanti cinque su sei
+     * che perdere l'intera selezione.
+     */
+    suspend fun resolveKidBoxMedia(photoIds: List<String>): List<Pair<android.net.Uri, Boolean>> {
+        if (photoIds.isEmpty()) return emptyList()
+        return withContext(Dispatchers.IO) {
+            photoIds.mapNotNull { id ->
+                runCatching {
+                    val photo = photoDao.getById(id) ?: return@runCatching null
+                    val file = photoVideoRepository.preparePreviewFile(photo)
+                    android.net.Uri.fromFile(file) to photo.mimeType.startsWith("video/")
+                }.getOrNull()
+            }
+        }
+    }
+
     fun sendMediaGroup(items: List<Pair<ByteArray, Boolean>>) {
         val state = _uiState.value
         val familyId = state.familyId

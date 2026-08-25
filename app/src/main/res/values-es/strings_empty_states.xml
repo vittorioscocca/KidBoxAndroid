@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Schermate di sezione vuota: icona, titolo, testo esplicativo, pulsante. -->
+    <string name="empty_calendar_title">Ningún evento</string>
+    <string name="empty_calendar_body">Apunta las citas, los compromisos y las fechas señaladas de la familia. Cada evento tiene una categoría y un color, así ves de un vistazo quién tiene el día lleno.</string>
+    <string name="empty_calendar_action">Nuevo evento</string>
+    <string name="empty_documents_title">Ningún documento</string>
+    <string name="empty_documents_body">Guarda informes, contratos, certificados y recibos en un solo sitio, organizados en carpetas. Los archivos están cifrados de extremo a extremo: solo tu familia puede abrirlos.</string>
+    <string name="empty_documents_action">Añadir documento</string>
+    <string name="empty_expenses_title">Ningún gasto</string>
+    <string name="empty_expenses_body">Controla cuánto sale y en qué, repartido por categorías. Ves enseguida cómo va el mes y quién ha pagado qué.</string>
+    <string name="empty_expenses_action">Nuevo gasto</string>
+    <string name="empty_grocery_title">Lista vacía</string>
+    <string name="empty_grocery_body">Añade lo que falta y márcalo mientras estás en el súper. La lista es compartida: si alguien coge la leche, la ves desaparecer de tu móvil.</string>
+    <string name="empty_grocery_action">Añadir artículo</string>
+    <string name="empty_homeitems_title">Casa está todavía vacía</string>
+    <string name="empty_homeitems_body">Registra electrodomésticos, garantías y mantenimientos, y ten controlados los vencimientos periódicos como el alquiler, las facturas y la comunidad.</string>
+    <string name="empty_homeitems_action">Nuevo elemento</string>
+    <string name="empty_homeitems_action_secondary">Nuevo vencimiento</string>
+    <string name="empty_passwords_title">Ninguna contraseña</string>
+    <string name="empty_passwords_body">Guarda las credenciales de casa y compártelas solo con quien tú decidas. Todo está cifrado de extremo a extremo y KidBox puede rellenarlas por ti en las apps y en la web.</string>
+    <string name="empty_passwords_action">Nueva contraseña</string>
+    <string name="empty_pets_title">Ninguna mascota</string>
+    <string name="empty_pets_body">Añade a los perros, los gatos y a todos los demás de casa: cartilla sanitaria, vacunas, tratamientos y visitas al veterinario, siempre a mano.</string>
+    <string name="empty_pets_action">Añadir mascota</string>
+    <string name="empty_photos_title">Ninguna foto</string>
+    <string name="empty_photos_body">Reúne las fotos y los vídeos de la familia en álbumes compartidos, sin dejarlos en manos de una red social. Todo está cifrado de extremo a extremo y se queda entre vosotros.</string>
+    <string name="empty_photos_action">Añadir foto</string>
+    <string name="empty_vehicles_title">Ningún vehículo</string>
+    <string name="empty_vehicles_body">Añade coches, motos y bicis: seguro, ITV, impuesto y revisión de un vistazo, con el aviso antes de cada vencimiento.</string>
+    <string name="empty_vehicles_action">Añadir vehículo</string>
+    <string name="empty_wallet_tickets_title">Ninguna entrada</string>
+    <string name="empty_wallet_tickets_body">Guarda billetes de viaje y entradas de conciertos y cine: los tienes aquí incluso sin conexión, con el aviso antes de salir. Todo cifrado de extremo a extremo.</string>
+    <string name="empty_wallet_tickets_action">Añadir entrada</string>
+    <string name="empty_wallet_documents_title">Ningún documento</string>
+    <string name="empty_wallet_documents_body">DNI, carné de conducir, tarjeta sanitaria y pasaporte de toda la familia, siempre contigo. Cifrados de extremo a extremo, con el aviso antes de que caduquen.</string>
+    <string name="empty_wallet_documents_action">Añadir documento</string>
+    <string name="empty_loyalty_title">Ninguna tarjeta</string>
+    <string name="empty_loyalty_body">Reúne las tarjetas de fidelización de las tiendas y enseña el código de barras en la caja, sin llevar encima la cartera. Las fotos de las tarjetas están cifradas de extremo a extremo.</string>
+    <string name="empty_loyalty_action">Añadir tarjeta</string>
+</resources>

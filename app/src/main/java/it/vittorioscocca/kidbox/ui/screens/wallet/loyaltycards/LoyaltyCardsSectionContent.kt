@@ -44,6 +44,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.entity.KBLoyaltyCardEntity
+import it.vittorioscocca.kidbox.ui.components.KBEmptyState
+import androidx.compose.material.icons.filled.AddCircle
 
 /**
  * Contenuto del terzo tab "Carte" del Wallet: griglia 2 colonne di carte
@@ -89,15 +91,18 @@ fun LoyaltyCardsSectionContent(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-            OutlinedTextField(
-                value = searchText,
-                onValueChange = { searchText = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text(stringResource(R.string.wallet_loyalty_search_placeholder)) },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                singleLine = true,
-            )
+        // La barra di ricerca ha senso solo con almeno una carta: senza, resta il solo empty state.
+        if (!state.isLoading && state.cards.isNotEmpty()) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                OutlinedTextField(
+                    value = searchText,
+                    onValueChange = { searchText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text(stringResource(R.string.wallet_loyalty_search_placeholder)) },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    singleLine = true,
+                )
+            }
         }
 
         if (state.isLoading) {
@@ -108,7 +113,13 @@ fun LoyaltyCardsSectionContent(
         }
 
         if (state.cards.isEmpty()) {
-            EmptyLoyaltyCardsState()
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                EmptyLoyaltyCardsState(onAddCard = { onShowAddFlowChange(true) })
+            }
             return@Column
         }
 
@@ -175,34 +186,13 @@ fun LoyaltyCardsSectionContent(
 }
 
 @Composable
-private fun EmptyLoyaltyCardsState() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Icon(
-            Icons.Filled.CreditCard,
-            contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            stringResource(R.string.wallet_loyalty_empty_title),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            stringResource(R.string.wallet_loyalty_empty_subtitle),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
-        // Nessun bottone qui: si aggiunge dal "+" nella barra in alto, come
-        // nello stato vuoto della sezione Documenti del Wallet.
-    }
+private fun EmptyLoyaltyCardsState(onAddCard: () -> Unit) {
+    KBEmptyState(
+        icon = Icons.Filled.CreditCard,
+        title = stringResource(R.string.empty_loyalty_title),
+        body = stringResource(R.string.empty_loyalty_body),
+        primaryIcon = Icons.Filled.AddCircle,
+        primaryLabel = stringResource(R.string.empty_loyalty_action),
+        onPrimary = onAddCard,
+    )
 }

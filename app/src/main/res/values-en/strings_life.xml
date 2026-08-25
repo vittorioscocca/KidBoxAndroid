@@ -82,6 +82,7 @@
     <string name="home_items_house">Home</string>
     <string name="home_items_new_item_house">New home item</string>
     <string name="home_items_new_deadline_payment">New deadline or payment</string>
+    <string name="home_items_add_sheet_title">Add to Home</string>
     <string name="home_items_none_yet">No items yet</string>
     <string name="home_items_item">Home item</string>
     <string name="home_items_deadline">Deadline</string>

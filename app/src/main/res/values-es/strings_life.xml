@@ -82,6 +82,7 @@
     <string name="home_items_house">Casa</string>
     <string name="home_items_new_item_house">Nuevo elemento del hogar</string>
     <string name="home_items_new_deadline_payment">Nuevo vencimiento o pago</string>
+    <string name="home_items_add_sheet_title">Añadir a Casa</string>
     <string name="home_items_none_yet">Todavía no hay elementos</string>
     <string name="home_items_item">Elemento del hogar</string>
     <string name="home_items_deadline">Vencimiento</string>

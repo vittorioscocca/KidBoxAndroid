@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox.ui.screens.ai.planning
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -197,6 +198,28 @@ object DailyBriefingService {
             return if (retry) Result.retry() else Result.failure()
         }
     }
+
+    /**
+     * Annulla l'allarme e il lavoro periodico. Serve al logout: senza questo la
+     * notifica generata per la famiglia precedente continuerebbe ad arrivare.
+     */
+    fun cancelScheduledNotification(context: Context, familyId: String) {
+        val intent = Intent(context, DailyBriefingBroadcastReceiver::class.java).apply {
+            action = DailyBriefingBroadcastReceiver.ACTION_DAILY_BRIEFING
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            ("daily:$familyId").hashCode(),
+            intent,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+        )
+        if (pendingIntent != null) {
+            (context.getSystemService(Context.ALARM_SERVICE) as AlarmManager).cancel(pendingIntent)
+            pendingIntent.cancel()
+        }
+        WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
+    }
+
 }
 
 class DailyBriefingBroadcastReceiver : BroadcastReceiver() {
@@ -252,4 +275,5 @@ class DailyBriefingBroadcastReceiver : BroadcastReceiver() {
         const val CHANNEL_ID = "kb_daily_briefing"
         const val ACTION_DAILY_BRIEFING = "it.vittorioscocca.kidbox.DAILY_BRIEFING"
     }
+
 }

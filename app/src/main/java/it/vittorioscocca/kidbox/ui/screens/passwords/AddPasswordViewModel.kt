@@ -35,6 +35,9 @@ data class AddPasswordPickerMember(
 data class AddPasswordPickerGroup(
     val id: String,
     val label: String,
+    /** Nome in stile SF Symbol, come lo scrive iOS. Vedi `passwordGroupIcon`. */
+    val icon: String = "folder",
+    val colorHex: String = "#7C6FDE",
 )
 
 /** Valori decifrati per precompilare il form in modifica. */
@@ -106,15 +109,63 @@ class AddPasswordViewModel @Inject constructor(
                             .compareTo(decryptGroupName(b, uid).lowercase())
                     }
                 }
-                sorted.map { g ->
-                    AddPasswordPickerGroup(
-                        id = g.id,
-                        label = decryptGroupName(g, uid).ifBlank { "Gruppo" },
-                    )
-                }
+                sorted
+                    // "Non assegnato" è già la prima voce fissa del selettore, che
+                    // corrisponde a `groupId = null`. Lasciando qui anche il gruppo
+                    // omonimo — che esiste davvero, seminato o arrivato da iOS — la
+                    // voce compariva DUE volte.
+                    .filterNot { it.id == unassignedId }
+                    .map { g ->
+                        AddPasswordPickerGroup(
+                            id = g.id,
+                            label = decryptGroupName(g, uid).ifBlank { "Gruppo" },
+                            icon = g.icon,
+                            colorHex = g.color,
+                        )
+                    }
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * Crea un gruppo mentre si sta compilando la password e lo restituisce già
+     * selezionato.
+     *
+     * Prima, se il gruppo giusto non esisteva, bisognava abbandonare il form,
+     * andare nella gestione gruppi e ricominciare. Stessa forma di
+     * `PasswordsGroupsViewModel.createGroup`, con id casuale perché è un gruppo
+     * dell'utente e non uno dei predefiniti a id deterministico.
+     *
+     * @return l'id del gruppo creato, o `null` se il nome era vuoto o manca la
+     *     sessione.
+     */
+    suspend fun createGroup(name: String): String? {
+        val familyId = familyIdFlow.value ?: return null
+        val uid = auth.currentUser?.uid?.trim().orEmpty()
+        val cleanName = name.trim()
+        if (uid.isEmpty() || cleanName.isEmpty()) return null
+
+        return runCatching {
+            val now = System.currentTimeMillis()
+            val entity = PasswordGroupEntity(
+                id = "kb.password.group.$familyId.${UUID.randomUUID()}",
+                familyId = familyId,
+                nameCipher = passwordCypher.encrypt(cleanName, familyId, KBVisibilityScope.FAMILY, uid),
+                icon = "folder",
+                color = "#7C6FDE",
+                visibility = KBVisibilityScope.FAMILY,
+                createdBy = uid,
+                createdAtEpochMillis = now,
+                updatedAtEpochMillis = now,
+                deletedAtEpochMillis = null,
+                syncStateRaw = 1,
+                lastSyncError = null,
+            )
+            passwordGroupDao.upsert(entity)
+            passwordsRepository.pushUpsertGroup(entity)
+            entity.id
+        }.getOrNull()
+    }
 
     fun bind(familyId: String, editingEntryId: String? = null) {
         familyIdFlow.value = familyId

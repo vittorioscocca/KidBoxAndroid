@@ -145,6 +145,7 @@ class TodoRepository @Inject constructor(
             createdAtEpochMillis = now,
             updatedAtEpochMillis = now,
             isDeleted = false,
+            createdBy = auth.currentUser?.uid?.trim()?.takeIf { it.isNotEmpty() },
         )
         try {
             listDao.upsert(local)
@@ -406,6 +407,7 @@ class TodoRepository @Inject constructor(
                                 createdAtEpochMillis = local?.createdAtEpochMillis ?: (dto.updatedAtEpochMillis ?: now),
                                 updatedAtEpochMillis = dto.updatedAtEpochMillis ?: now,
                                 isDeleted = false,
+                                createdBy = dto.createdBy ?: local?.createdBy,
                             ),
                         )
                         KBLog.sync.debug("applyListInbound SAVED id=${dto.id}", tag = "todo")

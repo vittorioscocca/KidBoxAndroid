@@ -20,6 +20,16 @@ import androidx.compose.ui.text.font.FontWeight
 import it.vittorioscocca.kidbox.R
 
 data class KidBoxColorScheme(
+    /**
+     * Vero quando è attivo il tema scuro DELL'APP.
+     *
+     * Serve a chi deve decidere qualcosa che non è un colore del tema — per
+     * esempio lo stile scuro della mappa in Posizione. Prima quei punti usavano
+     * `isSystemInDarkTheme()`, che ignora la preferenza scelta in Impostazioni:
+     * con app forzata a chiaro e sistema scuro si otteneva una mappa scura
+     * dentro una schermata chiara.
+     */
+    val isDark: Boolean,
     val background: Color,
     val card: Color,
     val title: Color,
@@ -40,6 +50,7 @@ data class KidBoxColorScheme(
 )
 
 val KidBoxLightColorScheme = KidBoxColorScheme(
+    isDark = false,
     background = Color(0xFFF5F3EE),
     card = Color(0xFFFFFFFF),
     title = Color(0xFF1A1A1A),
@@ -53,6 +64,7 @@ val KidBoxLightColorScheme = KidBoxColorScheme(
 )
 
 val KidBoxDarkColorScheme = KidBoxColorScheme(
+    isDark = true,
     background = Color(0xFF1C1C1E),
     card = Color(0xFF2C2C2E),
     title = Color(0xFFFFFFFF),

@@ -158,4 +158,10 @@
     <string name="ai_weekly_summary_sub">Recap automatico settimanale della famiglia</string>
     <string name="ai_quiet_week">Settimana tranquilla! Nessuna scadenza urgente.</string>
     <string name="ai_open_weekly">Apri il recap settimanale</string>
+    <string name="chat_media_source_title">Da dove vuoi scegliere?</string>
+    <string name="chat_media_source_gallery">Galleria del telefono</string>
+    <string name="chat_media_source_kidbox">Foto e Video di KidBox</string>
+    <string name="chat_kidbox_picker_title">Scegli da KidBox</string>
+    <string name="chat_kidbox_picker_empty">Non ci sono ancora foto o video in KidBox.</string>
+    <string name="chat_kidbox_picker_send">Invia</string>
 </resources>

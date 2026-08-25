@@ -19,6 +19,7 @@ import javax.inject.Singleton
 class HousePaymentReminderScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
     private val housePaymentDao: HousePaymentDao,
+    private val alarmRegistry: ReminderAlarmRegistry,
 ) {
     private val alarmManager: AlarmManager
         get() = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -31,22 +32,25 @@ class HousePaymentReminderScheduler @Inject constructor(
         val interval = fire - System.currentTimeMillis()
         if (interval < 5_000L) return
 
-        val intent = baseIntent(
-            paymentId = entity.id,
-            familyId = entity.familyId,
-            paymentName = entity.name,
+        alarmRegistry.arm(
+            ReminderAlarmRegistry.AlarmSpec(
+                key = ReminderAlarmRegistry.housePaymentKey(entity.id),
+                target = ReminderAlarmRegistry.Target.HEALTH,
+                requestCode = requestCode(entity.id),
+                fireAtMillis = fire,
+                dataUri = alarmUri(entity.id).toString(),
+                stringExtras = mapOf(
+                    HealthReminderReceiver.EXTRA_TYPE to HealthReminderReceiver.TYPE_HOUSE_PAYMENT,
+                    HealthReminderReceiver.EXTRA_HOUSE_PAYMENT_ID to entity.id,
+                    HealthReminderReceiver.EXTRA_FAMILY_ID to entity.familyId,
+                    HealthReminderReceiver.EXTRA_HOUSE_PAYMENT_NAME to entity.name,
+                ),
+            ),
         )
-        val req = requestCode(entity.id)
-        val pi = PendingIntent.getBroadcast(
-            context,
-            req,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fire, pi)
     }
 
     fun cancelForPayment(paymentId: String) {
+        alarmRegistry.forget(ReminderAlarmRegistry.housePaymentKey(paymentId))
         val cancelIntent = Intent(context, HealthReminderReceiver::class.java).apply {
             data = alarmUri(paymentId)
         }

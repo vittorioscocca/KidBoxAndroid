@@ -5,7 +5,10 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import it.vittorioscocca.kidbox.data.crypto.PasswordCypher
 import it.vittorioscocca.kidbox.data.local.dao.HousePaymentDao
+import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
+import it.vittorioscocca.kidbox.data.local.dao.KBTreatmentDao
 import it.vittorioscocca.kidbox.data.local.dao.PasswordEntryDao
+import it.vittorioscocca.kidbox.data.local.dao.PetDao
 import it.vittorioscocca.kidbox.data.local.dao.VehicleDao
 
 @EntryPoint
@@ -18,4 +21,9 @@ interface VehicleReminderEntryPoint {
     fun passwordExpiryReminderScheduler(): PasswordExpiryReminderScheduler
     fun passwordEntryDao(): PasswordEntryDao
     fun passwordCypher(): PasswordCypher
+    fun reminderAlarmRegistry(): ReminderAlarmRegistry
+    fun treatmentNotificationManager(): TreatmentNotificationManager
+    fun treatmentDao(): KBTreatmentDao
+    fun childDao(): KBChildDao
+    fun petDao(): PetDao
 }

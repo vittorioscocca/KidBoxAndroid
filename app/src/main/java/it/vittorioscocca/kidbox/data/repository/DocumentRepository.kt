@@ -232,6 +232,10 @@ class DocumentRepository @Inject constructor(
             KBLog.data.debug("healHierarchy skipped for familyId=$familyId (already healed this session)", TAG_DOC_SYNC)
             return 0
         }
+        if (!hasExpenseContent(familyId)) {
+            KBLog.data.debug("healHierarchy skipped for familyId=$familyId (nessun contenuto spese: root non creata)", TAG_DOC_SYNC)
+            return 0
+        }
         val now = System.currentTimeMillis()
         val uid = auth.currentUser?.uid ?: "local"
         val restored = database.withTransaction {
@@ -537,7 +541,20 @@ class DocumentRepository @Inject constructor(
         return restored
     }
 
+    /**
+     * True se la famiglia ha qualcosa di legato alle spese (spesa attiva, cartella `exp-cat-`
+     * o documento agganciato a una spesa). Se è false la root «Spese» in Documenti non deve
+     * esistere: parity con la richiesta «la cartella compare solo quando si crea una spesa».
+     */
+    suspend fun hasExpenseContent(familyId: String): Boolean {
+        if (expenseDao.getAllByFamilyId(familyId).any { !it.isDeleted }) return true
+        if (categoryDao.getAllByFamilyId(familyId).any { !it.isDeleted && it.id.startsWith("exp-cat-") }) return true
+        return documentDao.getAllByFamilyId(familyId)
+            .any { !it.isDeleted && isExpenseLinkedDocument(it.id, it.notes) }
+    }
+
     suspend fun hasCriticalExpenseHierarchyInstability(familyId: String): Boolean {
+        if (!hasExpenseContent(familyId)) return false
         val rootId = expensesRootFolderId(familyId)
         val root = categoryDao.getById(rootId)
         if (root == null || root.isDeleted || root.parentId != null) return true

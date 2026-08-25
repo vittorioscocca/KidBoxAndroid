@@ -42,6 +42,9 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.components.KBBackButton
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 
 // Verde/ambra dell'avviso sicurezza sull'invito. Locali come gli accenti
 // delle altre schermate: la palette del tema non ha semantici per questi due.
@@ -65,6 +68,9 @@ fun InviteCodeScreen(
     var showRevokeConfirmation by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        // Il contenuto della schermata è centrato: il tasto indietro sta
+        // sovrapposto in alto a sinistra.
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -216,5 +222,13 @@ fun InviteCodeScreen(
                 },
             )
         }
+
+        KBBackButton(
+            onClick = onBack,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .statusBarsPadding()
+                .padding(16.dp),
+        )
     }
 }

@@ -97,6 +97,10 @@ import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import com.google.firebase.auth.FirebaseAuth
+import android.content.Context
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.fragment.app.FragmentActivity
 
 private val PasswordsAccentPurple = Color(0xFF9973D9)
 
@@ -264,7 +268,15 @@ fun PasswordDetailScreen(
                 label = stringResource(R.string.passwords_password_placeholder),
                 passwordValue = state.password,
                 showPassword = showPassword,
-                onTogglePassword = { showPassword = !showPassword },
+                // Come su iOS: mostrare la password richiede di autenticarsi.
+                // Nasconderla no — non è un'operazione che espone nulla.
+                onTogglePassword = {
+                    if (showPassword) {
+                        showPassword = false
+                    } else {
+                        biometricThenReveal(context) { showPassword = true }
+                    }
+                },
             )
             InfoRow(label = stringResource(R.string.passwords_website_section_label), value = state.website.ifBlank { "—" })
             if (state.notes.isNotBlank()) {
@@ -775,5 +787,48 @@ private fun PasswordRow(
         style = MaterialTheme.typography.bodyLarge,
         color = kb.title,
         modifier = Modifier.padding(top = 4.dp, bottom = 10.dp),
+    )
+}
+
+/**
+ * Chiede l'autenticazione prima di rivelare la password.
+ *
+ * Gemello di `unlockPasswordVisibility` su iOS: accetta biometria O credenziale
+ * del dispositivo (PIN/sequenza), così anche chi non ha impronta o volto
+ * registrati può comunque sbloccare — se richiedessimo la sola biometria, su
+ * quei dispositivi la password diventerebbe invisibile.
+ *
+ * Se non è configurato NESSUN metodo di sblocco il prompt non può comparire: in
+ * quel caso si mostra comunque la password, perché il dispositivo non offre
+ * alcuna barriera da opporre e bloccare l'accesso renderebbe il dato
+ * irraggiungibile al legittimo proprietario.
+ */
+private fun biometricThenReveal(context: Context, onSuccess: () -> Unit) {
+    val activity = context as? FragmentActivity
+    if (activity == null) {
+        onSuccess()
+        return
+    }
+    val allowed = BiometricManager.Authenticators.BIOMETRIC_STRONG or
+        BiometricManager.Authenticators.DEVICE_CREDENTIAL
+    if (BiometricManager.from(activity).canAuthenticate(allowed) != BiometricManager.BIOMETRIC_SUCCESS) {
+        onSuccess()
+        return
+    }
+    val prompt = BiometricPrompt(
+        activity,
+        ContextCompat.getMainExecutor(activity),
+        object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                onSuccess()
+            }
+        },
+    )
+    prompt.authenticate(
+        BiometricPrompt.PromptInfo.Builder()
+            .setTitle(activity.getString(R.string.passwords_biometric_reveal_title))
+            .setSubtitle(activity.getString(R.string.passwords_biometric_reveal_subtitle))
+            .setAllowedAuthenticators(allowed)
+            .build(),
     )
 }

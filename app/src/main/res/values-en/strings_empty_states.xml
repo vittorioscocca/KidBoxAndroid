@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Schermate di sezione vuota: icona, titolo, testo esplicativo, pulsante. -->
+    <string name="empty_calendar_title">No events</string>
+    <string name="empty_calendar_body">Keep track of the family\'s appointments, commitments and recurring dates. Every event has a category and a colour, so you can see at a glance whose day is packed.</string>
+    <string name="empty_calendar_action">New event</string>
+    <string name="empty_documents_title">No documents</string>
+    <string name="empty_documents_body">Keep reports, contracts, certificates and receipts in one place, organised into folders. Files are end-to-end encrypted: only your family can open them.</string>
+    <string name="empty_documents_action">Add document</string>
+    <string name="empty_expenses_title">No expenses</string>
+    <string name="empty_expenses_body">Track what goes out and what for, broken down by category. See how the month is going and who paid for what.</string>
+    <string name="empty_expenses_action">New expense</string>
+    <string name="empty_grocery_title">Your list is empty</string>
+    <string name="empty_grocery_body">Add whatever you\'ve run out of and tick it off while you\'re at the shop. The list is shared: if someone grabs the milk, you\'ll see it disappear from your phone.</string>
+    <string name="empty_grocery_action">Add item</string>
+    <string name="empty_homeitems_title">Home is still empty</string>
+    <string name="empty_homeitems_body">Keep a record of appliances, warranties and maintenance, and stay on top of recurring bills like rent, utilities and service charges.</string>
+    <string name="empty_homeitems_action">New item</string>
+    <string name="empty_homeitems_action_secondary">New bill</string>
+    <string name="empty_passwords_title">No passwords</string>
+    <string name="empty_passwords_body">Store the household\'s credentials and share them only with the people you choose. Everything is end-to-end encrypted, and KidBox can fill them in for you in apps and on the web.</string>
+    <string name="empty_passwords_action">New password</string>
+    <string name="empty_pets_title">No pets</string>
+    <string name="empty_pets_body">Add the dogs, cats and everyone else in the house: health record, vaccines, treatments and vet visits, always within reach.</string>
+    <string name="empty_pets_action">Add pet</string>
+    <string name="empty_photos_title">No photos</string>
+    <string name="empty_photos_body">Gather the family\'s photos and videos into shared albums, without handing them to a social network. Everything is end-to-end encrypted and stays between you.</string>
+    <string name="empty_photos_action">Add photo</string>
+    <string name="empty_vehicles_title">No vehicles</string>
+    <string name="empty_vehicles_body">Add cars, motorbikes and bikes: insurance, inspection, road tax and servicing at a glance, with a reminder before every deadline.</string>
+    <string name="empty_vehicles_action">Add vehicle</string>
+    <string name="empty_wallet_tickets_title">No tickets</string>
+    <string name="empty_wallet_tickets_body">Save travel, concert and cinema tickets: they\'re here even offline, with a reminder before you set off. All end-to-end encrypted.</string>
+    <string name="empty_wallet_tickets_action">Add ticket</string>
+    <string name="empty_wallet_documents_title">No documents</string>
+    <string name="empty_wallet_documents_body">ID cards, driving licences, health cards and passports for the whole family, always with you. End-to-end encrypted, with a warning before they expire.</string>
+    <string name="empty_wallet_documents_action">Add document</string>
+    <string name="empty_loyalty_title">No cards</string>
+    <string name="empty_loyalty_body">Collect your shop loyalty cards and show the barcode at the till, without carrying your wallet around. Card photos are end-to-end encrypted.</string>
+    <string name="empty_loyalty_action">Add card</string>
+</resources>

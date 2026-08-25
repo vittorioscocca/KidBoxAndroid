@@ -5,6 +5,7 @@ import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.OnboardingPreferences
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
 import it.vittorioscocca.kidbox.data.sync.MembershipSyncService
+import it.vittorioscocca.kidbox.notifications.ReminderLogoutCleaner
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.FamilyMemoryService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -18,6 +19,7 @@ class LogoutUseCase @Inject constructor(
     private val onboardingPreferences: OnboardingPreferences,
     private val familyMemoryService: FamilyMemoryService,
     private val membershipSyncService: MembershipSyncService,
+    private val reminderLogoutCleaner: ReminderLogoutCleaner,
 ) {
     /**
      * Logout standard (allineato iOS): sign-out + wipe locale,
@@ -26,6 +28,9 @@ class LogoutUseCase @Inject constructor(
      */
     suspend fun logout() {
         membershipSyncService.stop()
+        // Prima del wipe: gli allarmi AI si annullano per id famiglia attivo, che
+        // fra un attimo non sarà più leggibile.
+        reminderLogoutCleaner.clearEverything()
         FirebaseAuth.getInstance().signOut()
         withContext(Dispatchers.IO) {
             database.clearAllTables()

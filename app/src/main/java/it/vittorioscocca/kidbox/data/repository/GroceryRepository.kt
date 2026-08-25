@@ -46,7 +46,9 @@ class GroceryRepository @Inject constructor(
                 listener?.remove()
                 listener = remoteStore.listenGroceries(
                     familyId = familyId,
-                    onChange = { changes -> scope.launch { applyInboundChanges(changes) } },
+                    onChange = { changes, snapshotIds ->
+                        scope.launch { applyInboundChanges(familyId, changes, snapshotIds) }
+                    },
                     onError = { err ->
                         if (
                             err is FirebaseFirestoreException &&
@@ -189,7 +191,11 @@ class GroceryRepository @Inject constructor(
         groceryDao.deleteById(itemId)
     }
 
-    private suspend fun applyInboundChanges(changes: List<GroceryRemoteChange>) {
+    private suspend fun applyInboundChanges(
+        familyId: String,
+        changes: List<GroceryRemoteChange>,
+        snapshotIds: Set<String>?,
+    ) {
         changes.forEach { change ->
             when (change) {
                 is GroceryRemoteChange.Remove -> groceryDao.deleteById(change.id)
@@ -230,6 +236,23 @@ class GroceryRepository @Inject constructor(
                             lastSyncError = null,
                         ),
                     )
+                }
+            }
+        }
+
+        // Riconciliazione: un articolo cancellato da un altro dispositivo può non
+        // arrivare mai come REMOVED sul delta (vedi il commento in
+        // GroceryRemoteStore). Se la snapshot viene dal server e non lo contiene
+        // più, la riga locale va tolta. Si saltano le scritture locali non ancora
+        // inviate: non sono nel result set remoto perché non ci sono ancora
+        // arrivate, non perché siano state cancellate.
+        if (snapshotIds != null) {
+            runCatching {
+                groceryDao.listByFamilyId(familyId).forEach { local ->
+                    if (local.id in snapshotIds) return@forEach
+                    val sync = KBSyncState.fromRaw(local.syncStateRaw)
+                    if (sync == KBSyncState.PENDING_UPSERT || sync == KBSyncState.ERROR) return@forEach
+                    groceryDao.deleteById(local.id)
                 }
             }
         }

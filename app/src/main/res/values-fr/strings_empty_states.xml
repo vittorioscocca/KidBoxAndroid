@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Schermate di sezione vuota: icona, titolo, testo esplicativo, pulsante. -->
+    <string name="empty_calendar_title">Aucun événement</string>
+    <string name="empty_calendar_body">Notez les rendez-vous, les obligations et les dates récurrentes de la famille. Chaque événement a une catégorie et une couleur : vous voyez d\'un coup d\'œil qui a une journée chargée.</string>
+    <string name="empty_calendar_action">Nouvel événement</string>
+    <string name="empty_documents_title">Aucun document</string>
+    <string name="empty_documents_body">Rassemblez comptes rendus, contrats, certificats et reçus au même endroit, classés dans des dossiers. Les fichiers sont chiffrés de bout en bout : seule votre famille peut les ouvrir.</string>
+    <string name="empty_documents_action">Ajouter un document</string>
+    <string name="empty_expenses_title">Aucune dépense</string>
+    <string name="empty_expenses_body">Suivez ce qui sort et pourquoi, réparti par catégorie. Vous voyez tout de suite l\'évolution du mois et qui a payé quoi.</string>
+    <string name="empty_expenses_action">Nouvelle dépense</string>
+    <string name="empty_grocery_title">Liste vide</string>
+    <string name="empty_grocery_body">Ajoutez ce qui manque et cochez-le pendant que vous êtes au magasin. La liste est partagée : si quelqu\'un prend le lait, vous le voyez disparaître de votre téléphone.</string>
+    <string name="empty_grocery_action">Ajouter un article</string>
+    <string name="empty_homeitems_title">Maison est encore vide</string>
+    <string name="empty_homeitems_body">Répertoriez appareils, garanties et entretiens, et gardez un œil sur les échéances récurrentes comme le loyer, les factures et les charges.</string>
+    <string name="empty_homeitems_action">Nouvel élément</string>
+    <string name="empty_homeitems_action_secondary">Nouvelle échéance</string>
+    <string name="empty_passwords_title">Aucun mot de passe</string>
+    <string name="empty_passwords_body">Enregistrez les identifiants de la maison et partagez-les seulement avec qui vous voulez. Tout est chiffré de bout en bout, et KidBox peut les saisir pour vous dans les apps et sur le web.</string>
+    <string name="empty_passwords_action">Nouveau mot de passe</string>
+    <string name="empty_pets_title">Aucun animal</string>
+    <string name="empty_pets_body">Ajoutez les chiens, les chats et tous les autres de la maison : carnet de santé, vaccins, traitements et visites chez le vétérinaire, toujours à portée de main.</string>
+    <string name="empty_pets_action">Ajouter un animal</string>
+    <string name="empty_photos_title">Aucune photo</string>
+    <string name="empty_photos_body">Réunissez les photos et vidéos de famille dans des albums partagés, sans les confier à un réseau social. Tout est chiffré de bout en bout et reste entre vous.</string>
+    <string name="empty_photos_action">Ajouter une photo</string>
+    <string name="empty_vehicles_title">Aucun véhicule</string>
+    <string name="empty_vehicles_body">Ajoutez voitures, motos et vélos : assurance, contrôle technique, taxe et révision d\'un coup d\'œil, avec un rappel avant chaque échéance.</string>
+    <string name="empty_vehicles_action">Ajouter un véhicule</string>
+    <string name="empty_wallet_tickets_title">Aucun billet</string>
+    <string name="empty_wallet_tickets_body">Enregistrez vos billets de voyage, de concert et de cinéma : vous les retrouvez ici même hors ligne, avec un rappel avant le départ. Le tout chiffré de bout en bout.</string>
+    <string name="empty_wallet_tickets_action">Ajouter un billet</string>
+    <string name="empty_wallet_documents_title">Aucun document</string>
+    <string name="empty_wallet_documents_body">Carte d\'identité, permis de conduire, carte vitale et passeport de toute la famille, toujours avec vous. Chiffrés de bout en bout, avec une alerte avant l\'expiration.</string>
+    <string name="empty_wallet_documents_action">Ajouter un document</string>
+    <string name="empty_loyalty_title">Aucune carte</string>
+    <string name="empty_loyalty_body">Rassemblez vos cartes de fidélité et montrez le code-barres en caisse, sans emporter votre portefeuille. Les photos des cartes sont chiffrées de bout en bout.</string>
+    <string name="empty_loyalty_action">Ajouter une carte</string>
+</resources>

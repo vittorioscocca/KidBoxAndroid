@@ -4,7 +4,6 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.mapper.KBVaccineStatus
 import it.vittorioscocca.kidbox.data.local.mapper.computedStatus
@@ -18,6 +17,7 @@ import javax.inject.Singleton
 @Singleton
 class VaccineReminderScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val alarmRegistry: ReminderAlarmRegistry,
 ) {
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
@@ -30,24 +30,40 @@ class VaccineReminderScheduler @Inject constructor(
         if (fireAt <= System.currentTimeMillis()) return
 
         val body = context.getString(R.string.vaccine_reminder_body_format, childName, vaccine.displayTitle())
-        val pi = buildPendingIntent(vaccine.id, body, vaccine.familyId, vaccine.childId)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt, pi)
-            } else {
-                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt, pi)
-            }
-        } else {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt, pi)
-        }
+        alarmRegistry.arm(
+            ReminderAlarmRegistry.AlarmSpec(
+                key = ReminderAlarmRegistry.vaccineKey(vaccine.id),
+                target = ReminderAlarmRegistry.Target.HEALTH,
+                requestCode = ("vaccine:${vaccine.id}").hashCode(),
+                fireAtMillis = fireAt,
+                action = vaccineAction(vaccine.id),
+                stringExtras = mapOf(
+                    HealthReminderReceiver.EXTRA_TYPE to HealthReminderReceiver.TYPE_VACCINE_REMINDER,
+                    HealthReminderReceiver.EXTRA_VACCINE_ID to vaccine.id,
+                    HealthReminderReceiver.EXTRA_TITLE to body,
+                    HealthReminderReceiver.EXTRA_FAMILY_ID to vaccine.familyId,
+                    HealthReminderReceiver.EXTRA_CHILD_ID to vaccine.childId,
+                ),
+            ),
+        )
     }
 
     fun cancelVaccineReminder(vaccineId: String) {
-        val pi = buildPendingIntent(vaccineId, "", "", "")
+        alarmRegistry.forget(ReminderAlarmRegistry.vaccineKey(vaccineId))
+        val intent = Intent(context, HealthReminderReceiver::class.java).apply {
+            action = vaccineAction(vaccineId)
+        }
+        val pi = PendingIntent.getBroadcast(
+            context,
+            ("vaccine:$vaccineId").hashCode(),
+            intent,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+        ) ?: return
         alarmManager.cancel(pi)
         pi.cancel()
     }
+
+    private fun vaccineAction(vaccineId: String) = "kb.health.vaccine_reminder.$vaccineId"
 
     private fun dayBeforeAt9(scheduledMillis: Long): Long =
         Calendar.getInstance().apply {
@@ -59,25 +75,4 @@ class VaccineReminderScheduler @Inject constructor(
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
 
-    private fun buildPendingIntent(
-        vaccineId: String,
-        body: String,
-        familyId: String,
-        childId: String,
-    ): PendingIntent {
-        val intent = Intent(context, HealthReminderReceiver::class.java).apply {
-            action = "kb.health.vaccine_reminder.$vaccineId"
-            putExtra(HealthReminderReceiver.EXTRA_TYPE, HealthReminderReceiver.TYPE_VACCINE_REMINDER)
-            putExtra(HealthReminderReceiver.EXTRA_VACCINE_ID, vaccineId)
-            putExtra(HealthReminderReceiver.EXTRA_TITLE, body)
-            putExtra(HealthReminderReceiver.EXTRA_FAMILY_ID, familyId)
-            putExtra(HealthReminderReceiver.EXTRA_CHILD_ID, childId)
-        }
-        return PendingIntent.getBroadcast(
-            context,
-            ("vaccine:$vaccineId").hashCode(),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-    }
 }

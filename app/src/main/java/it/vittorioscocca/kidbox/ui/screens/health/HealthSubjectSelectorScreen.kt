@@ -43,6 +43,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,6 +83,12 @@ fun HealthSubjectSelectorScreen(
     familyId: String,
     onBack: () -> Unit,
     onSelect: (childId: String) -> Unit,
+    /**
+     * Invocata quando il soggetto è uno solo e la schermata si apre da sé.
+     * Deve *sostituire* questa schermata nello stack: altrimenti tornando
+     * indietro si rientra qui e si viene rispediti subito dentro.
+     */
+    onAutoSelect: (childId: String) -> Unit = onSelect,
     viewModel: HealthSubjectSelectorViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -92,9 +99,14 @@ fun HealthSubjectSelectorScreen(
 
     LaunchedEffect(familyId) { viewModel.load(familyId) }
 
+    // Una sola volta: senza la guardia l'effetto riparte a ogni cambio di stato e
+    // impila più copie di Salute, così «Indietro» sembrava non funzionare (serviva
+    // premerlo tante volte quante le copie).
+    var didAutoSelect by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(state.subjects.size, state.isLoading) {
-        if (!state.isLoading && state.subjects.size == 1) {
-            onSelect(state.subjects.first().id)
+        if (!state.isLoading && state.subjects.size == 1 && !didAutoSelect) {
+            didAutoSelect = true
+            onAutoSelect(state.subjects.first().id)
         }
     }
 

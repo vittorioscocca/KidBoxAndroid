@@ -24,6 +24,7 @@ import javax.inject.Singleton
 class VehicleDeadlineReminderScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
     private val vehicleDao: VehicleDao,
+    private val alarmRegistry: ReminderAlarmRegistry,
 ) {
 
     private val zone: ZoneId = ZoneId.of("Europe/Rome")
@@ -69,6 +70,7 @@ class VehicleDeadlineReminderScheduler @Inject constructor(
     fun cancelForVehicle(vehicleId: String) {
         KIND_KEYS.forEach { kind ->
             VehicleReminderOffsets.ALLOWED_OFFSETS.map { offsetSlot(it) }.forEach { slot ->
+                alarmRegistry.forget(ReminderAlarmRegistry.vehicleKey(vehicleId, kind, slot))
                 val cancelIntent = Intent(context, HealthReminderReceiver::class.java).apply {
                     data = alarmUri(vehicleId, kind, slot)
                 }
@@ -102,7 +104,7 @@ class VehicleDeadlineReminderScheduler @Inject constructor(
         val titlePrefix = firedIntent.getStringExtra(HealthReminderReceiver.EXTRA_VEHICLE_TITLE_PREFIX)
             ?: defaultTitlePrefix(kindKey)
 
-        val intent = baseIntent(
+        armAlarm(
             vehicleId = vehicleId,
             familyId = entity.familyId,
             vehicleName = vehicleName,
@@ -110,15 +112,8 @@ class VehicleDeadlineReminderScheduler @Inject constructor(
             slot = slot,
             titlePrefix = titlePrefix,
             anchorDayMillis = newAnchor,
+            fireAtMillis = nextFire,
         )
-        val req = requestCode(vehicleId, kindKey, slot)
-        val pi = PendingIntent.getBroadcast(
-            context,
-            req,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextFire, pi)
     }
 
     private fun scheduleInitial(
@@ -130,8 +125,7 @@ class VehicleDeadlineReminderScheduler @Inject constructor(
         titlePrefix: String,
         anchorDayMillis: Long,
     ) {
-        val nextFire = nextNineAmMillisAfter(anchorDayMillis, System.currentTimeMillis())
-        val intent = baseIntent(
+        armAlarm(
             vehicleId = vehicleId,
             familyId = familyId,
             vehicleName = vehicleName,
@@ -139,15 +133,41 @@ class VehicleDeadlineReminderScheduler @Inject constructor(
             slot = slot,
             titlePrefix = titlePrefix,
             anchorDayMillis = anchorDayMillis,
+            fireAtMillis = nextNineAmMillisAfter(anchorDayMillis, System.currentTimeMillis()),
         )
-        val req = requestCode(vehicleId, kindKey, slot)
-        val pi = PendingIntent.getBroadcast(
-            context,
-            req,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    }
+
+    private fun armAlarm(
+        vehicleId: String,
+        familyId: String,
+        vehicleName: String,
+        kindKey: String,
+        slot: String,
+        titlePrefix: String,
+        anchorDayMillis: Long,
+        fireAtMillis: Long,
+    ) {
+        alarmRegistry.arm(
+            ReminderAlarmRegistry.AlarmSpec(
+                key = ReminderAlarmRegistry.vehicleKey(vehicleId, kindKey, slot),
+                target = ReminderAlarmRegistry.Target.HEALTH,
+                requestCode = requestCode(vehicleId, kindKey, slot),
+                fireAtMillis = fireAtMillis,
+                dataUri = alarmUri(vehicleId, kindKey, slot).toString(),
+                stringExtras = mapOf(
+                    HealthReminderReceiver.EXTRA_TYPE to HealthReminderReceiver.TYPE_VEHICLE_DEADLINE,
+                    HealthReminderReceiver.EXTRA_VEHICLE_ID to vehicleId,
+                    HealthReminderReceiver.EXTRA_FAMILY_ID to familyId,
+                    HealthReminderReceiver.EXTRA_VEHICLE_NAME to vehicleName,
+                    HealthReminderReceiver.EXTRA_VEHICLE_KIND to kindKey,
+                    HealthReminderReceiver.EXTRA_VEHICLE_SLOT to slot,
+                    HealthReminderReceiver.EXTRA_VEHICLE_TITLE_PREFIX to titlePrefix,
+                ),
+                longExtras = mapOf(
+                    HealthReminderReceiver.EXTRA_VEHICLE_ANCHOR_DAY_MILLIS to anchorDayMillis,
+                ),
+            ),
         )
-        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextFire, pi)
     }
 
     private fun alarmUri(vehicleId: String, kindKey: String, slot: String): Uri =

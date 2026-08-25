@@ -81,6 +81,13 @@ fun ChatInputBar(
      * ViewModel così da serializzarlo nel campo `mentions` al successivo invio.
      */
     onMentionPicked: (ChatMentionCandidate) -> Unit = {},
+    /**
+     * `false` disattiva l'intera barra (campo, allegati, invio, registrazione).
+     * Usato quando in famiglia c'è un solo membro: non c'è nessun destinatario.
+     */
+    enabled: Boolean = true,
+    /** Sfondo della barra: `null` = colore card. Serve a farla sparire quando è disattivata. */
+    containerColor: Color? = null,
 ) {
     val isTyping = text.isNotBlank()
     var touchStartX by remember { mutableFloatStateOf(0f) }
@@ -108,7 +115,7 @@ fun ChatInputBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(MaterialTheme.kidBoxColors.card)
+            .background(containerColor ?: MaterialTheme.kidBoxColors.card)
             .padding(horizontal = 8.dp, vertical = 5.dp),
     ) {
         if (mentionSuggestions.isNotEmpty() && !recordingState.isRecording) {
@@ -181,7 +188,7 @@ fun ChatInputBar(
                 shape = CircleShape,
                 colors = CardDefaults.cardColors(containerColor = Color(0x1AFF6B00)),
             ) {
-                IconButton(onClick = onOpenAttachments, enabled = !isSending && !recordingState.isRecording) {
+                IconButton(onClick = onOpenAttachments, enabled = enabled && !isSending && !recordingState.isRecording) {
                     Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFFFF6B00))
                 }
             }
@@ -200,7 +207,7 @@ fun ChatInputBar(
                 shape = RoundedCornerShape(20.dp),
                 placeholder = { Text(stringResource(R.string.chat_message_placeholder)) },
                 maxLines = 5,
-                enabled = !recordingState.isRecording,
+                enabled = enabled && !recordingState.isRecording,
             )
 
             Spacer(Modifier.size(6.dp))
@@ -213,11 +220,11 @@ fun ChatInputBar(
                 ),
             ) {
                 if (recordingState.isLocked) {
-                    IconButton(onClick = onStopRecording, enabled = !isSending) {
+                    IconButton(onClick = onStopRecording, enabled = enabled && !isSending) {
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = Color.White)
                     }
                 } else if (isTyping) {
-                    IconButton(onClick = onSendText, enabled = !isSending) {
+                    IconButton(onClick = onSendText, enabled = enabled && !isSending) {
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = Color.White)
                     }
                 } else {
@@ -225,6 +232,9 @@ fun ChatInputBar(
                         modifier = Modifier
                             .fillMaxSize()
                             .pointerInteropFilter { event ->
+                                // Barra disattivata: il tocco viene consumato e ignorato,
+                                // così non parte nessuna registrazione.
+                                if (!enabled) return@pointerInteropFilter true
                                 when (event.actionMasked) {
                                     MotionEvent.ACTION_DOWN -> {
                                         touchStartX = event.rawX

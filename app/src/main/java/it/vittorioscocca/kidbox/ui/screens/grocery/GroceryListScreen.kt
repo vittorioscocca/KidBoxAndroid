@@ -67,6 +67,9 @@ import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.notifications.AppSection
 import it.vittorioscocca.kidbox.notifications.TrackSectionPresence
+import it.vittorioscocca.kidbox.ui.components.KBEmptyState
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.ShoppingCart
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -156,20 +159,14 @@ fun GroceryListScreen(
             ) {
                 if (state.items.isEmpty()) {
                     item {
-                        Card(
-                            shape = RoundedCornerShape(24.dp),
-                            colors = CardDefaults.cardColors(containerColor = groceryCard),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 2.dp),
-                        ) {
-                            Text(
-                                text = stringResource(R.string.grocery_empty),
-                                color = groceryTextMuted,
-                                style = MaterialTheme.typography.titleLarge,
-                                modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
-                            )
-                        }
+                        KBEmptyState(
+                            icon = Icons.Filled.ShoppingCart,
+                            title = stringResource(R.string.empty_grocery_title),
+                            body = stringResource(R.string.empty_grocery_body),
+                            primaryIcon = Icons.Filled.AddCircle,
+                            primaryLabel = stringResource(R.string.empty_grocery_action),
+                            onPrimary = { showAddDialog = true },
+                        )
                     }
                 }
 

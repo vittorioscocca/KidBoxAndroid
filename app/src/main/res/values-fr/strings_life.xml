@@ -82,6 +82,7 @@
     <string name="home_items_house">Maison</string>
     <string name="home_items_new_item_house">Nouvel élément maison</string>
     <string name="home_items_new_deadline_payment">Nouvelle échéance ou paiement</string>
+    <string name="home_items_add_sheet_title">Ajouter à Maison</string>
     <string name="home_items_none_yet">Aucun élément pour le moment</string>
     <string name="home_items_item">Élément maison</string>
     <string name="home_items_deadline">Échéance</string>

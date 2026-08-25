@@ -41,6 +41,11 @@ import it.vittorioscocca.kidbox.feature.passwords.autofill.autofillEntryPoint
 import it.vittorioscocca.kidbox.feature.passwords.autofill.resolveAutofillFamilyId
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.components.KBBackButton
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
 private data class AutofillDiag(
     val loggedIn: Boolean,
@@ -86,15 +91,24 @@ fun AutoFillSettingsScreen(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.kidBoxColors.background,
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_autofill_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.settings_common_back))
-                    }
-                },
-            )
+            // Titolo sotto il tasto indietro, come nelle altre Impostazioni.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            ) {
+                KBBackButton(onClick = onBack)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    stringResource(R.string.settings_autofill_title),
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.kidBoxColors.title,
+                )
+            }
         },
     ) { pad ->
         Column(

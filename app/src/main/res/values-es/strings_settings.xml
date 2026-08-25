@@ -12,8 +12,8 @@
     <string name="settings_row_privacy">Privacidad</string>
     <string name="settings_row_privacy_sub">Informes de error y registros técnicos</string>
     <string name="settings_row_storage">Uso del almacenamiento</string>
-    <string name="settings_row_autofill">Autocompletado</string>
-    <string name="settings_row_autofill_sub">Contraseñas, biometría, servicios del sistema</string>
+    <string name="settings_row_autofill">Contraseña</string>
+    <string name="settings_row_autofill_sub">Autorrelleno y relleno automático</string>
     <string name="settings_row_support">Ayuda y soporte</string>
     <string name="settings_row_support_sub">Preguntas, problemas y sugerencias</string>
     <string name="settings_row_guide">Guía de uso</string>
@@ -157,7 +157,7 @@
     <string name="settings_join_invalid_qr">Este código QR no es una invitación válida de KidBox.</string>
     <string name="settings_join_frame_qr">Enfoca el código QR</string>
     <string name="settings_family_title">Familia</string>
-    <string name="settings_family_intro">Aquí gestionas la familia e invitas al otro progenitor.</string>
+    <string name="settings_family_intro">KidBox funciona de verdad cuando la familia está completa: en cuanto invitas al otro progenitor, el calendario, los gastos, las listas, los documentos y el chat se actualizan para todos en tiempo real. Solo, ves únicamente tu mitad de la organización.</string>
     <string name="settings_family_none">No hay ninguna familia configurada</string>
     <string name="settings_family_create">Crear una familia</string>
     <string name="settings_family_configure">Configura tu familia</string>

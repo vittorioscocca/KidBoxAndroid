@@ -33,6 +33,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.components.KBBackButton
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.sp
 
 @Composable
 fun MessageSettingsScreen(
@@ -49,24 +52,15 @@ fun MessageSettingsScreen(
             .statusBarsPadding()
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.settings_common_back),
-                    tint = kb.title,
-                )
-            }
-            Text(
-                text = stringResource(R.string.settings_messages_title),
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                color = kb.title,
-            )
-        }
-        Spacer(Modifier.height(12.dp))
+        KBBackButton(onClick = onBack)
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = stringResource(R.string.settings_messages_title),
+            fontSize = 34.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = kb.title,
+        )
+        Spacer(Modifier.height(16.dp))
         Card(
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = kb.card),

@@ -97,15 +97,43 @@ private fun calcInSampleSize(opts: BitmapFactory.Options, maxPx: Int): Int {
 }
 
 /**
- * Applies the rotation stored in the video container's [MediaMetadataRetriever] to [bitmap].
- * [MediaMetadataRetriever.getFrameAtTime] extracts raw pixels without rotation — this
- * function corrects the resulting bitmap using [METADATA_KEY_VIDEO_ROTATION].
+ * Raddrizza il fotogramma estratto da un video usando `METADATA_KEY_VIDEO_ROTATION`.
+ *
+ * Il punto delicato è che **non tutte le versioni di Android si comportano allo
+ * stesso modo**: [MediaMetadataRetriever.getFrameAtTime] su alcune restituisce i
+ * pixel grezzi non ruotati, su altre applica già la rotazione del contenitore.
+ * Ruotare a scatola chiusa, come si faceva prima, raddrizzava il fotogramma nel
+ * primo caso e lo storceva nel secondo — ed è per questo che le anteprime dei
+ * video giravano storte.
+ *
+ * Qui non si indovina: si confrontano le dimensioni del bitmap con quelle
+ * **codificate** nel video (che sono sempre pre-rotazione). Se il bitmap risulta
+ * già trasposto, la piattaforma ha fatto il lavoro e non si tocca nulla.
+ *
+ * Per una rotazione di 180° le dimensioni non cambiano e il confronto non può
+ * dire nulla: lì si applica comunque la rotazione, come prima. È il caso raro —
+ * i video da telefono ruotano quasi sempre di 90° o 270°.
  */
 fun fixVideoFrameOrientation(bitmap: Bitmap, retriever: MediaMetadataRetriever): Bitmap {
-    val degrees = retriever
+    val degrees = ((retriever
         .extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
-        ?.toIntOrNull() ?: 0
+        ?.toIntOrNull() ?: 0) % 360 + 360) % 360
     if (degrees == 0) return bitmap
+
+    val isQuarterTurn = degrees % 180 != 0
+    if (isQuarterTurn) {
+        val encodedWidth = retriever
+            .extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull()
+        val encodedHeight = retriever
+            .extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull()
+        // Il confronto è utile solo su video non quadrati: con lati uguali la
+        // trasposizione è invisibile.
+        if (encodedWidth != null && encodedHeight != null && encodedWidth != encodedHeight) {
+            val alreadyRotated = bitmap.width == encodedHeight && bitmap.height == encodedWidth
+            if (alreadyRotated) return bitmap
+        }
+    }
+
     val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
     return runCatching {
         Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)

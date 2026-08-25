@@ -4,7 +4,6 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.R
 import java.util.Calendar
@@ -18,6 +17,7 @@ import javax.inject.Singleton
 @Singleton
 class VisitReminderScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val alarmRegistry: ReminderAlarmRegistry,
 ) {
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
@@ -47,25 +47,42 @@ class VisitReminderScheduler @Inject constructor(
         if (fireAt <= System.currentTimeMillis()) return
 
         val resolvedTitle = if (isNextVisit) context.getString(R.string.visit_next_reminder_title, title) else title
-        val pi = buildPendingIntent(reminderKey, visitId, familyId, childId, resolvedTitle)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt, pi)
-            } else {
-                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt, pi)
-            }
-        } else {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAt, pi)
-        }
+        alarmRegistry.arm(
+            ReminderAlarmRegistry.AlarmSpec(
+                key = ReminderAlarmRegistry.visitKey(reminderKey),
+                target = ReminderAlarmRegistry.Target.HEALTH,
+                requestCode = reminderKey.hashCode(),
+                fireAtMillis = fireAt,
+                action = visitAction(reminderKey),
+                stringExtras = mapOf(
+                    HealthReminderReceiver.EXTRA_TYPE to HealthReminderReceiver.TYPE_VISIT_REMINDER,
+                    HealthReminderReceiver.EXTRA_VISIT_ID to visitId,
+                    HealthReminderReceiver.EXTRA_TITLE to resolvedTitle,
+                    HealthReminderReceiver.EXTRA_FAMILY_ID to familyId,
+                    HealthReminderReceiver.EXTRA_CHILD_ID to childId,
+                ),
+            ),
+        )
     }
 
     /** Cancel the alarm for [reminderKey]. Safe to call even if no alarm exists. */
     fun cancel(reminderKey: String, visitId: String) {
-        val pi = buildPendingIntent(reminderKey, visitId, "", "", "")
+        alarmRegistry.forget(ReminderAlarmRegistry.visitKey(reminderKey))
+        val intent = Intent(context, HealthReminderReceiver::class.java).apply {
+            action = visitAction(reminderKey)
+        }
+        val pi = PendingIntent.getBroadcast(
+            context,
+            reminderKey.hashCode(),
+            intent,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+        ) ?: return
         alarmManager.cancel(pi)
         pi.cancel()
     }
+
+    private fun visitAction(reminderKey: String) = "kb.health.visit_reminder.$reminderKey"
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -81,24 +98,4 @@ class VisitReminderScheduler @Inject constructor(
         return cal.timeInMillis
     }
 
-    private fun buildPendingIntent(
-        reminderKey: String,
-        visitId: String,
-        familyId: String,
-        childId: String,
-        title: String,
-    ): PendingIntent {
-        val intent = Intent(context, HealthReminderReceiver::class.java).apply {
-            putExtra(HealthReminderReceiver.EXTRA_VISIT_ID, visitId)
-            putExtra(HealthReminderReceiver.EXTRA_TITLE, title)
-            putExtra(HealthReminderReceiver.EXTRA_FAMILY_ID, familyId)
-            putExtra(HealthReminderReceiver.EXTRA_CHILD_ID, childId)
-        }
-        return PendingIntent.getBroadcast(
-            context,
-            reminderKey.hashCode(),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-    }
 }

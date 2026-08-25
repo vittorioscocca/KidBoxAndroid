@@ -89,6 +89,8 @@ import it.vittorioscocca.kidbox.ui.screens.ai.planning.AIChatTypingIndicator
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.components.KBBackButton
+import androidx.compose.foundation.layout.statusBarsPadding
 
 private const val ROLE_USER = "user"
 private const val ROLE_ASSISTANT = "assistant"
@@ -136,36 +138,19 @@ fun SupportChatScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = kb.card,
-                    titleContentColor = kb.title,
-                    navigationIconContentColor = kb.title,
-                    actionIconContentColor = kb.title,
-                ),
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text("🤖", fontSize = 22.sp)
-                        Text(
-                            stringResource(R.string.settings_support_assistant),
-                            color = kb.title,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.settings_common_back),
-                            tint = kb.title,
-                        )
-                    }
-                },
-                actions = {
+            // Niente TopAppBar tinta di «card»: la fascia bianca staccava dal resto
+            // della schermata. Header piatto sullo sfondo con il tondo «indietro»
+            // standard dell'app.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(kb.background)
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    KBBackButton(onClick = onBack)
+                    Spacer(modifier = Modifier.weight(1f))
                     IconButton(onClick = { showInfoSheet = true }) {
                         Icon(
                             Icons.Default.Info,
@@ -173,8 +158,21 @@ fun SupportChatScreen(
                             tint = kb.title,
                         )
                     }
-                },
-            )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text("🤖", fontSize = 28.sp)
+                    Text(
+                        stringResource(R.string.settings_support_assistant),
+                        fontSize = 34.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = kb.title,
+                    )
+                }
+            }
         },
         snackbarHost = { SnackbarHost(snackHost) },
         containerColor = kb.background,

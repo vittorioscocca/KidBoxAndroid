@@ -16,6 +16,9 @@ interface KBGroceryItemDao {
     @Query("SELECT * FROM kb_grocery_items WHERE familyId = :familyId AND isDeleted = 0 ORDER BY updatedAtEpochMillis DESC")
     fun observeByFamilyId(familyId: String): Flow<List<KBGroceryItemEntity>>
 
+    @Query("SELECT * FROM kb_grocery_items WHERE familyId = :familyId AND isDeleted = 0")
+    suspend fun listByFamilyId(familyId: String): List<KBGroceryItemEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBGroceryItemEntity)
 

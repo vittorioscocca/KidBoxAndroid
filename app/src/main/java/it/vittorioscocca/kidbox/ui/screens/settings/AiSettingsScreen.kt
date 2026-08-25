@@ -82,6 +82,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import it.vittorioscocca.kidbox.util.KBLocale
+import it.vittorioscocca.kidbox.ui.components.KBBackButton
 
 private fun CONSENT_DATE_FMT() = SimpleDateFormat("d MMMM yyyy, HH:mm", KBLocale.current())
 private val DESTRUCTIVE = Color(0xFFD32F2F)
@@ -139,20 +140,22 @@ fun AiSettingsScreen(
         containerColor = kb.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                modifier = Modifier.statusBarsPadding(),
-                title = {
-                    Text(stringResource(R.string.settings_ai_title), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = kb.title)
-                },
-                navigationIcon = {
-                    KidBoxHeaderCircleButton(
-                        icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.settings_common_back),
-                        onClick = onBack,
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = kb.background),
-            )
+            // Titolo sotto il tasto indietro, come nelle altre Impostazioni.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 18.dp, vertical = 8.dp),
+            ) {
+                KBBackButton(onClick = onBack)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    stringResource(R.string.settings_ai_title),
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = kb.title,
+                )
+            }
         },
     ) { innerPadding ->
         if (state.isLoading) {

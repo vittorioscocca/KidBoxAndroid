@@ -145,4 +145,10 @@
     <string name="ai_weekly_summary_sub">Récapitulatif hebdomadaire automatique de la famille</string>
     <string name="ai_quiet_week">Semaine tranquille ! Aucune échéance urgente.</string>
     <string name="ai_open_weekly">Ouvrir le récapitulatif hebdomadaire</string>
+    <string name="chat_media_source_title">Où veux-tu choisir ?</string>
+    <string name="chat_media_source_gallery">Galerie du téléphone</string>
+    <string name="chat_media_source_kidbox">Photos et vidéos KidBox</string>
+    <string name="chat_kidbox_picker_title">Choisir depuis KidBox</string>
+    <string name="chat_kidbox_picker_empty">Il n\'y a pas encore de photos ou vidéos dans KidBox.</string>
+    <string name="chat_kidbox_picker_send">Envoyer</string>
 </resources>

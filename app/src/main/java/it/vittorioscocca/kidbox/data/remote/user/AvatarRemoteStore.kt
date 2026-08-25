@@ -28,4 +28,25 @@ class AvatarRemoteStore @Inject constructor() {
             throw Exception(e.userMessageForFirebaseStorage(), e)
         }
     }
+
+    /**
+     * Rimuove il file dell'avatar da Storage.
+     *
+     * Prova ENTRAMBI i percorsi possibili perché quello usato dipende dal fatto
+     * che al momento del caricamento ci fosse una famiglia attiva: chi ha
+     * cambiato famiglia nel frattempo potrebbe avere il file nell'altro.
+     *
+     * Non solleva se il file non c'è: l'obiettivo è che dopo la chiamata
+     * l'avatar non esista, e un file già assente soddisfa la condizione.
+     */
+    suspend fun deleteAvatar(uid: String, familyId: String?) {
+        runCatching { prefetchAppCheckTokenForStorage() }
+        val paths = buildList {
+            familyId?.takeIf { it.isNotBlank() }?.let { add("families/$it/avatars/$uid.jpg") }
+            add("users/$uid/avatar.jpg")
+        }
+        for (path in paths) {
+            runCatching { storage.reference.child(path).delete().await() }
+        }
+    }
 }

@@ -68,6 +68,7 @@ import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.components.KBBackButton
 
 @Composable
 fun StorageUsageScreen(
@@ -118,11 +119,7 @@ fun StorageUsageScreen(
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            KidBoxHeaderCircleButton(
-                icon = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = stringResource(R.string.settings_common_back),
-                onClick = onBack,
-            )
+            KBBackButton(onClick = onBack)
         }
         Spacer(Modifier.height(10.dp))
         Text(

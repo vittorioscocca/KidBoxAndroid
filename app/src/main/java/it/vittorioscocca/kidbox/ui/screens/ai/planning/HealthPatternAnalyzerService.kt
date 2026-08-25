@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox.ui.screens.ai.planning
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -230,6 +231,28 @@ object HealthPatternAnalyzerService {
             return if (retry) Result.retry() else Result.failure()
         }
     }
+
+    /**
+     * Annulla l'allarme e il lavoro periodico. Serve al logout: senza questo la
+     * notifica generata per la famiglia precedente continuerebbe ad arrivare.
+     */
+    fun cancelScheduledNotification(context: Context, familyId: String) {
+        val intent = Intent(context, HealthPatternBroadcastReceiver::class.java).apply {
+            action = HealthPatternBroadcastReceiver.ACTION_HEALTH_PATTERN
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            ("health_pattern:$familyId").hashCode(),
+            intent,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+        )
+        if (pendingIntent != null) {
+            (context.getSystemService(Context.ALARM_SERVICE) as AlarmManager).cancel(pendingIntent)
+            pendingIntent.cancel()
+        }
+        WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
+    }
+
 }
 
 class HealthPatternBroadcastReceiver : BroadcastReceiver() {
@@ -290,4 +313,5 @@ class HealthPatternBroadcastReceiver : BroadcastReceiver() {
         const val CHANNEL_ID = "kb_health_pattern"
         const val ACTION_HEALTH_PATTERN = "it.vittorioscocca.kidbox.HEALTH_PATTERN"
     }
+
 }

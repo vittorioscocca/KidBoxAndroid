@@ -13,8 +13,11 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -32,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -50,6 +54,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -87,12 +92,21 @@ import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.util.KBLocale
 import it.vittorioscocca.kidbox.notifications.AppSection
 import it.vittorioscocca.kidbox.notifications.TrackSectionPresence
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.window.Dialog
+import androidx.compose.foundation.layout.width
+import kotlinx.coroutines.delay
+import java.time.Duration
+import it.vittorioscocca.kidbox.ui.components.KBEmptyState
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.AddCircle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(
     familyId: String,
     onBack: () -> Unit,
+    openEventId: String? = null,
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -100,6 +114,47 @@ fun CalendarScreen(
     var showForm by remember { mutableStateOf(false) }
     var editingEvent by remember { mutableStateOf<KBCalendarEventEntity?>(null) }
     val currentUid = remember { FirebaseAuth.getInstance().currentUser?.uid }
+
+    // Evento aperto da notifica: si attende che la sincronizzazione lo porti in
+    // locale, poi si apre il suo dettaglio. Senza attendere si resterebbe sulla
+    // vista mese come se la notifica non avesse portato da nessuna parte,
+    // perché la push precede la sincronizzazione.
+    var waitingForEvent by remember(openEventId) { mutableStateOf(!openEventId.isNullOrBlank()) }
+    var openedEventId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(openEventId, state.events) {
+        val target = openEventId?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        // Una sola apertura: senza questo, chiudere il dettaglio lo farebbe
+        // riaprire al primo aggiornamento della lista eventi.
+        if (openedEventId == target) return@LaunchedEffect
+        val event = state.events.firstOrNull { it.id == target } ?: return@LaunchedEffect
+        openedEventId = target
+        waitingForEvent = false
+        editingEvent = event
+        showForm = true
+    }
+    LaunchedEffect(openEventId) {
+        if (openEventId.isNullOrBlank()) return@LaunchedEffect
+        delay(EVENT_SYNC_WAIT_MS)
+        // Scaduta l'attesa si smette di bloccare l'utente: resta la vista mese.
+        waitingForEvent = false
+    }
+    if (waitingForEvent) {
+        Dialog(onDismissRequest = { waitingForEvent = false }) {
+            Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.kidBoxColors.card) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(14.dp))
+                    Text(
+                        text = stringResource(R.string.calendar_deeplink_opening),
+                        color = MaterialTheme.kidBoxColors.title,
+                    )
+                }
+            }
+        }
+    }
 
     // Visibility state hoisted here so the picker dialog can be shown OUTSIDE the bottom sheet,
     // avoiding the nested-sheet issue on MIUI and other ROM variants.
@@ -146,6 +201,10 @@ fun CalendarScreen(
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
+                        // Senza colore esplicito si eredita il nero di default:
+                        // la schermata disegna il proprio sfondo e non sta dentro
+                        // una Surface, quindi il tema scuro non viene applicato.
+                        color = MaterialTheme.kidBoxColors.title,
                     )
                     HeaderCircleButton(
                         icon = Icons.Default.Add,
@@ -197,6 +256,10 @@ fun CalendarScreen(
                         showForm = true
                     },
                     onDeleteEvent = viewModel::deleteEvent,
+                    onAddEvent = {
+                        editingEvent = null
+                        showForm = true
+                    },
                 )
 
                 CalendarMode.YEAR -> CalendarYearView(
@@ -254,12 +317,14 @@ private fun CalendarMonthView(
     onChangeDisplayedMonth: (LocalDate) -> Unit,
     onEditEvent: (KBCalendarEventEntity) -> Unit,
     onDeleteEvent: (KBCalendarEventEntity) -> Unit,
+    onAddEvent: () -> Unit,
 ) {
     val eventsByDate = remember(events) {
         buildEventsByDay(events)
     }
 
     val days = remember(displayedMonth) { monthGridDays(displayedMonth.withDayOfMonth(1)) }
+    val kb = MaterialTheme.kidBoxColors
     val locale = KBLocale.current()
     val monthLabel = displayedMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy", locale))
         .replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
@@ -272,7 +337,11 @@ private fun CalendarMonthView(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = { onChangeDisplayedMonth(displayedMonth.minusMonths(1).withDayOfMonth(1)) }) {
-                Icon(Icons.Default.ChevronLeft, contentDescription = "Mese precedente")
+                Icon(
+                    Icons.Default.ChevronLeft,
+                    contentDescription = stringResource(R.string.calendar_previous_month_cd),
+                    tint = kb.title,
+                )
             }
             Text(
                 monthLabel,
@@ -280,9 +349,16 @@ private fun CalendarMonthView(
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
+                // Come il titolo: senza colore esplicito resterebbe nero anche
+                // in tema scuro.
+                color = kb.title,
             )
             IconButton(onClick = { onChangeDisplayedMonth(displayedMonth.plusMonths(1).withDayOfMonth(1)) }) {
-                Icon(Icons.Default.ChevronRight, contentDescription = "Mese successivo")
+                Icon(
+                    Icons.Default.ChevronRight,
+                    contentDescription = stringResource(R.string.calendar_next_month_cd),
+                    tint = kb.title,
+                )
             }
         }
 
@@ -349,19 +425,29 @@ private fun CalendarMonthView(
         Divider(modifier = Modifier.padding(top = 6.dp))
         val selectedEvents = eventsByDate[selectedDate].orEmpty().sortedBy { it.startDateEpochMillis }
         if (selectedEvents.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Default.NotificationsNone,
-                        contentDescription = null,
-                        tint = MaterialTheme.kidBoxColors.subtitle,
-                        modifier = Modifier.size(42.dp),
-                    )
-                    Text(stringResource(R.string.calendar_no_events), color = MaterialTheme.kidBoxColors.subtitle, modifier = Modifier.padding(top = 6.dp))
-                }
+            // `weight` + scroll: senza, lo spazio residuo sotto la griglia del mese può
+            // essere minore dell'empty state e il pulsante finisce schiacciato/tagliato.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+                contentAlignment = Alignment.Center,
+            ) {
+                KBEmptyState(
+                    icon = Icons.Filled.CalendarMonth,
+                    title = stringResource(R.string.empty_calendar_title),
+                    body = stringResource(R.string.empty_calendar_body),
+                    primaryIcon = Icons.Filled.AddCircle,
+                    primaryLabel = stringResource(R.string.empty_calendar_action),
+                    onPrimary = onAddEvent,
+                )
             }
         } else {
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(vertical = 5.dp),
+            ) {
                 items(selectedEvents, key = { it.id }) { event ->
                     CalendarEventCard(
                         event = event,
@@ -541,7 +627,7 @@ private fun CalendarEventCard(
         .atZone(ZoneId.systemDefault())
         .toLocalDateTime()
     val timeLabel = if (event.isAllDay) {
-        "Tutto il giorno"
+        stringResource(R.string.calendar_all_day)
     } else {
         "${start.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))} - ${end.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))}"
     }
@@ -549,20 +635,70 @@ private fun CalendarEventCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .padding(horizontal = 16.dp, vertical = 3.dp)
             .clickable(onClick = onEdit),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(event.title, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = MaterialTheme.kidBoxColors.title)
-            Text(timeLabel, color = MaterialTheme.kidBoxColors.subtitle, fontSize = 12.sp)
-            Text(categoryLabel(event.categoryRaw), color = categoryColor(event.categoryRaw), fontSize = 12.sp)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onDelete) {
-                    Text("Elimina", color = Color(0xFFD32F2F))
+        // Riga singola come su iOS (`CalendarEventRow`): barra colorata della
+        // categoria, titolo, e sotto orario e categoria sulla stessa riga. Prima
+        // erano tre testi impilati più un pulsante "Elimina" a tutta larghezza:
+        // ogni evento occupava più del doppio dello spazio e in una giornata piena
+        // se ne vedevano tre per schermata.
+        Row(
+            modifier = Modifier.height(IntrinsicSize.Min),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .padding(vertical = 8.dp)
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(categoryColor(event.categoryRaw), RoundedCornerShape(2.dp)),
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 10.dp, top = 10.dp, bottom = 10.dp, end = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(1.dp),
+            ) {
+                Text(
+                    event.title,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp,
+                    color = MaterialTheme.kidBoxColors.title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        timeLabel,
+                        color = MaterialTheme.kidBoxColors.subtitle,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                    )
+                    Text("·", color = MaterialTheme.kidBoxColors.subtitle, fontSize = 12.sp)
+                    Text(
+                        categoryLabel(event.categoryRaw),
+                        color = categoryColor(event.categoryRaw),
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
+            IconButton(onClick = onDelete, modifier = Modifier.size(38.dp)) {
+                Icon(
+                    Icons.Default.DeleteOutline,
+                    contentDescription = stringResource(R.string.calendar_delete),
+                    tint = Color(0xFFD32F2F),
+                    modifier = Modifier.size(19.dp),
+                )
+            }
+            Spacer(modifier = Modifier.width(4.dp))
         }
     }
 }
@@ -607,6 +743,28 @@ private fun CalendarEventDialog(
     var endDate by remember { mutableStateOf(initialEnd.toLocalDate()) }
     var endTime by remember { mutableStateOf(initialEnd.toLocalTime().withSecond(0).withNano(0)) }
 
+    // Un evento non può finire prima di iniziare.
+    //
+    // Spostando l'INIZIO si trascina la fine mantenendo la durata: cambiando la
+    // data di inizio senza toccare la fine si otteneva altrimenti un evento che
+    // comincia dopo essere finito. Toccando invece direttamente la FINE la si
+    // blocca all'inizio, che è il minimo sensato.
+    fun moveEndKeepingDuration(previousStart: LocalDateTime, newStart: LocalDateTime) {
+        val currentEnd = LocalDateTime.of(endDate, endTime)
+        val duration = Duration.between(previousStart, currentEnd)
+        val kept = if (duration.isNegative) Duration.ZERO else duration
+        val newEnd = newStart.plus(kept)
+        endDate = newEnd.toLocalDate()
+        endTime = newEnd.toLocalTime()
+    }
+
+    fun clampEndNotBeforeStart(candidate: LocalDateTime) {
+        val start = LocalDateTime.of(startDate, startTime)
+        val fixed = if (candidate.isBefore(start)) start else candidate
+        endDate = fixed.toLocalDate()
+        endTime = fixed.toLocalTime()
+    }
+
     val canEditVisibility = remember(initial?.id, currentUid) {
         when {
             initial == null -> true
@@ -648,14 +806,20 @@ private fun CalendarEventDialog(
         Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    // Il foglio è a tutta altezza (`skipPartiallyExpanded`) e vive
+                    // in una finestra propria, quindi NON eredita i padding di
+                    // sistema applicati alla radice dell'app: senza questo la riga
+                    // con "Annulla" finiva sotto la barra di stato.
+                    .statusBarsPadding()
                     .navigationBarsPadding()
                     .imePadding()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 16.dp, bottom = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                PillButton(text = "Annulla", onClick = onDismiss)
+                PillButton(text = stringResource(R.string.calendar_cancel), onClick = onDismiss)
                 Spacer(modifier = Modifier.weight(1f))
                 Text(
                     text = titleText,
@@ -720,8 +884,20 @@ private fun CalendarEventDialog(
                         allDay = isAllDay,
                         labelColor = kb.title,
                         valueColor = kb.title,
-                        onPickDate = { pickDate(startDate) { startDate = it } },
-                        onPickTime = { pickTime(startTime) { startTime = it } },
+                        onPickDate = {
+                            pickDate(startDate) { picked ->
+                                val previousStart = LocalDateTime.of(startDate, startTime)
+                                startDate = picked
+                                moveEndKeepingDuration(previousStart, LocalDateTime.of(picked, startTime))
+                            }
+                        },
+                        onPickTime = {
+                            pickTime(startTime) { picked ->
+                                val previousStart = LocalDateTime.of(startDate, startTime)
+                                startTime = picked
+                                moveEndKeepingDuration(previousStart, LocalDateTime.of(startDate, picked))
+                            }
+                        },
                     )
                     Divider()
                     DateTimeRow(
@@ -731,8 +907,16 @@ private fun CalendarEventDialog(
                         allDay = isAllDay,
                         labelColor = kb.title,
                         valueColor = kb.title,
-                        onPickDate = { pickDate(endDate) { endDate = it } },
-                        onPickTime = { pickTime(endTime) { endTime = it } },
+                        onPickDate = {
+                            pickDate(endDate) { picked ->
+                                clampEndNotBeforeStart(LocalDateTime.of(picked, endTime))
+                            }
+                        },
+                        onPickTime = {
+                            pickTime(endTime) { picked ->
+                                clampEndNotBeforeStart(LocalDateTime.of(endDate, picked))
+                            }
+                        },
                     )
                     Divider()
                     Text(stringResource(R.string.section_recurrence), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle)
@@ -856,7 +1040,11 @@ private fun CalendarEventDialog(
                 onClick = {
                     if (title.isBlank()) return@Button
                     val startDateTime = LocalDateTime.of(startDate, if (isAllDay) LocalTime.MIDNIGHT else startTime)
+                    // Rete di sicurezza: i picker già impediscono una fine
+                    // anteriore all'inizio, ma qui si chiude comunque la porta a
+                    // un evento salvato con le date invertite.
                     val endDateTime = LocalDateTime.of(endDate, if (isAllDay) LocalTime.of(23, 59) else endTime)
+                        .coerceAtLeast(startDateTime)
                     onSave(
                         CalendarDraftInput(
                             title = title,
@@ -1096,13 +1284,14 @@ private fun monthGridDays(monthFirstDate: LocalDate): List<LocalDate?> {
     return result
 }
 
+@Composable
 private fun categoryLabel(raw: String): String = when (raw) {
-    "children" -> "Bambini"
-    "school" -> "Scuola"
-    "health" -> "Salute"
-    "family" -> "Famiglia"
-    "admin" -> "Amministrazione"
-    "leisure" -> "Tempo libero"
+    "children" -> stringResource(R.string.calendar_category_children)
+    "school" -> stringResource(R.string.calendar_category_school)
+    "health" -> stringResource(R.string.calendar_category_health)
+    "family" -> stringResource(R.string.calendar_category_family)
+    "admin" -> stringResource(R.string.calendar_category_admin)
+    "leisure" -> stringResource(R.string.calendar_category_leisure)
     else -> raw
 }
 
@@ -1150,3 +1339,5 @@ private fun eventCoveredDates(event: KBCalendarEventEntity): List<LocalDate> {
     return result
 }
 
+/** Quanto si attende che la sincronizzazione porti l'evento aperto da notifica. */
+private const val EVENT_SYNC_WAIT_MS = 25_000L

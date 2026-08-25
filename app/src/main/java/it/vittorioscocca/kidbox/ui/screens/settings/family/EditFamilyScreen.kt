@@ -60,6 +60,7 @@ import java.time.format.DateTimeFormatter
 import java.util.UUID
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.components.KBBackButton
 
 data class ChildEntry(
     val id: String = UUID.randomUUID().toString(),
@@ -122,6 +123,8 @@ fun EditFamilyScreen(
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
     ) {
+        KBBackButton(onClick = onBack)
+        Spacer(modifier = Modifier.height(12.dp))
         Text(
             stringResource(R.string.settings_editfamily_title),
             fontSize = 34.sp,
