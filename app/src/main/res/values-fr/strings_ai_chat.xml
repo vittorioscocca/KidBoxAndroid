@@ -151,4 +151,24 @@
     <string name="chat_kidbox_picker_title">Choisir depuis KidBox</string>
     <string name="chat_kidbox_picker_empty">Il n\'y a pas encore de photos ou vidéos dans KidBox.</string>
     <string name="chat_kidbox_picker_send">Envoyer</string>
+    <string name="ai_consent_title">Assistant IA médical</string>
+    <string name="ai_consent_subtitle">Avant de continuer, lisez comment cela fonctionne et comment vos données sont utilisées.</string>
+    <string name="ai_consent_subtitle_short">Avant de continuer, lisez comment cela fonctionne.</string>
+    <string name="ai_consent_sent_title">Ce qui est envoyé</string>
+    <string name="ai_consent_sent_body">Vos questions et le contexte de santé sélectionné sont envoyés à Anthropic pour générer la réponse. Aucune donnée non pertinente n\'est transmise.</string>
+    <string name="ai_consent_sent_body_short">Vos questions et le contexte de santé sont envoyés à Anthropic pour générer la réponse.</string>
+    <string name="ai_consent_provider_title">Fournisseur IA : Anthropic</string>
+    <string name="ai_consent_provider_body">Les données sont traitées selon la politique de confidentialité d\'Anthropic (anthropic.com/privacy). KidBox ne conserve pas les réponses sur ses serveurs.</string>
+    <string name="ai_consent_provider_body_short">Les données sont traitées selon la politique de confidentialité d\'Anthropic.</string>
+    <string name="ai_consent_not_advice_title">Ne remplace pas un avis médical</string>
+    <string name="ai_consent_not_advice_body">L\'IA fournit des informations générales et ne remplace pas le jugement de votre médecin. En cas d\'urgence, contactez toujours un professionnel.</string>
+    <string name="ai_consent_not_advice_body_short">L\'IA fournit des informations générales et ne remplace pas votre médecin.</string>
+    <string name="ai_consent_privacy_title">Confidentialité et données</string>
+    <string name="ai_consent_privacy_body">Les données de santé sont chiffrées en transit. Vous pouvez retirer votre consentement à tout moment depuis l\'écran Réglages IA.</string>
+    <string name="ai_consent_link_anthropic">Confidentialité Anthropic</string>
+    <string name="ai_consent_link_kidbox">Confidentialité KidBox</string>
+    <string name="ai_consent_accept">Compris, continuer</string>
+    <string name="ai_consent_accept_terms">Accepter et continuer</string>
+    <string name="ai_consent_terms_checkbox">J\'ai lu et j\'accepte les conditions d\'utilisation de l\'IA</string>
+    <string name="ai_consent_cancel">Annuler</string>
 </resources>

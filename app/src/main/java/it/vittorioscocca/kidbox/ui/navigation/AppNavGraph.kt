@@ -146,6 +146,7 @@ import androidx.compose.ui.window.Dialog
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.ui.Modifier
+import it.vittorioscocca.kidbox.data.local.ChatAvailability
 
 @Composable
 fun AppNavGraph(
@@ -1492,6 +1493,13 @@ fun AppNavGraph(
         }
 
         composable(AppDestination.Chat.route) { backStackEntry ->
+            // Chat spenta da Impostazioni → Messaggi. Il controllo sta qui, sulla
+            // destinazione, e non sui singoli `navigate`: così restano fuori anche
+            // deep link, notifiche push, nudge e condivisioni da Documenti.
+            val chatEnabled by ChatAvailability.enabled.collectAsStateWithLifecycle()
+            LaunchedEffect(chatEnabled) { if (!chatEnabled) navController.popBackStack() }
+            if (!chatEnabled) return@composable
+
             val chatViewModel: ChatViewModel = hiltViewModel(backStackEntry)
             val pendingMsgId by NotificationDeepLinkRouter.pendingChatMessageId.collectAsStateWithLifecycle()
             LaunchedEffect(pendingMsgId) {

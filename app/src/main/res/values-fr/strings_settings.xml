@@ -165,6 +165,10 @@
     <string name="settings_family_no_children">Aucun enfant configuré.</string>
     <string name="settings_family_members">Membres</string>
     <string name="settings_family_loading_members">Chargement des membres…</string>
+    <plurals name="settings_storage_section_items">
+        <item quantity="one">%1$d élément</item>
+        <item quantity="other">%1$d éléments</item>
+    </plurals>
     <plurals name="settings_family_members_connected">
         <item quantity="one">%1$d membre connecté.</item>
         <item quantity="other">%1$d membres connectés.</item>
@@ -262,7 +266,16 @@
     <string name="settings_ai_ctx_full_detail">Envoie toujours tous les comptes rendus et les données de santé complètes.</string>
     <string name="settings_ai_ctx_summary_title">Contexte résumé</string>
     <string name="settings_ai_ctx_summary_detail">Utilise un résumé du profil de santé pour économiser des messages.</string>
+    <string name="settings_plan_ai_one_time">%1$d msg IA à vie</string>
     <string name="settings_plan_ai_per_day">%1$d msg IA/jour</string>
     <string name="settings_plan_ai_messages_per_day">IA : %1$d messages/jour</string>
     <string name="settings_family_limit_reached">Tu as atteint la limite de 2 familles par compte. Supprime une famille existante pour en créer une nouvelle.</string>
+    <string name="settings_ai_consent_given_on">Consentement donné le %1$s</string>
+    <string name="settings_ai_messages_sent_today">%1$d messages envoyés aujourd\'hui</string>
+    <string name="settings_ai_available_count">Disponibles : %1$d</string>
+    <string name="settings_ai_used_count">Utilisés : %1$d/%2$d</string>
+    <string name="settings_messages_chat_title">Discussion familiale</string>
+    <string name="settings_messages_chat_sub">Permet d\'activer ou de désactiver la discussion familiale</string>
+    <string name="settings_messages_chat_note">Le choix s\'applique à tous vos appareils. Les autres membres continuent de discuter entre eux, et vous retrouverez les messages en la réactivant.</string>
+    <string name="settings_notif_chat_disabled">La discussion est désactivée dans Réglages → Messages.</string>
 </resources>

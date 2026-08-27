@@ -1,14 +1,18 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
 import it.vittorioscocca.kidbox.data.local.dao.HousePaymentDao
+import it.vittorioscocca.kidbox.ui.screens.life.housePaymentPresetSubtypes
+import it.vittorioscocca.kidbox.ui.screens.life.isHousePaymentPresetSubtype
 import it.vittorioscocca.kidbox.data.local.entity.HousePaymentEntity
 import it.vittorioscocca.kidbox.data.remote.life.HousePaymentRemoteChange
 import it.vittorioscocca.kidbox.data.remote.life.HousePaymentRemoteStore
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
 import it.vittorioscocca.kidbox.notifications.HousePaymentReminderScheduler
+import it.vittorioscocca.kidbox.util.KBLog
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -131,6 +135,49 @@ class HousePaymentRepository @Inject constructor(
             }
     }
 
+    /**
+     * Ripulisce i sottotipi rimasti attaccati da un tipo precedente.
+     *
+     * Il form iOS partiva su Bolletta con `subtypeRaw = "luce"` e, cambiando tipo
+     * in Mutuo/Affitto/Altro, non lo azzerava: il valore finiva salvato su
+     * Firestore e da lì arrivava anche qui. Il form è corretto su entrambe le
+     * piattaforme, ma i record già scritti restano sporchi.
+     *
+     * Si tocca solo un sottotipo che è **esattamente** un preset di un altro
+     * tipo: il testo libero scritto dall'utente non viene mai perso. Gemella di
+     * `KBHousePayment.cleanupInheritedSubtypes` su iOS ed è idempotente, quindi
+     * non fa danni se ha già girato l'altra piattaforma.
+     */
+    suspend fun cleanupInheritedSubtypes(context: Context, familyId: String) {
+        if (familyId.isBlank()) return
+        val prefs = context.getSharedPreferences(CLEANUP_PREFS, Context.MODE_PRIVATE)
+        val key = CLEANUP_KEY_PREFIX + familyId
+        if (prefs.getBoolean(key, false)) return
+
+        var fixed = 0
+        for (payment in housePaymentDao.listActiveByFamily(familyId)) {
+            val raw = payment.subtypeRaw?.takeIf { it.isNotBlank() } ?: continue
+            if (housePaymentPresetSubtypes(payment.typeRaw).isNotEmpty()) continue
+            if (!isHousePaymentPresetSubtype(raw)) continue
+            runCatching { updateHousePayment(payment.copy(subtypeRaw = null)) }
+                .onSuccess { fixed++ }
+                .onFailure {
+                    KBLog.data.error(
+                        "cleanupInheritedSubtypes: ${payment.id} non aggiornato: ${it.message}",
+                        "HousePayments",
+                    )
+                }
+        }
+
+        if (fixed > 0) {
+            KBLog.data.info(
+                "cleanupInheritedSubtypes: ripuliti $fixed sottotipi ereditati familyId=$familyId",
+                "HousePayments",
+            )
+        }
+        prefs.edit().putBoolean(key, true).apply()
+    }
+
     suspend fun updateHousePayment(entity: HousePaymentEntity) {
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()
@@ -220,5 +267,10 @@ class HousePaymentRepository @Inject constructor(
                 }
             }
         }
+    }
+
+    private companion object {
+        const val CLEANUP_PREFS = "kidbox_house_payments"
+        const val CLEANUP_KEY_PREFIX = "subtypeCleanup."
     }
 }

@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.passwords
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -11,6 +12,7 @@ import it.vittorioscocca.kidbox.data.local.entity.PasswordGroupEntity
 import it.vittorioscocca.kidbox.data.repository.PasswordsRepository
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import java.util.UUID
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -35,6 +37,7 @@ data class PasswordsGroupsUiState(
 
 @HiltViewModel
 class PasswordsGroupsViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val passwordsRepository: PasswordsRepository,
     private val passwordGroupDao: PasswordGroupDao,
     private val passwordCypher: PasswordCypher,
@@ -83,9 +86,12 @@ class PasswordsGroupsViewModel @Inject constructor(
             PasswordsGroupsUiState(),
         )
 
-    private fun decryptName(g: PasswordGroupEntity, uid: String): String = runCatching {
-        passwordCypher.decrypt(g.nameCipher, g.familyId, g.visibility, g.createdBy, uid)
-    }.getOrElse { "" }
+    private fun decryptName(g: PasswordGroupEntity, uid: String): String {
+        val stored = runCatching {
+            passwordCypher.decrypt(g.nameCipher, g.familyId, g.visibility, g.createdBy, uid)
+        }.getOrElse { "" }
+        return PasswordDefaultGroups.displayName(appContext, g.id, g.familyId, stored)
+    }
 
     fun bind(familyId: String) {
         familyIdFlow.value = familyId

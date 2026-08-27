@@ -63,9 +63,11 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBPlan
+import it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod
 import android.app.Activity
 import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.components.KBBackButton
@@ -425,8 +427,15 @@ private fun StorageSectionRow(section: StorageUsageSectionUi, totalBytes: Long) 
                 trackColor = kb.divider,
             )
             Spacer(Modifier.height(5.dp))
-            val countLabel = if (section.recordCount == 1) "elemento" else "elementi"
-            Text("${section.recordCount} $countLabel", color = kb.subtitle, fontSize = 13.sp)
+            Text(
+                pluralStringResource(
+                    R.plurals.settings_storage_section_items,
+                    section.recordCount,
+                    section.recordCount,
+                ),
+                color = kb.subtitle,
+                fontSize = 13.sp,
+            )
         }
     }
 }
@@ -477,8 +486,13 @@ private fun PlanRow(
         Column(horizontalAlignment = Alignment.End) {
             Text(
                 // Confronto piani puramente informativo: ogni piano ora include l'AI
-                // nominalmente, Free non è più marcato "senza AI".
-                plan.aiQuotaLabel,
+                // nominalmente, Free non è più marcato "senza AI". Free è un bonus una
+                // tantum, Pro/Max una quota giornaliera: due stringhe diverse.
+                if (plan.aiQuotaPeriod == AIQuotaPeriod.LIFETIME) {
+                    stringResource(R.string.settings_plan_ai_one_time, plan.aiMessageLimit)
+                } else {
+                    stringResource(R.string.settings_plan_ai_per_day, plan.aiMessageLimit)
+                },
                 color = kb.subtitle,
                 fontSize = 14.sp,
             )

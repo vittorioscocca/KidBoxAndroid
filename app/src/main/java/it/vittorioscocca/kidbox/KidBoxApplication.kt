@@ -34,6 +34,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import it.vittorioscocca.kidbox.data.local.ChatAvailability
 
 @HiltAndroidApp
 class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFactory {
@@ -62,6 +63,12 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
         super.onCreate()
         KidBoxApplicationHolder.applicationContext = applicationContext
         KBFileLogger.init(this)
+        // Prima che Home disegni le sue card: altrimenti la chat comparirebbe
+        // per un istante anche con l'interruttore spento.
+        ChatAvailability.init(this)
+        // Poi si allinea all'account: init() serve solo a non far comparire la
+        // chat per un istante prima che la risposta di Firestore arrivi.
+        appInitScope.launch { ChatAvailability.refreshFromRemote(this@KidBoxApplication) }
         // Debug diagnostico temporaneo: dà visibilità sul traffico gRPC di Firestore
         // (query inviate, stream di listen, risposte) sotto il tag logcat "Firestore".
         // Solo debug build, va tolto una volta chiuso il problema di sync sulla
@@ -165,6 +172,10 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
             val oldUid = observedUid
             if (oldUid == newUid) return@addAuthStateListener
             observedUid = newUid
+
+            // La chat è una preferenza dell'account: al cambio utente si rilegge,
+            // così su questo telefono arriva la scelta fatta su un altro dispositivo.
+            appInitScope.launch { ChatAvailability.refreshFromRemote(this@KidBoxApplication) }
 
             appInitScope.launch {
                 val currentToken = runCatching {

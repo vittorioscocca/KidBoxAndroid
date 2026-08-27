@@ -82,7 +82,6 @@ import it.vittorioscocca.kidbox.ui.components.IosPlainTextFieldRow
 import it.vittorioscocca.kidbox.ui.components.KidBoxIosFormTopBar
 import it.vittorioscocca.kidbox.ui.screens.life.daysRemainingCalendarIt
 import it.vittorioscocca.kidbox.ui.screens.life.formatItDateMedium
-import it.vittorioscocca.kidbox.ui.screens.life.homeCategoryLabelIt
 import it.vittorioscocca.kidbox.ui.screens.life.rememberLifeDatePicker
 import it.vittorioscocca.kidbox.ui.screens.life.homeDeadlineUrgencyColor
 import it.vittorioscocca.kidbox.ui.screens.life.homeDeadlineUrgencyLabel
@@ -93,6 +92,7 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.io.File
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.screens.life.homeCategoryLabel
 
 private fun homeCategoryIcon(cat: String): ImageVector = when (cat) {
     "appliance" -> Icons.Filled.Kitchen
@@ -677,6 +677,7 @@ private fun EditHomeItemDialog(
 
 @Composable
 private fun HomeItemHeaderCard(it: HomeItemEntity, kb: KidBoxColorScheme) {
+    val context = LocalContext.current
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = kb.card),
@@ -707,7 +708,7 @@ private fun HomeItemHeaderCard(it: HomeItemEntity, kb: KidBoxColorScheme) {
                 )
             }
             Text(
-                homeCategoryLabelIt(it.category),
+                homeCategoryLabel(context, it.category),
                 style = MaterialTheme.typography.bodyMedium,
                 color = kb.subtitle,
             )

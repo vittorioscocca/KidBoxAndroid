@@ -36,6 +36,7 @@ import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.components.KBBackButton
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.automirrored.filled.Chat
 
 @Composable
 fun MessageSettingsScreen(
@@ -59,6 +60,52 @@ fun MessageSettingsScreen(
             fontSize = 34.sp,
             fontWeight = FontWeight.ExtraBold,
             color = kb.title,
+        )
+        Spacer(Modifier.height(16.dp))
+        Card(
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = kb.card),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Chat,
+                        contentDescription = null,
+                        tint = Color(0xFF27AE60),
+                    )
+                    Column(modifier = Modifier.padding(start = 12.dp)) {
+                        Text(
+                            text = stringResource(R.string.settings_messages_chat_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = kb.title,
+                        )
+                        Text(
+                            text = stringResource(R.string.settings_messages_chat_sub),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = kb.subtitle,
+                        )
+                    }
+                }
+                Switch(
+                    checked = state.chatEnabled,
+                    onCheckedChange = viewModel::setChatEnabled,
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.settings_messages_chat_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = kb.subtitle,
         )
         Spacer(Modifier.height(16.dp))
         Card(

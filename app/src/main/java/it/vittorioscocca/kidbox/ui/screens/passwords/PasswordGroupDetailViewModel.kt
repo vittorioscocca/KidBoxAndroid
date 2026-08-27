@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.passwords
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -10,6 +11,7 @@ import it.vittorioscocca.kidbox.data.local.entity.PasswordGroupEntity
 import it.vittorioscocca.kidbox.data.repository.PasswordsRepository
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import java.util.UUID
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +33,7 @@ data class PasswordGroupDetailUiState(
 
 @HiltViewModel
 class PasswordGroupDetailViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val groupDao: PasswordGroupDao,
     private val passwordCypher: PasswordCypher,
     private val auth: FirebaseAuth,
@@ -52,9 +55,11 @@ class PasswordGroupDetailViewModel @Inject constructor(
                 _uiState.value = PasswordGroupDetailUiState(familyId = familyId)
                 return@launch
             }
-            val title = runCatching {
+            // Si prefilla il nome mostrato, così l'utente modifica quello che vede.
+            val storedTitle = runCatching {
                 passwordCypher.decrypt(group.nameCipher, group.familyId, group.visibility, group.createdBy, uid)
             }.getOrDefault("")
+            val title = PasswordDefaultGroups.displayName(appContext, group.id, group.familyId, storedTitle)
             _uiState.value = PasswordGroupDetailUiState(
                 familyId = familyId,
                 groupId = gid,

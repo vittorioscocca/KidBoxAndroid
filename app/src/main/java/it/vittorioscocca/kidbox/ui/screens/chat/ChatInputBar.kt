@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import androidx.compose.ui.platform.LocalDensity
 
 @Composable
 fun ChatInputBar(
@@ -94,6 +95,12 @@ fun ChatInputBar(
     var touchStartY by remember { mutableFloatStateOf(0f) }
     var lockRaised by remember { mutableStateOf(false) }
     var cancelRaised by remember { mutableStateOf(false) }
+
+    // Le soglie erano 120 pixel grezzi: su uno schermo a 3x sono 40dp, su uno a
+    // 1.5x sono 80dp. Convertite in dp perché il gesto sia lo stesso ovunque.
+    val density = LocalDensity.current
+    val lockThresholdPx = with(density) { LOCK_DRAG_THRESHOLD.toPx() }
+    val cancelThresholdPx = with(density) { CANCEL_DRAG_THRESHOLD.toPx() }
 
     // TextFieldValue locale per controllare la posizione del cursore.
     // Sincronizziamo il testo esterno → locale solo quando cambia da fuori
@@ -248,11 +255,11 @@ fun ChatInputBar(
                                     MotionEvent.ACTION_MOVE -> {
                                         val dx = event.rawX - touchStartX
                                         val dy = event.rawY - touchStartY
-                                        if (!lockRaised && dy < -120f) {
+                                        if (!lockRaised && dy < -lockThresholdPx) {
                                             lockRaised = true
                                             onLockRecording()
                                         }
-                                        if (!cancelRaised && !lockRaised && dx < -120f) {
+                                        if (!cancelRaised && !lockRaised && dx < -cancelThresholdPx) {
                                             cancelRaised = true
                                             onCancelRecording()
                                         }
@@ -265,7 +272,13 @@ fun ChatInputBar(
                                     }
 
                                     MotionEvent.ACTION_CANCEL -> {
-                                        onCancelRecording()
+                                        // Bloccando la registrazione questa Box sparisce
+                                        // (al suo posto compare il tasto invio) e Compose
+                                        // manda ACTION_CANCEL al nodo smontato: senza questa
+                                        // guardia lo swipe verso l'alto BUTTAVA la
+                                        // registrazione invece di bloccarla. Vale anche per
+                                        // l'annullamento, che altrimenti fermava due volte.
+                                        if (!lockRaised && !cancelRaised) onCancelRecording()
                                         true
                                     }
 
@@ -398,3 +411,8 @@ private fun findActiveMentionQuery(text: String): MentionQuery? {
     return MentionQuery(atIndex = atIndex, endIndex = text.length, query = tail)
 }
 
+/** Trascinamento verso l'alto per bloccare la registrazione a mani libere. */
+private val LOCK_DRAG_THRESHOLD = 48.dp
+
+/** Trascinamento verso sinistra per annullare la registrazione. */
+private val CANCEL_DRAG_THRESHOLD = 72.dp

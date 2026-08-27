@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.passwords
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -15,6 +16,7 @@ import it.vittorioscocca.kidbox.data.repository.PasswordsRepository
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.notifications.PasswordExpiryReminderScheduler
 import java.util.UUID
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,6 +59,7 @@ data class AddPasswordEditDraft(
 
 @HiltViewModel
 class AddPasswordViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val passwordCypher: PasswordCypher,
     private val passwordEntryDao: PasswordEntryDao,
     private val passwordGroupDao: PasswordGroupDao,
@@ -355,10 +358,12 @@ class AddPasswordViewModel @Inject constructor(
         }
     }
 
-    private fun decryptGroupName(g: PasswordGroupEntity, uid: String): String =
-        runCatching {
+    private fun decryptGroupName(g: PasswordGroupEntity, uid: String): String {
+        val stored = runCatching {
             passwordCypher.decrypt(g.nameCipher, g.familyId, g.visibility, g.createdBy, uid)
         }.getOrElse { "" }
+        return PasswordDefaultGroups.displayName(appContext, g.id, g.familyId, stored)
+    }
 
     private fun encodeVisibilityMemberIds(ids: List<String>): String {
         val cleaned = ids.map { it.trim() }.filter { it.isNotEmpty() }.distinct()

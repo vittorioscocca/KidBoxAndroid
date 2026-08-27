@@ -84,8 +84,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import it.vittorioscocca.kidbox.ui.screens.life.deadlineUrgencyColor
 import it.vittorioscocca.kidbox.ui.screens.life.earliestNonNull
 import it.vittorioscocca.kidbox.ui.screens.life.formatItDate
-import it.vittorioscocca.kidbox.ui.screens.life.homeCategoryLabelIt
-import it.vittorioscocca.kidbox.ui.screens.life.housePaymentTypeLabelIt
+import it.vittorioscocca.kidbox.ui.screens.life.housePaymentTypeLabel
 import it.vittorioscocca.kidbox.ui.screens.life.rememberLifeDatePicker
 import it.vittorioscocca.kidbox.ui.components.IosFormDivider
 import it.vittorioscocca.kidbox.ui.components.IosGroupedCard
@@ -103,6 +102,7 @@ import it.vittorioscocca.kidbox.ui.components.KBEmptyState
 import it.vittorioscocca.kidbox.ui.components.KBSectionHeader
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.EventRepeat
+import it.vittorioscocca.kidbox.ui.screens.life.homeCategoryLabel
 
 private fun categoryIcon(cat: String): ImageVector = when (cat) {
     "appliance" -> Icons.Filled.Kitchen
@@ -243,7 +243,7 @@ fun HomeItemsScreen(
             categoryOrder.forEach { cat ->
                 val rows = grouped[cat].orEmpty()
                 if (rows.isNotEmpty()) {
-                    add(CasaListRow.SectionHeader(homeCategoryLabelIt(cat)))
+                    add(CasaListRow.SectionHeader(homeCategoryLabel(context, cat)))
                     rows.forEach { add(CasaListRow.HomeItemRow(it)) }
                 }
             }
@@ -253,14 +253,14 @@ fun HomeItemsScreen(
             }
             val other = grouped["other"].orEmpty()
             if (other.isNotEmpty()) {
-                add(CasaListRow.SectionHeader(homeCategoryLabelIt("other")))
+                add(CasaListRow.SectionHeader(homeCategoryLabel(context, "other")))
                 other.forEach { add(CasaListRow.HomeItemRow(it)) }
             }
             val seenCats = setOf("appliance", "system", "contract", "other")
             (grouped.keys - seenCats).sorted().forEach { cat ->
                 val rows = grouped[cat].orEmpty()
                 if (rows.isNotEmpty()) {
-                    add(CasaListRow.SectionHeader(homeCategoryLabelIt(cat)))
+                    add(CasaListRow.SectionHeader(homeCategoryLabel(context, cat)))
                     rows.forEach { add(CasaListRow.HomeItemRow(it)) }
                 }
             }
@@ -370,7 +370,7 @@ fun HomeItemsScreen(
                                 Column(Modifier.weight(1f)) {
                                     Text(p.name, fontWeight = FontWeight.SemiBold, color = kb.title)
                                     Text(
-                                        housePaymentTypeLabelIt(p.typeRaw),
+                                        housePaymentTypeLabel(context, p.typeRaw),
                                         color = kb.subtitle,
                                         style = MaterialTheme.typography.bodySmall,
                                     )

@@ -151,4 +151,24 @@
     <string name="chat_kidbox_picker_title">Elegir de KidBox</string>
     <string name="chat_kidbox_picker_empty">Todavía no hay fotos ni vídeos en KidBox.</string>
     <string name="chat_kidbox_picker_send">Enviar</string>
+    <string name="ai_consent_title">Asistente IA médico</string>
+    <string name="ai_consent_subtitle">Antes de continuar, lee cómo funciona y cómo se usan tus datos.</string>
+    <string name="ai_consent_subtitle_short">Antes de continuar, lee cómo funciona.</string>
+    <string name="ai_consent_sent_title">Qué se envía</string>
+    <string name="ai_consent_sent_body">Tus preguntas y el contexto sanitario seleccionado se envían a Anthropic para generar la respuesta. No se transmiten datos irrelevantes.</string>
+    <string name="ai_consent_sent_body_short">Tus preguntas y el contexto sanitario se envían a Anthropic para generar la respuesta.</string>
+    <string name="ai_consent_provider_title">Proveedor de IA: Anthropic</string>
+    <string name="ai_consent_provider_body">Los datos se tratan según la Política de Privacidad de Anthropic (anthropic.com/privacy). KidBox no conserva las respuestas en sus servidores.</string>
+    <string name="ai_consent_provider_body_short">Los datos se tratan según la Política de Privacidad de Anthropic.</string>
+    <string name="ai_consent_not_advice_title">No sustituye la opinión médica</string>
+    <string name="ai_consent_not_advice_body">La IA ofrece información general de apoyo y no sustituye el criterio de tu médico. En caso de urgencia, contacta siempre con un profesional.</string>
+    <string name="ai_consent_not_advice_body_short">La IA ofrece información general y no sustituye a tu médico.</string>
+    <string name="ai_consent_privacy_title">Privacidad y datos</string>
+    <string name="ai_consent_privacy_body">Los datos de salud se cifran en tránsito. Puedes retirar tu consentimiento en cualquier momento desde la pantalla Ajustes de IA.</string>
+    <string name="ai_consent_link_anthropic">Privacidad de Anthropic</string>
+    <string name="ai_consent_link_kidbox">Privacidad de KidBox</string>
+    <string name="ai_consent_accept">Entendido, continuar</string>
+    <string name="ai_consent_accept_terms">Aceptar y continuar</string>
+    <string name="ai_consent_terms_checkbox">He leído y acepto las condiciones de uso de la IA</string>
+    <string name="ai_consent_cancel">Cancelar</string>
 </resources>

@@ -40,6 +40,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun AIConsentBottomSheet(
@@ -69,7 +71,7 @@ fun AIConsentBottomSheet(
             }
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "Assistente AI Medico",
+                text = stringResource(R.string.ai_consent_title),
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.fillMaxWidth(),
@@ -77,7 +79,7 @@ fun AIConsentBottomSheet(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "Prima di continuare, leggi come funziona e come vengono usati i tuoi dati.",
+                text = stringResource(R.string.ai_consent_subtitle),
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth(),
@@ -88,29 +90,29 @@ fun AIConsentBottomSheet(
             ConsentBlock(
                 icon = Icons.Default.UploadFile,
                 color = Color(0xFFF59E0B),
-                title = "Cosa viene inviato",
-                body = "Le tue domande e il contesto sanitario selezionato vengono inviati ad Anthropic per generare la risposta. Non vengono trasmessi dati non rilevanti.",
+                title = stringResource(R.string.ai_consent_sent_title),
+                body = stringResource(R.string.ai_consent_sent_body),
             )
             Spacer(Modifier.height(10.dp))
             ConsentBlock(
                 icon = Icons.Default.Business,
                 color = Color(0xFF3B82F6),
-                title = "Fornitore AI: Anthropic",
-                body = "I dati sono trattati secondo la Privacy Policy di Anthropic (anthropic.com/privacy). KidBox non conserva le risposte sui propri server.",
+                title = stringResource(R.string.ai_consent_provider_title),
+                body = stringResource(R.string.ai_consent_provider_body),
             )
             Spacer(Modifier.height(10.dp))
             ConsentBlock(
                 icon = Icons.Default.Warning,
                 color = Color(0xFFEF4444),
-                title = "Non è un parere medico",
-                body = "L'AI fornisce informazioni generali di supporto e non sostituisce il giudizio del tuo medico. In caso di urgenza, contatta sempre un professionista.",
+                title = stringResource(R.string.ai_consent_not_advice_title),
+                body = stringResource(R.string.ai_consent_not_advice_body),
             )
             Spacer(Modifier.height(10.dp))
             ConsentBlock(
                 icon = Icons.Default.Lock,
                 color = Color(0xFF10B981),
-                title = "Privacy e dati",
-                body = "I dati sanitari sono cifrati in transito. Puoi revocare il consenso in qualsiasi momento dalla schermata Impostazioni AI.",
+                title = stringResource(R.string.ai_consent_privacy_title),
+                body = stringResource(R.string.ai_consent_privacy_body),
             )
 
             Spacer(Modifier.height(16.dp))
@@ -129,7 +131,7 @@ fun AIConsentBottomSheet(
                     },
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text("Privacy Anthropic", fontSize = 12.sp)
+                    Text(stringResource(R.string.ai_consent_link_anthropic), fontSize = 12.sp)
                 }
                 TextButton(
                     onClick = {
@@ -141,7 +143,7 @@ fun AIConsentBottomSheet(
                     },
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text("Privacy KidBox", fontSize = 12.sp)
+                    Text(stringResource(R.string.ai_consent_link_kidbox), fontSize = 12.sp)
                 }
             }
 
@@ -153,14 +155,14 @@ fun AIConsentBottomSheet(
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
             ) {
-                Text("Ho capito, procedi", fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.ai_consent_accept), fontWeight = FontWeight.SemiBold)
             }
 
             TextButton(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Annulla")
+                Text(stringResource(R.string.ai_consent_cancel))
             }
             Spacer(Modifier.height(8.dp))
         }

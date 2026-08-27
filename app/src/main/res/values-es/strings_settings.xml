@@ -165,6 +165,10 @@
     <string name="settings_family_no_children">No hay hijos configurados.</string>
     <string name="settings_family_members">Miembros</string>
     <string name="settings_family_loading_members">Cargando miembros…</string>
+    <plurals name="settings_storage_section_items">
+        <item quantity="one">%1$d elemento</item>
+        <item quantity="other">%1$d elementos</item>
+    </plurals>
     <plurals name="settings_family_members_connected">
         <item quantity="one">%1$d miembro conectado.</item>
         <item quantity="other">%1$d miembros conectados.</item>
@@ -262,7 +266,16 @@
     <string name="settings_ai_ctx_full_detail">Envía siempre todos los informes y los datos de salud completos.</string>
     <string name="settings_ai_ctx_summary_title">Contexto resumido</string>
     <string name="settings_ai_ctx_summary_detail">Usa un resumen del perfil de salud para ahorrar mensajes.</string>
+    <string name="settings_plan_ai_one_time">%1$d msj IA único</string>
     <string name="settings_plan_ai_per_day">%1$d msj IA/día</string>
     <string name="settings_plan_ai_messages_per_day">IA: %1$d mensajes/día</string>
     <string name="settings_family_limit_reached">Has alcanzado el límite de 2 familias por cuenta. Elimina una familia existente para crear una nueva.</string>
+    <string name="settings_ai_consent_given_on">Consentimiento dado el %1$s</string>
+    <string name="settings_ai_messages_sent_today">%1$d mensajes enviados hoy</string>
+    <string name="settings_ai_available_count">Disponibles: %1$d</string>
+    <string name="settings_ai_used_count">Usados: %1$d/%2$d</string>
+    <string name="settings_messages_chat_title">Chat de familia</string>
+    <string name="settings_messages_chat_sub">Permite activar o desactivar el chat de familia</string>
+    <string name="settings_messages_chat_note">La elección se aplica a todos tus dispositivos. Los demás miembros siguen chateando entre ellos y recuperarás los mensajes al reactivarlo.</string>
+    <string name="settings_notif_chat_disabled">El chat está desactivado en Ajustes → Mensajes.</string>
 </resources>

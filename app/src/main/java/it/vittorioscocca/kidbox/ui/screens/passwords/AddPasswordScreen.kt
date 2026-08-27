@@ -87,6 +87,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
+import it.vittorioscocca.kidbox.ui.util.visibilityChipLabel
 
 private val PasswordsAccentPurple = Color(0xFF9973D9)
 
@@ -261,7 +262,7 @@ fun AddPasswordScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        KBVisibilityScope.chipLabel(visibilityScope),
+                        visibilityChipLabel(visibilityScope),
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyLarge,
                         color = kb.title,
@@ -495,20 +496,20 @@ fun AddPasswordScreen(
                     fontWeight = FontWeight.SemiBold,
                 )
                 VisibilityRadioRow(
-                    label = KBVisibilityScope.chipLabel(KBVisibilityScope.FAMILY),
+                    label = visibilityChipLabel(KBVisibilityScope.FAMILY),
                     selected = visibilityScope == KBVisibilityScope.FAMILY,
                 ) {
                     visibilityScope = KBVisibilityScope.FAMILY
                     visibilityMemberIds = emptySet()
                 }
                 VisibilityRadioRow(
-                    label = KBVisibilityScope.chipLabel(KBVisibilityScope.MEMBERS),
+                    label = visibilityChipLabel(KBVisibilityScope.MEMBERS),
                     selected = visibilityScope == KBVisibilityScope.MEMBERS,
                 ) {
                     visibilityScope = KBVisibilityScope.MEMBERS
                 }
                 VisibilityRadioRow(
-                    label = KBVisibilityScope.chipLabel(KBVisibilityScope.ONLY_CREATOR),
+                    label = visibilityChipLabel(KBVisibilityScope.ONLY_CREATOR),
                     selected = visibilityScope == KBVisibilityScope.ONLY_CREATOR,
                 ) {
                     visibilityScope = KBVisibilityScope.ONLY_CREATOR

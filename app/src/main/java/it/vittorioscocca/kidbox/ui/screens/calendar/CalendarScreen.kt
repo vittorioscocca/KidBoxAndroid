@@ -100,6 +100,7 @@ import java.time.Duration
 import it.vittorioscocca.kidbox.ui.components.KBEmptyState
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.AddCircle
+import it.vittorioscocca.kidbox.ui.util.visibilityChipLabel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -985,7 +986,7 @@ private fun CalendarEventDialog(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    KBVisibilityScope.chipLabel(visibilityScope),
+                                    visibilityChipLabel(visibilityScope),
                                     color = kb.title,
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 15.sp,
@@ -995,7 +996,7 @@ private fun CalendarEventDialog(
                         }
                     } else {
                         Text(
-                            KBVisibilityScope.chipLabel(
+                            visibilityChipLabel(
                                 KBVisibilityScope.normalized(initial?.visibilityScope ?: KBVisibilityScope.FAMILY),
                             ),
                             color = kb.title,

@@ -55,7 +55,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.life.HousePaymentDeadlineCalculator
 import it.vittorioscocca.kidbox.ui.screens.life.deadlineUrgencyColor
 import it.vittorioscocca.kidbox.ui.screens.life.formatItDate
-import it.vittorioscocca.kidbox.ui.screens.life.housePaymentTypeLabelIt
+import it.vittorioscocca.kidbox.ui.screens.life.housePaymentSubtypeLabel
+import it.vittorioscocca.kidbox.ui.screens.life.housePaymentTypeLabel
 import it.vittorioscocca.kidbox.ui.screens.health.attachments.HealthAttachmentsCard
 import it.vittorioscocca.kidbox.ui.screens.health.attachments.KidBoxDocumentPickerSheet
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
@@ -169,21 +170,21 @@ fun HousePaymentDetailScreen(
         ) {
             Card(colors = CardDefaults.cardColors(containerColor = kb.card)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(housePaymentTypeLabelIt(p.typeRaw), color = kb.subtitle)
+                    Text(housePaymentTypeLabel(context, p.typeRaw), color = kb.subtitle)
                     Text(p.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = kb.title)
-                    p.subtypeRaw?.takeIf { it.isNotBlank() }?.let { Text(it, color = kb.subtitle) }
+                    p.subtypeRaw?.takeIf { it.isNotBlank() }?.let { Text(housePaymentSubtypeLabel(context, it), color = kb.subtitle) }
                     p.importo?.let { v ->
                         val cur = NumberFormat.getCurrencyInstance(KBLocale.current()).format(v)
-                        Text("Importo: $cur", color = kb.subtitle)
+                        Text(stringResource(R.string.home_items_amount_value, cur), color = kb.subtitle)
                     }
-                    p.fornitore?.takeIf { it.isNotBlank() }?.let { Text("Fornitore: $it", color = kb.subtitle) }
+                    p.fornitore?.takeIf { it.isNotBlank() }?.let { Text(stringResource(R.string.home_items_provider_value, it), color = kb.subtitle) }
                     p.note?.takeIf { it.isNotBlank() }?.let { Text(it, color = kb.subtitle) }
                 }
             }
             Text(stringResource(R.string.home_items_deadlines), fontWeight = FontWeight.SemiBold, color = kb.title)
             p.giornoDiScadenzaMensile?.let { giorno ->
                 HousePaymentDeadlineCalculator.nextMonthlyDeadlineOnly(p)?.let { d ->
-                    deadlineChip("Prossima scadenza mensile (giorno $giorno)", d)
+                    deadlineChip(stringResource(R.string.home_items_next_monthly_day, giorno), d)
                 }
             }
             p.dataScadenza?.let {

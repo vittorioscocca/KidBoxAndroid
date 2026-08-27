@@ -140,6 +140,7 @@ import it.vittorioscocca.kidbox.notifications.TrackSectionPresence
 import it.vittorioscocca.kidbox.ui.components.KBEmptyState
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.FolderOpen
+import it.vittorioscocca.kidbox.ui.util.visibilityChipLabel
 
 private const val TAG_DOC_OPEN = "KB_Doc_Open"
 private sealed interface ContextMenuTarget {
@@ -784,7 +785,7 @@ fun DocumentBrowserScreen(
                         color = MaterialTheme.kidBoxColors.card,
                     ) {
                         Text(
-                            KBVisibilityScope.chipLabel(draftUploadScope),
+                            visibilityChipLabel(draftUploadScope),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 14.dp, vertical = 12.dp),
@@ -855,7 +856,7 @@ fun DocumentBrowserScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                KBVisibilityScope.chipLabel(docInfo.visibilityScope),
+                                visibilityChipLabel(docInfo.visibilityScope),
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.kidBoxColors.title,
                             )

@@ -7,9 +7,16 @@ import javax.inject.Singleton
 
 @Singleton
 class MessageSettingsPreferences @Inject constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext private val appContext: Context,
 ) {
-    private val prefs = context.getSharedPreferences("kidbox_prefs", Context.MODE_PRIVATE)
+    private val prefs = appContext.getSharedPreferences("kidbox_prefs", Context.MODE_PRIVATE)
+
+    /** Lo stato vive in [ChatAvailability], che lo espone anche fuori da Hilt. */
+    fun isChatEnabled(): Boolean = ChatAvailability.isEnabled
+
+    suspend fun setChatEnabled(enabled: Boolean) = ChatAvailability.set(appContext, enabled)
+
+    suspend fun refreshChatEnabled() = ChatAvailability.refreshFromRemote(appContext)
 
     fun isAudioTranscriptionEnabled(): Boolean =
         prefs.getBoolean(KEY_AUDIO_TRANSCRIPTION_ENABLED, true)

@@ -46,12 +46,19 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.entity.PetEntity
+import it.vittorioscocca.kidbox.ui.screens.life.speciesLabel
 import it.vittorioscocca.kidbox.ui.screens.life.speciesEmoji
-import it.vittorioscocca.kidbox.ui.screens.life.speciesLabelIt
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import it.vittorioscocca.kidbox.ui.components.KBEmptyState
 import it.vittorioscocca.kidbox.ui.components.KBSectionHeader
 import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.automirrored.filled.Note
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.sp
+import it.vittorioscocca.kidbox.ui.components.KidBoxFormPage
+import it.vittorioscocca.kidbox.ui.components.FormSectionTitle
+import it.vittorioscocca.kidbox.ui.components.FormSectionHeader
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -60,6 +67,7 @@ fun PetsScreen(
     onOpenPet: (String) -> Unit,
     viewModel: PetsViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val pets by viewModel.pets.collectAsStateWithLifecycle()
     var showAdd by remember { mutableStateOf(false) }
     var petToDelete by remember { mutableStateOf<PetEntity?>(null) }
@@ -124,7 +132,7 @@ fun PetsScreen(
                             Text(speciesEmoji(pet.species), style = MaterialTheme.typography.headlineSmall)
                             Column(Modifier.weight(1f)) {
                                 Text(pet.name, fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.title)
-                                Text(speciesLabelIt(pet.species), color = MaterialTheme.kidBoxColors.subtitle, style = MaterialTheme.typography.bodySmall)
+                                Text(speciesLabel(context, pet.species), color = MaterialTheme.kidBoxColors.subtitle, style = MaterialTheme.typography.bodySmall)
                                 pet.breed?.takeIf { it.isNotBlank() }?.let {
                                     Text(it, color = MaterialTheme.kidBoxColors.subtitle, style = MaterialTheme.typography.bodySmall)
                                 }
@@ -183,46 +191,84 @@ private fun AddPetDialog(
     onDismiss: () -> Unit,
     onConfirm: (name: String, species: String, breed: String?, notes: String?) -> Unit,
 ) {
+    val context = LocalContext.current
     var name by remember { mutableStateOf("") }
     var species by remember { mutableStateOf("cane") }
     var breed by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
     val speciesOptions = listOf("cane", "gatto", "coniglio", "criceto", "uccello", "altro")
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.pets_new_pet_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.pets_field_name)) }, singleLine = true)
-                Text(stringResource(R.string.pets_field_species), style = MaterialTheme.typography.labelLarge)
-                Column {
-                    speciesOptions.forEach { opt ->
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .selectable(selected = species == opt, onClick = { species = opt }),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(selected = species == opt, onClick = { species = opt })
-                            Text(speciesLabelIt(opt))
-                        }
-                    }
-                }
-                OutlinedTextField(value = breed, onValueChange = { breed = it }, label = { Text(stringResource(R.string.pets_field_breed_optional)) }, singleLine = true)
-                OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text(stringResource(R.string.pets_field_notes)) })
+    val accent = Color(0xFFFF9500)
+    val kb = MaterialTheme.kidBoxColors
+
+    KidBoxFormPage(
+        title = stringResource(R.string.pets_new_pet_title),
+        onDismiss = onDismiss,
+        saveLabel = stringResource(R.string.pets_action_save),
+        saveEnabled = name.isNotBlank(),
+        accent = accent,
+        onSave = {
+            if (name.isNotBlank()) {
+                onConfirm(
+                    name.trim(),
+                    species,
+                    breed.trim().takeIf { it.isNotEmpty() },
+                    notes.trim().takeIf { it.isNotEmpty() },
+                )
             }
         },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (name.isNotBlank()) {
-                        onConfirm(name.trim(), species, breed.trim().takeIf { it.isNotEmpty() }, notes.trim().takeIf { it.isNotEmpty() })
+    ) {
+        FormSectionTitle(stringResource(R.string.form_section_details))
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text(stringResource(R.string.pets_field_name)) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = breed,
+            onValueChange = { breed = it },
+            label = { Text(stringResource(R.string.pets_field_breed_optional)) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            singleLine = true,
+        )
+
+        FormSectionHeader(stringResource(R.string.pets_field_species), Icons.Default.Pets, accent)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = kb.rowBackground),
+        ) {
+            Column {
+                speciesOptions.forEach { opt ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .selectable(selected = species == opt, onClick = { species = opt })
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = species == opt, onClick = { species = opt })
+                        Text(speciesEmoji(opt), fontSize = 18.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Text(speciesLabel(context, opt), color = kb.title)
                     }
-                },
-            ) { Text(stringResource(R.string.pets_action_save)) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.pets_action_cancel)) } },
-    )
+                }
+            }
+        }
+
+        FormSectionHeader(stringResource(R.string.life_notes), Icons.AutoMirrored.Filled.Note, accent)
+        OutlinedTextField(
+            value = notes,
+            onValueChange = { notes = it },
+            placeholder = { Text(stringResource(R.string.pets_field_notes)) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            minLines = 3,
+        )
+        Spacer(Modifier.height(8.dp))
+    }
 }

@@ -72,6 +72,7 @@ fun NotificationSettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
+    val chatEnabled by it.vittorioscocca.kidbox.data.local.ChatAvailability.enabled.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var pendingEnableKey by remember { mutableStateOf<String?>(null) }
     var isNotificationChannelSilent by remember { mutableStateOf(false) }
@@ -223,11 +224,17 @@ fun NotificationSettingsScreen(
                     )
                 }
             }
+            // Con la chat spenta la riga resta ma non si tocca: riaccenderla
+            // manderebbe notifiche per una schermata che si rifiuta di aprirsi.
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_chat),
-                subtitle = stringResource(R.string.settings_notif_chat_sub),
-                checked = state.notifyOnNewMessages && !systemDenied,
-                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
+                subtitle = if (chatEnabled) {
+                    stringResource(R.string.settings_notif_chat_sub)
+                } else {
+                    stringResource(R.string.settings_notif_chat_disabled)
+                },
+                checked = state.notifyOnNewMessages && !systemDenied && chatEnabled,
+                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied && chatEnabled,
                 onCheckedChange = { enabled ->
                     updatePreferenceWithPermission(
                         key = PreferenceKeys.NOTIFY_ON_NEW_MESSAGES,

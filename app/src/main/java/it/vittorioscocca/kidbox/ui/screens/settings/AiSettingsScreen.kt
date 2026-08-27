@@ -399,7 +399,7 @@ private fun AIToggleCard(
                         modifier = Modifier.size(16.dp),
                     )
                     Text(
-                        "  Consenso fornito il ${CONSENT_DATE_FMT().format(Date(consentDate))}",
+                        stringResource(R.string.settings_ai_consent_given_on, CONSENT_DATE_FMT().format(Date(consentDate))),
                         color = CONSENT_GREEN,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
@@ -456,7 +456,7 @@ private fun AIUsageCard(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "$usageToday messaggi inviati oggi",
+                    stringResource(R.string.settings_ai_messages_sent_today, usageToday),
                     fontSize = 14.sp,
                     color = kb.subtitle,
                 )
@@ -479,9 +479,9 @@ private fun AIUsageCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text("Disponibili: $availableToday", fontSize = 14.sp, color = kb.title, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.settings_ai_available_count, availableToday), fontSize = 14.sp, color = kb.title, fontWeight = FontWeight.SemiBold)
                     Text(
-                        "Usati: $usageToday/$dailyLimit",
+                        stringResource(R.string.settings_ai_used_count, usageToday, dailyLimit),
                         fontSize = 13.sp,
                         color = kb.subtitle,
                     )

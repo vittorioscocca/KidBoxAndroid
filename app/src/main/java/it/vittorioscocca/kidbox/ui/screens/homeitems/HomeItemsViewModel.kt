@@ -1,10 +1,12 @@
 package it.vittorioscocca.kidbox.ui.screens.homeitems
 
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
 import it.vittorioscocca.kidbox.data.home.HomeItemAttachmentTag
 import it.vittorioscocca.kidbox.data.home.HousePaymentAttachmentTag
@@ -26,6 +28,7 @@ import kotlinx.coroutines.launch
 
 @HiltViewModel
 class HomeItemsViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     savedStateHandle: SavedStateHandle,
     private val homeItemRepository: HomeItemRepository,
     private val housePaymentRepository: HousePaymentRepository,
@@ -33,6 +36,11 @@ class HomeItemsViewModel @Inject constructor(
     private val documentDao: KBDocumentDao,
 ) : ViewModel() {
     private val familyId: String = savedStateHandle.get<String>("familyId").orEmpty()
+
+    init {
+        // Bonifica una tantum dei sottotipi ereditati da un cambio di tipo.
+        viewModelScope.launch { housePaymentRepository.cleanupInheritedSubtypes(appContext, familyId) }
+    }
 
     /** Es. KidBox Documenti picker nella schermata lista Casa. */
     val familyIdForPicker: String get() = familyId

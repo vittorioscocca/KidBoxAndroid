@@ -49,13 +49,24 @@ import it.vittorioscocca.kidbox.ui.screens.life.deadlineUrgencyColor
 import it.vittorioscocca.kidbox.ui.screens.life.earliestNonNull
 import it.vittorioscocca.kidbox.ui.screens.life.formatItDate
 import it.vittorioscocca.kidbox.ui.screens.life.rememberLifeDatePicker
-import it.vittorioscocca.kidbox.ui.screens.life.vehicleFuelLabelIt
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.components.KBEmptyState
 import it.vittorioscocca.kidbox.ui.components.KBSectionHeader
 import androidx.compose.material.icons.filled.AddCircle
+import it.vittorioscocca.kidbox.ui.screens.life.vehicleFuelLabel
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.LocalGasStation
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.automirrored.filled.Note
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.unit.sp
+import it.vittorioscocca.kidbox.ui.components.KidBoxFormPage
+import it.vittorioscocca.kidbox.ui.components.FormSectionTitle
+import it.vittorioscocca.kidbox.ui.components.FormSectionHeader
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -227,6 +238,7 @@ private fun AddVehicleDialog(
     onDismiss: () -> Unit,
     onConfirm: (VehicleFormFields) -> Unit,
 ) {
+    val context = LocalContext.current
     var name by remember { mutableStateOf("") }
     var plate by remember { mutableStateOf("") }
     var brand by remember { mutableStateOf("") }
@@ -254,68 +266,38 @@ private fun AddVehicleDialog(
     val pickLast = rememberLifeDatePicker { lastSvc = it }
     val pickNext = rememberLifeDatePicker { nextSvc = it }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.vehicles_new_vehicle)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.life_name)) })
-                OutlinedTextField(value = plate, onValueChange = { plate = it }, label = { Text(stringResource(R.string.vehicles_plate)) })
-                OutlinedTextField(value = brand, onValueChange = { brand = it }, label = { Text(stringResource(R.string.home_items_brand)) })
-                OutlinedTextField(value = model, onValueChange = { model = it }, label = { Text(stringResource(R.string.home_items_model)) })
-                OutlinedTextField(value = yearText, onValueChange = { yearText = it }, label = { Text(stringResource(R.string.vehicles_year)) })
-                Text(stringResource(R.string.vehicles_fuel), style = MaterialTheme.typography.labelLarge)
-                fuels.forEach { f ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = fuel == f, onClick = { fuel = f })
-                        Text(vehicleFuelLabelIt(f))
-                    }
-                }
-                OutlinedTextField(value = color, onValueChange = { color = it }, label = { Text(stringResource(R.string.vehicles_color)) })
-                OutlinedTextField(value = vin, onValueChange = { vin = it }, label = { Text("VIN") })
-                TextButton(onClick = { pickIns(ins) }) { Text("Scad. assicurazione: ${ins?.let { formatItDate(it) } ?: "—"}") }
-                if (ins != null) {
-                    ReminderOffsetChips(
-                        selected = insOffsets,
-                        onToggle = { d -> insOffsets = if (d in insOffsets) insOffsets - d else insOffsets + d },
-                    )
-                }
-                TextButton(onClick = { pickRev(rev) }) { Text("Scad. revisione: ${rev?.let { formatItDate(it) } ?: "—"}") }
-                if (rev != null) {
-                    ReminderOffsetChips(
-                        selected = revOffsets,
-                        onToggle = { d -> revOffsets = if (d in revOffsets) revOffsets - d else revOffsets + d },
-                    )
-                }
-                TextButton(onClick = { pickTax(tax) }) { Text("Scad. bollo: ${tax?.let { formatItDate(it) } ?: "—"}") }
-                if (tax != null) {
-                    ReminderOffsetChips(
-                        selected = taxOffsets,
-                        onToggle = { d -> taxOffsets = if (d in taxOffsets) taxOffsets - d else taxOffsets + d },
-                    )
-                }
-                TextButton(onClick = { pickLast(lastSvc) }) { Text("Ultimo tagliando: ${lastSvc?.let { formatItDate(it) } ?: "—"}") }
-                TextButton(onClick = { pickNext(nextSvc) }) { Text("Prossimo tagliando: ${nextSvc?.let { formatItDate(it) } ?: "—"}") }
-                if (nextSvc != null) {
-                    ReminderOffsetChips(
-                        selected = nextSvcOffsets,
-                        onToggle = { d -> nextSvcOffsets = if (d in nextSvcOffsets) nextSvcOffsets - d else nextSvcOffsets + d },
-                    )
-                }
-                OutlinedTextField(value = kmText, onValueChange = { kmText = it }, label = { Text(stringResource(R.string.vehicles_current_km_short)) })
-                OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text(stringResource(R.string.life_notes)) })
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = reminder, onCheckedChange = { reminder = it })
-                    Text(stringResource(R.string.vehicles_reminder))
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (name.isNotBlank()) {
-                        onConfirm(
-                            VehicleFormFields(
+    val accent = Color(0xFFFF6B00)
+    val kb = MaterialTheme.kidBoxColors
+
+    @Composable
+    fun DateRow(label: String, value: Long?, onPick: () -> Unit) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onPick() }
+                .padding(horizontal = 12.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(label, fontSize = 14.sp, color = kb.subtitle)
+            Text(
+                value?.let { formatItDate(it) } ?: stringResource(R.string.vehicles_no_date),
+                fontSize = 15.sp,
+                color = kb.title,
+            )
+        }
+    }
+
+    KidBoxFormPage(
+        title = stringResource(R.string.vehicles_new_vehicle),
+        onDismiss = onDismiss,
+        saveLabel = stringResource(R.string.life_save),
+        saveEnabled = name.isNotBlank(),
+        accent = accent,
+        onSave = {
+            if (name.isNotBlank()) {
+                onConfirm(
+                    VehicleFormFields(
                                 name = name.trim(),
                                 plate = plate.trim().takeIf { it.isNotEmpty() },
                                 brand = brand.trim().takeIf { it.isNotEmpty() },
@@ -339,11 +321,76 @@ private fun AddVehicleDialog(
                                     service = nextSvcOffsets.sorted(),
                                 ).encode(),
                             ),
-                        )
-                    }
-                },
-            ) { Text(stringResource(R.string.life_save)) }
+                )
+            }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.life_cancel)) } },
-    )
+    ) {
+        FormSectionTitle(stringResource(R.string.form_section_details))
+        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.life_name)) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true)
+        OutlinedTextField(value = plate, onValueChange = { plate = it }, label = { Text(stringResource(R.string.vehicles_plate)) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true)
+        OutlinedTextField(value = brand, onValueChange = { brand = it }, label = { Text(stringResource(R.string.home_items_brand)) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true)
+        OutlinedTextField(value = model, onValueChange = { model = it }, label = { Text(stringResource(R.string.home_items_model)) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true)
+        OutlinedTextField(value = yearText, onValueChange = { yearText = it }, label = { Text(stringResource(R.string.vehicles_year)) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true)
+        OutlinedTextField(value = color, onValueChange = { color = it }, label = { Text(stringResource(R.string.vehicles_color)) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true)
+        OutlinedTextField(value = vin, onValueChange = { vin = it }, label = { Text("VIN") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true)
+
+        FormSectionHeader(stringResource(R.string.vehicles_fuel), Icons.Default.LocalGasStation, accent)
+        Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = kb.rowBackground)) {
+            Column {
+                fuels.forEach { f ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .selectable(selected = fuel == f, onClick = { fuel = f })
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = fuel == f, onClick = { fuel = f })
+                        Text(vehicleFuelLabel(context, f), color = kb.title)
+                    }
+                }
+            }
+        }
+
+        FormSectionHeader(stringResource(R.string.form_section_deadlines), Icons.Default.Event, accent)
+        Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = kb.rowBackground)) {
+            Column {
+                DateRow(stringResource(R.string.vehicles_insurance), ins) { pickIns(ins) }
+                if (ins != null) {
+                    ReminderOffsetChips(selected = insOffsets, onToggle = { d -> insOffsets = if (d in insOffsets) insOffsets - d else insOffsets + d })
+                }
+                DateRow(stringResource(R.string.vehicles_inspection), rev) { pickRev(rev) }
+                if (rev != null) {
+                    ReminderOffsetChips(selected = revOffsets, onToggle = { d -> revOffsets = if (d in revOffsets) revOffsets - d else revOffsets + d })
+                }
+                DateRow(stringResource(R.string.vehicles_road_tax), tax) { pickTax(tax) }
+                if (tax != null) {
+                    ReminderOffsetChips(selected = taxOffsets, onToggle = { d -> taxOffsets = if (d in taxOffsets) taxOffsets - d else taxOffsets + d })
+                }
+            }
+        }
+
+        FormSectionHeader(stringResource(R.string.form_section_service), Icons.Default.Build, accent)
+        Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = kb.rowBackground)) {
+            Column {
+                DateRow(stringResource(R.string.vehicles_last_service), lastSvc) { pickLast(lastSvc) }
+                DateRow(stringResource(R.string.vehicles_next_service), nextSvc) { pickNext(nextSvc) }
+                if (nextSvc != null) {
+                    ReminderOffsetChips(selected = nextSvcOffsets, onToggle = { d -> nextSvcOffsets = if (d in nextSvcOffsets) nextSvcOffsets - d else nextSvcOffsets + d })
+                }
+            }
+        }
+
+        FormSectionHeader(stringResource(R.string.form_section_options), Icons.AutoMirrored.Filled.Note, accent)
+        OutlinedTextField(value = kmText, onValueChange = { kmText = it }, label = { Text(stringResource(R.string.vehicles_current_km_short)) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true)
+        OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text(stringResource(R.string.life_notes)) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), minLines = 3)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Checkbox(checked = reminder, onCheckedChange = { reminder = it })
+            Text(stringResource(R.string.vehicles_reminder), color = kb.title)
+        }
+        Spacer(Modifier.height(8.dp))
+    }
 }

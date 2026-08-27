@@ -1,7 +1,11 @@
 package it.vittorioscocca.kidbox.ui.screens.passwords
 
 import android.content.Context
+import android.content.res.Configuration
 import androidx.annotation.StringRes
+import org.xmlpull.v1.XmlPullParser
+import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.dao.PasswordGroupDao
 import it.vittorioscocca.kidbox.data.local.entity.PasswordGroupEntity
@@ -19,9 +23,11 @@ import it.vittorioscocca.kidbox.util.KBLog
  * dispositivi della stessa famiglia devono generare esattamente lo stesso
  * record — altrimenti si creerebbero doppioni a ogni sincronizzazione.
  *
- * Il nome è cifrato come qualunque altro gruppo: viene salvato TRADOTTO nella
- * lingua di chi semina, esattamente come fa iOS. È una conseguenza del fatto
- * che il nome è un dato cifrato e non una chiave di traduzione.
+ * Il nome è cifrato come qualunque altro gruppo e viene salvato TRADOTTO nella
+ * lingua di chi semina, esattamente come fa iOS: una famiglia nata in italiano
+ * si porta dietro "Lavoro" anche se poi l'app passa in inglese. Per la sola
+ * visualizzazione questo si recupera con [displayName], che risale allo slug
+ * dall'id deterministico — il fatto che il nome sia cifrato non c'entra.
  */
 object PasswordDefaultGroups {
 
@@ -45,6 +51,71 @@ object PasswordDefaultGroups {
         SeedDefinition("finance", R.string.passwords_group_finance, "creditcard.fill", "#5E5CE6", 4),
         SeedDefinition("family", R.string.passwords_group_family, "house.fill", "#FF2D55", 5),
     )
+
+    /** Seed corrispondente a un gruppo, ricavato dall'id deterministico. */
+    fun seedDefinitionFor(groupId: String, familyId: String): SeedDefinition? {
+        val prefix = "kb.password.group.$familyId."
+        if (!groupId.startsWith(prefix)) return null
+        val slug = groupId.removePrefix(prefix)
+        return seedDefinitions.firstOrNull { it.slug == slug }
+    }
+
+    /**
+     * Nome da mostrare per un gruppo, gemello di `PasswordGroup.displayName` su iOS.
+     *
+     * I gruppi seed hanno il nome salvato nella lingua di chi ha seminato: qui si
+     * risale allo slug dall'id e si rimostra il nome nella lingua corrente.
+     *
+     * L'utente però può rinominare anche un gruppo di sistema, quindi si traduce
+     * SOLO se [storedName] è ancora uno dei nomi seed noti — cioè il valore di
+     * quella stringa in una qualsiasi lingua dell'app. Se l'ha cambiato in altro,
+     * vince quello che ha scritto lui.
+     */
+    fun displayName(
+        context: Context,
+        groupId: String,
+        familyId: String,
+        storedName: String,
+    ): String {
+        val seed = seedDefinitionFor(groupId, familyId) ?: return storedName
+        if (storedName !in seedNames(context, seed.nameRes)) return storedName
+        return context.getString(seed.nameRes)
+    }
+
+    private val seedNameCache = ConcurrentHashMap<Int, Set<String>>()
+
+    /** Il valore di [res] in tutte le lingue dichiarate dall'app. */
+    private fun seedNames(context: Context, @StringRes res: Int): Set<String> =
+        seedNameCache.getOrPut(res) {
+            appLocaleTags(context).mapNotNullTo(mutableSetOf()) { tag ->
+                runCatching {
+                    val config = Configuration(context.resources.configuration).apply {
+                        setLocale(Locale.forLanguageTag(tag))
+                    }
+                    context.createConfigurationContext(config).getString(res)
+                }.getOrNull()
+            }
+        }
+
+    /**
+     * Le lingue lette da `res/xml/locales_config.xml`, così aggiungerne una non
+     * richiede di toccare questo file (su iOS l'equivalente è `Bundle.localizations`).
+     */
+    private fun appLocaleTags(context: Context): List<String> = runCatching {
+        val tags = mutableListOf<String>()
+        context.resources.getXml(R.xml.locales_config).use { parser ->
+            while (parser.next() != XmlPullParser.END_DOCUMENT) {
+                if (parser.eventType == XmlPullParser.START_TAG && parser.name == "locale") {
+                    parser.getAttributeValue(ANDROID_NS, "name")
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let(tags::add)
+                }
+            }
+        }
+        tags.takeIf { it.isNotEmpty() }
+    }.getOrNull() ?: listOf("it")
+
+    private const val ANDROID_NS = "http://schemas.android.com/apk/res/android"
 
     /**
      * Crea i gruppi predefiniti mancanti per la famiglia.

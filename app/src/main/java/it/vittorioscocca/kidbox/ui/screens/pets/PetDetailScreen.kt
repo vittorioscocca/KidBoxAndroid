@@ -72,12 +72,11 @@ import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.entity.PetEntity
 import it.vittorioscocca.kidbox.data.local.entity.PetEventEntity
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
+import it.vittorioscocca.kidbox.ui.screens.life.speciesLabel
 import it.vittorioscocca.kidbox.ui.screens.life.formatItDate
 import it.vittorioscocca.kidbox.ui.screens.life.formatItDateTime
-import it.vittorioscocca.kidbox.ui.screens.life.petEventTypeLabelIt
 import it.vittorioscocca.kidbox.ui.screens.life.rememberLifeDatePicker
 import it.vittorioscocca.kidbox.ui.screens.life.speciesEmoji
-import it.vittorioscocca.kidbox.ui.screens.life.speciesLabelIt
 import it.vittorioscocca.kidbox.ui.components.IosFormDivider
 import it.vittorioscocca.kidbox.ui.components.IosGroupedCard
 import it.vittorioscocca.kidbox.ui.components.IosPlainTextFieldRow
@@ -89,6 +88,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import it.vittorioscocca.kidbox.ui.screens.life.petEventTypeLabel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -541,6 +541,7 @@ private fun AddPetEventDialog(
         reminder: Boolean,
     ) -> Unit,
 ) {
+    val context = LocalContext.current
     var title by remember { mutableStateOf("") }
     var type by remember { mutableStateOf("vaccine") }
     var dateMillis by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -613,7 +614,7 @@ private fun AddPetEventDialog(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Text(petEventTypeLabelIt(type), color = kb.subtitle)
+                                    Text(petEventTypeLabel(context, type), color = kb.subtitle)
                                     Icon(
                                         Icons.Filled.KeyboardArrowDown,
                                         contentDescription = null,
@@ -628,7 +629,7 @@ private fun AddPetEventDialog(
                             ) {
                                 types.forEach { t ->
                                     DropdownMenuItem(
-                                        text = { Text(petEventTypeLabelIt(t)) },
+                                        text = { Text(petEventTypeLabel(context, t)) },
                                         onClick = {
                                             type = t
                                             typeMenuOpen = false
@@ -737,6 +738,7 @@ private fun EditPetDialog(
     onDismiss: () -> Unit,
     onConfirm: (PetEntity) -> Unit,
 ) {
+    val context = LocalContext.current
     var name by remember(initial.id) { mutableStateOf(initial.name) }
     var species by remember(initial.id) { mutableStateOf(initial.species) }
     var breed by remember(initial.id) { mutableStateOf(initial.breed.orEmpty()) }
@@ -811,7 +813,7 @@ private fun EditPetDialog(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Text(speciesLabelIt(species), color = kb.subtitle)
+                                    Text(speciesLabel(context, species), color = kb.subtitle)
                                     Icon(
                                         Icons.Filled.KeyboardArrowDown,
                                         contentDescription = null,
@@ -826,7 +828,7 @@ private fun EditPetDialog(
                             ) {
                                 speciesOptions.forEach { opt ->
                                     DropdownMenuItem(
-                                        text = { Text(speciesLabelIt(opt)) },
+                                        text = { Text(speciesLabel(context, opt)) },
                                         onClick = {
                                             species = opt
                                             speciesMenuOpen = false

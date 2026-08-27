@@ -91,8 +91,6 @@ import it.vittorioscocca.kidbox.ui.screens.life.rememberLifeDatePicker
 import it.vittorioscocca.kidbox.ui.screens.life.rememberLifeDatePickerKeepingTime
 import it.vittorioscocca.kidbox.ui.screens.life.rememberLifeTimePicker
 import it.vittorioscocca.kidbox.ui.screens.life.vehicleEventTypeEmoji
-import it.vittorioscocca.kidbox.ui.screens.life.vehicleEventTypeLabelIt
-import it.vittorioscocca.kidbox.ui.screens.life.vehicleFuelLabelIt
 import it.vittorioscocca.kidbox.ui.components.IosFormDivider
 import it.vittorioscocca.kidbox.ui.components.IosGroupedCard
 import it.vittorioscocca.kidbox.ui.components.IosPlainTextFieldRow
@@ -108,6 +106,10 @@ import kotlinx.coroutines.launch
 import it.vittorioscocca.kidbox.util.KBLocale
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.screens.life.vehicleFuelLabel
+import it.vittorioscocca.kidbox.ui.screens.life.vehicleEventTypeLabel
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 
 private enum class GarageAttachmentPickTarget {
     DetailVehicle,
@@ -305,7 +307,7 @@ fun VehicleDetailScreen(
                             ?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = kb.subtitle) }
                         v.year?.let { Text("Anno: $it", style = MaterialTheme.typography.bodyMedium, color = kb.title) }
                         Text(
-                            "Carburante: ${vehicleFuelLabelIt(v.fuelType)}",
+                            stringResource(R.string.vehicles_fuel_value, vehicleFuelLabel(context, v.fuelType)),
                             style = MaterialTheme.typography.bodyMedium,
                             color = kb.title,
                         )
@@ -600,6 +602,7 @@ private fun AddVehicleEventDialog(
     onOpenAttachment: (KBDocumentEntity) -> Unit,
     onDeleteAttachment: (KBDocumentEntity) -> Unit,
 ) {
+    val context = LocalContext.current
     var title by remember { mutableStateOf("") }
     var type by remember { mutableStateOf("service") }
     var date by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -625,14 +628,18 @@ private fun AddVehicleEventDialog(
     val canSave = title.trim().isNotBlank()
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        // A tutto schermo come `MedicalVisitFormScreen`: prima era una card al
+        // 94%x92% con gli angoli tondi, che lasciava i margini ai lati.
         Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .fillMaxHeight(0.92f),
-            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxSize(),
             color = kb.background,
         ) {
-            Column(Modifier.fillMaxSize()) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding(),
+            ) {
                 KidBoxIosFormTopBar(
                     title = stringResource(R.string.vehicles_new_service),
                     onCancel = onDismiss,
@@ -679,7 +686,7 @@ private fun AddVehicleEventDialog(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Text(vehicleEventTypeLabelIt(type), color = kb.subtitle)
+                                    Text(vehicleEventTypeLabel(context, type), color = kb.subtitle)
                                     Icon(
                                         Icons.Filled.KeyboardArrowDown,
                                         contentDescription = null,
@@ -694,7 +701,7 @@ private fun AddVehicleEventDialog(
                             ) {
                                 types.forEach { t ->
                                     DropdownMenuItem(
-                                        text = { Text(vehicleEventTypeLabelIt(t)) },
+                                        text = { Text(vehicleEventTypeLabel(context, t)) },
                                         onClick = {
                                             type = t
                                             typeMenuOpen = false
@@ -829,6 +836,7 @@ private fun EditVehicleDialog(
     onOpenAttachment: (KBDocumentEntity) -> Unit,
     onDeleteAttachment: (KBDocumentEntity) -> Unit,
 ) {
+    val context = LocalContext.current
     var name by remember(initial.id) { mutableStateOf(initial.name) }
     var plate by remember(initial.id) { mutableStateOf(initial.licensePlate.orEmpty()) }
     var brand by remember(initial.id) { mutableStateOf(initial.brand.orEmpty()) }
@@ -909,14 +917,18 @@ private fun EditVehicleDialog(
     }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        // A tutto schermo come `MedicalVisitFormScreen`: prima era una card al
+        // 94%x92% con gli angoli tondi, che lasciava i margini ai lati.
         Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .fillMaxHeight(0.92f),
-            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxSize(),
             color = kb.background,
         ) {
-            Column(Modifier.fillMaxSize()) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding(),
+            ) {
                 KidBoxIosFormTopBar(
                     title = stringResource(R.string.vehicles_edit),
                     onCancel = onDismiss,
@@ -965,7 +977,7 @@ private fun EditVehicleDialog(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Text(vehicleFuelLabelIt(fuel), color = kb.subtitle)
+                                    Text(vehicleFuelLabel(context, fuel), color = kb.subtitle)
                                     Icon(
                                         Icons.Filled.KeyboardArrowDown,
                                         contentDescription = null,
@@ -980,7 +992,7 @@ private fun EditVehicleDialog(
                             ) {
                                 fuels.forEach { f ->
                                     DropdownMenuItem(
-                                        text = { Text(vehicleFuelLabelIt(f)) },
+                                        text = { Text(vehicleFuelLabel(context, f)) },
                                         onClick = {
                                             fuel = f
                                             fuelMenuOpen = false

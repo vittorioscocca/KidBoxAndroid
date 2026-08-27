@@ -942,13 +942,16 @@ internal fun featureItems(
     // Default sullo stato reattivo, non sul piano: su Free l'AI resta sbloccata
     // finché il bonus una tantum non è esaurito (vedi CurrentPlanStore).
     aiAccessBlocked: Boolean = it.vittorioscocca.kidbox.ai.CurrentPlanStore.aiAccessBlocked.value,
-): List<FeatureItem> = listOf(
+    // Chat spenta da Impostazioni → Messaggi: sparisce da griglia, gruppi e
+    // scorciatoie in un colpo solo, perché tutti e tre partono da qui.
+    chatEnabled: Boolean = it.vittorioscocca.kidbox.data.local.ChatAvailability.isEnabled,
+): List<FeatureItem> = listOfNotNull(
     FeatureItem("notes", context.getString(R.string.home_feature_notes_title), context.getString(R.string.home_feature_notes_subtitle), AppDestination.NotesHome.createRoute(familyId), Icons.AutoMirrored.Filled.Note, Color(0xFFFFF9E6), Color(0xFFF5A623), state.badgeNotes, CounterField.NOTES),
     FeatureItem("todo", context.getString(R.string.home_feature_todo_title), context.getString(R.string.home_feature_todo_subtitle), AppDestination.Todo.route, Icons.Filled.CheckCircle, Color(0xFFEBF3FF), Color(0xFF2E86FF), state.badgeTodos, CounterField.TODOS),
     FeatureItem("shopping", context.getString(R.string.home_feature_shopping_title), context.getString(R.string.home_feature_shopping_subtitle), AppDestination.ShoppingList.createRoute(familyId), Icons.Filled.LocalGroceryStore, Color(0xFFEDFAF3), Color(0xFF27AE60), state.badgeShopping, CounterField.SHOPPING),
     FeatureItem("calendar", context.getString(R.string.home_feature_calendar_title), context.getString(R.string.home_feature_calendar_subtitle), AppDestination.Calendar.createRoute(familyId), Icons.Filled.CalendarMonth, Color(0xFFF3EEFF), Color(0xFF8B5CF6), state.badgeCalendar, CounterField.CALENDAR),
     FeatureItem("health", context.getString(R.string.home_feature_health_title), context.getString(R.string.home_feature_health_subtitle), AppDestination.PediatricChildSelector.createRoute(familyId), Icons.Filled.Favorite, Color(0xFFFFEAEA), Color(0xFFE53E3E)),
-    FeatureItem("chat", context.getString(R.string.home_feature_chat_title), context.getString(R.string.home_feature_chat_subtitle), AppDestination.Chat.route, Icons.AutoMirrored.Filled.Chat, Color(0xFFEDFAF3), Color(0xFF27AE60), state.badgeChat, CounterField.CHAT),
+    FeatureItem("chat", context.getString(R.string.home_feature_chat_title), context.getString(R.string.home_feature_chat_subtitle), AppDestination.Chat.route, Icons.AutoMirrored.Filled.Chat, Color(0xFFEDFAF3), Color(0xFF27AE60), state.badgeChat, CounterField.CHAT).takeIf { chatEnabled },
     FeatureItem("expenses", context.getString(R.string.home_feature_expenses_title), context.getString(R.string.home_feature_expenses_subtitle), AppDestination.ExpensesHome.createRoute(familyId), Icons.Filled.Euro, Color(0xFFFFF3E6), Color(0xFFFF6B00), state.badgeExpenses, CounterField.EXPENSES),
     FeatureItem("documents", context.getString(R.string.home_feature_documents_title), context.getString(R.string.home_feature_documents_subtitle), AppDestination.DocumentsHome.createRoute(familyId), Icons.Filled.Description, Color(0xFFEBF3FF), Color(0xFF2E86FF), state.badgeDocuments, CounterField.DOCUMENTS),
     FeatureItem(
@@ -1076,7 +1079,8 @@ private fun HomeCategorySection(
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
     val aiAccessBlocked by it.vittorioscocca.kidbox.ai.CurrentPlanStore.aiAccessBlocked.collectAsStateWithLifecycle()
-    val features = featureItems(context, state.familyId, state, aiAccessBlocked)
+    val chatEnabled by it.vittorioscocca.kidbox.data.local.ChatAvailability.enabled.collectAsStateWithLifecycle()
+    val features = featureItems(context, state.familyId, state, aiAccessBlocked, chatEnabled)
     val byId = remember(features) { features.associateBy { it.id } }
 
     // Assistente ("ai") escluso: è il bottone AI flottante.
@@ -1157,8 +1161,9 @@ private fun HomeFreeGridSection(
 ) {
     val context = LocalContext.current
     val aiAccessBlocked by it.vittorioscocca.kidbox.ai.CurrentPlanStore.aiAccessBlocked.collectAsStateWithLifecycle()
-    val features = remember(context, state.familyId, state, aiAccessBlocked) {
-        featureItems(context, state.familyId, state, aiAccessBlocked).filter { it.id != "ai" }
+    val chatEnabled by it.vittorioscocca.kidbox.data.local.ChatAvailability.enabled.collectAsStateWithLifecycle()
+    val features = remember(context, state.familyId, state, aiAccessBlocked, chatEnabled) {
+        featureItems(context, state.familyId, state, aiAccessBlocked, chatEnabled).filter { it.id != "ai" }
     }
     val byId = remember(features) { features.associateBy { it.id } }
 

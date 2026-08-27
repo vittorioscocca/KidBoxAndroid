@@ -41,6 +41,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 @Composable
 fun AiConsentDialog(
     onAccept: () -> Unit,
@@ -73,7 +75,7 @@ fun AiConsentDialog(
             }
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "Assistente AI Medico",
+                text = stringResource(R.string.ai_consent_title),
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.fillMaxWidth(),
@@ -81,7 +83,7 @@ fun AiConsentDialog(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "Prima di continuare, leggi come funziona.",
+                text = stringResource(R.string.ai_consent_subtitle_short),
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth(),
@@ -92,22 +94,22 @@ fun AiConsentDialog(
             ConsentInfoBlock(
                 icon = Icons.Default.UploadFile,
                 color = Color(0xFFF59E0B),
-                title = "Cosa viene inviato",
-                body = "Le tue domande e il contesto sanitario vengono inviati ad Anthropic per generare la risposta.",
+                title = stringResource(R.string.ai_consent_sent_title),
+                body = stringResource(R.string.ai_consent_sent_body_short),
             )
             Spacer(Modifier.height(10.dp))
             ConsentInfoBlock(
                 icon = Icons.Default.Business,
                 color = Color(0xFF3B82F6),
-                title = "Fornitore AI: Anthropic",
-                body = "I dati sono trattati secondo la Privacy Policy di Anthropic.",
+                title = stringResource(R.string.ai_consent_provider_title),
+                body = stringResource(R.string.ai_consent_provider_body_short),
             )
             Spacer(Modifier.height(10.dp))
             ConsentInfoBlock(
                 icon = Icons.Default.Warning,
                 color = Color(0xFFEF4444),
-                title = "Non è un parere medico",
-                body = "L'AI fornisce informazioni generali e non sostituisce il medico.",
+                title = stringResource(R.string.ai_consent_not_advice_title),
+                body = stringResource(R.string.ai_consent_not_advice_body_short),
             )
 
             Spacer(Modifier.height(14.dp))
@@ -120,7 +122,7 @@ fun AiConsentDialog(
                     onCheckedChange = { acceptedTerms = it },
                 )
                 Text(
-                    text = "Ho letto e accetto le condizioni d'uso dell'AI",
+                    text = stringResource(R.string.ai_consent_terms_checkbox),
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f),
@@ -143,14 +145,14 @@ fun AiConsentDialog(
                     disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                 ),
             ) {
-                Text("Accetta e continua")
+                Text(stringResource(R.string.ai_consent_accept_terms))
             }
 
             TextButton(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Annulla")
+                Text(stringResource(R.string.ai_consent_cancel))
             }
             Spacer(Modifier.height(8.dp))
         }

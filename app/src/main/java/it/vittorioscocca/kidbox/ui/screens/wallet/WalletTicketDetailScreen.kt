@@ -94,6 +94,7 @@ import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import it.vittorioscocca.kidbox.util.KBLocale
+import it.vittorioscocca.kidbox.ui.util.visibilityChipLabel
 
 @Composable
 fun WalletTicketDetailScreen(
@@ -260,7 +261,7 @@ fun WalletTicketDetailScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        KBVisibilityScope.chipLabel(KBVisibilityScope.normalizedWallet(ticket.visibilityScope)),
+                        visibilityChipLabel(KBVisibilityScope.normalizedWallet(ticket.visibilityScope)),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
                     )

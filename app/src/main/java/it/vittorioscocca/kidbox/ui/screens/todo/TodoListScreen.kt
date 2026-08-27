@@ -80,6 +80,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import kotlinx.coroutines.delay
 import it.vittorioscocca.kidbox.notifications.AppSection
 import it.vittorioscocca.kidbox.notifications.TrackSectionPresence
+import it.vittorioscocca.kidbox.ui.util.visibilityChipLabel
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Flag
+import it.vittorioscocca.kidbox.ui.components.KidBoxFormPage
+import it.vittorioscocca.kidbox.ui.components.FormSectionTitle
+import it.vittorioscocca.kidbox.ui.components.FormSectionHeader
 
 @Composable
 fun TodoListScreen(
@@ -505,43 +513,92 @@ private fun TodoEditDialog(
         ).show()
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (initial == null) stringResource(R.string.todo_new) else stringResource(R.string.todo_edit)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                TextField(value = title, onValueChange = { title = it }, placeholder = { Text(stringResource(R.string.vehicles_title_field)) })
-                TextField(value = notes, onValueChange = { notes = it }, placeholder = { Text(stringResource(R.string.life_notes)) })
-                Card(
+    val accent = Color(0xFF2E86FF)
+    val kb = MaterialTheme.kidBoxColors
+
+    KidBoxFormPage(
+        title = if (initial == null) stringResource(R.string.todo_new) else stringResource(R.string.todo_edit),
+        onDismiss = onDismiss,
+        saveLabel = stringResource(R.string.life_save),
+        saveEnabled = title.isNotBlank(),
+        accent = accent,
+        onSave = {
+            val cleanTitle = title.trim()
+            if (cleanTitle.isNotBlank()) {
+                onSave(
+                    TodoEditForm(
+                        title = cleanTitle,
+                        notes = notes.trim().takeIf { it.isNotEmpty() },
+                        dueAt = if (dueEnabled) dueAt else null,
+                        assignedTo = assignedTo,
+                        urgent = urgent,
+                        reminderEnabled = dueEnabled && reminderEnabled,
+                        visibilityScope = visScope,
+                        visibilityMemberIds = if (KBVisibilityScope.normalized(visScope) == KBVisibilityScope.MEMBERS) {
+                            visMemberIds.toList().sorted()
+                        } else {
+                            emptyList()
+                        },
+                    ),
+                )
+            }
+        },
+    ) {
+        FormSectionTitle(stringResource(R.string.form_section_details))
+        OutlinedTextField(
+            value = title,
+            onValueChange = { title = it },
+            placeholder = { Text(stringResource(R.string.vehicles_title_field)) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = notes,
+            onValueChange = { notes = it },
+            placeholder = { Text(stringResource(R.string.life_notes)) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            minLines = 3,
+        )
+
+        FormSectionHeader(stringResource(R.string.todo_visibility), Icons.Default.Lock, accent)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    if (canEditTodoVisibility) showVisPick = true else showVisLocked = true
+                },
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = kb.rowBackground),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(stringResource(R.string.todo_visibility), fontSize = 13.sp, color = kb.subtitle)
+                Text(visibilityChipLabel(displayVisScope), fontSize = 15.sp, color = kb.title)
+            }
+        }
+
+        FormSectionHeader(stringResource(R.string.home_items_deadline), Icons.Default.Event, accent)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = kb.rowBackground),
+        ) {
+            Column {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable {
-                            if (canEditTodoVisibility) {
-                                showVisPick = true
-                            } else {
-                                showVisLocked = true
-                            }
-                        },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.rowBackground),
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(stringResource(R.string.todo_visibility), fontSize = 13.sp, color = MaterialTheme.kidBoxColors.subtitle)
-                        Text(
-                            KBVisibilityScope.chipLabel(displayVisScope),
-                            fontSize = 15.sp,
-                            color = MaterialTheme.kidBoxColors.title,
-                        )
-                    }
-                }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.home_items_deadline))
+                    Text(stringResource(R.string.home_items_deadline), color = kb.title)
                     Switch(
                         checked = dueEnabled,
                         onCheckedChange = {
@@ -552,7 +609,9 @@ private fun TodoEditDialog(
                 }
                 if (dueEnabled) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Card(
@@ -560,30 +619,37 @@ private fun TodoEditDialog(
                                 .weight(1f)
                                 .clickable { pickDate() },
                             shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.rowBackground),
+                            colors = CardDefaults.cardColors(containerColor = kb.card),
                         ) {
                             Text(
                                 text = formatDateOnly(dueAt),
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
                                 fontSize = 14.sp,
+                                color = kb.title,
                             )
                         }
                         Card(
-                            modifier = Modifier
-                                .clickable { pickTime() },
+                            modifier = Modifier.clickable { pickTime() },
                             shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.rowBackground),
+                            colors = CardDefaults.cardColors(containerColor = kb.card),
                         ) {
                             Text(
                                 text = formatTimeOnly(dueAt),
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
                                 fontSize = 14.sp,
+                                color = kb.title,
                             )
                         }
                     }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.vehicles_reminder))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                ) {
+                    Text(stringResource(R.string.vehicles_reminder), color = kb.title)
                     Switch(
                         checked = reminderEnabled,
                         onCheckedChange = { enabled ->
@@ -597,60 +663,46 @@ private fun TodoEditDialog(
                         },
                     )
                 }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.todo_urgent))
-                    Switch(checked = urgent, onCheckedChange = { urgent = it })
-                }
-                Card(
+            }
+        }
+
+        FormSectionHeader(stringResource(R.string.form_section_options), Icons.Default.Flag, accent)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = kb.rowBackground),
+        ) {
+            Column {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { showAssigneePicker = true },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.rowBackground),
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(stringResource(R.string.todo_assigned_to), fontSize = 13.sp, color = MaterialTheme.kidBoxColors.subtitle)
-                        Text(
-                            members.firstOrNull { it.uid == assignedTo }?.displayName ?: stringResource(R.string.todo_nobody),
-                            fontSize = 15.sp,
-                            color = MaterialTheme.kidBoxColors.title,
-                        )
-                    }
+                    Text(stringResource(R.string.todo_urgent), color = kb.title)
+                    Switch(checked = urgent, onCheckedChange = { urgent = it })
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showAssigneePicker = true }
+                        .padding(horizontal = 12.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(stringResource(R.string.todo_assigned_to), fontSize = 13.sp, color = kb.subtitle)
+                    Text(
+                        members.firstOrNull { it.uid == assignedTo }?.displayName
+                            ?: stringResource(R.string.todo_nobody),
+                        fontSize = 15.sp,
+                        color = kb.title,
+                    )
                 }
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    val cleanTitle = title.trim()
-                    if (cleanTitle.isBlank()) return@TextButton
-                    onSave(
-                        TodoEditForm(
-                            title = cleanTitle,
-                            notes = notes.trim().takeIf { it.isNotEmpty() },
-                            dueAt = if (dueEnabled) dueAt else null,
-                            assignedTo = assignedTo,
-                            urgent = urgent,
-                            reminderEnabled = dueEnabled && reminderEnabled,
-                            visibilityScope = visScope,
-                            visibilityMemberIds = if (KBVisibilityScope.normalized(visScope) == KBVisibilityScope.MEMBERS) {
-                                visMemberIds.toList().sorted()
-                            } else {
-                                emptyList()
-                            },
-                        ),
-                    )
-                },
-            ) { Text(stringResource(R.string.life_save)) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.life_cancel)) } },
-    )
+        }
+        Spacer(Modifier.height(8.dp))
+    }
 
     if (showReminderConfirm) {
         AlertDialog(

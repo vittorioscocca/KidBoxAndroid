@@ -483,7 +483,13 @@ fun ChatScreen(
     // NB: "è arrivato un messaggio nuovo" si riconosce dall'id del messaggio più recente,
     // non dalla crescita del conteggio. Il conteggio cresce anche quando si caricano
     // messaggi *vecchi*, e usarlo faceva saltare in fondo mentre si paginava all'indietro.
-    LaunchedEffect(state.messages.size) {
+    //
+    // Per lo stesso motivo l'id deve stare anche nella CHIAVE, non solo nel corpo:
+    // la lista osservata è una finestra di INITIAL_MESSAGE_WINDOW messaggi, quindi in
+    // una chat già piena inviarne uno nuovo ne fa uscire il più vecchio e la size resta
+    // identica. Con la sola size l'effetto non ripartiva e la lista non scendeva sul
+    // messaggio appena inviato.
+    LaunchedEffect(state.messages.lastOrNull()?.id, state.messages.size) {
         val newest = state.messages.lastOrNull()
         if (newest == null) {
             newestMessageId = null

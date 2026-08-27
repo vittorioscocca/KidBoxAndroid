@@ -328,10 +328,12 @@ class PasswordsHomeViewModel @Inject constructor(
             }
     }
 
-    private fun decryptGroupName(g: PasswordGroupEntity, uid: String): String =
-        runCatching {
+    private fun decryptGroupName(g: PasswordGroupEntity, uid: String): String {
+        val stored = runCatching {
             passwordCypher.decrypt(g.nameCipher, g.familyId, g.visibility, g.createdBy, uid)
         }.getOrElse { "" }
+        return PasswordDefaultGroups.displayName(appContext, g.id, g.familyId, stored)
+    }
 
     fun bind(familyId: String) {
         // I gruppi predefiniti li creava solo iOS: su un account nato su Android

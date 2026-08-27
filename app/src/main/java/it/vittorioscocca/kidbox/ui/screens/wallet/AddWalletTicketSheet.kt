@@ -80,6 +80,7 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
 import it.vittorioscocca.kidbox.util.KBLocale
+import it.vittorioscocca.kidbox.ui.util.visibilityChipLabel
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -410,7 +411,7 @@ fun AddWalletTicketSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        KBVisibilityScope.chipLabel(draftVisibilityScope),
+                        visibilityChipLabel(draftVisibilityScope),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
                     )

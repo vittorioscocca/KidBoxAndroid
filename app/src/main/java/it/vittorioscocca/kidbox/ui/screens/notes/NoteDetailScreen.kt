@@ -57,6 +57,7 @@ import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.material3.CircularProgressIndicator
+import it.vittorioscocca.kidbox.ui.util.visibilityChipLabel
 
 @Composable
 fun NoteDetailScreen(
@@ -164,7 +165,7 @@ fun NoteDetailScreen(
             contentAlignment = Alignment.CenterStart,
         ) {
             KidBoxChip(
-                label = KBVisibilityScope.chipLabel(state.visibilityScope),
+                label = visibilityChipLabel(state.visibilityScope),
                 onClick = {
                     if (state.canEditVisibility) {
                         showVisibilityPick = true

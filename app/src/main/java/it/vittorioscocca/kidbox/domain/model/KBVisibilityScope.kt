@@ -1,5 +1,8 @@
 package it.vittorioscocca.kidbox.domain.model
 
+import androidx.annotation.StringRes
+import it.vittorioscocca.kidbox.R
+
 /**
  * Stored on Firestore / Room as raw strings `"family"` | `"members"` | `"private"` (solo creatore).
  * Allineato a [KBVisibilityScope] iOS.
@@ -31,10 +34,16 @@ object KBVisibilityScope {
         }
     }
 
-    fun chipLabel(scope: String): String = when (normalized(scope)) {
-        MEMBERS -> "👥 Membri selezionati"
-        ONLY_CREATOR -> "🔒 Solo io"
-        else -> "👨‍👩‍👧 Tutta la famiglia"
+    /**
+     * Id della stringa da mostrare nella pill: le tre voci sono le stesse del menu di
+     * scelta, quindi riusa le risorse già tradotte invece di duplicarle in italiano.
+     * Risolvilo con [it.vittorioscocca.kidbox.ui.util.visibilityChipLabel] nelle composable.
+     */
+    @StringRes
+    fun chipLabelRes(scope: String): Int = when (normalized(scope)) {
+        MEMBERS -> R.string.notes_visibility_option_members
+        ONLY_CREATOR -> R.string.notes_visibility_option_only_me
+        else -> R.string.notes_visibility_option_family
     }
 
     /** `createdBy` is KBNote.createdBy / KBTodoItemEntity.createdBy. */

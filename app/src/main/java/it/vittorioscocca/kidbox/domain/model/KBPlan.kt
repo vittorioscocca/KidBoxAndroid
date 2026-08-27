@@ -45,13 +45,6 @@ enum class KBPlan(val rawValue: String) {
 
     val aiQuotaPeriod: AIQuotaPeriod get() = if (this == FREE) AIQuotaPeriod.LIFETIME else AIQuotaPeriod.DAILY
 
-    /** Etichetta breve per le schermate informative (confronto piani, profilo). */
-    val aiQuotaLabel: String get() = when (this) {
-        FREE -> "5 msg AI una tantum"
-        PRO -> "30 msg AI/giorno"
-        MAX -> "100 msg AI/giorno"
-    }
-
     val productId: String? get() = when (this) {
         FREE -> null
         PRO -> "it.vittorioscocca.kidbox.pro.monthly"

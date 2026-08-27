@@ -151,4 +151,24 @@
     <string name="chat_kidbox_picker_title">Pick from KidBox</string>
     <string name="chat_kidbox_picker_empty">There are no photos or videos in KidBox yet.</string>
     <string name="chat_kidbox_picker_send">Send</string>
+    <string name="ai_consent_title">Medical AI Assistant</string>
+    <string name="ai_consent_subtitle">Before continuing, read how it works and how your data is used.</string>
+    <string name="ai_consent_subtitle_short">Before continuing, read how it works.</string>
+    <string name="ai_consent_sent_title">What gets sent</string>
+    <string name="ai_consent_sent_body">Your questions and the selected health context are sent to Anthropic to generate the answer. No irrelevant data is transmitted.</string>
+    <string name="ai_consent_sent_body_short">Your questions and health context are sent to Anthropic to generate the answer.</string>
+    <string name="ai_consent_provider_title">AI provider: Anthropic</string>
+    <string name="ai_consent_provider_body">Data is processed under Anthropic\'s Privacy Policy (anthropic.com/privacy). KidBox does not keep the answers on its own servers.</string>
+    <string name="ai_consent_provider_body_short">Data is processed under Anthropic\'s Privacy Policy.</string>
+    <string name="ai_consent_not_advice_title">Not medical advice</string>
+    <string name="ai_consent_not_advice_body">The AI provides general supporting information and does not replace your doctor\'s judgement. In an emergency, always contact a professional.</string>
+    <string name="ai_consent_not_advice_body_short">The AI provides general information and does not replace your doctor.</string>
+    <string name="ai_consent_privacy_title">Privacy and data</string>
+    <string name="ai_consent_privacy_body">Health data is encrypted in transit. You can withdraw your consent at any time from the AI Settings screen.</string>
+    <string name="ai_consent_link_anthropic">Anthropic privacy</string>
+    <string name="ai_consent_link_kidbox">KidBox privacy</string>
+    <string name="ai_consent_accept">Got it, proceed</string>
+    <string name="ai_consent_accept_terms">Accept and continue</string>
+    <string name="ai_consent_terms_checkbox">I have read and accept the AI terms of use</string>
+    <string name="ai_consent_cancel">Cancel</string>
 </resources>

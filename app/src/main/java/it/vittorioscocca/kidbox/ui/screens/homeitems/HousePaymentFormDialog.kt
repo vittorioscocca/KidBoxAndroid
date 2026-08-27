@@ -51,31 +51,14 @@ import it.vittorioscocca.kidbox.ui.components.IosPlainTextFieldRow
 import it.vittorioscocca.kidbox.ui.components.KidBoxIosFormTopBar
 import it.vittorioscocca.kidbox.ui.screens.health.attachments.HealthAttachmentsCard
 import it.vittorioscocca.kidbox.ui.screens.life.formatItDate
-import it.vittorioscocca.kidbox.ui.screens.life.housePaymentTypeLabelIt
+import it.vittorioscocca.kidbox.ui.screens.life.housePaymentPresetSubtypes
+import it.vittorioscocca.kidbox.ui.screens.life.housePaymentSubtypeLabel
+import it.vittorioscocca.kidbox.ui.screens.life.housePaymentTypeLabel
 import it.vittorioscocca.kidbox.ui.screens.life.rememberLifeDatePicker
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 import androidx.compose.ui.platform.LocalContext
-
-private fun billSubtypeLabelIt(context: android.content.Context, raw: String): String = when (raw) {
-    "luce" -> context.getString(R.string.home_items_electricity)
-    "gas" -> context.getString(R.string.home_items_gas)
-    "internet" -> context.getString(R.string.home_items_internet)
-    "telefono" -> context.getString(R.string.home_items_phone)
-    "acqua" -> context.getString(R.string.home_items_water)
-    "condominio" -> context.getString(R.string.home_items_condo)
-    else -> raw
-}
-
-private fun taxSubtypeLabelIt(context: android.content.Context, raw: String): String = when (raw) {
-    "IMU" -> "IMU"
-    "TARI" -> "TARI"
-    "dichiarazione redditi" -> context.getString(R.string.home_items_tax_return)
-    "bollo auto" -> context.getString(R.string.home_items_car_tax)
-    "altre" -> context.getString(R.string.home_items_others)
-    else -> raw
-}
 
 @Composable
 fun AddHousePaymentDialog(
@@ -121,8 +104,8 @@ fun AddHousePaymentDialog(
     var subtypeMenuOpen by remember { mutableStateOf(false) }
 
     val types = listOf("mutuo", "affitto", "bolletta", "tassa", "altro")
-    val billSub = listOf("luce", "gas", "internet", "telefono", "acqua", "condominio")
-    val taxSub = listOf("IMU", "TARI", "dichiarazione redditi", "bollo auto", "altre")
+    val billSub = housePaymentPresetSubtypes("bolletta")
+    val taxSub = housePaymentPresetSubtypes("tassa")
 
     val pickScadenza = rememberLifeDatePicker { dataScadenza = it }
     val pickContratto = rememberLifeDatePicker { dataContratto = it }
@@ -197,7 +180,7 @@ fun AddHousePaymentDialog(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Text(housePaymentTypeLabelIt(typeRaw), color = kb.subtitle)
+                                    Text(housePaymentTypeLabel(context, typeRaw), color = kb.subtitle)
                                     Icon(
                                         Icons.Filled.KeyboardArrowDown,
                                         contentDescription = null,
@@ -209,7 +192,7 @@ fun AddHousePaymentDialog(
                             DropdownMenu(expanded = typeMenuOpen, onDismissRequest = { typeMenuOpen = false }) {
                                 types.forEach { t ->
                                     DropdownMenuItem(
-                                        text = { Text(housePaymentTypeLabelIt(t)) },
+                                        text = { Text(housePaymentTypeLabel(context, t)) },
                                         onClick = {
                                             typeRaw = t
                                             when (t) {
@@ -241,7 +224,7 @@ fun AddHousePaymentDialog(
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
                                             Text(
-                                                if (typeRaw == "bolletta") billSubtypeLabelIt(context, subtype) else taxSubtypeLabelIt(context, subtype),
+                                                housePaymentSubtypeLabel(context, subtype),
                                                 color = kb.subtitle,
                                             )
                                             Icon(
@@ -256,7 +239,7 @@ fun AddHousePaymentDialog(
                                         if (typeRaw == "bolletta") {
                                             billSub.forEach { s ->
                                                 DropdownMenuItem(
-                                                    text = { Text(billSubtypeLabelIt(context, s)) },
+                                                    text = { Text(housePaymentSubtypeLabel(context, s)) },
                                                     onClick = {
                                                         subtype = s
                                                         subtypeMenuOpen = false
@@ -266,7 +249,7 @@ fun AddHousePaymentDialog(
                                         } else {
                                             taxSub.forEach { s ->
                                                 DropdownMenuItem(
-                                                    text = { Text(taxSubtypeLabelIt(context, s)) },
+                                                    text = { Text(housePaymentSubtypeLabel(context, s)) },
                                                     onClick = {
                                                         subtype = s
                                                         subtypeMenuOpen = false
@@ -334,7 +317,7 @@ fun AddHousePaymentDialog(
                                         onClick = { if (giorno > 1) giorno-- },
                                         enabled = giorno > 1,
                                     ) { Text("−", style = MaterialTheme.typography.titleLarge) }
-                                    Text("Giorno $giorno", style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                                    Text(stringResource(R.string.home_items_day_value, giorno), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                                     TextButton(
                                         onClick = { if (giorno < 31) giorno++ },
                                         enabled = giorno < 31,

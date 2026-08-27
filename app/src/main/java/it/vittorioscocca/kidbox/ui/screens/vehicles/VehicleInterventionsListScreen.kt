@@ -40,7 +40,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.entity.VehicleEventEntity
 import it.vittorioscocca.kidbox.ui.screens.life.formatItDateTime
 import it.vittorioscocca.kidbox.ui.screens.life.vehicleEventTypeEmoji
-import it.vittorioscocca.kidbox.ui.screens.life.vehicleEventTypeLabelIt
 import it.vittorioscocca.kidbox.ui.theme.KidBoxColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.NumberFormat
@@ -48,6 +47,8 @@ import java.util.Locale
 import it.vittorioscocca.kidbox.util.KBLocale
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.screens.life.vehicleEventTypeLabel
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,6 +56,7 @@ fun VehicleInterventionsListScreen(
     onNavigateBack: () -> Unit,
     viewModel: VehicleInterventionsListViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val vehicle by viewModel.vehicle.collectAsStateWithLifecycle()
     val events by viewModel.events.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
@@ -67,7 +69,7 @@ fun VehicleInterventionsListScreen(
             events.filter { ev ->
                 ev.title.lowercase(Locale.ROOT).contains(q) ||
                     ev.eventType.lowercase(Locale.ROOT).contains(q) ||
-                    vehicleEventTypeLabelIt(ev.eventType).lowercase(Locale.ROOT).contains(q) ||
+                    vehicleEventTypeLabel(context, ev.eventType).lowercase(Locale.ROOT).contains(q) ||
                     (ev.notes?.lowercase(Locale.ROOT)?.contains(q) == true) ||
                     (ev.garageName?.lowercase(Locale.ROOT)?.contains(q) == true) ||
                     (ev.km?.toString()?.contains(q) == true) ||
