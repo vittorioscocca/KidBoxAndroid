@@ -6,19 +6,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,6 +23,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.stringResource
@@ -39,9 +39,15 @@ import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
 /**
- * Pagina di inserimento/modifica a tutta larghezza, nello stile di
- * `MedicalVisitFormScreen`: barra in alto con Annulla e titolo centrato,
- * contenuto che scorre, pulsante di salvataggio grande in fondo.
+ * Pagina di inserimento/modifica a tutta larghezza: barra in alto con
+ * Annulla a sinistra, titolo al centro e Salva a destra, contenuto che scorre.
+ *
+ * Il Salva sta in alto e non in fondo perche' la finestra del Dialog viene
+ * posizionata sotto la status bar restando alta quanto tutto lo schermo:
+ * misurato sul device, la colonna partiva da y=112 ed era alta 2391 su uno
+ * schermo di 2392, quindi un pulsante ancorato in basso finiva fuori. In alto
+ * il problema non si pone, ed e' anche la stessa barra di
+ * `KidBoxIosFormTopBar` usata dagli altri form.
  *
  * Sostituisce gli `AlertDialog` stretti usati finora dai form brevi (todo,
  * animali, veicoli, interventi). Resta un `Dialog` invece di una destinazione
@@ -60,16 +66,25 @@ fun KidBoxFormPage(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
+    // Per lo stesso sfasamento descritto sopra, `fillMaxSize()` darebbe una
+    // colonna piu' alta della parte visibile: l'altezza va ridotta dell'inset
+    // alto, cosi' il fondo del contenuto non finisce oltre il bordo.
+    val density = LocalDensity.current
+    val topInset = WindowInsets.statusBars.getTop(density)
+    val visibleHeight = with(density) {
+        (LocalConfiguration.current.screenHeightDp.dp.toPx() - topInset).toDp()
+    }
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .height(visibleHeight)
                 .background(kb.background)
-                .statusBarsPadding()
-                .navigationBarsPadding(),
+                .navigationBarsPadding()
+                .imePadding(),
         ) {
             Row(
                 modifier = Modifier
@@ -87,7 +102,15 @@ fun KidBoxFormPage(
                     fontWeight = FontWeight.Bold,
                     color = kb.title,
                 )
-                Spacer(Modifier.width(72.dp))
+                TextButton(onClick = onSave, enabled = saveEnabled) {
+                    Text(
+                        saveLabel,
+                        // Il colore va detto esplicitamente: da disabilitato i
+                        // default Material sbiadiscono fino a farlo sparire.
+                        color = if (saveEnabled) accent else kb.subtitle,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
 
             Column(
@@ -99,18 +122,6 @@ fun KidBoxFormPage(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 content = content,
             )
-
-            Button(
-                onClick = onSave,
-                enabled = saveEnabled,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = accent),
-            ) {
-                Text(saveLabel, fontWeight = FontWeight.SemiBold, color = Color.White)
-            }
         }
     }
 }
