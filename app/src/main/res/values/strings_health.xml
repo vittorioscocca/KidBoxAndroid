@@ -67,6 +67,7 @@
     <string name="health_hc_permission">Per importare i dati, consenti l\'accesso a Health Connect.</string>
     <string name="health_data_imported">Dati importati</string>
     <string name="health_no_recent_data">Nessun dato cardiaco o di attività recente.</string>
+    <string name="health_hc_empty_hint">Health Connect non contiene ancora dati. È un contenitore: devono scriverci le app che misurano — Mi Fitness, Samsung Health, Google Fit, Fitbit — e la sincronizzazione va attivata da lì.</string>
     <string name="health_not_connected">Non ancora collegato a Health Connect.</string>
     <string name="health_profile_from_health">Profilo da Salute</string>
     <string name="health_install_hc">Installa l\'app Salute di Google (Health Connect) dal Play Store.</string>
@@ -199,6 +200,11 @@
     <string name="health_attachments_ai_note">I referti allegati verranno letti dall\'AI dopo il salvataggio della visita.</string>
     <string name="health_add_attachment">Aggiungi allegato</string>
     <string name="health_visit_notes">Appunti della Visita</string>
+    <string name="health_visit_cost">Costo visita</string>
+    <string name="health_exam_cost">Costo esame</string>
+    <string name="health_cost_expense_hint">Se lo indichi, compare anche in Spese famiglia.</string>
+    <string name="health_visit_expense_fallback_title">Visita medica</string>
+    <string name="health_exam_expense_fallback_title">Esame medico</string>
     <string name="health_visit_notes_hint">Aggiungi note sulla visita...</string>
     <string name="health_ai_readable">Leggibile dall\'AI ✓</string>
     <string name="health_in_progress">in corso</string>
@@ -476,6 +482,7 @@
     <string name="health_metric_steps">Passi</string>
     <string name="health_metric_steps_sub">Oggi</string>
     <string name="health_metric_weight">Peso</string>
+    <string name="health_metric_height">Altezza</string>
     <string name="health_metric_weight_sub">Corpo</string>
     <string name="health_metric_heart">Battiti</string>
     <string name="health_metric_heart_sub">Ultima FC</string>

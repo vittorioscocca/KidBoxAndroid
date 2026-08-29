@@ -21,6 +21,15 @@ interface KBFamilyMemberDao {
     @Query("SELECT * FROM kb_family_members WHERE familyId = :familyId AND isDeleted = 0")
     fun observeActiveByFamilyId(familyId: String): Flow<List<KBFamilyMemberEntity>>
 
+    /**
+     * Lettura secca di tutte le righe della famiglia, cancellate incluse.
+     * Serve alla riconciliazione con il server ([FamilySyncCenter.forceResync]):
+     * per sapere quali righe locali il server non ha più bisogna vedere tutto,
+     * non solo le attive.
+     */
+    @Query("SELECT * FROM kb_family_members WHERE familyId = :familyId")
+    suspend fun getAllByFamilyId(familyId: String): List<KBFamilyMemberEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBFamilyMemberEntity)
 

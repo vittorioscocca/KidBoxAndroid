@@ -67,6 +67,7 @@
     <string name="health_hc_permission">To import data, allow access to Health Connect.</string>
     <string name="health_data_imported">Data imported</string>
     <string name="health_no_recent_data">No recent heart or activity data.</string>
+    <string name="health_hc_empty_hint">Health Connect has no data yet. It is a hub: the apps that measure — Mi Fitness, Samsung Health, Google Fit, Fitbit — must write into it, and syncing has to be enabled there.</string>
     <string name="health_not_connected">Not connected to Health Connect yet.</string>
     <string name="health_profile_from_health">Profile from Health</string>
     <string name="health_install_hc">Install Google\'s Health app (Health Connect) from the Play Store.</string>
@@ -199,6 +200,11 @@
     <string name="health_attachments_ai_note">Attached reports will be read by the AI after the visit is saved.</string>
     <string name="health_add_attachment">Add attachment</string>
     <string name="health_visit_notes">Visit notes</string>
+    <string name="health_visit_cost">Visit cost</string>
+    <string name="health_exam_cost">Test cost</string>
+    <string name="health_cost_expense_hint">If you enter it, it also appears in Family expenses.</string>
+    <string name="health_visit_expense_fallback_title">Medical visit</string>
+    <string name="health_exam_expense_fallback_title">Medical test</string>
     <string name="health_visit_notes_hint">Add notes about the visit…</string>
     <string name="health_ai_readable">AI-readable ✓</string>
     <string name="health_in_progress">in progress</string>
@@ -476,6 +482,7 @@
     <string name="health_metric_steps">Steps</string>
     <string name="health_metric_steps_sub">Today</string>
     <string name="health_metric_weight">Weight</string>
+    <string name="health_metric_height">Height</string>
     <string name="health_metric_weight_sub">Body</string>
     <string name="health_metric_heart">Heart rate</string>
     <string name="health_metric_heart_sub">Latest</string>

@@ -21,6 +21,7 @@
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
     <uses-permission android:name="android.permission.health.READ_STEPS" />
     <uses-permission android:name="android.permission.health.READ_WEIGHT" />
+    <uses-permission android:name="android.permission.health.READ_HEIGHT" />
     <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
     <uses-permission android:name="android.permission.health.READ_EXERCISE" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
@@ -59,6 +60,7 @@
             android:exported="true"
             android:label="@string/app_name"
             android:launchMode="singleTop"
+            android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.App.Starting">
             <intent-filter>
@@ -295,6 +297,7 @@
         <activity
             android:name=".feature.passwords.autofill.AutoFillProviderSettingsActivity"
             android:exported="true"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.KidBox" />
 
         <!-- Persistenza della lingua per-app su API < 33 (su 33+ ci pensa il sistema). -->

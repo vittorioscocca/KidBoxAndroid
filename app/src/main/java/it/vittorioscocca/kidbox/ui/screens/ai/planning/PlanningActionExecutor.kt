@@ -115,6 +115,7 @@ class PlanningActionExecutor @Inject constructor(
                     name = name,
                     category = category,
                     notes = null,
+                    quantity = null,
                     isPurchased = false,
                     purchasedAtEpochMillis = null,
                     purchasedBy = null,

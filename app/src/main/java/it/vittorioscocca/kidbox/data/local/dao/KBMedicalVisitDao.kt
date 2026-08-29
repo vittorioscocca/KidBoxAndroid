@@ -16,6 +16,10 @@ interface KBMedicalVisitDao {
     @Query("SELECT * FROM kb_medical_visits WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 ORDER BY dateEpochMillis DESC")
     fun observeByFamilyAndChild(familyId: String, childId: String): Flow<List<KBMedicalVisitEntity>>
 
+    /** Tutte le visite della famiglia: la Dashboard riassume la famiglia, non il singolo bambino. */
+    @Query("SELECT * FROM kb_medical_visits WHERE familyId = :familyId AND isDeleted = 0 ORDER BY dateEpochMillis ASC")
+    fun observeByFamilyId(familyId: String): Flow<List<KBMedicalVisitEntity>>
+
     @Query(
         "SELECT * FROM kb_medical_visits WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 " +
             "ORDER BY dateEpochMillis DESC LIMIT :limit",

@@ -6,6 +6,7 @@ import android.net.Uri
 import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -235,6 +237,42 @@ fun VehicleDetailScreen(
         showKidBoxPicker = true
     }
 
+    // Il form dell'intervento prende il posto della schermata invece di aprirsi
+    // sopra in una finestra: una sola cosa a video per volta.
+    val isAddingEvent = showAddEvent && pendingEventDraftId != null
+
+    if (isAddingEvent) {
+        AddVehicleEventScreen(
+            eventDraftAttachments = eventDraftAttachments,
+            attachmentUploading = attachmentUploading,
+            onDismiss = {
+                val id = pendingEventDraftId
+                scope.launch {
+                    id?.let { viewModel.deleteAllAttachmentsForDraftEvent(it) }
+                }
+                viewModel.bindEventDraftAttachments(null)
+                pendingEventDraftId = null
+                showAddEvent = false
+            },
+            onConfirm = { title, type, date, km, cost, garage, notes ->
+                val draftId = pendingEventDraftId
+                viewModel.addVehicleEvent(
+                    draftId, title, type, date, km, cost, garage, notes,
+                    expenseFallbackTitle = context.getString(R.string.vehicles_expense_fallback_title),
+                ) { err -> toast = err }
+                pendingEventDraftId = null
+                viewModel.bindEventDraftAttachments(null)
+                showAddEvent = false
+            },
+            onTakePhoto = { requestTakePhoto(GarageAttachmentPickTarget.EventDraft) },
+            onPickPhoto = { requestPickPhoto(GarageAttachmentPickTarget.EventDraft) },
+            onPickFile = { requestPickFile(GarageAttachmentPickTarget.EventDraft) },
+            onPickKidBox = { requestKidBoxDocuments(GarageAttachmentPickTarget.EventDraft) },
+            onOpenAttachment = { viewModel.openAttachment(it) },
+            onDeleteAttachment = { viewModel.deleteAttachment(it) },
+        )
+    } else {
+
     Scaffold(
         containerColor = kb.background,
         topBar = {
@@ -407,34 +445,7 @@ fun VehicleDetailScreen(
         }
     }
 
-    if (showAddEvent && pendingEventDraftId != null) {
-        AddVehicleEventDialog(
-            eventDraftAttachments = eventDraftAttachments,
-            attachmentUploading = attachmentUploading,
-            onDismiss = {
-                val id = pendingEventDraftId
-                scope.launch {
-                    id?.let { viewModel.deleteAllAttachmentsForDraftEvent(it) }
-                }
-                viewModel.bindEventDraftAttachments(null)
-                pendingEventDraftId = null
-                showAddEvent = false
-            },
-            onConfirm = { title, type, date, km, cost, garage, notes ->
-                val draftId = pendingEventDraftId
-                viewModel.addVehicleEvent(draftId, title, type, date, km, cost, garage, notes) { err -> toast = err }
-                pendingEventDraftId = null
-                viewModel.bindEventDraftAttachments(null)
-                showAddEvent = false
-            },
-            onTakePhoto = { requestTakePhoto(GarageAttachmentPickTarget.EventDraft) },
-            onPickPhoto = { requestPickPhoto(GarageAttachmentPickTarget.EventDraft) },
-            onPickFile = { requestPickFile(GarageAttachmentPickTarget.EventDraft) },
-            onPickKidBox = { requestKidBoxDocuments(GarageAttachmentPickTarget.EventDraft) },
-            onOpenAttachment = { viewModel.openAttachment(it) },
-            onDeleteAttachment = { viewModel.deleteAttachment(it) },
-        )
-    }
+    } // fine else: schermata veicolo
 
     if (showEditVehicle && vehicle != null) {
         EditVehicleDialog(
@@ -590,7 +601,7 @@ private fun VehicleEventRowContent(ev: VehicleEventEntity) {
 }
 
 @Composable
-private fun AddVehicleEventDialog(
+private fun AddVehicleEventScreen(
     eventDraftAttachments: List<KBDocumentEntity>,
     attachmentUploading: Boolean,
     onDismiss: () -> Unit,
@@ -627,19 +638,25 @@ private fun AddVehicleEventDialog(
     val orange = Color(0xFFFF6B00)
     val canSave = title.trim().isNotBlank()
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        // A tutto schermo come `MedicalVisitFormScreen`: prima era una card al
-        // 94%x92% con gli angoli tondi, che lasciava i margini ai lati.
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = kb.background,
+    // Schermata vera, non `Dialog`: dentro una finestra di dialogo lo scroll si
+    // impunta e il foglio delle sorgenti allegato veniva stretto dai limiti di
+    // quella finestra. Qui il form vive nella stessa finestra dell'app, quindi
+    // scorre e mostra gli allegati come ogni altra schermata.
+    BackHandler(onBack = onDismiss)
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = kb.background,
+    ) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                // La tastiera spinge il contenuto invece di coprirlo: senza,
+                // note e allegati finiscono sotto.
+                .imePadding(),
         ) {
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .navigationBarsPadding(),
-            ) {
                 KidBoxIosFormTopBar(
                     title = stringResource(R.string.vehicles_new_service),
                     onCancel = onDismiss,
@@ -817,7 +834,6 @@ private fun AddVehicleEventDialog(
                         onPickFromKidBoxDocuments = onPickKidBox,
                     )
                 }
-            }
         }
     }
 }

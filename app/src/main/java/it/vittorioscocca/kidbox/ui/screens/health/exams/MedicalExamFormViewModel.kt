@@ -1,16 +1,20 @@
 package it.vittorioscocca.kidbox.ui.screens.health.exams
 
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.health.ExamAttachmentTag
 import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import it.vittorioscocca.kidbox.data.local.mapper.examStatusFromRaw
 import it.vittorioscocca.kidbox.data.repository.DocumentRepository
+import it.vittorioscocca.kidbox.data.repository.ExpenseRepository
 import it.vittorioscocca.kidbox.data.repository.MedicalExamRepository
 import it.vittorioscocca.kidbox.domain.model.KBExamStatus
 import it.vittorioscocca.kidbox.domain.model.KBMedicalExam
@@ -40,6 +44,7 @@ data class MedicalExamFormState(
     val deadlineEpochMillis: Long = System.currentTimeMillis(),
     val preparation: String = "",
     val notes: String = "",
+    val costText: String = "",
     val location: String = "",
     val status: KBExamStatus = KBExamStatus.PENDING,
     val reminderOn: Boolean = false,
@@ -64,7 +69,12 @@ class MedicalExamFormViewModel @Inject constructor(
     private val memberDao: KBFamilyMemberDao,
     private val attachmentService: HealthAttachmentService,
     private val documentRepository: DocumentRepository,
+    private val expenseRepository: ExpenseRepository,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
+
+    /** L'id della spesa collegata all'esame in modifica, se ne ha una. */
+    private var loadedLinkedExpenseId: String? = null
 
     private val _uiState = MutableStateFlow(MedicalExamFormState())
     val uiState: StateFlow<MedicalExamFormState> = _uiState.asStateFlow()
@@ -123,6 +133,7 @@ class MedicalExamFormViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(isLoading = true, childName = childName)
         val exam = repository.getById(examId)
         if (exam != null) {
+            loadedLinkedExpenseId = exam.linkedExpenseId
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 examId = exam.id,
@@ -133,6 +144,9 @@ class MedicalExamFormViewModel @Inject constructor(
                 deadlineEpochMillis = exam.deadlineEpochMillis ?: System.currentTimeMillis(),
                 preparation = exam.preparation.orEmpty(),
                 notes = exam.notes.orEmpty(),
+                costText = exam.cost?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString().replace('.', ',') }.orEmpty(),
+                // L'id della spesa collegata non sta nello stato UI: non si mostra,
+                // serve solo a ritrovare la voce al salvataggio.
                 location = exam.location.orEmpty(),
                 status = examStatusFromRaw(exam.statusRaw),
                 reminderOn = exam.reminderOn,
@@ -159,6 +173,7 @@ class MedicalExamFormViewModel @Inject constructor(
     fun setLocation(v: String) { _uiState.value = _uiState.value.copy(location = v) }
     fun setPreparation(v: String) { _uiState.value = _uiState.value.copy(preparation = v) }
     fun setNotes(v: String) { _uiState.value = _uiState.value.copy(notes = v) }
+    fun setCostText(v: String) { _uiState.value = _uiState.value.copy(costText = v) }
     fun setHasResult(v: Boolean) { _uiState.value = _uiState.value.copy(hasResult = v) }
     fun setResultText(v: String) { _uiState.value = _uiState.value.copy(resultText = v) }
     fun setResultDateEpochMillis(v: Long) { _uiState.value = _uiState.value.copy(resultDateEpochMillis = v) }
@@ -213,6 +228,8 @@ class MedicalExamFormViewModel @Inject constructor(
                 deadlineEpochMillis = deadline,
                 preparation = s.preparation.takeIf { it.isNotBlank() },
                 notes = s.notes.takeIf { it.isNotBlank() },
+                cost = s.costText.replace(',', '.').trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()?.takeIf { it > 0 },
+                linkedExpenseId = loadedLinkedExpenseId,
                 location = s.location.takeIf { it.isNotBlank() },
                 statusRaw = effectiveStatus.rawValue,
                 resultText = if (s.hasResult) s.resultText.takeIf { it.isNotBlank() } else null,
@@ -230,6 +247,23 @@ class MedicalExamFormViewModel @Inject constructor(
             runCatching { repository.upsert(exam) }
                 .fold(
                     onSuccess = { savedExam ->
+                        // L'esame che costa qualcosa è anche una spesa di
+                        // famiglia, categoria Salute.
+                        val linkedId = expenseRepository.syncLinkedExpense(
+                            familyId = familyId,
+                            linkedExpenseId = savedExam.linkedExpenseId,
+                            amount = savedExam.cost,
+                            title = savedExam.name,
+                            fallbackTitle = appContext.getString(R.string.health_exam_expense_fallback_title),
+                            // La scadenza dell'esame se c'è: è la data in cui si paga.
+                            dateEpochMillis = savedExam.deadlineEpochMillis ?: savedExam.createdAtEpochMillis,
+                            notes = savedExam.location ?: savedExam.notes,
+                            categorySlug = "salute",
+                        )
+                        if (linkedId != savedExam.linkedExpenseId) {
+                            loadedLinkedExpenseId = linkedId
+                            runCatching { repository.upsert(savedExam.copy(linkedExpenseId = linkedId)) }
+                        }
                         if (savedExam.reminderOn && savedExam.deadlineEpochMillis != null) {
                             reminderScheduler.scheduleExamReminder(savedExam, s.childName)
                         } else {

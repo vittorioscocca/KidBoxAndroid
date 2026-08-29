@@ -22,6 +22,7 @@ data class HousePaymentRemoteDto(
     val typeRaw: String,
     val subtypeRaw: String?,
     val importo: Double?,
+    val linkedExpenseId: String?,
     val giornoDiScadenzaMensile: Int?,
     val dataScadenzaMillis: Long?,
     val dataScadenzaContrattoMillis: Long?,
@@ -85,6 +86,7 @@ class HousePaymentRemoteStore @Inject constructor(
                         typeRaw = typeRaw,
                         subtypeRaw = d["subtypeRaw"] as? String,
                         importo = importo,
+                        linkedExpenseId = d["linkedExpenseId"] as? String,
                         giornoDiScadenzaMensile = giorno,
                         dataScadenzaMillis = (d["dataScadenza"] as? Timestamp)?.toDate()?.time,
                         dataScadenzaContrattoMillis = (d["dataScadenzaContratto"] as? Timestamp)?.toDate()?.time,
@@ -122,6 +124,7 @@ class HousePaymentRemoteStore @Inject constructor(
         if (isNew) data["createdAt"] = FieldValue.serverTimestamp()
         data["subtypeRaw"] = entity.subtypeRaw
         data["importo"] = entity.importo
+        data["linkedExpenseId"] = entity.linkedExpenseId
         data["giornoDiScadenzaMensile"] = entity.giornoDiScadenzaMensile
         data["dataScadenza"] = entity.dataScadenza?.let { millisToTimestamp(it) }
         data["dataScadenzaContratto"] = entity.dataScadenzaContratto?.let { millisToTimestamp(it) }

@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.MonitorHeart
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Vaccines
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Badge
@@ -149,6 +150,13 @@ fun HealthHomeScreen(
                 icon = Icons.Default.Folder,
                 tint = Color(0xFF738FE6),
                 onClick = { onNavigate(AppDestination.ClinicalRecord.route(familyId, childId)) },
+            ),
+            HealthCard(
+                title = context.getString(R.string.meal_plan_title),
+                subtitle = context.getString(R.string.meal_plan_card_subtitle),
+                icon = Icons.Default.Restaurant,
+                tint = Color(0xFF66B880),
+                onClick = { onNavigate(AppDestination.MealPlan.route(familyId, childId)) },
             ),
             HealthCard(
                 title = context.getString(R.string.health_history),

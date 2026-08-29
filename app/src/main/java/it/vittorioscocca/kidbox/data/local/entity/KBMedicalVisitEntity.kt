@@ -35,6 +35,9 @@ data class KBMedicalVisitEntity(
     val prescribedExamsJson: String?,
     val photoUrlsJson: String,
     val notes: String?,
+    /** Costo della visita: quando c'è, genera la voce in Spese famiglia. */
+    val cost: Double? = null,
+    val linkedExpenseId: String? = null,
     val nextVisitDateEpochMillis: Long?,
     val nextVisitReason: String?,
     val visitStatusRaw: String?,

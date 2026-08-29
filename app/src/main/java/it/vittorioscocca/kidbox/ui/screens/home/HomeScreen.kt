@@ -79,6 +79,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -146,7 +147,9 @@ fun HomeScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val homeViewMode by viewModel.homeViewMode.collectAsStateWithLifecycle()
     val onboarding by viewModel.onboarding.collectAsStateWithLifecycle()
+    val showDashboard by viewModel.showDashboard.collectAsStateWithLifecycle()
     var showFamilySwitcher by remember { mutableStateOf(false) }
+    var showQuickInvite by remember { mutableStateOf(false) }
     val familySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val snackbarHostState = remember { SnackbarHostState() }
     val pendingUri by viewModel.pendingHeroUri.collectAsStateWithLifecycle()
@@ -205,170 +208,195 @@ fun HomeScreen(
             return@Box
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 16.dp),
+        // Pull-to-refresh: la sincronizzazione automatica non è ripetibile
+        // (i listener già attivi vengono saltati e Firestore non rimanda dati
+        // invariati), quindi serve un modo esplicito per rilanciarla quando i
+        // membri della famiglia non compaiono tutti. Vedi HomeViewModel.forceRefresh.
+        PullToRefreshBox(
+            isRefreshing = state.isRefreshing,
+            onRefresh = { viewModel.forceRefresh() },
+            modifier = Modifier.fillMaxSize(),
         ) {
-            Row(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .zIndex(10f),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
             ) {
-                KidBoxAvatar(
-                    imageUrl = state.avatarUrl,
-                    name = "",
-                    size = 44.dp,
-                    modifier = Modifier
-                        .shadow(6.dp, CircleShape)
-                        .border(2.dp, MaterialTheme.kidBoxColors.card, CircleShape)
-                        .clip(CircleShape)
-                        .clickable { onNavigate(AppDestination.Profile.route) },
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { onNavigate(AppDestination.Suggestions.route) }) {
-                        Icon(
-                            imageVector = Icons.Filled.Lightbulb,
-                            contentDescription = null,
-                            tint = MaterialTheme.kidBoxColors.title,
-                        )
-                    }
-                    IconButton(onClick = { onNavigate(AppDestination.Settings.route) }) {
-                        Icon(Icons.Filled.Settings, contentDescription = null, tint = MaterialTheme.kidBoxColors.title)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.size(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "KidBox",
-                        fontSize = 34.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = (-0.5).sp,
-                        color = MaterialTheme.kidBoxColors.title,
-                    )
-                    if (state.familyName.isNotBlank()) {
-                        Text(
-                            text = state.familyName,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.kidBoxColors.subtitle,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                HomeHeaderControls(
-                    viewMode = homeViewMode,
-                    onViewModeChange = { viewModel.setHomeViewMode(it) },
-                    onSwitchFamily = { showFamilySwitcher = true },
-                )
-            }
-
-            Spacer(modifier = Modifier.size(16.dp))
-
-            HomeHeroCarousel(
-                state = state,
-                onNavigate = onNavigate,
-                onChangeHeroPhoto = {
-                    photoPicker.launch(singleImageRequest())
-                },
-                // Finché la checklist è viva le slide promozionali restano
-                // fuori: sono due sistemi di suggerimento con lo stesso scopo, e
-                // uno sopra l'altro si annullano — il carosello, per di più,
-                // promuove anche cose che la checklist ha già spuntato.
-                showPromoSlides = !onboarding.isVisible,
-            )
-            if (state.isMembersSyncing) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.Center,
+                        .zIndex(10f),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(14.dp),
-                        strokeWidth = 2.dp,
-                        color = Color(0xFFFF6B00),
+                    KidBoxAvatar(
+                        imageUrl = state.avatarUrl,
+                        name = "",
+                        size = 44.dp,
+                        modifier = Modifier
+                            .shadow(6.dp, CircleShape)
+                            .border(2.dp, MaterialTheme.kidBoxColors.card, CircleShape)
+                            .clip(CircleShape)
+                            .clickable { onNavigate(AppDestination.Profile.route) },
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(R.string.home_members_syncing),
-                        color = MaterialTheme.kidBoxColors.subtitle,
-                        fontSize = 12.sp,
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { onNavigate(AppDestination.Suggestions.route) }) {
+                            Icon(
+                                imageVector = Icons.Filled.Lightbulb,
+                                contentDescription = null,
+                                tint = MaterialTheme.kidBoxColors.title,
+                            )
+                        }
+                        IconButton(onClick = { onNavigate(AppDestination.Settings.route) }) {
+                            Icon(Icons.Filled.Settings, contentDescription = null, tint = MaterialTheme.kidBoxColors.title)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.size(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "KidBox",
+                            fontSize = 34.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = (-0.5).sp,
+                            color = MaterialTheme.kidBoxColors.title,
+                        )
+                        if (state.familyName.isNotBlank()) {
+                            Text(
+                                text = state.familyName,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.kidBoxColors.subtitle,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    HomeHeaderControls(
+                        viewMode = homeViewMode,
+                        onViewModeChange = { viewModel.setHomeViewMode(it) },
+                        onSwitchFamily = { showFamilySwitcher = true },
                     )
                 }
-            }
-            state.membersSyncWarning?.let { warning ->
-                Text(
-                    text = warning,
-                    color = Color(0xFFD9822B),
-                    fontSize = 12.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                )
-            }
-            if (state.isUploadingHero) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
-            }
-            state.errorMessage?.takeIf { it.isNotBlank() }?.let { err ->
-                Text(err, color = Color(0xFFE53E3E), fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
-            }
 
-            Spacer(modifier = Modifier.size(16.dp))
-
-            // Sopra le sezioni, non in fondo: il senso della checklist è farsi
-            // vedere da chi apre la Home e non sa da dove partire.
-            if (onboarding.isVisible) {
-                OnboardingChecklistCard(
-                    state = onboarding,
-                    onSelect = { step ->
-                        if (step == OnboardingStep.NOTIFICATIONS) {
-                            // Il permesso si chiede sul posto: mandare l'utente
-                            // in una schermata per poi mostrargli il dialog di
-                            // sistema aggiungerebbe un passaggio senza aggiungere
-                            // niente.
-                            viewModel.onOnboardingStepTapped(step)
-                            requestNotifications()
-                        } else {
-                            viewModel.onOnboardingStepTapped(step)?.let(onNavigate)
-                        }
-                    },
-                    onDismiss = { viewModel.dismissOnboarding() },
-                )
                 Spacer(modifier = Modifier.size(16.dp))
-            }
 
-            if (homeViewMode == it.vittorioscocca.kidbox.data.local.HomeViewMode.GRID) {
-                HomeFreeGridSection(
+                HomeHeroCarousel(
                     state = state,
                     onNavigate = onNavigate,
-                    onFeatureOpened = { field -> viewModel.onFeatureOpened(field) },
-                    onRecordFeatureUsage = { id -> viewModel.recordFeatureUsage(id) },
-                    initialOrder = viewModel.getGridOrder(),
-                    onOrderChanged = { ids -> viewModel.setGridOrder(ids) },
+                    onChangeHeroPhoto = {
+                        photoPicker.launch(singleImageRequest())
+                    },
+                    onInvite = { showQuickInvite = true },
+                    // Finché la checklist è viva le slide promozionali restano
+                    // fuori: sono due sistemi di suggerimento con lo stesso scopo, e
+                    // uno sopra l'altro si annullano — il carosello, per di più,
+                    // promuove anche cose che la checklist ha già spuntato.
+                    showPromoSlides = !onboarding.isVisible,
                 )
-            } else {
-                HomeCategorySection(
-                    state = state,
-                    onNavigate = onNavigate,
-                    onFeatureOpened = { field -> viewModel.onFeatureOpened(field) },
-                    onRecordFeatureUsage = { id -> viewModel.recordFeatureUsage(id) },
-                )
+                if (state.isMembersSyncing) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = Color(0xFFFF6B00),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.home_members_syncing),
+                            color = MaterialTheme.kidBoxColors.subtitle,
+                            fontSize = 12.sp,
+                        )
+                    }
+                }
+                state.membersSyncWarning?.let { warning ->
+                    Text(
+                        text = warning,
+                        color = Color(0xFFD9822B),
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                    )
+                }
+                if (state.isUploadingHero) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                }
+                state.errorMessage?.takeIf { it.isNotBlank() }?.let { err ->
+                    Text(err, color = Color(0xFFE53E3E), fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                }
+
+                Spacer(modifier = Modifier.size(16.dp))
+
+                // Sopra le sezioni, non in fondo: il senso della checklist è farsi
+                // vedere da chi apre la Home e non sa da dove partire.
+                if (onboarding.isVisible) {
+                    OnboardingChecklistCard(
+                        state = onboarding,
+                        onSelect = { step ->
+                            if (step == OnboardingStep.NOTIFICATIONS) {
+                                // Il permesso si chiede sul posto: mandare l'utente
+                                // in una schermata per poi mostrargli il dialog di
+                                // sistema aggiungerebbe un passaggio senza aggiungere
+                                // niente.
+                                viewModel.onOnboardingStepTapped(step)
+                                requestNotifications()
+                            } else {
+                                viewModel.onOnboardingStepTapped(step)?.let(onNavigate)
+                            }
+                        },
+                        onDismiss = { viewModel.dismissOnboarding() },
+                    )
+                    Spacer(modifier = Modifier.size(16.dp))
+                }
+
+                // Riepilogo: cosa c'è dentro le sezioni, prima delle sezioni. Vale per
+                // entrambe le modalità. Finché la checklist è viva resta fuori, come
+                // le slide promozionali: una famiglia appena creata avrebbe sei
+                // tessere vuote proprio dove le serve una spinta.
+                if (showDashboard && state.familyId.isNotBlank() && !onboarding.isVisible) {
+                    HomeDashboardSection(
+                        state = state,
+                        onNavigate = onNavigate,
+                        onFeatureOpened = { field -> viewModel.onFeatureOpened(field) },
+                        onRecordFeatureUsage = { id -> viewModel.recordFeatureUsage(id) },
+                    )
+                    Spacer(modifier = Modifier.size(16.dp))
+                }
+
+                if (homeViewMode == it.vittorioscocca.kidbox.data.local.HomeViewMode.GRID) {
+                    HomeFreeGridSection(
+                        state = state,
+                        onNavigate = onNavigate,
+                        onFeatureOpened = { field -> viewModel.onFeatureOpened(field) },
+                        onRecordFeatureUsage = { id -> viewModel.recordFeatureUsage(id) },
+                        initialOrder = viewModel.getGridOrder(),
+                        onOrderChanged = { ids -> viewModel.setGridOrder(ids) },
+                    )
+                } else {
+                    HomeCategorySection(
+                        state = state,
+                        onNavigate = onNavigate,
+                        onFeatureOpened = { field -> viewModel.onFeatureOpened(field) },
+                        onRecordFeatureUsage = { id -> viewModel.recordFeatureUsage(id) },
+                    )
+                }
+                // Evita che l’ultima riga resti sotto al FAB (overlay in basso a destra).
+                Spacer(Modifier.height(88.dp))
             }
-            // Evita che l’ultima riga resti sotto al FAB (overlay in basso a destra).
-            Spacer(Modifier.height(88.dp))
         }
 
         // Stesso pulsante AI della card Salute (AskAiButton condiviso).
@@ -400,6 +428,10 @@ fun HomeScreen(
             },
             onJoinFamily = { onNavigate(AppDestination.JoinFamily.route) },
         )
+    }
+
+    if (showQuickInvite) {
+        QuickInviteSheet(onDismiss = { showQuickInvite = false })
     }
 }
 
@@ -498,6 +530,9 @@ private fun FamilyHeroCard(
     heroOffsetX: Float = 0f,
     heroOffsetY: Float = 0f,
     onChangePhoto: () -> Unit,
+    // Quando c'è, sulla foto compare il "+" che apre l'invito. `null` finché
+    // non c'è una famiglia: non si invita nessuno in una casa che non esiste.
+    onInvite: (() -> Unit)? = null,
 ) {
     Card(
         modifier = Modifier
@@ -572,31 +607,56 @@ private fun FamilyHeroCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(modifier = Modifier.size(4.dp))
-                Surface(
-                    color = Color.White.copy(alpha = 0.18f),
-                    shape = RoundedCornerShape(16.dp),
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .clickable(onClick = onChangePhoto)
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                    Surface(
+                        color = Color.White.copy(alpha = 0.18f),
+                        shape = RoundedCornerShape(16.dp),
                     ) {
-                        Icon(
-                            Icons.Filled.PhotoCamera,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            stringResource(
-                                if (photoUrl != null) R.string.home_hero_change_photo
-                                else R.string.home_hero_add_photo,
-                            ),
-                            color = Color.White,
-                            fontSize = 11.sp,
-                        )
+                        Row(
+                            modifier = Modifier
+                                .clickable(onClick = onChangePhoto)
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Filled.PhotoCamera,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                stringResource(
+                                    if (photoUrl != null) R.string.home_hero_change_photo
+                                    else R.string.home_hero_add_photo,
+                                ),
+                                color = Color.White,
+                                fontSize = 11.sp,
+                            )
+                        }
+                    }
+
+                    if (onInvite != null) {
+                        Surface(
+                            color = Color(0xFFFF6B00),
+                            shape = CircleShape,
+                            modifier = Modifier.size(36.dp),
+                        ) {
+                            Box(
+                                modifier = Modifier.clickable(onClick = onInvite),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Filled.Add,
+                                    contentDescription = stringResource(R.string.quick_invite_title),
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -622,6 +682,7 @@ private fun HomeHeroCarousel(
     state: HomeUiState,
     onNavigate: (String) -> Unit,
     onChangeHeroPhoto: () -> Unit,
+    onInvite: () -> Unit,
     showPromoSlides: Boolean = true,
 ) {
     val familyId = state.familyId
@@ -649,6 +710,7 @@ private fun HomeHeroCarousel(
             heroOffsetX = state.heroPhotoOffsetX,
             heroOffsetY = state.heroPhotoOffsetY,
             onChangePhoto = onChangeHeroPhoto,
+            onInvite = if (hasFamily) onInvite else null,
         )
     }
 
@@ -1186,8 +1248,13 @@ private fun HomeFreeGridSection(
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        Eyebrow(stringResource(R.string.home_sections_eyebrow))
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
         orderedIds.chunked(2).forEach { rowIds ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1266,11 +1333,12 @@ private fun HomeFreeGridSection(
                 }
             }
         }
+        }
     }
 }
 
 @Composable
-private fun Eyebrow(text: String) {
+internal fun Eyebrow(text: String) {
     Text(
         text.uppercase(),
         fontSize = 11.sp,

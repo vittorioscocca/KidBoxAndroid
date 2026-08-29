@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.InsertDriveFile
@@ -1215,6 +1216,38 @@ private fun Step4AttachmentsNotes(
                 maxLines = 8,
                 colors = notesFieldColors,
                 shape = RoundedCornerShape(0.dp),
+            )
+
+            Spacer(Modifier.height(14.dp))
+
+            // Il costo genera la voce in Spese famiglia: si scrive qui, una
+            // volta sola, e non va riportato a mano fra le spese.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Euro, contentDescription = null, tint = kb.title, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    stringResource(R.string.health_visit_cost),
+                    fontWeight = FontWeight.Bold,
+                    color = kb.title,
+                    fontSize = 14.sp,
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            TextField(
+                value = state.costText,
+                onValueChange = vm::setCostText,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("0,00", fontSize = 15.sp) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                colors = notesFieldColors,
+                shape = RoundedCornerShape(0.dp),
+            )
+            Text(
+                stringResource(R.string.health_cost_expense_hint),
+                fontSize = 12.sp,
+                color = kb.subtitle,
+                modifier = Modifier.padding(top = 6.dp),
             )
         }
     }

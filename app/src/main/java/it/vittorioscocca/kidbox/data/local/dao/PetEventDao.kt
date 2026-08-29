@@ -14,6 +14,10 @@ interface PetEventDao {
     )
     fun observeByPet(familyId: String, petId: String): Flow<List<PetEventEntity>>
 
+    /** Gli eventi di tutti gli animali: la Dashboard non sa quale animale mostrare. */
+    @Query("SELECT * FROM pet_events WHERE familyId = :familyId AND isDeleted = 0 ORDER BY date ASC")
+    fun observeByFamily(familyId: String): Flow<List<PetEventEntity>>
+
     @Query("SELECT * FROM pet_events WHERE id = :id")
     fun observeById(id: String): Flow<PetEventEntity?>
 

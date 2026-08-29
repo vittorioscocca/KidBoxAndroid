@@ -1,9 +1,12 @@
 package it.vittorioscocca.kidbox.ui.screens.health.visits
 
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
 import it.vittorioscocca.kidbox.data.health.VisitAttachmentTag
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
@@ -18,6 +21,7 @@ import it.vittorioscocca.kidbox.data.local.mapper.encodeAsNeededDrugs
 import it.vittorioscocca.kidbox.data.local.mapper.encodeStringList
 import it.vittorioscocca.kidbox.data.local.mapper.encodeTherapyTypes
 import it.vittorioscocca.kidbox.data.repository.DocumentRepository
+import it.vittorioscocca.kidbox.data.repository.ExpenseRepository
 import it.vittorioscocca.kidbox.data.repository.MedicalExamRepository
 import it.vittorioscocca.kidbox.data.repository.MedicalVisitRepository
 import it.vittorioscocca.kidbox.data.repository.TreatmentRepository
@@ -63,6 +67,7 @@ data class MedicalVisitFormState(
     val linkedExamIds: List<String> = emptyList(),
     val prescriptionsTab: Int = 0,
     val notes: String = "",
+    val costText: String = "",
     val pendingAttachmentUris: List<Uri> = emptyList(),
     val hasNextVisit: Boolean = false,
     val nextVisitDateMillis: Long = startOfTodayMillis(),
@@ -105,6 +110,8 @@ class MedicalVisitFormViewModel @Inject constructor(
     private val memberDao: KBFamilyMemberDao,
     private val attachmentService: HealthAttachmentService,
     private val documentRepository: DocumentRepository,
+    private val expenseRepository: ExpenseRepository,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MedicalVisitFormState())
@@ -196,6 +203,7 @@ class MedicalVisitFormViewModel @Inject constructor(
                 asNeededDrugs = decodeAsNeededDrugs(visit.asNeededDrugsJson),
                 therapyTypes = decodeTherapyTypes(visit.therapyTypesJson),
                 notes = visit.notes.orEmpty(),
+                costText = visit.cost?.let { formatAmount(it) }.orEmpty(),
                 hasNextVisit = visit.nextVisitDateEpochMillis != null,
                 nextVisitDateMillis = visit.nextVisitDateEpochMillis ?: startOfTodayMillis(),
                 nextVisitReminder = visit.nextVisitReminderOn,
@@ -245,6 +253,7 @@ class MedicalVisitFormViewModel @Inject constructor(
     fun setDiagnosis(v: String) { _uiState.value = _uiState.value.copy(diagnosis = v) }
     fun setRecommendations(v: String) { _uiState.value = _uiState.value.copy(recommendations = v) }
     fun setNotes(v: String) { _uiState.value = _uiState.value.copy(notes = v) }
+    fun setCostText(v: String) { _uiState.value = _uiState.value.copy(costText = v) }
     fun setPrescriptionsTab(tab: Int) { _uiState.value = _uiState.value.copy(prescriptionsTab = tab.coerceIn(0, 3)) }
 
     fun setHasNextVisit(v: Boolean) { _uiState.value = _uiState.value.copy(hasNextVisit = v) }
@@ -368,6 +377,13 @@ class MedicalVisitFormViewModel @Inject constructor(
         viewModelScope.launch { attachmentService.deleteAttachment(doc) }
     }
 
+    /** "12,50" → 12.5; vuoto o non numerico → `null`. */
+    private fun parseAmount(text: String): Double? =
+        text.replace(',', '.').trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()?.takeIf { it > 0 }
+
+    private fun formatAmount(value: Double): String =
+        if (value % 1.0 == 0.0) value.toLong().toString() else value.toString().replace('.', ',')
+
     fun save() {
         val s = _uiState.value
         if (!s.canSave) return
@@ -409,6 +425,8 @@ class MedicalVisitFormViewModel @Inject constructor(
                 prescribedExamsJson = linkedExamIdsJson,
                 photoUrlsJson = existing?.photoUrlsJson ?: "[]",
                 notes = s.notes.takeIf { it.isNotBlank() },
+                cost = parseAmount(s.costText),
+                linkedExpenseId = existing?.linkedExpenseId,
                 nextVisitDateEpochMillis = nextDate,
                 nextVisitReason = existing?.nextVisitReason,
                 visitStatusRaw = s.visitStatus.rawValue,
@@ -426,6 +444,24 @@ class MedicalVisitFormViewModel @Inject constructor(
             runCatching {
                 // La visita deve esistere in SQLite prima di aggiornare gli esami (FK prescribingVisitId → kb_medical_visits).
                 repository.save(visit)
+
+                // La visita che costa qualcosa è anche una spesa di famiglia,
+                // categoria Salute: l'importo si scrive qui e la voce si allinea.
+                val doctor = visit.doctorName?.trim().orEmpty()
+                val linkedId = expenseRepository.syncLinkedExpense(
+                    familyId = familyId,
+                    linkedExpenseId = visit.linkedExpenseId,
+                    amount = visit.cost,
+                    title = if (doctor.isEmpty()) visit.reason else "${visit.reason} — $doctor",
+                    fallbackTitle = appContext.getString(R.string.health_visit_expense_fallback_title),
+                    dateEpochMillis = visit.dateEpochMillis,
+                    notes = visit.notes,
+                    categorySlug = "salute",
+                )
+                if (linkedId != visit.linkedExpenseId) {
+                    repository.save(visit.copy(linkedExpenseId = linkedId))
+                }
+
                 linkExamsToVisit(
                     visitId = visit.id,
                     examIds = normalizedLinkedExamIds,

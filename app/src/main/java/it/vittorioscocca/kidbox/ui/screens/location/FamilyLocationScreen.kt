@@ -26,6 +26,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.filled.Battery1Bar
+import androidx.compose.material.icons.filled.Battery3Bar
+import androidx.compose.material.icons.filled.Battery5Bar
+import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -55,6 +60,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -363,29 +369,39 @@ fun FamilyLocationScreen(
             )
         }
 
+        // Pill e scheda nella STESSA colonna, non due strati sovrapposti in un
+        // Box: così l'uno non può finire sopra l'altro qualunque altezza abbia
+        // la scheda. Prima il margine dei pill era calcolato sull'altezza della
+        // scheda, e bastava una riga in più perché ci finissero sotto.
         val otherUsers = state.sharedUsers.filter { it.id != myUid }
-        if (otherUsers.isNotEmpty()) {
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .navigationBarsPadding()
-                    .padding(end = 12.dp, bottom = 280.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                otherUsers.forEach { user ->
-                    FollowUserPill(
-                        user = user,
-                        isActive = followingUserId == user.id,
-                        onClick = { followingUserId = user.id },
-                    )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .navigationBarsPadding(),
+            horizontalAlignment = Alignment.End,
+        ) {
+            if (otherUsers.isNotEmpty()) {
+                Column(
+                    modifier = Modifier.padding(end = 12.dp, bottom = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.End,
+                ) {
+                    otherUsers.forEach { user ->
+                        FollowUserPill(
+                            user = user,
+                            isActive = followingUserId == user.id,
+                            onClick = { followingUserId = user.id },
+                        )
+                    }
                 }
             }
-        }
 
-        LocationBottomCard(
-            state = state,
-            isDarkTheme = isDarkTheme,
-            onToggle = { enabled ->
+            LocationBottomCard(
+                state = state,
+                isDarkTheme = isDarkTheme,
+                myUid = myUid,
+                onToggle = { enabled ->
                 if (enabled) {
                     if (viewModel.hasLocationPermissionNow()) {
                         viewModel.setLocationPermissionGranted(true)
@@ -417,11 +433,9 @@ fun FamilyLocationScreen(
                     )
                 }
             },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-        )
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            )
+        }
 
         if (showForegroundDisclosure) {
             ForegroundLocationDisclosureOverlay(
@@ -584,7 +598,54 @@ private fun FollowUserPill(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
             )
+            user.batteryLevel?.let { level ->
+                BatteryBadge(level = level, isCharging = user.isCharging, onOrange = isActive)
+            }
         }
+    }
+}
+
+/**
+ * Pila e percentuale accanto al nome. Rossa sotto il 20% e non in carica: è
+ * l'unico caso in cui la carica di un altro cambia quello che fai.
+ *
+ * Sul pill attivo (fondo arancione) il rosso e il grigio sparirebbero, quindi
+ * lì si passa al bianco: la percentuale resta leggibile, il livello lo dice il
+ * numero.
+ */
+@Composable
+private fun BatteryBadge(level: Int, isCharging: Boolean, onOrange: Boolean) {
+    val tint = when {
+        onOrange -> Color.White
+        // Verde più scuro del solito: il pill ha fondo bianco anche in tema
+        // scuro, e un verde acceso lì sopra si legge male.
+        isCharging -> Color(0xFF178040)
+        level <= 20 -> Color(0xFFE53935)
+        else -> Color(0xFF6B7280)
+    }
+    val icon = when {
+        isCharging -> Icons.Filled.BatteryChargingFull
+        level <= 20 -> Icons.Filled.Battery1Bar
+        level <= 60 -> Icons.Filled.Battery3Bar
+        level <= 85 -> Icons.Filled.Battery5Bar
+        else -> Icons.Filled.BatteryFull
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(1.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(13.dp),
+        )
+        Text(
+            text = "$level%",
+            color = tint,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
@@ -592,6 +653,7 @@ private fun FollowUserPill(
 private fun LocationBottomCard(
     state: FamilyLocationUiState,
     isDarkTheme: Boolean,
+    myUid: String,
     onToggle: (Boolean) -> Unit,
     onMyLocationTap: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -600,7 +662,6 @@ private fun LocationBottomCard(
     val innerCardColor = if (isDarkTheme) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.62f)
     val dangerColor = if (isDarkTheme) Color(0xFFFF7A7A) else Color(0xFFD54A4A)
     val secondaryTextColor = if (isDarkTheme) Color(0xFFB9C2CF) else Color(0xFF7B7B7B)
-    val tertiaryTextColor = if (isDarkTheme) Color(0xFF9FA9B8) else Color(0xFF8B8B8B)
     val locationChipColor = if (isDarkTheme) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.82f)
     val chevronColor = if (isDarkTheme) Color(0xFFB7C0CD) else Color.Gray
 
@@ -615,6 +676,27 @@ private fun LocationBottomCard(
             }
         }
         null -> null
+    }
+
+    // Chi altro sta condividendo, con la scadenza se temporanea. Stesse regole
+    // di iOS: due nomi per esteso, poi il conteggio dei restanti.
+    val others = state.sharedUsers.filter { it.id != myUid }
+    val otherParts = others.map { user ->
+        val expires = user.expiresAtEpochMillis
+        when {
+            user.modeRaw != LocationShareMode.TEMPORARY.raw ->
+                stringResource(R.string.location_other_sharing_realtime, user.name)
+            expires != null ->
+                stringResource(R.string.location_other_sharing_until, user.name, formatHour(expires))
+            else ->
+                stringResource(R.string.location_other_sharing_temporary, user.name)
+        }
+    }
+    val othersStatusText = when {
+        otherParts.isEmpty() -> null
+        otherParts.size <= 2 -> otherParts.joinToString(" • ")
+        else -> otherParts.take(2).joinToString(" • ") +
+            " • " + stringResource(R.string.location_other_sharing_more, otherParts.size - 2)
     }
 
     Box(modifier = modifier.fillMaxWidth()) {
@@ -737,10 +819,15 @@ private fun LocationBottomCard(
                             )
                         }
 
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Text(stringResource(R.string.location_shared_from_label), color = tertiaryTextColor, fontSize = 11.sp)
-                            Spacer(modifier = Modifier.weight(1f))
-                            Text(stringResource(R.string.location_this_android), color = tertiaryTextColor, fontSize = 11.sp)
+                        othersStatusText?.let { line ->
+                            Text(
+                                text = line,
+                                color = secondaryTextColor,
+                                fontSize = 12.sp,
+                                lineHeight = 16.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
                 }

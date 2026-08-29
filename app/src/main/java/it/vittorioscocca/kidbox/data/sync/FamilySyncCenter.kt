@@ -562,7 +562,13 @@ class FamilySyncCenter @Inject constructor(
                                 )
                                 KBLog.sync.debug("member upserted id=${doc.id} name=$displayName", TAG)
                             } catch (e: Exception) {
-                                KBLog.sync.error("member upsert FAILED id=${doc.id}: ${e.message}", TAG)
+                                // Quasi sempre è la chiave esterna sulla famiglia:
+                                // dirlo per nome evita di ricominciare da capo la
+                                // prossima volta che i membri non compaiono.
+                                KBLog.sync.error(
+                                    "member upsert FAILED id=${doc.id} familyRowPresent=${familyDao.getById(familyId) != null}: ${e.message}",
+                                    TAG,
+                                )
                             }
                         }
                         membersFirstDone = true
@@ -753,7 +759,40 @@ class FamilySyncCenter @Inject constructor(
             .getOrNull()
         val data = snap?.data
         if (data == null) {
-            KBLog.sync.warning("ensureFamilyRowExists: documento famiglia non leggibile familyId=$familyId", TAG)
+            // Segnaposto, non resa. `kb_family_members` ha una chiave esterna
+            // sulla famiglia: senza una riga qui OGNI upsert di membro fallisce,
+            // l'eccezione viene inghiottita riga per riga e i membri non
+            // compaiono più finché non arriva un'altra snapshot. Su iOS la
+            // stessa corsa è innocua perché non c'è vincolo.
+            //
+            // `updatedAtEpochMillis = 0` perché qualunque dato remoto vinca
+            // subito il confronto last-write-wins e riempia nome e foto.
+            KBLog.sync.warning(
+                "ensureFamilyRowExists: documento famiglia non leggibile familyId=$familyId — inserisco segnaposto per non perdere i membri",
+                TAG,
+            )
+            runCatching {
+                familyDao.upsert(
+                    KBFamilyEntity(
+                        id = familyId,
+                        name = "",
+                        heroPhotoURL = null,
+                        heroPhotoLocalPath = null,
+                        heroPhotoUpdatedAtEpochMillis = null,
+                        heroPhotoScale = null,
+                        heroPhotoOffsetX = null,
+                        heroPhotoOffsetY = null,
+                        createdBy = "",
+                        updatedBy = "",
+                        createdAtEpochMillis = System.currentTimeMillis(),
+                        updatedAtEpochMillis = 0L,
+                        lastSyncAtEpochMillis = null,
+                        lastSyncError = null,
+                    ),
+                )
+            }.onFailure {
+                KBLog.sync.error("ensureFamilyRowExists: segnaposto fallito familyId=$familyId: ${it.message}", TAG)
+            }
             return
         }
         val now = System.currentTimeMillis()
@@ -967,6 +1006,9 @@ class FamilySyncCenter @Inject constructor(
                     }
                 }
                 val now = System.currentTimeMillis()
+                // Senza riga famiglia ogni upsert membro viola la foreign key
+                // e fallisce in silenzio, riga per riga.
+                ensureFamilyRowExists(familyId)
                 for (doc in docs) {
                     val d = doc.data.orEmpty()
                     if (d["isDeleted"] as? Boolean == true) {
@@ -1010,6 +1052,125 @@ class FamilySyncCenter @Inject constructor(
                 KBLog.sync.warning("refreshMembersOnce failed familyId=$familyId: ${e.message}", TAG)
             }
         }
+    }
+
+    /**
+     * Riallineamento completo su richiesta esplicita dell'utente (pull-to-refresh in Home).
+     *
+     * [startSync] da solo non basta: se i listener sono già attivi per la stessa
+     * famiglia prende la scorciatoia del guard e non fa nulla, e anche quando li
+     * riattacca Firestore non rimanda documenti invariati — quindi una riga membro
+     * persa in Room (foreign key fallita, REMOVED spurio, wipe della cascata)
+     * non torna più da sola.
+     *
+     * Qui invece: si staccano i listener, si riconcilia Room contro una lettura
+     * `Source.SERVER` autorevole ([reconcileMembersFromServer]) e poi si riparte.
+     */
+    suspend fun forceResync(familyId: String) {
+        if (familyId.isBlank()) return
+        KBLog.sync.info("forceResync familyId=$familyId", TAG)
+        stopSync()
+        // stopSync azzera la famiglia attiva nelle preferenze: rimetterla subito,
+        // altrimenti chi osserva Room durante la riconciliazione risolve a "nessuna
+        // famiglia" e la Home lampeggia vuota.
+        sessionPrefs.setActiveFamilyId(familyId)
+        withContext(Dispatchers.IO) { reconcileMembersFromServer(familyId) }
+        startSync(familyId)
+    }
+
+    /**
+     * Fa combaciare `kb_family_members` con `families/{familyId}/members` letta dal
+     * server, senza last-write-wins: la lettura remota è la verità.
+     *
+     * - upsert incondizionato di ogni doc presente (niente `shouldUpdate`: una riga
+     *   locale con `updatedAt` più recente non deve poter mascherare un membro che
+     *   in Room non c'è proprio);
+     * - cancellazione delle righe locali che il server non ha più — è l'unico punto
+     *   in cui i residui vengono ripuliti, i listener vedono solo i delta;
+     * - la propria riga non viene mai cancellata da qui: la revoca d'accesso ha il
+     *   suo percorso dedicato ([triggerAccessLostIfEligible]) e una lettura parziale
+     *   non deve buttare fuori l'utente.
+     *
+     * Se la lettura dal server fallisce non tocca nulla: meglio dati vecchi che
+     * cancellare righe basandosi sulla cache.
+     */
+    private suspend fun reconcileMembersFromServer(familyId: String) {
+        val myUid = auth.currentUser?.uid.orEmpty()
+        val now = System.currentTimeMillis()
+        val docs = try {
+            db.collection("families").document(familyId).collection("members")
+                .get(Source.SERVER).await().documents
+        } catch (e: Exception) {
+            KBLog.sync.warning("reconcileMembers: lettura server fallita familyId=$familyId, Room invariato: ${e.message}", TAG)
+            return
+        }
+
+        ensureFamilyRowExists(familyId)
+
+        val remoteIds = mutableSetOf<String>()
+        for (doc in docs) {
+            val d = doc.data.orEmpty()
+            if (d["isDeleted"] as? Boolean == true) continue
+            remoteIds.add(doc.id)
+
+            val memberUid = (d["uid"] as? String) ?: doc.id
+            val local = familyMemberDao.getById(doc.id)
+            val isMe = memberUid == myUid
+
+            var displayName: String? = null
+            if (isMe) {
+                displayName = userProfileDao.getByUid(memberUid)?.canonicalMemberDisplayName()
+            }
+            if (displayName.isNullOrBlank()) {
+                displayName = d.firstNonBlankString("displayName", "name", "fullName")
+                    ?: d.firstNonBlankString("email")
+            }
+            if (displayName.isNullOrBlank() && isMe) {
+                val u = auth.currentUser
+                displayName = u?.displayName?.trim()?.takeIf { it.isNotEmpty() && it != "Utente" }
+                    ?: u?.email?.trim()?.takeIf { it.isNotEmpty() }
+            }
+            if (displayName.isNullOrBlank()) displayName = local?.displayName ?: "Membro"
+
+            val remoteUpdatedAt = (d["updatedAt"] as? com.google.firebase.Timestamp)?.toDate()?.time
+
+            try {
+                familyMemberDao.upsert(
+                    KBFamilyMemberEntity(
+                        id = doc.id,
+                        familyId = familyId,
+                        userId = memberUid,
+                        role = (d["role"] as? String) ?: local?.role ?: "member",
+                        displayName = displayName,
+                        email = d.firstNonBlankString("email")
+                            ?: auth.currentUser
+                                ?.takeIf { it.uid == memberUid }
+                                ?.email?.trim()?.takeIf { it.isNotEmpty() }
+                            ?: local?.email,
+                        photoURL = d["photoURL"] as? String ?: local?.photoURL,
+                        createdAtEpochMillis = (d["createdAt"] as? com.google.firebase.Timestamp)
+                            ?.toDate()?.time ?: local?.createdAtEpochMillis ?: now,
+                        updatedAtEpochMillis = remoteUpdatedAt ?: local?.updatedAtEpochMillis ?: now,
+                        updatedBy = (d["updatedBy"] as? String) ?: doc.id,
+                        isDeleted = false,
+                    ),
+                )
+            } catch (e: Exception) {
+                KBLog.sync.error(
+                    "reconcileMembers upsert FAILED id=${doc.id} familyRowPresent=${familyDao.getById(familyId) != null}: ${e.message}",
+                    TAG,
+                )
+            }
+        }
+
+        val stale = familyMemberDao.getAllByFamilyId(familyId)
+            .filter { it.id !in remoteIds && it.userId != myUid }
+        stale.forEach { familyMemberDao.deleteById(it.id) }
+
+        KBLog.sync.info(
+            "reconcileMembers familyId=$familyId remoti=${remoteIds.size} rimossi=${stale.size}",
+            TAG,
+        )
     }
 
     /**

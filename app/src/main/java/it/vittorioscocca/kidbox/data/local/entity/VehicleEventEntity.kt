@@ -31,6 +31,8 @@ data class VehicleEventEntity(
     val cost: Double? = null,
     val garageName: String? = null,
     val notes: String? = null,
+    /** La spesa creata in Spese famiglia quando l'intervento ha un costo. */
+    val linkedExpenseId: String? = null,
     val isDeleted: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),

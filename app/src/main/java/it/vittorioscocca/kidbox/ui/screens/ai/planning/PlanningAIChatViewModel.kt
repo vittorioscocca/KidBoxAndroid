@@ -884,6 +884,7 @@ private fun KBGroceryItemEntity.toDomain() = KBGroceryItem(
     name = name,
     category = category,
     notes = notes,
+    quantity = quantity,
     isPurchased = isPurchased,
     purchasedAtEpochMillis = purchasedAtEpochMillis,
     purchasedBy = purchasedBy,

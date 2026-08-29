@@ -21,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.MonitorWeight
+import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -75,7 +76,9 @@ fun HealthConnectAppScreen(
     val healthPermissionLauncher = rememberLauncherForActivityResult(
         PermissionController.createRequestPermissionResultContract(),
     ) { granted ->
-        if (granted.containsAll(viewModel.healthPermissions)) {
+        // Basta l'insieme obbligatorio: se manca solo una facoltativa (l'altezza)
+        // si importa lo stesso, senza dire all'utente che non ha dato l'accesso.
+        if (granted.containsAll(viewModel.requiredHealthPermissions)) {
             viewModel.importFromHealthConnect()
         } else {
             Toast.makeText(
@@ -140,6 +143,8 @@ fun HealthConnectAppScreen(
                     snapshot.hasCardiacOrActivity ||
                         snapshot.weightKg != null ||
                         state.childWeightKg != null ||
+                        state.childHeightCm != null ||
+                        snapshot.heightCm != null ||
                         !state.ageDescription.isNullOrBlank()
                     )
                 when {
@@ -148,6 +153,7 @@ fun HealthConnectAppScreen(
                             snapshot = snapshot,
                             ageDescription = state.ageDescription,
                             childWeightKg = state.childWeightKg,
+                            childHeightCm = state.childHeightCm,
                         )
                         if (snapshot.hasCardiacOrActivity) {
                             Spacer(Modifier.height(20.dp))
@@ -155,9 +161,18 @@ fun HealthConnectAppScreen(
                         }
                     }
                     snapshot != null -> {
+                        // Health Connect è un contenitore, non una sorgente:
+                        // se nessuna app ci scrive dentro resta vuoto, e senza
+                        // dirlo l'utente pensa che sia KidBox a non funzionare.
                         Text(
                             stringResource(R.string.health_no_recent_data),
                             fontSize = 15.sp,
+                            color = kb.title,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            stringResource(R.string.health_hc_empty_hint),
+                            fontSize = 13.sp,
                             color = kb.subtitle,
                         )
                     }
@@ -172,6 +187,13 @@ fun HealthConnectAppScreen(
             }
         }
 
+        // Card profilo solo quando ha qualcosa da dire: vuota sembrava un
+        // riquadro rotto.
+        val hasProfileData = !state.ageDescription.isNullOrBlank() ||
+            state.childWeightKg != null ||
+            state.childHeightCm != null ||
+            !state.snapshot?.bloodGroup.isNullOrBlank()
+        if (hasProfileData) {
         Spacer(Modifier.height(16.dp))
         SectionLabel(stringResource(R.string.health_profile_from_health), kb.subtitle)
         Card(
@@ -196,7 +218,15 @@ fun HealthConnectAppScreen(
                 state.snapshot?.bloodGroup?.takeIf { it.isNotBlank() }?.let { bg ->
                     Text("Gruppo sanguigno: $bg", fontSize = 15.sp, color = kb.title)
                 }
+                state.childHeightCm?.let { h ->
+                    Text(
+                        String.format(KBLocale.current(), "Altezza: %.0f cm", h),
+                        fontSize = 15.sp,
+                        color = kb.title,
+                    )
+                }
             }
+        }
         }
 
         Spacer(Modifier.height(16.dp))
@@ -369,6 +399,7 @@ private fun HealthMetricsSummary(
     snapshot: HealthImportSnapshot,
     ageDescription: String?,
     childWeightKg: Double?,
+    childHeightCm: Double?,
 ) {
     val kb = MaterialTheme.kidBoxColors
     val locale = KBLocale.current()
@@ -377,6 +408,7 @@ private fun HealthMetricsSummary(
     // Il peso di Health Connect ha la precedenza su quello inserito a mano: è il
     // dato appena letto, ed è la ragione per cui si è premuto "aggiorna".
     val weight = snapshot.weightKg ?: childWeightKg
+    val height = snapshot.heightCm ?: childHeightCm
 
     val tiles = buildList {
         snapshot.stepsToday?.takeIf { it > 0 }?.let {
@@ -398,6 +430,17 @@ private fun HealthMetricsSummary(
                     subtitle = stringResource(R.string.health_metric_weight_sub),
                     icon = Icons.Default.MonitorWeight,
                     tint = Color(0xFF5A8DEA),
+                )
+            )
+        }
+        height?.let {
+            add(
+                MetricTileData(
+                    title = stringResource(R.string.health_metric_height),
+                    value = String.format(locale, "%.0f cm", it),
+                    subtitle = stringResource(R.string.health_metric_weight_sub),
+                    icon = Icons.Default.Straighten,
+                    tint = Color(0xFF59B4D1),
                 )
             )
         }

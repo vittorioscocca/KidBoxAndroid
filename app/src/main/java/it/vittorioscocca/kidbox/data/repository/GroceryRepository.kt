@@ -76,6 +76,7 @@ class GroceryRepository @Inject constructor(
         name: String,
         category: String?,
         notes: String?,
+        quantity: Int? = null,
     ) {
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()
@@ -86,6 +87,7 @@ class GroceryRepository @Inject constructor(
             name = name,
             category = category,
             notes = notes,
+            quantity = quantity,
             isPurchased = false,
             purchasedAtEpochMillis = null,
             purchasedBy = null,
@@ -127,6 +129,7 @@ class GroceryRepository @Inject constructor(
         name: String,
         category: String?,
         notes: String?,
+        quantity: Int? = null,
     ) {
         val existing = groceryDao.getById(itemId) ?: return
         val uid = auth.currentUser?.uid ?: "local"
@@ -134,6 +137,7 @@ class GroceryRepository @Inject constructor(
             name = name,
             category = category,
             notes = notes,
+            quantity = quantity,
             updatedAtEpochMillis = System.currentTimeMillis(),
             updatedBy = uid,
             syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
@@ -224,6 +228,7 @@ class GroceryRepository @Inject constructor(
                             name = dto.name,
                             category = dto.category,
                             notes = dto.notes,
+                            quantity = dto.quantity,
                             isPurchased = dto.isPurchased,
                             purchasedAtEpochMillis = dto.purchasedAtEpochMillis,
                             purchasedBy = dto.purchasedBy,

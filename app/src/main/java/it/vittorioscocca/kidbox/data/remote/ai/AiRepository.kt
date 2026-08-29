@@ -43,7 +43,7 @@ class AiRepository @Inject constructor(
             payload["purpose"] = purpose
         }
         val callable = functions.getHttpsCallable("askAI")
-        if (purpose == "clinicalRecord") {
+        if (purpose == "clinicalRecord" || purpose == "mealPlan") {
             callable.setTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
         }
         val result = callable

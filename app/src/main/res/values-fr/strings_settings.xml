@@ -134,6 +134,15 @@
     <string name="settings_invite_title">Inviter</string>
     <string name="settings_invite_send_link">Envoyer le lien d’invitation</string>
     <string name="settings_invite_copy_link">Copier le lien</string>
+    <string name="quick_invite_title">Inviter un proche</string>
+    <string name="quick_invite_subtitle">Celui qui ouvre le lien rejoint la famille et reçoit la clé de chiffrement.</string>
+    <string name="quick_invite_create">Créer une invitation</string>
+    <string name="quick_invite_creating">Création de l’invitation…</string>
+    <string name="quick_invite_validity">Valable 24 heures, une seule fois.</string>
+    <string name="quick_invite_link_note">Le lien contient la clé : valable 24 heures, une seule fois.</string>
+    <string name="quick_invite_send">Envoyer le lien</string>
+    <string name="quick_invite_copy">Copier</string>
+    <string name="quick_invite_close">Fermer</string>
     <string name="settings_invite_share_text">Rejoins notre famille sur KidBox :\n%1$s</string>
     <string name="settings_invite_share_subject">Rejoins notre famille sur KidBox</string>
     <string name="invite_qr_safer">La clé est lue par la caméra : elle ne passe ni par les chats, ni par les mails, ni par les sauvegardes.</string>
@@ -179,6 +188,7 @@
     <string name="settings_family_generate_share">Génère un code et partage-le.</string>
     <string name="settings_family_use_code_hint">Utilise un code si tu veux rejoindre une autre famille.</string>
     <string name="settings_family_leave">Quitter la famille</string>
+    <string name="settings_family_card_leave">Quitter la famille</string>
     <string name="settings_family_leave_sub">Tu n\'auras plus accès aux données partagées.</string>
     <string name="settings_family_remove_q">Retirer ce membre ?</string>
     <string name="settings_family_remove_body">Cette personne n\'aura plus accès aux données de la famille depuis ce compte.</string>
@@ -278,4 +288,6 @@
     <string name="settings_messages_chat_sub">Permet d\'activer ou de désactiver la discussion familiale</string>
     <string name="settings_messages_chat_note">Le choix s\'applique à tous vos appareils. Les autres membres continuent de discuter entre eux, et vous retrouverez les messages en la réactivant.</string>
     <string name="settings_notif_chat_disabled">La discussion est désactivée dans Réglages → Messages.</string>
+    <string name="settings_section_home">Accueil</string>
+    <string name="settings_home_show_dashboard">Afficher le tableau de bord sur la page d\'accueil</string>
 </resources>

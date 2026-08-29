@@ -16,6 +16,7 @@ import it.vittorioscocca.kidbox.data.remote.DocumentStorageManager
 import it.vittorioscocca.kidbox.data.repository.DocumentRepository
 import it.vittorioscocca.kidbox.data.home.HomeItemAttachmentTag
 import it.vittorioscocca.kidbox.data.home.HousePaymentAttachmentTag
+import it.vittorioscocca.kidbox.data.pets.PetAttachmentTag
 import it.vittorioscocca.kidbox.data.pets.PetEventAttachmentTag
 import it.vittorioscocca.kidbox.data.vehicles.VehicleAttachmentTag
 import it.vittorioscocca.kidbox.data.vehicles.VehicleEventAttachmentTag
@@ -122,6 +123,34 @@ class HealthAttachmentService @Inject constructor(
         resolveCategoryId = { documentRepository.ensureGarageRootFolder(familyId).id },
     )
 
+    /** Allegati della scheda animale (cartella Documenti › Animali domestici, parity iOS). */
+    suspend fun uploadPetAttachment(
+        uri: Uri,
+        petId: String,
+        familyId: String,
+    ): Result<KBDocumentEntity> = upload(
+        uri = uri,
+        familyId = familyId,
+        childId = null,
+        tag = PetAttachmentTag.make(petId),
+        storageScopeSegment = "pet-attachments/$petId",
+        resolveCategoryId = { documentRepository.ensurePetsRootFolder(familyId).id },
+    )
+
+    /** Allegati evento animale (cartella Documenti › Animali domestici, parity iOS). */
+    suspend fun uploadPetEventAttachment(
+        uri: Uri,
+        eventId: String,
+        familyId: String,
+    ): Result<KBDocumentEntity> = upload(
+        uri = uri,
+        familyId = familyId,
+        childId = null,
+        tag = PetEventAttachmentTag.make(eventId),
+        storageScopeSegment = "pet-event-attachments/$eventId",
+        resolveCategoryId = { documentRepository.ensurePetsRootFolder(familyId).id },
+    )
+
     suspend fun uploadHomeItemAttachment(
         uri: Uri,
         homeItemId: String,
@@ -189,6 +218,36 @@ class HealthAttachmentService @Inject constructor(
                 deleteAttachment(doc)
             } catch (e: Exception) {
                 KBLog.data.error("deleteAllGarageAttachmentsForVehicleEvent doc=${doc.id}", TAG, e)
+            }
+        }
+    }
+
+    /** Gli allegati se ne vanno con l'animale: da soli resterebbero in Documenti
+     *  senza più niente che li spieghi. */
+    suspend fun deleteAllAttachmentsForPet(petId: String, familyId: String) = withContext(Dispatchers.IO) {
+        if (familyId.isBlank() || petId.isBlank()) return@withContext
+        val docs = documentDao.getAllByFamilyId(familyId)
+            .filter { !it.isDeleted && PetAttachmentTag.matches(it.notes, petId) }
+        for (doc in docs) {
+            try {
+                deleteAttachment(doc)
+            } catch (e: Exception) {
+                KBLog.data.error("deleteAllAttachmentsForPet doc=${doc.id}", TAG, e)
+            }
+        }
+    }
+
+    /** Ripulisce gli allegati di un evento animale mai salvato: senza evento a cui
+     *  appartenere resterebbero appesi in Documenti. */
+    suspend fun deleteAllAttachmentsForPetEvent(eventId: String, familyId: String) = withContext(Dispatchers.IO) {
+        if (familyId.isBlank() || eventId.isBlank()) return@withContext
+        val docs = documentDao.getAllByFamilyId(familyId)
+            .filter { !it.isDeleted && PetEventAttachmentTag.matches(it.notes, eventId) }
+        for (doc in docs) {
+            try {
+                deleteAttachment(doc)
+            } catch (e: Exception) {
+                KBLog.data.error("deleteAllAttachmentsForPetEvent doc=${doc.id}", TAG, e)
             }
         }
     }

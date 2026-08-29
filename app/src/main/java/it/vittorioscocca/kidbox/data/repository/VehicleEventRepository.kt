@@ -22,6 +22,7 @@ import kotlinx.coroutines.sync.withLock
 class VehicleEventRepository @Inject constructor(
     private val vehicleEventDao: VehicleEventDao,
     private val remoteStore: VehicleEventRemoteStore,
+    private val expenseRepository: ExpenseRepository,
     private val auth: FirebaseAuth,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -91,10 +92,34 @@ class VehicleEventRepository @Inject constructor(
         garageName: String?,
         notes: String?,
         presetEventId: String? = null,
+        // Serve solo al titolo della spesa: "Tagliando — Panda" invece del solo
+        // titolo dell'intervento.
+        vehicleName: String? = null,
+        expenseFallbackTitle: String? = null,
     ) {
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()
         val id = presetEventId?.trim()?.takeIf { it.isNotEmpty() } ?: java.util.UUID.randomUUID().toString()
+
+        // Un intervento che è costato qualcosa è anche una spesa di famiglia:
+        // il costo si scrive una volta sola, qui, e la voce in Spese nasce da sé.
+        val linkedExpenseId = if ((cost ?: 0.0) > 0.0) {
+            runCatching {
+                // La categoria "Automobile" deve esistere prima di agganciarcisi.
+                expenseRepository.seedDefaultCategories(familyId)
+                expenseRepository.createExpenseLocal(
+                    familyId = familyId,
+                    title = expenseTitle(title, vehicleName, expenseFallbackTitle),
+                    amount = cost ?: 0.0,
+                    dateEpochMillis = dateMillis,
+                    categoryId = ExpenseRepository.defaultCategoryId(familyId, "automobile"),
+                    notes = expenseNotes(garageName, km, notes),
+                ).id
+            }.getOrNull()
+        } else {
+            null
+        }
+
         val entity = VehicleEventEntity(
             id = id,
             familyId = familyId,
@@ -106,6 +131,7 @@ class VehicleEventRepository @Inject constructor(
             cost = cost,
             garageName = garageName,
             notes = notes,
+            linkedExpenseId = linkedExpenseId,
             isDeleted = false,
             createdAt = now,
             updatedAt = now,
@@ -114,12 +140,31 @@ class VehicleEventRepository @Inject constructor(
             syncState = KBSyncState.PENDING_UPSERT.rawValue,
         )
         vehicleEventDao.upsert(entity)
+        if (linkedExpenseId != null) {
+            runCatching { expenseRepository.flushPending(familyId) }
+        }
         runCatching { remoteStore.upsertVehicleEventToFirestore(entity) }
             .onSuccess { vehicleEventDao.upsert(entity.copy(syncState = KBSyncState.SYNCED.rawValue)) }
             .onFailure {
                 vehicleEventDao.upsert(entity.copy(syncState = KBSyncState.ERROR.rawValue))
                 throw it
             }
+    }
+
+    /** "Tagliando — Panda": in Spese si legge cosa e su quale auto. */
+    private fun expenseTitle(title: String, vehicleName: String?, fallback: String?): String {
+        val base = title.trim().ifEmpty { fallback?.trim().orEmpty().ifEmpty { "Intervento auto" } }
+        val vehicle = vehicleName?.trim().orEmpty()
+        return if (vehicle.isEmpty()) base else "$base — $vehicle"
+    }
+
+    private fun expenseNotes(garageName: String?, km: Int?, notes: String?): String? {
+        val parts = buildList {
+            garageName?.trim()?.takeIf { it.isNotEmpty() }?.let { add(it) }
+            km?.let { add("$it km") }
+            notes?.trim()?.takeIf { it.isNotEmpty() }?.let { add(it) }
+        }
+        return parts.joinToString(" · ").takeIf { it.isNotEmpty() }
     }
 
     suspend fun deleteVehicleEvent(entity: VehicleEventEntity) {
@@ -170,6 +215,7 @@ class VehicleEventRepository @Inject constructor(
                             cost = dto.cost,
                             garageName = dto.garageName,
                             notes = dto.notes,
+                            linkedExpenseId = dto.linkedExpenseId,
                             isDeleted = false,
                             createdAt = local?.createdAt ?: (dto.createdAtMillis ?: now),
                             updatedAt = dto.updatedAtMillis ?: now,

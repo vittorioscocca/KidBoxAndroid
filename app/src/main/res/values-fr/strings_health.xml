@@ -67,6 +67,7 @@
     <string name="health_hc_permission">Pour importer les données, autorise l\'accès à Health Connect.</string>
     <string name="health_data_imported">Données importées</string>
     <string name="health_no_recent_data">Aucune donnée cardiaque ou d\'activité récente.</string>
+    <string name="health_hc_empty_hint">Health Connect ne contient pas encore de données. C’est un conteneur : ce sont les apps qui mesurent — Mi Fitness, Samsung Health, Google Fit, Fitbit — qui doivent y écrire, et la synchronisation s’active depuis elles.</string>
     <string name="health_not_connected">Pas encore connecté à Health Connect.</string>
     <string name="health_profile_from_health">Profil depuis Santé</string>
     <string name="health_install_hc">Installe l\'app Santé de Google (Health Connect) depuis le Play Store.</string>
@@ -199,6 +200,11 @@
     <string name="health_attachments_ai_note">Les comptes rendus joints seront lus par l\'IA après l\'enregistrement de la consultation.</string>
     <string name="health_add_attachment">Ajouter une pièce jointe</string>
     <string name="health_visit_notes">Notes de la consultation</string>
+    <string name="health_visit_cost">Coût de la visite</string>
+    <string name="health_exam_cost">Coût de l’examen</string>
+    <string name="health_cost_expense_hint">Si tu l’indiques, cela apparaît aussi dans Dépenses de la famille.</string>
+    <string name="health_visit_expense_fallback_title">Visite médicale</string>
+    <string name="health_exam_expense_fallback_title">Examen médical</string>
     <string name="health_visit_notes_hint">Ajoute des notes sur la consultation…</string>
     <string name="health_ai_readable">Lisible par l\'IA ✓</string>
     <string name="health_in_progress">en cours</string>
@@ -476,6 +482,7 @@
     <string name="health_metric_steps">Pas</string>
     <string name="health_metric_steps_sub">Aujourd\'hui</string>
     <string name="health_metric_weight">Poids</string>
+    <string name="health_metric_height">Taille</string>
     <string name="health_metric_weight_sub">Corps</string>
     <string name="health_metric_heart">Fréq. cardiaque</string>
     <string name="health_metric_heart_sub">Dernière</string>

@@ -26,6 +26,7 @@ data class HealthConnectAppState(
     val isImporting: Boolean = false,
     val healthConnectAvailable: Boolean = true,
     val childWeightKg: Double? = null,
+    val childHeightCm: Double? = null,
     val ageDescription: String? = null,
     val error: String? = null,
 )
@@ -40,7 +41,11 @@ class HealthConnectAppViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(HealthConnectAppState())
     val uiState: StateFlow<HealthConnectAppState> = _uiState.asStateFlow()
 
-    val healthPermissions: Set<String> get() = healthGateway.requiredPermissions
+    /** Da chiedere: tutto quello che sappiamo leggere. */
+    val healthPermissions: Set<String> get() = healthGateway.allPermissions
+
+    /** Da verificare: senza queste l'importazione non parte. Le facoltative, no. */
+    val requiredHealthPermissions: Set<String> get() = healthGateway.requiredPermissions
 
     private var familyId: String = ""
     private var childId: String = ""
@@ -78,6 +83,7 @@ class HealthConnectAppViewModel @Inject constructor(
                 snapshot = snapshot,
                 healthConnectAvailable = healthGateway.isAvailable(),
                 childWeightKg = child?.weightKg ?: snapshot?.weightKg,
+                childHeightCm = child?.heightCm ?: snapshot?.heightCm,
                 ageDescription = snapshot?.ageDescription
                     ?: child?.birthDateEpochMillis?.let(HealthAgeFormatting::ageDescriptionFromBirth),
             )
@@ -90,6 +96,7 @@ class HealthConnectAppViewModel @Inject constructor(
         val now = System.currentTimeMillis()
         val updated = base.copy(
             weightKg = imported.weightKg ?: base.weightKg,
+            heightCm = imported.heightCm ?: base.heightCm,
             birthDateEpochMillis = imported.birthDateEpochMillis ?: base.birthDateEpochMillis,
             updatedBy = uid.ifBlank { base.updatedBy },
             updatedAtEpochMillis = now,

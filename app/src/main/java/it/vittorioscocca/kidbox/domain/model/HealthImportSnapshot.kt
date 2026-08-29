@@ -34,6 +34,8 @@ data class HealthECGEntry(
 data class HealthImportSnapshot(
     val birthDateEpochMillis: Long? = null,
     val weightKg: Double? = null,
+    /** Altezza in centimetri, da Health Connect. */
+    val heightCm: Double? = null,
     val bloodGroup: String? = null,
     val heartRateBpm: Double? = null,
     val heartRateMeasuredAtEpochMillis: Long? = null,

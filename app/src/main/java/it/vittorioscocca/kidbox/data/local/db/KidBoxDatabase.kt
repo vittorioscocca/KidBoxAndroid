@@ -23,6 +23,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyPhotoDao
 import it.vittorioscocca.kidbox.data.local.dao.KBGroceryItemDao
+import it.vittorioscocca.kidbox.data.local.dao.KBShoppingTripDao
 import it.vittorioscocca.kidbox.data.local.dao.KBMedicalExamDao
 import it.vittorioscocca.kidbox.data.local.dao.KBMedicalVisitDao
 import it.vittorioscocca.kidbox.data.local.dao.KBNoteDao
@@ -101,10 +102,11 @@ import it.vittorioscocca.kidbox.data.local.entity.KBPackingItemEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTripEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTripDayPlanEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTripExpenseEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBShoppingTripEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTripLegEntity
 
 @Database(
-    version = 39,
+    version = 44,
     exportSchema = false,
     entities = [
         KBUserProfileEntity::class,
@@ -118,6 +120,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBTripLegEntity
         KBTodoListEntity::class,
         KBTodoItemEntity::class,
         KBGroceryItemEntity::class,
+        KBShoppingTripEntity::class,
         KBNoteEntity::class,
         KBDocumentCategoryEntity::class,
         KBDocumentEntity::class,
@@ -170,6 +173,7 @@ abstract class KidBoxDatabase : RoomDatabase() {
     abstract fun todoListDao(): KBTodoListDao
     abstract fun todoItemDao(): KBTodoItemDao
     abstract fun groceryItemDao(): KBGroceryItemDao
+    abstract fun shoppingTripDao(): KBShoppingTripDao
     abstract fun noteDao(): KBNoteDao
     abstract fun documentCategoryDao(): KBDocumentCategoryDao
     abstract fun documentDao(): KBDocumentDao

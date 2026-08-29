@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -59,6 +60,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -350,6 +352,23 @@ fun MedicalExamFormScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 minLines = 3,
+            )
+            Spacer(Modifier.height(16.dp))
+
+            // ── Costo ─────────────────────────────────────────────────────────
+            // Genera la voce in Spese famiglia: si scrive qui, una volta sola,
+            // e non va riportato a mano fra le spese.
+            ExamSectionLabel(stringResource(R.string.health_exam_cost))
+            OutlinedTextField(
+                value = state.costText,
+                onValueChange = viewModel::setCostText,
+                placeholder = { Text("0,00") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                suffix = { Text("€") },
+                supportingText = { Text(stringResource(R.string.health_cost_expense_hint)) },
             )
             Spacer(Modifier.height(16.dp))
 

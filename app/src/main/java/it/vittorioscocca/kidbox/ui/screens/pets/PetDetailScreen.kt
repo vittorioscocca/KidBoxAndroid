@@ -1,5 +1,14 @@
 package it.vittorioscocca.kidbox.ui.screens.pets
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -66,9 +75,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import it.vittorioscocca.kidbox.data.local.entity.PetEntity
 import it.vittorioscocca.kidbox.data.local.entity.PetEventEntity
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
@@ -81,14 +93,23 @@ import it.vittorioscocca.kidbox.ui.components.IosFormDivider
 import it.vittorioscocca.kidbox.ui.components.IosGroupedCard
 import it.vittorioscocca.kidbox.ui.components.IosPlainTextFieldRow
 import it.vittorioscocca.kidbox.ui.components.KidBoxIosFormTopBar
+import it.vittorioscocca.kidbox.ui.screens.health.attachments.HealthAttachmentsCard
+import it.vittorioscocca.kidbox.ui.screens.health.attachments.KidBoxDocumentPickerSheet
 import it.vittorioscocca.kidbox.ui.theme.KidBoxColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
+import java.io.File
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import java.util.UUID
 import it.vittorioscocca.kidbox.ui.screens.life.petEventTypeLabel
+
+private enum class PetAttachmentPickTarget { Pet, EventDraft }
+
+/** Quanti allegati stanno nella scheda animale prima di "Vedi tutti". */
+private const val PET_ATTACHMENTS_PREVIEW = 4
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -107,9 +128,76 @@ fun PetDetailScreen(
     var confirmDeletePet by remember { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
 
+    val eventDraftAttachments by viewModel.eventDraftAttachments.collectAsStateWithLifecycle()
+    val petAttachments by viewModel.petAttachments.collectAsStateWithLifecycle()
+    val attachmentUploading by viewModel.attachmentUploading.collectAsStateWithLifecycle()
+    val openFileEvent by viewModel.openFileEvent.collectAsStateWithLifecycle()
+    val attachmentError by viewModel.attachmentError.collectAsStateWithLifecycle()
+    // L'id dell'evento esiste prima dell'evento: gli allegati caricati mentre
+    // compili vanno taggati con l'id che avrà una volta salvato.
+    var pendingEventDraftId by remember { mutableStateOf<String?>(null) }
+    // L'evento salvato che stai guardando: stessa scheda del nuovo evento, ma
+    // compilata, e con gli allegati che sono già i suoi.
+    var editingEvent by remember { mutableStateOf<PetEventEntity?>(null) }
+    var confirmDeleteEvent by remember { mutableStateOf<PetEventEntity?>(null) }
+    var showKidBoxPicker by remember { mutableStateOf(false) }
+    var attachmentTarget by remember { mutableStateOf(PetAttachmentPickTarget.EventDraft) }
+    var showAllAttachments by remember { mutableStateOf(false) }
+
     val kb = MaterialTheme.kidBoxColors
     val orange = Color(0xFFFF6B00)
     val context = LocalContext.current
+
+    LaunchedEffect(attachmentError) {
+        attachmentError?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            viewModel.consumeAttachmentError()
+        }
+    }
+    LaunchedEffect(openFileEvent) {
+        openFileEvent?.let { (mime, file) ->
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, mime)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            runCatching { context.startActivity(intent) }
+            viewModel.consumeOpenFileEvent()
+        }
+    }
+
+    val petCamDir = remember { File(context.cacheDir, "pets-camera").apply { mkdirs() } }
+    val petCameraFile = remember { File(petCamDir, "pet_attach_tmp.jpg") }
+    val petCameraUri = remember(petCameraFile) {
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", petCameraFile)
+    }
+
+    // Le due sorgenti di allegati convivono: la scheda dell'animale e la bozza
+    // dell'evento. Senza un bersaglio esplicito una foto scattata dalla scheda
+    // finirebbe attaccata all'evento aperto per ultimo.
+    fun uploadUri(uri: Uri) {
+        when (attachmentTarget) {
+            PetAttachmentPickTarget.Pet -> viewModel.uploadPetAttachment(uri)
+            PetAttachmentPickTarget.EventDraft -> viewModel.uploadEventDraftAttachment(uri)
+        }
+    }
+
+    val takePictureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        if (ok) uploadUri(petCameraUri)
+    }
+    val cameraPermLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            takePictureLauncher.launch(petCameraUri)
+        } else {
+            Toast.makeText(context, context.getString(R.string.life_camera_denied), Toast.LENGTH_SHORT).show()
+        }
+    }
+    val pickPhotoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { uploadUri(it) }
+    }
+    val pickFileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { uploadUri(it) }
+    }
 
     LaunchedEffect(pet?.id) {
         val p = pet ?: return@LaunchedEffect
@@ -118,6 +206,44 @@ fun PetDetailScreen(
             AppAnalytics.contentSharedRead(context, "pets")
         }
     }
+
+    if (showAllAttachments) {
+        // Schermata vera e non foglio: qui si scorre, si apre e si elimina, e
+        // una finestra sovrapposta stringerebbe di nuovo tutto.
+        PetAttachmentsScreen(
+            attachments = petAttachments,
+            isUploading = attachmentUploading,
+            onBack = { showAllAttachments = false },
+            onOpen = { viewModel.openAttachment(it) },
+            onDelete = { viewModel.deleteAttachment(it) },
+            onAddFile = {
+                attachmentTarget = PetAttachmentPickTarget.Pet
+                pickFileLauncher.launch(arrayOf("*/*"))
+            },
+            onAddPhoto = {
+                attachmentTarget = PetAttachmentPickTarget.Pet
+                pickPhotoLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
+            },
+            onTakePhoto = {
+                attachmentTarget = PetAttachmentPickTarget.Pet
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                    PackageManager.PERMISSION_GRANTED
+                ) {
+                    takePictureLauncher.launch(petCameraUri)
+                } else {
+                    cameraPermLauncher.launch(Manifest.permission.CAMERA)
+                }
+            },
+            onPickKidBox = {
+                attachmentTarget = PetAttachmentPickTarget.Pet
+                showKidBoxPicker = true
+            },
+            kb = kb,
+            orange = orange,
+        )
+    } else {
 
     Scaffold(
         containerColor = kb.background,
@@ -137,7 +263,13 @@ fun PetDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showAddEvent = true }) {
+                    IconButton(
+                        onClick = {
+                            pendingEventDraftId = UUID.randomUUID().toString()
+                            viewModel.bindEventDraftAttachments(pendingEventDraftId)
+                            showAddEvent = true
+                        },
+                    ) {
                         Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.pets_new_event_cd), tint = orange)
                     }
                     IconButton(onClick = { showEditPet = true }) {
@@ -193,6 +325,7 @@ fun PetDetailScreen(
             item {
                 PetHeaderCard(p = p, kb = kb)
             }
+
             item {
                 Text(
                     stringResource(R.string.pets_section_events_history),
@@ -222,6 +355,10 @@ fun PetDetailScreen(
                                     ev = ev,
                                     orange = orange,
                                     kb = kb,
+                                    onClick = {
+                                        editingEvent = ev
+                                        viewModel.bindEventDraftAttachments(ev.id)
+                                    },
                                 )
                                 if (index < events.lastIndex) {
                                     HorizontalDivider(color = kb.divider, thickness = 1.dp)
@@ -271,16 +408,214 @@ fun PetDetailScreen(
                     }
                 }
             }
+            // Allegati dell'animale: libretto sanitario, pedigree, referti.
+            // Finiscono in Documenti › Animali domestici, la stessa cartella
+            // degli allegati degli eventi.
+            item {
+                Text(
+                    stringResource(R.string.life_attachments),
+                    color = kb.subtitle,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
+            }
+            item {
+                HealthAttachmentsCard(
+                    // In scheda solo i primi quattro: la lista intera farebbe
+                    // scorrere la scheda dell'animale per minuti. Il resto sta
+                    // dietro "Vedi tutti".
+                    attachments = petAttachments.take(PET_ATTACHMENTS_PREVIEW),
+                    tintColor = orange,
+                    isUploading = attachmentUploading,
+                    onPickFile = {
+                        attachmentTarget = PetAttachmentPickTarget.Pet
+                        pickFileLauncher.launch(arrayOf("*/*"))
+                    },
+                    onPickPhoto = {
+                        attachmentTarget = PetAttachmentPickTarget.Pet
+                        pickPhotoLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    },
+                    onTakePhoto = {
+                        attachmentTarget = PetAttachmentPickTarget.Pet
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                            PackageManager.PERMISSION_GRANTED
+                        ) {
+                            takePictureLauncher.launch(petCameraUri)
+                        } else {
+                            cameraPermLauncher.launch(Manifest.permission.CAMERA)
+                        }
+                    },
+                    onOpenAttachment = { viewModel.openAttachment(it) },
+                    onDeleteAttachment = { viewModel.deleteAttachment(it) },
+                    onPickFromKidBoxDocuments = {
+                        attachmentTarget = PetAttachmentPickTarget.Pet
+                        showKidBoxPicker = true
+                    },
+                )
+            }
+
+            if (petAttachments.size > PET_ATTACHMENTS_PREVIEW) {
+                item {
+                    TextButton(
+                        onClick = { showAllAttachments = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            stringResource(R.string.pets_attachments_see_all, petAttachments.size),
+                            color = orange,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
+
             item { Spacer(Modifier.height(24.dp)) }
         }
     }
 
-    if (showAddEvent) {
-        AddPetEventDialog(
-            onDismiss = { showAddEvent = false },
-            onConfirm = { title, type, date, nextDue, vet, cost, notes, reminder ->
-                viewModel.addPetEvent(title, type, date, nextDue, vet, cost, notes, reminder) { err -> toast = err }
+    } // fine else: scheda animale
+
+    if (showAddEvent && pendingEventDraftId != null) {
+        PetEventDialog(
+            initial = null,
+            attachments = eventDraftAttachments,
+            attachmentUploading = attachmentUploading,
+            onDismiss = {
+                // Chi annulla non lascia allegati appesi in Documenti: senza
+                // evento a cui appartenere non li ritroverebbe più nessuno.
+                pendingEventDraftId?.let { viewModel.discardDraftAttachments(it) }
+                viewModel.bindEventDraftAttachments(null)
+                pendingEventDraftId = null
                 showAddEvent = false
+            },
+            onConfirm = { title, type, date, nextDue, vet, cost, notes, reminder ->
+                viewModel.addPetEvent(
+                    pendingEventDraftId, title, type, date, nextDue, vet, cost, notes, reminder,
+                ) { err -> toast = err }
+                viewModel.bindEventDraftAttachments(null)
+                pendingEventDraftId = null
+                showAddEvent = false
+            },
+            onTakePhoto = {
+                attachmentTarget = PetAttachmentPickTarget.EventDraft
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                    PackageManager.PERMISSION_GRANTED
+                ) {
+                    takePictureLauncher.launch(petCameraUri)
+                } else {
+                    cameraPermLauncher.launch(Manifest.permission.CAMERA)
+                }
+            },
+            onPickPhoto = {
+                attachmentTarget = PetAttachmentPickTarget.EventDraft
+                pickPhotoLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
+            },
+            onPickFile = {
+                attachmentTarget = PetAttachmentPickTarget.EventDraft
+                pickFileLauncher.launch(arrayOf("*/*"))
+            },
+            onPickKidBox = {
+                attachmentTarget = PetAttachmentPickTarget.EventDraft
+                showKidBoxPicker = true
+            },
+            onOpenAttachment = { viewModel.openAttachment(it) },
+            onDeleteAttachment = { viewModel.deleteAttachment(it) },
+        )
+    }
+
+    editingEvent?.let { existing ->
+        PetEventDialog(
+            initial = existing,
+            attachments = eventDraftAttachments,
+            attachmentUploading = attachmentUploading,
+            onDismiss = {
+                // Niente pulizia degli allegati: qui appartengono a un evento
+                // che esiste, non a una bozza abbandonata.
+                viewModel.bindEventDraftAttachments(null)
+                editingEvent = null
+            },
+            onConfirm = { title, type, date, nextDue, vet, cost, notes, reminder ->
+                viewModel.updatePetEvent(
+                    existing.copy(
+                        title = title,
+                        eventType = type,
+                        date = date,
+                        nextDueDate = nextDue,
+                        vetName = vet,
+                        cost = cost,
+                        notes = notes,
+                        reminderEnabled = reminder,
+                    ),
+                ) { err -> toast = err }
+                viewModel.bindEventDraftAttachments(null)
+                editingEvent = null
+            },
+            onDelete = { confirmDeleteEvent = existing },
+            onTakePhoto = {
+                attachmentTarget = PetAttachmentPickTarget.EventDraft
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                    PackageManager.PERMISSION_GRANTED
+                ) {
+                    takePictureLauncher.launch(petCameraUri)
+                } else {
+                    cameraPermLauncher.launch(Manifest.permission.CAMERA)
+                }
+            },
+            onPickPhoto = {
+                attachmentTarget = PetAttachmentPickTarget.EventDraft
+                pickPhotoLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
+            },
+            onPickFile = {
+                attachmentTarget = PetAttachmentPickTarget.EventDraft
+                pickFileLauncher.launch(arrayOf("*/*"))
+            },
+            onPickKidBox = {
+                attachmentTarget = PetAttachmentPickTarget.EventDraft
+                showKidBoxPicker = true
+            },
+            onOpenAttachment = { viewModel.openAttachment(it) },
+            onDeleteAttachment = { viewModel.deleteAttachment(it) },
+        )
+    }
+
+    confirmDeleteEvent?.let { target ->
+        AlertDialog(
+            onDismissRequest = { confirmDeleteEvent = null },
+            title = { Text(stringResource(R.string.pets_delete_event_confirm_title)) },
+            text = { Text(stringResource(R.string.pets_delete_event_confirm_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deletePetEvent(target) { err -> toast = err }
+                        confirmDeleteEvent = null
+                        viewModel.bindEventDraftAttachments(null)
+                        editingEvent = null
+                    },
+                ) { Text(stringResource(R.string.pets_action_delete), color = Color(0xFFE53935)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDeleteEvent = null }) {
+                    Text(stringResource(R.string.pets_action_cancel))
+                }
+            },
+        )
+    }
+
+    val familyIdForPicker = pet?.familyId.orEmpty()
+    if (showKidBoxPicker && familyIdForPicker.isNotBlank()) {
+        KidBoxDocumentPickerSheet(
+            familyId = familyIdForPicker,
+            onDismiss = { showKidBoxPicker = false },
+            onPickedUri = { uri ->
+                uploadUri(uri)
+                showKidBoxPicker = false
             },
         )
     }
@@ -472,11 +807,13 @@ private fun PetEventRow(
     ev: PetEventEntity,
     orange: Color,
     kb: KidBoxColorScheme,
+    onClick: () -> Unit,
 ) {
     val nextDuePillBackground = orange.copy(alpha = 0.2f)
     Row(
         Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(16.dp),
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -528,8 +865,19 @@ private fun PetEventRow(
 }
 
 @Composable
-private fun AddPetEventDialog(
+private fun PetEventDialog(
+    /** `null` per un evento nuovo; l'evento salvato quando lo apri dallo storico. */
+    initial: PetEventEntity?,
+    attachments: List<KBDocumentEntity>,
+    attachmentUploading: Boolean,
     onDismiss: () -> Unit,
+    onTakePhoto: () -> Unit,
+    onPickPhoto: () -> Unit,
+    onPickFile: () -> Unit,
+    onPickKidBox: () -> Unit,
+    onOpenAttachment: (KBDocumentEntity) -> Unit,
+    onDeleteAttachment: (KBDocumentEntity) -> Unit,
+    onDelete: (() -> Unit)? = null,
     onConfirm: (
         title: String,
         type: String,
@@ -542,13 +890,15 @@ private fun AddPetEventDialog(
     ) -> Unit,
 ) {
     val context = LocalContext.current
-    var title by remember { mutableStateOf("") }
-    var type by remember { mutableStateOf("vaccine") }
-    var dateMillis by remember { mutableStateOf(System.currentTimeMillis()) }
-    var nextDue by remember { mutableStateOf<Long?>(null) }
-    var vet by remember { mutableStateOf("") }
-    var costText by remember { mutableStateOf("") }
-    var notes by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf(initial?.title.orEmpty()) }
+    var type by remember { mutableStateOf(initial?.eventType ?: "vaccine") }
+    var dateMillis by remember { mutableStateOf(initial?.date ?: System.currentTimeMillis()) }
+    var nextDue by remember { mutableStateOf(initial?.nextDueDate) }
+    var vet by remember { mutableStateOf(initial?.vetName.orEmpty()) }
+    var costText by remember {
+        mutableStateOf(initial?.cost?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() }.orEmpty())
+    }
+    var notes by remember { mutableStateOf(initial?.notes.orEmpty()) }
     var typeMenuOpen by remember { mutableStateOf(false) }
     val types = listOf("vaccine", "vet_visit", "medication", "grooming", "other")
     val pickDate = rememberLifeDatePicker { dateMillis = it }
@@ -567,7 +917,10 @@ private fun AddPetEventDialog(
         ) {
             Column(Modifier.fillMaxSize()) {
                 KidBoxIosFormTopBar(
-                    title = stringResource(R.string.pets_new_event_dialog_title),
+                    title = stringResource(
+                        if (initial == null) R.string.pets_new_event_dialog_title
+                        else R.string.pets_edit_event_dialog_title,
+                    ),
                     onCancel = onDismiss,
                     onSave = {
                         if (canSave) {
@@ -725,6 +1078,39 @@ private fun AddPetEventDialog(
                             ),
                             textStyle = MaterialTheme.typography.bodyMedium,
                         )
+                    }
+
+                    Text(
+                        stringResource(R.string.life_attachments),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = kb.subtitle,
+                        modifier = Modifier.padding(start = 4.dp),
+                    )
+                    HealthAttachmentsCard(
+                        attachments = attachments,
+                        tintColor = orange,
+                        isUploading = attachmentUploading,
+                        onPickFile = onPickFile,
+                        onPickPhoto = onPickPhoto,
+                        onTakePhoto = onTakePhoto,
+                        onOpenAttachment = onOpenAttachment,
+                        onDeleteAttachment = onDeleteAttachment,
+                        onPickFromKidBoxDocuments = onPickKidBox,
+                    )
+
+                    if (onDelete != null) {
+                        IosGroupedCard(kb) {
+                            Text(
+                                stringResource(R.string.pets_delete_event_item),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = Color(0xFFE53935),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(onClick = onDelete)
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -915,6 +1301,79 @@ private fun EditPetDialog(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * L'elenco completo degli allegati dell'animale: si apre da "Vedi tutti".
+ *
+ * Riusa la stessa scheda della vista compatta, che sa già aprire ed eliminare
+ * riga per riga — cambia solo che qui non c'è un tetto di quattro.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PetAttachmentsScreen(
+    attachments: List<KBDocumentEntity>,
+    isUploading: Boolean,
+    onBack: () -> Unit,
+    onOpen: (KBDocumentEntity) -> Unit,
+    onDelete: (KBDocumentEntity) -> Unit,
+    onAddFile: () -> Unit,
+    onAddPhoto: () -> Unit,
+    onTakePhoto: () -> Unit,
+    onPickKidBox: () -> Unit,
+    kb: KidBoxColorScheme,
+    orange: Color,
+) {
+    BackHandler(onBack = onBack)
+
+    Scaffold(
+        containerColor = kb.background,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        stringResource(R.string.life_attachments),
+                        color = kb.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = kb.title)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = kb.background,
+                    titleContentColor = kb.title,
+                    navigationIconContentColor = kb.title,
+                ),
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item {
+                HealthAttachmentsCard(
+                    attachments = attachments,
+                    tintColor = orange,
+                    isUploading = isUploading,
+                    onPickFile = onAddFile,
+                    onPickPhoto = onAddPhoto,
+                    onTakePhoto = onTakePhoto,
+                    onOpenAttachment = onOpen,
+                    onDeleteAttachment = onDelete,
+                    onPickFromKidBoxDocuments = onPickKidBox,
+                )
+            }
+            item { Spacer(Modifier.height(24.dp)) }
         }
     }
 }

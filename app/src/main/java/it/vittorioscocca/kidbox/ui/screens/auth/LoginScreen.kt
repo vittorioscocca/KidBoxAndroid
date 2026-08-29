@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.data.local.KBFeatureFlags
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
@@ -157,6 +158,10 @@ fun LoginScreen(
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val resetSent by viewModel.resetPasswordSent.collectAsStateWithLifecycle()
     val registrationPending by viewModel.registrationPendingVerification.collectAsStateWithLifecycle()
+    // Interruttore remoto del pulsante Facebook, vedi KBFeatureFlags. Come flow
+    // e non lettura secca perché il valore può arrivare da Remote Config mentre
+    // questa schermata è già a video.
+    val isFacebookLoginEnabled by KBFeatureFlags.facebookLoginEnabled.collectAsStateWithLifecycle()
 
     var showEmailSheet by remember { mutableStateOf(false) }
     var emailFormReachedSuccess by remember { mutableStateOf(false) }
@@ -255,13 +260,19 @@ fun LoginScreen(
                 ) {
                     GoogleLoginIcon(iconSize = metrics.iconSize)
                 }
-                SocialLoginButton(
-                    label = socialLoginLabel(SocialProvider.FACEBOOK, metrics.compactLabels),
-                    enabled = !isBusy,
-                    metrics = metrics,
-                    onClick = { viewModel.signInFacebook(activity) },
-                ) {
-                    FacebookLoginIcon(iconSize = metrics.iconSize)
+                // Nascosto finché l'app Meta è in modalità sviluppo: chi lo
+                // toccava riceveva «questa app non funziona», che si legge come
+                // un guasto di KidBox. Torna da solo quando il flag remoto passa
+                // a true, senza nuova release.
+                if (isFacebookLoginEnabled) {
+                    SocialLoginButton(
+                        label = socialLoginLabel(SocialProvider.FACEBOOK, metrics.compactLabels),
+                        enabled = !isBusy,
+                        metrics = metrics,
+                        onClick = { viewModel.signInFacebook(activity) },
+                    ) {
+                        FacebookLoginIcon(iconSize = metrics.iconSize)
+                    }
                 }
             }
 

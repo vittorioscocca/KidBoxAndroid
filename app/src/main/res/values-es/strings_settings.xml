@@ -134,6 +134,15 @@
     <string name="settings_invite_title">Invitar</string>
     <string name="settings_invite_send_link">Enviar enlace de invitación</string>
     <string name="settings_invite_copy_link">Copiar enlace</string>
+    <string name="quick_invite_title">Invitar a un familiar</string>
+    <string name="quick_invite_subtitle">Quien abra el enlace entra en la familia y recibe la clave de cifrado.</string>
+    <string name="quick_invite_create">Crear invitación</string>
+    <string name="quick_invite_creating">Creando invitación…</string>
+    <string name="quick_invite_validity">Válido 24 horas y una sola vez.</string>
+    <string name="quick_invite_link_note">El enlace contiene la clave: válido 24 horas y una sola vez.</string>
+    <string name="quick_invite_send">Enviar enlace</string>
+    <string name="quick_invite_copy">Copiar</string>
+    <string name="quick_invite_close">Cerrar</string>
     <string name="settings_invite_share_text">Únete a nuestra familia en KidBox:\n%1$s</string>
     <string name="settings_invite_share_subject">Únete a nuestra familia en KidBox</string>
     <string name="invite_qr_safer">La cámara lee la clave: no pasa por chats, correo ni copias de seguridad.</string>
@@ -179,6 +188,7 @@
     <string name="settings_family_generate_share">Genera un código y compártelo.</string>
     <string name="settings_family_use_code_hint">Usa un código si quieres unirte a otra familia.</string>
     <string name="settings_family_leave">Salir de la familia</string>
+    <string name="settings_family_card_leave">Abandonar familia</string>
     <string name="settings_family_leave_sub">Perderás el acceso a los datos compartidos.</string>
     <string name="settings_family_remove_q">¿Quitar a este miembro?</string>
     <string name="settings_family_remove_body">Esta persona ya no podrá acceder a los datos de la familia desde esta cuenta.</string>
@@ -278,4 +288,6 @@
     <string name="settings_messages_chat_sub">Permite activar o desactivar el chat de familia</string>
     <string name="settings_messages_chat_note">La elección se aplica a todos tus dispositivos. Los demás miembros siguen chateando entre ellos y recuperarás los mensajes al reactivarlo.</string>
     <string name="settings_notif_chat_disabled">El chat está desactivado en Ajustes → Mensajes.</string>
+    <string name="settings_section_home">Inicio</string>
+    <string name="settings_home_show_dashboard">Mostrar el Panel en la página de inicio</string>
 </resources>

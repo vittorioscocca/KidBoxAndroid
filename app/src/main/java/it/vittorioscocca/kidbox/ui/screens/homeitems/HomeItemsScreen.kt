@@ -493,6 +493,7 @@ fun HomeItemsScreen(
                     note = note,
                     reminderOn = reminderOn,
                     presetPaymentId = pid,
+                    expenseFallbackTitle = context.getString(R.string.home_items_expense_fallback_title),
                 ) { err -> toast = err }
                 paymentAddDraftId = null
                 showAddPayment = false

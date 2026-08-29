@@ -64,6 +64,16 @@ import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.activity.compose.BackHandler
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -127,6 +137,9 @@ import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.ReceiptLong
 
 @OptIn(ExperimentalMaterial3Api::class)
+/** Quante spese stanno in home prima di "Vedi tutte". */
+private const val EXPENSES_PREVIEW_COUNT = 4
+
 @Composable
 fun ExpensesHomeScreen(
     familyId: String,
@@ -148,6 +161,7 @@ fun ExpensesHomeScreen(
     var selectedKidBoxDocumentId by remember { mutableStateOf<String?>(null) }
     var consumedHighlightExpenseId by rememberSaveable(highlightExpenseId) { mutableStateOf(false) }
     var isSelectingExpenses by rememberSaveable { mutableStateOf(false) }
+    var showAllExpenses by rememberSaveable { mutableStateOf(false) }
     var selectedExpenseIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showDeleteSelectedConfirm by rememberSaveable { mutableStateOf(false) }
     var isOpeningAttachment by rememberSaveable { mutableStateOf(false) }
@@ -237,6 +251,20 @@ fun ExpensesHomeScreen(
 
     val hasAnyExpense = state.expenses.isNotEmpty()
 
+    // Schermata vera e non foglio: qui si cerca una spesa, e una finestra
+    // sovrapposta stringerebbe la lista.
+    if (showAllExpenses) {
+        AllExpensesScreen(
+            state = state,
+            onBack = { showAllExpenses = false },
+            onSetPeriod = viewModel::setPeriod,
+            onSelect = {
+                selectedExpense = it
+                showDetail = true
+            },
+        )
+    } else {
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -293,13 +321,17 @@ fun ExpensesHomeScreen(
                     count = state.visibleExpenses.size,
                 )
                 Spacer(Modifier.height(12.dp))
-                MonthlyChartCard(bars = state.monthlyBars)
+                // Due grafici, non due card: sono la stessa domanda ("quanto
+                // spendiamo") vista in due modi.
+                ExpenseChartsCarousel(bars = state.monthlyBars)
                 Spacer(Modifier.height(12.dp))
                 CategoryChartCard(slices = state.categorySlices)
             }
             Spacer(Modifier.height(12.dp))
             ExpenseListCard(
                 showChrome = hasAnyExpense,
+                maxItems = EXPENSES_PREVIEW_COUNT,
+                onSeeAll = { showAllExpenses = true },
                 onAddExpense = { showEditor = true },
                 expenses = state.visibleExpenses,
                 categories = state.categories,
@@ -322,7 +354,8 @@ fun ExpensesHomeScreen(
             )
             Spacer(Modifier.height(24.dp))
         }
-    }
+        }
+    } // fine else: home spese
 
     if (showEditor) {
         AddEditExpenseSheet(
@@ -599,6 +632,9 @@ private fun CategoryChartCard(slices: List<ExpenseCategorySlice>) {
 @Composable
 private fun ExpenseListCard(
     expenses: List<KBExpenseEntity>,
+    /** Quante righe mostrare; `null` = tutte (schermata "Tutte le spese"). */
+    maxItems: Int? = null,
+    onSeeAll: (() -> Unit)? = null,
     categories: List<KBExpenseCategoryEntity>,
     selecting: Boolean,
     selectedExpenseIds: Set<String>,
@@ -667,7 +703,11 @@ private fun ExpenseListCard(
                     onPrimary = onAddExpense,
                 )
             } else {
-                expenses.forEachIndexed { index, expense ->
+                // In home solo le ultime quattro: sopra ci sono totali e
+                // grafici, ed è quello che si viene a vedere. L'elenco intero
+                // sta dietro "Vedi tutte".
+                val visible = if (maxItems != null) expenses.take(maxItems) else expenses
+                visible.forEachIndexed { index, expense ->
                     val category = categories.firstOrNull { it.id == expense.categoryId }
                     val iconTint = parseHexColor(category?.colorHex ?: "#9E9E9E")
                     val selected = expense.id in selectedExpenseIds
@@ -725,12 +765,27 @@ private fun ExpenseListCard(
                         }
                         Text(formatEuro(expense.amount), fontWeight = FontWeight.Bold, color = MaterialTheme.kidBoxColors.title)
                     }
-                    if (index < expenses.lastIndex) {
+                    if (index < visible.lastIndex) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(1.dp)
                                 .background(MaterialTheme.kidBoxColors.divider),
+                        )
+                    }
+                }
+
+                if (onSeeAll != null && maxItems != null && expenses.size > maxItems && !selecting) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(MaterialTheme.kidBoxColors.divider),
+                    )
+                    TextButton(onClick = onSeeAll, modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            stringResource(R.string.expenses_see_all, expenses.size),
+                            fontWeight = FontWeight.SemiBold,
                         )
                     }
                 }
@@ -1548,5 +1603,232 @@ private fun categoryIcon(category: KBExpenseCategoryEntity?): androidx.compose.u
         raw.contains("desktop") || name.contains("elettron") -> Icons.Default.DesktopWindows
         raw.contains("paw") || name.contains("animal") -> Icons.Default.Pets
         else -> Icons.Default.MoreHoriz
+    }
+}
+
+/**
+ * L'elenco completo delle spese, con gli stessi filtri di periodo della home.
+ *
+ * Nessun secondo stato: periodo e lista vengono dal `ExpensesViewModel` già in
+ * uso, quindi cambiando finestra qui cambia anche il totale in home — è la
+ * stessa domanda, fatta da due punti diversi.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AllExpensesScreen(
+    state: ExpensesUiState,
+    onBack: () -> Unit,
+    onSetPeriod: (ExpensePeriod) -> Unit,
+    onSelect: (KBExpenseEntity) -> Unit,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    BackHandler(onBack = onBack)
+
+    Scaffold(
+        containerColor = kb.background,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        stringResource(R.string.expenses_all_title),
+                        color = kb.title,
+                        fontWeight = FontWeight.Bold,
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = kb.title)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = kb.background,
+                    titleContentColor = kb.title,
+                    navigationIconContentColor = kb.title,
+                ),
+            )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                ExpensePeriod.entries.forEach { p ->
+                    PeriodPill(
+                        label = stringResource(p.labelRes),
+                        selected = state.period == p,
+                        onClick = { onSetPeriod(p) },
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            ExpenseTotalCard(total = state.totalAmount, count = state.visibleExpenses.size)
+            Spacer(Modifier.height(12.dp))
+
+            ExpenseListCard(
+                expenses = state.visibleExpenses,
+                categories = state.categories,
+                selecting = false,
+                selectedExpenseIds = emptySet(),
+                onToggleSelecting = {},
+                onToggleExpenseSelection = {},
+                onDeleteSelected = {},
+                onSelect = onSelect,
+                onAddExpense = {},
+                showChrome = true,
+            )
+
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+/**
+ * Due pagine: l'andamento mese per mese e la media mensile del periodo scelto.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ExpenseChartsCarousel(bars: List<MonthlyExpenseBar>) {
+    val pagerState = rememberPagerState(pageCount = { 2 })
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        HorizontalPager(state = pagerState) { page ->
+            when (page) {
+                0 -> MonthlyChartCard(bars = bars)
+                else -> MonthlyAverageChartCard(bars = bars)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            repeat(2) { index ->
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 3.dp)
+                        .size(7.dp)
+                        .background(
+                            if (pagerState.currentPage == index) {
+                                Color(0xFF1E88E5)
+                            } else {
+                                MaterialTheme.kidBoxColors.subtitle.copy(alpha = 0.3f)
+                            },
+                            CircleShape,
+                        ),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Media mensile del periodo scelto, con la spezzata dei mesi e la linea
+ * tratteggiata della media.
+ *
+ * La media si calcola su TUTTI i mesi del periodo, compresi quelli a zero: un
+ * mese senza spese è un mese in cui non si è speso, non un mese che non esiste,
+ * e ignorarlo gonfierebbe la media.
+ */
+@Composable
+private fun MonthlyAverageChartCard(bars: List<MonthlyExpenseBar>) {
+    val average = if (bars.isEmpty()) 0.0 else bars.sumOf { it.total } / bars.size
+    val maxValue = (bars.maxOfOrNull { it.total } ?: 0.0).coerceAtLeast(1.0)
+    val lineColor = Color(0xFF1E88E5)
+    val averageColor = MaterialTheme.kidBoxColors.subtitle
+
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ShowChart,
+                    contentDescription = null,
+                    tint = MaterialTheme.kidBoxColors.title,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    stringResource(R.string.expenses_monthly_average),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 30.sp,
+                    color = MaterialTheme.kidBoxColors.title,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    formatEuro(average),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = lineColor,
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp),
+            ) {
+                if (bars.isEmpty()) return@Canvas
+                val stepX = if (bars.size > 1) size.width / (bars.size - 1) else 0f
+                fun yFor(value: Double): Float =
+                    size.height - (value / maxValue).toFloat().coerceIn(0f, 1f) * size.height
+
+                // Linea della media: serve a vedere quali mesi stanno sopra.
+                val avgY = yFor(average)
+                drawLine(
+                    color = averageColor,
+                    start = Offset(0f, avgY),
+                    end = Offset(size.width, avgY),
+                    strokeWidth = 2f,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f)),
+                )
+
+                val points = bars.mapIndexed { index, bar ->
+                    Offset(if (bars.size > 1) index * stepX else size.width / 2f, yFor(bar.total))
+                }
+                for (i in 0 until points.size - 1) {
+                    drawLine(
+                        color = lineColor,
+                        start = points[i],
+                        end = points[i + 1],
+                        strokeWidth = 6f,
+                        cap = StrokeCap.Round,
+                    )
+                }
+                points.forEach { drawCircle(color = lineColor, radius = 8f, center = it) }
+            }
+
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                bars.forEach { bar ->
+                    Text(
+                        bar.label,
+                        fontSize = 10.sp,
+                        color = MaterialTheme.kidBoxColors.subtitle,
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.expenses_monthly_average_hint),
+                fontSize = 11.sp,
+                color = MaterialTheme.kidBoxColors.subtitle,
+            )
+        }
     }
 }

@@ -19,6 +19,13 @@ interface KBVaccineDao {
     )
     fun observeByFamilyAndChild(familyId: String, childId: String): Flow<List<KBVaccineEntity>>
 
+    /** Tutti i vaccini della famiglia: la Dashboard riassume la famiglia, non il singolo bambino. */
+    @Query(
+        "SELECT * FROM kb_vaccines WHERE familyId = :familyId AND isDeleted = 0 " +
+            "ORDER BY scheduledDateEpochMillis ASC",
+    )
+    fun observeByFamilyId(familyId: String): Flow<List<KBVaccineEntity>>
+
     @Query(
         "SELECT * FROM kb_vaccines WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 " +
             "ORDER BY scheduledDateEpochMillis ASC",

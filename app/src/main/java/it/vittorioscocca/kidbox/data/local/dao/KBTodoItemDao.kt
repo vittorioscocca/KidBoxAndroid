@@ -20,6 +20,14 @@ interface KBTodoItemDao {
     @Query("SELECT * FROM kb_todo_items WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 ORDER BY dueAtEpochMillis")
     suspend fun getByFamilyAndChild(familyId: String, childId: String): List<KBTodoItemEntity>
 
+    /**
+     * Tutti i to-do aperti della famiglia, senza filtro sul bambino: la Dashboard
+     * riassume la famiglia, e una famiglia senza bambini associati ha comunque
+     * i suoi to-do (stessa scelta fatta su iOS).
+     */
+    @Query("SELECT * FROM kb_todo_items WHERE familyId = :familyId AND isDeleted = 0 AND isDone = 0 ORDER BY dueAtEpochMillis")
+    fun observeOpenByFamilyId(familyId: String): Flow<List<KBTodoItemEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: KBTodoItemEntity)
 

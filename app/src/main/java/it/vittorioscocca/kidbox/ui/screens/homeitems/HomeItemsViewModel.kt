@@ -196,6 +196,7 @@ class HomeItemsViewModel @Inject constructor(
         note: String?,
         reminderOn: Boolean,
         presetPaymentId: String?,
+        expenseFallbackTitle: String,
         onError: (String) -> Unit,
     ) {
         if (familyId.isBlank()) return
@@ -214,6 +215,7 @@ class HomeItemsViewModel @Inject constructor(
                     note = note,
                     reminderOn = reminderOn,
                     presetPaymentId = presetPaymentId,
+                    expenseFallbackTitle = expenseFallbackTitle,
                 )
             }.onFailure { onError(it.message ?: "Errore") }
         }

@@ -21,6 +21,8 @@ data class KBMedicalVisit(
     val prescribedExamsJson: String?,
     val photoUrlsJson: String,
     val notes: String?,
+    val cost: Double? = null,
+    val linkedExpenseId: String? = null,
     val nextVisitDateEpochMillis: Long?,
     val nextVisitReason: String?,
     val visitStatusRaw: String?,

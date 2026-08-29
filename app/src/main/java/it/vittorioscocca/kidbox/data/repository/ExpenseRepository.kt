@@ -150,6 +150,65 @@ class ExpenseRepository @Inject constructor(
         }
     }
 
+    /**
+     * La spesa di famiglia che nasce da un'altra scheda (intervento auto,
+     * scadenza di casa, visita, esame).
+     *
+     * Regole in un punto solo, come su iOS:
+     * - importo > 0 e nessuna spesa collegata → la crea;
+     * - importo > 0 e spesa già collegata → la aggiorna;
+     * - importo tolto → la spesa collegata sparisce.
+     *
+     * @return l'id da conservare nel `linkedExpenseId` della scheda, o `null`.
+     */
+    suspend fun syncLinkedExpense(
+        familyId: String,
+        linkedExpenseId: String?,
+        amount: Double?,
+        title: String,
+        fallbackTitle: String,
+        dateEpochMillis: Long,
+        notes: String?,
+        categorySlug: String,
+    ): String? {
+        val existing = linkedExpenseId?.let { expenseDao.getById(it) }?.takeIf { !it.isDeleted }
+
+        if ((amount ?: 0.0) <= 0.0) {
+            existing?.let { deleteExpenseLocal(it) }
+            runCatching { flushPending(familyId) }
+            return null
+        }
+
+        val effectiveTitle = title.trim().ifEmpty { fallbackTitle }
+        if (existing != null) {
+            updateExpenseLocal(
+                current = existing,
+                title = effectiveTitle,
+                amount = amount ?: 0.0,
+                dateEpochMillis = dateEpochMillis,
+                categoryId = existing.categoryId ?: defaultCategoryId(familyId, categorySlug),
+                notes = notes,
+                attachedDocumentId = existing.attachedDocumentId,
+            )
+            runCatching { flushPending(familyId) }
+            return existing.id
+        }
+
+        // La categoria deve esistere prima di agganciarcisi: su una famiglia che
+        // non ha mai aperto le Spese non è ancora stata creata.
+        seedDefaultCategories(familyId)
+        val created = createExpenseLocal(
+            familyId = familyId,
+            title = effectiveTitle,
+            amount = amount ?: 0.0,
+            dateEpochMillis = dateEpochMillis,
+            categoryId = defaultCategoryId(familyId, categorySlug),
+            notes = notes,
+        )
+        runCatching { flushPending(familyId) }
+        return created.id
+    }
+
     suspend fun createExpenseLocal(
         familyId: String,
         title: String,

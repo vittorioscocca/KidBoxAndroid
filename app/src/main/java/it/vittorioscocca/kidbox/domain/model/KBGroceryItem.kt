@@ -7,6 +7,7 @@ data class KBGroceryItem(
     val name: String,
     val category: String?,
     val notes: String?,
+    val quantity: Int?,
     val isPurchased: Boolean,
     val purchasedAtEpochMillis: Long?,
     val purchasedBy: String?,

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -19,12 +20,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -56,6 +60,7 @@ fun ThemeScreen(
 ) {
     BackHandler { onBack() }
     val current by viewModel.theme.collectAsStateWithLifecycle()
+    val showDashboard by viewModel.showDashboard.collectAsStateWithLifecycle()
 
     val rows = listOf(
         ThemeRow(stringResource(R.string.settings_theme_light), Icons.Filled.WbSunny, AppTheme.LIGHT),
@@ -120,6 +125,57 @@ fun ThemeScreen(
                         color = MaterialTheme.kidBoxColors.divider,
                     )
                 }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(
+            text = stringResource(R.string.settings_section_home),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.kidBoxColors.subtitle,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp)
+                    .clickable { viewModel.setShowDashboard(!showDashboard) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.GridView,
+                        contentDescription = null,
+                        tint = Color(0xFFFF6B00),
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Spacer(modifier = Modifier.size(12.dp))
+                    Text(
+                        stringResource(R.string.settings_home_show_dashboard),
+                        fontSize = 16.sp,
+                        color = MaterialTheme.kidBoxColors.title,
+                    )
+                }
+                Switch(
+                    checked = showDashboard,
+                    onCheckedChange = { viewModel.setShowDashboard(it) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = Color(0xFFFF6B00),
+                    ),
+                )
             }
         }
     }

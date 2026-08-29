@@ -159,6 +159,8 @@ class FamilyLocationRepository @Inject constructor(
                     expiresAtEpochMillis = dto.expiresAtEpochMillis,
                     lastUpdateAtEpochMillis = dto.lastUpdateAtEpochMillis,
                     avatarUrl = dto.avatarUrl,
+                    batteryLevel = dto.batteryLevel,
+                    isCharging = dto.isCharging,
                 ),
             )
         }

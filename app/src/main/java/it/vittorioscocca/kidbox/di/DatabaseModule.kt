@@ -23,6 +23,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyPhotoDao
 import it.vittorioscocca.kidbox.data.local.dao.KBGroceryItemDao
+import it.vittorioscocca.kidbox.data.local.dao.KBShoppingTripDao
 import it.vittorioscocca.kidbox.data.local.dao.KBNoteDao
 import it.vittorioscocca.kidbox.data.local.dao.KBPackingItemDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTripDao
@@ -133,6 +134,71 @@ object DatabaseModule {
     private val MIGRATION_38_39 = object : Migration(38, 39) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE kb_todo_lists ADD COLUMN createdBy TEXT")
+        }
+    }
+
+    private val MIGRATION_39_40 = object : Migration(39, 40) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE kb_shared_locations ADD COLUMN batteryLevel INTEGER")
+            db.execSQL("ALTER TABLE kb_shared_locations ADD COLUMN isCharging INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
+    /**
+     * Quantità sui prodotti della lista e archivio delle spese fatte: lo
+     * scontrino di quello che si è spuntato al supermercato.
+     */
+    private val MIGRATION_40_41 = object : Migration(40, 41) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE kb_grocery_items ADD COLUMN quantity INTEGER")
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS kb_shopping_trips (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    familyId TEXT NOT NULL,
+                    storeName TEXT,
+                    total REAL NOT NULL,
+                    dateEpochMillis INTEGER NOT NULL,
+                    linesJson TEXT,
+                    notes TEXT,
+                    linkedExpenseId TEXT,
+                    isDeleted INTEGER NOT NULL,
+                    createdAtEpochMillis INTEGER NOT NULL,
+                    updatedAtEpochMillis INTEGER NOT NULL,
+                    updatedBy TEXT,
+                    createdBy TEXT,
+                    syncStateRaw INTEGER NOT NULL,
+                    lastSyncError TEXT,
+                    FOREIGN KEY(familyId) REFERENCES kb_families(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_shopping_trips_familyId ON kb_shopping_trips (familyId)")
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_kb_shopping_trips_dateEpochMillis " +
+                    "ON kb_shopping_trips (dateEpochMillis)",
+            )
+        }
+    }
+
+    private val MIGRATION_41_42 = object : Migration(41, 42) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE vehicle_events ADD COLUMN linkedExpenseId TEXT")
+        }
+    }
+
+    private val MIGRATION_42_43 = object : Migration(42, 43) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE house_payments ADD COLUMN linkedExpenseId TEXT")
+        }
+    }
+
+    private val MIGRATION_43_44 = object : Migration(43, 44) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE kb_medical_visits ADD COLUMN cost REAL")
+            db.execSQL("ALTER TABLE kb_medical_visits ADD COLUMN linkedExpenseId TEXT")
+            db.execSQL("ALTER TABLE kb_medical_exams ADD COLUMN cost REAL")
+            db.execSQL("ALTER TABLE kb_medical_exams ADD COLUMN linkedExpenseId TEXT")
         }
     }
 
@@ -1207,6 +1273,11 @@ object DatabaseModule {
         MIGRATION_36_37,
         MIGRATION_37_38,
         MIGRATION_38_39,
+        MIGRATION_39_40,
+        MIGRATION_40_41,
+        MIGRATION_41_42,
+        MIGRATION_42_43,
+        MIGRATION_43_44,
     )
         .fallbackToDestructiveMigration()
         .build()
@@ -1225,6 +1296,9 @@ object DatabaseModule {
 
     @Provides
     fun provideKBGroceryItemDao(database: KidBoxDatabase): KBGroceryItemDao = database.groceryItemDao()
+
+    @Provides
+    fun provideKBShoppingTripDao(database: KidBoxDatabase): KBShoppingTripDao = database.shoppingTripDao()
 
     @Provides
     fun provideKBEventDao(database: KidBoxDatabase): KBEventDao = database.eventDao()

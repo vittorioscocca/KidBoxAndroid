@@ -19,6 +19,10 @@ interface KBTreatmentDao {
     @Query("SELECT * FROM kb_treatments WHERE familyId = :familyId AND petId = :petId AND isDeleted = 0 ORDER BY startDateEpochMillis DESC")
     fun observeByFamilyAndPet(familyId: String, petId: String): Flow<List<KBTreatmentEntity>>
 
+    /** Tutte le terapie della famiglia: serve alla Dashboard, che non filtra per bambino. */
+    @Query("SELECT * FROM kb_treatments WHERE familyId = :familyId AND isDeleted = 0 ORDER BY startDateEpochMillis DESC")
+    fun observeByFamilyId(familyId: String): Flow<List<KBTreatmentEntity>>
+
     @Query("SELECT * FROM kb_treatments WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 ORDER BY startDateEpochMillis DESC")
     suspend fun listByFamilyAndChild(familyId: String, childId: String): List<KBTreatmentEntity>
 

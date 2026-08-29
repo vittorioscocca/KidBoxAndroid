@@ -98,6 +98,7 @@ import it.vittorioscocca.kidbox.ui.screens.health.HealthSubjectSelectorScreen
 import it.vittorioscocca.kidbox.ui.screens.health.HealthHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.health.HealthConnectAppScreen
 import it.vittorioscocca.kidbox.ui.screens.health.ClinicalRecordScreen
+import it.vittorioscocca.kidbox.ui.screens.health.MealPlanScreen
 import it.vittorioscocca.kidbox.ui.screens.health.MedicalRecordScreen
 import it.vittorioscocca.kidbox.ui.screens.health.visits.MedicalVisitsScreen
 import it.vittorioscocca.kidbox.ui.screens.health.visits.MedicalVisitFormScreen
@@ -447,8 +448,13 @@ fun AppNavGraph(
         }
 
         composable(AppDestination.Settings.route) {
+            val settingsContext = androidx.compose.ui.platform.LocalContext.current
             SettingsScreen(
                 onBack = { navController.popBackToHome() },
+                onFamilyLeft = {
+                    KBLog.navigation.debug("onFamilyLeft -> restart app", "AppNavGraph")
+                    restartApp(settingsContext)
+                },
                 onTheme = { navController.navigate(AppDestination.Theme.route) },
                 onLanguage = { navController.navigate(AppDestination.Language.route) },
                 onUsageGuide = { navController.navigate(AppDestination.UsageGuide.route) },
@@ -941,6 +947,26 @@ fun AppNavGraph(
                 childId = childId,
                 subjectName = "",
                 onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.MealPlan.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            MealPlanScreen(
+                familyId = familyId,
+                childId = childId,
+                subjectName = "",
+                onBack = { navController.popBackStack() },
+                onUpgrade = {
+                    navController.navigate(AppDestination.Plans.route) { launchSingleTop = true }
+                },
             )
         }
 
@@ -2131,15 +2157,7 @@ fun AppNavGraph(
                 onEditFamily = { navController.navigate(AppDestination.EditFamily.route) },
                 onLeaveDone = {
                     KBLog.navigation.debug("onLeaveDone -> restart app", "AppNavGraph")
-                    val intent = (context as android.app.Activity).packageManager
-                        .getLaunchIntentForPackage(context.packageName)!!
-                        .apply {
-                            addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                            addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                        }
-                    context.startActivity(intent)
-                    (context as android.app.Activity).finish()
+                    restartApp(context)
                 },
             )
         }
@@ -2241,4 +2259,22 @@ private fun PlaceholderScreen(label: String) {
     ) {
         Text(text = label)
     }
+}
+
+/**
+ * Ripartenza pulita dopo l'uscita dalla famiglia: i dati locali sono stati
+ * cancellati, e ricostruire lo stack a mano lascerebbe in giro schermate che
+ * puntano a una famiglia che non c'è più.
+ */
+private fun restartApp(context: android.content.Context) {
+    val activity = context as android.app.Activity
+    val intent = activity.packageManager
+        .getLaunchIntentForPackage(activity.packageName)!!
+        .apply {
+            addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        }
+    activity.startActivity(intent)
+    activity.finish()
 }

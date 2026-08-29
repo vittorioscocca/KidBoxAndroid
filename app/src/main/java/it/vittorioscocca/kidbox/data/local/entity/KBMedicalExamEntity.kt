@@ -32,6 +32,9 @@ data class KBMedicalExamEntity(
     val deadlineEpochMillis: Long?,
     val preparation: String?,
     val notes: String?,
+    /** Costo dell'esame: quando c'è, genera la voce in Spese famiglia. */
+    val cost: Double? = null,
+    val linkedExpenseId: String? = null,
     val location: String?,
     val statusRaw: String,
     val resultText: String?,

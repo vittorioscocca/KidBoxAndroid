@@ -67,6 +67,7 @@
     <string name="health_hc_permission">Para importar los datos, permite el acceso a Health Connect.</string>
     <string name="health_data_imported">Datos importados</string>
     <string name="health_no_recent_data">No hay datos recientes de corazón o actividad.</string>
+    <string name="health_hc_empty_hint">Health Connect aún no tiene datos. Es un contenedor: deben escribir en él las apps que miden — Mi Fitness, Samsung Health, Google Fit, Fitbit — y la sincronización se activa desde ahí.</string>
     <string name="health_not_connected">Todavía no está conectado a Health Connect.</string>
     <string name="health_profile_from_health">Perfil desde Salud</string>
     <string name="health_install_hc">Instala la app de Salud de Google (Health Connect) desde Play Store.</string>
@@ -199,6 +200,11 @@
     <string name="health_attachments_ai_note">La IA leerá los informes adjuntos después de guardar la consulta.</string>
     <string name="health_add_attachment">Añadir adjunto</string>
     <string name="health_visit_notes">Apuntes de la consulta</string>
+    <string name="health_visit_cost">Coste de la visita</string>
+    <string name="health_exam_cost">Coste de la prueba</string>
+    <string name="health_cost_expense_hint">Si lo indicas, también aparece en Gastos de familia.</string>
+    <string name="health_visit_expense_fallback_title">Visita médica</string>
+    <string name="health_exam_expense_fallback_title">Prueba médica</string>
     <string name="health_visit_notes_hint">Añade notas sobre la consulta…</string>
     <string name="health_ai_readable">Legible por la IA ✓</string>
     <string name="health_in_progress">en curso</string>
@@ -476,6 +482,7 @@
     <string name="health_metric_steps">Pasos</string>
     <string name="health_metric_steps_sub">Hoy</string>
     <string name="health_metric_weight">Peso</string>
+    <string name="health_metric_height">Altura</string>
     <string name="health_metric_weight_sub">Cuerpo</string>
     <string name="health_metric_heart">Pulsaciones</string>
     <string name="health_metric_heart_sub">Última FC</string>

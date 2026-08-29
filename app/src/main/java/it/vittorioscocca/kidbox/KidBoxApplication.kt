@@ -35,6 +35,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import it.vittorioscocca.kidbox.data.local.ChatAvailability
+import it.vittorioscocca.kidbox.data.local.KBFeatureFlags
 
 @HiltAndroidApp
 class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFactory {
@@ -66,6 +67,11 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
         // Prima che Home disegni le sue card: altrimenti la chat comparirebbe
         // per un istante anche con l'interruttore spento.
         ChatAvailability.init(this)
+        // Stessa ragione della chat, un passo prima: la schermata di login non
+        // deve far comparire il pulsante Facebook per un istante prima che
+        // Remote Config risponda.
+        KBFeatureFlags.init(this)
+        appInitScope.launch { KBFeatureFlags.refresh(this@KidBoxApplication) }
         // Poi si allinea all'account: init() serve solo a non far comparire la
         // chat per un istante prima che la risposta di Firestore arrivi.
         appInitScope.launch { ChatAvailability.refreshFromRemote(this@KidBoxApplication) }

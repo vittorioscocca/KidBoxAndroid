@@ -15,6 +15,21 @@ interface KBDocumentDao {
     @Query("SELECT * FROM kb_documents WHERE familyId = :familyId AND isDeleted = 0 ORDER BY updatedAtEpochMillis DESC")
     fun observeByFamilyId(familyId: String): Flow<List<KBDocumentEntity>>
 
+    /**
+     * Solo le colonne che servono alla tessera Dashboard, e solo i documenti mossi
+     * di recente: `extractedText` è l'OCR intero, caricare l'archivio per contarlo
+     * costerebbe più che aprire la sezione.
+     */
+    @Query(
+        """
+        SELECT title, updatedAtEpochMillis, visibilityScope, visibilityMemberIdsJson, createdBy
+        FROM kb_documents
+        WHERE familyId = :familyId AND isDeleted = 0 AND updatedAtEpochMillis >= :since
+        ORDER BY updatedAtEpochMillis DESC
+        """,
+    )
+    fun observeRecentSummariesByFamilyId(familyId: String, since: Long): Flow<List<KBDocumentSummary>>
+
     @Query(
         """
         SELECT * FROM kb_documents
@@ -140,3 +155,12 @@ interface KBDocumentDao {
     @Query("SELECT COUNT(*) FROM kb_documents WHERE familyId = :familyId AND isDeleted = 0 AND notes LIKE 'kb_wallet_doc:%'")
     suspend fun countWalletDocumentsByFamilyId(familyId: String): Int
 }
+
+/** Proiezione leggera di [KBDocumentEntity] per la Dashboard. */
+data class KBDocumentSummary(
+    val title: String,
+    val updatedAtEpochMillis: Long,
+    val visibilityScope: String,
+    val visibilityMemberIdsJson: String,
+    val createdBy: String,
+)

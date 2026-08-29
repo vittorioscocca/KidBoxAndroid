@@ -14,6 +14,10 @@ interface VehicleEventDao {
     )
     fun observeByVehicle(familyId: String, vehicleId: String): Flow<List<VehicleEventEntity>>
 
+    /** Le scadenze di tutti i veicoli: la Dashboard non sa quale veicolo mostrare. */
+    @Query("SELECT * FROM vehicle_events WHERE familyId = :familyId AND isDeleted = 0 ORDER BY date ASC")
+    fun observeByFamily(familyId: String): Flow<List<VehicleEventEntity>>
+
     @Query("SELECT * FROM vehicle_events WHERE id = :id")
     fun observeById(id: String): Flow<VehicleEventEntity?>
 

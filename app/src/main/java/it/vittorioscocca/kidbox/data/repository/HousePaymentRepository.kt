@@ -27,6 +27,7 @@ import kotlinx.coroutines.sync.withLock
 class HousePaymentRepository @Inject constructor(
     private val housePaymentDao: HousePaymentDao,
     private val remoteStore: HousePaymentRemoteStore,
+    private val expenseRepository: ExpenseRepository,
     private val auth: FirebaseAuth,
     private val housePaymentReminderScheduler: HousePaymentReminderScheduler,
 ) {
@@ -98,10 +99,37 @@ class HousePaymentRepository @Inject constructor(
         note: String?,
         reminderOn: Boolean,
         presetPaymentId: String? = null,
+        // Titolo di ripiego per la spesa quando la scadenza non ha un nome.
+        expenseFallbackTitle: String? = null,
     ) {
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()
         val id = presetPaymentId?.trim()?.takeIf { it.isNotEmpty() } ?: java.util.UUID.randomUUID().toString()
+
+        // Una scadenza con un importo è anche una spesa di famiglia: l'importo
+        // si scrive una volta sola, qui, e la voce in Spese nasce da sé.
+        val linkedExpenseId = if ((importo ?: 0.0) > 0.0) {
+            runCatching {
+                // La categoria "Casa" deve esistere prima di agganciarcisi.
+                expenseRepository.seedDefaultCategories(familyId)
+                expenseRepository.createExpenseLocal(
+                    familyId = familyId,
+                    title = name.trim().ifEmpty { expenseFallbackTitle?.trim().orEmpty().ifEmpty { "Scadenza casa" } },
+                    amount = importo ?: 0.0,
+                    // La scadenza vera se c'è: una bolletta datata deve cadere
+                    // nel mese in cui si paga, non in quello in cui la registri.
+                    dateEpochMillis = dataScadenza ?: now,
+                    categoryId = ExpenseRepository.defaultCategoryId(familyId, "casa"),
+                    notes = listOfNotNull(
+                        fornitore?.trim()?.takeIf { it.isNotEmpty() },
+                        note?.trim()?.takeIf { it.isNotEmpty() },
+                    ).joinToString(" · ").takeIf { it.isNotEmpty() },
+                ).id
+            }.getOrNull()
+        } else {
+            null
+        }
+
         val entity = HousePaymentEntity(
             id = id,
             familyId = familyId,
@@ -114,6 +142,7 @@ class HousePaymentRepository @Inject constructor(
             dataScadenzaContratto = dataScadenzaContratto,
             fornitore = fornitore,
             note = note,
+            linkedExpenseId = linkedExpenseId,
             reminderOn = reminderOn,
             isDeleted = false,
             createdAt = now,
@@ -123,6 +152,9 @@ class HousePaymentRepository @Inject constructor(
             syncState = KBSyncState.PENDING_UPSERT.rawValue,
         )
         housePaymentDao.upsert(entity)
+        if (linkedExpenseId != null) {
+            runCatching { expenseRepository.flushPending(familyId) }
+        }
         runCatching { remoteStore.upsertHousePaymentToFirestore(entity) }
             .onSuccess {
                 val synced = entity.copy(syncState = KBSyncState.SYNCED.rawValue)
@@ -249,6 +281,7 @@ class HousePaymentRepository @Inject constructor(
                             typeRaw = dto.typeRaw,
                             subtypeRaw = dto.subtypeRaw,
                             importo = dto.importo,
+                            linkedExpenseId = dto.linkedExpenseId,
                             giornoDiScadenzaMensile = dto.giornoDiScadenzaMensile,
                             dataScadenza = dto.dataScadenzaMillis,
                             dataScadenzaContratto = dto.dataScadenzaContrattoMillis,

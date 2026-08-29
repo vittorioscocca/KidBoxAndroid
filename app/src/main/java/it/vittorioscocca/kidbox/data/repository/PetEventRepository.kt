@@ -92,11 +92,15 @@ class PetEventRepository @Inject constructor(
         cost: Double?,
         notes: String?,
         reminderEnabled: Boolean,
+        // L'id arriva da fuori quando l'evento ha già degli allegati addosso:
+        // sono stati caricati durante la compilazione, con questo id nel tag.
+        presetEventId: String? = null,
     ) {
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()
+        val id = presetEventId?.trim()?.takeIf { it.isNotEmpty() } ?: java.util.UUID.randomUUID().toString()
         val entity = PetEventEntity(
-            id = java.util.UUID.randomUUID().toString(),
+            id = id,
             familyId = familyId,
             petId = petId,
             title = title,

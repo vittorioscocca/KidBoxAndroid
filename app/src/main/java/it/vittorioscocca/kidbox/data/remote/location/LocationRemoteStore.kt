@@ -1,10 +1,14 @@
 package it.vittorioscocca.kidbox.data.remote.location
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
+import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.data.location.DeviceBattery
+import it.vittorioscocca.kidbox.util.KBLog
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
@@ -21,6 +25,10 @@ data class RemoteSharedLocationDto(
     val expiresAtEpochMillis: Long?,
     val lastUpdateAtEpochMillis: Long?,
     val avatarUrl: String?,
+    /** Carica del dispositivo che sta condividendo, 0…100. `null` finché quel
+     *  dispositivo non ne ha ancora spedita una (versioni precedenti incluse). */
+    val batteryLevel: Int?,
+    val isCharging: Boolean,
 )
 
 /**
@@ -42,6 +50,7 @@ private class FanOutListenerRegistration(
 
 @Singleton
 class LocationRemoteStore @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val auth: FirebaseAuth,
 ) {
     private val firestore get() = FirebaseFirestore.getInstance()
@@ -60,6 +69,8 @@ class LocationRemoteStore @Inject constructor(
         val lon: Double,
         val accuracy: Double?,
         val lastUpdateAtEpochMillis: Long?,
+        val batteryLevel: Int?,
+        val isCharging: Boolean,
     )
 
     /**
@@ -96,6 +107,8 @@ class LocationRemoteStore @Inject constructor(
                     expiresAtEpochMillis = status.expiresAtEpochMillis,
                     lastUpdateAtEpochMillis = coords?.lastUpdateAtEpochMillis,
                     avatarUrl = status.avatarUrl,
+                    batteryLevel = coords?.batteryLevel,
+                    isCharging = coords?.isCharging ?: false,
                 )
             }
             onChange(dtos)
@@ -127,6 +140,8 @@ class LocationRemoteStore @Inject constructor(
                                 lon = lon,
                                 accuracy = data.numberOrNull("accuracy")?.toDouble(),
                                 lastUpdateAtEpochMillis = data.timestampOrNull("lastUpdateAt"),
+                                batteryLevel = data.numberOrNull("battery")?.toInt(),
+                                isCharging = data["batteryCharging"] as? Boolean ?: false,
                             )
                         }
                         emit()
@@ -217,16 +232,26 @@ class LocationRemoteStore @Inject constructor(
         lon: Double,
         accuracy: Double?,
     ) {
+        // La batteria viaggia dentro questa stessa scrittura: nessun documento
+        // nuovo, nessuna scrittura in più, nessun tocco al documento di stato
+        // (che è quello osservato dalle Cloud Functions).
+        val battery = DeviceBattery.snapshot(appContext)
+
+        val payload = mutableMapOf<String, Any?>(
+            "lat" to lat,
+            "lon" to lon,
+            "accuracy" to accuracy,
+            "lastUpdateAt" to FieldValue.serverTimestamp(),
+        )
+        // Il campo si omette quando il livello non è noto: scrivere un valore
+        // finto farebbe apparire in mappa una percentuale inventata.
+        battery.percentage?.let {
+            payload["battery"] = it
+            payload["batteryCharging"] = battery.isCharging
+        }
+
         liveLocationRef(familyId, uid)
-            .set(
-                mapOf(
-                    "lat" to lat,
-                    "lon" to lon,
-                    "accuracy" to accuracy,
-                    "lastUpdateAt" to FieldValue.serverTimestamp(),
-                ),
-                SetOptions.merge(),
-            )
+            .set(payload, SetOptions.merge())
             .await()
     }
 
@@ -265,6 +290,10 @@ class LocationRemoteStore @Inject constructor(
                 SetOptions.merge(),
             )
             .await()
+    }
+
+    private companion object {
+        const val TAG = "LocationRemoteStore"
     }
 
     private fun liveLocationRef(familyId: String, uid: String) =

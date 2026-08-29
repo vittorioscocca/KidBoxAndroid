@@ -32,8 +32,8 @@ android {
         applicationId = "it.vittorioscocca.kidbox"
         minSdk = 26
         targetSdk = 36
-        versionCode = 44
-        versionName = "2.2.2"
+        versionCode = 46
+        versionName = "2.2.3"
         manifestPlaceholders["googleMapsApiKey"] = mapsApiKey
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
         buildConfigField("Boolean", "AI_ENABLED", "true")
@@ -139,6 +139,9 @@ dependencies {
     implementation("com.google.firebase:firebase-storage-ktx")
     implementation(libs.firebase.messaging)
     implementation(libs.firebase.analytics)
+    // Interruttori remoti letti prima del login (vedi KBFeatureFlags):
+    // Firestore non serve, `config/` richiede un utente autenticato.
+    implementation(libs.firebase.config)
     implementation("com.google.firebase:firebase-functions-ktx")
     implementation("com.google.firebase:firebase-appcheck")
 

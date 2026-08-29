@@ -154,6 +154,7 @@ class VehicleDetailViewModel @Inject constructor(
         cost: Double?,
         garageName: String?,
         notes: String?,
+        expenseFallbackTitle: String,
         onError: (String) -> Unit,
     ) {
         if (familyId.isBlank() || vehicleId.isBlank()) return
@@ -170,6 +171,8 @@ class VehicleDetailViewModel @Inject constructor(
                     garageName = garageName,
                     notes = notes,
                     presetEventId = presetEventId,
+                    vehicleName = vehicle.value?.name,
+                    expenseFallbackTitle = expenseFallbackTitle,
                 )
             }.onFailure { onError(it.message ?: "Errore") }
         }

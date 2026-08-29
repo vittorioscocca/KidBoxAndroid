@@ -29,6 +29,8 @@ data class HousePaymentEntity(
     val dataScadenzaContratto: Long? = null,
     val fornitore: String? = null,
     val note: String? = null,
+    /** La spesa creata in Spese famiglia quando la scadenza ha un importo. */
+    val linkedExpenseId: String? = null,
     val reminderOn: Boolean = true,
     val isDeleted: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),

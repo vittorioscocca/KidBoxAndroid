@@ -60,7 +60,18 @@ class InviteCodeViewModel @Inject constructor(
     private val _currentInviteId = MutableStateFlow<String?>(null)
     val currentInviteId: StateFlow<String?> = _currentInviteId.asStateFlow()
 
-    init {
+    /**
+     * La generazione non parte più da sola alla costruzione: il foglio rapido in
+     * Home deve poter mostrare prima il tasto «Crea invito» e non bruciare un
+     * invito su Firestore a ogni tocco del "+". Chi vuole il vecchio
+     * comportamento chiama [generateIfNeeded] all'ingresso.
+     */
+    private var didAutoGenerate = false
+
+    /** Genera una sola volta per vita del ViewModel, come faceva `init`. */
+    fun generateIfNeeded() {
+        if (didAutoGenerate) return
+        didAutoGenerate = true
         generateInviteCode()
     }
 

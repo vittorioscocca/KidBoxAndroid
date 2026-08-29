@@ -10,6 +10,8 @@ data class KBMedicalExam(
     val deadlineEpochMillis: Long?,
     val preparation: String?,
     val notes: String?,
+    val cost: Double? = null,
+    val linkedExpenseId: String? = null,
     val location: String?,
     val statusRaw: String,
     val resultText: String?,

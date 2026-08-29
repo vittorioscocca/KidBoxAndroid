@@ -26,7 +26,6 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Contrast
-import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Key
@@ -58,6 +57,7 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.components.KBBackButton
+import it.vittorioscocca.kidbox.ui.screens.settings.family.SettingsFamilyCard
 
 private data class SettingRowItem(
     val title: String,
@@ -74,6 +74,7 @@ fun SettingsScreen(
     onLanguage: () -> Unit,
     onUsageGuide: () -> Unit,
     onFamilySettings: () -> Unit,
+    onFamilyLeft: () -> Unit,
     onMessageSettings: () -> Unit,
     onNotifications: () -> Unit,
     onAiSettings: () -> Unit,
@@ -109,12 +110,6 @@ fun SettingsScreen(
             icon = Icons.Filled.Language,
             showChevron = true,
             onClick = onLanguage,
-        ),
-        SettingRowItem(
-            title = stringResource(R.string.settings_row_family),
-            icon = Icons.Filled.Groups,
-            showChevron = true,
-            onClick = onFamilySettings,
         ),
         SettingRowItem(
             title = stringResource(R.string.settings_row_messages),
@@ -187,6 +182,15 @@ fun SettingsScreen(
             fontWeight = FontWeight.ExtraBold,
             color = MaterialTheme.kidBoxColors.title,
         )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // La famiglia sta in una card sua, sopra l'elenco: è la prima cosa che
+        // si viene a cercare qui, e una riga fra le altre non lo diceva.
+        SettingsFamilyCard(
+            onOpenFamilySettings = onFamilySettings,
+            onLeaveDone = onFamilyLeft,
+        )
+
         Spacer(modifier = Modifier.height(16.dp))
 
         Card(

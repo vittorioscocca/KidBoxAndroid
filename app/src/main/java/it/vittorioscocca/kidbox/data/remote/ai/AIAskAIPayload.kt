@@ -12,6 +12,10 @@ object AIAskAIPayload {
      *  Parity con `CLINICAL_RECORD_MIN_UNITS` in `functions/index.js`. */
     const val CLINICAL_RECORD_MIN_UNITS: Int = 3
 
+    /** Unità minime per il piano alimentare (Sonnet + output lungo: piano 90 giorni).
+     *  Parity con `MEAL_PLAN_MIN_UNITS` in `functions/index.js`. */
+    const val MEAL_PLAN_MIN_UNITS: Int = 5
+
     fun totalChars(systemPrompt: String, messages: List<KBAIMessage>, pendingUserText: String = ""): Int {
         val history = messages.sumOf { it.content.length }
         val pending = pendingUserText.trim().length
@@ -29,6 +33,11 @@ object AIAskAIPayload {
      *  oppure le unità del payload se il contesto è molto grande. */
     fun clinicalRecordMessageUnits(totalChars: Int): Int =
         maxOf(CLINICAL_RECORD_MIN_UNITS, messageUnits(totalChars))
+
+    /** Unità per il piano alimentare: minimo fisso [MEAL_PLAN_MIN_UNITS],
+     *  oppure le unità del payload se il contesto è molto grande. */
+    fun mealPlanMessageUnits(totalChars: Int): Int =
+        maxOf(MEAL_PLAN_MIN_UNITS, messageUnits(totalChars))
 
     fun transientLargeContextNotice(context: android.content.Context): String =
         context.getString(it.vittorioscocca.kidbox.R.string.health_ctx_large_notice)

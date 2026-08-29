@@ -23,6 +23,11 @@ data class KBGroceryItemEntity(
     val name: String,
     val category: String?,
     val notes: String?,
+    /**
+     * Quante confezioni servono. `null` (o 1) significa una sola: la lista non
+     * scrive "x 1", che sarebbe rumore su quasi tutte le righe.
+     */
+    val quantity: Int?,
     val isPurchased: Boolean,
     val purchasedAtEpochMillis: Long?,
     val purchasedBy: String?,

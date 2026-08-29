@@ -134,6 +134,15 @@
     <string name="settings_invite_title">Invite</string>
     <string name="settings_invite_send_link">Send invite link</string>
     <string name="settings_invite_copy_link">Copy link</string>
+    <string name="quick_invite_title">Invite a family member</string>
+    <string name="quick_invite_subtitle">Whoever opens the link joins the family and receives the encryption key.</string>
+    <string name="quick_invite_create">Create invite</string>
+    <string name="quick_invite_creating">Creating invite…</string>
+    <string name="quick_invite_validity">Valid for 24 hours, once only.</string>
+    <string name="quick_invite_link_note">The link carries the key: valid for 24 hours, once only.</string>
+    <string name="quick_invite_send">Send link</string>
+    <string name="quick_invite_copy">Copy</string>
+    <string name="quick_invite_close">Close</string>
     <string name="settings_invite_share_text">Join our family on KidBox:\n%1$s</string>
     <string name="settings_invite_share_subject">Join our family on KidBox</string>
     <string name="invite_qr_safer">The key is read by the camera: it never travels through chat, email or backups.</string>
@@ -179,6 +188,7 @@
     <string name="settings_family_generate_share">Generate a code and share it.</string>
     <string name="settings_family_use_code_hint">Use a code if you want to join another family.</string>
     <string name="settings_family_leave">Leave the family</string>
+    <string name="settings_family_card_leave">Leave family</string>
     <string name="settings_family_leave_sub">You\'ll lose access to shared data.</string>
     <string name="settings_family_remove_q">Remove this member?</string>
     <string name="settings_family_remove_body">This person will no longer be able to access family data from this account.</string>
@@ -278,4 +288,6 @@
     <string name="settings_messages_chat_sub">Lets you turn the family chat on or off</string>
     <string name="settings_messages_chat_note">The choice applies to all your devices. Other members keep chatting with each other, and you\'ll find the messages again when you turn it back on.</string>
     <string name="settings_notif_chat_disabled">Chat is turned off in Settings → Messages.</string>
+    <string name="settings_section_home">Home</string>
+    <string name="settings_home_show_dashboard">Show the Dashboard on the home page</string>
 </resources>

@@ -736,6 +736,21 @@ class DocumentRepository @Inject constructor(
         )
     }
 
+    /** Cartella root «Animali domestici» (id deterministico, parity iOS `pets-root-{familyId}`). */
+    fun petsRootFolderId(familyId: String): String = "pets-root-$familyId"
+
+    suspend fun ensurePetsRootFolder(familyId: String): KBDocumentCategoryEntity {
+        val all = categoryDao.getAllByFamilyId(familyId)
+        val nextSort = (all.filter { it.parentId == null }.maxOfOrNull { it.sortOrder } ?: 0) + 1
+        return createFolderLocal(
+            familyId = familyId,
+            title = "Animali domestici",
+            parentId = null,
+            forcedId = petsRootFolderId(familyId),
+            sortOrder = nextSort.coerceAtMost(87),
+        )
+    }
+
     suspend fun uploadDocumentLocal(
         familyId: String,
         parentFolderId: String?,

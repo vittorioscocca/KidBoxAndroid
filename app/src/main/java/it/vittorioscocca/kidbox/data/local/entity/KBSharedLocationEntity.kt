@@ -34,4 +34,7 @@ data class KBSharedLocationEntity(
     val expiresAtEpochMillis: Long?,
     val lastUpdateAtEpochMillis: Long?,
     val avatarUrl: String?,
+    /** Carica del dispositivo che condivide, 0…100; `null` se non l'ha mandata. */
+    val batteryLevel: Int? = null,
+    val isCharging: Boolean = false,
 )

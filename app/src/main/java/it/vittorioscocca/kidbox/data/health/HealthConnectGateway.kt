@@ -6,6 +6,7 @@ import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.HeightRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.request.AggregateRequest
@@ -29,6 +30,11 @@ class HealthConnectGateway @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
 
+    /**
+     * Quelle senza cui l'importazione non ha senso. Restano queste cinque: chi
+     * aveva già concesso l'accesso non deve ritrovarsi bloccato perché ne
+     * abbiamo aggiunta una nuova.
+     */
     val requiredPermissions: Set<String> = setOf(
         HealthPermission.getReadPermission(HeartRateRecord::class),
         HealthPermission.getReadPermission(StepsRecord::class),
@@ -36,6 +42,14 @@ class HealthConnectGateway @Inject constructor(
         HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
         HealthPermission.getReadPermission(ExerciseSessionRecord::class),
     )
+
+    /** In più, se l'utente le concede. Senza, si importa tutto il resto. */
+    val optionalPermissions: Set<String> = setOf(
+        HealthPermission.getReadPermission(HeightRecord::class),
+    )
+
+    /** L'insieme da chiedere a Health Connect. */
+    val allPermissions: Set<String> = requiredPermissions + optionalPermissions
 
     fun sdkStatus(): Int = HealthConnectClient.getSdkStatus(context)
 
@@ -52,6 +66,13 @@ class HealthConnectGateway @Inject constructor(
 
     suspend fun fetchSnapshot(): HealthImportSnapshot {
         val client = clientOrThrow()
+        // Health Connect lancia un'eccezione se si legge un tipo non concesso:
+        // si chiede prima cosa è permesso e si salta il resto, invece di far
+        // fallire tutta l'importazione per un permesso mancante.
+        val granted = runCatching { client.permissionController.getGrantedPermissions() }
+            .getOrDefault(emptySet())
+        val canReadHeight = HealthPermission.getReadPermission(HeightRecord::class) in granted
+        val canReadWeight = HealthPermission.getReadPermission(WeightRecord::class) in granted
         val now = Instant.now()
         val zone = ZoneId.systemDefault()
         val startOfDay = LocalDate.now(zone).atStartOfDay(zone).toInstant()
@@ -84,17 +105,40 @@ class HealthConnectGateway @Inject constructor(
             }
         }
 
+        // Senza finestra temporale (`before`, non `between`): peso e altezza si
+        // inseriscono di rado, e l'ultimo valore vale finché non ne arriva un
+        // altro. Con i 30 giorni di `lookback` un peso di due mesi fa non
+        // esisteva, e la scheda restava vuota pur avendo il dato.
         var weightKg: Double? = null
+        if (canReadWeight) {
         val weightPage = client.readRecords(
             ReadRecordsRequest(
                 recordType = WeightRecord::class,
-                timeRangeFilter = TimeRangeFilter.between(lookback, now),
+                timeRangeFilter = TimeRangeFilter.before(now),
                 ascendingOrder = false,
                 pageSize = 1,
             ),
         )
         weightPage.records.firstOrNull()?.let { record ->
             weightKg = record.weight.inKilograms
+        }
+        }
+
+        // In centimetri: Health Connect la dà in metri, ma nella scheda si legge
+        // "172 cm", non "1,72 m".
+        var heightCm: Double? = null
+        if (canReadHeight) {
+        val heightPage = client.readRecords(
+            ReadRecordsRequest(
+                recordType = HeightRecord::class,
+                timeRangeFilter = TimeRangeFilter.before(now),
+                ascendingOrder = false,
+                pageSize = 1,
+            ),
+        )
+        heightPage.records.firstOrNull()?.let { record ->
+            heightCm = record.height.inMeters * 100
+        }
         }
 
         val lookback90 = now.minusSeconds(90L * 24 * 3600)
@@ -107,6 +151,7 @@ class HealthConnectGateway @Inject constructor(
 
         return HealthImportSnapshot(
             weightKg = weightKg,
+            heightCm = heightCm,
             heartRateBpm = latestHeart?.bpm ?: heartRates.firstOrNull()?.bpm,
             heartRateMeasuredAtEpochMillis = latestHeart?.measuredAtEpochMillis,
             restingHeartRateBpm = restingAvg,

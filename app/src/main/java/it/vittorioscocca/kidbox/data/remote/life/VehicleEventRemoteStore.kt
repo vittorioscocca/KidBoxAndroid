@@ -24,6 +24,7 @@ data class VehicleEventRemoteDto(
     val dateMillis: Long,
     val km: Int?,
     val cost: Double?,
+    val linkedExpenseId: String?,
     val garageName: String?,
     val notes: String?,
     val isDeleted: Boolean,
@@ -88,6 +89,7 @@ class VehicleEventRemoteStore @Inject constructor(
                         dateMillis = dateMillis,
                         km = km,
                         cost = cost,
+                        linkedExpenseId = d["linkedExpenseId"] as? String,
                         garageName = d["garageName"] as? String,
                         notes = d["notes"] as? String,
                         isDeleted = d["isDeleted"] as? Boolean ?: false,
@@ -122,6 +124,7 @@ class VehicleEventRemoteStore @Inject constructor(
         if (isNew) data["createdAt"] = FieldValue.serverTimestamp()
         data["km"] = entity.km
         data["cost"] = entity.cost
+        data["linkedExpenseId"] = entity.linkedExpenseId
         data["garageName"] = entity.garageName
         data["notes"] = entity.notes
         if (isNew) data["createdBy"] = entity.createdBy.ifEmpty { uid }

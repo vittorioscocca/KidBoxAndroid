@@ -84,6 +84,8 @@ data class HomeUiState(
     val isLocationSharing: Boolean = false,
     val isMembersSyncing: Boolean = false,
     val membersSyncWarning: String? = null,
+    /** Pull-to-refresh in corso: sync forzata chiesta dall'utente, non quella automatica. */
+    val isRefreshing: Boolean = false,
     val todayLabel: String = "",
     val avatarUrl: String? = null,
     val isFabExpanded: Boolean = false,
@@ -148,6 +150,10 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
     val homeViewMode: StateFlow<it.vittorioscocca.kidbox.data.local.HomeViewMode> =
         homeViewModePreference.getViewModeFlow()
+
+    /** Dashboard in Home: preferenza per-device, spenta di default. */
+    val showDashboard: StateFlow<Boolean> =
+        homeViewModePreference.getShowDashboardFlow()
 
     fun setHomeViewMode(mode: it.vittorioscocca.kidbox.data.local.HomeViewMode) {
         homeViewModePreference.setViewMode(mode)
@@ -308,7 +314,10 @@ class HomeViewModel @Inject constructor(
                 ) { fams, members, sharedUsers, syncDone ->
                     Triple(
                         fams.firstOrNull { it.id == familyId },
-                        members.size,
+                        // Stessa deduplica di FamilySettingsViewModel: con doc id
+                        // legacy diversi dall'uid lo stesso utente può avere due
+                        // righe, e Home e Impostazioni mostravano numeri diversi.
+                        members.distinctBy { it.userId }.size,
                         sharedUsers,
                     ) to syncDone
                 }.collect { (snapshot, syncDone) ->
@@ -501,6 +510,44 @@ class HomeViewModel @Inject constructor(
                     badgeExpenses = badges.expenses,
                     badgeWallet = badges.wallet,
                 )
+            }
+        }
+    }
+
+    /**
+     * Pull-to-refresh della Home: rilancia la sincronizzazione da capo.
+     *
+     * Serve perché la sincronizzazione automatica non è ripetibile — [FamilySyncCenter.startSync]
+     * salta se i listener sono già attivi, e Firestore non rimanda documenti invariati:
+     * una volta che un membro è sparito da Room non c'è evento che lo riporti.
+     * [FamilySyncCenter.forceResync] riconcilia Room contro una lettura dal server.
+     *
+     * Senza famiglia locale rifà il bootstrap da Firestore, che è il caso
+     * "sono entrato con un invito e la Home è rimasta vuota".
+     */
+    fun forceRefresh() {
+        if (_uiState.value.isRefreshing) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isRefreshing = true, membersSyncWarning = null)
+            try {
+                val familyId = _uiState.value.familyId
+                if (familyId.isBlank()) {
+                    val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+                    if (uid.isNotEmpty()) {
+                        runCatching { bootstrapFromFirestore(uid) }
+                            .onFailure { KBLog.ui.warning("forceRefresh bootstrap fallito: ${it.message}", MEMBERS_SYNC_TAG) }
+                    }
+                } else {
+                    // Niente da azzerare qui: forceResync stacca e riattacca i
+                    // listener per conto suo, scavalcando il guard di startSync.
+                    KBLog.ui.info("forceRefresh familyId=$familyId", MEMBERS_SYNC_TAG)
+                    runCatching { familySyncCenter.forceResync(familyId) }
+                        .onFailure { KBLog.ui.warning("forceRefresh forceResync fallito: ${it.message}", MEMBERS_SYNC_TAG) }
+                }
+                refreshAvatarUrl()
+                refreshOnboarding()
+            } finally {
+                _uiState.value = _uiState.value.copy(isRefreshing = false)
             }
         }
     }

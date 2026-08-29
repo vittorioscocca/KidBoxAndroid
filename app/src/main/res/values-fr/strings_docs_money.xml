@@ -91,6 +91,8 @@
     <!-- ===================== Expenses ===================== -->
     <string name="expenses_title">Dépenses de la famille</string>
     <string name="expenses_period_one_month">1 mois</string>
+    <string name="expenses_see_all">Voir tout (%1$d)</string>
+    <string name="expenses_all_title">Toutes les dépenses</string>
     <string name="expenses_period_three_months">3 mois</string>
     <string name="expenses_period_six_months">6 mois</string>
     <string name="expenses_period_one_year">1 an</string>
@@ -98,6 +100,8 @@
     <string name="expenses_total_spent">Total dépensé</string>
     <string name="expenses_count_expenses">%1$d dépenses</string>
     <string name="expenses_monthly_trend">Tendance mensuelle</string>
+    <string name="expenses_monthly_average">Moyenne mensuelle</string>
+    <string name="expenses_monthly_average_hint">Moyenne des mois de la période choisie.</string>
     <string name="expenses_by_category">Par catégorie</string>
     <string name="expenses_all_expenses">Toutes les dépenses</string>
     <string name="expenses_delete_count">Supprimer (%1$d)</string>

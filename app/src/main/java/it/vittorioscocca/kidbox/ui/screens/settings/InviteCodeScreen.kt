@@ -23,6 +23,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,6 +67,10 @@ fun InviteCodeScreen(
     val currentInviteId by viewModel.currentInviteId.collectAsStateWithLifecycle()
 
     var showRevokeConfirmation by remember { mutableStateOf(false) }
+
+    // Prima lo faceva l'`init` del ViewModel: qui la schermata esiste per
+    // mostrare un invito, quindi lo si crea appena si entra.
+    LaunchedEffect(Unit) { viewModel.generateIfNeeded() }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Il contenuto della schermata è centrato: il tasto indietro sta
