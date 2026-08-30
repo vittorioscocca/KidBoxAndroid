@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -66,6 +67,7 @@ fun LoyaltyCardsSectionContent(
     viewModel: LoyaltyCardsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     var searchText by remember { mutableStateOf("") }
 
     LaunchedEffect(familyId) { viewModel.bind(familyId) }
@@ -133,24 +135,32 @@ fun LoyaltyCardsSectionContent(
             return@Column
         }
 
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            contentPadding = PaddingValues(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+        // `weight` sta sul PullToRefreshBox: dentro di lui siamo in BoxScope,
+        // dove `weight` non esiste, e la griglia prende tutto lo spazio del box.
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.forceRefresh() },
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
         ) {
-            items(visibleCards, key = { it.id }) { card ->
-                LoyaltyCardTile(
-                    card = card,
-                    isSelecting = state.isSelecting,
-                    isSelected = state.selectedIds.contains(card.id),
-                    modifier = Modifier.clickable {
-                        if (state.isSelecting) viewModel.toggleSelected(card.id) else onCardClick(card.id)
-                    },
-                )
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                contentPadding = PaddingValues(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                items(visibleCards, key = { it.id }) { card ->
+                    LoyaltyCardTile(
+                        card = card,
+                        isSelecting = state.isSelecting,
+                        isSelected = state.selectedIds.contains(card.id),
+                        modifier = Modifier.clickable {
+                            if (state.isSelecting) viewModel.toggleSelected(card.id) else onCardClick(card.id)
+                        },
+                    )
+                }
             }
         }
     }

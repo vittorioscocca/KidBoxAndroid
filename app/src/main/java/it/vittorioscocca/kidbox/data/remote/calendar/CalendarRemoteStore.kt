@@ -65,9 +65,15 @@ class CalendarRemoteStore @Inject constructor(
                     if (err != null) {
                         onError(err)
                     } else if (snap != null) {
-                        val changes = snap.documentChanges.mapNotNull { diff ->
-                            val doc = diff.document
-                            val d = doc.data
+                        // Gli upsert vengono dal risultato COMPLETO della query
+                        // (`snap.documents`), non dal delta (`snap.documentChanges`): con la
+                        // persistenza locale attiva Firestore può riusare una snapshot in cache e
+                        // farsela confermare "invariata" dal server con un existence filter, senza
+                        // inviare alcun document_change. In quel caso il delta è vuoto anche se la
+                        // query ha risultati reali, e in Room non arrivava più nulla. Le rimozioni
+                        // restano sul delta, dove sono affidabili.
+                        val upserts = snap.documents.mapNotNull { doc ->
+                            val d = doc.data ?: return@mapNotNull null
                             val title = (d["title"] as? String)?.trim().orEmpty()
                             if (title.isBlank()) {
                                 null
@@ -95,15 +101,13 @@ class CalendarRemoteStore @Inject constructor(
                                     updatedBy = d["updatedBy"] as? String,
                                     createdBy = d["createdBy"] as? String,
                                 )
-                                when (diff.type) {
-                                    DocumentChange.Type.ADDED,
-                                    DocumentChange.Type.MODIFIED,
-                                    -> CalendarEventRemoteChange.Upsert(dto)
-
-                                    DocumentChange.Type.REMOVED -> CalendarEventRemoteChange.Remove(doc.id)
-                                }
+                            CalendarEventRemoteChange.Upsert(dto)
                             }
                         }
+                        val removes = snap.documentChanges
+                            .filter { it.type == DocumentChange.Type.REMOVED }
+                            .map { CalendarEventRemoteChange.Remove(it.document.id) }
+                        val changes = upserts + removes
                         if (changes.isNotEmpty()) onChange(changes)
                     }
                 },

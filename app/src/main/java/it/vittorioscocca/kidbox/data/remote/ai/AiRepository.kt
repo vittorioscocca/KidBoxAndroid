@@ -43,8 +43,11 @@ class AiRepository @Inject constructor(
             payload["purpose"] = purpose
         }
         val callable = functions.getHttpsCallable("askAI")
-        if (purpose == "clinicalRecord" || purpose == "mealPlan") {
-            callable.setTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
+        // Sonnet senza streaming: la cartella clinica e soprattutto il piano
+        // alimentare (8192 token di output) sforavano i 120s → DEADLINE_EXCEEDED.
+        when (purpose) {
+            "mealPlan" -> callable.setTimeout(300, java.util.concurrent.TimeUnit.SECONDS)
+            "clinicalRecord" -> callable.setTimeout(240, java.util.concurrent.TimeUnit.SECONDS)
         }
         val result = callable
             .call(payload)

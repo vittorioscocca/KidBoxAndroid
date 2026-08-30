@@ -2,6 +2,7 @@
 
 package it.vittorioscocca.kidbox.ui.screens.wallet
 
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import it.vittorioscocca.kidbox.ui.components.FamilyKeyMissingGate
 import it.vittorioscocca.kidbox.R
 import androidx.compose.ui.res.stringResource
@@ -100,6 +101,7 @@ fun WalletHomeScreen(
     viewModel: WalletViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     TrackSectionPresence(AppSection.WALLET, familyId)
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -297,95 +299,102 @@ fun WalletHomeScreen(
             return@Scaffold
         }
 
-        Box(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.forceRefresh() },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            if (state.isLoading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                return@Box
-            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize(),
+            ) {
+                if (state.isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    return@Box
+                }
 
-            if (state.hasQueuedSharePdf) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .clickable(enabled = !state.isImporting) { viewModel.importQueuedShare() },
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                if (state.hasQueuedSharePdf) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .clickable(enabled = !state.isImporting) { viewModel.importQueuedShare() },
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                stringResource(R.string.wallet_shared_pdf_title),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.kidBoxColors.title,
-                            )
-                            Text(
-                                stringResource(R.string.wallet_shared_pdf_subtitle),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.kidBoxColors.subtitle,
-                            )
-                        }
-                        if (state.isImporting) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.padding(start = 8.dp).size(24.dp),
-                                strokeWidth = 2.dp,
-                            )
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    stringResource(R.string.wallet_shared_pdf_title),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.kidBoxColors.title,
+                                )
+                                Text(
+                                    stringResource(R.string.wallet_shared_pdf_subtitle),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.kidBoxColors.subtitle,
+                                )
+                            }
+                            if (state.isImporting) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.padding(start = 8.dp).size(24.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            if (state.tickets.isEmpty() && !state.hasQueuedSharePdf) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    KBEmptyState(
-                        icon = Icons.Filled.ConfirmationNumber,
-                        title = stringResource(R.string.empty_wallet_tickets_title),
-                        body = stringResource(R.string.empty_wallet_tickets_body),
-                        primaryIcon = Icons.Filled.AddCircle,
-                        primaryLabel = stringResource(R.string.empty_wallet_tickets_action),
-                        onPrimary = { showAddSheet = true },
-                    )
-                }
-            } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(
-                        top = if (state.hasQueuedSharePdf) 0.dp else 16.dp,
-                        bottom = 120.dp,
-                        start = 16.dp,
-                        end = 16.dp,
-                    ),
-                    verticalArrangement = Arrangement.spacedBy((-90).dp),
-                ) {
-                    itemsIndexed(state.tickets, key = { _, t -> t.id }) { index, ticket ->
-                        WalletTicketCard(
-                            ticket = ticket,
-                            modifier = Modifier.zIndex(index.toFloat()),
-                            onClick = { onTicketClick(ticket.id) },
+                if (state.tickets.isEmpty() && !state.hasQueuedSharePdf) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        KBEmptyState(
+                            icon = Icons.Filled.ConfirmationNumber,
+                            title = stringResource(R.string.empty_wallet_tickets_title),
+                            body = stringResource(R.string.empty_wallet_tickets_body),
+                            primaryIcon = Icons.Filled.AddCircle,
+                            primaryLabel = stringResource(R.string.empty_wallet_tickets_action),
+                            onPrimary = { showAddSheet = true },
                         )
                     }
+                } else {
+                    LazyColumn(
+                        contentPadding = PaddingValues(
+                            top = if (state.hasQueuedSharePdf) 0.dp else 16.dp,
+                            bottom = 120.dp,
+                            start = 16.dp,
+                            end = 16.dp,
+                        ),
+                        verticalArrangement = Arrangement.spacedBy((-90).dp),
+                    ) {
+                        itemsIndexed(state.tickets, key = { _, t -> t.id }) { index, ticket ->
+                            WalletTicketCard(
+                                ticket = ticket,
+                                modifier = Modifier.zIndex(index.toFloat()),
+                                onClick = { onTicketClick(ticket.id) },
+                            )
+                        }
+                    }
                 }
-            }
 
-            if (state.isImporting) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.3f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator()
+                if (state.isImporting) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.3f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator()
+                    }
                 }
             }
         }

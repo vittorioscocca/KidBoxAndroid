@@ -19,6 +19,7 @@ import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerMember
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -70,6 +71,17 @@ class CalendarViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(CalendarUiState())
     val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow()
     private val forcedFamilyId = MutableStateFlow<String?>(null)
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /** Pull-to-refresh: rilegge gli eventi del calendario da Firestore. */
+    fun forceRefresh() = pullToRefresh.refresh {
+        val familyId = _uiState.value.familyId
+        if (familyId.isBlank()) return@refresh
+        calendarRepository.awaitForceRestartRealtime(familyId)
+        runCatching { calendarRepository.flushPending(familyId) }
+    }
 
     init {
         viewModelScope.launch {

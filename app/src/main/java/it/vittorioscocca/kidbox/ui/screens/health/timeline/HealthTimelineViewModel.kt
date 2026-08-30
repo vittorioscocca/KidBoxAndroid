@@ -18,6 +18,7 @@ import it.vittorioscocca.kidbox.domain.model.HealthTimelineEvent
 import it.vittorioscocca.kidbox.domain.model.HealthTimelineEventKind
 import java.util.Calendar
 import java.util.Locale
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -70,6 +71,19 @@ class HealthTimelineViewModel @Inject constructor(
     private var boundFamilyId = ""
     private var boundChildId = ""
     private var allEvents: List<HealthTimelineEvent> = emptyList()
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /** Pull-to-refresh: rilegge tutta la storia clinica da Firestore. */
+    fun forceRefresh() = pullToRefresh.refresh {
+        val familyId = boundFamilyId
+        if (familyId.isBlank()) return@refresh
+        treatmentSyncCenter.restart(familyId)
+        visitSyncCenter.restart(familyId)
+        examSyncCenter.restart(familyId)
+        vaccineSyncCenter.restart(familyId)
+    }
 
     fun bind(familyId: String, childId: String) {
         if (boundFamilyId == familyId && boundChildId == childId) return

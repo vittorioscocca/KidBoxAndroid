@@ -7,6 +7,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.local.entity.PetEntity
 import it.vittorioscocca.kidbox.data.repository.PetEventRepository
 import it.vittorioscocca.kidbox.data.repository.PetRepository
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +30,16 @@ class PetsViewModel @Inject constructor(
             petRepository.startRealtime(familyId)
             petEventRepository.startRealtime(familyId)
         }
+    }
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /** Pull-to-refresh: rilegge da Firestore animali ed eventi. */
+    fun forceRefresh() = pullToRefresh.refresh {
+        if (familyId.isBlank()) return@refresh
+        petRepository.awaitForceRestartRealtime(familyId)
+        petEventRepository.awaitForceRestartRealtime(familyId)
     }
 
     override fun onCleared() {

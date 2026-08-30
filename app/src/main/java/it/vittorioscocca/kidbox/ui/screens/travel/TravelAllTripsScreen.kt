@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -54,6 +55,7 @@ fun TravelAllTripsScreen(
     }
 
     val allTrips by viewModel.trips.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val filteredTrips by viewModel.filteredTrips.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val legsByTripId by viewModel.legsByTripId.collectAsStateWithLifecycle()
@@ -114,70 +116,76 @@ fun TravelAllTripsScreen(
             )
         },
     ) { padding ->
-        if (allTrips.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(stringResource(R.string.travel_none), color = kb.subtitle)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                item {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = viewModel::setSearchQuery,
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text(stringResource(R.string.travel_search_hint)) },
-                        leadingIcon = {
-                            Icon(Icons.Filled.Search, contentDescription = null)
-                        },
-                        singleLine = true,
-                    )
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.forceRefresh() },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
+            if (allTrips.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(stringResource(R.string.travel_none), color = kb.subtitle)
                 }
-                if (filteredTrips.isEmpty()) {
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
                     item {
-                        Text(
-                            stringResource(R.string.travel_no_results_dot),
-                            color = kb.subtitle,
-                            modifier = Modifier.padding(vertical = 24.dp),
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = viewModel::setSearchQuery,
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text(stringResource(R.string.travel_search_hint)) },
+                            leadingIcon = {
+                                Icon(Icons.Filled.Search, contentDescription = null)
+                            },
+                            singleLine = true,
                         )
                     }
-                } else {
-                    items(filteredTrips, key = { it.id }) { trip ->
-                        val selected = trip.id in selectedIds
-                        val tripLegs = legsByTripId[trip.id].orEmpty()
-                        TravelTripCard(
-                            trip = trip,
-                            legs = tripLegs,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .combinedClickable(
-                                    onClick = {
-                                        if (isSelectionMode) {
-                                            viewModel.toggleTripSelection(trip.id)
-                                        } else {
-                                            onOpenTrip(trip.id)
-                                        }
-                                    },
-                                    onLongClick = {
-                                        if (!isSelectionMode) {
-                                            viewModel.setSelectionMode(true)
-                                            viewModel.toggleTripSelection(trip.id)
-                                        }
-                                    },
-                                ),
-                            isSelected = selected,
-                            showsSelectionBadge = isSelectionMode,
-                        )
+                    if (filteredTrips.isEmpty()) {
+                        item {
+                            Text(
+                                stringResource(R.string.travel_no_results_dot),
+                                color = kb.subtitle,
+                                modifier = Modifier.padding(vertical = 24.dp),
+                            )
+                        }
+                    } else {
+                        items(filteredTrips, key = { it.id }) { trip ->
+                            val selected = trip.id in selectedIds
+                            val tripLegs = legsByTripId[trip.id].orEmpty()
+                            TravelTripCard(
+                                trip = trip,
+                                legs = tripLegs,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .combinedClickable(
+                                        onClick = {
+                                            if (isSelectionMode) {
+                                                viewModel.toggleTripSelection(trip.id)
+                                            } else {
+                                                onOpenTrip(trip.id)
+                                            }
+                                        },
+                                        onLongClick = {
+                                            if (!isSelectionMode) {
+                                                viewModel.setSelectionMode(true)
+                                                viewModel.toggleTripSelection(trip.id)
+                                            }
+                                        },
+                                    ),
+                                isSelected = selected,
+                                showsSelectionBadge = isSelectionMode,
+                            )
+                        }
                     }
                 }
             }

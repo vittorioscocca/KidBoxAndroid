@@ -49,19 +49,50 @@ class VehicleEventRepository @Inject constructor(
                 boundFamilyId = familyId
                 subscriberCount++
                 if (listener != null) return@withLock
-                listener = remoteStore.listenVehicleEvents(
-                    familyId = familyId,
-                    onChange = { changes -> scope.launch { applyInbound(changes) } },
-                    onError = { err ->
-                        if (
-                            err is FirebaseFirestoreException &&
-                            err.code == FirebaseFirestoreException.Code.PERMISSION_DENIED
-                        ) {
-                            onPermissionDenied?.invoke()
-                        }
-                    },
-                )
+                attachListenerLocked(familyId, onPermissionDenied)
             }
+        }
+    }
+
+    /** Aggancio del listener: chiamare solo con [realtimeMutex] già preso. */
+    private fun attachListenerLocked(
+        familyId: String,
+        onPermissionDenied: (() -> Unit)?,
+    ) {
+        listener = remoteStore.listenVehicleEvents(
+            familyId = familyId,
+            onChange = { changes -> scope.launch { applyInbound(changes) } },
+            onError = { err ->
+                if (
+                    err is FirebaseFirestoreException &&
+                    err.code == FirebaseFirestoreException.Code.PERMISSION_DENIED
+                ) {
+                    onPermissionDenied?.invoke()
+                }
+            },
+        )
+    }
+
+    /**
+     * Pull-to-refresh: stacca e riaggancia il listener realtime.
+     *
+     * [startRealtime] da solo non basta — con il listener già attivo esce dal
+     * guard senza fare nulla. Qui il listener viene rimosso e riagganciato
+     * dentro lo stesso lock, ma `subscriberCount` NON si tocca: le schermate
+     * agganciate non sono cambiate, e alterarlo farebbe cadere il listener al
+     * primo [stopRealtime]. Stesso idioma di
+     * [PasswordsRepository.awaitForceRestartRealtime].
+     */
+    suspend fun awaitForceRestartRealtime(
+        familyId: String,
+        onPermissionDenied: (() -> Unit)? = null,
+    ) {
+        if (familyId.isBlank()) return
+        realtimeMutex.withLock {
+            listener?.remove()
+            listener = null
+            boundFamilyId = familyId
+            attachListenerLocked(familyId, onPermissionDenied)
         }
     }
 

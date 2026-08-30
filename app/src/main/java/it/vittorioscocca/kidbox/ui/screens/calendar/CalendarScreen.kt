@@ -54,6 +54,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -111,6 +112,7 @@ fun CalendarScreen(
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     TrackSectionPresence(AppSection.CALENDAR, familyId)
     var showForm by remember { mutableStateOf(false) }
     var editingEvent by remember { mutableStateOf<KBCalendarEventEntity?>(null) }
@@ -220,57 +222,64 @@ fun CalendarScreen(
         },
         containerColor = MaterialTheme.kidBoxColors.background,
     ) { padding ->
-        Column(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.forceRefresh() },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            Row(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(MaterialTheme.kidBoxColors.card)
-                    .padding(3.dp),
+                    .fillMaxSize(),
             ) {
-                TogglePill(
-                    text = stringResource(R.string.calendar_month_tab),
-                    selected = state.mode == CalendarMode.MONTH,
-                    modifier = Modifier.weight(1f),
-                ) { viewModel.setMode(CalendarMode.MONTH) }
-                TogglePill(
-                    text = stringResource(R.string.calendar_year_tab),
-                    selected = state.mode == CalendarMode.YEAR,
-                    modifier = Modifier.weight(1f),
-                ) { viewModel.setMode(CalendarMode.YEAR) }
-            }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(MaterialTheme.kidBoxColors.card)
+                        .padding(3.dp),
+                ) {
+                    TogglePill(
+                        text = stringResource(R.string.calendar_month_tab),
+                        selected = state.mode == CalendarMode.MONTH,
+                        modifier = Modifier.weight(1f),
+                    ) { viewModel.setMode(CalendarMode.MONTH) }
+                    TogglePill(
+                        text = stringResource(R.string.calendar_year_tab),
+                        selected = state.mode == CalendarMode.YEAR,
+                        modifier = Modifier.weight(1f),
+                    ) { viewModel.setMode(CalendarMode.YEAR) }
+                }
 
-            when (state.mode) {
-                CalendarMode.MONTH -> CalendarMonthView(
-                    selectedDate = state.selectedDate,
-                    displayedMonth = state.displayedMonth,
-                    events = state.events,
-                    onSelectDate = viewModel::setSelectedDate,
-                    onChangeDisplayedMonth = viewModel::setDisplayedMonth,
-                    onEditEvent = {
-                        editingEvent = it
-                        showForm = true
-                    },
-                    onDeleteEvent = viewModel::deleteEvent,
-                    onAddEvent = {
-                        editingEvent = null
-                        showForm = true
-                    },
-                )
+                when (state.mode) {
+                    CalendarMode.MONTH -> CalendarMonthView(
+                        selectedDate = state.selectedDate,
+                        displayedMonth = state.displayedMonth,
+                        events = state.events,
+                        onSelectDate = viewModel::setSelectedDate,
+                        onChangeDisplayedMonth = viewModel::setDisplayedMonth,
+                        onEditEvent = {
+                            editingEvent = it
+                            showForm = true
+                        },
+                        onDeleteEvent = viewModel::deleteEvent,
+                        onAddEvent = {
+                            editingEvent = null
+                            showForm = true
+                        },
+                    )
 
-                CalendarMode.YEAR -> CalendarYearView(
-                    selectedDate = state.selectedDate,
-                    events = state.events,
-                    onSelectDate = {
-                        viewModel.setSelectedDate(it)
-                        viewModel.setMode(CalendarMode.MONTH)
-                    },
-                )
+                    CalendarMode.YEAR -> CalendarYearView(
+                        selectedDate = state.selectedDate,
+                        events = state.events,
+                        onSelectDate = {
+                            viewModel.setSelectedDate(it)
+                            viewModel.setMode(CalendarMode.MONTH)
+                        },
+                    )
+                }
             }
         }
     }

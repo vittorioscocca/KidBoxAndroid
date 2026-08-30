@@ -12,7 +12,7 @@ object AIAskAIPayload {
      *  Parity con `CLINICAL_RECORD_MIN_UNITS` in `functions/index.js`. */
     const val CLINICAL_RECORD_MIN_UNITS: Int = 3
 
-    /** Unità minime per il piano alimentare (Sonnet + output lungo: piano 90 giorni).
+    /** Unità minime per il piano alimentare (Haiku + output lungo: piano 90 giorni).
      *  Parity con `MEAL_PLAN_MIN_UNITS` in `functions/index.js`. */
     const val MEAL_PLAN_MIN_UNITS: Int = 5
 

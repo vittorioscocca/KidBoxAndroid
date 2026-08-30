@@ -60,8 +60,14 @@ class PetRemoteStore @Inject constructor(
                     return@addSnapshotListener
                 }
                 if (snap == null) return@addSnapshotListener
-                val changes = snap.documentChanges.mapNotNull { diff ->
-                    val doc = diff.document
+                // Gli upsert vengono dal risultato COMPLETO della query
+                // (`snap.documents`), non dal delta (`snap.documentChanges`): con la
+                // persistenza locale attiva Firestore può riusare una snapshot in cache e
+                // farsela confermare "invariata" dal server con un existence filter, senza
+                // inviare alcun document_change. In quel caso il delta è vuoto anche se la
+                // query ha risultati reali, e in Room non arrivava più nulla. Le rimozioni
+                // restano sul delta, dove sono affidabili.
+                val upserts = snap.documents.mapNotNull { doc ->
                     val d = doc.data ?: return@mapNotNull null
                     val name = (d["name"] as? String)?.trim().orEmpty()
                     if (name.isEmpty()) return@mapNotNull null
@@ -84,13 +90,12 @@ class PetRemoteStore @Inject constructor(
                         createdBy = d["createdBy"] as? String,
                         updatedBy = d["updatedBy"] as? String,
                     )
-                    when (diff.type) {
-                        DocumentChange.Type.ADDED,
-                        DocumentChange.Type.MODIFIED,
-                        -> PetRemoteChange.Upsert(dto)
-                        DocumentChange.Type.REMOVED -> PetRemoteChange.Remove(doc.id)
-                    }
+                    PetRemoteChange.Upsert(dto)
                 }
+                val removes = snap.documentChanges
+                    .filter { it.type == DocumentChange.Type.REMOVED }
+                    .map { PetRemoteChange.Remove(it.document.id) }
+                val changes = upserts + removes
                 if (changes.isNotEmpty()) onChange(changes)
             }
 

@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.Vaccines
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
@@ -100,6 +101,7 @@ fun HealthTimelineScreen(
 ) {
     val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     var isSearchVisible by remember { mutableStateOf(false) }
     var showYearSheet by remember { mutableStateOf(false) }
 
@@ -227,38 +229,44 @@ fun HealthTimelineScreen(
                 }
 
                 else -> {
-                    LazyColumn(
-                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
+                    PullToRefreshBox(
+                        isRefreshing = isRefreshing,
+                        onRefresh = { viewModel.forceRefresh() },
+                        modifier = Modifier.fillMaxSize(),
                     ) {
-                        state.eventsGroupedByYearMonth.forEach { yearGroup ->
-                            stickyHeader(key = "year-${yearGroup.year}") {
-                                YearHeader(
-                                    year = yearGroup.year,
-                                    count = yearGroup.months.sumOf { it.events.size },
-                                    kb = kb,
-                                )
-                            }
-                            yearGroup.months.forEach { monthGroup ->
-                                item(key = "month-${yearGroup.year}-${monthGroup.month}") {
-                                    MonthHeader(month = monthGroup.month, kb = kb)
-                                }
-                                itemsIndexed(
-                                    items = monthGroup.events,
-                                    key = { _, event -> event.id },
-                                ) { index, event ->
-                                    val isLast = index == monthGroup.events.lastIndex
-                                    TimelineEventCard(
-                                        event = event,
-                                        isLastInGroup = isLast,
-                                        onOpen = {
-                                            when (event.kind) {
-                                                HealthTimelineEventKind.VISIT -> onOpenVisit(event.sourceId)
-                                                HealthTimelineEventKind.EXAM -> onOpenExam(event.sourceId)
-                                                HealthTimelineEventKind.TREATMENT -> onOpenTreatment(event.sourceId)
-                                                HealthTimelineEventKind.VACCINE -> onOpenVaccine(event.sourceId)
-                                            }
-                                        },
+                        LazyColumn(
+                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
+                        ) {
+                            state.eventsGroupedByYearMonth.forEach { yearGroup ->
+                                stickyHeader(key = "year-${yearGroup.year}") {
+                                    YearHeader(
+                                        year = yearGroup.year,
+                                        count = yearGroup.months.sumOf { it.events.size },
+                                        kb = kb,
                                     )
+                                }
+                                yearGroup.months.forEach { monthGroup ->
+                                    item(key = "month-${yearGroup.year}-${monthGroup.month}") {
+                                        MonthHeader(month = monthGroup.month, kb = kb)
+                                    }
+                                    itemsIndexed(
+                                        items = monthGroup.events,
+                                        key = { _, event -> event.id },
+                                    ) { index, event ->
+                                        val isLast = index == monthGroup.events.lastIndex
+                                        TimelineEventCard(
+                                            event = event,
+                                            isLastInGroup = isLast,
+                                            onOpen = {
+                                                when (event.kind) {
+                                                    HealthTimelineEventKind.VISIT -> onOpenVisit(event.sourceId)
+                                                    HealthTimelineEventKind.EXAM -> onOpenExam(event.sourceId)
+                                                    HealthTimelineEventKind.TREATMENT -> onOpenTreatment(event.sourceId)
+                                                    HealthTimelineEventKind.VACCINE -> onOpenVaccine(event.sourceId)
+                                                }
+                                            },
+                                        )
+                                    }
                                 }
                             }
                         }

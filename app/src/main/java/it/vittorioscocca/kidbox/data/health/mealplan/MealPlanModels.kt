@@ -27,14 +27,30 @@ enum class MealPlanActivityLevel(val labelRes: Int, val promptLabel: String) {
     INTENSE(R.string.meal_plan_activity_intense, "intenso (5 o più allenamenti a settimana)"),
 }
 
-/** Input raccolti nel form prima della generazione. */
+/**
+ * Input raccolti nel form prima della generazione.
+ *
+ * Età, peso e altezza sono chiesti all'utente solo quando Health Connect non
+ * li fornisce: i campi manuali restano vuoti se il dato arriva dallo snapshot.
+ */
 data class MealPlanInput(
     val goal: MealPlanGoal = MealPlanGoal.FAT_LOSS,
     val activityLevel: MealPlanActivityLevel = MealPlanActivityLevel.MODERATE,
     val preferredFoods: String = "",
     val avoidedFoods: String = "",
     val notes: String = "",
-)
+    val manualAgeYears: String = "",
+    val manualWeightKg: String = "",
+    val manualHeightCm: String = "",
+) {
+    val manualAgeValue: Int? get() = number(manualAgeYears)?.toInt()?.takeIf { it in 1..119 }
+    val manualWeightValue: Double? get() = number(manualWeightKg)?.takeIf { it in 2.0..400.0 }
+    val manualHeightValue: Double? get() = number(manualHeightCm)?.takeIf { it in 40.0..260.0 }
+
+    /** Numero inserito a mano, accettando sia la virgola sia il punto decimale. */
+    private fun number(raw: String): Double? =
+        raw.trim().replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }
+}
 
 /** Piano alimentare generato, salvato in locale per non doverlo rigenerare. */
 data class MealPlanDocument(

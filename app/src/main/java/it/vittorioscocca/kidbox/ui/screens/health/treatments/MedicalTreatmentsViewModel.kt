@@ -10,6 +10,7 @@ import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import it.vittorioscocca.kidbox.notifications.TreatmentNotificationManager
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,6 +49,15 @@ class MedicalTreatmentsViewModel @Inject constructor(
 
     private var familyId = ""
     private var childId = ""
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /** Pull-to-refresh: rilegge le cure da Firestore. */
+    fun forceRefresh() = pullToRefresh.refresh {
+        if (familyId.isBlank()) return@refresh
+        syncCenter.restart(familyId)
+    }
 
     fun bind(familyId: String, childId: String) {
         if (this.familyId == familyId && this.childId == childId) return

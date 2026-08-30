@@ -50,6 +50,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -139,6 +140,7 @@ fun HomeItemsScreen(
     val deadlinesHeader = stringResource(R.string.home_items_deadlines_payments)
     val context = LocalContext.current
     val items by viewModel.homeItems.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val housePayments by viewModel.housePayments.collectAsStateWithLifecycle()
     val draftAttachmentUploading by viewModel.draftAttachmentUploading.collectAsStateWithLifecycle()
     val draftAttachmentError by viewModel.draftAttachmentError.collectAsStateWithLifecycle()
@@ -278,120 +280,126 @@ fun HomeItemsScreen(
             )
         },
     ) { padding ->
-        LazyColumn(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.forceRefresh() },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (items.isEmpty() && housePayments.isEmpty()) {
-                item {
-                    // Casa è l'unica sezione con due modi di iniziare: un elemento
-                    // (elettrodomestico, garanzia) oppure una scadenza ricorrente.
-                    KBEmptyState(
-                        icon = Icons.Filled.Home,
-                        title = stringResource(R.string.empty_homeitems_title),
-                        body = stringResource(R.string.empty_homeitems_body),
-                        primaryIcon = Icons.Filled.AddCircle,
-                        primaryLabel = stringResource(R.string.empty_homeitems_action),
-                        accent = orange,
-                        onPrimary = {
-                            homeAddDraftId = UUID.randomUUID().toString()
-                            showAdd = true
-                        },
-                        secondaryIcon = Icons.Filled.EventRepeat,
-                        secondaryLabel = stringResource(R.string.empty_homeitems_action_secondary),
-                        onSecondary = {
-                            paymentAddDraftId = UUID.randomUUID().toString()
-                            showAddPayment = true
-                        },
-                    )
-                }
-            }
-            items(
-                listRows.size,
-                key = { i -> listRows[i].stableKey },
-            ) { idx ->
-                when (val row = listRows[idx]) {
-                    is CasaListRow.SectionHeader -> {
-                        Text(
-                            row.label,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = kb.subtitle,
-                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (items.isEmpty() && housePayments.isEmpty()) {
+                    item {
+                        // Casa è l'unica sezione con due modi di iniziare: un elemento
+                        // (elettrodomestico, garanzia) oppure una scadenza ricorrente.
+                        KBEmptyState(
+                            icon = Icons.Filled.Home,
+                            title = stringResource(R.string.empty_homeitems_title),
+                            body = stringResource(R.string.empty_homeitems_body),
+                            primaryIcon = Icons.Filled.AddCircle,
+                            primaryLabel = stringResource(R.string.empty_homeitems_action),
+                            accent = orange,
+                            onPrimary = {
+                                homeAddDraftId = UUID.randomUUID().toString()
+                                showAdd = true
+                            },
+                            secondaryIcon = Icons.Filled.EventRepeat,
+                            secondaryLabel = stringResource(R.string.empty_homeitems_action_secondary),
+                            onSecondary = {
+                                paymentAddDraftId = UUID.randomUUID().toString()
+                                showAddPayment = true
+                            },
                         )
                     }
-                    is CasaListRow.HomeItemRow -> {
-                        val homeRow = row.item
-                        val deadline = earliestNonNull(homeRow.warrantyExpiryDate, homeRow.nextServiceDate)
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .combinedClickable(
-                                    onClick = { onOpenItem(homeRow.id) },
-                                    onLongClick = { toDelete = homeRow },
-                                ),
-                            colors = CardDefaults.cardColors(containerColor = kb.card),
-                        ) {
-                            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Icon(categoryIcon(homeRow.category), contentDescription = null, tint = orange)
-                                Column(Modifier.weight(1f)) {
-                                    Text(homeRow.name, fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.title)
-                                    val bm = listOfNotNull(homeRow.brand, homeRow.model).joinToString(" ")
-                                    if (bm.isNotBlank()) Text(bm, color = MaterialTheme.kidBoxColors.subtitle, style = MaterialTheme.typography.bodySmall)
-                                }
-                                deadline?.let {
-                                    Surface(color = deadlineUrgencyColor(it), shape = RoundedCornerShape(12.dp)) {
-                                        Text(
-                                            formatItDate(it),
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = Color.White,
-                                        )
+                }
+                items(
+                    listRows.size,
+                    key = { i -> listRows[i].stableKey },
+                ) { idx ->
+                    when (val row = listRows[idx]) {
+                        is CasaListRow.SectionHeader -> {
+                            Text(
+                                row.label,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = kb.subtitle,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                            )
+                        }
+                        is CasaListRow.HomeItemRow -> {
+                            val homeRow = row.item
+                            val deadline = earliestNonNull(homeRow.warrantyExpiryDate, homeRow.nextServiceDate)
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .combinedClickable(
+                                        onClick = { onOpenItem(homeRow.id) },
+                                        onLongClick = { toDelete = homeRow },
+                                    ),
+                                colors = CardDefaults.cardColors(containerColor = kb.card),
+                            ) {
+                                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Icon(categoryIcon(homeRow.category), contentDescription = null, tint = orange)
+                                    Column(Modifier.weight(1f)) {
+                                        Text(homeRow.name, fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.title)
+                                        val bm = listOfNotNull(homeRow.brand, homeRow.model).joinToString(" ")
+                                        if (bm.isNotBlank()) Text(bm, color = MaterialTheme.kidBoxColors.subtitle, style = MaterialTheme.typography.bodySmall)
                                     }
+                                    deadline?.let {
+                                        Surface(color = deadlineUrgencyColor(it), shape = RoundedCornerShape(12.dp)) {
+                                            Text(
+                                                formatItDate(it),
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = Color.White,
+                                            )
+                                        }
+                                    }
+                                    Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = kb.subtitle)
                                 }
-                                Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = kb.subtitle)
                             }
                         }
-                    }
-                    is CasaListRow.HousePaymentRow -> {
-                        val p = row.payment
-                        val deadline = HousePaymentDeadlineCalculator.earliestDisplayDeadlineMillis(p)
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .combinedClickable(onClick = { onOpenHousePayment(p.id) }),
-                            colors = CardDefaults.cardColors(containerColor = kb.card),
-                        ) {
-                            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Icon(Icons.Filled.Event, contentDescription = null, tint = orange)
-                                Column(Modifier.weight(1f)) {
-                                    Text(p.name, fontWeight = FontWeight.SemiBold, color = kb.title)
-                                    Text(
-                                        housePaymentTypeLabel(context, p.typeRaw),
-                                        color = kb.subtitle,
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                }
-                                deadline?.let {
-                                    Surface(color = deadlineUrgencyColor(it), shape = RoundedCornerShape(12.dp)) {
+                        is CasaListRow.HousePaymentRow -> {
+                            val p = row.payment
+                            val deadline = HousePaymentDeadlineCalculator.earliestDisplayDeadlineMillis(p)
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .combinedClickable(onClick = { onOpenHousePayment(p.id) }),
+                                colors = CardDefaults.cardColors(containerColor = kb.card),
+                            ) {
+                                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Icon(Icons.Filled.Event, contentDescription = null, tint = orange)
+                                    Column(Modifier.weight(1f)) {
+                                        Text(p.name, fontWeight = FontWeight.SemiBold, color = kb.title)
                                         Text(
-                                            formatItDate(it),
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = Color.White,
+                                            housePaymentTypeLabel(context, p.typeRaw),
+                                            color = kb.subtitle,
+                                            style = MaterialTheme.typography.bodySmall,
                                         )
                                     }
+                                    deadline?.let {
+                                        Surface(color = deadlineUrgencyColor(it), shape = RoundedCornerShape(12.dp)) {
+                                            Text(
+                                                formatItDate(it),
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = Color.White,
+                                            )
+                                        }
+                                    }
+                                    Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = kb.subtitle)
                                 }
-                                Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = kb.subtitle)
                             }
                         }
                     }
                 }
+                item { Spacer(Modifier.height(72.dp)) }
             }
-            item { Spacer(Modifier.height(72.dp)) }
         }
     }
 

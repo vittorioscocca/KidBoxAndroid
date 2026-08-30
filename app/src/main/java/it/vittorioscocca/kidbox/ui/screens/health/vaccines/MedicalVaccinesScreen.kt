@@ -38,12 +38,14 @@ import androidx.compose.material.icons.outlined.LocalPharmacy
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -93,6 +95,7 @@ private fun timeFilterLabel(context: android.content.Context, filter: VaccineLis
     VaccineListTimeFilter.CUSTOM -> context.getString(R.string.health_custom)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MedicalVaccinesScreen(
     familyId: String,
@@ -109,6 +112,7 @@ fun MedicalVaccinesScreen(
     val notDoneTitle = stringResource(R.string.health_not_done)
     val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     var isSelecting by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
     var showFilterDialog by remember { mutableStateOf(false) }
@@ -216,63 +220,72 @@ fun MedicalVaccinesScreen(
                 },
             )
         } else {
-            LazyColumn(
+            // `weight` sta sul PullToRefreshBox: dentro di lui siamo in BoxScope,
+            // dove `weight` non esiste.
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { viewModel.forceRefresh() },
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                    .fillMaxWidth(),
             ) {
-                item { Spacer(Modifier.height(4.dp)) }
-                vaccineSectionIos(
-                    title = apptTitle,
-                    icon = Icons.Default.Event,
-                    iconTint = BLUE,
-                    items = appointments,
-                    isSelecting = isSelecting,
-                    selectedIds = selectedIds,
-                    onToggleSelect = { id ->
-                        selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
-                    },
-                    onOpen = onOpen,
-                )
-                vaccineSectionIos(
-                    title = administeredTitle,
-                    icon = Icons.Default.CheckCircle,
-                    iconTint = GREEN,
-                    items = state.administered,
-                    isSelecting = isSelecting,
-                    selectedIds = selectedIds,
-                    onToggleSelect = { id ->
-                        selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
-                    },
-                    onOpen = onOpen,
-                )
-                vaccineSectionIos(
-                    title = toScheduleTitle,
-                    icon = Icons.AutoMirrored.Filled.HelpOutline,
-                    iconTint = ORANGE,
-                    items = state.planned,
-                    isSelecting = isSelecting,
-                    selectedIds = selectedIds,
-                    onToggleSelect = { id ->
-                        selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
-                    },
-                    onOpen = onOpen,
-                )
-                vaccineSectionIos(
-                    title = notDoneTitle,
-                    icon = Icons.Outlined.Cancel,
-                    iconTint = Color(0xFF616161),
-                    items = state.skipped,
-                    isSelecting = isSelecting,
-                    selectedIds = selectedIds,
-                    onToggleSelect = { id ->
-                        selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
-                    },
-                    onOpen = onOpen,
-                )
-                item { Spacer(Modifier.height(24.dp)) }
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    item { Spacer(Modifier.height(4.dp)) }
+                    vaccineSectionIos(
+                        title = apptTitle,
+                        icon = Icons.Default.Event,
+                        iconTint = BLUE,
+                        items = appointments,
+                        isSelecting = isSelecting,
+                        selectedIds = selectedIds,
+                        onToggleSelect = { id ->
+                            selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
+                        },
+                        onOpen = onOpen,
+                    )
+                    vaccineSectionIos(
+                        title = administeredTitle,
+                        icon = Icons.Default.CheckCircle,
+                        iconTint = GREEN,
+                        items = state.administered,
+                        isSelecting = isSelecting,
+                        selectedIds = selectedIds,
+                        onToggleSelect = { id ->
+                            selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
+                        },
+                        onOpen = onOpen,
+                    )
+                    vaccineSectionIos(
+                        title = toScheduleTitle,
+                        icon = Icons.AutoMirrored.Filled.HelpOutline,
+                        iconTint = ORANGE,
+                        items = state.planned,
+                        isSelecting = isSelecting,
+                        selectedIds = selectedIds,
+                        onToggleSelect = { id ->
+                            selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
+                        },
+                        onOpen = onOpen,
+                    )
+                    vaccineSectionIos(
+                        title = notDoneTitle,
+                        icon = Icons.Outlined.Cancel,
+                        iconTint = Color(0xFF616161),
+                        items = state.skipped,
+                        isSelecting = isSelecting,
+                        selectedIds = selectedIds,
+                        onToggleSelect = { id ->
+                            selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
+                        },
+                        onOpen = onOpen,
+                    )
+                    item { Spacer(Modifier.height(24.dp)) }
+                }
             }
         }
         }

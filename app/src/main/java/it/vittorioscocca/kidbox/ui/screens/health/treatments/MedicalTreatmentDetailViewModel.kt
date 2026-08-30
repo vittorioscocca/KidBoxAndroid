@@ -403,7 +403,7 @@ class MedicalTreatmentDetailViewModel @Inject constructor(
             return "Animale"
         }
         childDao.getById(childId)?.name?.takeIf { it.isNotBlank() }?.let { return it }
-        memberDao.getById(childId)?.displayName?.takeIf { it.isNotBlank() }?.let { return it }
+        memberDao.getAnyById(childId)?.displayName?.takeIf { it.isNotBlank() }?.let { return it }
         return "Profilo"
     }
 

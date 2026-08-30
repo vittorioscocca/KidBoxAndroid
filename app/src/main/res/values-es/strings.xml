@@ -88,7 +88,16 @@
     <string name="meal_plan_data_treatments">Tratamientos activos</string>
     <string name="meal_plan_not_available">no disponible</string>
     <string name="meal_plan_years">%1$d años</string>
-    <string name="meal_plan_missing_metrics">El peso y la altura son obligatorios: actualízalos en Health Connect o en la Ficha médica.</string>
+    <string name="meal_plan_missing_metrics">El peso y la altura son obligatorios: actualízalos en Health Connect, en la Ficha Médica, o introdúcelos manualmente aquí abajo.</string>
+    <string name="meal_plan_intro_health">Para un plan completo, conecta los datos de Health Connect: peso, altura, edad y entrenamientos se leen de ahí. Si no están disponibles, introduce tú edad, peso y altura aquí abajo.</string>
+    <string name="meal_plan_manual_title">Edad, peso y altura</string>
+    <string name="meal_plan_manual_hint">Health Connect no tiene todos los datos: introdúcelos aquí, sirven para estimar las calorías.</string>
+    <string name="meal_plan_manual_age">Edad (años)</string>
+    <string name="meal_plan_manual_weight">Peso (kg)</string>
+    <string name="meal_plan_manual_height">Altura (cm)</string>
+    <string name="meal_plan_manual_suffix"> (introducido por ti)</string>
+    <string name="meal_plan_swipe_hint">Desliza de lado para pasar de una tarjeta a otra.</string>
+    <string name="meal_plan_card_index">Tarjeta %1$d</string>
     <string name="meal_plan_locked_title">Incluido en Pro y Max</string>
     <string name="meal_plan_locked_body">El Plan de alimentación solo está disponible en los planes de pago. Cambia a Pro o Max para generarlo con la IA.</string>
     <string name="meal_plan_see_plans">Ver los planes</string>
@@ -111,11 +120,16 @@
     <string name="meal_plan_generate">Crear plan de alimentación</string>
     <string name="meal_plan_regenerate">Regenerar plan</string>
     <string name="meal_plan_generating">Creando el plan de alimentación…</string>
-    <string name="meal_plan_your_plan">Tu plan</string>
+    <string name="meal_plan_delete">Eliminar plan</string>
+    <string name="meal_plan_delete_title">¿Quieres eliminar el plan de alimentación?</string>
+    <string name="meal_plan_delete_body">El plan se elimina de este dispositivo. Volver a generarlo cuesta mensajes de IA.</string>
+    <string name="meal_plan_delete_cancel">Cancelar</string>
+<string name="meal_plan_your_plan">Tu plan</string>
     <string name="meal_plan_generated_at">Generado el %1$s</string>
     <string name="meal_plan_error_plan">El Plan de alimentación está incluido en los planes Pro y Max. Cambia a Pro para generarlo.</string>
     <string name="meal_plan_error_quota">Generar el plan requiere %1$d mensajes de IA, pero solo quedan %2$d de %3$d hoy. Inténtalo mañana.</string>
     <string name="meal_plan_error_payload">Contexto demasiado grande (%1$d caracteres, máx. %2$d). Reduce los documentos adjuntos en Salud.</string>
     <string name="meal_plan_error_missing_data">Se necesitan peso y altura para crear el plan. Actualízalos en Health Connect o en la Ficha médica.</string>
+    <string name="meal_plan_error_timeout">La creación del plan ha superado el tiempo máximo. El plan es largo: inténtalo de nuevo, normalmente funciona al segundo intento.</string>
     <string name="meal_plan_error_generic">No se pudo crear el plan de alimentación. Inténtalo de nuevo.</string>
 </resources>

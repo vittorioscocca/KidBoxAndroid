@@ -12,6 +12,7 @@ import it.vittorioscocca.kidbox.data.sync.MedicalExamSyncCenter
 import it.vittorioscocca.kidbox.domain.model.KBExamStatus
 import it.vittorioscocca.kidbox.domain.model.KBMedicalExam
 import java.util.Calendar
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -73,6 +74,15 @@ class MedicalExamsViewModel @Inject constructor(
     private var childId: String = ""
     private var rawExams: List<KBMedicalExam> = emptyList()
     private var observeJob: Job? = null
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /** Pull-to-refresh: rilegge analisi ed esami da Firestore. */
+    fun forceRefresh() = pullToRefresh.refresh {
+        if (familyId.isBlank()) return@refresh
+        syncCenter.restart(familyId)
+    }
 
     fun bind(familyId: String, childId: String) {
         if (this.familyId == familyId && this.childId == childId) return
@@ -265,7 +275,7 @@ class MedicalExamsViewModel @Inject constructor(
 
     private suspend fun resolveChildName(id: String): String {
         childDao.getById(id)?.name?.takeIf { it.isNotBlank() }?.let { return it }
-        memberDao.getById(id)?.displayName?.takeIf { it.isNotBlank() }?.let { return it }
+        memberDao.getAnyById(id)?.displayName?.takeIf { it.isNotBlank() }?.let { return it }
         return "Profilo"
     }
 }

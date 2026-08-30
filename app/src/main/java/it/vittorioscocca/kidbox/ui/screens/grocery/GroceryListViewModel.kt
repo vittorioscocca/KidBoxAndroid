@@ -8,6 +8,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBGroceryItemEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBShoppingTripEntity
 import it.vittorioscocca.kidbox.data.repository.GroceryRepository
 import it.vittorioscocca.kidbox.data.repository.ShoppingTripRepository
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -60,6 +61,16 @@ class GroceryListViewModel @Inject constructor(
     private val familyId: String = savedStateHandle.get<String>("familyId").orEmpty()
     private val _uiState = MutableStateFlow(GroceryListUiState(familyId = familyId))
     val uiState: StateFlow<GroceryListUiState> = _uiState.asStateFlow()
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /** Pull-to-refresh: rilegge lista della spesa e scontrini salvati. */
+    fun forceRefresh() = pullToRefresh.refresh {
+        if (familyId.isBlank()) return@refresh
+        groceryRepository.awaitForceRestartRealtime(familyId)
+        shoppingTripRepository.awaitForceRestartRealtime(familyId)
+    }
 
     private var observeJob: Job? = null
     private var tripsJob: Job? = null

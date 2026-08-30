@@ -46,6 +46,11 @@ class WalletDocumentRepository @Inject constructor(
         documentRepository.startRealtime(familyId, onPermissionDenied)
     }
 
+    /** Pull-to-refresh: come [startRealtime], delega ai documenti veri. */
+    suspend fun awaitForceRestartRealtime(familyId: String, onPermissionDenied: (() -> Unit)? = null) {
+        documentRepository.awaitForceRestartRealtime(familyId, onPermissionDenied)
+    }
+
     /** Documenti Wallet della famiglia (filtrati per tag, non serve una query Room dedicata). */
     fun observeWalletDocuments(familyId: String): Flow<List<KBDocumentEntity>> =
         documentDao.observeByFamilyId(familyId).map { list ->

@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.expenses
 
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import it.vittorioscocca.kidbox.R
 import androidx.compose.ui.res.stringResource
 import android.app.DatePickerDialog
@@ -140,6 +141,7 @@ import androidx.compose.material.icons.filled.ReceiptLong
 /** Quante spese stanno in home prima di "Vedi tutte". */
 private const val EXPENSES_PREVIEW_COUNT = 4
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpensesHomeScreen(
     familyId: String,
@@ -150,6 +152,7 @@ fun ExpensesHomeScreen(
     viewModel: ExpensesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     TrackSectionPresence(AppSection.EXPENSES, familyId)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -256,6 +259,8 @@ fun ExpensesHomeScreen(
     if (showAllExpenses) {
         AllExpensesScreen(
             state = state,
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.forceRefresh() },
             onBack = { showAllExpenses = false },
             onSetPeriod = viewModel::setPeriod,
             onSelect = {
@@ -270,89 +275,95 @@ fun ExpensesHomeScreen(
             .fillMaxSize()
             .background(MaterialTheme.kidBoxColors.background),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState()),
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.forceRefresh() },
+            modifier = Modifier.fillMaxSize(),
         ) {
-            Spacer(Modifier.height(10.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(rememberScrollState()),
             ) {
-                HeaderCircleButton(icon = Icons.AutoMirrored.Filled.ArrowBack, onClick = onBack)
-                HeaderCircleButton(icon = Icons.Default.Add) {
-                    editingExpense = null
-                    pendingAttachment = null
-                    selectedKidBoxDocumentId = null
-                    showEditor = true
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = stringResource(R.string.expenses_title),
-                fontSize = 38.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.kidBoxColors.title,
-            )
-            if (hasAnyExpense) {
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(10.dp))
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ExpensePeriod.entries.forEach { p ->
-                        PeriodPill(
-                            label = stringResource(p.labelRes),
-                            selected = state.period == p,
-                            onClick = { viewModel.setPeriod(p) },
-                        )
+                    HeaderCircleButton(icon = Icons.AutoMirrored.Filled.ArrowBack, onClick = onBack)
+                    HeaderCircleButton(icon = Icons.Default.Add) {
+                        editingExpense = null
+                        pendingAttachment = null
+                        selectedKidBoxDocumentId = null
+                        showEditor = true
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                ExpenseTotalCard(
-                    total = state.totalAmount,
-                    count = state.visibleExpenses.size,
+                Text(
+                    text = stringResource(R.string.expenses_title),
+                    fontSize = 38.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.kidBoxColors.title,
                 )
-                Spacer(Modifier.height(12.dp))
-                // Due grafici, non due card: sono la stessa domanda ("quanto
-                // spendiamo") vista in due modi.
-                ExpenseChartsCarousel(bars = state.monthlyBars)
-                Spacer(Modifier.height(12.dp))
-                CategoryChartCard(slices = state.categorySlices)
-            }
-            Spacer(Modifier.height(12.dp))
-            ExpenseListCard(
-                showChrome = hasAnyExpense,
-                maxItems = EXPENSES_PREVIEW_COUNT,
-                onSeeAll = { showAllExpenses = true },
-                onAddExpense = { showEditor = true },
-                expenses = state.visibleExpenses,
-                categories = state.categories,
-                selecting = isSelectingExpenses,
-                selectedExpenseIds = selectedExpenseIds,
-                onToggleSelecting = {
-                    isSelectingExpenses = !isSelectingExpenses
-                    if (!isSelectingExpenses) selectedExpenseIds = emptySet()
-                },
-                onToggleExpenseSelection = { expense ->
-                    selectedExpenseIds = selectedExpenseIds.toMutableSet().apply {
-                        if (!add(expense.id)) remove(expense.id)
+                if (hasAnyExpense) {
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        ExpensePeriod.entries.forEach { p ->
+                            PeriodPill(
+                                label = stringResource(p.labelRes),
+                                selected = state.period == p,
+                                onClick = { viewModel.setPeriod(p) },
+                            )
+                        }
                     }
-                },
-                onDeleteSelected = { showDeleteSelectedConfirm = true },
-                onSelect = {
-                    selectedExpense = it
-                    showDetail = true
-                },
-            )
-            Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(12.dp))
+                    ExpenseTotalCard(
+                        total = state.totalAmount,
+                        count = state.visibleExpenses.size,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    // Due grafici, non due card: sono la stessa domanda ("quanto
+                    // spendiamo") vista in due modi.
+                    ExpenseChartsCarousel(bars = state.monthlyBars)
+                    Spacer(Modifier.height(12.dp))
+                    CategoryChartCard(slices = state.categorySlices)
+                }
+                Spacer(Modifier.height(12.dp))
+                ExpenseListCard(
+                    showChrome = hasAnyExpense,
+                    maxItems = EXPENSES_PREVIEW_COUNT,
+                    onSeeAll = { showAllExpenses = true },
+                    onAddExpense = { showEditor = true },
+                    expenses = state.visibleExpenses,
+                    categories = state.categories,
+                    selecting = isSelectingExpenses,
+                    selectedExpenseIds = selectedExpenseIds,
+                    onToggleSelecting = {
+                        isSelectingExpenses = !isSelectingExpenses
+                        if (!isSelectingExpenses) selectedExpenseIds = emptySet()
+                    },
+                    onToggleExpenseSelection = { expense ->
+                        selectedExpenseIds = selectedExpenseIds.toMutableSet().apply {
+                            if (!add(expense.id)) remove(expense.id)
+                        }
+                    },
+                    onDeleteSelected = { showDeleteSelectedConfirm = true },
+                    onSelect = {
+                        selectedExpense = it
+                        showDetail = true
+                    },
+                )
+                Spacer(Modifier.height(24.dp))
+            }
         }
         }
     } // fine else: home spese
@@ -1617,6 +1628,8 @@ private fun categoryIcon(category: KBExpenseCategoryEntity?): androidx.compose.u
 @Composable
 private fun AllExpensesScreen(
     state: ExpensesUiState,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
     onBack: () -> Unit,
     onSetPeriod: (ExpensePeriod) -> Unit,
     onSelect: (KBExpenseEntity) -> Unit,
@@ -1648,46 +1661,53 @@ private fun AllExpensesScreen(
             )
         },
     ) { padding ->
-        Column(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = onRefresh,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState()),
+                .padding(padding),
         ) {
-            Row(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(rememberScrollState()),
             ) {
-                ExpensePeriod.entries.forEach { p ->
-                    PeriodPill(
-                        label = stringResource(p.labelRes),
-                        selected = state.period == p,
-                        onClick = { onSetPeriod(p) },
-                    )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    ExpensePeriod.entries.forEach { p ->
+                        PeriodPill(
+                            label = stringResource(p.labelRes),
+                            selected = state.period == p,
+                            onClick = { onSetPeriod(p) },
+                        )
+                    }
                 }
+
+                Spacer(Modifier.height(12.dp))
+                ExpenseTotalCard(total = state.totalAmount, count = state.visibleExpenses.size)
+                Spacer(Modifier.height(12.dp))
+
+                ExpenseListCard(
+                    expenses = state.visibleExpenses,
+                    categories = state.categories,
+                    selecting = false,
+                    selectedExpenseIds = emptySet(),
+                    onToggleSelecting = {},
+                    onToggleExpenseSelection = {},
+                    onDeleteSelected = {},
+                    onSelect = onSelect,
+                    onAddExpense = {},
+                    showChrome = true,
+                )
+
+                Spacer(Modifier.height(24.dp))
             }
-
-            Spacer(Modifier.height(12.dp))
-            ExpenseTotalCard(total = state.totalAmount, count = state.visibleExpenses.size)
-            Spacer(Modifier.height(12.dp))
-
-            ExpenseListCard(
-                expenses = state.visibleExpenses,
-                categories = state.categories,
-                selecting = false,
-                selectedExpenseIds = emptySet(),
-                onToggleSelecting = {},
-                onToggleExpenseSelection = {},
-                onDeleteSelected = {},
-                onSelect = onSelect,
-                onAddExpense = {},
-                showChrome = true,
-            )
-
-            Spacer(Modifier.height(24.dp))
         }
     }
 }

@@ -14,6 +14,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBTripLegEntity
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.data.repository.TripRepository
 import it.vittorioscocca.kidbox.domain.model.KBPlan
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,6 +55,16 @@ class TravelListViewModel @Inject constructor(
 
     private val _selectedTripIds = MutableStateFlow<Set<String>>(emptySet())
     val selectedTripIds = _selectedTripIds.asStateFlow()
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /** Pull-to-refresh: rilegge i viaggi da Firestore. */
+    fun forceRefresh() = pullToRefresh.refresh {
+        val familyId = familyIdFlow.value
+        if (familyId.isBlank()) return@refresh
+        tripRepository.awaitForceRestartRealtime(familyId)
+    }
 
     fun setFamilyId(familyId: String) {
         familyIdFlow.value = familyId

@@ -12,6 +12,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBLoyaltyCardEntity
 import it.vittorioscocca.kidbox.data.repository.LoyaltyCardPhotoSide
 import it.vittorioscocca.kidbox.data.repository.LoyaltyCardRepository
 import java.io.ByteArrayOutputStream
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -55,6 +56,15 @@ class LoyaltyCardsViewModel @Inject constructor(
 
     /** Download in corso, per non scaricare due volte la stessa foto. */
     private val loadingPhotoPaths = mutableSetOf<String>()
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /** Pull-to-refresh: rilegge le carte fedeltà da Firestore. */
+    fun forceRefresh() = pullToRefresh.refresh {
+        val familyId = boundFamilyId ?: return@refresh
+        repository.awaitForceRestartRealtime(familyId)
+    }
 
     fun bind(familyId: String) {
         if (familyId.isBlank()) {

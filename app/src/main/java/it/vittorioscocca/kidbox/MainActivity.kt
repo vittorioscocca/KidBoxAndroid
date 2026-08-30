@@ -223,7 +223,7 @@ class MainActivity : AppCompatActivity() {
             startActivity(
                 Intent(
                     Intent.ACTION_VIEW,
-                    android.net.Uri.parse("https://kidbox-landing.web.app/privacy.html"),
+                    android.net.Uri.parse("https://kidboxapp.com/privacy.html"),
                 )
             )
         }.onFailure {

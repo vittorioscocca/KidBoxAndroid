@@ -9,6 +9,7 @@ import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
 import it.vittorioscocca.kidbox.data.repository.NoteRepository
 import it.vittorioscocca.kidbox.domain.model.KBNote
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,6 +46,15 @@ class NotesHomeViewModel @Inject constructor(
 
     private var observeJob: Job? = null
     private var boundFamilyId: String? = null
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /** Pull-to-refresh: rilegge le note da Firestore. */
+    fun forceRefresh() = pullToRefresh.refresh {
+        val familyId = boundFamilyId ?: return@refresh
+        noteRepository.awaitForceRestartRealtime(familyId)
+    }
 
     fun bind(familyId: String) {
         if (familyId.isBlank()) {

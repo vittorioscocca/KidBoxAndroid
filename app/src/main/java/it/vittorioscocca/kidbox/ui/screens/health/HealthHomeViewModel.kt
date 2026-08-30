@@ -17,6 +17,7 @@ import it.vittorioscocca.kidbox.data.sync.TreatmentSyncCenter
 import it.vittorioscocca.kidbox.data.sync.VaccineSyncCenter
 import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
 import it.vittorioscocca.kidbox.domain.model.KBExamStatus
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -69,6 +70,19 @@ class HealthHomeViewModel @Inject constructor(
     private var loadedFamilyId = ""
     private var loadedChildId = ""
     private var observeJob: Job? = null
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /** Pull-to-refresh: rilegge cure, visite, analisi e vaccini da Firestore. */
+    fun forceRefresh() = pullToRefresh.refresh {
+        val familyId = loadedFamilyId
+        if (familyId.isBlank()) return@refresh
+        treatmentSyncCenter.restart(familyId)
+        visitSyncCenter.restart(familyId)
+        examSyncCenter.restart(familyId)
+        vaccineSyncCenter.restart(familyId)
+    }
 
     fun load(familyId: String, childId: String) {
         if (loadedFamilyId == familyId && loadedChildId == childId) return

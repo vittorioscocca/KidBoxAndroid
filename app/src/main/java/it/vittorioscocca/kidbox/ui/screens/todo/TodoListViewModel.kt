@@ -11,6 +11,7 @@ import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
 import it.vittorioscocca.kidbox.data.repository.TodoRepository
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.domain.model.TodoListExposure
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -126,6 +127,15 @@ class TodoListViewModel @Inject constructor(
             errorMessage = err,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodoListUiState(isLoading = true))
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /** Pull-to-refresh: rilegge i to-do della lista da Firestore. */
+    fun forceRefresh() = pullToRefresh.refresh {
+        if (familyId.isBlank()) return@refresh
+        todoRepository.awaitForceRestartRealtime(familyId, childId)
+    }
 
     init {
         if (familyId.isNotBlank() && childId.isNotBlank()) {

@@ -121,8 +121,8 @@ class UserProfileRepository @Inject constructor(
             ).ifBlank { null }
             if (familyId != null) {
                 memberProfileRemoteStore.upsertMyMemberProfileIfNeeded(familyId, displayName)
-                val member = familyMemberDao.getById(uid)
-                if (member != null && member.familyId == familyId) {
+                val member = familyMemberDao.getByFamilyAndId(familyId, uid)
+                if (member != null) {
                     familyMemberDao.upsert(
                         member.copy(
                             displayName = displayName,
@@ -159,8 +159,8 @@ class UserProfileRepository @Inject constructor(
             memberProfileRemoteStore.upsertMyMemberProfileIfNeeded(familyId, displayName)
         }
 
-        val member = familyMemberDao.getById(uid)
-        if (member != null && member.familyId == familyId && member.displayName != displayName) {
+        val member = familyMemberDao.getByFamilyAndId(familyId, uid)
+        if (member != null && member.displayName != displayName) {
             familyMemberDao.upsert(
                 member.copy(
                     displayName = displayName,

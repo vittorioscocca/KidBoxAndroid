@@ -51,6 +51,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -100,6 +101,7 @@ fun GroceryListScreen(
     val kb = MaterialTheme.kidBoxColors
     val groceryBg = kb.background
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     TrackSectionPresence(AppSection.SHOPPING_LIST, state.familyId)
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -180,115 +182,121 @@ fun GroceryListScreen(
             }
         },
     ) { padding ->
-        if (state.isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(stringResource(R.string.grocery_loading))
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(groceryBg)
-                    .padding(padding)
-                    .navigationBarsPadding()
-                    .padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                // La scorciatoia sta dove serve: guardando cosa è già stato preso.
-                if (state.filter == GroceryFilter.PURCHASED && state.purchased.isNotEmpty()) {
-                    item(key = "save_trip") {
-                        Button(
-                            onClick = { showSaveTripSheet = true },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 4.dp, bottom = 6.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                containerColor = GroceryGreen,
-                                contentColor = Color.White,
-                            ),
-                        ) {
-                            Icon(Icons.Default.Receipt, contentDescription = null, tint = Color.White)
-                            Spacer(Modifier.size(8.dp))
-                            Text(
-                                stringResource(R.string.grocery_save_trip),
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White,
-                                modifier = Modifier.padding(vertical = 6.dp),
-                            )
-                        }
-                    }
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.forceRefresh() },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
+            if (state.isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(stringResource(R.string.grocery_loading))
                 }
-
-                if (state.items.isEmpty()) {
-                    item {
-                        KBEmptyState(
-                            icon = Icons.Filled.ShoppingCart,
-                            title = stringResource(R.string.empty_grocery_title),
-                            body = stringResource(R.string.empty_grocery_body),
-                            primaryIcon = Icons.Filled.AddCircle,
-                            primaryLabel = stringResource(R.string.empty_grocery_action),
-                            onPrimary = { showAddDialog = true },
-                        )
-                    }
-                } else if (state.visibleItems.isEmpty()) {
-                    // La lista non è vuota: è vuoto questo filtro. Dirlo evita di
-                    // far credere che la spesa sia sparita.
-                    item {
-                        Text(
-                            text = if (state.filter == GroceryFilter.PURCHASED) {
-                                stringResource(R.string.grocery_nothing_purchased)
-                            } else {
-                                stringResource(R.string.grocery_nothing_to_buy)
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = kb.subtitle,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 32.dp),
-                        )
-                    }
-                }
-
-                state.groupedVisible.forEach { (category, itemsInCategory) ->
-                    item(key = "header_$category") {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 10.dp, bottom = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = groceryCategoryLabel(category),
-                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                color = kb.title,
-                            )
-                            Spacer(Modifier.weight(1f))
-                            if (state.filter == GroceryFilter.PURCHASED) {
-                                TextButton(onClick = { showDeletePurchasedAlert = true }) {
-                                    Text(stringResource(R.string.grocery_delete_all), color = GroceryRed)
-                                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(groceryBg)
+                        .navigationBarsPadding()
+                        .padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    // La scorciatoia sta dove serve: guardando cosa è già stato preso.
+                    if (state.filter == GroceryFilter.PURCHASED && state.purchased.isNotEmpty()) {
+                        item(key = "save_trip") {
+                            Button(
+                                onClick = { showSaveTripSheet = true },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp, bottom = 6.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                    containerColor = GroceryGreen,
+                                    contentColor = Color.White,
+                                ),
+                            ) {
+                                Icon(Icons.Default.Receipt, contentDescription = null, tint = Color.White)
+                                Spacer(Modifier.size(8.dp))
+                                Text(
+                                    stringResource(R.string.grocery_save_trip),
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White,
+                                    modifier = Modifier.padding(vertical = 6.dp),
+                                )
                             }
                         }
                     }
-                    item(key = "group_$category") {
-                        GroceryGroupCard(
-                            items = itemsInCategory,
-                            onToggle = { viewModel.togglePurchased(it.id) },
-                            onClick = { item ->
-                                editingItem = item
-                                showAddDialog = true
-                            },
-                            onDelete = { viewModel.deleteItem(it.id) },
-                        )
+
+                    if (state.items.isEmpty()) {
+                        item {
+                            KBEmptyState(
+                                icon = Icons.Filled.ShoppingCart,
+                                title = stringResource(R.string.empty_grocery_title),
+                                body = stringResource(R.string.empty_grocery_body),
+                                primaryIcon = Icons.Filled.AddCircle,
+                                primaryLabel = stringResource(R.string.empty_grocery_action),
+                                onPrimary = { showAddDialog = true },
+                            )
+                        }
+                    } else if (state.visibleItems.isEmpty()) {
+                        // La lista non è vuota: è vuoto questo filtro. Dirlo evita di
+                        // far credere che la spesa sia sparita.
+                        item {
+                            Text(
+                                text = if (state.filter == GroceryFilter.PURCHASED) {
+                                    stringResource(R.string.grocery_nothing_purchased)
+                                } else {
+                                    stringResource(R.string.grocery_nothing_to_buy)
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = kb.subtitle,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 32.dp),
+                            )
+                        }
                     }
+
+                    state.groupedVisible.forEach { (category, itemsInCategory) ->
+                        item(key = "header_$category") {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 10.dp, bottom = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = groceryCategoryLabel(category),
+                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = kb.title,
+                                )
+                                Spacer(Modifier.weight(1f))
+                                if (state.filter == GroceryFilter.PURCHASED) {
+                                    TextButton(onClick = { showDeletePurchasedAlert = true }) {
+                                        Text(stringResource(R.string.grocery_delete_all), color = GroceryRed)
+                                    }
+                                }
+                            }
+                        }
+                        item(key = "group_$category") {
+                            GroceryGroupCard(
+                                items = itemsInCategory,
+                                onToggle = { viewModel.togglePurchased(it.id) },
+                                onClick = { item ->
+                                    editingItem = item
+                                    showAddDialog = true
+                                },
+                                onDelete = { viewModel.deleteItem(it.id) },
+                            )
+                        }
+                    }
+                    item { Spacer(Modifier.height(96.dp)) }
                 }
-                item { Spacer(Modifier.height(96.dp)) }
             }
         }
     }

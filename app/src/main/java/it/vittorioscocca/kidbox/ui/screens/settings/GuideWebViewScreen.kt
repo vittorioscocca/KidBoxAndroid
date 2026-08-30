@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
-private const val GUIDE_URL = "https://kidbox-landing.web.app/guide.html"
+private const val GUIDE_URL = "https://kidboxapp.com/guide.html"
 
 @Composable
 fun GuideWebViewScreen(onBack: () -> Unit) {

@@ -10,8 +10,24 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface KBFamilyMemberDao {
+    /**
+     * La riga di quel membro **in quella famiglia**. È il lookup da usare
+     * ovunque conti a quale famiglia appartiene la riga: confronti last-write-wins
+     * della sync, controlli di ruolo, aggiornamenti del proprio profilo.
+     */
+    @Query("SELECT * FROM kb_family_members WHERE familyId = :familyId AND id = :id LIMIT 1")
+    suspend fun getByFamilyAndId(familyId: String, id: String): KBFamilyMemberEntity?
+
+    /**
+     * Una riga qualsiasi con quell'id, senza guardare la famiglia.
+     *
+     * Serve SOLO a risolvere il nome da mostrare a partire da un uid: la persona
+     * è la stessa in tutte le famiglie, quindi va bene la prima che si trova.
+     * Per qualunque altra cosa usare [getByFamilyAndId] — con la chiave composita
+     * lo stesso id può esistere in più famiglie, e qui non si sa quale esce.
+     */
     @Query("SELECT * FROM kb_family_members WHERE id = :id LIMIT 1")
-    suspend fun getById(id: String): KBFamilyMemberEntity?
+    suspend fun getAnyById(id: String): KBFamilyMemberEntity?
 
     @Query(
         "SELECT * FROM kb_family_members WHERE familyId = :familyId AND userId = :userId AND isDeleted = 0 LIMIT 1",
@@ -39,8 +55,12 @@ interface KBFamilyMemberDao {
     @Delete
     suspend fun delete(entity: KBFamilyMemberEntity)
 
-    @Query("DELETE FROM kb_family_members WHERE id = :id")
-    suspend fun deleteById(id: String)
+    /**
+     * Rimuove quel membro da QUELLA famiglia, lasciando intatte le sue righe
+     * nelle altre famiglie a cui appartiene.
+     */
+    @Query("DELETE FROM kb_family_members WHERE familyId = :familyId AND id = :id")
+    suspend fun deleteByFamilyAndId(familyId: String, id: String)
 
     @Query("DELETE FROM kb_family_members WHERE familyId = :familyId")
     suspend fun deleteByFamilyId(familyId: String): Int

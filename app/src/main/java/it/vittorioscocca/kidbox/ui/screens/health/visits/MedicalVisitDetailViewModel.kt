@@ -261,7 +261,7 @@ class MedicalVisitDetailViewModel @Inject constructor(
 
     private suspend fun resolveChildName(id: String): String {
         childDao.getById(id)?.name?.takeIf { it.isNotBlank() }?.let { return it }
-        memberDao.getById(id)?.displayName?.takeIf { it.isNotBlank() }?.let { return it }
+        memberDao.getAnyById(id)?.displayName?.takeIf { it.isNotBlank() }?.let { return it }
         return "Profilo"
     }
 }

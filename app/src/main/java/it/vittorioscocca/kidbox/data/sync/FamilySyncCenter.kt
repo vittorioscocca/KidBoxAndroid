@@ -112,8 +112,8 @@ class FamilySyncCenter @Inject constructor(
         }
         val localFamily = familyDao.getById(familyId)
         val byCreated = localFamily?.createdBy == uid
-        val myMember = familyMemberDao.getById(uid)
-        val byOwnerRoleFromMember = myMember?.familyId == familyId &&
+        val myMember = familyMemberDao.getByFamilyAndId(familyId, uid)
+        val byOwnerRoleFromMember = myMember != null &&
             myMember.userId == uid &&
             myMember.role.equals("owner", ignoreCase = true)
         // Creatore da Room: sempre owner per il bypass, anche se la riga membro / Firestore è incoerente
@@ -482,7 +482,7 @@ class FamilySyncCenter @Inject constructor(
                                 KBLog.sync.warning("membersListener: skip delete local row per proprio uid (creator, REMOVED spurio)", TAG)
                                 continue
                             }
-                            familyMemberDao.deleteById(doc.id)
+                            familyMemberDao.deleteByFamilyAndId(familyId, doc.id)
                         }
 
                         // Merge completo: su alcuni device/cache, documentChanges è vuoto mentre
@@ -499,12 +499,12 @@ class FamilySyncCenter @Inject constructor(
                                     KBLog.sync.warning("membersListener: skip delete local row per proprio uid (creator, isDeleted spurio)", TAG)
                                     continue
                                 }
-                                familyMemberDao.deleteById(doc.id)
+                                familyMemberDao.deleteByFamilyAndId(familyId, doc.id)
                                 continue
                             }
 
                             val memberUid = (d["uid"] as? String) ?: doc.id
-                            val localMember = familyMemberDao.getById(doc.id)
+                            val localMember = familyMemberDao.getByFamilyAndId(familyId, doc.id)
 
                             val remoteUpdatedAt = (d["updatedAt"] as? com.google.firebase.Timestamp)
                                 ?.toDate()?.time
@@ -844,12 +844,12 @@ class FamilySyncCenter @Inject constructor(
                 if (d["isDeleted"] as? Boolean == true) {
                     val creatorBypass = isLocalFamilyCreator(familyId, myUid)
                     if (!(creatorBypass && doc.id == myUid)) {
-                        familyMemberDao.deleteById(doc.id)
+                        familyMemberDao.deleteByFamilyAndId(familyId, doc.id)
                     }
                     continue
                 }
                 val memberUid = (d["uid"] as? String) ?: doc.id
-                val localMember = familyMemberDao.getById(doc.id)
+                val localMember = familyMemberDao.getByFamilyAndId(familyId, doc.id)
                 val remoteUpdatedAt = (d["updatedAt"] as? com.google.firebase.Timestamp)
                     ?.toDate()?.time
                 val localUpdatedAt = localMember?.updatedAtEpochMillis ?: 0L
@@ -1012,11 +1012,11 @@ class FamilySyncCenter @Inject constructor(
                 for (doc in docs) {
                     val d = doc.data.orEmpty()
                     if (d["isDeleted"] as? Boolean == true) {
-                        familyMemberDao.deleteById(doc.id)
+                        familyMemberDao.deleteByFamilyAndId(familyId, doc.id)
                         continue
                     }
                     val memberUid = (d["uid"] as? String) ?: doc.id
-                    val local = familyMemberDao.getById(doc.id)
+                    val local = familyMemberDao.getByFamilyAndId(familyId, doc.id)
                     val remoteUpdatedAt = (d["updatedAt"] as? com.google.firebase.Timestamp)?.toDate()?.time
                     val shouldUpdate = local == null || remoteUpdatedAt == null || remoteUpdatedAt >= (local.updatedAtEpochMillis)
                     if (!shouldUpdate) continue
@@ -1114,7 +1114,7 @@ class FamilySyncCenter @Inject constructor(
             remoteIds.add(doc.id)
 
             val memberUid = (d["uid"] as? String) ?: doc.id
-            val local = familyMemberDao.getById(doc.id)
+            val local = familyMemberDao.getByFamilyAndId(familyId, doc.id)
             val isMe = memberUid == myUid
 
             var displayName: String? = null
@@ -1165,7 +1165,7 @@ class FamilySyncCenter @Inject constructor(
 
         val stale = familyMemberDao.getAllByFamilyId(familyId)
             .filter { it.id !in remoteIds && it.userId != myUid }
-        stale.forEach { familyMemberDao.deleteById(it.id) }
+        stale.forEach { familyMemberDao.deleteByFamilyAndId(familyId, it.id) }
 
         KBLog.sync.info(
             "reconcileMembers familyId=$familyId remoti=${remoteIds.size} rimossi=${stale.size}",

@@ -28,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -76,6 +77,7 @@ fun VehiclesScreen(
     viewModel: VehiclesViewModel = hiltViewModel(),
 ) {
     val vehicles by viewModel.vehicles.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     var showAdd by remember { mutableStateOf(false) }
     var toDelete by remember { mutableStateOf<VehicleEntity?>(null) }
     var toast by remember { mutableStateOf<String?>(null) }
@@ -94,69 +96,75 @@ fun VehiclesScreen(
             )
         },
     ) { padding ->
-        if (vehicles.isEmpty()) {
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                KBEmptyState(
-                    icon = Icons.Filled.DirectionsCar,
-                    title = stringResource(R.string.empty_vehicles_title),
-                    body = stringResource(R.string.empty_vehicles_body),
-                    primaryIcon = Icons.Filled.AddCircle,
-                    primaryLabel = stringResource(R.string.empty_vehicles_action),
-                    accent = orange,
-                    onPrimary = { showAdd = true },
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(vehicles, key = { it.id }) { v ->
-                    val next = earliestNonNull(
-                        v.insuranceExpiryDate,
-                        v.revisionExpiryDate,
-                        v.taxExpiryDate,
-                        v.nextServiceDate,
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.forceRefresh() },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
+            if (vehicles.isEmpty()) {
+                Column(
+                    Modifier
+                        .fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    KBEmptyState(
+                        icon = Icons.Filled.DirectionsCar,
+                        title = stringResource(R.string.empty_vehicles_title),
+                        body = stringResource(R.string.empty_vehicles_body),
+                        primaryIcon = Icons.Filled.AddCircle,
+                        primaryLabel = stringResource(R.string.empty_vehicles_action),
+                        accent = orange,
+                        onPrimary = { showAdd = true },
                     )
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .combinedClickable(
-                                onClick = { onOpenVehicle(v.id) },
-                                onLongClick = { toDelete = v },
-                            ),
-                        colors = CardDefaults.cardColors(containerColor = kb.card),
-                    ) {
-                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Icon(Icons.Filled.DirectionsCar, contentDescription = null, tint = orange)
-                            Column(Modifier.weight(1f)) {
-                                Text(v.name, fontWeight = FontWeight.SemiBold, color = kb.title)
-                                v.licensePlate?.takeIf { it.isNotBlank() }?.let { Text(it, color = kb.subtitle) }
-                            }
-                            next?.let {
-                                Surface(color = deadlineUrgencyColor(it), shape = RoundedCornerShape(12.dp)) {
-                                    Text(
-                                        formatItDate(it),
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        color = Color.White,
-                                        style = MaterialTheme.typography.labelMedium,
-                                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(vehicles, key = { it.id }) { v ->
+                        val next = earliestNonNull(
+                            v.insuranceExpiryDate,
+                            v.revisionExpiryDate,
+                            v.taxExpiryDate,
+                            v.nextServiceDate,
+                        )
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .combinedClickable(
+                                    onClick = { onOpenVehicle(v.id) },
+                                    onLongClick = { toDelete = v },
+                                ),
+                            colors = CardDefaults.cardColors(containerColor = kb.card),
+                        ) {
+                            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Icon(Icons.Filled.DirectionsCar, contentDescription = null, tint = orange)
+                                Column(Modifier.weight(1f)) {
+                                    Text(v.name, fontWeight = FontWeight.SemiBold, color = kb.title)
+                                    v.licensePlate?.takeIf { it.isNotBlank() }?.let { Text(it, color = kb.subtitle) }
                                 }
+                                next?.let {
+                                    Surface(color = deadlineUrgencyColor(it), shape = RoundedCornerShape(12.dp)) {
+                                        Text(
+                                            formatItDate(it),
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                            color = Color.White,
+                                            style = MaterialTheme.typography.labelMedium,
+                                        )
+                                    }
+                                }
+                                Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = kb.subtitle)
                             }
-                            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = kb.subtitle)
                         }
                     }
+                    item { Spacer(Modifier.height(72.dp)) }
                 }
-                item { Spacer(Modifier.height(72.dp)) }
             }
         }
     }

@@ -23,6 +23,7 @@ import it.vittorioscocca.kidbox.data.repository.DocumentRepository
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerMember
 import java.io.File
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
@@ -95,6 +96,16 @@ class DocumentsViewModel @Inject constructor(
                 if (effective.isNotBlank()) bindFamily(effective)
             }
         }
+    }
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /** Pull-to-refresh: rilegge documenti e cartelle da Firestore. */
+    fun forceRefresh() = pullToRefresh.refresh {
+        val familyId = _uiState.value.familyId
+        if (familyId.isBlank()) return@refresh
+        repository.awaitForceRestartRealtime(familyId)
     }
 
     fun bindFamily(familyId: String) {

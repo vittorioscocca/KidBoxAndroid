@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +43,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -89,6 +91,7 @@ import it.vittorioscocca.kidbox.ui.components.KidBoxFormPage
 import it.vittorioscocca.kidbox.ui.components.FormSectionTitle
 import it.vittorioscocca.kidbox.ui.components.FormSectionHeader
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodoListScreen(
     onBack: () -> Unit,
@@ -96,6 +99,7 @@ fun TodoListScreen(
 ) {
     val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var showEditor by remember { mutableStateOf(false) }
@@ -240,41 +244,47 @@ fun TodoListScreen(
             Text(state.listName, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold, color = kb.title)
             Spacer(Modifier.height(16.dp))
 
-            LazyColumn(
-                state = todoListState,
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { viewModel.forceRefresh() },
                 modifier = Modifier.fillMaxSize(),
             ) {
-                if (state.filteredTodos.isEmpty()) {
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = kb.card),
-                        ) {
-                            Text(
-                                stringResource(R.string.todo_no_items),
-                                modifier = Modifier.padding(16.dp),
-                                color = kb.subtitle,
+                LazyColumn(
+                    state = todoListState,
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    if (state.filteredTodos.isEmpty()) {
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = kb.card),
+                            ) {
+                                Text(
+                                    stringResource(R.string.todo_no_items),
+                                    modifier = Modifier.padding(16.dp),
+                                    color = kb.subtitle,
+                                )
+                            }
+                        }
+                    } else {
+                        items(state.filteredTodos, key = { it.id }) { todo ->
+                            TodoRow(
+                                todo = todo,
+                                assigneeName = state.members.firstOrNull { it.uid == todo.assignedTo }?.displayName,
+                                highlighted = flashingTodoId == todo.id,
+                                onToggle = { viewModel.toggleDone(todo.id) },
+                                onEdit = {
+                                    editingTodo = todo
+                                    showEditor = true
+                                },
+                                onDelete = { viewModel.deleteTodo(todo.id) },
                             )
                         }
                     }
-                } else {
-                    items(state.filteredTodos, key = { it.id }) { todo ->
-                        TodoRow(
-                            todo = todo,
-                            assigneeName = state.members.firstOrNull { it.uid == todo.assignedTo }?.displayName,
-                            highlighted = flashingTodoId == todo.id,
-                            onToggle = { viewModel.toggleDone(todo.id) },
-                            onEdit = {
-                                editingTodo = todo
-                                showEditor = true
-                            },
-                            onDelete = { viewModel.deleteTodo(todo.id) },
-                        )
-                    }
+                    item { Spacer(Modifier.height(24.dp)) }
                 }
-                item { Spacer(Modifier.height(24.dp)) }
             }
         }
         }

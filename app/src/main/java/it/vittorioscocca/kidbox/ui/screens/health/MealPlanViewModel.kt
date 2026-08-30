@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import com.google.firebase.functions.FirebaseFunctionsException
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ai.CurrentPlanStore
@@ -13,6 +14,7 @@ import it.vittorioscocca.kidbox.data.health.mealplan.MealPlanDocument
 import it.vittorioscocca.kidbox.data.health.mealplan.MealPlanError
 import it.vittorioscocca.kidbox.data.health.mealplan.MealPlanGenerator
 import it.vittorioscocca.kidbox.data.health.mealplan.MealPlanInput
+import it.vittorioscocca.kidbox.data.health.mealplan.MealPlanRemoteStore
 import it.vittorioscocca.kidbox.data.health.mealplan.MealPlanStore
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBMedicalExamDao
@@ -24,6 +26,7 @@ import it.vittorioscocca.kidbox.data.remote.ai.AiRepository
 import it.vittorioscocca.kidbox.data.repository.PediatricProfileRepository
 import it.vittorioscocca.kidbox.domain.model.HealthImportSnapshot
 import it.vittorioscocca.kidbox.domain.model.KBPlan
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,13 +53,21 @@ data class MealPlanUiState(
     val activeTreatmentCount: Int = 0,
     val message: String? = null,
 ) {
-    val hasBodyMetrics: Boolean get() = weightKg != null && heightCm != null
+    /** Peso e altezza: da Health Connect oppure inseriti a mano nel form. */
+    val hasBodyMetrics: Boolean
+        get() = (weightKg ?: input.manualWeightValue) != null &&
+            (heightCm ?: input.manualHeightValue) != null
+
+    /** Vero quando Health Connect non copre peso, altezza o età: allora li chiediamo all'utente. */
+    val needsManualMetrics: Boolean
+        get() = weightKg == null || heightCm == null || ageYears == null
 }
 
 @HiltViewModel
 class MealPlanViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val mealPlanStore: MealPlanStore,
+    private val mealPlanRemoteStore: MealPlanRemoteStore,
     private val childDao: KBChildDao,
     private val treatmentDao: KBTreatmentDao,
     private val visitDao: KBMedicalVisitDao,
@@ -84,8 +95,33 @@ class MealPlanViewModel @Inject constructor(
         load()
     }
 
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /**
+     * Pull-to-refresh: qui non ci sono listener, il piano vive su Firestore e
+     * si rilegge con una fetch — la stessa che fa l'apertura della schermata.
+     */
+    fun forceRefresh() = pullToRefresh.refresh {
+        if (childId.isBlank()) return@refresh
+        syncFromRemote(withContext(Dispatchers.IO) { mealPlanStore.load(childId) })
+    }
+
     fun updateInput(transform: (MealPlanInput) -> MealPlanInput) {
         _uiState.value = _uiState.value.copy(input = transform(_uiState.value.input))
+    }
+
+    /** Rimuove il piano salvato in locale: nessuna chiamata AI, nessun costo. */
+    fun deletePlan() {
+        val id = childId
+        if (id.isBlank()) return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                mealPlanStore.clear(id)
+                mealPlanRemoteStore.delete(id)
+            }
+            _uiState.value = _uiState.value.copy(document = null, lastUsage = null)
+        }
     }
 
     fun consumeMessage() {
@@ -123,7 +159,10 @@ class MealPlanViewModel @Inject constructor(
                     )
                 }
             }.onSuccess { result ->
-                withContext(Dispatchers.IO) { mealPlanStore.save(childId, result.document) }
+                withContext(Dispatchers.IO) {
+                    mealPlanStore.save(childId, result.document)
+                    mealPlanRemoteStore.upsert(childId, result.document)
+                }
                 _uiState.value = _uiState.value.copy(
                     isGenerating = false,
                     document = result.document,
@@ -172,6 +211,42 @@ class MealPlanViewModel @Inject constructor(
                     examCount = inputs.exams.size,
                     activeTreatmentCount = inputs.activeTreatments.size,
                 )
+                syncFromRemote(cached)
+            }
+        }
+    }
+
+    /**
+     * Allinea la copia locale con Firestore: vince il piano generato più di
+     * recente, e un'eliminazione fatta su un altro device svuota anche qui.
+     */
+    private suspend fun syncFromRemote(local: MealPlanDocument?) {
+        val id = childId
+        if (id.isBlank()) return
+        when (val remote = withContext(Dispatchers.IO) { mealPlanRemoteStore.fetch(id) }) {
+            is MealPlanRemoteStore.Remote.None ->
+                // Mai sincronizzato: se qui c'è un piano locale, è quello da caricare
+                // sul remoto (piano generato prima che il sync esistesse).
+                if (local != null) {
+                    withContext(Dispatchers.IO) { mealPlanRemoteStore.upsert(id, local) }
+                }
+
+            is MealPlanRemoteStore.Remote.Deleted ->
+                if (local != null) {
+                    withContext(Dispatchers.IO) { mealPlanStore.clear(id) }
+                    _uiState.value = _uiState.value.copy(document = null, lastUsage = null)
+                }
+
+            is MealPlanRemoteStore.Remote.Plan -> {
+                val newer = remote.document.generatedAtEpochMillis >
+                    (local?.generatedAtEpochMillis ?: Long.MIN_VALUE)
+                if (newer) {
+                    withContext(Dispatchers.IO) { mealPlanStore.save(id, remote.document) }
+                    _uiState.value = _uiState.value.copy(
+                        document = remote.document,
+                        input = remote.document.input,
+                    )
+                }
             }
         }
     }
@@ -230,6 +305,13 @@ class MealPlanViewModel @Inject constructor(
             error.remaining,
             error.dailyLimit,
         )
+        is FirebaseFunctionsException ->
+            if (error.code == FirebaseFunctionsException.Code.DEADLINE_EXCEEDED) {
+                context.getString(R.string.meal_plan_error_timeout)
+            } else {
+                error.message?.takeIf { it.isNotBlank() }
+                    ?: context.getString(R.string.meal_plan_error_generic)
+            }
         else -> error.message?.takeIf { it.isNotBlank() }
             ?: context.getString(R.string.meal_plan_error_generic)
     }

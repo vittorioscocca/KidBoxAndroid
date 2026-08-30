@@ -543,6 +543,18 @@ class HomeViewModel @Inject constructor(
                     KBLog.ui.info("forceRefresh familyId=$familyId", MEMBERS_SYNC_TAG)
                     runCatching { familySyncCenter.forceResync(familyId) }
                         .onFailure { KBLog.ui.warning("forceRefresh forceResync fallito: ${it.message}", MEMBERS_SYNC_TAG) }
+
+                    // Anche la dashboard va rinfrescata, non solo la famiglia: i
+                    // badge delle sezioni vengono dal documento `counters` e le
+                    // card da wallet e password, ciascuno col proprio listener.
+                    // Senza questo, il pull sistemava i membri e lasciava i
+                    // numeri delle sezioni fermi a prima.
+                    homeBadgeManager.stopListening()
+                    homeBadgeManager.startListening(familyId)
+                    runCatching { walletRepository.awaitForceRestartRealtime(familyId) }
+                        .onFailure { KBLog.ui.warning("forceRefresh wallet fallito: ${it.message}", MEMBERS_SYNC_TAG) }
+                    runCatching { passwordsRepository.awaitForceRestartRealtime(familyId) }
+                        .onFailure { KBLog.ui.warning("forceRefresh password fallito: ${it.message}", MEMBERS_SYNC_TAG) }
                 }
                 refreshAvatarUrl()
                 refreshOnboarding()

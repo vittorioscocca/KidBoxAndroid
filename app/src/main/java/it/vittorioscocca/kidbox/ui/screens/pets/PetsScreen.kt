@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -69,6 +70,7 @@ fun PetsScreen(
 ) {
     val context = LocalContext.current
     val pets by viewModel.pets.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     var showAdd by remember { mutableStateOf(false) }
     var petToDelete by remember { mutableStateOf<PetEntity?>(null) }
     var toast by remember { mutableStateOf<String?>(null) }
@@ -87,65 +89,71 @@ fun PetsScreen(
             )
         },
     ) { padding ->
-        if (pets.isEmpty()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                KBEmptyState(
-                    icon = Icons.Filled.Pets,
-                    title = stringResource(R.string.empty_pets_title),
-                    body = stringResource(R.string.empty_pets_body),
-                    primaryIcon = Icons.Filled.AddCircle,
-                    primaryLabel = stringResource(R.string.empty_pets_action),
-                    accent = orange,
-                    onPrimary = { showAdd = true },
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(pets, key = { it.id }) { pet ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .combinedClickable(
-                                onClick = { onOpenPet(pet.id) },
-                                onLongClick = { petToDelete = pet },
-                            ),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    ) {
-                        Row(
-                            Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.forceRefresh() },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
+            if (pets.isEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    KBEmptyState(
+                        icon = Icons.Filled.Pets,
+                        title = stringResource(R.string.empty_pets_title),
+                        body = stringResource(R.string.empty_pets_body),
+                        primaryIcon = Icons.Filled.AddCircle,
+                        primaryLabel = stringResource(R.string.empty_pets_action),
+                        accent = orange,
+                        onPrimary = { showAdd = true },
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(pets, key = { it.id }) { pet ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .combinedClickable(
+                                    onClick = { onOpenPet(pet.id) },
+                                    onLongClick = { petToDelete = pet },
+                                ),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                         ) {
-                            Text(speciesEmoji(pet.species), style = MaterialTheme.typography.headlineSmall)
-                            Column(Modifier.weight(1f)) {
-                                Text(pet.name, fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.title)
-                                Text(speciesLabel(context, pet.species), color = MaterialTheme.kidBoxColors.subtitle, style = MaterialTheme.typography.bodySmall)
-                                pet.breed?.takeIf { it.isNotBlank() }?.let {
-                                    Text(it, color = MaterialTheme.kidBoxColors.subtitle, style = MaterialTheme.typography.bodySmall)
+                            Row(
+                                Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Text(speciesEmoji(pet.species), style = MaterialTheme.typography.headlineSmall)
+                                Column(Modifier.weight(1f)) {
+                                    Text(pet.name, fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.title)
+                                    Text(speciesLabel(context, pet.species), color = MaterialTheme.kidBoxColors.subtitle, style = MaterialTheme.typography.bodySmall)
+                                    pet.breed?.takeIf { it.isNotBlank() }?.let {
+                                        Text(it, color = MaterialTheme.kidBoxColors.subtitle, style = MaterialTheme.typography.bodySmall)
+                                    }
                                 }
+                                Icon(
+                                    Icons.Filled.ChevronRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.kidBoxColors.subtitle,
+                                )
                             }
-                            Icon(
-                                Icons.Filled.ChevronRight,
-                                contentDescription = null,
-                                tint = MaterialTheme.kidBoxColors.subtitle,
-                            )
                         }
                     }
+                    item { Spacer(Modifier.height(72.dp)) }
                 }
-                item { Spacer(Modifier.height(72.dp)) }
             }
         }
     }

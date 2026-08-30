@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +43,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -90,7 +92,7 @@ private fun NoteSection.label(): String = when (this) {
     NoteSection.OLDER -> stringResource(R.string.notes_section_older)
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun NotesHomeScreen(
     familyId: String,
@@ -99,6 +101,7 @@ fun NotesHomeScreen(
     viewModel: NotesHomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     TrackSectionPresence(AppSection.NOTES, familyId)
     val kb = MaterialTheme.kidBoxColors
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -315,157 +318,163 @@ fun NotesHomeScreen(
             }
 
             else -> {
-                LazyColumn(
+                PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = { viewModel.forceRefresh() },
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    if (sectioned.isEmpty()) {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 32.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(stringResource(R.string.notes_no_results), color = kb.subtitle)
-                            }
-                        }
-                    } else {
-                        sectioned.forEach { (section, notes) ->
-                            item(key = "section-${section.name}") {
-                                Text(
-                                    text = section.label().uppercase(KBLocale.current()),
-                                    color = kb.subtitle,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
-                                )
-                            }
-                            items(notes, key = { it.id }) { note ->
-                                val isPinned = pinnedIds.contains(note.id)
-                                val isSelected = selectedIds.contains(note.id)
-                                val cardColor = animatedCardColor(isSelected, kb.card)
-                                val cardElevation = animatedCardElevation(isSelected)
-                                val selectionTint = animatedSelectionTint(isSelected, kb.subtitle)
-                                val selectionScale = animatedSelectionScale(isSelected)
-                                val pinTint = animatedPinTint(isPinned, kb.subtitle)
-                                Card(
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        if (sectioned.isEmpty()) {
+                            item {
+                                Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .combinedClickable(
-                                            onLongClick = {
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                isSelecting = true
-                                                selectedIds = selectedIds + note.id
-                                            },
-                                            onClick = {
-                                                if (isSelecting) {
-                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                    selectedIds = if (isSelected) selectedIds - note.id else selectedIds + note.id
-                                                } else {
-                                                    onNavigate(AppDestination.NoteDetail.createRoute(familyId = familyId, noteId = note.id))
-                                                }
-                                            },
-                                        ),
-                                    shape = RoundedCornerShape(20.dp),
-                                    colors = CardDefaults.cardColors(containerColor = cardColor),
-                                    elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
+                                        .padding(top = 32.dp),
+                                    contentAlignment = Alignment.Center,
                                 ) {
-                                    Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            if (isSelecting) {
-                                                Icon(
-                                                    imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                                                    contentDescription = null,
-                                                    tint = selectionTint,
-                                                    modifier = Modifier
-                                                        .size(18.dp)
-                                                        .padding(end = 6.dp)
-                                                        .graphicsLayer {
-                                                            scaleX = selectionScale
-                                                            scaleY = selectionScale
-                                                        },
-                                                )
-                                            }
-                                            Text(
-                                                text = note.title.ifBlank { stringResource(R.string.notes_untitled) },
-                                                color = kb.title,
-                                                fontWeight = FontWeight.SemiBold,
-                                                fontSize = 18.sp,
-                                                modifier = Modifier.weight(1f),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                            )
-                                            if (!isSelecting) {
-                                                IconButton(
-                                                    modifier = Modifier.size(36.dp),
-                                                    onClick = {
+                                    Text(stringResource(R.string.notes_no_results), color = kb.subtitle)
+                                }
+                            }
+                        } else {
+                            sectioned.forEach { (section, notes) ->
+                                item(key = "section-${section.name}") {
+                                    Text(
+                                        text = section.label().uppercase(KBLocale.current()),
+                                        color = kb.subtitle,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
+                                    )
+                                }
+                                items(notes, key = { it.id }) { note ->
+                                    val isPinned = pinnedIds.contains(note.id)
+                                    val isSelected = selectedIds.contains(note.id)
+                                    val cardColor = animatedCardColor(isSelected, kb.card)
+                                    val cardElevation = animatedCardElevation(isSelected)
+                                    val selectionTint = animatedSelectionTint(isSelected, kb.subtitle)
+                                    val selectionScale = animatedSelectionScale(isSelected)
+                                    val pinTint = animatedPinTint(isPinned, kb.subtitle)
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .combinedClickable(
+                                                onLongClick = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    isSelecting = true
+                                                    selectedIds = selectedIds + note.id
+                                                },
+                                                onClick = {
+                                                    if (isSelecting) {
                                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                        val nowPinned = !isPinned
-                                                        persistPinned(
-                                                            if (nowPinned) pinnedIds + note.id else pinnedIds - note.id,
-                                                            justPinned = nowPinned,
-                                                        )
-                                                    },
-                                                ) {
+                                                        selectedIds = if (isSelected) selectedIds - note.id else selectedIds + note.id
+                                                    } else {
+                                                        onNavigate(AppDestination.NoteDetail.createRoute(familyId = familyId, noteId = note.id))
+                                                    }
+                                                },
+                                            ),
+                                        shape = RoundedCornerShape(20.dp),
+                                        colors = CardDefaults.cardColors(containerColor = cardColor),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
+                                    ) {
+                                        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                if (isSelecting) {
                                                     Icon(
-                                                        Icons.Filled.PushPin,
-                                                        contentDescription = stringResource(R.string.notes_pin_cd),
-                                                        tint = pinTint,
-                                                        modifier = Modifier.size(20.dp),
+                                                        imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                                                        contentDescription = null,
+                                                        tint = selectionTint,
+                                                        modifier = Modifier
+                                                            .size(18.dp)
+                                                            .padding(end = 6.dp)
+                                                            .graphicsLayer {
+                                                                scaleX = selectionScale
+                                                                scaleY = selectionScale
+                                                            },
                                                     )
                                                 }
-                                                IconButton(
-                                                    modifier = Modifier.size(36.dp),
-                                                    onClick = { viewModel.deleteNote(note.id) },
-                                                ) {
-                                                    Icon(
-                                                        Icons.Default.Delete,
-                                                        contentDescription = stringResource(R.string.notes_delete_cd),
-                                                        tint = kb.subtitle,
-                                                        modifier = Modifier.size(20.dp),
-                                                    )
+                                                Text(
+                                                    text = note.title.ifBlank { stringResource(R.string.notes_untitled) },
+                                                    color = kb.title,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    fontSize = 18.sp,
+                                                    modifier = Modifier.weight(1f),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                                if (!isSelecting) {
+                                                    IconButton(
+                                                        modifier = Modifier.size(36.dp),
+                                                        onClick = {
+                                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                            val nowPinned = !isPinned
+                                                            persistPinned(
+                                                                if (nowPinned) pinnedIds + note.id else pinnedIds - note.id,
+                                                                justPinned = nowPinned,
+                                                            )
+                                                        },
+                                                    ) {
+                                                        Icon(
+                                                            Icons.Filled.PushPin,
+                                                            contentDescription = stringResource(R.string.notes_pin_cd),
+                                                            tint = pinTint,
+                                                            modifier = Modifier.size(20.dp),
+                                                        )
+                                                    }
+                                                    IconButton(
+                                                        modifier = Modifier.size(36.dp),
+                                                        onClick = { viewModel.deleteNote(note.id) },
+                                                    ) {
+                                                        Icon(
+                                                            Icons.Default.Delete,
+                                                            contentDescription = stringResource(R.string.notes_delete_cd),
+                                                            tint = kb.subtitle,
+                                                            modifier = Modifier.size(20.dp),
+                                                        )
+                                                    }
                                                 }
                                             }
-                                        }
-                                        Spacer(Modifier.height(6.dp))
-                                        Text(
-                                            text = previewFor(note.body, stringResource(R.string.notes_no_content)),
-                                            color = kb.subtitle,
-                                            maxLines = 2,
-                                            fontSize = 14.sp,
-                                        )
-                                        Spacer(Modifier.height(6.dp))
-                                        // Orario e chi ha creato/condiviso la nota sulla
-                                        // stessa riga, allineati a sinistra (icona cartella +
-                                        // nome, stesso stile di iOS). Il nome è risolto dai
-                                        // membri famiglia via uid — non dal campo denormalizzato
-                                        // `updatedByName`, che alla creazione è sempre vuoto.
-                                        val editorName = state.memberNames[note.updatedBy].orEmpty().trim()
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Spacer(Modifier.height(6.dp))
                                             Text(
-                                                text = formatDate(note.updatedAtEpochMillis, stringResource(R.string.notes_yesterday)),
+                                                text = previewFor(note.body, stringResource(R.string.notes_no_content)),
                                                 color = kb.subtitle,
-                                                fontSize = 12.sp,
+                                                maxLines = 2,
+                                                fontSize = 14.sp,
                                             )
-                                            if (editorName.isNotEmpty()) {
-                                                Spacer(Modifier.width(6.dp))
-                                                Icon(
-                                                    Icons.Filled.Folder,
-                                                    contentDescription = null,
-                                                    tint = kb.subtitle,
-                                                    modifier = Modifier
-                                                        .size(12.dp)
-                                                        .padding(end = 4.dp),
-                                                )
+                                            Spacer(Modifier.height(6.dp))
+                                            // Orario e chi ha creato/condiviso la nota sulla
+                                            // stessa riga, allineati a sinistra (icona cartella +
+                                            // nome, stesso stile di iOS). Il nome è risolto dai
+                                            // membri famiglia via uid — non dal campo denormalizzato
+                                            // `updatedByName`, che alla creazione è sempre vuoto.
+                                            val editorName = state.memberNames[note.updatedBy].orEmpty().trim()
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Text(
-                                                    text = editorName,
+                                                    text = formatDate(note.updatedAtEpochMillis, stringResource(R.string.notes_yesterday)),
                                                     color = kb.subtitle,
-                                                    fontSize = 11.sp,
+                                                    fontSize = 12.sp,
                                                 )
+                                                if (editorName.isNotEmpty()) {
+                                                    Spacer(Modifier.width(6.dp))
+                                                    Icon(
+                                                        Icons.Filled.Folder,
+                                                        contentDescription = null,
+                                                        tint = kb.subtitle,
+                                                        modifier = Modifier
+                                                            .size(12.dp)
+                                                            .padding(end = 4.dp),
+                                                    )
+                                                    Text(
+                                                        text = editorName,
+                                                        color = kb.subtitle,
+                                                        fontSize = 11.sp,
+                                                    )
+                                                }
                                             }
                                         }
                                     }

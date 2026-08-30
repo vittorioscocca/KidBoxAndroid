@@ -62,6 +62,20 @@ class GroceryRepository @Inject constructor(
         }
     }
 
+    /**
+     * Pull-to-refresh: riaggancia il listener realtime.
+     *
+     * Qui [startRealtime] riattacca già a ogni chiamata (nessun guard di
+     * famiglia), quindi basta inoltrare — la funzione esiste per dare a tutte
+     * le sezioni lo stesso punto d'ingresso del pull.
+     */
+    suspend fun awaitForceRestartRealtime(
+        familyId: String,
+        onPermissionDenied: (() -> Unit)? = null,
+    ) {
+        startRealtime(familyId, onPermissionDenied)
+    }
+
     fun stopRealtime() {
         scope.launch {
             realtimeMutex.withLock {

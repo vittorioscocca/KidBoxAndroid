@@ -36,7 +36,9 @@ import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -65,6 +67,7 @@ import androidx.compose.ui.platform.LocalContext
 /** Stesso family del viola cure / tema iOS (avatar cerchio sotto nome). */
 private val HEALTH_HEADER_TINT = Color(0xFF9573D9)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HealthHomeScreen(
     familyId: String,
@@ -76,6 +79,7 @@ fun HealthHomeScreen(
     val context = LocalContext.current
     val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
 
     LaunchedEffect(familyId, childId) { viewModel.load(familyId, childId) }
 
@@ -176,72 +180,78 @@ fun HealthHomeScreen(
             .fillMaxSize()
             .background(kb.background),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 18.dp),
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.forceRefresh() },
+            modifier = Modifier.fillMaxSize(),
         ) {
-            Spacer(Modifier.height(10.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 18.dp),
             ) {
-                KidBoxHeaderCircleButton(
-                    icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                    contentDescription = stringResource(R.string.health_back),
-                    onClick = onBack,
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    KidBoxHeaderCircleButton(
+                        icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        contentDescription = stringResource(R.string.health_back),
+                        onClick = onBack,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.health_title),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 34.sp,
+                    color = kb.title,
+                    modifier = Modifier.fillMaxWidth(),
                 )
-            }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(R.string.health_title),
-                fontWeight = FontWeight.Bold,
-                fontSize = 34.sp,
-                color = kb.title,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(8.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(HEALTH_HEADER_TINT.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("🧑", fontSize = 24.sp)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            state.subjectName.ifBlank { stringResource(R.string.health_profile) },
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
+                            color = kb.title,
+                        )
+                        Text(stringResource(R.string.health_diary), fontSize = 14.sp, color = kb.subtitle)
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+
                 Box(
                     modifier = Modifier
-                        .size(52.dp)
-                        .clip(CircleShape)
-                        .background(HEALTH_HEADER_TINT.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center,
+                        .fillMaxWidth()
+                        .weight(1f),
                 ) {
-                    Text("🧑", fontSize = 24.sp)
-                }
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text(
-                        state.subjectName.ifBlank { stringResource(R.string.health_profile) },
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = kb.title,
-                    )
-                    Text(stringResource(R.string.health_diary), fontSize = 14.sp, color = kb.subtitle)
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-            ) {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        bottom = if (state.hasAnyHealthData) 108.dp else 32.dp,
-                    ),
-                ) {
-                    items(cards, key = { it.title }) { card -> HealthModuleCard(card) }
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            bottom = if (state.hasAnyHealthData) 108.dp else 32.dp,
+                        ),
+                    ) {
+                        items(cards, key = { it.title }) { card -> HealthModuleCard(card) }
+                    }
                 }
             }
         }

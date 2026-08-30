@@ -112,6 +112,17 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
+                    android:host="kidboxapp.com"
+                    android:pathPrefix="/join" />
+                <!--
+                    Il vecchio host resta accanto al nuovo, non al suo posto: è
+                    lo stesso sito Firebase servito su due nomi, e gli inviti già
+                    circolanti portano ancora `kidbox-landing.web.app`. Toglierlo
+                    li farebbe aprire nel browser invece che nell'app.
+                    Entrambi i domini servono lo stesso assetlinks.json.
+                -->
+                <data
+                    android:scheme="https"
                     android:host="kidbox-landing.web.app"
                     android:pathPrefix="/join" />
             </intent-filter>

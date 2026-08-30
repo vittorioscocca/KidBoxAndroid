@@ -35,6 +35,9 @@ class MealPlanStore @Inject constructor(
             put("preferredFoods", document.input.preferredFoods)
             put("avoidedFoods", document.input.avoidedFoods)
             put("notes", document.input.notes)
+            put("manualAgeYears", document.input.manualAgeYears)
+            put("manualWeightKg", document.input.manualWeightKg)
+            put("manualHeightCm", document.input.manualHeightCm)
         }
         file(childId).writeText(json.toString())
     }
@@ -55,6 +58,9 @@ class MealPlanStore @Inject constructor(
                     preferredFoods = json.optString("preferredFoods"),
                     avoidedFoods = json.optString("avoidedFoods"),
                     notes = json.optString("notes"),
+                    manualAgeYears = json.optString("manualAgeYears"),
+                    manualWeightKg = json.optString("manualWeightKg"),
+                    manualHeightCm = json.optString("manualHeightCm"),
                 ),
                 text = json.optString("text"),
                 generatedAtEpochMillis = json.optLong("generatedAtEpochMillis", file.lastModified()),

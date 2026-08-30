@@ -27,6 +27,8 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.onSizeChanged
@@ -169,6 +171,7 @@ private enum class PhotoGrouping(@androidx.annotation.StringRes val labelRes: In
     YEAR(R.string.photos_years), MONTH(R.string.photos_months), DAY(R.string.photos_days), ALL(R.string.photos_all)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FamilyPhotosScreen(
     onBack: () -> Unit,
@@ -176,6 +179,7 @@ fun FamilyPhotosScreen(
     viewModel: FamilyPhotosViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     // Copre in un colpo solo le decifrature che qui falliscono in silenzio.
@@ -416,76 +420,82 @@ fun FamilyPhotosScreen(
             }
 
             Spacer(Modifier.height(8.dp))
-            when (currentTab) {
-                PhotosTab.LIBRARY -> {
-                    LibraryContent(
-                        isLoading = state.isLoading,
-                        photos = state.filteredPhotos,
-                        grouping = grouping,
-                        onGroupingChange = { grouping = it },
-                        thumbTarget = thumbTarget,
-                        onThumbTargetChange = { thumbTarget = it },
-                        pendingScrollKey = pendingScrollKey,
-                        onScrollConsumed = { pendingScrollKey = null },
-                        onRequestYearScroll = { monthKey ->
-                            pendingScrollKey = monthKey
-                            grouping = PhotoGrouping.MONTH
-                        },
-                        isSelectionMode = isSelectionMode,
-                        selectedPhotoIds = selectedPhotoIds,
-                        uploadingPhotoIds = state.uploadingPhotoIds,
-                        familyId = state.familyId,
-                        loadPreview = viewModel::previewBitmap,
-                        onEmptyPick = {
-                            multiMediaPicker.launch(imageAndVideoRequest())
-                        },
-                        onEmptyCamera = { requestPhotoCamera() },
-                        onPhotoTap = { photo ->
-                            if (isSelectionMode) {
-                                selectedPhotoIds = if (selectedPhotoIds.contains(photo.id)) {
-                                    selectedPhotoIds - photo.id
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { viewModel.forceRefresh() },
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                when (currentTab) {
+                    PhotosTab.LIBRARY -> {
+                        LibraryContent(
+                            isLoading = state.isLoading,
+                            photos = state.filteredPhotos,
+                            grouping = grouping,
+                            onGroupingChange = { grouping = it },
+                            thumbTarget = thumbTarget,
+                            onThumbTargetChange = { thumbTarget = it },
+                            pendingScrollKey = pendingScrollKey,
+                            onScrollConsumed = { pendingScrollKey = null },
+                            onRequestYearScroll = { monthKey ->
+                                pendingScrollKey = monthKey
+                                grouping = PhotoGrouping.MONTH
+                            },
+                            isSelectionMode = isSelectionMode,
+                            selectedPhotoIds = selectedPhotoIds,
+                            uploadingPhotoIds = state.uploadingPhotoIds,
+                            familyId = state.familyId,
+                            loadPreview = viewModel::previewBitmap,
+                            onEmptyPick = {
+                                multiMediaPicker.launch(imageAndVideoRequest())
+                            },
+                            onEmptyCamera = { requestPhotoCamera() },
+                            onPhotoTap = { photo ->
+                                if (isSelectionMode) {
+                                    selectedPhotoIds = if (selectedPhotoIds.contains(photo.id)) {
+                                        selectedPhotoIds - photo.id
+                                    } else {
+                                        selectedPhotoIds + photo.id
+                                    }
+                                    if (selectedPhotoIds.isEmpty()) isSelectionMode = false
                                 } else {
-                                    selectedPhotoIds + photo.id
+                                    viewerPhotoId = photo.id
                                 }
+                            },
+                            onPhotoLongPress = { photo ->
+                                longPressMenuPhoto = photo
+                            },
+                            onSetSelected = { id, sel ->
+                                selectedPhotoIds = if (sel) selectedPhotoIds + id else selectedPhotoIds - id
                                 if (selectedPhotoIds.isEmpty()) isSelectionMode = false
-                            } else {
-                                viewerPhotoId = photo.id
-                            }
-                        },
-                        onPhotoLongPress = { photo ->
-                            longPressMenuPhoto = photo
-                        },
-                        onSetSelected = { id, sel ->
-                            selectedPhotoIds = if (sel) selectedPhotoIds + id else selectedPhotoIds - id
-                            if (selectedPhotoIds.isEmpty()) isSelectionMode = false
-                        },
-                    )
-                }
+                            },
+                        )
+                    }
 
-                PhotosTab.ALBUMS -> {
-                    AlbumsContent(
-                        isLoading = state.isLoading,
-                        albums = state.albums,
-                        allPhotos = state.photos,
-                        isSelectionMode = isAlbumSelectionMode,
-                        selectedAlbumIds = selectedAlbumIds,
-                        onCreateAlbum = { showCreateAlbum = true },
-                        onAlbumTap = { album ->
-                            if (isAlbumSelectionMode) {
-                                selectedAlbumIds = if (selectedAlbumIds.contains(album.id)) {
-                                    selectedAlbumIds - album.id
+                    PhotosTab.ALBUMS -> {
+                        AlbumsContent(
+                            isLoading = state.isLoading,
+                            albums = state.albums,
+                            allPhotos = state.photos,
+                            isSelectionMode = isAlbumSelectionMode,
+                            selectedAlbumIds = selectedAlbumIds,
+                            onCreateAlbum = { showCreateAlbum = true },
+                            onAlbumTap = { album ->
+                                if (isAlbumSelectionMode) {
+                                    selectedAlbumIds = if (selectedAlbumIds.contains(album.id)) {
+                                        selectedAlbumIds - album.id
+                                    } else {
+                                        selectedAlbumIds + album.id
+                                    }
+                                    if (selectedAlbumIds.isEmpty()) isAlbumSelectionMode = false
                                 } else {
-                                    selectedAlbumIds + album.id
+                                    onOpenAlbumDetail(album.id, album.title)
                                 }
-                                if (selectedAlbumIds.isEmpty()) isAlbumSelectionMode = false
-                            } else {
-                                onOpenAlbumDetail(album.id, album.title)
-                            }
-                        },
-                        onAlbumLongPress = { album ->
-                            longPressMenuAlbum = album
-                        },
-                    )
+                            },
+                            onAlbumLongPress = { album ->
+                                longPressMenuAlbum = album
+                            },
+                        )
+                    }
                 }
             }
         }

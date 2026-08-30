@@ -15,7 +15,7 @@ import it.vittorioscocca.kidbox.domain.model.KBPlan
 
 /**
  * Generazione del piano alimentare via Cloud Function `askAI` con
- * `purpose: "mealPlan"` (Anthropic Sonnet lato server, max_tokens esteso).
+ * `purpose: "mealPlan"` (Anthropic Haiku lato server, max_tokens esteso).
  */
 object MealPlanGenerator {
 
@@ -56,6 +56,7 @@ object MealPlanGenerator {
             birthDateEpochMillis = birthDateEpochMillis,
             snapshot = snapshot,
             profile = profile,
+            input = input,
         )
         return Payload(
             systemPrompt = MealPlanPromptBuilder.systemPrompt(
@@ -68,8 +69,8 @@ object MealPlanGenerator {
                 healthContext = healthContext,
             ),
             profileSummary = profileSummary,
-            hasWeight = snapshot?.weightKg != null,
-            hasHeight = snapshot?.heightCm != null,
+            hasWeight = snapshot?.weightKg != null || input.manualWeightValue != null,
+            hasHeight = snapshot?.heightCm != null || input.manualHeightValue != null,
         )
     }
 

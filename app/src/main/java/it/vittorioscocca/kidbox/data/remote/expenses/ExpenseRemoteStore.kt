@@ -57,39 +57,42 @@ class ExpenseRemoteStore @Inject constructor(
                     onError(err)
                     return@EventListener
                 }
-                val changes = snap?.documentChanges?.mapNotNull { diff ->
-                    val doc = diff.document
-                    val d = doc.data
-                    when (diff.type) {
-                        DocumentChange.Type.ADDED,
-                        DocumentChange.Type.MODIFIED,
-                        -> {
-                            val title = (d["title"] as? String)?.trim().orEmpty()
-                            val amount = (d["amount"] as? Number)?.toDouble() ?: return@mapNotNull null
-                            val dateEpochMillis = (d["date"] as? Timestamp)?.toDate()?.time ?: return@mapNotNull null
-                            if (title.isBlank()) return@mapNotNull null
-                            ExpenseRemoteChange.Upsert(
-                                RemoteExpenseDto(
-                                    id = doc.id,
-                                    familyId = familyId,
-                                    title = title,
-                                    amount = amount,
-                                    dateEpochMillis = dateEpochMillis,
-                                    categoryId = (d["categoryId"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
-                                    notes = (d["notes"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
-                                    attachedDocumentId = (d["attachedDocumentId"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
-                                    createdByUid = (d["createdByUid"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
-                                    updatedBy = (d["updatedBy"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
-                                    createdAtEpochMillis = (d["createdAt"] as? Timestamp)?.toDate()?.time,
-                                    updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
-                                    isDeleted = d["isDeleted"] as? Boolean ?: false,
-                                ),
-                            )
-                        }
-
-                        DocumentChange.Type.REMOVED -> ExpenseRemoteChange.Remove(doc.id)
-                    }
+                // Gli upsert vengono dal risultato COMPLETO della query
+                // (`snap.documents`), non dal delta (`snap.documentChanges`): con la
+                // persistenza locale attiva Firestore può riusare una snapshot in cache e
+                // farsela confermare "invariata" dal server con un existence filter, senza
+                // inviare alcun document_change. In quel caso il delta è vuoto anche se la
+                // query ha risultati reali, e in Room non arrivava più nulla. Le rimozioni
+                // restano sul delta, dove sono affidabili.
+                val upserts = snap?.documents?.mapNotNull { doc ->
+                    val d = doc.data ?: return@mapNotNull null
+                    val title = (d["title"] as? String)?.trim().orEmpty()
+                    val amount = (d["amount"] as? Number)?.toDouble() ?: return@mapNotNull null
+                    val dateEpochMillis = (d["date"] as? Timestamp)?.toDate()?.time ?: return@mapNotNull null
+                    if (title.isBlank()) return@mapNotNull null
+                    ExpenseRemoteChange.Upsert(
+                        RemoteExpenseDto(
+                            id = doc.id,
+                            familyId = familyId,
+                            title = title,
+                            amount = amount,
+                            dateEpochMillis = dateEpochMillis,
+                            categoryId = (d["categoryId"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                            notes = (d["notes"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                            attachedDocumentId = (d["attachedDocumentId"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                            createdByUid = (d["createdByUid"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                            updatedBy = (d["updatedBy"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                            createdAtEpochMillis = (d["createdAt"] as? Timestamp)?.toDate()?.time,
+                            updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
+                            isDeleted = d["isDeleted"] as? Boolean ?: false,
+                        ),
+                    )
                 }.orEmpty()
+                val removes = snap?.documentChanges
+                    ?.filter { it.type == DocumentChange.Type.REMOVED }
+                    ?.map { ExpenseRemoteChange.Remove(it.document.id) }
+                    .orEmpty()
+                val changes = upserts + removes
                 if (changes.isNotEmpty()) onChange(changes)
             },
         )

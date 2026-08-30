@@ -101,57 +101,65 @@ class DocumentRemoteStore @Inject constructor(
                 val isFromCache = snap?.metadata?.isFromCache == true
                 var upsertCount = 0
                 var removedCount = 0
-                snap?.documentChanges?.forEach { diff ->
-                    val doc = diff.document
-                    val d = doc.data
+                // Documenti da riversare: normalmente il delta, ma se il delta è
+                // vuoto si ricade sul risultato completo della query. Con la
+                // persistenza locale Firestore può riusare una snapshot in cache e
+                // farsela confermare "invariata" dal server con un existence
+                // filter, senza inviare alcun document_change: il delta risulta
+                // vuoto anche con risultati reali e in Room non arriva più nulla.
+                //
+                // Il fallback invece della lettura sempre completa (come fa
+                // TodoRemoteStore) è deliberato: qui i documenti di una famiglia
+                // possono essere molti, e rimandarli tutti a ogni snapshot
+                // costerebbe caro per l'unico caso in cui serve.
+                val changed = snap?.documentChanges.orEmpty()
+                val upsertDocs = changed
+                    .filter { it.type != DocumentChange.Type.REMOVED }
+                    .map { it.document }
+                    .ifEmpty { if (changed.isEmpty()) snap?.documents.orEmpty() else emptyList() }
+                upsertDocs.forEach { doc ->
+                    val d = doc.data ?: return@forEach
                     val resolvedCategoryId = (d["categoryId"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
                         ?: (d["parentId"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
                         ?: (d["folderId"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
-                    when (diff.type) {
-                        DocumentChange.Type.ADDED,
-                        DocumentChange.Type.MODIFIED,
-                        -> {
-                            if (isFromCache && doc.id.startsWith("exp-") && resolvedCategoryId.isNullOrBlank()) {
-                                KBLog.data.debug("cache-guard skip document id=${doc.id} reason=fromCache_null_category", TAG_DOC_SYNC)
-                                return@forEach
-                            }
-                            val dto = RemoteDocumentDto(
-                                id = doc.id,
-                                familyId = familyId,
-                                childId = (d["childId"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
-                                categoryId = resolvedCategoryId,
-                                title = (d["title"] as? String)?.trim().orEmpty(),
-                                fileName = (d["fileName"] as? String)?.trim().orEmpty(),
-                                mimeType = (d["mimeType"] as? String)?.trim().orEmpty().ifBlank { "application/octet-stream" },
-                                fileSize = (d["fileSize"] as? Number)?.toLong() ?: 0L,
-                                storagePath = (d["storagePath"] as? String)?.trim().orEmpty(),
-                                downloadURL = (d["downloadURL"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
-                                notes = (d["notes"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
-                                extractedText = (d["extractedText"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
-                                extractedTextUpdatedAtEpochMillis = (d["extractedTextUpdatedAt"] as? Timestamp)?.toDate()?.time,
-                                extractionStatusRaw = (d["extractionStatusRaw"] as? Number)?.toInt(),
-                                extractionError = (d["extractionError"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
-                                isDeleted = d["isDeleted"] as? Boolean ?: false,
-                                createdAtEpochMillis = (d["createdAt"] as? Timestamp)?.toDate()?.time,
-                                updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
-                                updatedBy = (d["updatedBy"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
-                                visibilityScope = (d["visibilityScope"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
-                                visibilityMemberIds = visibilityMemberIdsFromFirestore(d["visibilityMemberIds"]),
-                                createdBy = (d["createdBy"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
-                            )
-                            onChange(DocumentRemoteChange.UpsertDocument(dto, isFromCache = isFromCache))
-                            upsertCount += 1
-                        }
-
-                        DocumentChange.Type.REMOVED -> {
-                            if (isFromCache) {
-                                KBLog.data.debug("cache-guard skip document removed id=${doc.id}", TAG_DOC_SYNC)
-                                return@forEach
-                            }
-                            onChange(DocumentRemoteChange.RemoveDocument(doc.id, isFromCache = false))
-                            removedCount += 1
-                        }
+                    if (isFromCache && doc.id.startsWith("exp-") && resolvedCategoryId.isNullOrBlank()) {
+                        KBLog.data.debug("cache-guard skip document id=${doc.id} reason=fromCache_null_category", TAG_DOC_SYNC)
+                        return@forEach
                     }
+                    val dto = RemoteDocumentDto(
+                        id = doc.id,
+                        familyId = familyId,
+                        childId = (d["childId"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                        categoryId = resolvedCategoryId,
+                        title = (d["title"] as? String)?.trim().orEmpty(),
+                        fileName = (d["fileName"] as? String)?.trim().orEmpty(),
+                        mimeType = (d["mimeType"] as? String)?.trim().orEmpty().ifBlank { "application/octet-stream" },
+                        fileSize = (d["fileSize"] as? Number)?.toLong() ?: 0L,
+                        storagePath = (d["storagePath"] as? String)?.trim().orEmpty(),
+                        downloadURL = (d["downloadURL"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                        notes = (d["notes"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                        extractedText = (d["extractedText"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                        extractedTextUpdatedAtEpochMillis = (d["extractedTextUpdatedAt"] as? Timestamp)?.toDate()?.time,
+                        extractionStatusRaw = (d["extractionStatusRaw"] as? Number)?.toInt(),
+                        extractionError = (d["extractionError"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                        isDeleted = d["isDeleted"] as? Boolean ?: false,
+                        createdAtEpochMillis = (d["createdAt"] as? Timestamp)?.toDate()?.time,
+                        updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
+                        updatedBy = (d["updatedBy"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                        visibilityScope = (d["visibilityScope"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                        visibilityMemberIds = visibilityMemberIdsFromFirestore(d["visibilityMemberIds"]),
+                        createdBy = (d["createdBy"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                    )
+                    onChange(DocumentRemoteChange.UpsertDocument(dto, isFromCache = isFromCache))
+                    upsertCount += 1
+                }
+                changed.filter { it.type == DocumentChange.Type.REMOVED }.forEach { diff ->
+                    if (isFromCache) {
+                        KBLog.data.debug("cache-guard skip document removed id=${diff.document.id}", TAG_DOC_SYNC)
+                        return@forEach
+                    }
+                    onChange(DocumentRemoteChange.RemoveDocument(diff.document.id, isFromCache = false))
+                    removedCount += 1
                 }
                 if (upsertCount + removedCount > 0) {
                     KBLog.data.debug("Snapshot processed. Changes: $upsertCount added/modified, $removedCount removed. collection=documents isFromCache=$isFromCache", TAG_DOC_SYNC)
@@ -176,47 +184,55 @@ class DocumentRemoteStore @Inject constructor(
                 val isFromCache = snap?.metadata?.isFromCache == true
                 var upsertCount = 0
                 var removedCount = 0
-                snap?.documentChanges?.forEach { diff ->
-                    val doc = diff.document
-                    val d = doc.data
-                    when (diff.type) {
-                        DocumentChange.Type.ADDED,
-                        DocumentChange.Type.MODIFIED,
-                        -> {
-                            val resolvedParentId = (d["parentId"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
-                            if (
-                                isFromCache &&
-                                doc.id.startsWith("exp-") &&
-                                !doc.id.startsWith("exp-root-") &&
-                                resolvedParentId.isNullOrBlank()
-                            ) {
-                                KBLog.data.debug("cache-guard skip category id=${doc.id} reason=fromCache_null_parent", TAG_DOC_SYNC)
-                                return@forEach
-                            }
-                            val dto = RemoteDocumentCategoryDto(
-                                id = doc.id,
-                                familyId = familyId,
-                                title = (d["title"] as? String)?.trim().orEmpty(),
-                                sortOrder = (d["sortOrder"] as? Number)?.toInt() ?: 0,
-                                parentId = resolvedParentId,
-                                isDeleted = d["isDeleted"] as? Boolean ?: false,
-                                createdAtEpochMillis = (d["createdAt"] as? Timestamp)?.toDate()?.time,
-                                updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
-                                updatedBy = (d["updatedBy"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
-                            )
-                            onChange(DocumentRemoteChange.UpsertCategory(dto, isFromCache = isFromCache))
-                            upsertCount += 1
-                        }
-
-                        DocumentChange.Type.REMOVED -> {
-                            if (isFromCache) {
-                                KBLog.data.debug("cache-guard skip category removed id=${doc.id}", TAG_DOC_SYNC)
-                                return@forEach
-                            }
-                            onChange(DocumentRemoteChange.RemoveCategory(doc.id, isFromCache = false))
-                            removedCount += 1
-                        }
+                // Documenti da riversare: normalmente il delta, ma se il delta è
+                // vuoto si ricade sul risultato completo della query. Con la
+                // persistenza locale Firestore può riusare una snapshot in cache e
+                // farsela confermare "invariata" dal server con un existence
+                // filter, senza inviare alcun document_change: il delta risulta
+                // vuoto anche con risultati reali e in Room non arriva più nulla.
+                //
+                // Il fallback invece della lettura sempre completa (come fa
+                // TodoRemoteStore) è deliberato: qui le cartelle di una famiglia
+                // possono essere molti, e rimandarli tutti a ogni snapshot
+                // costerebbe caro per l'unico caso in cui serve.
+                val changed = snap?.documentChanges.orEmpty()
+                val upsertDocs = changed
+                    .filter { it.type != DocumentChange.Type.REMOVED }
+                    .map { it.document }
+                    .ifEmpty { if (changed.isEmpty()) snap?.documents.orEmpty() else emptyList() }
+                upsertDocs.forEach { doc ->
+                    val d = doc.data ?: return@forEach
+                    val resolvedParentId = (d["parentId"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
+                    if (
+                        isFromCache &&
+                        doc.id.startsWith("exp-") &&
+                        !doc.id.startsWith("exp-root-") &&
+                        resolvedParentId.isNullOrBlank()
+                    ) {
+                        KBLog.data.debug("cache-guard skip category id=${doc.id} reason=fromCache_null_parent", TAG_DOC_SYNC)
+                        return@forEach
                     }
+                    val dto = RemoteDocumentCategoryDto(
+                        id = doc.id,
+                        familyId = familyId,
+                        title = (d["title"] as? String)?.trim().orEmpty(),
+                        sortOrder = (d["sortOrder"] as? Number)?.toInt() ?: 0,
+                        parentId = resolvedParentId,
+                        isDeleted = d["isDeleted"] as? Boolean ?: false,
+                        createdAtEpochMillis = (d["createdAt"] as? Timestamp)?.toDate()?.time,
+                        updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
+                        updatedBy = (d["updatedBy"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                    )
+                    onChange(DocumentRemoteChange.UpsertCategory(dto, isFromCache = isFromCache))
+                    upsertCount += 1
+                }
+                changed.filter { it.type == DocumentChange.Type.REMOVED }.forEach { diff ->
+                    if (isFromCache) {
+                        KBLog.data.debug("cache-guard skip category removed id=${diff.document.id}", TAG_DOC_SYNC)
+                        return@forEach
+                    }
+                    onChange(DocumentRemoteChange.RemoveCategory(diff.document.id, isFromCache = false))
+                    removedCount += 1
                 }
                 if (upsertCount + removedCount > 0) {
                     KBLog.data.debug("Snapshot processed. Changes: $upsertCount added/modified, $removedCount removed. collection=documentCategories isFromCache=$isFromCache", TAG_DOC_SYNC)

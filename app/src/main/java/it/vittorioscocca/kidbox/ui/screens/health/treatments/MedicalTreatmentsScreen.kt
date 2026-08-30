@@ -50,6 +50,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -100,6 +101,7 @@ fun MedicalTreatmentsScreen(
     val completedTitle = stringResource(R.string.health_completed)
     val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     var showFilterSheet by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var datePickerForStart by remember { mutableStateOf(false) }
@@ -244,45 +246,51 @@ fun MedicalTreatmentsScreen(
                 if (isEmpty) {
                     EmptyTreatments(modifier = Modifier.fillMaxSize())
                 } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 18.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    PullToRefreshBox(
+                        isRefreshing = isRefreshing,
+                        onRefresh = { viewModel.forceRefresh() },
+                        modifier = Modifier.fillMaxSize(),
                     ) {
-                        item { Spacer(Modifier.height(4.dp)) }
-                        treatmentSection(
-                            title = activeTitle,
-                            items = state.active,
-                            takenDosesByTreatmentId = state.takenDosesByTreatmentId,
-                            isSelecting = state.isSelecting,
-                            selectedIds = state.selectedIds,
-                            showBadge = true,
-                            onRowClick = { t ->
-                                if (state.isSelecting) viewModel.toggleSelection(t.id) else onOpen(t.id)
-                            },
-                        )
-                        treatmentSection(
-                            title = longTermTitle,
-                            items = state.longTerm,
-                            takenDosesByTreatmentId = state.takenDosesByTreatmentId,
-                            isSelecting = state.isSelecting,
-                            selectedIds = state.selectedIds,
-                            onRowClick = { t ->
-                                if (state.isSelecting) viewModel.toggleSelection(t.id) else onOpen(t.id)
-                            },
-                        )
-                        treatmentSection(
-                            title = completedTitle,
-                            items = state.inactive,
-                            takenDosesByTreatmentId = state.takenDosesByTreatmentId,
-                            isSelecting = state.isSelecting,
-                            selectedIds = state.selectedIds,
-                            onRowClick = { t ->
-                                if (state.isSelecting) viewModel.toggleSelection(t.id) else onOpen(t.id)
-                            },
-                        )
-                        item { Spacer(Modifier.height(24.dp)) }
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 18.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            item { Spacer(Modifier.height(4.dp)) }
+                            treatmentSection(
+                                title = activeTitle,
+                                items = state.active,
+                                takenDosesByTreatmentId = state.takenDosesByTreatmentId,
+                                isSelecting = state.isSelecting,
+                                selectedIds = state.selectedIds,
+                                showBadge = true,
+                                onRowClick = { t ->
+                                    if (state.isSelecting) viewModel.toggleSelection(t.id) else onOpen(t.id)
+                                },
+                            )
+                            treatmentSection(
+                                title = longTermTitle,
+                                items = state.longTerm,
+                                takenDosesByTreatmentId = state.takenDosesByTreatmentId,
+                                isSelecting = state.isSelecting,
+                                selectedIds = state.selectedIds,
+                                onRowClick = { t ->
+                                    if (state.isSelecting) viewModel.toggleSelection(t.id) else onOpen(t.id)
+                                },
+                            )
+                            treatmentSection(
+                                title = completedTitle,
+                                items = state.inactive,
+                                takenDosesByTreatmentId = state.takenDosesByTreatmentId,
+                                isSelecting = state.isSelecting,
+                                selectedIds = state.selectedIds,
+                                onRowClick = { t ->
+                                    if (state.isSelecting) viewModel.toggleSelection(t.id) else onOpen(t.id)
+                                },
+                            )
+                            item { Spacer(Modifier.height(24.dp)) }
+                        }
                     }
                 }
             }

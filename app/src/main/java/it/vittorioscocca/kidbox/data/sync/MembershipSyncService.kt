@@ -4,6 +4,7 @@ import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
+import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
@@ -50,6 +51,7 @@ private const val TAG = "MembershipSyncService"
 class MembershipSyncService @Inject constructor(
     private val familyDao: KBFamilyDao,
     private val familyMemberDao: KBFamilyMemberDao,
+    private val sessionPrefs: FamilySessionPreferences,
 ) {
     private val db get() = FirebaseFirestore.getInstance()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -141,7 +143,8 @@ class MembershipSyncService @Inject constructor(
             val data = familySnap.data.orEmpty()
             if (data["isDeleted"] as? Boolean == true) {
                 KBLog.sync.info("loadAndUpsertFamily: family marked isDeleted, removing local familyId=$familyId", TAG)
-                removeFamilyLocally(familyId)
+                // Il lock è già nostro: la variante con `withLock` qui si bloccherebbe.
+                removeFamilyLocallyLocked(familyId)
                 return@withLock
             }
 
@@ -180,6 +183,36 @@ class MembershipSyncService @Inject constructor(
             // Upsert del proprio doc membro (best-effort: serve per non avere FK orfane
             // quando FamilySwitcher / Home query "members" prima che startSync gestisca
             // la famiglia). Le altre righe member arriveranno via startSync.
+            //
+            // ⚠️ Solo per la famiglia ATTIVA. `kb_family_members` ha come chiave
+            // primaria l'`id`, che qui e in FamilySyncCenter è l'**uid** del
+            // membro: chi appartiene a due famiglie ha quindi UNA sola riga, e
+            // con `OnConflictStrategy.REPLACE` l'ultima scrittura vince
+            // portandosi dietro il proprio `familyId`. Scrivendo anche le
+            // famiglie non attive, questo servizio spostava la riga dell'utente
+            // sull'altra famiglia: la famiglia aperta perdeva un membro a ogni
+            // avvio, e tornava a posto solo col pull-to-refresh della Home
+            // (`forceResync` → `reconcileMembersFromServer`). Verificato sui log
+            // del 30/08/2026.
+            //
+            // Questo è un contenimento, NON la correzione: la vera soluzione è
+            // una chiave primaria composita (familyId + userId) su
+            // `kb_family_members`, che richiede una migrazione Room. Finché
+            // resta così, ogni nuovo writer che usa `id = uid` reintroduce il
+            // problema in silenzio.
+            //
+            // Se non c'è ancora una famiglia attiva (primo avvio) si scrive
+            // comunque: non c'è nessuno stato da corrompere e la protezione
+            // sulle FK orfane serve proprio lì.
+            val activeFamilyId = sessionPrefs.getActiveFamilyId()?.trim().orEmpty()
+            if (activeFamilyId.isNotEmpty() && activeFamilyId != familyId) {
+                KBLog.sync.debug(
+                    "loadAndUpsertFamily: salto la riga self-member, famiglia non attiva familyId=$familyId (attiva=$activeFamilyId)",
+                    TAG,
+                )
+                return@withLock
+            }
+
             runCatching {
                 val memberSnap = db.collection("families")
                     .document(familyId)
@@ -219,9 +252,20 @@ class MembershipSyncService @Inject constructor(
     }
 
     private suspend fun removeFamilyLocally(familyId: String) {
-        mutex.withLock {
-            familyDao.deleteByFamilyId(familyId)
-            KBLog.sync.info("removeFamilyLocally: familyId=$familyId rimosso da Room", TAG)
-        }
+        mutex.withLock { removeFamilyLocallyLocked(familyId) }
+    }
+
+    /**
+     * Uscita pulita: via la famiglia e, per cascata sulla foreign key, i suoi
+     * membri — di una famiglia a cui non appartieni più non resta nulla in locale.
+     *
+     * Da chiamare con [mutex] GIÀ preso. Il `Mutex` di Kotlin non è rientrante:
+     * la versione con lock chiamata da dentro `loadAndUpsertFamily` (che il lock
+     * ce l'ha già) piantava la coroutine per sempre, e con lei ogni sync di
+     * membership successiva.
+     */
+    private suspend fun removeFamilyLocallyLocked(familyId: String) {
+        familyDao.deleteByFamilyId(familyId)
+        KBLog.sync.info("removeFamilyLocally: familyId=$familyId rimosso da Room", TAG)
     }
 }

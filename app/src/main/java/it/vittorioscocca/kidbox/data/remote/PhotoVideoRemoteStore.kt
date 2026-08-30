@@ -106,6 +106,22 @@ class PhotoVideoRemoteStore @Inject constructor() {
                     }
                 }
             }
+            // Delta vuoto con risultati reali: con la persistenza locale Firestore
+            // può riusare una snapshot in cache e farsela confermare "invariata"
+            // dal server con un existence filter, senza inviare alcun
+            // document_change — e in Room non arriva più nulla. Qui si ricade sul
+            // risultato completo della query.
+            //
+            // Il fallback invece della lettura sempre completa (come fa
+            // TodoRemoteStore) è deliberato: una libreria foto può contenere
+            // migliaia di documenti, e rimandarli tutti a ogni snapshot
+            // costerebbe caro per l'unico caso in cui serve.
+            if (upserts == 0 && removes == 0) {
+                snapshot.documents.forEach { doc ->
+                    onChange(PhotoRemoteChange.Upsert(doc.toRemotePhotoDto(), isFromCache))
+                    upserts += 1
+                }
+            }
             if (upserts > 0 || removes > 0) {
                 KBLog.data.debug("Snapshot processed. Changes: $upserts added/modified, $removes removed. collection=photos isFromCache=$isFromCache", TAG_PHOTO_SYNC)
             }
@@ -142,6 +158,22 @@ class PhotoVideoRemoteStore @Inject constructor() {
                         onChange(PhotoAlbumRemoteChange.Remove(change.document.id, isFromCache))
                         removes += 1
                     }
+                }
+            }
+            // Delta vuoto con risultati reali: con la persistenza locale Firestore
+            // può riusare una snapshot in cache e farsela confermare "invariata"
+            // dal server con un existence filter, senza inviare alcun
+            // document_change — e in Room non arriva più nulla. Qui si ricade sul
+            // risultato completo della query.
+            //
+            // Il fallback invece della lettura sempre completa (come fa
+            // TodoRemoteStore) è deliberato: una libreria foto può contenere
+            // migliaia di documenti, e rimandarli tutti a ogni snapshot
+            // costerebbe caro per l'unico caso in cui serve.
+            if (upserts == 0 && removes == 0) {
+                snapshot.documents.forEach { doc ->
+                    onChange(PhotoAlbumRemoteChange.Upsert(doc.toRemoteAlbumDto(), isFromCache))
+                    upserts += 1
                 }
             }
             if (upserts > 0 || removes > 0) {

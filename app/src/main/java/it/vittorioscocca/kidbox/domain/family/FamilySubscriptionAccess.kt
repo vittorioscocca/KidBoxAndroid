@@ -20,7 +20,7 @@ suspend fun isFamilySubscriptionManager(
     val family = familyDao.getById(familyId) ?: return false
     val byFamilyField = family.createdBy == uid
     val membership = memberDao.getActiveByFamilyAndUser(familyId, uid)
-        ?: memberDao.getById(uid)?.takeIf { it.familyId == familyId && !it.isDeleted }
+        ?: memberDao.getByFamilyAndId(familyId, uid)?.takeIf { !it.isDeleted }
     val byOwnerRole = membership != null &&
         membership.userId == uid &&
         membership.role.equals("owner", ignoreCase = true)

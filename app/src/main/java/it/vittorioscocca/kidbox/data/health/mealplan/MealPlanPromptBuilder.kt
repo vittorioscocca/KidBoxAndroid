@@ -29,21 +29,28 @@ object MealPlanPromptBuilder {
         COSA DEVI PRODURRE, IN QUEST'ORDINE:
         1) STIMA CALORICA — stima le calorie di mantenimento a partire da età, altezza, peso, livello di
         attività e allenamenti registrati, poi definisci un deficit (o surplus) calorico realistico
-        coerente con l'obiettivo. Usa INTERVALLI, non falsa precisione, e tieni conto delle normali
-        fluttuazioni del peso corporeo. Spiega come adattare le calorie in base alle variazioni
-        settimanali del peso.
-        2) OBIETTIVI DI MACRONUTRIENTI — proteine, carboidrati e grassi come intervalli giornalieri,
-        con una riga sul perché di quella ripartizione.
-        3) PIANO DEI PASTI — un piano pratico sul target calorico stimato, costruito con gli alimenti
-        graditi indicati. Per OGNI pasto: porzioni, calorie, proteine, carboidrati e grassi, più 2
-        alternative equivalenti. Includi spuntini ad alto contenuto proteico e opzioni pre e post
-        allenamento.
-        4) IDRATAZIONE — indicazioni pratiche su acqua e sali, adattate agli allenamenti.
-        5) LISTA DELLA SPESA — organizzata per reparto, economica e riutilizzabile durante la settimana.
-        6) PIANO 90 GIORNI — progressione realistica su 90 giorni con calorie, proteine, allenamento,
-        cardio, recupero e obiettivi intermedi mese per mese.
-        7) NOTE DI SALUTE — come le condizioni cliniche, le cure in corso, le allergie e i valori di
-        laboratorio presenti nei dati influenzano il piano. Se un dato manca, dillo esplicitamente.
+        coerente con l'obiettivo. Usa INTERVALLI, non falsa precisione. Aggiungi una riga su come
+        adattare le calorie alle variazioni settimanali del peso. Massimo 6 righe.
+        2) OBIETTIVI DI MACRONUTRIENTI — proteine, carboidrati e grassi come intervalli giornalieri, più
+        una riga sul perché di quella ripartizione. Massimo 5 righe.
+        3) PIANO DEI PASTI — UNA sola giornata tipo (colazione, pranzo, cena, 1-2 spuntini) sul target
+        calorico stimato, costruita con gli alimenti graditi. Per ogni pasto una riga con porzioni e
+        calorie, e una riga con proteine/carboidrati/grassi. Per ogni pasto UNA sola alternativa
+        equivalente, su una riga. Se ci sono allenamenti, aggiungi 2 righe su cosa mangiare prima e dopo.
+        Massimo 30 righe in tutto.
+        4) IDRATAZIONE — acqua e sali, adattati agli allenamenti. Massimo 4 righe.
+        5) LISTA DELLA SPESA — solo gli alimenti della giornata tipo, raggruppati per reparto, una riga
+        per reparto con gli alimenti separati da virgola. Massimo 8 righe.
+        6) PIANO 90 GIORNI — tre blocchi (mese 1, mese 2, mese 3), massimo 3 righe ciascuno, con calorie,
+        proteine, allenamento e obiettivo intermedio del mese.
+        7) NOTE DI SALUTE — come condizioni cliniche, cure in corso, allergie e valori di laboratorio
+        presenti nei dati influenzano il piano. Se un dato manca, dillo. Massimo 6 righe.
+
+        LUNGHEZZA:
+        L'INTERO piano deve stare in circa 1200 parole. È un vincolo, non un suggerimento: meglio una
+        sezione asciutta che un piano tagliato a metà. Scrivi frasi brevi, niente introduzioni, niente
+        riepiloghi di quanto hai appena scritto, niente ripetizioni delle regole tra una sezione e l'altra.
+        Devi arrivare fino in fondo alla sezione 7: se stai correndo lungo, accorcia le sezioni successive.
 
         REGOLE ASSOLUTE:
         Il piano deve essere economico, saziante, bilanciato e realistico da seguire per 90 giorni.
@@ -104,24 +111,33 @@ object MealPlanPromptBuilder {
         birthDateEpochMillis: Long?,
         snapshot: HealthImportSnapshot?,
         profile: KBPediatricProfile?,
+        input: MealPlanInput = MealPlanInput(),
     ): List<String> {
         val lines = mutableListOf<String>()
 
         val birth = birthDateEpochMillis ?: snapshot?.birthDateEpochMillis
-        if (birth != null) {
-            lines += "Età: ${yearsSince(birth)} anni"
-        } else {
-            lines += "Età: non disponibile"
+        val manualAge = input.manualAgeValue
+        lines += when {
+            birth != null -> "Età: ${yearsSince(birth)} anni"
+            manualAge != null -> "Età: $manualAge anni (indicata dall'utente)"
+            else -> "Età: non disponibile"
         }
 
         val height = snapshot?.heightCm
-        lines += if (height != null) "Altezza: ${height.roundToInt()} cm" else "Altezza: non disponibile"
+        val manualHeight = input.manualHeightValue
+        lines += when {
+            height != null -> "Altezza: ${height.roundToInt()} cm"
+            manualHeight != null -> "Altezza: ${manualHeight.roundToInt()} cm (indicata dall'utente)"
+            else -> "Altezza: non disponibile"
+        }
 
         val weight = snapshot?.weightKg
-        lines += if (weight != null) {
-            "Peso: ${String.format(Locale.getDefault(), "%.1f", weight)} kg"
-        } else {
-            "Peso: non disponibile"
+        val manualWeight = input.manualWeightValue
+        lines += when {
+            weight != null -> "Peso: ${String.format(Locale.getDefault(), "%.1f", weight)} kg"
+            manualWeight != null ->
+                "Peso: ${String.format(Locale.getDefault(), "%.1f", manualWeight)} kg (indicato dall'utente)"
+            else -> "Peso: non disponibile"
         }
 
         (profile?.bloodGroup ?: snapshot?.bloodGroup)?.takeIf { it.isNotBlank() }?.let {

@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,6 +47,7 @@ fun TravelListScreen(
 ) {
     LaunchedEffect(familyId) { viewModel.setFamilyId(familyId) }
     val trips by viewModel.trips.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val recentTrips = trips.take(3)
     val legsByTripId by viewModel.legsByTripId.collectAsStateWithLifecycle()
     val needsOnboarding by viewModel.needsOnboarding.collectAsStateWithLifecycle()
@@ -83,57 +85,64 @@ fun TravelListScreen(
             )
         },
     ) { padding ->
-        LazyColumn(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.forceRefresh() },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item {
-                TravelHubSection(
-                    profile = travelProfile,
-                    aiAvailable = aiAvailable,
-                    onPlanTrip = onOpenWizard,
-                    onDiscover = onOpenDiscover,
-                )
-            }
-            if (trips.isNotEmpty()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            stringResource(R.string.travel_your_trips),
-                            fontWeight = FontWeight.Bold,
-                            color = kb.title,
-                            modifier = Modifier.weight(1f),
-                        )
-                        TextButton(onClick = onOpenAllTrips) {
-                            Text(stringResource(R.string.travel_see_all), color = kb.title)
+                    TravelHubSection(
+                        profile = travelProfile,
+                        aiAvailable = aiAvailable,
+                        onPlanTrip = onOpenWizard,
+                        onDiscover = onOpenDiscover,
+                    )
+                }
+                if (trips.isNotEmpty()) {
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                stringResource(R.string.travel_your_trips),
+                                fontWeight = FontWeight.Bold,
+                                color = kb.title,
+                                modifier = Modifier.weight(1f),
+                            )
+                            TextButton(onClick = onOpenAllTrips) {
+                                Text(stringResource(R.string.travel_see_all), color = kb.title)
+                            }
                         }
                     }
-                }
-                items(recentTrips, key = { it.id }) { trip ->
-                    val tripLegs = legsByTripId[trip.id].orEmpty()
-                    TravelTripCard(
-                        trip = trip,
-                        legs = tripLegs,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onOpenTrip(trip.id) },
-                    )
-                }
-            } else if (!aiAvailable) {
-                item {
-                    Text(
-                        stringResource(R.string.travel_upgrade_hint),
-                        color = kb.subtitle,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
+                    items(recentTrips, key = { it.id }) { trip ->
+                        val tripLegs = legsByTripId[trip.id].orEmpty()
+                        TravelTripCard(
+                            trip = trip,
+                            legs = tripLegs,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onOpenTrip(trip.id) },
+                        )
+                    }
+                } else if (!aiAvailable) {
+                    item {
+                        Text(
+                            stringResource(R.string.travel_upgrade_hint),
+                            color = kb.subtitle,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
                 }
             }
         }

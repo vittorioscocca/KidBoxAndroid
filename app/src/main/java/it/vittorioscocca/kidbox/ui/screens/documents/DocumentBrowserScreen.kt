@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.documents
 
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import it.vittorioscocca.kidbox.ui.permissions.rememberCameraPermissionRequester
 import it.vittorioscocca.kidbox.util.KBLog
 import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
@@ -159,6 +160,7 @@ fun DocumentBrowserScreen(
     viewModel: DocumentsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     TrackSectionPresence(AppSection.DOCUMENTS, familyId)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -397,106 +399,112 @@ fun DocumentBrowserScreen(
             }
 
             Spacer(Modifier.height(10.dp))
-            if (isEmptyBrowser) {
-                KBEmptyState(
-                    modifier = Modifier.fillMaxSize(),
-                    icon = Icons.Filled.FolderOpen,
-                    title = stringResource(R.string.empty_documents_title),
-                    body = stringResource(R.string.empty_documents_body),
-                    primaryIcon = Icons.Filled.AddCircle,
-                    primaryLabel = stringResource(R.string.empty_documents_action),
-                    onPrimary = { showUploadSheet = true },
-                )
-            } else if (state.mode == DocumentsViewMode.GRID) {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    items(sortedFolders, key = { "folder_${it.id}" }) { folder ->
-                        FolderGridItem(
-                            folder = folder,
-                            isSelected = folder.id in state.selectedFolderIds,
-                            selecting = state.isSelecting,
-                            onClick = {
-                                if (state.isSelecting) viewModel.toggleFolderSelection(folder.id)
-                                else viewModel.navigateToFolder(folder)
-                            },
-                            onLongPress = { contextMenuTarget = ContextMenuTarget.Folder(folder) },
-                        )
-                    }
-                    items(sortedDocuments, key = { "doc_${it.id}" }) { doc ->
-                        DocumentGridItem(
-                            document = doc,
-                            isSelected = doc.id in state.selectedDocumentIds,
-                            isHighlighted = doc.id == state.highlightedDocumentId,
-                            selecting = state.isSelecting,
-                            onClick = {
-                                if (state.isSelecting) {
-                                    viewModel.toggleDocumentSelection(doc.id)
-                                } else {
-                                    viewModel.clearHighlightedDocument()
-                                    KBLog.ui.info("tap document id=${doc.id} mime=${doc.mimeType} hasLocal=${!doc.localPath.isNullOrBlank()} hasRemote=${!doc.storagePath.isBlank()}", TAG_DOC_OPEN)
-                                    scope.launch {
-                                        isOpeningDocument = true
-                                        try {
-                                            openDocument(context, viewModel, doc)
-                                        } finally {
-                                            isOpeningDocument = false
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { viewModel.forceRefresh() },
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                if (isEmptyBrowser) {
+                    KBEmptyState(
+                        modifier = Modifier.fillMaxSize(),
+                        icon = Icons.Filled.FolderOpen,
+                        title = stringResource(R.string.empty_documents_title),
+                        body = stringResource(R.string.empty_documents_body),
+                        primaryIcon = Icons.Filled.AddCircle,
+                        primaryLabel = stringResource(R.string.empty_documents_action),
+                        onPrimary = { showUploadSheet = true },
+                    )
+                } else if (state.mode == DocumentsViewMode.GRID) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(sortedFolders, key = { "folder_${it.id}" }) { folder ->
+                            FolderGridItem(
+                                folder = folder,
+                                isSelected = folder.id in state.selectedFolderIds,
+                                selecting = state.isSelecting,
+                                onClick = {
+                                    if (state.isSelecting) viewModel.toggleFolderSelection(folder.id)
+                                    else viewModel.navigateToFolder(folder)
+                                },
+                                onLongPress = { contextMenuTarget = ContextMenuTarget.Folder(folder) },
+                            )
+                        }
+                        items(sortedDocuments, key = { "doc_${it.id}" }) { doc ->
+                            DocumentGridItem(
+                                document = doc,
+                                isSelected = doc.id in state.selectedDocumentIds,
+                                isHighlighted = doc.id == state.highlightedDocumentId,
+                                selecting = state.isSelecting,
+                                onClick = {
+                                    if (state.isSelecting) {
+                                        viewModel.toggleDocumentSelection(doc.id)
+                                    } else {
+                                        viewModel.clearHighlightedDocument()
+                                        KBLog.ui.info("tap document id=${doc.id} mime=${doc.mimeType} hasLocal=${!doc.localPath.isNullOrBlank()} hasRemote=${!doc.storagePath.isBlank()}", TAG_DOC_OPEN)
+                                        scope.launch {
+                                            isOpeningDocument = true
+                                            try {
+                                                openDocument(context, viewModel, doc)
+                                            } finally {
+                                                isOpeningDocument = false
+                                            }
                                         }
                                     }
-                                }
-                            },
-                            onLongPress = { contextMenuTarget = ContextMenuTarget.Document(doc) },
-                        )
+                                },
+                                onLongPress = { contextMenuTarget = ContextMenuTarget.Document(doc) },
+                            )
+                        }
+                        item { Spacer(modifier = Modifier.height(if (state.isSelecting) 90.dp else 24.dp)) }
                     }
-                    item { Spacer(modifier = Modifier.height(if (state.isSelecting) 90.dp else 24.dp)) }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(sortedFolders, key = { "folder_${it.id}" }) { folder ->
-                        FolderListItem(
-                            folder = folder,
-                            selecting = state.isSelecting,
-                            isSelected = folder.id in state.selectedFolderIds,
-                            onClick = {
-                                if (state.isSelecting) viewModel.toggleFolderSelection(folder.id)
-                                else viewModel.navigateToFolder(folder)
-                            },
-                            onLongPress = { contextMenuTarget = ContextMenuTarget.Folder(folder) },
-                        )
-                    }
-                    items(sortedDocuments, key = { "doc_${it.id}" }) { doc ->
-                        DocumentListItem(
-                            document = doc,
-                            selecting = state.isSelecting,
-                            isSelected = doc.id in state.selectedDocumentIds,
-                            isHighlighted = doc.id == state.highlightedDocumentId,
-                            onClick = {
-                                if (state.isSelecting) {
-                                    viewModel.toggleDocumentSelection(doc.id)
-                                } else {
-                                    viewModel.clearHighlightedDocument()
-                                    KBLog.ui.info("tap document id=${doc.id} mime=${doc.mimeType} hasLocal=${!doc.localPath.isNullOrBlank()} hasRemote=${!doc.storagePath.isBlank()}", TAG_DOC_OPEN)
-                                    scope.launch {
-                                        isOpeningDocument = true
-                                        try {
-                                            openDocument(context, viewModel, doc)
-                                        } finally {
-                                            isOpeningDocument = false
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(sortedFolders, key = { "folder_${it.id}" }) { folder ->
+                            FolderListItem(
+                                folder = folder,
+                                selecting = state.isSelecting,
+                                isSelected = folder.id in state.selectedFolderIds,
+                                onClick = {
+                                    if (state.isSelecting) viewModel.toggleFolderSelection(folder.id)
+                                    else viewModel.navigateToFolder(folder)
+                                },
+                                onLongPress = { contextMenuTarget = ContextMenuTarget.Folder(folder) },
+                            )
+                        }
+                        items(sortedDocuments, key = { "doc_${it.id}" }) { doc ->
+                            DocumentListItem(
+                                document = doc,
+                                selecting = state.isSelecting,
+                                isSelected = doc.id in state.selectedDocumentIds,
+                                isHighlighted = doc.id == state.highlightedDocumentId,
+                                onClick = {
+                                    if (state.isSelecting) {
+                                        viewModel.toggleDocumentSelection(doc.id)
+                                    } else {
+                                        viewModel.clearHighlightedDocument()
+                                        KBLog.ui.info("tap document id=${doc.id} mime=${doc.mimeType} hasLocal=${!doc.localPath.isNullOrBlank()} hasRemote=${!doc.storagePath.isBlank()}", TAG_DOC_OPEN)
+                                        scope.launch {
+                                            isOpeningDocument = true
+                                            try {
+                                                openDocument(context, viewModel, doc)
+                                            } finally {
+                                                isOpeningDocument = false
+                                            }
                                         }
                                     }
-                                }
-                            },
-                            onLongPress = { contextMenuTarget = ContextMenuTarget.Document(doc) },
-                        )
+                                },
+                                onLongPress = { contextMenuTarget = ContextMenuTarget.Document(doc) },
+                            )
+                        }
+                        item { Spacer(modifier = Modifier.height(if (state.isSelecting) 90.dp else 24.dp)) }
                     }
-                    item { Spacer(modifier = Modifier.height(if (state.isSelecting) 90.dp else 24.dp)) }
                 }
             }
         }

@@ -96,6 +96,23 @@ class ExpenseRepository @Inject constructor(
         }
     }
 
+    /**
+     * Pull-to-refresh: stacca e riaggancia il listener realtime.
+     *
+     * [startRealtime] da solo non basta — se il listener è già attivo sulla
+     * stessa famiglia prende la scorciatoia del guard e non fa nulla. Qui il
+     * guard viene azzerato prima, così l'aggancio riparte davvero e Firestore
+     * rimanda lo snapshot completo. Stesso idioma di
+     * [PasswordsRepository.awaitForceRestartRealtime].
+     */
+    suspend fun awaitForceRestartRealtime(
+        familyId: String,
+        onPermissionDenied: (() -> Unit)? = null,
+    ) {
+        realtimeMutex.withLock { stopRealtimeLocked() }
+        startRealtime(familyId, onPermissionDenied)
+    }
+
     fun stopRealtime() {
         scope.launch {
             realtimeMutex.withLock { stopRealtimeLocked() }

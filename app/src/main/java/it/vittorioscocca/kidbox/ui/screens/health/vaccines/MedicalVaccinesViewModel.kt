@@ -8,6 +8,7 @@ import it.vittorioscocca.kidbox.data.sync.VaccineSyncCenter
 import it.vittorioscocca.kidbox.domain.model.KBVaccine
 import it.vittorioscocca.kidbox.notifications.VaccineReminderScheduler
 import java.util.Calendar
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,6 +54,15 @@ class MedicalVaccinesViewModel @Inject constructor(
     private var timeFilter: VaccineListTimeFilter = VaccineListTimeFilter.ALL
     private var customFilterStartMs: Long = 0L
     private var customFilterEndMs: Long = 0L
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /** Pull-to-refresh: rilegge i vaccini da Firestore. */
+    fun forceRefresh() = pullToRefresh.refresh {
+        if (familyId.isBlank()) return@refresh
+        syncCenter.restart(familyId)
+    }
 
     fun bind(familyId: String, childId: String) {
         if (this.familyId == familyId && this.childId == childId) return

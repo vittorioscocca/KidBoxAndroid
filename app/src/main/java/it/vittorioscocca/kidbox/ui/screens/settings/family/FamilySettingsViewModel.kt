@@ -482,7 +482,7 @@ class FamilySettingsViewModel @Inject constructor(
                             "updatedAt" to FieldValue.serverTimestamp(),
                         ),
                     ).await()
-                familyMemberDao.deleteById(member.id)
+                familyMemberDao.deleteByFamilyAndId(familyId, member.id)
 
                 familySyncCenter.stopSync()
                 KBLog.ui.debug("removeMember: stopSync dopo revoca familyId=$familyId", TAG)

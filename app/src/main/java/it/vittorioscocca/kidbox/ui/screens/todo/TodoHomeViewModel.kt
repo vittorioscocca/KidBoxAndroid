@@ -15,6 +15,7 @@ import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
 import it.vittorioscocca.kidbox.data.repository.TodoRepository
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.domain.model.TodoListExposure
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,6 +66,16 @@ class TodoHomeViewModel @Inject constructor(
                 observeFamilyTodo(familyId, childId)
             }
         }
+    }
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /** Pull-to-refresh: rilegge liste e to-do da Firestore. */
+    fun forceRefresh() = pullToRefresh.refresh {
+        val state = stateBacking.value
+        if (state.familyId.isBlank()) return@refresh
+        todoRepository.awaitForceRestartRealtime(state.familyId, state.childId)
     }
 
     private fun observeFamilyTodo(familyId: String, childId: String) {

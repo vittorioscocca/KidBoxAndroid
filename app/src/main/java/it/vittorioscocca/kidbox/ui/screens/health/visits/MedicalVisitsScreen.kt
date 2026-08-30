@@ -68,6 +68,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -123,6 +124,7 @@ fun MedicalVisitsScreen(
     val context = LocalContext.current
     val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     var showFilterSheet by remember { mutableStateOf(false) }
@@ -280,51 +282,60 @@ fun MedicalVisitsScreen(
                     )
                 }
                 else -> {
-                    LazyColumn(
+                    // `weight` sta sul PullToRefreshBox: dentro di lui siamo in
+                    // BoxScope, dove `weight` non esiste.
+                    PullToRefreshBox(
+                        isRefreshing = isRefreshing,
+                        onRefresh = { viewModel.forceRefresh() },
                         modifier = Modifier
                             .fillMaxSize()
-                            .weight(1f)
-                            .padding(horizontal = 18.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                            .weight(1f),
                     ) {
-                        item { Spacer(Modifier.height(4.dp)) }
-                        visitSection(
-                            status = KBVisitStatus.BOOKED,
-                            items = state.booked,
-                            isSelecting = state.isSelecting,
-                            selectedIds = state.selectedIds,
-                            onRowClick = { id ->
-                                if (state.isSelecting) viewModel.toggleVisitSelected(id) else onOpen(id)
-                            },
-                        )
-                        visitSection(
-                            status = KBVisitStatus.PENDING,
-                            items = state.pending,
-                            isSelecting = state.isSelecting,
-                            selectedIds = state.selectedIds,
-                            onRowClick = { id ->
-                                if (state.isSelecting) viewModel.toggleVisitSelected(id) else onOpen(id)
-                            },
-                        )
-                        visitSection(
-                            status = KBVisitStatus.RESULT_AVAILABLE,
-                            items = state.resultAvailable,
-                            isSelecting = state.isSelecting,
-                            selectedIds = state.selectedIds,
-                            onRowClick = { id ->
-                                if (state.isSelecting) viewModel.toggleVisitSelected(id) else onOpen(id)
-                            },
-                        )
-                        visitSection(
-                            status = KBVisitStatus.COMPLETED,
-                            items = state.completed,
-                            isSelecting = state.isSelecting,
-                            selectedIds = state.selectedIds,
-                            onRowClick = { id ->
-                                if (state.isSelecting) viewModel.toggleVisitSelected(id) else onOpen(id)
-                            },
-                        )
-                        item { Spacer(Modifier.height(24.dp)) }
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 18.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            item { Spacer(Modifier.height(4.dp)) }
+                            visitSection(
+                                status = KBVisitStatus.BOOKED,
+                                items = state.booked,
+                                isSelecting = state.isSelecting,
+                                selectedIds = state.selectedIds,
+                                onRowClick = { id ->
+                                    if (state.isSelecting) viewModel.toggleVisitSelected(id) else onOpen(id)
+                                },
+                            )
+                            visitSection(
+                                status = KBVisitStatus.PENDING,
+                                items = state.pending,
+                                isSelecting = state.isSelecting,
+                                selectedIds = state.selectedIds,
+                                onRowClick = { id ->
+                                    if (state.isSelecting) viewModel.toggleVisitSelected(id) else onOpen(id)
+                                },
+                            )
+                            visitSection(
+                                status = KBVisitStatus.RESULT_AVAILABLE,
+                                items = state.resultAvailable,
+                                isSelecting = state.isSelecting,
+                                selectedIds = state.selectedIds,
+                                onRowClick = { id ->
+                                    if (state.isSelecting) viewModel.toggleVisitSelected(id) else onOpen(id)
+                                },
+                            )
+                            visitSection(
+                                status = KBVisitStatus.COMPLETED,
+                                items = state.completed,
+                                isSelecting = state.isSelecting,
+                                selectedIds = state.selectedIds,
+                                onRowClick = { id ->
+                                    if (state.isSelecting) viewModel.toggleVisitSelected(id) else onOpen(id)
+                                },
+                            )
+                            item { Spacer(Modifier.height(24.dp)) }
+                        }
                     }
                 }
             }

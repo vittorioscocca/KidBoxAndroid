@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.wallet.documents
 
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import it.vittorioscocca.kidbox.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
@@ -45,6 +47,7 @@ import androidx.compose.material.icons.filled.Badge
  * altezza di quelli di "Biglietti"); questo componente mostra solo lo stack
  * di card sovrapposte e gestisce l'eliminazione singola (tenere premuto).
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WalletDocumentsSectionContent(
     familyId: String,
@@ -57,6 +60,7 @@ fun WalletDocumentsSectionContent(
     viewModel: WalletDocumentsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     var pendingSingleDelete by remember { mutableStateOf<KBDocumentEntity?>(null) }
 
     LaunchedEffect(familyId) { viewModel.bind(familyId) }
@@ -78,25 +82,31 @@ fun WalletDocumentsSectionContent(
                     onPrimary = { onShowAddSheetChange(true) },
                 )
             }
-            else -> LazyColumn(
-                contentPadding = PaddingValues(top = 8.dp, bottom = 120.dp, start = 16.dp, end = 16.dp),
-                verticalArrangement = Arrangement.spacedBy((-90).dp),
+            else -> PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { viewModel.forceRefresh() },
+                modifier = Modifier.fillMaxSize(),
             ) {
-                itemsIndexed(state.items, key = { _, item -> item.document.id }) { index, item ->
-                    WalletDocumentCard(
-                        item = item,
-                        isSelectionMode = state.isSelecting,
-                        isSelected = state.selectedIds.contains(item.document.id),
-                        modifier = Modifier.zIndex(index.toFloat()),
-                        onLongClick = if (!state.isSelecting) {
-                            { pendingSingleDelete = item.document }
-                        } else {
-                            null
-                        },
-                        onClick = {
-                            if (state.isSelecting) viewModel.toggleSelection(item.document.id) else onDocumentClick(item.document.id)
-                        },
-                    )
+                LazyColumn(
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 120.dp, start = 16.dp, end = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy((-90).dp),
+                ) {
+                    itemsIndexed(state.items, key = { _, item -> item.document.id }) { index, item ->
+                        WalletDocumentCard(
+                            item = item,
+                            isSelectionMode = state.isSelecting,
+                            isSelected = state.selectedIds.contains(item.document.id),
+                            modifier = Modifier.zIndex(index.toFloat()),
+                            onLongClick = if (!state.isSelecting) {
+                                { pendingSingleDelete = item.document }
+                            } else {
+                                null
+                            },
+                            onClick = {
+                                if (state.isSelecting) viewModel.toggleSelection(item.document.id) else onDocumentClick(item.document.id)
+                            },
+                        )
+                    }
                 }
             }
         }

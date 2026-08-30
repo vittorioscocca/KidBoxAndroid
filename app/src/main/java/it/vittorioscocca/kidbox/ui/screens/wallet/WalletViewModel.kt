@@ -22,6 +22,7 @@ import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.domain.model.WalletTicketKind
 import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerMember
 import java.util.Locale
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,6 +60,15 @@ class WalletViewModel @Inject constructor(
 
     private var observeJob: Job? = null
     private var boundFamilyId: String? = null
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /** Pull-to-refresh: rilegge i biglietti del Wallet da Firestore. */
+    fun forceRefresh() = pullToRefresh.refresh {
+        val familyId = boundFamilyId ?: return@refresh
+        walletRepository.awaitForceRestartRealtime(familyId)
+    }
 
     fun bind(familyId: String) {
         if (familyId.isBlank()) {

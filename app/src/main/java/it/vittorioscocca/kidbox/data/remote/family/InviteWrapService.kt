@@ -51,7 +51,7 @@ class InviteWrapService(
          * Dominio degli inviti. Deve combaciare con l'`intent-filter` in
          * AndroidManifest e con `assetlinks.json` sul dominio.
          */
-        const val INVITE_LINK_BASE_URL = "https://kidbox-landing.web.app/join"
+        const val INVITE_LINK_BASE_URL = "https://kidboxapp.com/join"
 
         /**
          * Costruisce il link d'invito con il segreto nel **frammento**.

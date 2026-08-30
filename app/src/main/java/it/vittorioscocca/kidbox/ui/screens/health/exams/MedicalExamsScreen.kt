@@ -53,6 +53,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -109,6 +110,7 @@ fun MedicalExamsScreen(
     val context = LocalContext.current
     val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     var showFilterSheet by remember { mutableStateOf(false) }
@@ -234,58 +236,64 @@ fun MedicalExamsScreen(
                         onClearFilter = { viewModel.setTimeFilter(ExamTimeFilter.ALL) },
                     )
                     else -> {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 18.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        PullToRefreshBox(
+                            isRefreshing = isRefreshing,
+                            onRefresh = { viewModel.forceRefresh() },
+                            modifier = Modifier.fillMaxSize(),
                         ) {
-                            item { Spacer(Modifier.height(4.dp)) }
-                            examSection(
-                                title = context.getString(R.string.health_status_pending),
-                                icon = Icons.Default.Schedule,
-                                tint = ORANGE_STATUS,
-                                items = state.pending,
-                                isSelecting = state.isSelecting,
-                                selectedIds = state.selectedIds,
-                                onRowClick = { id ->
-                                    if (state.isSelecting) viewModel.toggleExamSelected(id) else onOpen(id)
-                                },
-                            )
-                            examSection(
-                                title = context.getString(R.string.health_status_booked),
-                                icon = Icons.Default.EventAvailable,
-                                tint = TEAL,
-                                items = state.booked,
-                                isSelecting = state.isSelecting,
-                                selectedIds = state.selectedIds,
-                                onRowClick = { id ->
-                                    if (state.isSelecting) viewModel.toggleExamSelected(id) else onOpen(id)
-                                },
-                            )
-                            examSection(
-                                title = context.getString(R.string.health_status_done),
-                                icon = Icons.Default.CheckCircle,
-                                tint = Color(0xFF43A047),
-                                items = state.executed,
-                                isSelecting = state.isSelecting,
-                                selectedIds = state.selectedIds,
-                                onRowClick = { id ->
-                                    if (state.isSelecting) viewModel.toggleExamSelected(id) else onOpen(id)
-                                },
-                            )
-                            examSection(
-                                title = context.getString(R.string.health_status_none),
-                                icon = Icons.Default.Search,
-                                tint = kb.subtitle,
-                                items = state.unknownStatus,
-                                isSelecting = state.isSelecting,
-                                selectedIds = state.selectedIds,
-                                onRowClick = { id ->
-                                    if (state.isSelecting) viewModel.toggleExamSelected(id) else onOpen(id)
-                                },
-                            )
-                            item { Spacer(Modifier.height(24.dp)) }
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 18.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                item { Spacer(Modifier.height(4.dp)) }
+                                examSection(
+                                    title = context.getString(R.string.health_status_pending),
+                                    icon = Icons.Default.Schedule,
+                                    tint = ORANGE_STATUS,
+                                    items = state.pending,
+                                    isSelecting = state.isSelecting,
+                                    selectedIds = state.selectedIds,
+                                    onRowClick = { id ->
+                                        if (state.isSelecting) viewModel.toggleExamSelected(id) else onOpen(id)
+                                    },
+                                )
+                                examSection(
+                                    title = context.getString(R.string.health_status_booked),
+                                    icon = Icons.Default.EventAvailable,
+                                    tint = TEAL,
+                                    items = state.booked,
+                                    isSelecting = state.isSelecting,
+                                    selectedIds = state.selectedIds,
+                                    onRowClick = { id ->
+                                        if (state.isSelecting) viewModel.toggleExamSelected(id) else onOpen(id)
+                                    },
+                                )
+                                examSection(
+                                    title = context.getString(R.string.health_status_done),
+                                    icon = Icons.Default.CheckCircle,
+                                    tint = Color(0xFF43A047),
+                                    items = state.executed,
+                                    isSelecting = state.isSelecting,
+                                    selectedIds = state.selectedIds,
+                                    onRowClick = { id ->
+                                        if (state.isSelecting) viewModel.toggleExamSelected(id) else onOpen(id)
+                                    },
+                                )
+                                examSection(
+                                    title = context.getString(R.string.health_status_none),
+                                    icon = Icons.Default.Search,
+                                    tint = kb.subtitle,
+                                    items = state.unknownStatus,
+                                    isSelecting = state.isSelecting,
+                                    selectedIds = state.selectedIds,
+                                    onRowClick = { id ->
+                                        if (state.isSelecting) viewModel.toggleExamSelected(id) else onOpen(id)
+                                    },
+                                )
+                                item { Spacer(Modifier.height(24.dp)) }
+                            }
                         }
                     }
                 }

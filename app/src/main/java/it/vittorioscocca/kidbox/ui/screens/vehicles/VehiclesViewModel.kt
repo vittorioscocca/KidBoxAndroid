@@ -8,6 +8,7 @@ import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
 import it.vittorioscocca.kidbox.data.local.entity.VehicleEntity
 import it.vittorioscocca.kidbox.data.repository.VehicleEventRepository
 import it.vittorioscocca.kidbox.data.repository.VehicleRepository
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +33,16 @@ class VehiclesViewModel @Inject constructor(
             vehicleRepository.startRealtime(familyId)
             vehicleEventRepository.startRealtime(familyId)
         }
+    }
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /** Pull-to-refresh: rilegge da Firestore veicoli e interventi. */
+    fun forceRefresh() = pullToRefresh.refresh {
+        if (familyId.isBlank()) return@refresh
+        vehicleRepository.awaitForceRestartRealtime(familyId)
+        vehicleEventRepository.awaitForceRestartRealtime(familyId)
     }
 
     override fun onCleared() {

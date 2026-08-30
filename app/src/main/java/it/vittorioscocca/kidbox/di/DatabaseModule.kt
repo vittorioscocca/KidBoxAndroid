@@ -202,6 +202,57 @@ object DatabaseModule {
         }
     }
 
+    /**
+     * `kb_family_members`: chiave primaria da `id` a `(familyId, id)`.
+     *
+     * `id` è l'uid del membro, non unico fra famiglie: chi sta in due famiglie
+     * aveva una riga sola, e l'ultima scrittura se la portava via cambiandole il
+     * `familyId` — la famiglia aperta perdeva un membro a ogni avvio. SQLite non
+     * sa cambiare una primary key: si ricrea la tabella e si copiano le righe.
+     *
+     * Nessun rischio di collisione nella copia: prima `id` era unico, quindi
+     * ogni riga porta con sé una coppia `(familyId, id)` già distinta.
+     */
+    private val MIGRATION_44_45 = object : Migration(44, 45) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS kb_family_members_new (
+                    id TEXT NOT NULL,
+                    familyId TEXT NOT NULL,
+                    userId TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    displayName TEXT,
+                    email TEXT,
+                    photoURL TEXT,
+                    createdAtEpochMillis INTEGER NOT NULL,
+                    updatedAtEpochMillis INTEGER NOT NULL,
+                    updatedBy TEXT NOT NULL,
+                    isDeleted INTEGER NOT NULL,
+                    PRIMARY KEY(familyId, id),
+                    FOREIGN KEY(familyId) REFERENCES kb_families(id) ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                """
+                INSERT OR REPLACE INTO kb_family_members_new (
+                    id, familyId, userId, role, displayName, email, photoURL,
+                    createdAtEpochMillis, updatedAtEpochMillis, updatedBy, isDeleted
+                )
+                SELECT
+                    id, familyId, userId, role, displayName, email, photoURL,
+                    createdAtEpochMillis, updatedAtEpochMillis, updatedBy, isDeleted
+                FROM kb_family_members
+                """.trimIndent(),
+            )
+            db.execSQL("DROP TABLE kb_family_members")
+            db.execSQL("ALTER TABLE kb_family_members_new RENAME TO kb_family_members")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_family_members_familyId ON kb_family_members(familyId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_kb_family_members_userId ON kb_family_members(userId)")
+        }
+    }
+
     private val MIGRATION_5_6 = object : Migration(5, 6) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE kb_medical_exams ADD COLUMN reminderOn INTEGER NOT NULL DEFAULT 0")
@@ -1278,6 +1329,7 @@ object DatabaseModule {
         MIGRATION_41_42,
         MIGRATION_42_43,
         MIGRATION_43_44,
+        MIGRATION_44_45,
     )
         .fallbackToDestructiveMigration()
         .build()

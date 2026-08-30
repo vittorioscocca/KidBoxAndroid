@@ -223,7 +223,19 @@ class ChatRemoteStore @Inject constructor(
                 if (!snapshot.metadata.hasPendingWrites()) {
                     snapshot.documents.firstOrNull()?.let { onOldestDocument?.invoke(it) }
                 }
-                if (snapshot.documentChanges.isEmpty()) return@addSnapshotListener
+                // Delta vuoto con risultati reali: con la persistenza locale
+                // Firestore può riusare una snapshot in cache e farsela confermare
+                // "invariata" dal server con un existence filter, senza inviare
+                // alcun document_change — e la chat resterebbe vuota. Qui si
+                // ricade sul risultato completo, che `limitToLast` tiene comunque
+                // entro una pagina di messaggi.
+                if (snapshot.documentChanges.isEmpty()) {
+                    if (snapshot.isEmpty) return@addSnapshotListener
+                    ioScope.launch {
+                        snapshot.documents.forEach { doc -> applyRemoteUpsert(familyId, doc) }
+                    }
+                    return@addSnapshotListener
+                }
 
                 ioScope.launch {
                     snapshot.documentChanges.forEach { diff ->

@@ -63,8 +63,23 @@ class HousePaymentRemoteStore @Inject constructor(
                     return@addSnapshotListener
                 }
                 if (snap == null) return@addSnapshotListener
-                val changes = snap.documentChanges.mapNotNull { diff ->
-                    val doc = diff.document
+                // Delta vuoto con risultati reali: con la persistenza locale
+                // Firestore può riusare una snapshot in cache e farsela confermare
+                // "invariata" dal server con un existence filter, senza inviare
+                // alcun document_change — e in Room non arriva più nulla. Qui si
+                // ricade sul risultato completo della query.
+                //
+                // Il fallback invece della lettura sempre completa (come fa
+                // TodoRemoteStore) è deliberato: `applyInbound` riprogramma la
+                // sveglia di ogni scadenza che riceve, e rimandare tutti i
+                // documenti a ogni snapshot significherebbe rifare gli allarmi di
+                // tutta la lista ogni volta.
+                val changed = snap.documentChanges
+                val upsertDocs = changed
+                    .filter { it.type != DocumentChange.Type.REMOVED }
+                    .map { it.document }
+                    .ifEmpty { if (changed.isEmpty()) snap.documents else emptyList() }
+                val upserts = upsertDocs.mapNotNull { doc ->
                     val d = doc.data ?: return@mapNotNull null
                     val name = (d["name"] as? String)?.trim().orEmpty()
                     if (name.isEmpty()) return@mapNotNull null
@@ -99,13 +114,12 @@ class HousePaymentRemoteStore @Inject constructor(
                         createdBy = d["createdBy"] as? String,
                         updatedBy = d["updatedBy"] as? String,
                     )
-                    when (diff.type) {
-                        DocumentChange.Type.ADDED,
-                        DocumentChange.Type.MODIFIED,
-                        -> HousePaymentRemoteChange.Upsert(dto)
-                        DocumentChange.Type.REMOVED -> HousePaymentRemoteChange.Remove(doc.id)
-                    }
+                    HousePaymentRemoteChange.Upsert(dto)
                 }
+                val removes = changed
+                    .filter { it.type == DocumentChange.Type.REMOVED }
+                    .map { HousePaymentRemoteChange.Remove(it.document.id) }
+                val changes = upserts + removes
                 if (changes.isNotEmpty()) onChange(changes)
             }
 

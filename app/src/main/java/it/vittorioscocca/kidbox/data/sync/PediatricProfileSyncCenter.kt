@@ -45,6 +45,17 @@ class PediatricProfileSyncCenter @Inject constructor(
         KBLog.sync.debug("stopped listener familyId=$familyId childId=$childId", TAG)
     }
 
+    /**
+     * Pull-to-refresh: stacca e riaggancia il listener della famiglia.
+     *
+     * [start] da solo esce subito se il listener è già in mappa, quindi per
+     * rileggere davvero da Firestore serve passare dallo stop.
+     */
+    fun restart(familyId: String, childId: String) {
+        stop(familyId, childId)
+        start(familyId, childId)
+    }
+
     fun stopAll() {
         listeners.values.forEach { it.remove() }
         listeners.clear()

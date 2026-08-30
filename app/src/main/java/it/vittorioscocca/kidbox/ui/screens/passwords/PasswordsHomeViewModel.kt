@@ -14,6 +14,7 @@ import it.vittorioscocca.kidbox.data.passwords.security.PasswordSecurityPreferen
 import it.vittorioscocca.kidbox.data.passwords.security.SecurityScanScheduler
 import it.vittorioscocca.kidbox.data.repository.PasswordsRepository
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -333,6 +334,21 @@ class PasswordsHomeViewModel @Inject constructor(
             passwordCypher.decrypt(g.nameCipher, g.familyId, g.visibility, g.createdBy, uid)
         }.getOrElse { "" }
         return PasswordDefaultGroups.displayName(appContext, g.id, g.familyId, stored)
+    }
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /**
+     * Pull-to-refresh: riaggancia i listener e rilegge password e gruppi dal
+     * server. Qui l'idratazione esplicita serve davvero: le voci sono cifrate e
+     * la chiave di famiglia può essere arrivata dopo il primo aggancio.
+     */
+    fun forceRefresh() = pullToRefresh.refresh {
+        val familyId = familyIdFlow.value.orEmpty()
+        if (familyId.isBlank()) return@refresh
+        passwordsRepository.awaitForceRestartRealtime(familyId)
+        runCatching { passwordsRepository.hydratePasswordRoomFromServer(familyId) }
     }
 
     fun bind(familyId: String) {

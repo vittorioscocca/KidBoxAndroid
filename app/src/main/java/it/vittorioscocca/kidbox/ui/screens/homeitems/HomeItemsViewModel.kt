@@ -17,6 +17,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import it.vittorioscocca.kidbox.data.repository.HomeItemRepository
 import it.vittorioscocca.kidbox.data.repository.HousePaymentRepository
 import java.io.File
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -67,6 +68,16 @@ class HomeItemsViewModel @Inject constructor(
             homeItemRepository.startRealtime(familyId)
             housePaymentRepository.startRealtime(familyId)
         }
+    }
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /** Pull-to-refresh: rilegge da Firestore elementi casa e scadenze. */
+    fun forceRefresh() = pullToRefresh.refresh {
+        if (familyId.isBlank()) return@refresh
+        homeItemRepository.awaitForceRestartRealtime(familyId)
+        housePaymentRepository.awaitForceRestartRealtime(familyId)
     }
 
     override fun onCleared() {

@@ -18,6 +18,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.io.File
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
@@ -88,6 +89,16 @@ class ExpensesViewModel @Inject constructor(
     val uiState: StateFlow<ExpensesUiState> = _uiState.asStateFlow()
 
     private var observeJob: Job? = null
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /** Pull-to-refresh: rilegge le spese di famiglia da Firestore. */
+    fun forceRefresh() = pullToRefresh.refresh {
+        val familyId = _uiState.value.familyId
+        if (familyId.isBlank()) return@refresh
+        repository.awaitForceRestartRealtime(familyId)
+    }
 
     fun bindFamily(familyId: String) {
         if (familyId.isBlank() || _uiState.value.familyId == familyId) return

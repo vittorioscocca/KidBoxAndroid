@@ -12,6 +12,7 @@ import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.data.notification.CountersService
 import it.vittorioscocca.kidbox.data.repository.PhotoVideoRepository
 import java.io.File
+import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -59,6 +60,15 @@ class FamilyPhotosViewModel @Inject constructor(
         ),
     )
     val uiState: StateFlow<FamilyPhotosUiState> = _uiState.asStateFlow()
+
+    private val pullToRefresh = PullToRefreshController(viewModelScope)
+    val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
+
+    /** Pull-to-refresh: rilegge foto e album da Firestore. */
+    fun forceRefresh() = pullToRefresh.refresh {
+        if (familyId.isBlank()) return@refresh
+        repository.awaitForceRestartRealtime(familyId)
+    }
 
     init {
         if (familyId.isBlank()) {

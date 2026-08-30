@@ -60,6 +60,21 @@ class DoseLogRemoteStore @Inject constructor() {
                                 decode(change.document, familyId)?.let(::add)
                         }
                     }
+                    // Delta vuoto con risultati reali: con la persistenza locale
+                    // Firestore può riusare una snapshot in cache e farsela
+                    // confermare "invariata" dal server con un existence filter,
+                    // senza inviare alcun document_change — e in Room non arriva
+                    // più nulla. Qui si ricade sul risultato completo.
+                    //
+                    // Il fallback invece della lettura sempre completa (come fa
+                    // TodoRemoteStore) è deliberato: i doseLog sono uno per dose
+                    // per giorno, e riscrivere tutta la tabella a ogni snapshot
+                    // costerebbe caro per l'unico caso in cui serve.
+                    if (isEmpty() && removed.isEmpty()) {
+                        for (doc in snap.documents) {
+                            decode(doc, familyId)?.let(::add)
+                        }
+                    }
                 }
                 if (dtos.isNotEmpty() || removed.isNotEmpty()) {
                     onChange(dtos, removed)

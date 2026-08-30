@@ -2,6 +2,7 @@
 
 package it.vittorioscocca.kidbox.ui.screens.passwords
 
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import it.vittorioscocca.kidbox.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.BorderStroke
@@ -113,6 +114,7 @@ fun PasswordsHomeScreen(
     viewModel: PasswordsHomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     var showMenu by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -322,41 +324,47 @@ fun PasswordsHomeScreen(
                     )
                     else -> {
                         val listBottomExtra = if (state.isSelecting) 0.dp else PasswordsHomeListFabClearance
-                        LazyColumn(
-                            contentPadding = PaddingValues(
-                                start = 16.dp,
-                                end = 16.dp,
-                                top = 8.dp,
-                                bottom = 8.dp + listBottomExtra,
-                            ),
-                            verticalArrangement = Arrangement.spacedBy(18.dp),
+                        PullToRefreshBox(
+                            isRefreshing = isRefreshing,
+                            onRefresh = { viewModel.forceRefresh() },
+                            modifier = Modifier.fillMaxSize(),
                         ) {
-                            items(state.sections, key = { it.id }) { section ->
-                                PasswordHomeSection(
-                                    section = section,
-                                    surfaceCard = surfaceCard,
-                                    rowDivider = rowDivider,
-                                    kb = kb,
-                                    isSelecting = state.isSelecting,
-                                    selectedIds = state.selectedIds,
-                                    onToggleSelected = viewModel::toggleSelected,
-                                    onToggleSectionExpanded = viewModel::toggleSectionExpanded,
-                                    // Distingue "trovato cercando" da "trovato
-                                    // sfogliando": è la sola differenza che dice
-                                    // se il contenuto è davvero a portata di click.
-                                    onOpenPassword = onOpenPassword?.let { open ->
-                                        { id: String ->
-                                            KBAnalyticsOrigin.set(
-                                                if (state.searchQuery.isBlank()) {
-                                                    KBAnalyticsEntryPoint.LIST
-                                                } else {
-                                                    KBAnalyticsEntryPoint.SEARCH
-                                                }
-                                            )
-                                            open(id)
-                                        }
-                                    },
-                                )
+                            LazyColumn(
+                                contentPadding = PaddingValues(
+                                    start = 16.dp,
+                                    end = 16.dp,
+                                    top = 8.dp,
+                                    bottom = 8.dp + listBottomExtra,
+                                ),
+                                verticalArrangement = Arrangement.spacedBy(18.dp),
+                            ) {
+                                items(state.sections, key = { it.id }) { section ->
+                                    PasswordHomeSection(
+                                        section = section,
+                                        surfaceCard = surfaceCard,
+                                        rowDivider = rowDivider,
+                                        kb = kb,
+                                        isSelecting = state.isSelecting,
+                                        selectedIds = state.selectedIds,
+                                        onToggleSelected = viewModel::toggleSelected,
+                                        onToggleSectionExpanded = viewModel::toggleSectionExpanded,
+                                        // Distingue "trovato cercando" da "trovato
+                                        // sfogliando": è la sola differenza che dice
+                                        // se il contenuto è davvero a portata di click.
+                                        onOpenPassword = onOpenPassword?.let { open ->
+                                            { id: String ->
+                                                KBAnalyticsOrigin.set(
+                                                    if (state.searchQuery.isBlank()) {
+                                                        KBAnalyticsEntryPoint.LIST
+                                                    } else {
+                                                        KBAnalyticsEntryPoint.SEARCH
+                                                    }
+                                                )
+                                                open(id)
+                                            }
+                                        },
+                                    )
+                                }
                             }
                         }
                     }

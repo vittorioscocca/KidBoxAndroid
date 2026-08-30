@@ -352,8 +352,8 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             LoginTermsFooter(
-                onTermsClick = { uriHandler.openUri("https://kidbox-landing.web.app/terms.html") },
-                onPrivacyClick = { uriHandler.openUri("https://kidbox-landing.web.app/privacy.html") },
+                onTermsClick = { uriHandler.openUri("https://kidboxapp.com/terms.html") },
+                onPrivacyClick = { uriHandler.openUri("https://kidboxapp.com/privacy.html") },
             )
 
             Spacer(modifier = Modifier.height(40.dp))
