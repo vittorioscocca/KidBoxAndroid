@@ -226,6 +226,18 @@ class ExpenseRepository @Inject constructor(
         return created.id
     }
 
+    /**
+     * Elimina la spesa collegata a una scheda, se c'è ancora.
+     *
+     * Sta qui e non nei repository che la chiamano per lo stesso motivo di
+     * [syncLinkedExpense]: la logica delle spese resta in un posto solo.
+     */
+    suspend fun deleteLinkedExpense(familyId: String, linkedExpenseId: String?) {
+        val existing = linkedExpenseId?.let { expenseDao.getById(it) }?.takeIf { !it.isDeleted } ?: return
+        deleteExpenseLocal(existing)
+        runCatching { flushPending(familyId) }
+    }
+
     suspend fun createExpenseLocal(
         familyId: String,
         title: String,

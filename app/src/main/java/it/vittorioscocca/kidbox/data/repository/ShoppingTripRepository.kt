@@ -169,11 +169,76 @@ class ShoppingTripRepository @Inject constructor(
     }
 
     /**
-     * Lo scontrino sparisce, la spesa collegata no: i soldi sono usciti comunque,
-     * e cancellarli da qui sarebbe una sorpresa nei conti.
+     * Modifica negozio, totale o data di uno scontrino già salvato.
+     *
+     * Scontrino e spesa sono due facce dello stesso fatto: `syncLinkedExpense`
+     * tiene allineata la voce in Spese — la aggiorna, la crea se il totale
+     * viene aggiunto ora, la elimina se viene tolto.
+     *
+     * I prodotti non si toccano: sono l'archivio di cosa è stato preso davvero,
+     * e riscriverli a posteriori vorrebbe dire falsificare lo scontrino.
+     */
+    suspend fun updateTrip(
+        tripId: String,
+        storeName: String?,
+        total: Double?,
+        dateEpochMillis: Long,
+        fallbackTitle: String,
+    ) {
+        val existing = tripDao.getById(tripId) ?: return
+        val uid = auth.currentUser?.uid ?: "local"
+        val store = storeName?.trim()?.takeIf { it.isNotEmpty() }
+
+        val linkedId = expenseRepository.syncLinkedExpense(
+            familyId = existing.familyId,
+            linkedExpenseId = existing.linkedExpenseId,
+            amount = total,
+            title = store.orEmpty(),
+            fallbackTitle = fallbackTitle,
+            dateEpochMillis = dateEpochMillis,
+            notes = existing.notes,
+            categorySlug = "spesa",
+        )
+
+        val updated = existing.copy(
+            storeName = store,
+            total = total ?: 0.0,
+            dateEpochMillis = dateEpochMillis,
+            linkedExpenseId = linkedId,
+            updatedAtEpochMillis = System.currentTimeMillis(),
+            updatedBy = uid,
+            syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+            lastSyncError = null,
+        )
+        tripDao.upsert(updated)
+
+        runCatching { remoteStore.upsert(updated) }
+            .onSuccess {
+                tripDao.upsert(updated.copy(syncStateRaw = KBSyncState.SYNCED.rawValue, lastSyncError = null))
+            }
+            .onFailure { err ->
+                tripDao.upsert(
+                    updated.copy(
+                        syncStateRaw = KBSyncState.ERROR.rawValue,
+                        lastSyncError = err.message,
+                    ),
+                )
+            }
+    }
+
+    /**
+     * Elimina lo scontrino **e** la spesa collegata: sono lo stesso fatto e si
+     * modificano insieme, e lasciare nei totali una spesa senza più il suo
+     * dettaglio — non più raggiungibile da nessuna schermata — sarebbe la
+     * sorpresa peggiore.
      */
     suspend fun deleteTrip(tripId: String) {
         val existing = tripDao.getById(tripId) ?: return
+
+        runCatching {
+            expenseRepository.deleteLinkedExpense(existing.familyId, existing.linkedExpenseId)
+        }
+
         runCatching { remoteStore.softDelete(existing.familyId, tripId) }
             .onSuccess { tripDao.deleteById(tripId) }
             .onFailure { err ->

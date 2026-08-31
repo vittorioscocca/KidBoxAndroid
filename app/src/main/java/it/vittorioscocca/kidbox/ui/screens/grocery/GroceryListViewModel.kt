@@ -211,6 +211,35 @@ class GroceryListViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Modifica uno scontrino salvato. Il totale è opzionale: toglierlo elimina
+     * la spesa collegata, aggiungerlo a uno scontrino che non ce l'aveva la crea.
+     */
+    fun updateTrip(
+        tripId: String,
+        storeName: String,
+        total: Double?,
+        dateEpochMillis: Long,
+        fallbackTitle: String,
+        onSaved: () -> Unit,
+    ) {
+        if (familyId.isBlank()) return
+        viewModelScope.launch {
+            runCatching {
+                shoppingTripRepository.updateTrip(
+                    tripId = tripId,
+                    storeName = storeName,
+                    total = total,
+                    dateEpochMillis = dateEpochMillis,
+                    fallbackTitle = fallbackTitle,
+                )
+            }.onSuccess { onSaved() }
+                .onFailure { err ->
+                    _uiState.value = _uiState.value.copy(errorMessage = err.message ?: "Errore modifica")
+                }
+        }
+    }
+
     fun deleteTrip(tripId: String) {
         viewModelScope.launch {
             runCatching { shoppingTripRepository.deleteTrip(tripId) }

@@ -75,6 +75,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.entity.KBGroceryItemEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBShoppingTripEntity
+import it.vittorioscocca.kidbox.domain.model.KBShoppingTripLine
 import it.vittorioscocca.kidbox.domain.model.ShoppingTripLines
 import it.vittorioscocca.kidbox.notifications.AppSection
 import it.vittorioscocca.kidbox.notifications.TrackSectionPresence
@@ -110,6 +111,7 @@ fun GroceryListScreen(
     var showDeletePurchasedAlert by remember { mutableStateOf(false) }
     var showSaveTripSheet by remember { mutableStateOf(false) }
     var showTripsHistory by remember { mutableStateOf(false) }
+    var editingTrip by remember { mutableStateOf<KBShoppingTripEntity?>(null) }
     val tripFallbackTitle = stringResource(R.string.grocery_trip_fallback_title)
 
     LaunchedEffect(state.errorMessage) {
@@ -339,10 +341,32 @@ fun GroceryListScreen(
         )
     }
 
+    // In modifica i prodotti restano quelli archiviati: si passa una lista vuota
+    // perché il foglio non deve rileggere i "presi" di adesso.
+    editingTrip?.let { trip ->
+        SaveShoppingTripSheet(
+            purchasedItems = emptyList(),
+            isSaving = false,
+            editingTrip = trip,
+            onDismiss = { editingTrip = null },
+            onSave = { store, total, dateEpochMillis ->
+                viewModel.updateTrip(
+                    tripId = trip.id,
+                    storeName = store,
+                    total = total.takeIf { it > 0 },
+                    dateEpochMillis = dateEpochMillis,
+                    fallbackTitle = tripFallbackTitle,
+                    onSaved = { editingTrip = null },
+                )
+            },
+        )
+    }
+
     if (showTripsHistory) {
         ShoppingTripsSheet(
             trips = state.trips,
             onDismiss = { showTripsHistory = false },
+            onEdit = { editingTrip = it },
             onDelete = { viewModel.deleteTrip(it.id) },
         )
     }
@@ -661,16 +685,30 @@ private fun GroceryEditDialog(
 private fun SaveShoppingTripSheet(
     purchasedItems: List<KBGroceryItemEntity>,
     isSaving: Boolean,
+    /** Valorizzato in modifica: i campi partono da quelli dello scontrino. */
+    editingTrip: KBShoppingTripEntity? = null,
     onDismiss: () -> Unit,
     onSave: (storeName: String, total: Double, dateEpochMillis: Long) -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var storeName by remember { mutableStateOf("") }
-    var totalText by remember { mutableStateOf("") }
-    var dateEpochMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+    var storeName by remember { mutableStateOf(editingTrip?.storeName.orEmpty()) }
+    var totalText by remember {
+        mutableStateOf(
+            editingTrip?.total?.takeIf { it > 0 }?.let { String.format("%.2f", it) }.orEmpty(),
+        )
+    }
+    var dateEpochMillis by remember {
+        mutableStateOf(editingTrip?.dateEpochMillis ?: System.currentTimeMillis())
+    }
     val total = totalText.replace(',', '.').trim().toDoubleOrNull()?.takeIf { it >= 0 }
+    // In modifica i prodotti sono quelli archiviati nello scontrino, non i
+    // "presi" di adesso: sono l'elenco di cosa è stato comprato allora.
+    val previewLines = remember(editingTrip, purchasedItems) {
+        editingTrip?.let { ShoppingTripLines.decode(it.linesJson) }
+            ?: purchasedItems.map { KBShoppingTripLine(it.name, it.quantity?.takeIf { q -> q > 1 }) }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -697,8 +735,10 @@ private fun SaveShoppingTripSheet(
                 Spacer(Modifier.weight(1f))
                 PillButton(
                     text = stringResource(R.string.life_save),
-                    onClick = { total?.let { onSave(storeName, it, dateEpochMillis) } },
-                    enabled = total != null && purchasedItems.isNotEmpty() && !isSaving,
+                    onClick = { onSave(storeName, total ?: 0.0, dateEpochMillis) },
+                    enabled = previewLines.isNotEmpty() &&
+                        (editingTrip != null || total != null) &&
+                        !isSaving,
                 )
             }
 
@@ -768,7 +808,7 @@ private fun SaveShoppingTripSheet(
 
             Spacer(Modifier.height(16.dp))
             Text(
-                stringResource(R.string.grocery_trip_products_taken, purchasedItems.size),
+                stringResource(R.string.grocery_trip_products_taken, previewLines.size),
                 style = MaterialTheme.typography.titleMedium.copy(color = kb.subtitle, fontWeight = FontWeight.Bold),
             )
             Spacer(Modifier.height(8.dp))
@@ -778,15 +818,15 @@ private fun SaveShoppingTripSheet(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(Modifier.padding(vertical = 4.dp)) {
-                    purchasedItems.forEach { item ->
+                    previewLines.forEach { line ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(item.name, color = kb.title, modifier = Modifier.weight(1f))
-                            item.quantity?.takeIf { it > 1 }?.let {
+                            Text(line.name, color = kb.title, modifier = Modifier.weight(1f))
+                            line.quantity?.takeIf { it > 1 }?.let {
                                 Text("x $it", color = kb.subtitle)
                             }
                         }
@@ -812,6 +852,7 @@ private fun SaveShoppingTripSheet(
 private fun ShoppingTripsSheet(
     trips: List<KBShoppingTripEntity>,
     onDismiss: () -> Unit,
+    onEdit: (KBShoppingTripEntity) -> Unit,
     onDelete: (KBShoppingTripEntity) -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -879,6 +920,7 @@ private fun ShoppingTripsSheet(
                             onToggle = {
                                 expandedTripId = if (expandedTripId == trip.id) null else trip.id
                             },
+                            onEdit = { onEdit(trip) },
                             onDelete = { onDelete(trip) },
                         )
                     }
@@ -894,6 +936,7 @@ private fun ShoppingTripCard(
     trip: KBShoppingTripEntity,
     isExpanded: Boolean,
     onToggle: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -985,6 +1028,9 @@ private fun ShoppingTripCard(
                         )
                     } else {
                         Spacer(Modifier.weight(1f))
+                    }
+                    TextButton(onClick = onEdit) {
+                        Text(stringResource(R.string.life_edit), color = kb.title)
                     }
                     TextButton(onClick = onDelete) {
                         Text(stringResource(R.string.life_delete), color = GroceryRed)
