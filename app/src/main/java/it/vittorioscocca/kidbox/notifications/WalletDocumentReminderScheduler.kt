@@ -40,7 +40,6 @@ class WalletDocumentReminderScheduler @Inject constructor(
         val now = System.currentTimeMillis()
         if (fireAtMillis <= now) return
 
-        val body = title.ifBlank { "Documento" }
         alarmRegistry.arm(
             ReminderAlarmRegistry.AlarmSpec(
                 key = ReminderAlarmRegistry.walletDocumentKey(documentId),
@@ -48,13 +47,19 @@ class WalletDocumentReminderScheduler @Inject constructor(
                 requestCode = ("walletdoc:$documentId").hashCode(),
                 fireAtMillis = fireAtMillis,
                 action = documentAction(documentId),
-                stringExtras = mapOf(
-                    HealthReminderReceiver.EXTRA_TYPE to HealthReminderReceiver.TYPE_WALLET_DOCUMENT_REMINDER,
-                    HealthReminderReceiver.EXTRA_WALLET_DOCUMENT_ID to documentId,
-                    HealthReminderReceiver.EXTRA_FAMILY_ID to familyId,
-                    HealthReminderReceiver.EXTRA_TITLE to "Documento in scadenza tra una settimana",
-                    HealthReminderReceiver.EXTRA_BODY to body,
-                ),
+                stringExtras = buildMap<String, String> {
+                    put(HealthReminderReceiver.EXTRA_TYPE, HealthReminderReceiver.TYPE_WALLET_DOCUMENT_REMINDER)
+                    put(HealthReminderReceiver.EXTRA_WALLET_DOCUMENT_ID, documentId)
+                    put(HealthReminderReceiver.EXTRA_FAMILY_ID, familyId)
+                    KBNotificationText.put(this, titleKey = "wallet_document_reminder_title")
+                    // Il nome del documento lo scrive l'utente: se manca, il
+                    // fallback resta una chiave e si traduce alla consegna.
+                    if (title.isBlank()) {
+                        KBNotificationText.put(this, bodyKey = "wallet_document_fallback")
+                    } else {
+                        put(HealthReminderReceiver.EXTRA_BODY, title)
+                    }
+                },
             ),
         )
     }

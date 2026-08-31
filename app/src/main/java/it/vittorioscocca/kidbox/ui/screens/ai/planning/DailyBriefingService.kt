@@ -256,7 +256,7 @@ class DailyBriefingBroadcastReceiver : BroadcastReceiver() {
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_kidbox)
-            .setContentTitle("☀️ Buongiorno, $familyName")
+            .setContentTitle(context.getString(R.string.ai_daily_briefing_notification_title, familyName))
             .setContentText(firstLine.ifBlank { context.getString(R.string.ai_briefing_ready) })
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)

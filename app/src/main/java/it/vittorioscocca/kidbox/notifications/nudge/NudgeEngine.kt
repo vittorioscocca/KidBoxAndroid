@@ -17,6 +17,7 @@ import it.vittorioscocca.kidbox.ui.screens.home.onboarding.OnboardingChecklistSt
 import it.vittorioscocca.kidbox.ui.screens.home.onboarding.OnboardingStep
 import it.vittorioscocca.kidbox.util.KBLog
 import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
+import it.vittorioscocca.kidbox.notifications.KBNotificationText
 import java.util.Calendar
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -278,8 +279,21 @@ class NudgeEngine @Inject constructor(
         val intent = Intent(context, NudgeReceiver::class.java).apply {
             action = "kb.nudge.${campaign.id}"
             putExtra(NudgeReceiver.EXTRA_CAMPAIGN_ID, campaign.id)
-            putExtra(NudgeReceiver.EXTRA_TITLE, resolve(campaign.titleRes, campaign.titleFallback))
-            putExtra(NudgeReceiver.EXTRA_BODY, resolve(campaign.bodyRes, campaign.bodyFallback))
+            // Il nudge si arma al login e scatta settimane dopo: si passano le
+            // chiavi, non le frasi, così il receiver le traduce alla consegna.
+            // Il testo remoto invece è già una scelta fatta e viaggia com'è.
+            val titleKey = campaign.titleRes?.let(KBNotificationText::keyFor)
+            val bodyKey = campaign.bodyRes?.let(KBNotificationText::keyFor)
+            if (titleKey != null) {
+                putExtra(KBNotificationText.EXTRA_TITLE_KEY, titleKey)
+            } else {
+                putExtra(NudgeReceiver.EXTRA_TITLE, resolve(campaign.titleRes, campaign.titleFallback))
+            }
+            if (bodyKey != null) {
+                putExtra(KBNotificationText.EXTRA_BODY_KEY, bodyKey)
+            } else {
+                putExtra(NudgeReceiver.EXTRA_BODY, resolve(campaign.bodyRes, campaign.bodyFallback))
+            }
             putExtra(NudgeReceiver.EXTRA_DESTINATION, campaign.destination?.name.orEmpty())
             putExtra("fireAt", fireAtMillis)
         }

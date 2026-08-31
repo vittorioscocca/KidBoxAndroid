@@ -49,8 +49,15 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 val childId = intent.getStringExtra(EXTRA_CHILD_ID).orEmpty()
                 val dayOffset = intent.getIntExtra(EXTRA_DAY_OFFSET, 0)
                 val slotIndex = intent.getIntExtra(EXTRA_SLOT_INDEX, 0)
-                val title = intent.getStringExtra(EXTRA_TITLE) ?: context.getString(R.string.treatment_reminder_notification_title)
-                val body = intent.getStringExtra(EXTRA_BODY) ?: context.getString(R.string.treatment_reminder_body_fallback)
+                // Prima la chiave (tradotta ora, alla consegna), poi la frase già
+                // composta: gli alarm armati da una versione precedente hanno solo
+                // quella, e sopravvivono all'aggiornamento dell'app.
+                val title = KBNotificationText.title(context, intent)
+                    ?: intent.getStringExtra(EXTRA_TITLE)
+                    ?: context.getString(R.string.treatment_reminder_notification_title)
+                val body = KBNotificationText.body(context, intent)
+                    ?: intent.getStringExtra(EXTRA_BODY)
+                    ?: context.getString(R.string.treatment_reminder_body_fallback)
 
                 val deepLink = Intent(context, MainActivity::class.java).apply {
                     // NEW_TASK necessario: parte da un BroadcastReceiver (AlarmManager), un
@@ -110,8 +117,14 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 )
                 val notification = NotificationCompat.Builder(context, CHANNEL_ID_HEALTH_REMINDERS)
                     .setSmallIcon(R.mipmap.ic_launcher)
-                    .setContentTitle(title.ifBlank { "Wallet" })
-                    .setContentText(body.ifBlank { "Biglietto in arrivo" })
+                    .setContentTitle(
+                        KBNotificationText.title(context, intent)
+                            ?: title.ifBlank { context.getString(R.string.wallet_ticket_reminder_title_fallback) },
+                    )
+                    .setContentText(
+                        KBNotificationText.body(context, intent)
+                            ?: body.ifBlank { context.getString(R.string.wallet_ticket_reminder_body_fallback) },
+                    )
                     .setAutoCancel(true)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setContentIntent(pendingIntent)
@@ -144,8 +157,14 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 )
                 val notification = NotificationCompat.Builder(context, CHANNEL_ID_HEALTH_REMINDERS)
                     .setSmallIcon(R.mipmap.ic_launcher)
-                    .setContentTitle(title.ifBlank { "Documento in scadenza" })
-                    .setContentText(body.ifBlank { "Controlla il Wallet" })
+                    .setContentTitle(
+                        KBNotificationText.title(context, intent)
+                            ?: title.ifBlank { context.getString(R.string.wallet_document_reminder_title_fallback) },
+                    )
+                    .setContentText(
+                        KBNotificationText.body(context, intent)
+                            ?: body.ifBlank { context.getString(R.string.wallet_document_reminder_body_fallback) },
+                    )
                     .setAutoCancel(true)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setContentIntent(pendingIntent)
@@ -178,8 +197,11 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 )
                 val notification = NotificationCompat.Builder(context, CHANNEL_ID_HEALTH_REMINDERS)
                     .setSmallIcon(R.mipmap.ic_launcher)
-                    .setContentTitle(title.ifBlank { "Password in scadenza" })
-                    .setContentText(body)
+                    .setContentTitle(
+                        KBNotificationText.title(context, intent)
+                            ?: title.ifBlank { context.getString(R.string.password_expiry_reminder_title) },
+                    )
+                    .setContentText(KBNotificationText.body(context, intent) ?: body)
                     .setAutoCancel(true)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setContentIntent(pendingIntent)
@@ -215,7 +237,10 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 val notification = NotificationCompat.Builder(context, CHANNEL_ID_HEALTH_REMINDERS)
                     .setSmallIcon(R.mipmap.ic_launcher)
                     .setContentTitle(context.getString(R.string.vaccine_reminder_notification_title))
-                    .setContentText(body.ifBlank { context.getString(R.string.vaccine_reminder_body_fallback) })
+                    .setContentText(
+                        KBNotificationText.body(context, intent)
+                            ?: body.ifBlank { context.getString(R.string.vaccine_reminder_body_fallback) },
+                    )
                     .setAutoCancel(true)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setContentIntent(pendingIntent)
@@ -296,11 +321,11 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 val paymentId = intent.getStringExtra(EXTRA_HOUSE_PAYMENT_ID).orEmpty()
                 val familyId = intent.getStringExtra(EXTRA_FAMILY_ID).orEmpty()
                 val paymentName = intent.getStringExtra(EXTRA_HOUSE_PAYMENT_NAME).orEmpty()
-                val title = "Scadenza in arrivo"
+                val title = context.getString(R.string.house_payment_reminder_title)
                 val body = if (paymentName.isNotBlank()) {
-                    "$paymentName — tra 3 giorni."
+                    context.getString(R.string.house_payment_reminder_body, paymentName)
                 } else {
-                    "Tra 3 giorni — apri Casa."
+                    context.getString(R.string.house_payment_reminder_body_fallback)
                 }
                 val deepLink = Intent(context, MainActivity::class.java).apply {
                     // NEW_TASK necessario: parte da un BroadcastReceiver (AlarmManager), un
@@ -350,8 +375,9 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 val familyId = intent.getStringExtra(EXTRA_FAMILY_ID).orEmpty()
                 val childId = intent.getStringExtra(EXTRA_CHILD_ID).orEmpty()
                 val isExam = type == TYPE_EXAM_REMINDER
-                val notifTitle = context.getString(if (isExam) R.string.exam_reminder_notification_title else R.string.visit_reminder_notification_title)
-                val notifBody = body.ifBlank {
+                val notifTitle = KBNotificationText.title(context, intent)
+                    ?: context.getString(if (isExam) R.string.exam_reminder_notification_title else R.string.visit_reminder_notification_title)
+                val notifBody = KBNotificationText.body(context, intent) ?: body.ifBlank {
                     context.getString(if (isExam) R.string.exam_reminder_body_fallback else R.string.visit_reminder_body_fallback)
                 }
 

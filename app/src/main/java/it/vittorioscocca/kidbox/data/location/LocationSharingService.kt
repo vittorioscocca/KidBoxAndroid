@@ -173,7 +173,7 @@ class LocationSharingService : Service() {
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(getString(R.string.app_name))
-            .setContentText("Condivisione posizione attiva")
+            .setContentText(getString(R.string.location_sharing_notification_text))
             .setOngoing(true)
             .setContentIntent(contentIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)

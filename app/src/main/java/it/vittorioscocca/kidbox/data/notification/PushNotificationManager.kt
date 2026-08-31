@@ -3,6 +3,7 @@ package it.vittorioscocca.kidbox.data.notification
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
+import it.vittorioscocca.kidbox.data.local.AppLanguage
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
@@ -55,6 +56,27 @@ class PushNotificationManager @Inject constructor(
                 com.google.firebase.firestore.SetOptions.merge(),
             )
             .await()
+
+        // Il token si registra a ogni avvio: è il momento buono per riallineare
+        // anche la lingua, così il campo esiste pure per chi non ha mai aperto
+        // il selettore o ha cambiato la lingua di sistema fuori dall'app.
+        syncNotificationLanguage()
+    }
+
+    /**
+     * Allinea `users/{uid}.notificationLanguage` alla lingua in uso.
+     *
+     * Le push arrivano con il testo già scritto — è il sistema a mostrarle
+     * quando l'app non gira — quindi a tradurle è il server, che la lingua del
+     * device non può vederla. Questo campo è l'unico modo che ha per saperla;
+     * se manca, ricade sull'italiano.
+     */
+    suspend fun syncNotificationLanguage(tag: String = AppLanguage.resolvedTag()) {
+        val uid = auth.currentUser?.uid ?: return
+        db.collection("users").document(uid).set(
+            mapOf("notificationLanguage" to tag),
+            com.google.firebase.firestore.SetOptions.merge(),
+        ).await()
     }
 
     /**

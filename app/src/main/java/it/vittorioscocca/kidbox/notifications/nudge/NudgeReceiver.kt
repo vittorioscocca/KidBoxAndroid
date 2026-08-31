@@ -8,6 +8,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import it.vittorioscocca.kidbox.MainActivity
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.notifications.KBNotificationText
 import it.vittorioscocca.kidbox.notifications.KidBoxFirebaseMessagingService
 import it.vittorioscocca.kidbox.util.KBLog
 
@@ -23,8 +24,10 @@ class NudgeReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val campaignId = intent.getStringExtra(EXTRA_CAMPAIGN_ID).orEmpty()
-        val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
-        val body = intent.getStringExtra(EXTRA_BODY).orEmpty()
+        val title = KBNotificationText.title(context, intent)
+            ?: intent.getStringExtra(EXTRA_TITLE).orEmpty()
+        val body = KBNotificationText.body(context, intent)
+            ?: intent.getStringExtra(EXTRA_BODY).orEmpty()
         val destination = intent.getStringExtra(EXTRA_DESTINATION).orEmpty()
         if (campaignId.isBlank() || body.isBlank()) {
             KBLog.app.warning("Nudge senza contenuto, ignorato", TAG)
@@ -58,7 +61,7 @@ class NudgeReceiver : BroadcastReceiver() {
         val notification = NotificationCompat
             .Builder(context, KidBoxFirebaseMessagingService.CHANNEL_ID_FAMILY_UPDATES)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(title.ifBlank { "KidBox" })
+            .setContentTitle(title.ifBlank { context.getString(R.string.nudge_notification_title_fallback) })
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             // Priorità normale, non alta: un suggerimento non è un promemoria.

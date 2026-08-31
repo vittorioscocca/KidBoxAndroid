@@ -16,7 +16,8 @@ class TodoReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         ensureChannel(context)
         val todoId = intent.getStringExtra(EXTRA_TODO_ID).orEmpty()
-        val title = intent.getStringExtra(EXTRA_TITLE).orEmpty().ifBlank { "To-Do" }
+        val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
+            .ifBlank { context.getString(R.string.todo_reminder_title_fallback) }
         val familyId = intent.getStringExtra(EXTRA_FAMILY_ID).orEmpty()
         val childId = intent.getStringExtra(EXTRA_CHILD_ID)
         val listId = intent.getStringExtra(EXTRA_LIST_ID)

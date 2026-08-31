@@ -9,6 +9,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.MainActivity
+import it.vittorioscocca.kidbox.R
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -38,8 +39,8 @@ class SecurityNotifier @Inject constructor(
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_notify_error)
-            .setContentTitle("KidBox - Password a rischio")
-            .setContentText("$newCount nuove password trovate in data breach.")
+            .setContentTitle(context.getString(R.string.security_breach_notification_title))
+            .setContentText(context.getString(R.string.security_breach_notification_body, newCount.toString()))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)

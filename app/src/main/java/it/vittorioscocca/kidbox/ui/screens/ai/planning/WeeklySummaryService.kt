@@ -260,7 +260,7 @@ class WeeklySummaryBroadcastReceiver : BroadcastReceiver() {
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_kidbox)
-            .setContentTitle("Settimana di $familyName")
+            .setContentTitle(context.getString(R.string.ai_weekly_summary_notification_title, familyName))
             .setContentText(firstLine.ifBlank { context.getString(R.string.ai_open_weekly) })
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)

@@ -293,7 +293,7 @@ class HealthPatternBroadcastReceiver : BroadcastReceiver() {
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_kidbox)
-            .setContentTitle("🔍 Pattern salute · $familyName")
+            .setContentTitle(context.getString(R.string.ai_health_pattern_notification_title, familyName))
             .setContentText(firstLine.ifBlank { context.getString(R.string.ai_open_health_insights) })
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)

@@ -72,8 +72,13 @@ class WalletReminderScheduler @Inject constructor(
             for (offsetMinutes in offsetsMinutes) {
                 val fireAt = event - offsetMinutes * MIN_MS
                 if (fireAt <= now) continue
-                val title = t.title.ifBlank { "Biglietto" }
-                val body = "Tra poco: $title"
+                // Il titolo del biglietto lo scrive l'utente; quando manca resta
+                // una chiave, così si traduce quando l'alarm scatta.
+                val ticketLabel = if (t.title.isBlank()) {
+                    KBNotificationText.localizedArg("wallet_ticket_fallback")
+                } else {
+                    t.title
+                }
                 alarmRegistry.arm(
                     ReminderAlarmRegistry.AlarmSpec(
                         key = ReminderAlarmRegistry.walletTicketKey(t.id, offsetMinutes),
@@ -81,13 +86,17 @@ class WalletReminderScheduler @Inject constructor(
                         requestCode = ("wallet:${t.id}:$offsetMinutes").hashCode(),
                         fireAtMillis = fireAt,
                         action = ticketAction(t.id, offsetMinutes),
-                        stringExtras = mapOf(
-                            HealthReminderReceiver.EXTRA_TYPE to HealthReminderReceiver.TYPE_WALLET_REMINDER,
-                            HealthReminderReceiver.EXTRA_WALLET_TICKET_ID to t.id,
-                            HealthReminderReceiver.EXTRA_FAMILY_ID to familyId,
-                            HealthReminderReceiver.EXTRA_TITLE to title,
-                            HealthReminderReceiver.EXTRA_BODY to body,
-                        ),
+                        stringExtras = buildMap<String, String> {
+                            put(HealthReminderReceiver.EXTRA_TYPE, HealthReminderReceiver.TYPE_WALLET_REMINDER)
+                            put(HealthReminderReceiver.EXTRA_WALLET_TICKET_ID, t.id)
+                            put(HealthReminderReceiver.EXTRA_FAMILY_ID, familyId)
+                            if (t.title.isNotBlank()) put(HealthReminderReceiver.EXTRA_TITLE, t.title)
+                            KBNotificationText.put(
+                                this,
+                                bodyKey = "wallet_ticket_reminder_body_format",
+                                bodyArgs = listOf(ticketLabel),
+                            )
+                        },
                     ),
                 )
             }

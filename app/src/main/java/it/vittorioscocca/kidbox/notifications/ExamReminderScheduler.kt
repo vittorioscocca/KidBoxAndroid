@@ -23,9 +23,12 @@ class ExamReminderScheduler @Inject constructor(
         val fireAt = dayBeforeAt9(deadline)
         if (fireAt <= System.currentTimeMillis()) return
 
-        val body = buildString {
-            append(context.getString(R.string.exam_reminder_body_format, childName, exam.name))
-            if (exam.isUrgent) append(context.getString(R.string.exam_reminder_body_urgent_suffix))
+        // Chiave e argomenti al posto della frase: la compone il receiver quando
+        // l'alarm scatta, nella lingua di allora (vedi KBNotificationText).
+        val bodyKey = if (exam.isUrgent) {
+            "exam_reminder_body_format_urgent"
+        } else {
+            "exam_reminder_body_format"
         }
         alarmRegistry.arm(
             ReminderAlarmRegistry.AlarmSpec(
@@ -34,13 +37,18 @@ class ExamReminderScheduler @Inject constructor(
                 requestCode = ("exam:${exam.id}").hashCode(),
                 fireAtMillis = fireAt,
                 action = examAction(exam.id),
-                stringExtras = mapOf(
-                    HealthReminderReceiver.EXTRA_TYPE to HealthReminderReceiver.TYPE_EXAM_REMINDER,
-                    HealthReminderReceiver.EXTRA_EXAM_ID to exam.id,
-                    HealthReminderReceiver.EXTRA_TITLE to body,
-                    HealthReminderReceiver.EXTRA_FAMILY_ID to exam.familyId,
-                    HealthReminderReceiver.EXTRA_CHILD_ID to exam.childId,
-                ),
+                stringExtras = buildMap<String, String> {
+                    put(HealthReminderReceiver.EXTRA_TYPE, HealthReminderReceiver.TYPE_EXAM_REMINDER)
+                    put(HealthReminderReceiver.EXTRA_EXAM_ID, exam.id)
+                    put(HealthReminderReceiver.EXTRA_FAMILY_ID, exam.familyId)
+                    put(HealthReminderReceiver.EXTRA_CHILD_ID, exam.childId)
+                    KBNotificationText.put(
+                        this,
+                        titleKey = "exam_reminder_notification_title",
+                        bodyKey = bodyKey,
+                        bodyArgs = listOf(childName, exam.name),
+                    )
+                },
             ),
         )
     }

@@ -11,6 +11,7 @@ import java.util.Calendar
 import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
+import it.vittorioscocca.kidbox.R
 
 /**
  * Allarmi locali one-shot per la scadenza password: fino a 3 avvisi (30/7/1 giorni prima, ore 9).
@@ -33,7 +34,7 @@ class PasswordExpiryReminderScheduler @Inject constructor(
         val expiryDayStart = startOfDay(expiresAtEpochMillis)
         if (expiryDayStart < startOfDay(now)) return
 
-        val displayTitle = title.trim().ifEmpty { "Password" }
+        val displayTitle = title.trim().ifEmpty { context.getString(R.string.password_entry_fallback) }
 
         ALLOWED_OFFSETS.forEach { days ->
             val fireAt = nineAmDaysBefore(expiryDayStart, days)
@@ -46,13 +47,17 @@ class PasswordExpiryReminderScheduler @Inject constructor(
                     requestCode = requestCode(entryId, days),
                     fireAtMillis = fireAt,
                     dataUri = alarmUri(entryId, days),
-                    stringExtras = mapOf(
-                        HealthReminderReceiver.EXTRA_TYPE to HealthReminderReceiver.TYPE_PASSWORD_EXPIRY,
-                        HealthReminderReceiver.EXTRA_PASSWORD_ENTRY_ID to entryId,
-                        HealthReminderReceiver.EXTRA_FAMILY_ID to familyId,
-                        HealthReminderReceiver.EXTRA_TITLE to "Password in scadenza",
-                        HealthReminderReceiver.EXTRA_BODY to bodyFor(days, displayTitle, expiresAtEpochMillis),
-                    ),
+                    stringExtras = buildMap<String, String> {
+                        put(HealthReminderReceiver.EXTRA_TYPE, HealthReminderReceiver.TYPE_PASSWORD_EXPIRY)
+                        put(HealthReminderReceiver.EXTRA_PASSWORD_ENTRY_ID, entryId)
+                        put(HealthReminderReceiver.EXTRA_FAMILY_ID, familyId)
+                        KBNotificationText.put(
+                            this,
+                            titleKey = "password_expiry_reminder_title",
+                            bodyKey = bodyKeyFor(days),
+                            bodyArgs = listOf(displayTitle, expiryLabel(expiresAtEpochMillis)),
+                        )
+                    },
                 ),
             )
         }
@@ -83,14 +88,20 @@ class PasswordExpiryReminderScheduler @Inject constructor(
             putExtra(HealthReminderReceiver.EXTRA_FAMILY_ID, familyId)
         }
 
-    private fun bodyFor(days: Int, title: String, expiresAtEpochMillis: Long): String {
-        val expiryStr = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(expiresAtEpochMillis))
-        return when (days) {
-            1 -> "«$title» scade domani ($expiryStr)."
-            7 -> "«$title» scade il $expiryStr. Mancano 7 giorni."
-            else -> "«$title» scade il $expiryStr. Mancano 30 giorni."
-        }
+    private fun bodyKeyFor(days: Int): String = when (days) {
+        1 -> "password_expiry_body_tomorrow"
+        7 -> "password_expiry_body_7d"
+        else -> "password_expiry_body_30d"
     }
+
+    /**
+     * La data resta formattata ora, con la lingua di adesso.
+     *
+     * Per rifarla alla consegna dovrebbe viaggiare l'epoch e non il testo: qui
+     * cambierebbe solo il nome del mese, e non vale un formato di extra a parte.
+     */
+    private fun expiryLabel(expiresAtEpochMillis: Long): String =
+        DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(expiresAtEpochMillis))
 
     private fun startOfDay(epochMillis: Long): Long =
         Calendar.getInstance().apply {

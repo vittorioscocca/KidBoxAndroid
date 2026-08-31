@@ -29,7 +29,6 @@ class VaccineReminderScheduler @Inject constructor(
         val fireAt = dayBeforeAt9(target)
         if (fireAt <= System.currentTimeMillis()) return
 
-        val body = context.getString(R.string.vaccine_reminder_body_format, childName, vaccine.displayTitle())
         alarmRegistry.arm(
             ReminderAlarmRegistry.AlarmSpec(
                 key = ReminderAlarmRegistry.vaccineKey(vaccine.id),
@@ -37,13 +36,17 @@ class VaccineReminderScheduler @Inject constructor(
                 requestCode = ("vaccine:${vaccine.id}").hashCode(),
                 fireAtMillis = fireAt,
                 action = vaccineAction(vaccine.id),
-                stringExtras = mapOf(
-                    HealthReminderReceiver.EXTRA_TYPE to HealthReminderReceiver.TYPE_VACCINE_REMINDER,
-                    HealthReminderReceiver.EXTRA_VACCINE_ID to vaccine.id,
-                    HealthReminderReceiver.EXTRA_TITLE to body,
-                    HealthReminderReceiver.EXTRA_FAMILY_ID to vaccine.familyId,
-                    HealthReminderReceiver.EXTRA_CHILD_ID to vaccine.childId,
-                ),
+                stringExtras = buildMap<String, String> {
+                    put(HealthReminderReceiver.EXTRA_TYPE, HealthReminderReceiver.TYPE_VACCINE_REMINDER)
+                    put(HealthReminderReceiver.EXTRA_VACCINE_ID, vaccine.id)
+                    put(HealthReminderReceiver.EXTRA_FAMILY_ID, vaccine.familyId)
+                    put(HealthReminderReceiver.EXTRA_CHILD_ID, vaccine.childId)
+                    KBNotificationText.put(
+                        this,
+                        bodyKey = "vaccine_reminder_body_format",
+                        bodyArgs = listOf(childName, vaccine.displayTitle()),
+                    )
+                },
             ),
         )
     }

@@ -46,8 +46,6 @@ class VisitReminderScheduler @Inject constructor(
         val fireAt = dayBeforeAt9(visitDateMillis)
         if (fireAt <= System.currentTimeMillis()) return
 
-        val resolvedTitle = if (isNextVisit) context.getString(R.string.visit_next_reminder_title, title) else title
-
         alarmRegistry.arm(
             ReminderAlarmRegistry.AlarmSpec(
                 key = ReminderAlarmRegistry.visitKey(reminderKey),
@@ -55,13 +53,23 @@ class VisitReminderScheduler @Inject constructor(
                 requestCode = reminderKey.hashCode(),
                 fireAtMillis = fireAt,
                 action = visitAction(reminderKey),
-                stringExtras = mapOf(
-                    HealthReminderReceiver.EXTRA_TYPE to HealthReminderReceiver.TYPE_VISIT_REMINDER,
-                    HealthReminderReceiver.EXTRA_VISIT_ID to visitId,
-                    HealthReminderReceiver.EXTRA_TITLE to resolvedTitle,
-                    HealthReminderReceiver.EXTRA_FAMILY_ID to familyId,
-                    HealthReminderReceiver.EXTRA_CHILD_ID to childId,
-                ),
+                stringExtras = buildMap<String, String> {
+                    put(HealthReminderReceiver.EXTRA_TYPE, HealthReminderReceiver.TYPE_VISIT_REMINDER)
+                    put(HealthReminderReceiver.EXTRA_VISIT_ID, visitId)
+                    put(HealthReminderReceiver.EXTRA_FAMILY_ID, familyId)
+                    put(HealthReminderReceiver.EXTRA_CHILD_ID, childId)
+                    // Il motivo della visita è testo dell'utente e resta com'è;
+                    // "Prossima visita:" è cornice nostra e si traduce alla consegna.
+                    if (isNextVisit) {
+                        KBNotificationText.put(
+                            this,
+                            bodyKey = "visit_next_reminder_title",
+                            bodyArgs = listOf(title),
+                        )
+                    } else {
+                        put(HealthReminderReceiver.EXTRA_TITLE, title)
+                    }
+                },
             ),
         )
     }
