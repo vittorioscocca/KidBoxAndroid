@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.data.local
 
 import android.content.Context
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,7 +33,38 @@ class FamilySessionPreferences @Inject constructor(
 
     fun setActiveFamilyId(id: String) {
         prefs.edit().putString(KEY_ACTIVE_FAMILY_ID, id).apply()
+        // Memoria per account, che sopravvive al logout: la chiave di sessione
+        // viene azzerata all'uscita, quindi da sola non basta a far ritrovare al
+        // rientro la famiglia in cui si stava. Vedi [getLastActiveFamilyId].
+        FirebaseAuth.getInstance().currentUser?.uid?.takeIf { it.isNotBlank() }?.let { uid ->
+            prefs.edit().putString(keyLastActive(uid), id).apply()
+        }
     }
+
+    /**
+     * Ultima famiglia aperta da questo account su questo dispositivo.
+     *
+     * Serve al bootstrap dopo un nuovo login: senza, l'app ripartiva dalla prima
+     * famiglia restituita da Firestore — che per chi ne ha create/joinate più di
+     * una è tipicamente la più vecchia, non quella in cui stava lavorando.
+     *
+     * È indicizzata per uid, quindi non può far trapelare la famiglia di un
+     * account in una sessione di un altro.
+     */
+    fun getLastActiveFamilyId(uid: String): String? {
+        if (uid.isBlank()) return null
+        return prefs.getString(keyLastActive(uid), null)?.trim()?.takeIf { it.isNotEmpty() }
+    }
+
+    /** Da chiamare quando l'accesso a una famiglia viene revocato. */
+    fun forgetLastActiveFamilyId(uid: String, familyId: String? = null) {
+        if (uid.isBlank()) return
+        val memorizzata = getLastActiveFamilyId(uid)
+        if (familyId != null && memorizzata != familyId) return
+        prefs.edit().remove(keyLastActive(uid)).apply()
+    }
+
+    private fun keyLastActive(uid: String) = "$KEY_LAST_ACTIVE_FAMILY_PREFIX$uid"
 
     fun getActiveFamilyId(): String? {
         prefs.getString(KEY_ACTIVE_FAMILY_ID, null)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
@@ -59,6 +91,7 @@ class FamilySessionPreferences @Inject constructor(
         /** Allineato a richieste legacy / log di bootstrap errati. */
         private const val LEGACY_PREFS_NAME = "KidBoxPrefs"
         private const val KEY_ACTIVE_FAMILY_ID = "active_family_id"
+        private const val KEY_LAST_ACTIVE_FAMILY_PREFIX = "last_active_family_id_"
         private const val KEY_SKIP_HOME_BOOTSTRAP_ONCE = "skip_home_bootstrap_once"
     }
 }

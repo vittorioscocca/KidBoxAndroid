@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.domain.family
 
+import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 
@@ -26,3 +27,20 @@ suspend fun isFamilySubscriptionManager(
         membership.role.equals("owner", ignoreCase = true)
     return byFamilyField || byOwnerRole
 }
+
+/**
+ * Famiglia su cui ragionare per piano, quote e permessi di acquisto.
+ *
+ * NON usare `familyDao.peekAnyFamilyId()` da solo: è `SELECT id FROM kb_families
+ * LIMIT 1`, senza `WHERE` né `ORDER BY`. Chi è membro di una famiglia e ne ha
+ * creata un'altra si ritrova, a seconda di quale riga esce per prima, il piano
+ * dell'altra famiglia e il permesso di abbonarsi che non dovrebbe avere.
+ * La famiglia attiva è quella scelta in sessione; il peek resta solo come
+ * ultima spiaggia quando la preferenza non c'è ancora.
+ */
+suspend fun resolveActiveFamilyId(
+    familySessionPreferences: FamilySessionPreferences,
+    familyDao: KBFamilyDao,
+): String =
+    familySessionPreferences.getActiveFamilyId()?.takeIf { it.isNotBlank() }
+        ?: familyDao.peekAnyFamilyId().orEmpty()

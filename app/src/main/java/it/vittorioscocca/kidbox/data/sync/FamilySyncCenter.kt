@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.data.sync
 
+import it.vittorioscocca.kidbox.data.remote.ActiveFamilyRemoteStore
 import it.vittorioscocca.kidbox.util.KBLog
 
 import android.content.Context
@@ -165,6 +166,9 @@ class FamilySyncCenter @Inject constructor(
             try {
                 // kidbox_prefs + KidBoxPrefs legacy (active_family_id), vedi FamilySessionPreferences
                 sessionPrefs.clearActiveFamilyId()
+                // ...e la memoria per account, altrimenti il prossimo login
+                // riproverebbe ad aprire proprio la famiglia da cui è stato tolto.
+                sessionPrefs.forgetLastActiveFamilyId(uid, familyId)
             } catch (e: Exception) {
                 KBLog.sync.error("access lost clearActiveFamilyId failed: ${e.message}", TAG, e)
             }
@@ -206,6 +210,9 @@ class FamilySyncCenter @Inject constructor(
         stopSync()
         currentFamilyId = familyId
         sessionPrefs.setActiveFamilyId(familyId)
+        // Ricordata anche sull'account: il logout azzera le preferenze locali,
+        // e senza questa il rientro ripartirebbe dalla famiglia sbagliata.
+        scope.launch(Dispatchers.IO) { ActiveFamilyRemoteStore.save(familyId) }
         _initialSyncDone.value = false
         KBLog.sync.debug("startSync familyId=$familyId", TAG)
         tripRepository.startRealtime(familyId)

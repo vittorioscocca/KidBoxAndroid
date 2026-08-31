@@ -21,10 +21,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.local.ActiveFamilyResolver
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.data.remote.user.AvatarRemoteStore
 import it.vittorioscocca.kidbox.data.user.UserProfileRepository
 import it.vittorioscocca.kidbox.domain.auth.LogoutUseCase
+import it.vittorioscocca.kidbox.domain.family.isFamilySubscriptionManager
+import it.vittorioscocca.kidbox.domain.family.resolveActiveFamilyId
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import java.util.Locale
 import javax.inject.Inject
@@ -59,6 +62,9 @@ data class ProfileUiState(
     val saveSucceeded: Boolean = false,
     val isDirty: Boolean = false,
     val planLabel: String = "Piano Free",
+    val plan: KBPlan = KBPlan.FREE,
+    /** Allineato a iOS: solo il gestore dell'abbonamento vede il tasto Upgrade. */
+    val isFamilyOwner: Boolean = true,
     val storageUsedBytes: Long = 0L,
     val storageTotalBytes: Long = 1_000_000_000L,
 )
@@ -76,6 +82,7 @@ class ProfileViewModel @Inject constructor(
     application: Application,
     private val userProfileRepository: UserProfileRepository,
     private val familyDao: KBFamilyDao,
+    private val familyMemberDao: KBFamilyMemberDao,
     private val familySessionPreferences: FamilySessionPreferences,
     private val subscriptionRepository: SubscriptionRepository,
     private val avatarRemoteStore: AvatarRemoteStore,
@@ -141,11 +148,13 @@ class ProfileViewModel @Inject constructor(
     }
 
     private suspend fun loadSubscriptionSnapshot() {
-        val familyId = familyDao.peekAnyFamilyId().orEmpty()
+        val familyId = resolveActiveFamilyId(familySessionPreferences, familyDao)
         if (familyId.isBlank()) {
             _uiState.update {
                 it.copy(
                     planLabel = getApplication<Application>().getString(R.string.home_profile_vm_plan_free),
+                    plan = KBPlan.FREE,
+                    isFamilyOwner = true,
                     storageUsedBytes = 0L,
                     storageTotalBytes = KBPlan.FREE.storageQuota,
                 )
@@ -154,6 +163,12 @@ class ProfileViewModel @Inject constructor(
         }
 
         val plan = subscriptionRepository.getPlan(familyId)
+        val isOwner = isFamilySubscriptionManager(
+            familyDao,
+            familyMemberDao,
+            familyId,
+            auth.currentUser?.uid.orEmpty(),
+        )
         runCatching {
             val result = functions.getHttpsCallable("getStorageUsage")
                 .call(hashMapOf("familyId" to familyId))
@@ -165,6 +180,8 @@ class ProfileViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     planLabel = getApplication<Application>().getString(R.string.home_profile_vm_plan_label, plan.displayName),
+                    plan = plan,
+                    isFamilyOwner = isOwner,
                     storageUsedBytes = usedBytes.coerceAtLeast(0L),
                     storageTotalBytes = plan.storageQuota,
                 )
@@ -174,6 +191,8 @@ class ProfileViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     planLabel = getApplication<Application>().getString(R.string.home_profile_vm_plan_label, plan.displayName),
+                    plan = plan,
+                    isFamilyOwner = isOwner,
                     storageTotalBytes = plan.storageQuota,
                 )
             }

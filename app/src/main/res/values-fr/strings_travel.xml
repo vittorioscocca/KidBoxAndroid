@@ -84,6 +84,8 @@
     <string name="travel_your_trips">Tes voyages</string>
     <string name="travel_see_all">Voir tout</string>
     <string name="travel_upgrade_hint">Tu as utilisé tous les messages IA gratuits de la formule Free. Passe à Pro ou Max pour continuer à planifier des voyages avec l\'IA.</string>
+    <string name="travel_locked_title">Inclus dans Pro et Max</string>
+    <string name="travel_locked_body">Le planificateur de voyages est disponible uniquement avec une formule payante. Passez à Pro ou Max pour planifier des voyages avec l\'IA.</string>
     <string name="travel_plane">Avion</string>
     <string name="travel_train">Train</string>
     <string name="travel_ship">Bateau</string>

@@ -17,6 +17,7 @@
     <string name="settings_row_support">Assistente &amp; Supporto</string>
     <string name="settings_row_support_sub">Domande, problemi e suggerimenti</string>
     <string name="settings_row_guide">Guida all\'utilizzo</string>
+    <string name="settings_row_website">Sito web</string>
     <string name="settings_common_back">Indietro</string>
     <string name="settings_theme_light">Chiaro</string>
     <string name="settings_theme_dark">Scuro</string>
@@ -74,12 +75,12 @@
     <string name="settings_storage_restore_purchases_title">Ripristino acquisti</string>
     <string name="settings_storage_purchase_error">Errore acquisto</string>
     <string name="settings_storage_upgrade">Upgrade</string>
+    <string name="settings_storage_upgrade_hint">Passa a %1$s per più spazio e AI.</string>
     <string name="settings_storage_by_section">Utilizzo per sezione</string>
     <string name="settings_storage_loading">Caricamento...</string>
     <string name="settings_storage_no_data">Nessun dato disponibile</string>
     <string name="settings_storage_plans_available">Piani disponibili</string>
     <string name="settings_storage_owner_managed">Piano gestito dal proprietario</string>
-    <string name="settings_storage_owner_only">Solo il proprietario della famiglia può attivare o cambiare un abbonamento.</string>
     <string name="settings_storage_ask_owner">Chiedi al proprietario di passare a un piano superiore se serve più spazio o funzioni AI.</string>
     <string name="settings_storage_active_subscription">Abbonamento attivo</string>
     <string name="settings_storage_manage_subscription">Gestisci abbonamento</string>
@@ -122,7 +123,7 @@
     <string name="settings_ai_patterns">Pattern salute AI</string>
     <string name="settings_ai_patterns_sub">Analisi mensile della storia sanitaria dei figli</string>
     <string name="settings_ai_requires_plan">Messaggi AI gratuiti terminati</string>
-    <string name="settings_ai_upgrade_hint">Hai usato tutti i 5 messaggi AI gratuiti inclusi nel piano Free. Passa a Pro per continuare a usare l\'assistente.</string>
+    <string name="settings_ai_upgrade_hint">Hai usato tutti i %1$d messaggi AI gratuiti inclusi nel piano Free. Passa a Pro per continuare a usare l\'assistente.</string>
     <string name="settings_ai_bonus_free_title">Bonus AI gratuito</string>
     <string name="settings_ai_free_messages_used">%1$d di %2$d messaggi gratuiti usati</string>
     <string name="settings_ai_see_plans">Scopri i piani</string>
@@ -276,8 +277,6 @@
     <string name="settings_ai_ctx_full_detail">Invia sempre tutti i referti e i dati sanitari completi.</string>
     <string name="settings_ai_ctx_summary_title">Contesto riassunto</string>
     <string name="settings_ai_ctx_summary_detail">Usa un riassunto del profilo sanitario per risparmiare messaggi.</string>
-    <string name="settings_plan_ai_one_time">%1$d msg AI una tantum</string>
-    <string name="settings_plan_ai_per_day">%1$d msg AI/giorno</string>
     <string name="settings_plan_ai_messages_per_day">AI: %1$d messaggi/giorno</string>
     <string name="settings_family_limit_reached">Hai raggiunto il limite di 2 famiglie per account. Elimina una famiglia esistente per crearne una nuova.</string>
     <string name="settings_ai_consent_given_on">Consenso fornito il %1$s</string>

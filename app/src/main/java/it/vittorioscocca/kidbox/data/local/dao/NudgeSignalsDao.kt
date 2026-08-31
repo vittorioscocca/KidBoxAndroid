@@ -32,6 +32,10 @@ interface NudgeSignalsDao {
     @Query("SELECT COUNT(*) FROM kb_calendar_events WHERE familyId = :familyId AND isDeleted = 0")
     suspend fun calendarEventCount(familyId: String): Int
 
+    /** `kb_children` non ha `isDeleted`: le righe o ci sono o sono state rimosse. */
+    @Query("SELECT COUNT(*) FROM kb_children WHERE familyId = :familyId")
+    suspend fun childCount(familyId: String): Int
+
     /** Le conversazioni AI non hanno `isDeleted`: o ci sono o non ci sono. */
     @Query("SELECT COUNT(*) FROM kb_ai_conversations WHERE familyId = :familyId")
     suspend fun aiConversationCount(familyId: String): Int

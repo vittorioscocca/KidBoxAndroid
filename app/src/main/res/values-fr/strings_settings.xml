@@ -17,6 +17,7 @@
     <string name="settings_row_support">Aide et assistance</string>
     <string name="settings_row_support_sub">Questions, problèmes et suggestions</string>
     <string name="settings_row_guide">Guide d\'utilisation</string>
+    <string name="settings_row_website">Site web</string>
     <string name="settings_common_back">Retour</string>
     <string name="settings_theme_light">Clair</string>
     <string name="settings_theme_dark">Sombre</string>
@@ -74,12 +75,12 @@
     <string name="settings_storage_restore_purchases_title">Restauration des achats</string>
     <string name="settings_storage_purchase_error">Erreur d\'achat</string>
     <string name="settings_storage_upgrade">Passer à supérieur</string>
+    <string name="settings_storage_upgrade_hint">Passez à %1$s pour plus d\'espace et l\'IA.</string>
     <string name="settings_storage_by_section">Utilisation par section</string>
     <string name="settings_storage_loading">Chargement…</string>
     <string name="settings_storage_no_data">Aucune donnée disponible</string>
     <string name="settings_storage_plans_available">Formules disponibles</string>
     <string name="settings_storage_owner_managed">Formule gérée par le propriétaire</string>
-    <string name="settings_storage_owner_only">Seul le propriétaire de la famille peut souscrire ou changer d\'abonnement.</string>
     <string name="settings_storage_ask_owner">Demande au propriétaire de passer à une formule supérieure s\'il te faut plus d\'espace ou l\'IA.</string>
     <string name="settings_storage_active_subscription">Abonnement actif</string>
     <string name="settings_storage_manage_subscription">Gérer l\'abonnement</string>
@@ -122,7 +123,7 @@
     <string name="settings_ai_patterns">Tendances santé IA</string>
     <string name="settings_ai_patterns_sub">Analyse mensuelle de l\'historique de santé des enfants</string>
     <string name="settings_ai_requires_plan">Messages IA gratuits épuisés</string>
-    <string name="settings_ai_upgrade_hint">Tu as utilisé les 5 messages IA gratuits inclus dans la formule Free. Passe à Pro pour continuer à utiliser l\'assistant.</string>
+    <string name="settings_ai_upgrade_hint">Tu as utilisé les %1$d messages IA gratuits inclus dans la formule Free. Passe à Pro pour continuer à utiliser l\'assistant.</string>
     <string name="settings_ai_bonus_free_title">Bonus IA gratuit</string>
     <string name="settings_ai_free_messages_used">%1$d messages gratuits utilisés sur %2$d</string>
     <string name="settings_ai_see_plans">Découvrir les formules</string>
@@ -276,8 +277,6 @@
     <string name="settings_ai_ctx_full_detail">Envoie toujours tous les comptes rendus et les données de santé complètes.</string>
     <string name="settings_ai_ctx_summary_title">Contexte résumé</string>
     <string name="settings_ai_ctx_summary_detail">Utilise un résumé du profil de santé pour économiser des messages.</string>
-    <string name="settings_plan_ai_one_time">%1$d msg IA à vie</string>
-    <string name="settings_plan_ai_per_day">%1$d msg IA/jour</string>
     <string name="settings_plan_ai_messages_per_day">IA : %1$d messages/jour</string>
     <string name="settings_family_limit_reached">Tu as atteint la limite de 2 familles par compte. Supprime une famille existante pour en créer une nouvelle.</string>
     <string name="settings_ai_consent_given_on">Consentement donné le %1$s</string>

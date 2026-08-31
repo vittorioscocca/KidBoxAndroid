@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Notifications
@@ -54,6 +55,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.content.pm.PackageInfoCompat
 import it.vittorioscocca.kidbox.data.local.AppTheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.components.KBBackButton
@@ -84,6 +86,7 @@ fun SettingsScreen(
     onSupportChat: () -> Unit,
     viewModel: ThemeViewModel = hiltViewModel(),
 ) {
+    val uriHandler = LocalUriHandler.current
     BackHandler { onBack() }
     val theme by viewModel.theme.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -163,6 +166,14 @@ fun SettingsScreen(
             icon = Icons.AutoMirrored.Filled.MenuBook,
             showChevron = true,
             onClick = onUsageGuide,
+        ),
+        SettingRowItem(
+            title = stringResource(R.string.settings_row_website),
+            icon = Icons.Filled.Public,
+            showChevron = true,
+            // Apex e non www: `www.kidboxapp.com` risponde con un 301 verso
+            // questo indirizzo, quindi si evita il rimbalzo.
+            onClick = { runCatching { uriHandler.openUri("https://kidboxapp.com") } },
         ),
     )
 

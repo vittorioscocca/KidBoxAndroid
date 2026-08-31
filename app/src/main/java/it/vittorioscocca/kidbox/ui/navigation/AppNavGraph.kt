@@ -1913,6 +1913,9 @@ fun AppNavGraph(
                 onOpenAllTrips = {
                     navController.navigate(AppDestination.TravelAllTrips.createRoute(familyId))
                 },
+                onUpgrade = {
+                    navController.navigate(AppDestination.Plans.route) { launchSingleTop = true }
+                },
             )
         }
 

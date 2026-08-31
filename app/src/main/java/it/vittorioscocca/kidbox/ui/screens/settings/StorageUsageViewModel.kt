@@ -6,11 +6,13 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctions
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.billing.KBBillingManager
 import it.vittorioscocca.kidbox.domain.family.isFamilySubscriptionManager
+import it.vittorioscocca.kidbox.domain.family.resolveActiveFamilyId
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -50,6 +52,7 @@ data class StorageUsageUiState(
 class StorageUsageViewModel @Inject constructor(
     private val familyDao: KBFamilyDao,
     private val familyMemberDao: KBFamilyMemberDao,
+    private val familySessionPreferences: FamilySessionPreferences,
     private val subscriptionRepository: SubscriptionRepository,
     private val billingManager: KBBillingManager,
     private val auth: FirebaseAuth,
@@ -95,7 +98,7 @@ class StorageUsageViewModel @Inject constructor(
 
     fun load(): Job = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            val familyId = familyDao.peekAnyFamilyId().orEmpty()
+            val familyId = resolveActiveFamilyId(familySessionPreferences, familyDao)
             if (familyId.isBlank()) {
                 _uiState.update {
                     it.copy(

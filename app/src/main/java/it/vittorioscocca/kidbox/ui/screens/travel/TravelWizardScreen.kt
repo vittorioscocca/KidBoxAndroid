@@ -95,9 +95,11 @@ fun TravelWizardScreen(
     val children by viewModel.children.collectAsStateWithLifecycle()
     val members by viewModel.members.collectAsStateWithLifecycle()
     val isGenerating by viewModel.isGenerating.collectAsStateWithLifecycle()
-    // Free ha accesso all'AI finché non esaurisce il bonus di 5 messaggi una tantum.
-    val aiAccessBlocked by it.vittorioscocca.kidbox.ai.CurrentPlanStore.aiAccessBlocked.collectAsStateWithLifecycle()
-    val aiAvailable = !aiAccessBlocked
+    // Il pianificatore viaggi è incluso nei soli piani a pagamento: `aiAccessBlocked`
+    // da solo non basta, perché è true solo per i Free che hanno già esaurito il bonus
+    // una tantum — un Free con bonus intatto riuscirebbe a generare itinerari.
+    val currentPlan by it.vittorioscocca.kidbox.ai.CurrentPlanStore.plan.collectAsStateWithLifecycle()
+    val aiAvailable = currentPlan != it.vittorioscocca.kidbox.domain.model.KBPlan.FREE
     val upgradeAction = LocalUpgradeAction.current
     val snackbar = remember { SnackbarHostState() }
 

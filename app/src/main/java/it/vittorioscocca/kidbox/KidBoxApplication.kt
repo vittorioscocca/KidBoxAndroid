@@ -18,6 +18,7 @@ import dagger.hilt.android.HiltAndroidApp
 import it.vittorioscocca.kidbox.data.local.ThemePreference
 import it.vittorioscocca.kidbox.data.local.toNightMode
 import it.vittorioscocca.kidbox.data.location.GeofenceMonitorRestorer
+import it.vittorioscocca.kidbox.domain.model.KBPlanCatalog
 import it.vittorioscocca.kidbox.data.remote.AppCheckTokenCache
 import it.vittorioscocca.kidbox.data.notification.PushNotificationManager
 import it.vittorioscocca.kidbox.notifications.KidBoxFirebaseMessagingService
@@ -75,6 +76,10 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
         // Poi si allinea all'account: init() serve solo a non far comparire la
         // chat per un istante prima che la risposta di Firestore arrivi.
         appInitScope.launch { ChatAvailability.refreshFromRemote(this@KidBoxApplication) }
+        // Listino piani: cache locale subito, poi `config/plans` — la fonte di
+        // verità di quote, prezzi e feature sta nel backend, non nell'app.
+        KBPlanCatalog.init(this)
+        appInitScope.launch { KBPlanCatalog.refresh(this@KidBoxApplication) }
         // Debug diagnostico temporaneo: dà visibilità sul traffico gRPC di Firestore
         // (query inviate, stream di listen, risposte) sotto il tag logcat "Firestore".
         // Solo debug build, va tolto una volta chiuso il problema di sync sulla
@@ -132,6 +137,11 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
                 if (now - lastRunAt >= THROTTLE_MS) {
                     lastRunAt = now
                     appInitScope.launch { runCatching { nudgeEngine.refresh() } }
+                    // Listino piani: senza questo, un piano modificato dalla
+                    // console si vedrebbe solo dopo un avvio a freddo del processo.
+                    appInitScope.launch {
+                        runCatching { KBPlanCatalog.refresh(this@KidBoxApplication) }
+                    }
                 }
             }
             startedActivities++

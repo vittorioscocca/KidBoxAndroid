@@ -20,10 +20,12 @@ import it.vittorioscocca.kidbox.util.KBLog
 import com.android.billingclient.api.QueryPurchasesParams
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.domain.family.isFamilySubscriptionManager
+import it.vittorioscocca.kidbox.domain.family.resolveActiveFamilyId
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import javax.inject.Inject
@@ -44,6 +46,7 @@ class KBBillingManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val subscriptionRepository: SubscriptionRepository,
     private val familyDao: KBFamilyDao,
+    private val familySessionPreferences: FamilySessionPreferences,
     private val familyMemberDao: KBFamilyMemberDao,
     private val auth: FirebaseAuth,
 ) : PurchasesResponseListener {
@@ -116,7 +119,7 @@ class KBBillingManager @Inject constructor(
     fun start() {
         scope.launch {
             _isLoading.value = true
-            currentFamilyId = familyDao.peekAnyFamilyId().orEmpty()
+            currentFamilyId = resolveActiveFamilyId(familySessionPreferences, familyDao)
             currentUid = auth.currentUser?.uid.orEmpty()
             _isFamilyOwner.value = isFamilySubscriptionManager(
                 familyDao,

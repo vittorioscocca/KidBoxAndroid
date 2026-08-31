@@ -58,6 +58,12 @@ private val TravelAccent = Color(0xFFF2611A)
 fun TravelOnboardingScreen(
     onComplete: (TravelProfile) -> Unit,
     onExit: () -> Unit,
+    /**
+     * Contenuto opzionale in cima alle domande. Serve all'avviso "serve un piano
+     * a pagamento": la configurazione iniziale è la prima cosa che vede un utente
+     * Free, e senza questo l'avviso resterebbe sepolto dietro tre domande.
+     */
+    header: (@Composable () -> Unit)? = null,
 ) {
     val kb = MaterialTheme.kidBoxColors
     var step by remember { mutableIntStateOf(0) }
@@ -115,6 +121,11 @@ fun TravelOnboardingScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(top = 24.dp),
         ) {
+            if (header != null) {
+                header()
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+
             when (step) {
                 0 -> {
                     Text(stringResource(R.string.travel_style_q), fontWeight = FontWeight.Bold, fontSize = 28.sp, color = kb.title)

@@ -36,6 +36,9 @@ abstract class KBFamilyDao {
     @Query("SELECT * FROM kb_families WHERE id = :familyId LIMIT 1")
     abstract fun observeById(familyId: String): Flow<KBFamilyEntity?>
 
+    @Query("SELECT * FROM kb_families ORDER BY updatedAtEpochMillis DESC")
+    abstract suspend fun getAll(): List<KBFamilyEntity>
+
     @Query("SELECT EXISTS(SELECT 1 FROM kb_families LIMIT 1)")
     abstract suspend fun hasAnyFamily(): Boolean
 

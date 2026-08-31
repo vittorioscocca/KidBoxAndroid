@@ -98,7 +98,32 @@ fun AiSettingsScreen(
     BackHandler { onBack() }
     val kb = MaterialTheme.kidBoxColors
     val uriHandler = LocalUriHandler.current
+
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // I pulsanti di abbonamento restano visibili a tutti: chi non gestisce
+    // l'abbonamento riceve la spiegazione al tocco, non un pulsante mancante.
+    var mostraAvvisoCreatore by remember { mutableStateOf(false) }
+    if (mostraAvvisoCreatore) {
+        AlertDialog(
+            onDismissRequest = { mostraAvvisoCreatore = false },
+            title = { Text(stringResource(R.string.subscription_owner_managed_title)) },
+            text = { Text(stringResource(R.string.subscription_owner_managed_body)) },
+            confirmButton = {
+                TextButton(onClick = { mostraAvvisoCreatore = false }) {
+                    Text(stringResource(R.string.subscription_ok))
+                }
+            },
+        )
+    }
+    val onPlansTap = { if (state.isFamilyOwner) onOpenPlans() else mostraAvvisoCreatore = true }
+    val onRedeemTap = {
+        if (state.isFamilyOwner) {
+            runCatching { uriHandler.openUri("https://play.google.com/redeem") }
+            Unit
+        } else {
+            mostraAvvisoCreatore = true
+        }
+    }
     var showRevokeConfirm by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(state.message) {
@@ -180,16 +205,15 @@ fun AiSettingsScreen(
                 usageToday = state.aiUsageToday,
                 period = state.aiQuotaPeriod,
                 aiAccessBlocked = state.aiAccessBlocked,
+                onUpgrade = onPlansTap,
             )
 
             AIIntroCard()
 
             if (state.aiAccessBlocked) {
                 AILockedBanner(
-                    onDiscoverPlans = onOpenPlans,
-                    onRedeemOfferCode = {
-                        runCatching { uriHandler.openUri("https://play.google.com/redeem") }
-                    },
+                    onDiscoverPlans = onPlansTap,
+                    onRedeemOfferCode = onRedeemTap,
                 )
             } else {
                 AIToggleCard(
@@ -244,6 +268,7 @@ private fun CurrentPlanCard(
     usageToday: Int,
     period: it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod,
     aiAccessBlocked: Boolean,
+    onUpgrade: () -> Unit,
 ) {
     val gradientColors = when (plan) {
         KBPlan.MAX -> listOf(Color(0xFF7C3AED), Color(0xFF4F46E5))
@@ -317,6 +342,26 @@ private fun CurrentPlanCard(
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
+                }
+            }
+            // Come su iOS: dalla scheda del piano si arriva ai piani superiori.
+            // Il pulsante c'è per tutti; a chi non gestisce l'abbonamento
+            // risponde con il motivo (vedi il dialogo della schermata).
+            if (plan != KBPlan.MAX) {
+                Spacer(Modifier.weight(1f))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Color.White.copy(alpha = 0.22f))
+                        .clickable(onClick = onUpgrade)
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.home_profile_upgrade),
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
                 }
             }
         }
@@ -655,6 +700,8 @@ private fun AILockedBanner(
     onRedeemOfferCode: () -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
+    val onPlansTap = onDiscoverPlans
+    val onRedeemTap = onRedeemOfferCode
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -673,7 +720,9 @@ private fun AILockedBanner(
                         color = kb.title,
                     )
                     Text(
-                        stringResource(R.string.settings_ai_upgrade_hint),
+                        // Il numero di messaggi bonus arriva dal catalogo piani,
+                        // non dalla stringa: vedi internal/plans-source-of-truth.md.
+                        stringResource(R.string.settings_ai_upgrade_hint, KBPlan.FREE.aiMessageLimit),
                         fontSize = 13.sp,
                         color = kb.subtitle,
                         lineHeight = 18.sp,
@@ -684,7 +733,7 @@ private fun AILockedBanner(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(onClick = onDiscoverPlans),
+                    .clickable(onClick = onPlansTap),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F1FF)),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
@@ -697,7 +746,7 @@ private fun AILockedBanner(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(stringResource(R.string.settings_ai_see_plans), color = Color(0xFF1D4ED8), fontWeight = FontWeight.SemiBold)
-                    TextButton(onClick = onDiscoverPlans) { Text(stringResource(R.string.settings_ai_open), color = Color(0xFF1D4ED8)) }
+                    TextButton(onClick = onPlansTap) { Text(stringResource(R.string.settings_ai_open), color = Color(0xFF1D4ED8)) }
                 }
             }
 
@@ -711,7 +760,7 @@ private fun AILockedBanner(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(stringResource(R.string.settings_storage_redeem), color = kb.title, fontWeight = FontWeight.SemiBold)
-                TextButton(onClick = onRedeemOfferCode) { Text(stringResource(R.string.settings_ai_open)) }
+                TextButton(onClick = onRedeemTap) { Text(stringResource(R.string.settings_ai_open)) }
             }
         }
     }

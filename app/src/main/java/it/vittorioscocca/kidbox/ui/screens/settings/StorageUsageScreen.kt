@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
@@ -37,6 +40,8 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -49,6 +54,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -100,6 +108,22 @@ fun StorageUsageScreen(
         )
     }
 
+    // I pulsanti di abbonamento restano visibili a tutti: chi non ha creato la
+    // famiglia riceve la spiegazione al tocco, non un pulsante mancante.
+    var mostraAvvisoCreatore by remember { mutableStateOf(false) }
+    if (mostraAvvisoCreatore) {
+        AlertDialog(
+            onDismissRequest = { mostraAvvisoCreatore = false },
+            title = { Text(stringResource(R.string.subscription_owner_managed_title)) },
+            text = { Text(stringResource(R.string.subscription_owner_managed_body)) },
+            confirmButton = {
+                TextButton(onClick = { mostraAvvisoCreatore = false }) {
+                    Text(stringResource(R.string.subscription_ok))
+                }
+            },
+        )
+    }
+
     state.billingPurchaseError?.let { err ->
         AlertDialog(
             onDismissRequest = viewModel::clearBillingPurchaseError,
@@ -138,12 +162,14 @@ fun StorageUsageScreen(
             sectionRows = state.sections,
         )
 
-        if (state.isFamilyOwner && (state.plan == KBPlan.FREE || state.plan == KBPlan.PRO)) {
+        if (state.plan == KBPlan.FREE || state.plan == KBPlan.PRO) {
             Spacer(Modifier.height(10.dp))
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(onClick = onOpenPlans),
+                    .clickable {
+                        if (state.isFamilyOwner) onOpenPlans() else mostraAvvisoCreatore = true
+                    },
                 shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F1FF)),
             ) {
@@ -154,7 +180,10 @@ fun StorageUsageScreen(
                     Text(stringResource(R.string.settings_storage_upgrade), color = Color(0xFF2563EB), fontWeight = FontWeight.Bold)
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        "Passa a ${if (state.plan == KBPlan.FREE) "Pro" else "Max"} per più spazio e AI.",
+                        stringResource(
+                            R.string.settings_storage_upgrade_hint,
+                            if (state.plan == KBPlan.FREE) KBPlan.PRO.displayName else KBPlan.MAX.displayName,
+                        ),
                         color = kb.title,
                         modifier = Modifier.weight(1f),
                     )
@@ -183,49 +212,38 @@ fun StorageUsageScreen(
         }
 
         Spacer(Modifier.height(14.dp))
-        SectionCard(title = stringResource(R.string.settings_storage_plans_available)) {
-            KBPlan.entries.forEachIndexed { idx, plan ->
-                PlanRow(
+        Text(
+            stringResource(R.string.settings_storage_plans_available),
+            color = kb.subtitle,
+            fontSize = 34.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+        )
+        // Carosello: le card di listino sono alte (fino a nove voci su Pro) e
+        // affiancate si confrontano a colpo d'occhio, invece di allungare la
+        // pagina per tre schermate.
+        // `Row` scrollabile e non `LazyRow`: i piani sono tre, e soprattutto una
+        // lazy row misura le card una per una — resterebbero di altezze diverse.
+        // Con `IntrinsicSize.Max` tutte prendono l'altezza della più alta.
+        Row(
+            modifier = Modifier
+                .horizontalScroll(rememberScrollState())
+                .height(IntrinsicSize.Max)
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            KBPlan.entries.sortedBy { it.spec.order }.forEach { plan ->
+                PlanCard(
                     plan = plan,
                     current = state.plan,
-                    isFamilyOwner = state.isFamilyOwner,
                     onPurchasePlan = {
-                        if (activity != null) {
+                        if (!state.isFamilyOwner) {
+                            mostraAvvisoCreatore = true
+                        } else if (activity != null) {
                             viewModel.purchase(plan, activity)
                         }
                     },
                 )
-                if (idx != KBPlan.entries.lastIndex) {
-                    HorizontalDivider(color = kb.divider, modifier = Modifier.padding(start = 16.dp))
-                }
-            }
-            if (!state.isFamilyOwner) {
-                HorizontalDivider(color = kb.divider, modifier = Modifier.padding(start = 16.dp))
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF3EEFF)),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Text(
-                            stringResource(R.string.settings_storage_owner_managed),
-                            color = Color(0xFF6D28D9),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                        )
-                        Text(
-                            stringResource(R.string.settings_storage_owner_full),
-                            color = kb.subtitle,
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp,
-                        )
-                    }
-                }
             }
         }
 
@@ -441,75 +459,112 @@ private fun StorageSectionRow(section: StorageUsageSectionUi, totalBytes: Long) 
 }
 
 @Composable
-private fun PlanRow(
+private fun PlanCard(
     plan: KBPlan,
     current: KBPlan,
-    isFamilyOwner: Boolean,
     onPurchasePlan: () -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
     val isCurrent = plan == current
-    val canPurchaseWholeRow =
-        isFamilyOwner && plan != KBPlan.FREE && !isCurrent
-    Row(
+    val canPurchase = plan != KBPlan.FREE && !isCurrent
+    val accento = when (plan) {
+        KBPlan.FREE -> kb.subtitle
+        KBPlan.PRO -> Color(0xFF4F8FDB)
+        KBPlan.MAX -> Color(0xFF8B5CF6)
+    }
+
+    Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .then(
-                if (canPurchaseWholeRow) {
-                    Modifier.clickable(onClick = onPurchasePlan)
-                } else {
-                    Modifier
-                },
-            )
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .width(280.dp)
+            .fillMaxHeight(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = kb.card),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Icon(Icons.Filled.Inventory2, null, tint = kb.subtitle, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.size(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .padding(16.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(plan.displayName, color = kb.title, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                if (isCurrent) {
-                    Spacer(Modifier.size(8.dp))
+                Text(plan.displayName, color = kb.title, fontWeight = FontWeight.Bold, fontSize = 22.sp)
+                Spacer(Modifier.size(8.dp))
+                val etichetta = if (isCurrent) stringResource(R.string.settings_storage_current_plan) else plan.badge
+                if (etichetta.isNotBlank()) {
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(999.dp))
-                            .background(Color(0xFFE8F1FF))
-                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                            .background(accento.copy(alpha = 0.15f))
+                            .padding(horizontal = 9.dp, vertical = 3.dp),
                     ) {
-                        Text(stringResource(R.string.settings_storage_current_plan), color = Color(0xFF4F8FDB), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Text(etichetta, color = accento, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
-            Text("${plan.storageQuotaBytes().toStorageString()} storage", color = kb.subtitle, fontSize = 14.sp)
-        }
-        Column(horizontalAlignment = Alignment.End) {
+
+            Spacer(Modifier.height(8.dp))
             Text(
-                // Confronto piani puramente informativo: ogni piano ora include l'AI
-                // nominalmente, Free non è più marcato "senza AI". Free è un bonus una
-                // tantum, Pro/Max una quota giornaliera: due stringhe diverse.
-                if (plan.aiQuotaPeriod == AIQuotaPeriod.LIFETIME) {
-                    stringResource(R.string.settings_plan_ai_one_time, plan.aiMessageLimit)
-                } else {
-                    stringResource(R.string.settings_plan_ai_per_day, plan.aiMessageLimit)
-                },
-                color = kb.subtitle,
-                fontSize = 14.sp,
+                // Prezzo dal catalogo `config/plans`, non da una stringa a mano:
+                // vedi KBPlanCatalog e internal/plans-source-of-truth.md.
+                if (plan == KBPlan.FREE) stringResource(R.string.settings_storage_free) else plan.monthlyPrice,
+                color = if (plan == KBPlan.FREE) kb.subtitle else accento,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
             )
-            Spacer(Modifier.height(4.dp))
-            if (isCurrent) {
-                Icon(Icons.Filled.CheckCircle, null, tint = Color(0xFF8B5CF6), modifier = Modifier.size(22.dp))
-            } else {
-                Text(
-                    when (plan) {
-                        KBPlan.FREE -> stringResource(R.string.settings_storage_free)
-                        KBPlan.PRO -> stringResource(R.string.settings_plan_pro_price)
-                        KBPlan.MAX -> stringResource(R.string.settings_plan_max_price)
-                    },
-                    color = if (plan == KBPlan.PRO) Color(0xFF4F8FDB) else kb.subtitle,
-                    fontWeight = if (plan == KBPlan.PRO) FontWeight.Bold else FontWeight.Normal,
-                    fontSize = 15.sp,
-                )
+            if (plan.tagline.isNotBlank()) {
+                Text(plan.tagline, color = kb.subtitle, fontSize = 13.sp, lineHeight = 17.sp)
+            }
+
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = kb.divider)
+            Spacer(Modifier.height(12.dp))
+
+            // Stesso elenco del paywall, della console e del sito: arriva dal
+            // catalogo `config/plans`, già localizzato e con le quote risolte.
+            plan.features.forEach { feature ->
+                Row(
+                    modifier = Modifier.padding(bottom = 8.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Text(feature.icon, fontSize = 15.sp, modifier = Modifier.width(24.dp))
+                    Text(
+                        feature.text,
+                        color = if (feature.strong) kb.title else kb.subtitle,
+                        fontWeight = if (feature.strong) FontWeight.SemiBold else FontWeight.Normal,
+                        fontSize = 15.sp,
+                        lineHeight = 20.sp,
+                    )
+                }
+            }
+
+            Spacer(Modifier.weight(1f))
+
+            if (canPurchase) {
+                Spacer(Modifier.height(6.dp))
+                Button(
+                    onClick = onPurchasePlan,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = accento),
+                ) {
+                    Text(stringResource(R.string.subscription_subscribe), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+            } else if (isCurrent) {
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Filled.CheckCircle, null, tint = accento, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.size(6.dp))
+                    Text(
+                        stringResource(R.string.settings_storage_current_plan),
+                        color = accento,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
         }
     }

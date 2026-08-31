@@ -14,6 +14,7 @@ import it.vittorioscocca.kidbox.domain.model.KBAIMessage
 import it.vittorioscocca.kidbox.ui.screens.travel.TravelDestination
 import it.vittorioscocca.kidbox.ui.screens.travel.TravelSuggestionsResult
 import it.vittorioscocca.kidbox.ai.CurrentPlanStore
+import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod
 import it.vittorioscocca.kidbox.domain.model.ai.AIResponse
 import it.vittorioscocca.kidbox.domain.model.ai.AIServiceError
@@ -145,8 +146,10 @@ class AIService @Inject constructor(
     ): Result<TravelPlanResponse> = withContext(Dispatchers.IO) {
         runCatching {
             val resolvedFamilyId = resolveFamilyId(familyId)
-            if (!CurrentPlanStore.isAIAccessible) {
-                error("Hai usato tutti i messaggi AI gratuiti inclusi nel piano Free. Passa a Pro per continuare a usare l'assistente.")
+            // Feature dei soli piani a pagamento (il server rifiuta comunque i Free):
+            // `isAIAccessible` da solo lascerebbe passare un Free col bonus intatto.
+            if (CurrentPlanStore.plan.value == KBPlan.FREE) {
+                error("Il Pianificatore Viaggi è incluso nei piani Pro e Max. Passa a Pro per generare un itinerario.")
             }
             val payload = hashMapOf<String, Any>(
                 "familyId" to resolvedFamilyId,

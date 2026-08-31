@@ -36,7 +36,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -72,6 +74,20 @@ fun PlansScreen(
             context,
             triggerFeature = UpgradeMessageStore.consumeTrigger(),
             planShown = "both",
+        )
+    }
+
+    // Solo chi ha creato la famiglia può abbonarsi: il tocco su "Abbonati"
+    // degli altri membri finisce qui invece che in un acquisto rifiutato.
+    var mostraAvvisoCreatore by remember { mutableStateOf(false) }
+    if (mostraAvvisoCreatore) {
+        AlertDialog(
+            onDismissRequest = { mostraAvvisoCreatore = false },
+            title = { Text(stringResource(R.string.subscription_owner_managed_title)) },
+            text = { Text(stringResource(R.string.subscription_owner_managed_body)) },
+            confirmButton = {
+                TextButton(onClick = { mostraAvvisoCreatore = false }) { Text(stringResource(R.string.subscription_ok)) }
+            },
         )
     }
 
@@ -140,42 +156,10 @@ fun PlansScreen(
                 }
             }
         }
-        if (!state.isFamilyOwner) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFF3EEFF)),
-            ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(
-                        stringResource(R.string.subscription_owner_managed_title),
-                        color = Color(0xFF6D28D9),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                    )
-                    Text(
-                        stringResource(R.string.subscription_owner_managed_body),
-                        color = kb.subtitle,
-                        fontSize = 13.sp,
-                        lineHeight = 18.sp,
-                    )
-                }
-            }
-        }
         Spacer(modifier = Modifier.height(16.dp))
 
         PlanCard(
-            title = stringResource(R.string.subscription_plan_free_name),
-            price = stringResource(R.string.subscription_plan_free_price),
-            badge = stringResource(R.string.subscription_plan_free_badge),
-            features = listOf(
-                stringResource(R.string.subscription_plan_free_feature_storage),
-                stringResource(R.string.subscription_plan_free_feature_ai),
-            ),
+            plan = KBPlan.FREE,
             isCurrent = state.currentPlan == KBPlan.FREE,
             badgeColor = Color(0xFF9CA3AF),
             buttonLabel = null,
@@ -184,45 +168,43 @@ fun PlansScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         PlanCard(
-            title = stringResource(R.string.subscription_plan_pro_name),
-            price = stringResource(R.string.subscription_plan_pro_price),
-            badge = stringResource(R.string.subscription_plan_pro_badge),
-            features = listOf(
-                stringResource(R.string.subscription_plan_pro_feature_storage),
-                stringResource(R.string.subscription_plan_pro_feature_ai_msgs),
-                stringResource(R.string.subscription_feature_ai_weekly_summary),
-            ),
+            plan = KBPlan.PRO,
             isCurrent = state.currentPlan == KBPlan.PRO,
             badgeColor = Color(0xFF2563EB),
-            buttonLabel = if (state.currentPlan != KBPlan.PRO && state.isFamilyOwner) stringResource(R.string.subscription_subscribe) else null,
+            // Il pulsante c'è anche per chi non ha creato la famiglia: nasconderlo
+            // lasciava senza risposta la domanda "perché non posso abbonarmi?".
+            // Al tocco arriva il motivo, non un acquisto che fallirebbe.
+            buttonLabel = if (state.currentPlan != KBPlan.PRO) stringResource(R.string.subscription_subscribe) else null,
             onButtonClick = {
-                if (activity != null) viewModel.purchase(KBPlan.PRO, activity)
+                if (!state.isFamilyOwner) {
+                    mostraAvvisoCreatore = true
+                } else if (activity != null) {
+                    viewModel.purchase(KBPlan.PRO, activity)
+                }
             },
         )
         Spacer(modifier = Modifier.height(12.dp))
 
         PlanCard(
-            title = stringResource(R.string.subscription_plan_max_name),
-            price = stringResource(R.string.subscription_plan_max_price),
-            badge = stringResource(R.string.subscription_plan_max_badge),
-            features = listOf(
-                stringResource(R.string.subscription_plan_max_feature_storage),
-                stringResource(R.string.subscription_plan_max_feature_ai_msgs),
-                stringResource(R.string.subscription_feature_ai_weekly_summary),
-                stringResource(R.string.subscription_plan_max_feature_support),
-            ),
+            plan = KBPlan.MAX,
             isCurrent = state.currentPlan == KBPlan.MAX,
             badgeColor = Color(0xFF7C3AED),
-            buttonLabel = if (state.currentPlan != KBPlan.MAX && state.isFamilyOwner) stringResource(R.string.subscription_subscribe) else null,
+            buttonLabel = if (state.currentPlan != KBPlan.MAX) stringResource(R.string.subscription_subscribe) else null,
             onButtonClick = {
-                if (activity != null) viewModel.purchase(KBPlan.MAX, activity)
+                if (!state.isFamilyOwner) {
+                    mostraAvvisoCreatore = true
+                } else if (activity != null) {
+                    viewModel.purchase(KBPlan.MAX, activity)
+                }
             },
         )
 
         Spacer(modifier = Modifier.height(14.dp))
-        if (state.isFamilyOwner) {
+        run {
             Button(
-                onClick = viewModel::restorePurchases,
+                onClick = {
+                    if (!state.isFamilyOwner) mostraAvvisoCreatore = true else viewModel.restorePurchases()
+                },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
             ) {
@@ -263,10 +245,7 @@ fun PlansScreen(
 
 @Composable
 private fun PlanCard(
-    title: String,
-    price: String,
-    badge: String,
-    features: List<String>,
+    plan: KBPlan,
     isCurrent: Boolean,
     badgeColor: Color,
     buttonLabel: String?,
@@ -293,22 +272,35 @@ private fun PlanCard(
     ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .background(badgeColor.copy(alpha = 0.18f), RoundedCornerShape(999.dp))
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                ) {
-                    Text(badge, color = badgeColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                val badge = plan.badge
+                if (badge.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .background(badgeColor.copy(alpha = 0.18f), RoundedCornerShape(999.dp))
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    ) {
+                        Text(badge, color = badgeColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
                 Spacer(Modifier.weight(1f))
                 if (isCurrent) {
                     Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF22C55E))
                 }
             }
-            Text(title, color = kb.title, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
-            Text(price, color = kb.subtitle, fontSize = 16.sp)
-            features.forEach { feature ->
-                Text("• $feature", color = kb.title, fontSize = 14.sp)
+            Text(plan.displayName, color = kb.title, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+            Text(plan.monthlyPrice, color = kb.subtitle, fontSize = 16.sp)
+            if (plan.tagline.isNotBlank()) {
+                Text(plan.tagline, color = kb.subtitle, fontSize = 12.sp)
+            }
+            // Testi e quote arrivano dal catalogo `config/plans`, già localizzati
+            // e con i segnaposto risolti (vedi KBPlanCatalog).
+            plan.features.forEach { feature ->
+                Text(
+                    "${feature.icon} ${feature.text}",
+                    color = kb.title,
+                    fontSize = 14.sp,
+                    fontWeight = if (feature.strong) FontWeight.SemiBold else FontWeight.Normal,
+                )
             }
             if (!buttonLabel.isNullOrBlank() && onButtonClick != null) {
                 Button(

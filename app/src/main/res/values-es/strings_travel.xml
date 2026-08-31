@@ -84,6 +84,8 @@
     <string name="travel_your_trips">Tus viajes</string>
     <string name="travel_see_all">Ver todos</string>
     <string name="travel_upgrade_hint">Has usado todos los mensajes de IA gratuitos del plan Free. Cambia a Pro o Max para seguir planificando viajes con IA.</string>
+    <string name="travel_locked_title">Incluido en Pro y Max</string>
+    <string name="travel_locked_body">El planificador de viajes solo está disponible con un plan de pago. Cambia a Pro o Max para planificar viajes con IA.</string>
     <string name="travel_plane">Avión</string>
     <string name="travel_train">Tren</string>
     <string name="travel_ship">Barco</string>

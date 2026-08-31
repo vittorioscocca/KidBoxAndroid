@@ -3,6 +3,7 @@ package it.vittorioscocca.kidbox.ui.screens.home
 import android.Manifest
 import android.graphics.BitmapFactory
 import android.net.Uri
+import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.util.fixBitmapOrientationFromBytes
 import androidx.activity.compose.BackHandler
@@ -47,6 +48,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -111,6 +114,22 @@ fun ProfileScreen(
     val deleteSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = androidx.compose.ui.platform.LocalContext.current
     val kb = MaterialTheme.kidBoxColors
+
+    // I pulsanti di abbonamento restano visibili a tutti: chi non gestisce
+    // l'abbonamento riceve la spiegazione al tocco, non un pulsante mancante.
+    var mostraAvvisoCreatore by remember { mutableStateOf(false) }
+    if (mostraAvvisoCreatore) {
+        AlertDialog(
+            onDismissRequest = { mostraAvvisoCreatore = false },
+            title = { Text(stringResource(R.string.subscription_owner_managed_title)) },
+            text = { Text(stringResource(R.string.subscription_owner_managed_body)) },
+            confirmButton = {
+                TextButton(onClick = { mostraAvvisoCreatore = false }) {
+                    Text(stringResource(R.string.subscription_ok))
+                }
+            },
+        )
+    }
 
     BackHandler(enabled = onBack != null) {
         onBack?.invoke()
@@ -507,16 +526,24 @@ fun ProfileScreen(
                 Spacer(Modifier.width(10.dp))
                 Text(state.planLabel, fontWeight = FontWeight.SemiBold, color = kb.title)
                 Spacer(Modifier.weight(1f))
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.kidBoxColors.rowBackground)
-                        .clickable(onClick = onOpenPlans)
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                ) {
-                    Text(stringResource(R.string.home_profile_upgrade), color = Color(0xFF2F80ED), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                // Allineato a iOS: nessun upgrade da proporre se il piano è già il
+                // massimo. Il pulsante c'è per tutti: a chi non gestisce
+                // l'abbonamento risponde con il motivo, non con l'assenza.
+                if (state.plan != KBPlan.MAX) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.kidBoxColors.rowBackground)
+                            .clickable {
+                                if (state.isFamilyOwner) onOpenPlans() else mostraAvvisoCreatore = true
+                            }
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                    ) {
+                        Text(stringResource(R.string.home_profile_upgrade), color = Color(0xFF2F80ED), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
+
             val progress = (state.storageUsedBytes.toFloat() / state.storageTotalBytes.toFloat()).coerceIn(0f, 1f)
             LinearProgressIndicator(
                 progress = { progress },

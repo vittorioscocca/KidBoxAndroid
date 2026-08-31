@@ -9,7 +9,11 @@ import it.vittorioscocca.kidbox.ai.HealthPatternPrefs
 import it.vittorioscocca.kidbox.ai.WeeklySummaryPrefs
 import it.vittorioscocca.kidbox.data.ai.AISettingsStore
 import it.vittorioscocca.kidbox.data.health.ai.HealthContextSendPreference
+import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
+import it.vittorioscocca.kidbox.domain.family.isFamilySubscriptionManager
+import it.vittorioscocca.kidbox.domain.family.resolveActiveFamilyId
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.remote.ai.AIService
 import it.vittorioscocca.kidbox.data.remote.ai.AIRemotePreferences
@@ -40,6 +44,8 @@ data class AiSettingsUiState(
     val isHealthPatternEnabled: Boolean = true,
     val healthContextSendPreference: HealthContextSendPreference = HealthContextSendPreference.ASK_EACH_TIME,
     val pendingShowConsent: Boolean = false,
+    /** Solo chi ha creato la famiglia può attivare o cambiare un abbonamento. */
+    val isFamilyOwner: Boolean = false,
     val message: String? = null,
 )
 
@@ -52,6 +58,8 @@ class AiSettingsViewModel @Inject constructor(
     private val aiRemotePrefs: AIRemotePreferences,
     private val subscriptionRepository: SubscriptionRepository,
     private val familyDao: KBFamilyDao,
+    private val familyMemberDao: KBFamilyMemberDao,
+    private val auth: FirebaseAuth,
     private val aiService: AIService,
     private val familySessionPreferences: FamilySessionPreferences,
     private val aiUsageTracker: AIUsageTracker,
@@ -92,8 +100,7 @@ class AiSettingsViewModel @Inject constructor(
 
     private suspend fun loadRemoteData() {
         _uiState.update { it.copy(isLoading = true) }
-        val familyId = familySessionPreferences.getActiveFamilyId()
-            ?: familyDao.peekAnyFamilyId().orEmpty()
+        val familyId = resolveActiveFamilyId(familySessionPreferences, familyDao)
         val plan = subscriptionRepository.getPlan(familyId)
         val remote = aiRemotePrefs.fetch()
         val usage = aiService.fetchUsage(familyId).getOrNull()
@@ -104,10 +111,17 @@ class AiSettingsViewModel @Inject constructor(
             aiSettingsStore.setHealthContextSendPreference(pref)
         }
         val limit = usage?.dailyLimit ?: aiUsageTracker.state.value.dailyLimit
+        val isFamilyOwner = isFamilySubscriptionManager(
+            familyDao,
+            familyMemberDao,
+            familyId,
+            auth.currentUser?.uid.orEmpty(),
+        )
         _uiState.update {
             it.copy(
                 isLoading = false,
                 plan = plan,
+                isFamilyOwner = isFamilyOwner,
                 isEnabled = remote?.aiEnabled ?: it.isEnabled,
                 aiUsageToday = usageToday,
                 aiQuotaPeriod = period,

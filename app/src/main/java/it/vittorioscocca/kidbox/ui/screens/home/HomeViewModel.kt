@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.home
 
+import it.vittorioscocca.kidbox.data.remote.ActiveFamilyRemoteStore
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.util.KBLog
 
@@ -264,9 +265,11 @@ class HomeViewModel @Inject constructor(
                     return@collectLatest
                 }
 
+                val uidCorrente = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
                 val familyId = ActiveFamilyResolver.resolveFamilyId(
                     families,
-                    familySessionPreferences.getActiveFamilyId(),
+                    familySessionPreferences.getActiveFamilyId()
+                        ?: familySessionPreferences.getLastActiveFamilyId(uidCorrente),
                 )
                 if (familyId.isBlank()) {
                     _uiState.value = HomeUiState(isLoading = false, familyId = "")
@@ -670,7 +673,18 @@ class HomeViewModel @Inject constructor(
                 return
             }
 
+            // La chiave di sessione è appena stata azzerata (vedi observeHomeData):
+            // al rientro con lo stesso account vale la memoria per uid, altrimenti
+            // si ripartirebbe dalla prima famiglia che risponde — di solito la più
+            // vecchia, non quella in cui si stava.
+            // Ordine: preferenza di sessione → famiglia attiva salvata
+            // sull'account (sopravvive a logout e reinstallazioni, e vale anche
+            // se l'ultimo accesso era da un altro dispositivo) → memoria locale
+            // per uid. Senza, si ripartirebbe dalla prima famiglia che risponde:
+            // di solito la più vecchia, non quella in cui si stava.
             val preferredId = familySessionPreferences.getActiveFamilyId()
+                ?: ActiveFamilyRemoteStore.load(uid)
+                ?: familySessionPreferences.getLastActiveFamilyId(uid)
             val orderedCandidates = if (
                 preferredId != null && distinctCandidates.contains(preferredId)
             ) {

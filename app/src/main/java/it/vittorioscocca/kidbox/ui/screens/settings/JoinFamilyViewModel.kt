@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.vittorioscocca.kidbox.data.remote.family.LeftoverFamilyCleaner
 import it.vittorioscocca.kidbox.data.crypto.FamilyKeyStore
 import it.vittorioscocca.kidbox.data.remote.family.PendingFamilyInvite
 import it.vittorioscocca.kidbox.R
@@ -51,6 +52,7 @@ class JoinFamilyViewModel @Inject constructor(
     private val familySyncCenter: FamilySyncCenter,
     private val passwordsRepository: PasswordsRepository,
     private val userProfileRepository: UserProfileRepository,
+    private val leftoverFamilyCleaner: LeftoverFamilyCleaner,
 ) : AndroidViewModel(application) {
 
     private val inviteRemote = InviteRemoteStore()
@@ -135,6 +137,14 @@ class JoinFamilyViewModel @Inject constructor(
 
                 val vaultKeyAvailable = FamilyKeyStore.hasFamilyKey(getApplication(), invite.familyId, uid)
                 AppAnalytics.familyJoined(getApplication(), vaultKeyAvailable)
+
+                // La famiglia creata solo per superare l'onboarding, se è rimasta
+                // vuota, va tolta di mezzo: occupa uno slot dei due per account e
+                // rende ambigua la scelta della famiglia "corrente".
+                withContext(Dispatchers.IO) {
+                    runCatching { leftoverFamilyCleaner.deleteEmptyOwnedFamilies(invite.familyId) }
+                        .onFailure { KBLog.ui.warning("pulizia famiglia residua fallita: ${it.message}", TAG) }
+                }
 
                 onJoined()
             } catch (e: Exception) {
