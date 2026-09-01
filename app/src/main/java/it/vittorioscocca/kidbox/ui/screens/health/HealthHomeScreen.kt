@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.Biotech
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.MonitorHeart
@@ -161,6 +162,13 @@ fun HealthHomeScreen(
                 icon = Icons.Default.Restaurant,
                 tint = Color(0xFF66B880),
                 onClick = { onNavigate(AppDestination.MealPlan.route(familyId, childId)) },
+            ),
+            HealthCard(
+                title = context.getString(R.string.fitness_plan_title),
+                subtitle = context.getString(R.string.fitness_card_subtitle),
+                icon = Icons.Default.DirectionsRun,
+                tint = Color(0xFF5A9EE0),
+                onClick = { onNavigate(AppDestination.FitnessPlan.route(familyId, childId)) },
             ),
             HealthCard(
                 title = context.getString(R.string.health_history),

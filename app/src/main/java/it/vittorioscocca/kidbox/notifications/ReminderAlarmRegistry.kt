@@ -202,5 +202,6 @@ class ReminderAlarmRegistry @Inject constructor(
         fun vehicleKey(vehicleId: String, kindKey: String, slot: String) = "vehicle:$vehicleId:$kindKey:$slot"
         fun housePaymentKey(paymentId: String) = "housepayment:$paymentId"
         fun passwordExpiryKey(entryId: String, days: Int) = "passwordexpiry:$entryId:$days"
+        fun fitnessSessionKey(childId: String, sessionId: String) = "fitness:$childId:$sessionId"
     }
 }

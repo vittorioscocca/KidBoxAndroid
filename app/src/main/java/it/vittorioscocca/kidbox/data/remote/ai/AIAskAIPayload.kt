@@ -16,6 +16,10 @@ object AIAskAIPayload {
      *  Parity con `MEAL_PLAN_MIN_UNITS` in `functions/index.js`. */
     const val MEAL_PLAN_MIN_UNITS: Int = 5
 
+    /** Unità minime per il piano fitness (Haiku + JSON lungo su 4 settimane).
+     *  Parity con `FITNESS_PLAN_MIN_UNITS` in `functions/index.js`. */
+    const val FITNESS_PLAN_MIN_UNITS: Int = 5
+
     fun totalChars(systemPrompt: String, messages: List<KBAIMessage>, pendingUserText: String = ""): Int {
         val history = messages.sumOf { it.content.length }
         val pending = pendingUserText.trim().length
@@ -38,6 +42,11 @@ object AIAskAIPayload {
      *  oppure le unità del payload se il contesto è molto grande. */
     fun mealPlanMessageUnits(totalChars: Int): Int =
         maxOf(MEAL_PLAN_MIN_UNITS, messageUnits(totalChars))
+
+    /** Unità per il piano fitness: minimo fisso [FITNESS_PLAN_MIN_UNITS],
+     *  oppure le unità del payload se il contesto è molto grande. */
+    fun fitnessPlanMessageUnits(totalChars: Int): Int =
+        maxOf(FITNESS_PLAN_MIN_UNITS, messageUnits(totalChars))
 
     fun transientLargeContextNotice(context: android.content.Context): String =
         context.getString(it.vittorioscocca.kidbox.R.string.health_ctx_large_notice)

@@ -26,12 +26,14 @@ class PasswordsTxtIOTest {
 
     @Test
     fun parse_multiline_notes_and_private_skip() {
+        // Nel file esportato l'a capo è la sequenza di due caratteri `\` + `n`:
+        // dentro una raw string Kotlin si scrive esattamente così.
         val txt = """
             # KidBox Password Export v1
             ---
             Title: A
             Password: x
-            Note: line1\\nline2
+            Note: line1\nline2
             Visibility: family
             ---
             ---
@@ -45,6 +47,23 @@ class PasswordsTxtIOTest {
         assertEquals(1, preview.total)
         assertEquals("line1\nline2", preview.records.first().note)
         assertEquals(1, preview.skippedOtherPrivate)
+    }
+
+    @Test
+    fun parse_escaped_backslash_stays_literal() {
+        // `\\n` è un backslash reale seguito da "n", non un a capo: una nota che
+        // contiene un percorso Windows non deve spezzarsi in due righe.
+        val txt = """
+            # KidBox Password Export v1
+            ---
+            Title: A
+            Password: x
+            Note: C:\\nuovo\\cartella
+            ---
+        """.trimIndent()
+        val preview = PasswordsTxtParser.parseText(txt, "u1")
+        assertEquals(1, preview.total)
+        assertEquals("C:\\nuovo\\cartella", preview.records.first().note)
     }
 
     @Test
@@ -62,10 +81,24 @@ class PasswordsTxtIOTest {
 
     @Test
     fun parse_legacy_multiple_records_single_text() {
+        // Due record su una riga sola si separano senza incertezze: ogni
+        // "Account:" apre davvero un record, quindi nessun avviso all'utente.
         val txt = "Account: A Group: G1 WebSite: https://a Username: u1 Password: p1 Note: n1 Account: B Group: G2 WebSite: https://b Username: u2 Password: p2 Note: n2"
         val preview = PasswordsTxtParser.parseText(txt, "u1")
         assertEquals(2, preview.total)
-        assertEquals(listOf(1), preview.legacyAmbiguousRecordIndices)
+        assertEquals("A", preview.records[0].title)
+        assertEquals("p2", preview.records[1].password)
+        assertEquals(emptyList<Int>(), preview.legacyAmbiguousRecordIndices)
+    }
+
+    @Test
+    fun parse_legacy_flags_account_hidden_in_note() {
+        // Qui l'avviso serve davvero: "Account:" dentro una nota può far
+        // tagliare il record nel punto sbagliato, e l'utente deve saperlo.
+        val txt = "Account: A Group: G1 WebSite: https://a Username: u1 Password: p1 " +
+            "Note: ricorda Account: vecchio del 2019"
+        val preview = PasswordsTxtParser.parseText(txt, "u1")
+        assertTrue(preview.legacyAmbiguousRecordIndices.isNotEmpty())
     }
 
     private fun fixture(path: String): String =

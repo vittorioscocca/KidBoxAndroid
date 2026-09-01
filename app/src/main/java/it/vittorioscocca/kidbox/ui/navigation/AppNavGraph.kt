@@ -98,6 +98,8 @@ import it.vittorioscocca.kidbox.ui.screens.health.HealthSubjectSelectorScreen
 import it.vittorioscocca.kidbox.ui.screens.health.HealthHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.health.HealthConnectAppScreen
 import it.vittorioscocca.kidbox.ui.screens.health.ClinicalRecordScreen
+import it.vittorioscocca.kidbox.ui.screens.health.FitnessCopilotScreen
+import it.vittorioscocca.kidbox.ui.screens.health.FitnessPlanScreen
 import it.vittorioscocca.kidbox.ui.screens.health.MealPlanScreen
 import it.vittorioscocca.kidbox.ui.screens.health.MedicalRecordScreen
 import it.vittorioscocca.kidbox.ui.screens.health.visits.MedicalVisitsScreen
@@ -967,6 +969,45 @@ fun AppNavGraph(
                 onUpgrade = {
                     navController.navigate(AppDestination.Plans.route) { launchSingleTop = true }
                 },
+            )
+        }
+
+        composable(
+            route = AppDestination.FitnessPlan.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            val childId = backStackEntry.arguments?.getString("childId").orEmpty()
+            FitnessPlanScreen(
+                familyId = familyId,
+                childId = childId,
+                subjectName = "",
+                onBack = { navController.popBackStack() },
+                onUpgrade = {
+                    navController.navigate(AppDestination.Plans.route) { launchSingleTop = true }
+                },
+                onOpenCopilot = {
+                    navController.navigate(AppDestination.FitnessCopilot.route(familyId, childId)) {
+                        launchSingleTop = true
+                    }
+                },
+            )
+        }
+
+        composable(
+            route = AppDestination.FitnessCopilot.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("childId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            FitnessCopilotScreen(
+                familyId = backStackEntry.arguments?.getString("familyId").orEmpty(),
+                childId = backStackEntry.arguments?.getString("childId").orEmpty(),
+                onBack = { navController.popBackStack() },
             )
         }
 

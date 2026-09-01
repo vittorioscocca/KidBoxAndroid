@@ -253,6 +253,16 @@ object NotificationDeepLinkRouter {
                     AppDestination.TreatmentDetail.route(fid, childId, treatmentId)
                 }
             }
+            "fitness_session_reminder" -> {
+                val childId = intent.getStringExtra("push_child_id")
+                if (childId.isNullOrBlank()) {
+                    KBLog.app.warning("NotificationDeepLink: fitness payload incompleto", TAG)
+                    return
+                }
+                queueFamilyAwareRoute(resolvedType, familyId) { fid ->
+                    AppDestination.FitnessPlan.route(fid, childId)
+                }
+            }
             "exam_reminder" -> {
                 val childId = intent.getStringExtra("push_child_id") ?: intent.getStringExtra("childId")
                 val examId = intent.getStringExtra("push_exam_id") ?: intent.getStringExtra("examId")

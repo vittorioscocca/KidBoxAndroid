@@ -118,6 +118,14 @@ sealed class AppDestination(val route: String) {
         fun route(familyId: String, childId: String) =
             "health/$familyId/$childId/meal-plan"
     }
+    data object FitnessPlan : AppDestination("health/{familyId}/{childId}/fitness-plan") {
+        fun route(familyId: String, childId: String) =
+            "health/$familyId/$childId/fitness-plan"
+    }
+    data object FitnessCopilot : AppDestination("health/{familyId}/{childId}/fitness-copilot") {
+        fun route(familyId: String, childId: String) =
+            "health/$familyId/$childId/fitness-copilot"
+    }
     data object HealthConnectApp : AppDestination("health/{familyId}/{childId}/health-connect-app") {
         fun route(familyId: String, childId: String) =
             "health/$familyId/$childId/health-connect-app"

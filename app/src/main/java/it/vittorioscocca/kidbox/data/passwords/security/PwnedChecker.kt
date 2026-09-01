@@ -3,7 +3,6 @@ package it.vittorioscocca.kidbox.data.passwords.security
 import it.vittorioscocca.kidbox.util.KBLog
 
 import android.content.Context
-import android.util.LruCache
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.PwnedPrefixCacheDao
 import java.io.IOException
@@ -53,7 +52,7 @@ class PwnedChecker @Inject constructor(
 
     private val requestMutex = Mutex()
     private var lastRequestAt = 0L
-    private val memoryCache = LruCache<String, Map<String, Int>>(256)
+    private val memoryCache = PrefixMemoryCache(256)
     private val cacheTtlMs = 24L * 60 * 60 * 1000
 
     suspend fun check(password: String): Result {
@@ -159,5 +158,32 @@ class PwnedChecker @Inject constructor(
 
     private companion object {
         const val DEFAULT_HIBP_BASE_URL = "https://api.pwnedpasswords.com"
+    }
+}
+
+/**
+ * LRU sui prefissi SHA-1 scritta a mano invece di android.util.LruCache: quella è una classe del
+ * framework, quindi negli unit test JVM è solo uno stub dell'android.jar che lancia "not mocked"
+ * a ogni chiamata, e renderebbe PwnedChecker verificabile solo su emulatore.
+ * LinkedHashMap in accessOrder ha la stessa semantica (il meno usato di recente esce per primo);
+ * la sincronizzazione esplicita conserva la thread-safety che LruCache garantiva.
+ */
+private class PrefixMemoryCache(maxEntries: Int) {
+    private val entries = object : LinkedHashMap<String, Map<String, Int>>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Map<String, Int>>): Boolean =
+            size > maxEntries
+    }
+
+    @Synchronized
+    fun get(key: String): Map<String, Int>? = entries[key]
+
+    @Synchronized
+    fun put(key: String, value: Map<String, Int>) {
+        entries[key] = value
+    }
+
+    @Synchronized
+    fun evictAll() {
+        entries.clear()
     }
 }

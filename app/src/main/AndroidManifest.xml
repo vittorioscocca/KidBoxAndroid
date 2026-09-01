@@ -209,6 +209,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".notifications.FitnessSessionActionReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".notifications.nudge.NudgeReceiver"
             android:exported="false" />
 

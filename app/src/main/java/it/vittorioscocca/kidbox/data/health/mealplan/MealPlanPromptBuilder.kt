@@ -112,11 +112,30 @@ object MealPlanPromptBuilder {
         snapshot: HealthImportSnapshot?,
         profile: KBPediatricProfile?,
         input: MealPlanInput = MealPlanInput(),
+    ): List<String> = profileSummaryLines(
+        birthDateEpochMillis = birthDateEpochMillis,
+        snapshot = snapshot,
+        profile = profile,
+        manualAge = input.manualAgeValue,
+        manualWeight = input.manualWeightValue,
+        manualHeight = input.manualHeightValue,
+    )
+
+    /**
+     * Variante usata anche dal Piano Fitness, che ha un input suo: i valori
+     * inseriti a mano arrivano già normalizzati, senza passare da [MealPlanInput].
+     */
+    fun profileSummaryLines(
+        birthDateEpochMillis: Long?,
+        snapshot: HealthImportSnapshot?,
+        profile: KBPediatricProfile?,
+        manualAge: Int?,
+        manualWeight: Double?,
+        manualHeight: Double?,
     ): List<String> {
         val lines = mutableListOf<String>()
 
         val birth = birthDateEpochMillis ?: snapshot?.birthDateEpochMillis
-        val manualAge = input.manualAgeValue
         lines += when {
             birth != null -> "Età: ${yearsSince(birth)} anni"
             manualAge != null -> "Età: $manualAge anni (indicata dall'utente)"
@@ -124,7 +143,6 @@ object MealPlanPromptBuilder {
         }
 
         val height = snapshot?.heightCm
-        val manualHeight = input.manualHeightValue
         lines += when {
             height != null -> "Altezza: ${height.roundToInt()} cm"
             manualHeight != null -> "Altezza: ${manualHeight.roundToInt()} cm (indicata dall'utente)"
@@ -132,7 +150,6 @@ object MealPlanPromptBuilder {
         }
 
         val weight = snapshot?.weightKg
-        val manualWeight = input.manualWeightValue
         lines += when {
             weight != null -> "Peso: ${String.format(Locale.getDefault(), "%.1f", weight)} kg"
             manualWeight != null ->

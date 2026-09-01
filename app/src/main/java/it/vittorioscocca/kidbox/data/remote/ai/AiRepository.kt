@@ -2,10 +2,15 @@ package it.vittorioscocca.kidbox.data.remote.ai
 
 import com.google.firebase.functions.FirebaseFunctions
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
+import it.vittorioscocca.kidbox.ai.CurrentPlanStore
+import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
+
+/** Purpose askAI riservati ai piani a pagamento. */
+private val PAID_ONLY_PURPOSES = setOf("mealPlan", "fitnessPlan", "fitnessAdjust", "fitnessCopilot")
 
 data class AiReply(
     val reply: String,
@@ -29,6 +34,13 @@ class AiRepository @Inject constructor(
         messages: List<KBAIMessage>,
         purpose: String? = null,
     ): Result<AiReply> = runCatching {
+        // Presidio client sui purpose riservati ai piani a pagamento: è il collo
+        // di bottiglia attraversato da ogni percorso (generazione, rigenerazione,
+        // spostamento seduta, copilota). Il gate vero resta lato server
+        // (`quota.period === "lifetime"`), questo evita di bruciare una chiamata.
+        if (purpose in PAID_ONLY_PURPOSES && CurrentPlanStore.plan.value == KBPlan.FREE) {
+            error("Questa funzione AI è inclusa nei piani Pro e Max. Passa a Pro per usarla.")
+        }
         val payload = hashMapOf(
             "familyId" to familyId,
             "systemPrompt" to systemPrompt,
@@ -46,7 +58,7 @@ class AiRepository @Inject constructor(
         // Sonnet senza streaming: la cartella clinica e soprattutto il piano
         // alimentare (8192 token di output) sforavano i 120s → DEADLINE_EXCEEDED.
         when (purpose) {
-            "mealPlan" -> callable.setTimeout(300, java.util.concurrent.TimeUnit.SECONDS)
+            "mealPlan", "fitnessPlan" -> callable.setTimeout(300, java.util.concurrent.TimeUnit.SECONDS)
             "clinicalRecord" -> callable.setTimeout(240, java.util.concurrent.TimeUnit.SECONDS)
         }
         val result = callable

@@ -284,6 +284,29 @@ class HealthConnectGateway @Inject constructor(
         return entries
     }
 
+    /**
+     * Allenamenti registrati da una data in poi, per la riconciliazione del
+     * Piano Fitness: non serve l'intero snapshot, solo la finestra di giorni
+     * che il piano deve chiudere. Restituisce lista vuota se Health Connect non
+     * c'è o se il permesso sugli allenamenti non è stato concesso.
+     */
+    suspend fun workoutsSince(startEpochMillis: Long, limit: Int = 60): List<HealthWorkoutEntry> {
+        if (!isAvailable()) return emptyList()
+        return runCatching {
+            val client = HealthConnectClient.getOrCreate(context)
+            val granted = client.permissionController.getGrantedPermissions()
+            if (HealthPermission.getReadPermission(ExerciseSessionRecord::class) !in granted) {
+                return emptyList()
+            }
+            readRecentWorkouts(
+                client = client,
+                start = Instant.ofEpochMilli(startEpochMillis),
+                end = Instant.now(),
+                limit = limit,
+            )
+        }.getOrDefault(emptyList())
+    }
+
     private suspend fun readRecentWorkouts(
         client: HealthConnectClient,
         start: Instant,

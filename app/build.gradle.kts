@@ -204,6 +204,9 @@ dependencies {
     releaseImplementation("com.google.firebase:firebase-appcheck-playintegrity")
 
     testImplementation("junit:junit:4.13.2")
+    // `org.json` nell'android.jar dei unit test è uno stub che lancia "Stub!":
+    // senza l'implementazione vera non si può testare niente che parsi JSON.
+    testImplementation("org.json:json:20240303")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("org.mockito:mockito-core:5.12.0")

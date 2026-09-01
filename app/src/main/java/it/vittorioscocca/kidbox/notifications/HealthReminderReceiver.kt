@@ -91,6 +91,70 @@ class HealthReminderReceiver : BroadcastReceiver() {
                     .build()
                 runCatching { NotificationManagerCompat.from(context).notify(notifId, notification) }
             }
+            TYPE_FITNESS_SESSION -> {
+                val childId = intent.getStringExtra(EXTRA_CHILD_ID).orEmpty()
+                val familyId = intent.getStringExtra(EXTRA_FAMILY_ID).orEmpty()
+                val sessionId = intent.getStringExtra(EXTRA_FITNESS_SESSION_ID).orEmpty()
+                if (childId.isBlank() || sessionId.isBlank()) return
+                val title = KBNotificationText.title(context, intent)
+                    ?: context.getString(R.string.fitness_reminder_title)
+                val body = intent.getStringExtra(EXTRA_BODY)
+                    ?: context.getString(R.string.fitness_reminder_body_fallback)
+                val notifId = "fitness:$childId:$sessionId".hashCode()
+
+                val deepLink = Intent(context, MainActivity::class.java).apply {
+                    // NEW_TASK necessario: parte da un BroadcastReceiver (AlarmManager),
+                    // un contesto non-Activity.
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                    )
+                    putExtra("push_type", TYPE_FITNESS_SESSION)
+                    putExtra("push_family_id", familyId)
+                    putExtra("push_child_id", childId)
+                    putExtra("kb_fitness_session_id", sessionId)
+                }
+                val contentIntent = PendingIntent.getActivity(
+                    context, notifId, deepLink,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+
+                fun actionIntent(action: String, requestOffset: Int): PendingIntent {
+                    val actionIntent = Intent(context, FitnessSessionActionReceiver::class.java).apply {
+                        this.action = action
+                        putExtra(FitnessSessionActionReceiver.EXTRA_CHILD_ID, childId)
+                        putExtra(FitnessSessionActionReceiver.EXTRA_FAMILY_ID, familyId)
+                        putExtra(FitnessSessionActionReceiver.EXTRA_SESSION_ID, sessionId)
+                        putExtra(FitnessSessionActionReceiver.EXTRA_NOTIFICATION_ID, notifId)
+                    }
+                    return PendingIntent.getBroadcast(
+                        context, notifId + requestOffset, actionIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                    )
+                }
+
+                val notification = NotificationCompat.Builder(context, CHANNEL_ID_HEALTH_REMINDERS)
+                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setContentTitle(title)
+                    .setContentText(body)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                    .setAutoCancel(true)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setContentIntent(contentIntent)
+                    .addAction(
+                        0,
+                        context.getString(R.string.fitness_action_done),
+                        actionIntent(FitnessSessionActionReceiver.ACTION_DONE, 1),
+                    )
+                    .addAction(
+                        0,
+                        context.getString(R.string.fitness_action_move),
+                        actionIntent(FitnessSessionActionReceiver.ACTION_MOVE, 2),
+                    )
+                    .build()
+                runCatching { NotificationManagerCompat.from(context).notify(notifId, notification) }
+            }
             TYPE_WALLET_REMINDER -> {
                 val ticketId = intent.getStringExtra(EXTRA_WALLET_TICKET_ID).orEmpty()
                 val familyId = intent.getStringExtra(EXTRA_FAMILY_ID).orEmpty()
@@ -480,6 +544,8 @@ class HealthReminderReceiver : BroadcastReceiver() {
         const val TYPE_TREATMENT_SENTINEL = "treatment_sentinel"
         const val TYPE_VACCINE_REMINDER = "vaccine_reminder"
         const val TYPE_WALLET_REMINDER = "wallet_reminder"
+        const val TYPE_FITNESS_SESSION = "fitness_session_reminder"
+        const val EXTRA_FITNESS_SESSION_ID = "extra_fitness_session_id"
         const val EXTRA_WALLET_TICKET_ID = "extra_wallet_ticket_id"
         const val TYPE_WALLET_DOCUMENT_REMINDER = "wallet_document_reminder"
         const val EXTRA_WALLET_DOCUMENT_ID = "extra_wallet_document_id"
