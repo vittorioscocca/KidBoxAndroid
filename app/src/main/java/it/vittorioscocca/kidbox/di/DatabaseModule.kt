@@ -253,6 +253,74 @@ object DatabaseModule {
         }
     }
 
+    /**
+     * `kb_pediatric_profiles`: via la foreign key su `childId`.
+     *
+     * Il campo punta a un soggetto salute, che può essere un figlio o un membro
+     * adulto: il vincolo verso `kb_children` era quindi insoddisfacibile per
+     * ogni adulto, e l'insert del suo profilo in arrivo da Firestore faceva
+     * cadere il processo. Resta la foreign key su `familyId`, che è corretta.
+     *
+     * SQLite non sa togliere un vincolo: si ricrea la tabella e si copiano le
+     * righe. La copia è sicura perché le uniche righe esistenti sono quelle che
+     * il vincolo lasciava passare, cioè i profili dei figli.
+     */
+    private val MIGRATION_45_46 = object : Migration(45, 46) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS kb_pediatric_profiles_new (
+                    id TEXT NOT NULL,
+                    familyId TEXT NOT NULL,
+                    childId TEXT NOT NULL,
+                    emergencyContactsJson TEXT,
+                    bloodGroup TEXT,
+                    allergies TEXT,
+                    medicalNotes TEXT,
+                    doctorName TEXT,
+                    doctorPhone TEXT,
+                    doctorEmail TEXT,
+                    doctorAddress TEXT,
+                    doctorWebsite TEXT,
+                    doctorOfficeHoursJson TEXT,
+                    updatedAtEpochMillis INTEGER NOT NULL,
+                    updatedBy TEXT,
+                    syncStateRaw INTEGER NOT NULL,
+                    lastSyncError TEXT,
+                    PRIMARY KEY(id),
+                    FOREIGN KEY(familyId) REFERENCES kb_families(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                """
+                INSERT OR REPLACE INTO kb_pediatric_profiles_new (
+                    id, familyId, childId, emergencyContactsJson, bloodGroup, allergies,
+                    medicalNotes, doctorName, doctorPhone, doctorEmail, doctorAddress,
+                    doctorWebsite, doctorOfficeHoursJson, updatedAtEpochMillis, updatedBy,
+                    syncStateRaw, lastSyncError
+                )
+                SELECT
+                    id, familyId, childId, emergencyContactsJson, bloodGroup, allergies,
+                    medicalNotes, doctorName, doctorPhone, doctorEmail, doctorAddress,
+                    doctorWebsite, doctorOfficeHoursJson, updatedAtEpochMillis, updatedBy,
+                    syncStateRaw, lastSyncError
+                FROM kb_pediatric_profiles
+                """.trimIndent(),
+            )
+            db.execSQL("DROP TABLE kb_pediatric_profiles")
+            db.execSQL("ALTER TABLE kb_pediatric_profiles_new RENAME TO kb_pediatric_profiles")
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_kb_pediatric_profiles_familyId " +
+                    "ON kb_pediatric_profiles (familyId)",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_kb_pediatric_profiles_childId " +
+                    "ON kb_pediatric_profiles (childId)",
+            )
+        }
+    }
+
     private val MIGRATION_5_6 = object : Migration(5, 6) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE kb_medical_exams ADD COLUMN reminderOn INTEGER NOT NULL DEFAULT 0")
@@ -1330,6 +1398,7 @@ object DatabaseModule {
         MIGRATION_42_43,
         MIGRATION_43_44,
         MIGRATION_44_45,
+        MIGRATION_45_46,
     )
         .fallbackToDestructiveMigration()
         .build()

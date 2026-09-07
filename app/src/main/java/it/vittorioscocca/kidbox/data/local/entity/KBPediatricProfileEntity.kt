@@ -5,6 +5,14 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+/**
+ * `childId` non ha foreign key, e non deve averla: il campo punta a un
+ * **soggetto salute**, che può essere un figlio (`kb_children`) oppure un
+ * membro adulto della famiglia (`kb_family_members`). Nessuna singola tabella
+ * li contiene entrambi, quindi un vincolo verso `kb_children` era
+ * insoddisfacibile per ogni profilo di un adulto e faceva fallire l'insert.
+ * L'indice resta, perché le letture avvengono per `childId`.
+ */
 @Entity(
     tableName = "kb_pediatric_profiles",
     foreignKeys = [
@@ -12,12 +20,6 @@ import androidx.room.PrimaryKey
             entity = KBFamilyEntity::class,
             parentColumns = ["id"],
             childColumns = ["familyId"],
-            onDelete = ForeignKey.CASCADE,
-        ),
-        ForeignKey(
-            entity = KBChildEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["childId"],
             onDelete = ForeignKey.CASCADE,
         ),
     ],

@@ -35,7 +35,21 @@ class PediatricProfileSyncCenter @Inject constructor(
         if (listeners.containsKey(key)) return
         KBLog.sync.debug("start listener familyId=$familyId childId=$childId", TAG)
         listeners[key] = remote.listen(familyId, childId) { dto ->
-            scope.launch { applyInbound(familyId, childId, dto) }
+            // Lo scope è di un Singleton: senza questo catch un'eccezione qui
+            // risale come uncaught e il processo viene ucciso, cioè un dato
+            // inatteso dal server basta a far cadere l'app. L'errore va però
+            // gridato nei log, non ingoiato: un profilo che non si salva senza
+            // dirlo è peggio di un crash da diagnosticare.
+            scope.launch {
+                runCatching { applyInbound(familyId, childId, dto) }
+                    .onFailure {
+                        KBLog.sync.error(
+                            "applyInbound fallito familyId=$familyId childId=$childId: ${it.message}",
+                            TAG,
+                            it,
+                        )
+                    }
+            }
         }
     }
 
