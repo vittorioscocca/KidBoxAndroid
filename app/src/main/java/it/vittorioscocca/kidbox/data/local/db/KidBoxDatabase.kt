@@ -107,7 +107,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBTripLegEntity
 
 @Database(
     version = 46,
-    exportSchema = false,
+    exportSchema = true,
     entities = [
         KBUserProfileEntity::class,
         KBFamilyEntity::class,

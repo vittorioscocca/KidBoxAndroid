@@ -95,6 +95,13 @@ configurations.configureEach {
     }
 }
 
+// Schemi Room versionati in app/schemas: con l'export attivo Room confronta a
+// compilazione lo schema generato con quello atteso, e segnala una migrazione
+// scritta male qui invece che sul telefono degli utenti al primo avvio.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     // Installa il Baseline Profile impacchettato nell'APK al primo avvio. Senza questa
     // dipendenza il profilo generato da :baselineprofile non verrebbe mai applicato.
