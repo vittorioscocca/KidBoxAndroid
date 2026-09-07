@@ -21,6 +21,8 @@ data class HealthWorkoutEntry(
     val startedAtEpochMillis: Long,
     val durationMinutes: Int? = null,
     val activeEnergyKcal: Double? = null,
+    /** Battito medio dell'allenamento, aggregato sull'intervallo della sessione. */
+    val averageHeartRateBpm: Double? = null,
 )
 
 data class HealthECGEntry(

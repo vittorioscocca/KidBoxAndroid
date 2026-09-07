@@ -32,8 +32,14 @@ class FitnessHealthSync @Inject constructor(
     data class Result(
         val plan: FitnessPlanDocument,
         val matchedSessions: List<FitnessSession>,
+        /** Allenamenti svolti che non corrispondono a nessuna seduta prevista. */
+        val loggedWorkouts: List<FitnessLoggedWorkout> = emptyList(),
+        /** Sedute riaperte perché chiuse da un'attività di un'altra disciplina. */
+        val repairedSessions: Int = 0,
     ) {
-        val didChange: Boolean get() = matchedSessions.isNotEmpty()
+        val didChange: Boolean
+            get() = matchedSessions.isNotEmpty() || loggedWorkouts.isNotEmpty() ||
+                repairedSessions > 0
     }
 
     /**
@@ -46,19 +52,95 @@ class FitnessHealthSync @Inject constructor(
      */
     suspend fun reconcile(plan: FitnessPlanDocument): Result {
         val today = FitnessPlanDates.today()
-        val pending = plan.allSessions.filter {
+
+        // Si rilegge dall'inizio del piano, non dalla prima seduta aperta: serve
+        // anche a ricontrollare le sedute già chiuse (vedi la riparazione qui
+        // sotto) e a registrare le attività dei giorni senza nulla in programma.
+        val workouts = healthConnect.workoutsSince(
+            FitnessPlanDates.startOfDay(plan.startDateEpochMillis),
+        )
+        if (workouts.isEmpty()) return Result(plan, emptyList())
+
+        var updated = plan
+        var repaired = 0
+
+        // Riparazione dei dati lasciati dalla vecchia euristica, che in mancanza
+        // di corrispondenza chiudeva una seduta con l'allenamento più lungo del
+        // giorno: una corsa poteva risultare "bici svolta". Quelle sedute vanno
+        // riaperte, altrimenti il calendario continua a dichiarare un
+        // allenamento mai fatto e l'attività vera resta invisibile.
+        //
+        // Si guardano SOLO le sedute senza `actualActivityTitle`: è la firma
+        // della vecchia versione, che quel campo non lo scriveva. Tutto ciò che
+        // ha un nome di attività è stato deciso dopo — dal matcher per
+        // disciplina, o dalla persona che ha attribuito a mano un allenamento a
+        // una seduta di un'altra disciplina ("conta la corsa di oggi come la
+        // seduta di bici"). Senza questo filtro la riparazione scambiava quella
+        // scelta esplicita per un errore da annullare e la disfaceva al primo
+        // giro di sincronizzazione.
+        plan.allSessions
+            .filter {
+                it.status == FitnessSessionStatus.DONE &&
+                    it.completionSource == FitnessCompletionSource.HEALTH_CONNECT &&
+                    it.actualActivityTitle == null
+            }
+            .forEach { session ->
+                val workout = workouts.firstOrNull { it.id == session.matchedWorkoutId }
+                    ?: return@forEach
+                if (matchesDiscipline(workout, session)) {
+                    updated = updated.updateSession(session.id) {
+                        it.copy(actualActivityTitle = workout.title)
+                    }
+                } else {
+                    updated = updated.updateSession(session.id) {
+                        it.copy(
+                            status = FitnessSessionStatus.PLANNED,
+                            completedAtEpochMillis = null,
+                            completionSource = null,
+                            matchedWorkoutId = null,
+                            actualActivityTitle = null,
+                            actualMinutes = null,
+                            actualKcal = null,
+                            actualHeartRateBpm = null,
+                        )
+                    }
+                    repaired++
+                }
+            }
+
+        // Residui di abbinamenti su sedute non chiuse: campi rimasti da versioni
+        // che riaprivano la seduta senza azzerarli. Falsano i minuti del
+        // consuntivo e impediscono di riusare quell'attività.
+        updated.allSessions
+            .filter { it.status != FitnessSessionStatus.DONE }
+            .filter {
+                it.matchedWorkoutId != null || it.actualMinutes != null ||
+                    it.actualKcal != null || it.actualActivityTitle != null ||
+                    it.actualHeartRateBpm != null
+            }
+            .forEach { session ->
+                updated = updated.updateSession(session.id) {
+                    it.copy(
+                        matchedWorkoutId = null,
+                        actualMinutes = null,
+                        actualKcal = null,
+                        actualHeartRateBpm = null,
+                        actualActivityTitle = null,
+                        completedAtEpochMillis = null,
+                        completionSource = null,
+                    )
+                }
+            }
+
+        // Le sedute da valutare si leggono dal piano già riparato: una riaperta
+        // qui sopra può essere richiusa subito dall'allenamento giusto.
+        val pending = updated.allSessions.filter {
             !it.isRest && it.status == FitnessSessionStatus.PLANNED && it.dateEpochMillis <= today
         }
-        if (pending.isEmpty()) return Result(plan, emptyList())
-
-        val windowStart = pending.minOf { it.dateEpochMillis }
-        val workouts = healthConnect.workoutsSince(windowStart)
-        if (workouts.isEmpty()) return Result(plan, emptyList())
 
         // Un allenamento chiude al massimo una seduta: senza questo insieme una
         // corsa lunga chiuderebbe tutte le sedute arretrate dello stesso giorno.
-        val usedWorkoutIds = plan.allSessions.mapNotNull { it.matchedWorkoutId }.toMutableSet()
-        var updated = plan
+        val usedWorkoutIds = updated.allSessions.mapNotNull { it.matchedWorkoutId }.toMutableSet()
         val matched = mutableListOf<FitnessSession>()
 
         pending.sortedBy { it.dateEpochMillis }.forEach { session ->
@@ -76,23 +158,51 @@ class FitnessHealthSync @Inject constructor(
                     completedAtEpochMillis = workout.startedAtEpochMillis,
                     completionSource = FitnessCompletionSource.HEALTH_CONNECT,
                     matchedWorkoutId = workout.id,
+                    actualActivityTitle = workout.title,
                     actualMinutes = workout.durationMinutes,
                     actualKcal = workout.activeEnergyKcal?.roundToInt(),
+                    actualHeartRateBpm = workout.averageHeartRateBpm?.roundToInt(),
                 )
             }
             updated.session(session.id)?.let { matched += it }
         }
 
+        // Quello che resta è attività svolta che il programma non prevedeva: va
+        // mostrata per quella che è, non spacciata per una seduta pianificata.
+        val alreadyLogged = updated.loggedWorkouts.map { it.id }.toSet()
+        val newlyLogged = workouts
+            .filter { it.id !in usedWorkoutIds && it.id !in alreadyLogged }
+            .map { workout ->
+                FitnessLoggedWorkout(
+                    id = workout.id,
+                    dateEpochMillis = workout.startedAtEpochMillis,
+                    title = workout.title,
+                    durationMinutes = workout.durationMinutes,
+                    kcal = workout.activeEnergyKcal?.roundToInt(),
+                    heartRateBpm = workout.averageHeartRateBpm?.roundToInt(),
+                )
+            }
+        if (newlyLogged.isNotEmpty()) {
+            updated = updated.copy(loggedWorkouts = updated.loggedWorkouts + newlyLogged)
+        }
+
         KBLog.sync.info(
-            "pending=${pending.size} workouts=${workouts.size} matched=${matched.size}",
+            "pending=${pending.size} workouts=${workouts.size} matched=${matched.size} " +
+                "logged=${newlyLogged.size} repaired=$repaired",
             TAG,
         )
-        return Result(updated, matched)
+        return Result(updated, matched, newlyLogged, repaired)
     }
 
     /**
-     * Tra gli allenamenti dello stesso giorno vince quello abbastanza lungo e, a
-     * parità, quello con la disciplina più vicina al tipo di seduta.
+     * Chiude la seduta solo un allenamento abbastanza lungo **e della stessa
+     * disciplina**.
+     *
+     * Prima, senza corrispondenza, si ripiegava sull'allenamento più lungo della
+     * giornata: una corsa chiudeva così sia la seduta di bici sia quella di
+     * corpo libero previste quel giorno, dichiarando svolto un allenamento mai
+     * fatto. Meglio lasciare la seduta aperta e mostrare a parte ciò che è stato
+     * fatto: a decidere se una cosa sostituisce l'altra è la persona.
      */
     private fun bestMatch(
         session: FitnessSession,
@@ -102,34 +212,16 @@ class FitnessHealthSync @Inject constructor(
             minimumMinutes,
             (session.durationMinutes * minimumDurationRatio).roundToInt(),
         )
-        val eligible = workouts.filter { (it.durationMinutes ?: 0) >= required }
-        if (eligible.isEmpty()) return null
-        return eligible.firstOrNull { matchesDiscipline(it, session) }
-            ?: eligible.maxByOrNull { it.durationMinutes ?: 0 }
+        return workouts
+            .filter { (it.durationMinutes ?: 0) >= required }
+            .firstOrNull { matchesDiscipline(it, session) }
     }
 
-    /**
-     * Corrispondenza grossolana tra il titolo Health Connect ("Corsa") e il tipo
-     * di seduta prodotto dall'AI ("corsa", "forza", …).
-     */
-    private fun matchesDiscipline(workout: HealthWorkoutEntry, session: FitnessSession): Boolean {
-        val workoutTitle = workout.title.lowercase()
-        val sessionText = "${session.activityType} ${session.title}".lowercase()
-        val families = listOf(
-            listOf("cors", "run", "jog"),
-            listOf("camm", "walk", "escursion"),
-            listOf("forza", "pesi", "strength", "funzional", "tonific"),
-            listOf("hiit", "intervall", "circuit"),
-            listOf("bici", "cicl", "cycl", "spinning"),
-            listOf("nuot", "swim"),
-            listOf("yoga", "pilates", "stretch", "mobil", "flessib"),
-            listOf("remo", "canott", "rowing"),
-            listOf("danza", "dance", "ballo"),
+    private fun matchesDiscipline(workout: HealthWorkoutEntry, session: FitnessSession): Boolean =
+        FitnessDisciplineMatcher.matches(
+            activityTitle = workout.title,
+            sessionText = "${session.activityType} ${session.title}",
         )
-        return families.any { keys ->
-            keys.any { workoutTitle.contains(it) } && keys.any { sessionText.contains(it) }
-        }
-    }
 
     private companion object {
         const val TAG = "FitnessHealthSync"

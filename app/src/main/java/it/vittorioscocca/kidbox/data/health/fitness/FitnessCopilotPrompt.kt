@@ -51,8 +51,16 @@ object FitnessCopilotPrompt {
             - "replace_session": sostituisce il contenuto di una seduta (es. allenamento indoor al posto
               della corsa) mantenendo il carico e l'obiettivo settimanale;
             - "move_session": sposta una seduta, con "date" in formato AAAA-MM-GG;
-            - "mark_session": aggiorna lo stato, con "status" fra "done", "skipped", "planned".
-            Usa SEMPRE il "sessionId" esatto preso dall'elenco delle sedute qui sotto.
+            - "mark_session": aggiorna lo stato, con "status" fra "done", "skipped", "planned";
+            - "add_session": aggiunge una seduta nuova in un giorno che non ne ha, con "date" in
+              formato AAAA-MM-GG, "title" e "activityType" obbligatori. La data deve cadere dentro
+              le settimane del piano: fuori non viene applicata;
+            - "delete_session": elimina una seduta. È l'unica azione che NON viene applicata subito:
+              l'utente riceve una richiesta di conferma. Nel testo chiedi conferma invece di darla
+              per fatta, e proponila solo se l'utente ha chiesto di togliere quella seduta; per
+              saltarne una senza perderla usa "mark_session" con "skipped".
+            Usa SEMPRE il "sessionId" esatto preso dall'elenco delle sedute qui sotto (tranne per
+            "add_session", che non ne ha uno).
             Nel testo della risposta spiega in una riga cosa hai cambiato e perché; il blocco JSON non
             viene mostrato all'utente. Se non serve modificare nulla, non allegare alcun blocco.
             """.trimIndent(),

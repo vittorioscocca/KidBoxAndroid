@@ -13,6 +13,7 @@ import it.vittorioscocca.kidbox.data.health.HealthLinkStore
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessAdjustmentProposal
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessCompletionSource
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessHealthSync
+import it.vittorioscocca.kidbox.data.health.fitness.FitnessLoggedWorkout
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanAIUsageInfo
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanDates
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanDocument
@@ -56,7 +57,7 @@ data class FitnessPlanUiState(
     val input: FitnessPlanInput = FitnessPlanInput(),
     val plan: FitnessPlanDocument? = null,
     val selectedDayEpochMillis: Long = FitnessPlanDates.today(),
-    val displayedMonthEpochMillis: Long = FitnessPlanDates.today(),
+    val displayedMonthEpochMillis: Long = FitnessPlanDates.startOfMonth(FitnessPlanDates.today()),
     val lastUsage: FitnessPlanAIUsageInfo? = null,
     val estimatedUnits: Int = AIAskAIPayload.FITNESS_PLAN_MIN_UNITS,
     val isPaidPlan: Boolean = false,
@@ -72,6 +73,8 @@ data class FitnessPlanUiState(
     val weightKg: Double? = null,
     val heightCm: Double? = null,
     val workoutCount: Int = 0,
+    /** Calorie attive lette da Health Connect, usate nel resoconto settimanale. */
+    val activeEnergyKcal: Double? = null,
     val visitCount: Int = 0,
     val examCount: Int = 0,
     val activeTreatmentCount: Int = 0,
@@ -150,12 +153,12 @@ class FitnessPlanViewModel @Inject constructor(
     fun selectDay(epochMillis: Long) {
         _uiState.value = _uiState.value.copy(
             selectedDayEpochMillis = FitnessPlanDates.startOfDay(epochMillis),
-            displayedMonthEpochMillis = startOfMonth(epochMillis),
+            displayedMonthEpochMillis = FitnessPlanDates.startOfMonth(epochMillis),
         )
     }
 
     fun showMonth(epochMillis: Long) {
-        _uiState.value = _uiState.value.copy(displayedMonthEpochMillis = startOfMonth(epochMillis))
+        _uiState.value = _uiState.value.copy(displayedMonthEpochMillis = FitnessPlanDates.startOfMonth(epochMillis))
     }
 
     // ── Generazione ────────────────────────────────────────────────────────
@@ -202,7 +205,7 @@ class FitnessPlanViewModel @Inject constructor(
                     estimatedUnits = result.usage.messageUnitsConsumed,
                     adjustmentProposal = null,
                     selectedDayEpochMillis = FitnessPlanDates.today(),
-                    displayedMonthEpochMillis = startOfMonth(System.currentTimeMillis()),
+                    displayedMonthEpochMillis = FitnessPlanDates.startOfMonth(System.currentTimeMillis()),
                 )
             }.onFailure { error ->
                 _uiState.value = _uiState.value.copy(
@@ -268,7 +271,7 @@ class FitnessPlanViewModel @Inject constructor(
                     isGenerating = false,
                     lastUsage = outcome.usage,
                     selectedDayEpochMillis = FitnessPlanDates.startOfDay(newDateEpochMillis),
-                    displayedMonthEpochMillis = startOfMonth(newDateEpochMillis),
+                    displayedMonthEpochMillis = FitnessPlanDates.startOfMonth(newDateEpochMillis),
                     banner = outcome.rationale.takeIf { it.isNotBlank() },
                 )
             }.onFailure { error ->
@@ -289,6 +292,67 @@ class FitnessPlanViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Fa valere un allenamento svolto come una delle sedute aperte del giorno.
+     * L'allenamento esce dal registro: da lì in poi è quella seduta.
+     */
+    fun countLoggedWorkout(workout: FitnessLoggedWorkout, sessionId: String) {
+        val plan = _uiState.value.plan ?: return
+        val updated = plan
+            .updateSession(sessionId) { session ->
+                session.copy(
+                    status = FitnessSessionStatus.DONE,
+                    completedAtEpochMillis = workout.dateEpochMillis,
+                    completionSource = FitnessCompletionSource.HEALTH_CONNECT,
+                    matchedWorkoutId = workout.id,
+                    actualActivityTitle = workout.title,
+                    actualMinutes = workout.durationMinutes,
+                    actualKcal = workout.kcal,
+                    actualHeartRateBpm = workout.heartRateBpm,
+                )
+            }
+            .let { doc -> doc.copy(loggedWorkouts = doc.loggedWorkouts.filterNot { it.id == workout.id }) }
+        viewModelScope.launch { persist(updated) }
+    }
+
+    /** Modifica manuale: stato, attività realmente svolta, durata e calorie. */
+    fun applyManualEdit(
+        sessionId: String,
+        status: FitnessSessionStatus,
+        activityTitle: String?,
+        minutes: Int?,
+        kcal: Int?,
+    ) {
+        val plan = _uiState.value.plan ?: return
+        val updated = plan.updateSession(sessionId) { session ->
+            if (status == FitnessSessionStatus.DONE) {
+                session.copy(
+                    status = status,
+                    actualActivityTitle = activityTitle?.takeIf { it.isNotBlank() },
+                    actualMinutes = minutes,
+                    actualKcal = kcal,
+                    completedAtEpochMillis = session.completedAtEpochMillis
+                        ?: System.currentTimeMillis(),
+                    // Una modifica a mano resta una dichiarazione della persona,
+                    // anche quando parte da un dato letto dall'orologio.
+                    completionSource = session.completionSource ?: FitnessCompletionSource.MANUAL,
+                )
+            } else {
+                session.copy(
+                    status = status,
+                    actualActivityTitle = null,
+                    actualMinutes = null,
+                    actualKcal = null,
+                    actualHeartRateBpm = null,
+                    completedAtEpochMillis = null,
+                    completionSource = null,
+                    matchedWorkoutId = null,
+                )
+            }
+        }
+        viewModelScope.launch { persist(updated) }
+    }
+
     // ── Health Connect ─────────────────────────────────────────────────────
 
     fun syncHealthNow() {
@@ -305,10 +369,7 @@ class FitnessPlanViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     isSyncingHealth = false,
                     lastHealthSyncEpochMillis = planStore.lastHealthSync(childId),
-                    banner = context.getString(
-                        R.string.fitness_sync_matched,
-                        result.matchedSessions.size,
-                    ),
+                    banner = syncSummary(result),
                 )
             } else {
                 _uiState.value = _uiState.value.copy(
@@ -319,6 +380,22 @@ class FitnessPlanViewModel @Inject constructor(
             }
         }
     }
+
+    /**
+     * Riassume la sincronizzazione distinguendo le sedute chiuse dalle attività
+     * registrate ma non attribuite: sono due cose diverse per chi legge.
+     */
+    private fun syncSummary(result: FitnessHealthSync.Result): String = buildList {
+        if (result.matchedSessions.isNotEmpty()) {
+            add(context.getString(R.string.fitness_sync_matched, result.matchedSessions.size))
+        }
+        if (result.repairedSessions > 0) {
+            add(context.getString(R.string.fitness_sync_repaired, result.repairedSessions))
+        }
+        if (result.loggedWorkouts.isNotEmpty()) {
+            add(context.getString(R.string.fitness_sync_logged, result.loggedWorkouts.size))
+        }
+    }.joinToString("\n")
 
     // ── Report settimanale ─────────────────────────────────────────────────
 
@@ -428,6 +505,7 @@ class FitnessPlanViewModel @Inject constructor(
                     weightKg = inputs.health?.weightKg,
                     heightCm = inputs.health?.heightCm,
                     workoutCount = inputs.health?.recentWorkouts?.size ?: 0,
+                    activeEnergyKcal = inputs.health?.activeEnergyKcal,
                     visitCount = inputs.visits.size,
                     examCount = inputs.exams.size,
                     activeTreatmentCount = inputs.activeTreatments.size,
@@ -494,7 +572,7 @@ class FitnessPlanViewModel @Inject constructor(
         persist(result.plan)
         _uiState.value = _uiState.value.copy(
             lastHealthSyncEpochMillis = planStore.lastHealthSync(childId),
-            banner = context.getString(R.string.fitness_sync_matched, result.matchedSessions.size),
+            banner = syncSummary(result),
         )
     }
 
@@ -538,15 +616,6 @@ class FitnessPlanViewModel @Inject constructor(
 
     private fun doneCount(document: FitnessPlanDocument?): Int =
         document?.allSessions?.count { it.status == FitnessSessionStatus.DONE } ?: 0
-
-    private fun startOfMonth(epochMillis: Long): Long = Calendar.getInstance().apply {
-        timeInMillis = epochMillis
-        set(Calendar.DAY_OF_MONTH, 1)
-        set(Calendar.HOUR_OF_DAY, 0)
-        set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-    }.timeInMillis
 
     private data class FitnessInputs(
         val name: String,

@@ -43,6 +43,14 @@
     <string name="documents_selection_done_with_count">Listo (%1$d)</string>
     <string name="documents_selection_select">Seleccionar</string>
     <string name="documents_action_move">Mover</string>
+    <string name="documents_action_to_pdf">A PDF</string>
+    <string name="documents_to_pdf_title">Convertir a PDF</string>
+    <string name="documents_to_pdf_confirm">Crear</string>
+    <string name="documents_to_pdf_name_label">Nombre del PDF</string>
+    <string name="documents_to_pdf_name_placeholder">Documento</string>
+    <string name="documents_converting_images">Creando el PDF...</string>
+    <string name="documents_to_pdf_success">PDF creado</string>
+    <string name="documents_to_pdf_error_prefix">Error al crear el PDF: %1$s</string>
     <string name="documents_action_merge">Unir</string>
     <string name="documents_action_unlock">Desbloquear</string>
     <string name="documents_action_share">Compartir</string>

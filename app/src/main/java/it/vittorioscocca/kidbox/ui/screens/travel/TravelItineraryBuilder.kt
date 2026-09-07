@@ -481,14 +481,47 @@ object TravelItineraryBuilder {
         return ""
     }
 
+    /**
+     * Divide sul separatore solo fuori dalle parentesi.
+     *
+     * Il « · » separa le tappe, ma compare anche DENTRO il dettaglio di una
+     * tappa — «Museo (2h · ~15)». Tagliando alla cieca quella riga diventava
+     * due tappe monche, «Museo (2h» e «~15)», ed era così che l'utente le
+     * vedeva nell'itinerario.
+     */
+    private fun splitOutsideParentheses(text: String, separator: String): List<String> {
+        val parts = mutableListOf<String>()
+        val current = StringBuilder()
+        var depth = 0
+        var index = 0
+
+        while (index < text.length) {
+            if (depth == 0 && text.startsWith(separator, index)) {
+                parts += current.toString()
+                current.clear()
+                index += separator.length
+                continue
+            }
+            val character = text[index]
+            if (character == '(') depth += 1
+            if (character == ')') depth = maxOf(depth - 1, 0)
+            current.append(character)
+            index += 1
+        }
+        parts += current.toString()
+        return parts
+    }
+
     private fun parseTextStops(text: String): List<TravelItineraryStop> {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return emptyList()
-        val lines = trimmed.split("\n", " · ").map { it.trim() }.filter { it.isNotEmpty() }
-        if (lines.size <= 1) {
-            val category = categoryForTitle(trimmed)
-            return listOf(TravelItineraryStop("", trimmed, "", category.emoji, category))
-        }
+        val lines = trimmed.split("\n")
+            .flatMap { splitOutsideParentheses(it, " · ") }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+        // Anche la riga unica passa da `parseTextLine`: prima finiva tale e
+        // quale nel titolo, orario e parentesi compresi, perché «non c'era
+        // niente da separare». Ma l'orario e il dettaglio ci sono lo stesso.
         return lines.mapNotNull { parseTextLine(it) }
     }
 
@@ -502,14 +535,52 @@ object TravelItineraryBuilder {
             val category = categoryForTitle(title)
             return TravelItineraryStop(time, title, detail, category.emoji, category)
         }
-        val category = categoryForTitle(trimmed)
-        return TravelItineraryStop("", trimmed, "", category.emoji, category)
+        // Anche senza orario il dettaglio va staccato: «Museo Faggiano (1h · ~8)»
+        // è un titolo più un dettaglio, e lasciandoli attaccati il riepilogo di
+        // fascia non trovava né la durata né il costo.
+        val (title, detail) = splitTitleDetail(trimmed)
+        val category = categoryForTitle(title)
+        return TravelItineraryStop("", title, detail, category.emoji, category)
+    }
+
+    /**
+     * Ultima coppia di parentesi di PRIMO livello.
+     *
+     * Si prendevano l'ultima « ( » e l'ultima « ) » qualunque fossero: con un
+     * dettaglio annidato — «Tour guidato (centro storico (con guida) · 2h)» — il
+     * taglio cadeva sulla parentesi interna e il titolo si portava dietro mezzo
+     * dettaglio.
+     */
+    private fun topLevelParentheses(text: String): Pair<Int, Int>? {
+        var depth = 0
+        var open = -1
+        var result: Pair<Int, Int>? = null
+
+        text.forEachIndexed { index, character ->
+            when (character) {
+                '(' -> {
+                    if (depth == 0) open = index
+                    depth += 1
+                }
+                ')' -> {
+                    depth = maxOf(depth - 1, 0)
+                    if (depth == 0 && open >= 0) {
+                        result = open to index
+                        open = -1
+                    }
+                }
+            }
+        }
+        // Parentesi aperta e mai chiusa: vale fino a fine riga. Il testo dell'AI
+        // ogni tanto la dimentica, e senza questo ramo «Passeggiata (2h · ~5»
+        // restava tutto nel titolo, durata e costo persi. Un `open` rimasto qui
+        // è per forza successivo all'ultima coppia chiusa, quindi vince lui.
+        if (open >= 0) result = open to text.length
+        return result
     }
 
     private fun splitTitleDetail(rest: String): Pair<String, String> {
-        val open = rest.lastIndexOf('(')
-        val close = rest.lastIndexOf(')')
-        if (open in 0..<close) {
+        topLevelParentheses(rest)?.let { (open, close) ->
             return rest.substring(0, open).trim() to rest.substring(open + 1, close).replace('•', '·')
         }
         val sep = rest.indexOf(" · ")
@@ -533,23 +604,57 @@ object TravelItineraryBuilder {
         return parts.joinToString(" · ")
     }
 
+    /**
+     * Durata e costo di una tappa si leggono dallo stesso `detail`, che è
+     * «1h 30m · ~45»: prima la durata, poi il prezzo. Serve un pattern solo per
+     * entrambe le letture, perché l'una si trova togliendo l'altra.
+     */
+    private val durationRegex = Regex("""(\d+)\s*h(?:\s*(\d+)\s*m)?|(\d+)\s*m""")
+    private val hoursRegex = Regex("""(\d+)\s*h(?:\s*(\d+)\s*m)?""")
+    private val minutesRegex = Regex("""(\d+)\s*m""")
+    private val amountRegex = Regex("""~?\s*(\d+(?:[.,]\d+)?)""")
+
+    /**
+     * Minuti della tappa: «1h 30m» sono 90, non 30.
+     *
+     * Si cercava solo `(\d+)\s*m`, che su «1h 30m» trovava i minuti e buttava
+     * via le ore: il riepilogo diceva «30m» per una mattinata da un'ora e mezza.
+     */
+    private fun stopMinutes(detail: String): Int? {
+        hoursRegex.find(detail)?.let { match ->
+            val hours = match.groupValues.getOrNull(1)?.toIntOrNull() ?: 0
+            val minutes = match.groupValues.getOrNull(2)?.toIntOrNull() ?: 0
+            return hours * 60 + minutes
+        }
+        return minutesRegex.find(detail)?.groupValues?.getOrNull(1)?.toIntOrNull()
+    }
+
+    /**
+     * Costo della tappa, cercato DOPO aver tolto la durata.
+     *
+     * Prima si prendeva il primo numero del dettaglio: su «1h 15m · ~45» quello
+     * è l'ora, non il prezzo, e la somma di fascia ne usciva senza senso — tre
+     * tappe da ~45, ~12 e ~60 facevano «~3».
+     */
+    private fun stopCost(detail: String): Double? {
+        val withoutDuration = durationRegex.replaceFirst(detail, " ")
+        if (withoutDuration.contains("gratis", ignoreCase = true)) return null
+        return amountRegex.find(withoutDuration)?.groupValues?.getOrNull(1)
+            ?.replace(',', '.')?.toDoubleOrNull()
+    }
+
     private fun summarizeDuration(stops: List<TravelItineraryStop>): String {
-        val minutes = stops.mapNotNull { stop ->
-            Regex("""(\d+)\s*m""").find(stop.detail)?.groupValues?.getOrNull(1)?.toIntOrNull()
-        }.sum()
+        val minutes = stops.mapNotNull { stopMinutes(it.detail) }.sum()
         if (minutes <= 0) return ""
         val h = minutes / 60
         val m = minutes % 60
         return if (h == 0) "${m}m" else if (m == 0) "${h}h" else "${h}h ${m}m"
     }
 
+    /** Somma senza la tilde: la mette chi la mostra, e prima ne comparivano due. */
     private fun summarizeCost(stops: List<TravelItineraryStop>): String {
-        val sum = stops.mapNotNull { stop ->
-            if (stop.detail.contains("gratis", ignoreCase = true)) return@mapNotNull null
-            Regex("""~?(\d+(?:[.,]\d+)?)""").find(stop.detail)?.groupValues?.getOrNull(1)
-                ?.replace(',', '.')?.toDoubleOrNull()
-        }.sum()
-        return if (sum > 0) "~${sum.roundToInt()}" else ""
+        val sum = stops.mapNotNull { stopCost(it.detail) }.sum()
+        return if (sum > 0) "${sum.roundToInt()}" else ""
     }
 
     private val foodNeedles = listOf(

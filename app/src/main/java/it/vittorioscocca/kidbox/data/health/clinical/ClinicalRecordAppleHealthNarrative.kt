@@ -54,6 +54,10 @@ object ClinicalRecordAppleHealthNarrative {
             parts += "La media di passi giornalieri è di circa ${steps.toInt()}, utile come indice di movimento quotidiano."
         }
 
+        averageDailyActiveKcal(snapshot)?.let { kcal ->
+            parts += "Il dispendio energetico attivo medio è di circa ${kcal.toInt()} kcal al giorno, indicativo dell'intensità complessiva del movimento quotidiano oltre al solo conteggio dei passi."
+        }
+
         snapshot.spo2NightlyAvgPercent?.let { spo2 ->
             parts += "La SpO₂ notturna media si mantiene al ${spo2.toInt()}%, escludendo su base indicativa episodi significativi di desaturazione."
         }
@@ -115,14 +119,19 @@ object ClinicalRecordAppleHealthNarrative {
             .sumOf { it.durationMinutes ?: 0 }
         val avgSteps = s.stepsDailyAvg90d ?: averageDailySteps(s) ?: (s.stepsToday?.toDouble() ?: 0.0)
         val weekly = s.weeklyExerciseMinutesAvg ?: 0.0
+        // Le calorie attive entrano come segnale aggiuntivo, mai sostitutivo:
+        // aggiunte in OR possono solo alzare la fascia, così chi non ha un
+        // indossabile che le rileva non viene declassato dalla loro assenza.
+        // Soglie indicative di consumo giornaliero, non cliniche.
+        val avgKcal = averageDailyActiveKcal(s) ?: 0.0
         return when {
-            workouts14 >= 4 || workoutMin >= 120 || weekly >= 150 ->
+            workouts14 >= 4 || workoutMin >= 120 || weekly >= 150 || avgKcal >= 600 ->
                 ActivityProfile("Pratica sportiva regolare", "uno stile di vita attivo e un buon compenso cardiovascolare")
-            workouts14 >= 2 || avgSteps >= 9_000 || weekly >= 90 ->
+            workouts14 >= 2 || avgSteps >= 9_000 || weekly >= 90 || avgKcal >= 400 ->
                 ActivityProfile("Attività fisica regolare", "un'attività fisica regolare")
-            workouts14 >= 1 || avgSteps >= 6_000 || weekly >= 45 ->
+            workouts14 >= 1 || avgSteps >= 6_000 || weekly >= 45 || avgKcal >= 250 ->
                 ActivityProfile("Attività moderata", "un'attività fisica moderata")
-            avgSteps >= 3_500 ->
+            avgSteps >= 3_500 || avgKcal >= 120 ->
                 ActivityProfile("Attività leggera", "un'attività quotidiana leggera")
             else ->
                 ActivityProfile("Vita prevalentemente sedentaria", "uno stile di vita prevalentemente sedentario")
@@ -139,6 +148,7 @@ object ClinicalRecordAppleHealthNarrative {
                 add("VO₂ max: ${"%.0f".format(Locale.US, it)} ml/kg/min")
             }
             snapshot.stepsDailyAvg90d?.let { add("Passi medi/die: ${it.toInt()}") }
+            averageDailyActiveKcal(snapshot)?.let { add("Calorie attive medie/die: ${it.toInt()}") }
         }
 
     private fun vo2MaxBand(vo2: Double, birthMillis: Long?): Vo2Band {
@@ -186,6 +196,18 @@ object ClinicalRecordAppleHealthNarrative {
         val vals = s.recentDailyActivity.mapNotNull { it.steps }.filter { it > 0 }
         if (vals.isEmpty()) return null
         return vals.sum().toDouble() / vals.size
+    }
+
+    /**
+     * Media giornaliera delle calorie attive sui giorni effettivamente
+     * rilevati. I giorni senza valore vengono esclusi invece che contati come
+     * zero: l'orologio non indossato non è una giornata sedentaria. Se manca
+     * lo storico si ripiega sul dato di oggi.
+     */
+    private fun averageDailyActiveKcal(s: HealthImportSnapshot): Double? {
+        val vals = s.recentDailyActivity.mapNotNull { it.activeEnergyKcal }.filter { it > 0 }
+        if (vals.isEmpty()) return s.activeEnergyKcal?.takeIf { it > 0 }
+        return vals.sum() / vals.size
     }
 
     private fun formatShort(epoch: Long): String =

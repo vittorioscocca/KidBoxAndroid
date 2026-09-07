@@ -95,6 +95,7 @@ class HealthLinkStore @Inject constructor(
                 put("startedAtEpochMillis", w.startedAtEpochMillis)
                 w.durationMinutes?.let { put("durationMinutes", it) }
                 w.activeEnergyKcal?.let { put("activeEnergyKcal", it) }
+                w.averageHeartRateBpm?.let { put("averageHeartRateBpm", it) }
             })
         }
     }
@@ -200,6 +201,8 @@ class HealthLinkStore @Inject constructor(
                             .takeIf { item.has("durationMinutes") && !item.isNull("durationMinutes") },
                         activeEnergyKcal = item.optDouble("activeEnergyKcal")
                             .takeIf { item.has("activeEnergyKcal") && !item.isNull("activeEnergyKcal") },
+                        averageHeartRateBpm = item.optDouble("averageHeartRateBpm")
+                            .takeIf { item.has("averageHeartRateBpm") && !item.isNull("averageHeartRateBpm") },
                     ),
                 )
             }

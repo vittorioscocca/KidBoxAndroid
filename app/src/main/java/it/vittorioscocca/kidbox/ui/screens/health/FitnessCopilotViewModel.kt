@@ -14,6 +14,11 @@ import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanDocument
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanGenerator
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanRemoteStore
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanStore
+import it.vittorioscocca.kidbox.data.health.fitness.FitnessSession
+import it.vittorioscocca.kidbox.data.local.dao.KBAIConversationDao
+import it.vittorioscocca.kidbox.data.local.dao.KBAIMessageDao
+import it.vittorioscocca.kidbox.data.local.entity.KBAIConversationEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBAIMessageEntity
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBMedicalExamDao
 import it.vittorioscocca.kidbox.data.local.dao.KBMedicalVisitDao
@@ -53,6 +58,8 @@ data class FitnessCopilotUiState(
     val safetyNoteCount: Int = 0,
     val hasTodaySession: Boolean = false,
     val actionSummary: String? = null,
+    /** Sedute che l'AI ha proposto di eliminare, in attesa di conferma. */
+    val pendingDeletions: List<FitnessSession> = emptyList(),
     val message: String? = null,
 ) {
     val canSend: Boolean get() = !isLoading && inputText.isNotBlank()
@@ -78,6 +85,8 @@ class FitnessCopilotViewModel @Inject constructor(
     private val profileRepository: PediatricProfileRepository,
     private val healthLinkStore: HealthLinkStore,
     private val aiRepository: AiRepository,
+    private val conversationDao: KBAIConversationDao,
+    private val messageDao: KBAIMessageDao,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FitnessCopilotUiState())
@@ -88,11 +97,80 @@ class FitnessCopilotViewModel @Inject constructor(
     private var systemPrompt = ""
     private var plan: FitnessPlanDocument? = null
 
+    /**
+     * La conversazione vive in Room come quella delle altre chat: uscire e
+     * rientrare non deve azzerare lo storico.
+     */
+    private var conversationId: String? = null
+
     fun bind(familyId: String, childId: String) {
         if (this.familyId == familyId && this.childId == childId) return
         this.familyId = familyId
         this.childId = childId
-        viewModelScope.launch { buildContext() }
+        viewModelScope.launch {
+            loadConversation()
+            buildContext()
+        }
+    }
+
+    private suspend fun loadConversation() {
+        val scopeId = "fitness-copilot-$childId"
+        val existing = withContext(Dispatchers.IO) { conversationDao.getByScope(scopeId) }
+        val id = existing?.id ?: UUID.randomUUID().toString()
+        if (existing == null) {
+            val now = System.currentTimeMillis()
+            withContext(Dispatchers.IO) {
+                conversationDao.upsert(
+                    KBAIConversationEntity(
+                        id = id,
+                        familyId = familyId,
+                        childId = childId,
+                        scopeId = scopeId,
+                        summary = null,
+                        summarizedMessageCount = 0,
+                        createdAtEpochMillis = now,
+                        updatedAtEpochMillis = now,
+                    ),
+                )
+            }
+        }
+        conversationId = id
+        val stored = withContext(Dispatchers.IO) { messageDao.getAllByConversationId(id) }
+        _uiState.value = _uiState.value.copy(
+            messages = stored
+                .sortedBy { it.createdAtEpochMillis }
+                .map {
+                    FitnessCopilotMessage(
+                        id = it.id,
+                        text = it.content,
+                        isUser = it.roleRaw == "user",
+                        createdAtEpochMillis = it.createdAtEpochMillis,
+                    )
+                },
+        )
+    }
+
+    fun clearConversation() {
+        val id = conversationId ?: return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { messageDao.deleteByConversationId(id) }
+            _uiState.value = _uiState.value.copy(messages = emptyList())
+        }
+    }
+
+    private suspend fun persist(message: FitnessCopilotMessage) {
+        val id = conversationId ?: return
+        withContext(Dispatchers.IO) {
+            messageDao.upsert(
+                KBAIMessageEntity(
+                    id = message.id,
+                    conversationId = id,
+                    roleRaw = if (message.isUser) "user" else "assistant",
+                    content = message.text,
+                    createdAtEpochMillis = message.createdAtEpochMillis,
+                ),
+            )
+        }
     }
 
     fun setInput(text: String) {
@@ -110,12 +188,15 @@ class FitnessCopilotViewModel @Inject constructor(
     fun send(text: String = _uiState.value.inputText) {
         val question = text.trim()
         if (question.isBlank() || _uiState.value.isLoading) return
+        val userMessage = FitnessCopilotMessage(text = question, isUser = true)
         _uiState.value = _uiState.value.copy(
             inputText = "",
             isLoading = true,
-            messages = _uiState.value.messages + FitnessCopilotMessage(text = question, isUser = true),
+            messages = _uiState.value.messages + userMessage,
         )
         viewModelScope.launch {
+            if (conversationId == null) loadConversation()
+            persist(userMessage)
             if (systemPrompt.isBlank()) buildContext()
             val current = plan
             if (current == null) {
@@ -154,15 +235,29 @@ class FitnessCopilotViewModel @Inject constructor(
                     }
                     buildContext()
                 }
+                // Se il modello ha allegato azioni che non si sono potute
+                // eseguire, la frase discorsiva resta una conferma falsa: va
+                // contraddetta nello stesso messaggio, non in un banner che
+                // scompare.
+                val text = if (processed.failedActions > 0) {
+                    val warning = context.getString(R.string.fitness_copilot_actions_failed)
+                    if (processed.displayText.isBlank()) warning else "${processed.displayText}\n\n$warning"
+                } else {
+                    processed.displayText
+                }
+                val assistantMessage = FitnessCopilotMessage(
+                    text = text,
+                    isUser = false,
+                )
+                persist(assistantMessage)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     usageToday = reply.usageToday,
                     dailyLimit = reply.dailyLimit,
                     actionSummary = summary(processed.changes),
-                    messages = _uiState.value.messages + FitnessCopilotMessage(
-                        text = processed.displayText,
-                        isUser = false,
-                    ),
+                    // L'eliminazione aspetta l'utente: qui si apre solo la richiesta.
+                    pendingDeletions = processed.pendingDeletions,
+                    messages = _uiState.value.messages + assistantMessage,
                 )
             }.onFailure { error ->
                 _uiState.value = _uiState.value.copy(
@@ -172,6 +267,35 @@ class FitnessCopilotViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    /** L'utente ha confermato: le sedute vengono rimosse e il piano risalvato. */
+    fun confirmPendingDeletions() {
+        val pending = _uiState.value.pendingDeletions
+        val current = plan ?: return
+        if (pending.isEmpty()) return
+
+        val updated = pending.fold(current) { doc, session -> doc.removeSession(session.id) }
+        plan = updated
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                planStore.save(childId, updated)
+                remoteStore.upsert(childId, updated)
+                reminderScheduler.reschedule(childId, familyId, updated)
+            }
+            buildContext()
+            _uiState.value = _uiState.value.copy(
+                pendingDeletions = emptyList(),
+                actionSummary = context.getString(
+                    R.string.fitness_copilot_deleted_summary,
+                    pending.size,
+                ),
+            )
+        }
+    }
+
+    fun cancelPendingDeletions() {
+        _uiState.value = _uiState.value.copy(pendingDeletions = emptyList())
     }
 
     private fun summary(changes: List<FitnessCopilotChange>): String? {
@@ -186,6 +310,8 @@ class FitnessCopilotViewModel @Inject constructor(
                     context.getString(R.string.fitness_copilot_changed_moved, date)
                 is FitnessCopilotChange.StatusUpdated ->
                     context.getString(R.string.fitness_copilot_changed_status, date)
+                is FitnessCopilotChange.Added ->
+                    context.getString(R.string.fitness_copilot_changed_added, date)
             }
         }
     }

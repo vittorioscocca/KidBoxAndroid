@@ -34,6 +34,11 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -202,6 +207,10 @@ fun FitnessPlanScreen(
                     val plan = state.plan
                     if (!state.isPaidPlan) {
                         IntroCard()
+                        // Anche senza piano a pagamento si vede quali dati di
+                        // salute alimentano l'allenamento: la lettura da Health
+                        // Connect non è ciò che si compra.
+                        DataSourcesCard(state)
                         LockedCard(onUpgrade)
                     } else if (plan != null) {
                         state.weeklyReport?.let { report ->
@@ -373,79 +382,29 @@ private fun LockedCard(onUpgrade: () -> Unit) {
 
 @Composable
 private fun DataSourcesCard(state: FitnessPlanUiState) {
-    val kb = MaterialTheme.kidBoxColors
-    val notAvailable = stringResource(R.string.meal_plan_not_available)
-    val rows = listOf(
-        Triple(
-            stringResource(R.string.meal_plan_data_age),
-            state.ageYears?.let { stringResource(R.string.meal_plan_years, it) }
-                ?: state.input.manualAgeValue?.let { stringResource(R.string.meal_plan_years, it) }
-                ?: notAvailable,
-            state.ageYears != null || state.input.manualAgeValue != null,
-        ),
-        Triple(
-            stringResource(R.string.meal_plan_data_weight),
-            (state.weightKg ?: state.input.manualWeightValue)
-                ?.let { String.format(Locale.getDefault(), "%.1f kg", it) } ?: notAvailable,
-            (state.weightKg ?: state.input.manualWeightValue) != null,
-        ),
-        Triple(
-            stringResource(R.string.meal_plan_data_height),
-            (state.heightCm ?: state.input.manualHeightValue)
-                ?.let { "${it.toInt()} cm" } ?: notAvailable,
-            (state.heightCm ?: state.input.manualHeightValue) != null,
-        ),
-        Triple(
-            stringResource(R.string.meal_plan_data_workouts),
-            state.workoutCount.toString(),
-            state.workoutCount > 0,
-        ),
-        Triple(
-            stringResource(R.string.meal_plan_data_visits),
-            state.visitCount.toString(),
-            state.visitCount > 0,
-        ),
-        Triple(
-            stringResource(R.string.meal_plan_data_exams),
-            state.examCount.toString(),
-            state.examCount > 0,
-        ),
-        Triple(
-            stringResource(R.string.meal_plan_data_treatments),
-            state.activeTreatmentCount.toString(),
-            state.activeTreatmentCount > 0,
-        ),
-    )
-
     FitnessCard {
-        SectionTitle(stringResource(R.string.meal_plan_data_used))
-        Spacer(Modifier.height(8.dp))
-        rows.forEach { (label, value, available) ->
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            ) {
-                Icon(
-                    if (available) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                    contentDescription = null,
-                    tint = if (available) FITNESS_TINT else Color(0xFFE0952F),
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(label, fontSize = 15.sp, color = kb.title, modifier = Modifier.weight(1f))
-                Text(value, fontSize = 13.sp, color = kb.subtitle)
-            }
-        }
-        if (!state.hasBodyMetrics) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(R.string.fitness_missing_metrics),
-                fontSize = 13.sp,
-                color = Color(0xFFE0952F),
-            )
-        }
+        PlanDataSourcesContent(
+            data = state.toPlanDataSources(),
+            tint = FITNESS_TINT,
+            missingMetricsText = stringResource(R.string.fitness_missing_metrics),
+        )
     }
 }
+
+private fun FitnessPlanUiState.toPlanDataSources() = PlanDataSources(
+    ageYears = ageYears,
+    manualAgeYears = input.manualAgeValue,
+    weightKg = weightKg,
+    manualWeightKg = input.manualWeightValue,
+    heightCm = heightCm,
+    manualHeightCm = input.manualHeightValue,
+    workoutCount = workoutCount,
+    activeEnergyKcal = activeEnergyKcal,
+    visitCount = visitCount,
+    examCount = examCount,
+    activeTreatmentCount = activeTreatmentCount,
+    hasBodyMetrics = hasBodyMetrics,
+)
 
 @Composable
 private fun SetupCard(estimatedUnits: Int, onSetup: () -> Unit) {
@@ -531,8 +490,8 @@ private fun CalendarCard(state: FitnessPlanUiState, viewModel: FitnessPlanViewMo
 private fun MonthHeader(state: FitnessPlanUiState, viewModel: FitnessPlanViewModel) {
     val kb = MaterialTheme.kidBoxColors
     val plan = state.plan ?: return
-    val firstMonth = startOfMonth(plan.startDateEpochMillis)
-    val lastMonth = startOfMonth(
+    val firstMonth = FitnessPlanDates.startOfMonth(plan.startDateEpochMillis)
+    val lastMonth = FitnessPlanDates.startOfMonth(
         plan.allSessions.lastOrNull()?.dateEpochMillis ?: plan.startDateEpochMillis,
     )
     val current = state.displayedMonthEpochMillis
@@ -721,6 +680,102 @@ private fun DayDetailCard(
                 Spacer(Modifier.height(10.dp))
             }
         }
+
+        val logged = state.plan?.loggedWorkoutsOn(state.selectedDayEpochMillis).orEmpty()
+        if (logged.isNotEmpty()) {
+            Spacer(Modifier.height(4.dp))
+            HorizontalDivider(color = kb.subtitle.copy(alpha = 0.15f))
+            Spacer(Modifier.height(10.dp))
+            Text(
+                stringResource(R.string.fitness_logged_title),
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                color = kb.title,
+            )
+            Text(
+                stringResource(R.string.fitness_logged_hint),
+                fontSize = 13.sp,
+                color = kb.subtitle,
+            )
+            Spacer(Modifier.height(6.dp))
+            logged.forEach { workout ->
+                LoggedWorkoutRow(
+                    workout = workout,
+                    openSessions = sessions.filter { it.status != FitnessSessionStatus.DONE },
+                    viewModel = viewModel,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Riga di un allenamento svolto fuori programma, con la possibilità di farlo
+ * valere come una delle sedute aperte della giornata.
+ */
+@Composable
+private fun LoggedWorkoutRow(
+    workout: it.vittorioscocca.kidbox.data.health.fitness.FitnessLoggedWorkout,
+    openSessions: List<FitnessSession>,
+    viewModel: FitnessPlanViewModel,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    var showMenu by remember { mutableStateOf(false) }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(FITNESS_TINT.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.DirectionsRun,
+                contentDescription = null,
+                tint = FITNESS_TINT,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(workout.title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = kb.title)
+            val parts = buildList {
+                workout.durationMinutes?.let {
+                    add(stringResource(R.string.fitness_session_minutes, it))
+                }
+                workout.kcal?.let { add("$it kcal") }
+                workout.heartRateBpm?.let { add("$it bpm") }
+            }
+            if (parts.isNotEmpty()) {
+                Text(parts.joinToString(" · "), fontSize = 13.sp, color = kb.subtitle)
+            }
+        }
+        if (openSessions.isNotEmpty()) {
+            Box {
+                Text(
+                    stringResource(R.string.fitness_count_as),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = FITNESS_TINT,
+                    modifier = Modifier.clickable { showMenu = true },
+                )
+                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                    openSessions.forEach { session ->
+                        DropdownMenuItem(
+                            text = { Text(session.title) },
+                            onClick = {
+                                showMenu = false
+                                viewModel.countLoggedWorkout(workout, session.id)
+                            },
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -731,6 +786,18 @@ private fun SessionCard(
     onMove: (FitnessSession) -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
+    var showEditor by remember { mutableStateOf(false) }
+
+    if (showEditor) {
+        SessionEditDialog(
+            session = session,
+            onDismiss = { showEditor = false },
+            onSave = { status, title, minutes, kcal ->
+                showEditor = false
+                viewModel.applyManualEdit(session.id, status, title, minutes, kcal)
+            },
+        )
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -750,13 +817,44 @@ private fun SessionCard(
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(session.title, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = kb.title)
-                Text(sessionSubtitle(session), fontSize = 13.sp, color = kb.subtitle)
+                // A seduta chiusa comanda quello che è stato fatto: il titolo
+                // grande è l'attività reale, con i suoi numeri. Il programma
+                // scende a riga di contorno.
+                Text(
+                    headlineTitle(session),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = kb.title,
+                )
+                Text(
+                    headlineSubtitle(session),
+                    fontSize = 13.sp,
+                    color = if (session.status == FitnessSessionStatus.DONE) {
+                        statusColor(session.status, kb.subtitle)
+                    } else {
+                        kb.subtitle
+                    },
+                )
+                if (session.status == FitnessSessionStatus.DONE) {
+                    Text(plannedFootnote(session), fontSize = 12.sp, color = kb.subtitle)
+                }
             }
             Icon(
                 statusIcon(session.status),
                 contentDescription = stringResource(session.status.labelRes),
                 tint = statusColor(session.status, kb.subtitle),
+            )
+        }
+
+        if (session.status == FitnessSessionStatus.DONE &&
+            (session.exercises.isNotEmpty() || session.targets.isNotEmpty())
+        ) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                stringResource(R.string.fitness_planned_program),
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                color = kb.subtitle,
             )
         }
 
@@ -793,6 +891,17 @@ private fun SessionCard(
             Text(it, fontSize = 13.sp, color = kb.subtitle)
         }
 
+        if (session.wasSubstituted && session.actualActivityTitle != null) {
+            // Il piano diceva un'altra cosa: dirlo, invece di far finta che la
+            // seduta programmata sia stata svolta.
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.fitness_done_different, session.actualActivityTitle!!),
+                fontSize = 13.sp,
+                color = Color(0xFFF2AD40),
+            )
+        }
+
         Spacer(Modifier.height(12.dp))
         if (session.status == FitnessSessionStatus.DONE) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -824,17 +933,58 @@ private fun SessionCard(
                 }) { Text(stringResource(R.string.fitness_action_skip)) }
             }
         }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            stringResource(R.string.fitness_edit_session),
+            fontSize = 13.sp,
+            color = FITNESS_TINT,
+            modifier = Modifier.clickable { showEditor = true },
+        )
     }
 }
 
+/** Il titolo grande: l'attività svolta se c'è, altrimenti quella prevista. */
 @Composable
-private fun completionText(session: FitnessSession): String = when (session.completionSource) {
-    FitnessCompletionSource.HEALTH_CONNECT -> {
-        val minutes = session.actualMinutes ?: session.durationMinutes
-        session.actualKcal?.let {
-            stringResource(R.string.fitness_done_health_kcal, minutes, it)
-        } ?: stringResource(R.string.fitness_done_health, minutes)
+private fun headlineTitle(session: FitnessSession): String {
+    val actual = session.actualActivityTitle?.takeIf { it.isNotBlank() }
+    return if (session.status == FitnessSessionStatus.DONE && actual != null) actual else session.title
+}
+
+/** Numeri in evidenza: quelli reali a seduta chiusa, quelli previsti prima. */
+@Composable
+private fun headlineSubtitle(session: FitnessSession): String {
+    if (session.status != FitnessSessionStatus.DONE) return sessionSubtitle(session)
+    val parts = mutableListOf<String>()
+    parts += stringResource(
+        R.string.fitness_session_minutes,
+        session.actualMinutes ?: session.durationMinutes,
+    )
+    // Con la seduta chiusa da Health Connect le calorie sono il dato che dice
+    // quanto è costata davvero: se mancano si dice che mancano, altrimenti
+    // l'unico «kcal» a schermo resta quello previsto dall'AI nella riga sotto,
+    // e sembra che le calorie lette non servano a niente.
+    val actualKcal = session.actualKcal
+    when {
+        actualKcal != null -> parts += "$actualKcal kcal"
+        session.completionSource == FitnessCompletionSource.HEALTH_CONNECT ->
+            parts += stringResource(R.string.fitness_session_kcal_missing)
+        else -> Unit
     }
+    session.actualHeartRateBpm?.let { parts += "$it bpm" }
+    return parts.joinToString(" · ")
+}
+
+/** Il programma previsto, ridotto a nota quando la seduta è chiusa. */
+@Composable
+private fun plannedFootnote(session: FitnessSession): String =
+    stringResource(R.string.fitness_planned_recap, session.title, sessionSubtitle(session))
+
+@Composable
+private fun completionText(session: FitnessSession): String = completionSourceText(session)
+
+@Composable
+private fun completionSourceText(session: FitnessSession): String = when (session.completionSource) {
+    FitnessCompletionSource.HEALTH_CONNECT -> stringResource(R.string.fitness_done_health)
     FitnessCompletionSource.NOTIFICATION -> stringResource(R.string.fitness_done_notification)
     else -> stringResource(R.string.fitness_done_manual)
 }
@@ -848,6 +998,104 @@ private fun sessionSubtitle(session: FitnessSession): String {
     if (session.intensity.isNotBlank()) parts += session.intensity
     session.targetKcal?.let { parts += "$it kcal" }
     return parts.joinToString(" · ")
+}
+
+/**
+ * Editor della singola seduta: stato, attività realmente svolta, durata e
+ * calorie effettive.
+ *
+ * Serve quando l'orologio non ha registrato nulla, o quando ha registrato una
+ * cosa diversa da quella prevista: l'ultima parola su cosa è stato fatto resta
+ * della persona, non della riconciliazione automatica.
+ */
+@Composable
+private fun SessionEditDialog(
+    session: FitnessSession,
+    onDismiss: () -> Unit,
+    onSave: (FitnessSessionStatus, String?, Int?, Int?) -> Unit,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    var status by remember { mutableStateOf(session.status) }
+    var activityTitle by remember { mutableStateOf(session.actualActivityTitle.orEmpty()) }
+    var minutes by remember { mutableStateOf(session.actualMinutes?.toString().orEmpty()) }
+    var kcal by remember { mutableStateOf(session.actualKcal?.toString().orEmpty()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.fitness_edit_session_title)) },
+        text = {
+            Column {
+                Text(session.title, fontSize = 13.sp, color = kb.subtitle)
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    stringResource(R.string.fitness_edit_status),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = kb.title,
+                )
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        FitnessSessionStatus.PLANNED,
+                        FitnessSessionStatus.DONE,
+                        FitnessSessionStatus.SKIPPED,
+                    ).forEach { value ->
+                        FitnessChip(stringResource(value.labelRes), status == value) { status = value }
+                    }
+                }
+                if (status == FitnessSessionStatus.DONE) {
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = activityTitle,
+                        onValueChange = { activityTitle = it },
+                        label = { Text(stringResource(R.string.fitness_edit_activity)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = minutes,
+                            onValueChange = { minutes = it.filter(Char::isDigit) },
+                            label = { Text(stringResource(R.string.fitness_edit_minutes)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedTextField(
+                            value = kcal,
+                            onValueChange = { kcal = it.filter(Char::isDigit) },
+                            label = { Text(stringResource(R.string.fitness_edit_kcal)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        stringResource(R.string.fitness_edit_hint),
+                        fontSize = 12.sp,
+                        color = kb.subtitle,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onSave(
+                    status,
+                    activityTitle.takeIf { it.isNotBlank() },
+                    minutes.toIntOrNull(),
+                    kcal.toIntOrNull(),
+                )
+            }) { Text(stringResource(R.string.fitness_edit_save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.meal_plan_delete_cancel))
+            }
+        },
+    )
 }
 
 // ── Health Connect ─────────────────────────────────────────────────────────
@@ -944,9 +1192,8 @@ private fun WeeklyReportCard(
                 "${report.completedSessions}/${report.plannedSessions}",
             )
             ReportMetric(stringResource(R.string.fitness_report_minutes), "${report.totalMinutes}")
-            if (report.totalKcal > 0) {
-                ReportMetric(stringResource(R.string.fitness_report_kcal), "${report.totalKcal}")
-            }
+            // Zero è un risultato, non un motivo per nascondere la metrica.
+            ReportMetric(stringResource(R.string.fitness_report_kcal), "${report.totalKcal}")
         }
 
         val proposal = state.adjustmentProposal
@@ -1095,15 +1342,6 @@ private fun statusColor(status: FitnessSessionStatus, planned: Color) = when (st
     FitnessSessionStatus.MOVED -> Color(0xFFF2AD40)
     FitnessSessionStatus.PLANNED -> planned
 }
-
-private fun startOfMonth(epochMillis: Long): Long = Calendar.getInstance().apply {
-    timeInMillis = epochMillis
-    set(Calendar.DAY_OF_MONTH, 1)
-    set(Calendar.HOUR_OF_DAY, 0)
-    set(Calendar.MINUTE, 0)
-    set(Calendar.SECOND, 0)
-    set(Calendar.MILLISECOND, 0)
-}.timeInMillis
 
 private fun addMonths(epochMillis: Long, months: Int): Long = Calendar.getInstance().apply {
     timeInMillis = epochMillis

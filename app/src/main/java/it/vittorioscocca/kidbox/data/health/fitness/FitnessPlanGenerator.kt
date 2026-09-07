@@ -382,6 +382,13 @@ object FitnessPlanGenerator {
         appendLine("Sedute previste: ${report.plannedSessions}")
         appendLine("Sedute completate: ${report.completedSessions} (${report.completionPercent}%)")
         appendLine("Sedute saltate: ${report.skippedSessions}")
+        if (report.substitutedSessions > 0) {
+            appendLine(
+                "Sedute svolte con un'attività diversa da quella programmata: " +
+                    "${report.substitutedSessions}. Tienine conto: il volume è stato rispettato, " +
+                    "il contenuto no.",
+            )
+        }
         appendLine("Minuti totali di attività: ${report.totalMinutes}")
         if (report.totalKcal > 0) appendLine("Calorie attive stimate: ${report.totalKcal}")
         if (report.chronicallySkippedWeekdays.isNotEmpty()) {

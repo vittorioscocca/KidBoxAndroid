@@ -23,6 +23,7 @@ object FitnessWeeklyReportBuilder {
             skippedSessions = skipped.size,
             totalMinutes = done.sumOf { it.actualMinutes ?: it.durationMinutes },
             totalKcal = done.sumOf { it.actualKcal ?: it.targetKcal ?: 0 },
+            substitutedSessions = done.count { it.wasSubstituted },
             chronicallySkippedWeekdays = chronicallySkippedWeekdays(plan, weekIndex),
         )
     }

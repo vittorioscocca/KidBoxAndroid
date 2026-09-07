@@ -225,15 +225,80 @@ data class FitnessSession(
     val status: FitnessSessionStatus = FitnessSessionStatus.PLANNED,
     val completedAtEpochMillis: Long? = null,
     val completionSource: FitnessCompletionSource? = null,
+    /**
+     * Attività realmente svolta, quando è diversa da quella programmata
+     * ("Corsa" su una seduta di bici).
+     */
+    val actualActivityTitle: String? = null,
     /** Id dell'allenamento Health Connect che ha chiuso la seduta (anti doppio conteggio). */
     val matchedWorkoutId: String? = null,
     val actualMinutes: Int? = null,
     val actualKcal: Int? = null,
+    /** Frequenza cardiaca media dell'allenamento svolto, se Health Connect ce l'ha. */
+    val actualHeartRateBpm: Int? = null,
 ) {
     val isRest: Boolean
         get() = activityType.lowercase().let { type ->
             type.contains("ripos") || type.contains("rest") || type.contains("recupero")
         }
+
+    /**
+     * La seduta è stata chiusa da un'attività di disciplina diversa da quella
+     * programmata. È il dato che il consuntivo settimanale deve dichiarare: il
+     * piano è stato rispettato come volume, non come contenuto.
+     */
+    val wasSubstituted: Boolean
+        get() {
+            if (status != FitnessSessionStatus.DONE) return false
+            val actual = actualActivityTitle?.takeIf { it.isNotBlank() } ?: return false
+            return !FitnessDisciplineMatcher.matches(actual, "$activityType $title")
+        }
+}
+
+/**
+ * Allenamento letto da Health Connect e non abbinato a nessuna seduta: è quello
+ * che la persona ha fatto davvero fuori dal programma. Resta nel piano perché la
+ * giornata deve poter mostrare il consuntivo reale accanto a quello previsto.
+ */
+data class FitnessLoggedWorkout(
+    /** Id dell'allenamento in Health Connect: evita di registrarlo due volte. */
+    val id: String,
+    val dateEpochMillis: Long,
+    val title: String,
+    val durationMinutes: Int? = null,
+    val kcal: Int? = null,
+    val heartRateBpm: Int? = null,
+)
+
+/**
+ * Confronto grossolano fra il titolo di un allenamento ("Corsa") e il tipo di
+ * seduta prodotto dall'AI ("corsa", "forza", …).
+ *
+ * Sta qui e non dentro la sincronizzazione perché serve a tre posti: decidere se
+ * un allenamento chiude una seduta, se una seduta chiusa è una sostituzione, e
+ * cosa scrivere nel consuntivo.
+ */
+object FitnessDisciplineMatcher {
+
+    private val families: List<List<String>> = listOf(
+        listOf("cors", "run", "jog"),
+        listOf("camm", "walk", "escursion"),
+        listOf("forza", "pesi", "strength", "funzional", "tonific"),
+        listOf("hiit", "intervall", "circuit"),
+        listOf("bici", "cicl", "cycl", "spinning"),
+        listOf("nuot", "swim"),
+        listOf("yoga", "pilates", "stretch", "mobil", "flessib"),
+        listOf("rem", "canott", "row"),
+        listOf("danza", "dance", "ball"),
+    )
+
+    fun matches(activityTitle: String, sessionText: String): Boolean {
+        val activity = activityTitle.lowercase()
+        val session = sessionText.lowercase()
+        return families.any { keys ->
+            keys.any { activity.contains(it) } && keys.any { session.contains(it) }
+        }
+    }
 }
 
 /** Una settimana del piano mensile. */
@@ -255,7 +320,17 @@ data class FitnessPlanDocument(
     val weeks: List<FitnessWeek>,
     val generatedAtEpochMillis: Long,
     val messageUnitsConsumed: Int,
+    /** Attività svolte che non corrispondono a nessuna seduta programmata. */
+    val loggedWorkouts: List<FitnessLoggedWorkout> = emptyList(),
 ) {
+    /** Attività registrate in una giornata, dalla più recente. */
+    fun loggedWorkoutsOn(dayEpochMillis: Long): List<FitnessLoggedWorkout> {
+        val day = FitnessPlanDates.startOfDay(dayEpochMillis)
+        return loggedWorkouts
+            .filter { FitnessPlanDates.startOfDay(it.dateEpochMillis) == day }
+            .sortedByDescending { it.dateEpochMillis }
+    }
+
     val allSessions: List<FitnessSession>
         get() = weeks.flatMap { it.sessions }.sortedBy { it.dateEpochMillis }
 
@@ -277,6 +352,10 @@ data class FitnessPlanDocument(
                 }
             },
         )
+
+    /** Restituisce una copia del piano senza la seduta indicata. */
+    fun removeSession(id: String): FitnessPlanDocument =
+        copy(weeks = weeks.map { week -> week.copy(sessions = week.sessions.filterNot { it.id == id }) })
 
     /** Sedute di una giornata specifica. */
     fun sessionsOn(dayEpochMillis: Long): List<FitnessSession> {
@@ -302,6 +381,8 @@ data class FitnessWeeklyReport(
     val skippedSessions: Int,
     val totalMinutes: Int,
     val totalKcal: Int,
+    /** Sedute completate con un'attività diversa da quella programmata. */
+    val substitutedSessions: Int = 0,
     /** Giorni della settimana (convenzione [Calendar]) sistematicamente saltati. */
     val chronicallySkippedWeekdays: List<Int>,
 ) {
@@ -362,6 +443,18 @@ object FitnessPlanDates {
     }.timeInMillis
 
     fun today(): Long = startOfDay(System.currentTimeMillis())
+
+    /**
+     * Primo giorno del mese a mezzanotte.
+     *
+     * La griglia del calendario parte da qui e conta i giorni del mese: se le
+     * si passa un istante qualsiasi disegna il mese a partire da quel giorno,
+     * perdendo i giorni precedenti e sconfinando in quello dopo.
+     */
+    fun startOfMonth(epochMillis: Long): Long = Calendar.getInstance().apply {
+        timeInMillis = startOfDay(epochMillis)
+        set(Calendar.DAY_OF_MONTH, 1)
+    }.timeInMillis
 
     /** Giorni di calendario fra due istanti, ignorando l'ora legale. */
     fun daysBetween(fromEpochMillis: Long, toEpochMillis: Long): Int {

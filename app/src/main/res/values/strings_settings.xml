@@ -44,8 +44,10 @@
     <string name="settings_notif_calendar_sub">Quando viene aggiunto un evento</string>
     <string name="settings_notif_expenses">Notifiche nuove spese</string>
     <string name="settings_notif_expenses_sub">Quando viene registrata una spesa famiglia</string>
+    <string name="settings_notif_document">Notifiche documenti</string>
+    <string name="settings_notif_document_sub">Quando un membro carica un nuovo documento</string>
     <string name="settings_notif_wallet">Notifiche Wallet</string>
-    <string name="settings_notif_wallet_sub">Quando viene aggiunto un nuovo contenuto al tuo Wallet</string>
+    <string name="settings_notif_wallet_sub">Quando viene aggiunto un biglietto o una carta fedeltà al tuo Wallet</string>
     <string name="settings_privacy_title">Privacy</string>
     <string name="settings_privacy_logs_title">Log tecnici e report errori</string>
     <string name="settings_privacy_body1">KidBox salva log tecnici sul dispositivo (avvio app, sincronizzazione, crash).</string>

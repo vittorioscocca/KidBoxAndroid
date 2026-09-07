@@ -42,6 +42,25 @@ object FitnessPlanJson {
         put("generatedAt", isoDate(document.generatedAtEpochMillis))
         put("messageUnitsConsumed", document.messageUnitsConsumed)
         put("input", encodeInput(document.input))
+        if (document.loggedWorkouts.isNotEmpty()) {
+            put(
+                "loggedWorkouts",
+                JSONArray().apply {
+                    document.loggedWorkouts.forEach { workout ->
+                        put(
+                            JSONObject().apply {
+                                put("id", workout.id)
+                                put("date", isoDate(workout.dateEpochMillis))
+                                put("title", workout.title)
+                                workout.durationMinutes?.let { put("durationMinutes", it) }
+                                workout.kcal?.let { put("kcal", it) }
+                                workout.heartRateBpm?.let { put("heartRateBpm", it) }
+                            },
+                        )
+                    }
+                },
+            )
+        }
         put(
             "weeks",
             JSONArray().apply {
@@ -95,8 +114,26 @@ object FitnessPlanJson {
             generatedAtEpochMillis = json.dateOrNull("generatedAt", "generatedAtEpochMillis")
                 ?: System.currentTimeMillis(),
             messageUnitsConsumed = json.optInt("messageUnitsConsumed", 0),
+            loggedWorkouts = decodeLoggedWorkouts(json.optJSONArray("loggedWorkouts")),
         )
     }.getOrNull()
+
+    private fun decodeLoggedWorkouts(array: JSONArray?): List<FitnessLoggedWorkout> {
+        if (array == null) return emptyList()
+        return (0 until array.length()).mapNotNull { index ->
+            val item = array.optJSONObject(index) ?: return@mapNotNull null
+            val date = item.dateOrNull("date", "dateEpochMillis") ?: return@mapNotNull null
+            val id = item.optString("id").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            FitnessLoggedWorkout(
+                id = id,
+                dateEpochMillis = date,
+                title = item.optString("title"),
+                durationMinutes = if (item.has("durationMinutes")) item.optInt("durationMinutes") else null,
+                kcal = if (item.has("kcal")) item.optInt("kcal") else null,
+                heartRateBpm = if (item.has("heartRateBpm")) item.optInt("heartRateBpm") else null,
+            )
+        }
+    }
 
     // ── Input ──────────────────────────────────────────────────────────────
 
@@ -185,11 +222,13 @@ object FitnessPlanJson {
         session.targetKcal?.let { put("targetKcal", it) }
         session.notes?.let { put("notes", it) }
         put("status", session.status.wire())
+        session.actualActivityTitle?.let { put("actualActivityTitle", it) }
         session.completedAtEpochMillis?.let { put("completedAt", isoDate(it)) }
         session.completionSource?.let { put("completionSource", it.wire()) }
         session.matchedWorkoutId?.let { put("matchedWorkoutId", it) }
         session.actualMinutes?.let { put("actualMinutes", it) }
         session.actualKcal?.let { put("actualKcal", it) }
+        session.actualHeartRateBpm?.let { put("actualHeartRateBpm", it) }
     }
 
     private fun decodeSession(json: JSONObject): FitnessSession? {
@@ -223,11 +262,17 @@ object FitnessPlanJson {
                 FitnessSessionStatus.PLANNED,
             ),
             completedAtEpochMillis = json.dateOrNull("completedAt", "completedAtEpochMillis"),
+            actualActivityTitle = json.optString("actualActivityTitle").takeIf { it.isNotBlank() },
             completionSource = FitnessCompletionSource.entries
                 .firstOrNull { it.matches(json.optString("completionSource")) },
             matchedWorkoutId = json.optString("matchedWorkoutId").takeIf { it.isNotBlank() },
             actualMinutes = if (json.has("actualMinutes")) json.optInt("actualMinutes") else null,
             actualKcal = if (json.has("actualKcal")) json.optInt("actualKcal") else null,
+            actualHeartRateBpm = if (json.has("actualHeartRateBpm")) {
+                json.optInt("actualHeartRateBpm")
+            } else {
+                null
+            },
         )
     }
 

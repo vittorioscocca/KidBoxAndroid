@@ -48,6 +48,8 @@ data class MealPlanUiState(
     val weightKg: Double? = null,
     val heightCm: Double? = null,
     val workoutCount: Int = 0,
+    /** Calorie attive da Health Connect: entrano nella stima del fabbisogno. */
+    val activeEnergyKcal: Double? = null,
     val visitCount: Int = 0,
     val examCount: Int = 0,
     val activeTreatmentCount: Int = 0,
@@ -207,6 +209,7 @@ class MealPlanViewModel @Inject constructor(
                     weightKg = inputs.health?.weightKg,
                     heightCm = inputs.health?.heightCm,
                     workoutCount = inputs.health?.recentWorkouts?.size ?: 0,
+                    activeEnergyKcal = inputs.health?.activeEnergyKcal,
                     visitCount = inputs.visits.size,
                     examCount = inputs.exams.size,
                     activeTreatmentCount = inputs.activeTreatments.size,

@@ -3,6 +3,7 @@ package it.vittorioscocca.kidbox.data.health.fitness
 import it.vittorioscocca.kidbox.util.KBLog
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.util.UUID
 import org.json.JSONArray
 
 /**
@@ -29,12 +30,31 @@ sealed interface FitnessCopilotChange {
     data class Replaced(override val dateEpochMillis: Long) : FitnessCopilotChange
     data class Moved(override val dateEpochMillis: Long) : FitnessCopilotChange
     data class StatusUpdated(override val dateEpochMillis: Long) : FitnessCopilotChange
+    data class Added(override val dateEpochMillis: Long) : FitnessCopilotChange
 }
 
 data class FitnessCopilotProcessedReply(
     val displayText: String,
     val plan: FitnessPlanDocument,
     val changes: List<FitnessCopilotChange>,
+    /**
+     * Sedute che l'AI vuole eliminare: **non** ancora rimosse dal piano.
+     *
+     * L'eliminazione è l'unica azione che non si applica da sola. Le altre sono
+     * rimediabili — una seduta spostata si rimette a posto, una segnata per
+     * errore si riapre — mentre una seduta cancellata non torna indietro:
+     * l'ultima parola resta all'utente.
+     */
+    val pendingDeletions: List<FitnessSession> = emptyList(),
+    /**
+     * Azioni allegate alla risposta che non è stato possibile eseguire.
+     *
+     * Serve a non lasciar passare una conferma falsa: il testo discorsivo dice
+     * "ho spostato la seduta" anche quando l'id era inventato o il JSON era
+     * malformato, e senza questo l'utente se ne accorgerebbe solo tornando sul
+     * calendario.
+     */
+    val failedActions: Int = 0,
 )
 
 object FitnessCopilotActionExecutor {
@@ -61,16 +81,67 @@ object FitnessCopilotActionExecutor {
         val actions = runCatching { JSONArray(json) }.getOrNull()
         if (actions == null || actions.length() == 0) {
             KBLog.ai.error("blocco azioni non decodificabile", TAG)
-            return FitnessCopilotProcessedReply(display, plan, emptyList())
+            // Il blocco c'era: la risposta parla di una modifica che non è
+            // avvenuta, e va segnalato.
+            return FitnessCopilotProcessedReply(display, plan, emptyList(), failedActions = 1)
         }
 
         var updated = plan
         val changes = mutableListOf<FitnessCopilotChange>()
+        val pendingDeletions = mutableListOf<FitnessSession>()
 
         for (index in 0 until actions.length()) {
             val action = actions.optJSONObject(index) ?: continue
+
+            // L'aggiunta è l'unica azione che non parte da una seduta esistente:
+            // va gestita prima del controllo sul sessionId.
+            if (action.optString("type") == "add_session") {
+                val date = parseDate(action.optString("date")) ?: continue
+                // Fuori dall'orizzonte del piano non c'è settimana in cui
+                // metterla: meglio non applicarla che inventarne una.
+                val weekIndex = updated.weekIndexFor(date) ?: continue
+                val title = action.optString("title").trim().takeIf { it.isNotBlank() } ?: continue
+                val activityType = action.optString("activityType").trim()
+                    .takeIf { it.isNotBlank() } ?: continue
+
+                val session = FitnessSession(
+                    id = UUID.randomUUID().toString(),
+                    dateEpochMillis = date,
+                    weekIndex = weekIndex,
+                    title = title,
+                    activityType = activityType,
+                    durationMinutes = action.optInt("durationMinutes")
+                        .takeIf { it > 0 }?.coerceAtLeast(10) ?: 45,
+                    intensity = action.optString("intensity").trim(),
+                    exercises = action.optJSONArray("exercises")?.let { exercises(it) } ?: emptyList(),
+                    targets = action.optJSONArray("targets")?.let { strings(it) } ?: emptyList(),
+                    targetKcal = if (action.has("targetKcal")) action.optInt("targetKcal") else null,
+                    notes = action.optString("notes").trim().takeIf { it.isNotBlank() },
+                )
+                updated = updated.copy(
+                    weeks = updated.weeks.map { week ->
+                        if (week.index != weekIndex) {
+                            week
+                        } else {
+                            week.copy(
+                                sessions = (week.sessions + session)
+                                    .sortedBy { it.dateEpochMillis },
+                            )
+                        }
+                    },
+                )
+                changes += FitnessCopilotChange.Added(date)
+                continue
+            }
+
             val sessionId = action.optString("sessionId").takeIf { it.isNotBlank() } ?: continue
             val existing = updated.session(sessionId) ?: continue
+
+            // L'eliminazione non si applica qui: si mette in attesa di conferma.
+            if (action.optString("type") == "delete_session") {
+                pendingDeletions += existing
+                continue
+            }
 
             when (action.optString("type")) {
                 "replace_session" -> {
@@ -140,7 +211,16 @@ object FitnessCopilotActionExecutor {
             }
         }
 
-        return FitnessCopilotProcessedReply(display, updated, changes)
+        return FitnessCopilotProcessedReply(
+            displayText = display,
+            plan = updated,
+            changes = changes,
+            pendingDeletions = pendingDeletions,
+            // Un'eliminazione in attesa non è un fallimento: è stata capita, e
+            // aspetta solo l'ultima parola dell'utente.
+            failedActions = (actions.length() - changes.size - pendingDeletions.size)
+                .coerceAtLeast(0),
+        )
     }
 
     private fun exercises(array: JSONArray): List<FitnessExercise> =

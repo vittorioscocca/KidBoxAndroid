@@ -9,12 +9,16 @@ import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsFeature
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.Matrix
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfRenderer
+import android.media.ExifInterface
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -67,6 +71,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MergeType
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Visibility
@@ -179,10 +184,14 @@ fun DocumentBrowserScreen(
     var showMoveSheet by remember { mutableStateOf(false) }
     var showCopySheet by remember { mutableStateOf(false) }
     var showMergeSheet by remember { mutableStateOf(false) }
+    var showImagesPdfSheet by remember { mutableStateOf(false) }
+    var imagesPdfCandidates by remember { mutableStateOf<List<KBDocumentEntity>>(emptyList()) }
+    var imagesPdfNameDraft by remember { mutableStateOf("") }
     var showUnlockSheet by remember { mutableStateOf(false) }
     var folderName by remember { mutableStateOf("") }
     var isOpeningDocument by remember { mutableStateOf(false) }
     var isMergingPdfs by remember { mutableStateOf(false) }
+    var isConvertingImages by remember { mutableStateOf(false) }
     var isUnlockingPdf by remember { mutableStateOf(false) }
     var mergeNameDraft by remember { mutableStateOf("") }
     var mergeCandidates by remember { mutableStateOf<List<KBDocumentEntity>>(emptyList()) }
@@ -520,6 +529,15 @@ fun DocumentBrowserScreen(
                 selectedPdfDocsForActions.size == state.selectedDocumentIds.size
             val canUnlockNow = selectedPdfDocsForActions.size == 1 &&
                 state.selectedDocumentIds.size == 1
+            // Immagini selezionate, nell'ordine in cui compaiono nella cartella:
+            // `selectedDocumentIds` è un Set, quindi da solo darebbe pagine in
+            // ordine casuale. Da qui l'utente può comunque riordinare.
+            val selectedImageDocs = remember(state.selectedDocumentIds, state.documents) {
+                state.documents.filter { it.id in state.selectedDocumentIds && isConvertibleImageDoc(it) }
+            }
+            val canConvertImagesNow = selectedImageDocs.isNotEmpty() &&
+                selectedImageDocs.size == state.selectedDocumentIds.size &&
+                state.selectedFolderIds.isEmpty()
             val msgSelectAtLeast2Pdfs = stringResource(R.string.documents_select_at_least_2_pdfs)
             val msgSelectSinglePdf = stringResource(R.string.documents_select_single_pdf)
             val msgSelectAtLeastOneFile = stringResource(R.string.documents_select_at_least_one_file)
@@ -541,6 +559,12 @@ fun DocumentBrowserScreen(
                         showMergeSheet = true
                     }
                 },
+                onImagesToPdf = {
+                    imagesPdfCandidates = selectedImageDocs
+                    imagesPdfNameDraft = buildImagesPdfTitle(selectedImageDocs)
+                    showImagesPdfSheet = true
+                },
+                imagesToPdfVisible = canConvertImagesNow,
                 onUnlock = {
                     val target = selectedPdfDocsForActions.firstOrNull()
                     if (target == null || state.selectedDocumentIds.size != 1) {
@@ -578,7 +602,7 @@ fun DocumentBrowserScreen(
             )
         }
 
-        if (isOpeningDocument || isMergingPdfs || isUnlockingPdf) {
+        if (isOpeningDocument || isMergingPdfs || isUnlockingPdf || isConvertingImages) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -601,6 +625,7 @@ fun DocumentBrowserScreen(
                         Text(
                             text = when {
                                 isMergingPdfs -> stringResource(R.string.documents_merging_pdf)
+                                isConvertingImages -> stringResource(R.string.documents_converting_images)
                                 isUnlockingPdf -> stringResource(R.string.documents_unlocking_pdf)
                                 else -> stringResource(R.string.documents_opening_document)
                             },
@@ -679,13 +704,13 @@ fun DocumentBrowserScreen(
     }
 
     if (showMergeSheet) {
-        MergePdfBottomSheet(
+        PdfBuilderBottomSheet(
             nameDraft = mergeNameDraft,
             documents = mergeCandidates,
             onDismiss = { showMergeSheet = false },
             onNameChange = { mergeNameDraft = it },
             onMove = { from, to ->
-                if (from !in mergeCandidates.indices || to !in mergeCandidates.indices || from == to) return@MergePdfBottomSheet
+                if (from !in mergeCandidates.indices || to !in mergeCandidates.indices || from == to) return@PdfBuilderBottomSheet
                 val mutable = mergeCandidates.toMutableList()
                 val moved = mutable.removeAt(from)
                 mutable.add(to, moved)
@@ -716,6 +741,57 @@ fun DocumentBrowserScreen(
                         ).show()
                     } finally {
                         isMergingPdfs = false
+                    }
+                }
+            },
+        )
+    }
+
+    if (showImagesPdfSheet) {
+        PdfBuilderBottomSheet(
+            nameDraft = imagesPdfNameDraft,
+            documents = imagesPdfCandidates,
+            onDismiss = { showImagesPdfSheet = false },
+            onNameChange = { imagesPdfNameDraft = it },
+            onMove = { from, to ->
+                if (from !in imagesPdfCandidates.indices || to !in imagesPdfCandidates.indices || from == to) {
+                    return@PdfBuilderBottomSheet
+                }
+                val mutable = imagesPdfCandidates.toMutableList()
+                val moved = mutable.removeAt(from)
+                mutable.add(to, moved)
+                imagesPdfCandidates = mutable.toList()
+            },
+            title = stringResource(R.string.documents_to_pdf_title),
+            confirmLabel = stringResource(R.string.documents_to_pdf_confirm),
+            nameLabel = stringResource(R.string.documents_to_pdf_name_label),
+            namePlaceholder = stringResource(R.string.documents_to_pdf_name_placeholder),
+            rowIcon = Icons.Default.Image,
+            minDocuments = 1,
+            onConfirm = {
+                val ordered = imagesPdfCandidates
+                showImagesPdfSheet = false
+                scope.launch {
+                    isConvertingImages = true
+                    try {
+                        val files = ordered.map { viewModel.preparePreviewFile(it) }
+                        val pdfBytes = imagesToPdfBytes(files)
+                        viewModel.importDocument(
+                            fileName = buildImagesPdfFileName(imagesPdfNameDraft, ordered),
+                            mimeType = "application/pdf",
+                            bytes = pdfBytes,
+                            targetFolderId = state.breadcrumbs.lastOrNull()?.id,
+                        )
+                        viewModel.clearSelection()
+                        Toast.makeText(context, context.getString(R.string.documents_to_pdf_success), Toast.LENGTH_SHORT).show()
+                    } catch (e: Exception) {
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.documents_to_pdf_error_prefix, e.localizedMessage ?: "sconosciuto"),
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    } finally {
+                        isConvertingImages = false
                     }
                 }
             },
@@ -1492,6 +1568,7 @@ private fun SelectionBottomBar(
     modifier: Modifier = Modifier,
     onMove: () -> Unit,
     onMerge: () -> Unit,
+    onImagesToPdf: () -> Unit,
     onUnlock: () -> Unit,
     onShare: () -> Unit,
     onChat: () -> Unit,
@@ -1501,6 +1578,9 @@ private fun SelectionBottomBar(
     unlockEnabled: Boolean,
     chatEnabled: Boolean,
     hasSelection: Boolean,
+    /** Mostrato solo quando la selezione è fatta di sole immagini: la barra ha
+     *  già sei azioni e una settima sempre presente la stringerebbe troppo. */
+    imagesToPdfVisible: Boolean,
 ) {
     Surface(
         modifier = modifier.navigationBarsPadding(),
@@ -1516,6 +1596,9 @@ private fun SelectionBottomBar(
         ) {
             BottomAction(stringResource(R.string.documents_action_move), Icons.Default.DriveFileMove, onMove, hasSelection)
             BottomAction(stringResource(R.string.documents_action_merge), Icons.Default.MergeType, onMerge, mergeEnabled)
+            if (imagesToPdfVisible) {
+                BottomAction(stringResource(R.string.documents_action_to_pdf), Icons.Default.Image, onImagesToPdf, true)
+            }
             BottomAction(stringResource(R.string.documents_action_unlock), Icons.Default.LockOpen, onUnlock, unlockEnabled)
             BottomAction(stringResource(R.string.documents_action_share), Icons.Default.Share, onShare, shareEnabled)
             BottomAction(stringResource(R.string.documents_action_chat), Icons.AutoMirrored.Filled.Chat, onChat, chatEnabled)
@@ -1638,13 +1721,20 @@ private fun MoveSelectionBottomSheet(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MergePdfBottomSheet(
+private fun PdfBuilderBottomSheet(
     nameDraft: String,
     documents: List<KBDocumentEntity>,
     onDismiss: () -> Unit,
     onNameChange: (String) -> Unit,
     onMove: (Int, Int) -> Unit,
     onConfirm: () -> Unit,
+    title: String = stringResource(R.string.documents_merge_pdf_title),
+    confirmLabel: String = stringResource(R.string.documents_action_merge),
+    nameLabel: String = stringResource(R.string.documents_merged_pdf_name_label),
+    namePlaceholder: String = stringResource(R.string.documents_merged_pdf_name_placeholder),
+    rowIcon: ImageVector = Icons.Default.PictureAsPdf,
+    /** Unire ne richiede due; trasformare in PDF funziona anche con una sola. */
+    minDocuments: Int = 2,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val dragThresholdPx = with(LocalDensity.current) { 42.dp.toPx() }
@@ -1672,22 +1762,22 @@ private fun MergePdfBottomSheet(
                     modifier = Modifier.width(92.dp),
                 )
                 Text(
-                    text = stringResource(R.string.documents_merge_pdf_title),
+                    text = title,
                     fontWeight = FontWeight.Bold,
                     fontSize = 28.sp,
                     color = MaterialTheme.kidBoxColors.title,
                     modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
                 )
                 CapsuleActionButton(
-                    label = stringResource(R.string.documents_action_merge),
+                    label = confirmLabel,
                     onClick = onConfirm,
-                    enabled = documents.size >= 2 && nameDraft.isNotBlank(),
+                    enabled = documents.size >= minDocuments && nameDraft.isNotBlank(),
                     modifier = Modifier.width(92.dp),
                 )
             }
             Spacer(modifier = Modifier.height(14.dp))
             Text(
-                text = stringResource(R.string.documents_merged_pdf_name_label),
+                text = nameLabel,
                 color = MaterialTheme.kidBoxColors.subtitle,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -1697,10 +1787,13 @@ private fun MergePdfBottomSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 6.dp),
-                placeholder = { Text(stringResource(R.string.documents_merged_pdf_name_placeholder)) },
+                placeholder = { Text(namePlaceholder) },
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp),
             )
+            // Con un file solo non c'è nessun ordine da scegliere: mostrare una
+            // lista trascinabile da un elemento sarebbe rumore.
+            if (documents.size > 1) {
             Spacer(modifier = Modifier.height(18.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1739,6 +1832,7 @@ private fun MergePdfBottomSheet(
                             totalCount = documents.size,
                             dragThresholdPx = dragThresholdPx,
                             onMove = onMove,
+                            icon = rowIcon,
                         )
                         if (index < documents.lastIndex) {
                             Box(
@@ -1751,6 +1845,7 @@ private fun MergePdfBottomSheet(
                         }
                     }
                 }
+            }
             }
             Spacer(modifier = Modifier.height(18.dp))
         }
@@ -1950,6 +2045,7 @@ private fun MergePdfRow(
     totalCount: Int,
     dragThresholdPx: Float,
     onMove: (Int, Int) -> Unit,
+    icon: ImageVector = Icons.Default.PictureAsPdf,
 ) {
     var dragAccum by remember(document.id) { mutableStateOf(0f) }
     var dragOffsetY by remember(document.id) { mutableStateOf(0f) }
@@ -1984,7 +2080,7 @@ private fun MergePdfRow(
             )
         }
         Icon(
-            imageVector = Icons.Default.PictureAsPdf,
+            imageVector = icon,
             contentDescription = null,
             tint = Color(0xFFE95858),
             modifier = Modifier.size(22.dp),
@@ -2313,6 +2409,126 @@ private suspend fun mergePdfFiles(files: List<File>): ByteArray = withContext(Di
         outputDocument.close()
         out.close()
     }
+}
+
+/**
+ * Vero se il documento è un'immagine trasformabile in PDF: JPEG, PNG e HEIC.
+ *
+ * HEIC solo da Android 9 (API 28): prima `BitmapFactory` non lo decodifica, e
+ * offrire un pulsante che fallirebbe è peggio che non offrirlo. La trasparenza
+ * del PNG non serve gestirla qui — la pagina viene dipinta di bianco prima
+ * dell'immagine.
+ */
+private fun isConvertibleImageDoc(doc: KBDocumentEntity): Boolean {
+    val heifSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+    val mimes = mutableSetOf("image/jpeg", "image/jpg", "image/png")
+    val extensions = mutableSetOf(".jpg", ".jpeg", ".png")
+    if (heifSupported) {
+        mimes += setOf("image/heic", "image/heif")
+        extensions += setOf(".heic", ".heif")
+    }
+
+    if (doc.mimeType.lowercase() in mimes) return true
+    val name = doc.fileName.lowercase()
+    return extensions.any { name.endsWith(it) }
+}
+
+/**
+ * Un PDF con una pagina per immagine, nell'ordine ricevuto.
+ *
+ * Le immagini si decodificano già ridotte: una foto da 12 MP a piena risoluzione
+ * sarebbe un bitmap da ~48 MB, e bastano poche pagine per far fuori la memoria
+ * dell'app. 3000px sul lato lungo sono circa 250 dpi su un A4 — abbastanza anche
+ * per una schermata piena di testo — e costano ~27 MB di bitmap per pagina.
+ */
+private suspend fun imagesToPdfBytes(files: List<File>): ByteArray = withContext(Dispatchers.IO) {
+    require(files.isNotEmpty()) { "Nessuna immagine da convertire" }
+
+    val outputDocument = PdfDocument()
+    var pageNumber = 1
+    try {
+        for (file in files) {
+            val bitmap = decodeScaledBitmap(file, MAX_PDF_IMAGE_SIDE)
+                ?: throw IllegalStateException("Immagine illeggibile: ${file.name}")
+            val oriented = applyExifRotation(bitmap, file)
+
+            val pageInfo = PdfDocument.PageInfo
+                .Builder(oriented.width, oriented.height, pageNumber++)
+                .create()
+            val page = outputDocument.startPage(pageInfo)
+            val canvas: Canvas = page.canvas
+            canvas.drawColor(android.graphics.Color.WHITE)
+            canvas.drawBitmap(oriented, 0f, 0f, null)
+            outputDocument.finishPage(page)
+
+            if (oriented !== bitmap) bitmap.recycle()
+            oriented.recycle()
+        }
+
+        val out = ByteArrayOutputStream()
+        try {
+            outputDocument.writeTo(out)
+            out.toByteArray()
+        } finally {
+            out.close()
+        }
+    } finally {
+        outputDocument.close()
+    }
+}
+
+private const val MAX_PDF_IMAGE_SIDE = 3000
+
+/** Decodifica con `inSampleSize`, così il bitmap grande non viene mai allocato. */
+private fun decodeScaledBitmap(file: File, maxSide: Int): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.absolutePath, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+    var sample = 1
+    while (bounds.outWidth / sample > maxSide || bounds.outHeight / sample > maxSide) {
+        sample *= 2
+    }
+    val options = BitmapFactory.Options().apply {
+        inSampleSize = sample
+        inPreferredConfig = Bitmap.Config.ARGB_8888
+    }
+    return BitmapFactory.decodeFile(file.absolutePath, options)
+}
+
+/**
+ * Le foto scattate col telefono portano la rotazione nell'EXIF invece che nei
+ * pixel: senza questo passaggio una foto verticale finisce coricata nel PDF.
+ */
+private fun applyExifRotation(bitmap: Bitmap, file: File): Bitmap {
+    val degrees = try {
+        when (ExifInterface(file.absolutePath).getAttributeInt(
+            ExifInterface.TAG_ORIENTATION,
+            ExifInterface.ORIENTATION_NORMAL,
+        )) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+            else -> 0f
+        }
+    } catch (_: Exception) {
+        0f
+    }
+    if (degrees == 0f) return bitmap
+    val matrix = Matrix().apply { postRotate(degrees) }
+    return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+}
+
+/** Da una sola immagine si eredita il nome; da più immagini si dice quante sono. */
+private fun buildImagesPdfTitle(selected: List<KBDocumentEntity>): String {
+    val first = selected.firstOrNull()?.title?.trim().orEmpty().ifBlank { "documento" }
+    val base = first.substringBeforeLast('.', first)
+    return if (selected.size <= 1) base else "$base (+${selected.size - 1})"
+}
+
+private fun buildImagesPdfFileName(nameDraft: String, selected: List<KBDocumentEntity>): String {
+    val base = nameDraft.trim().ifBlank { buildImagesPdfTitle(selected) }
+    return if (base.endsWith(".pdf", ignoreCase = true)) base else "$base.pdf"
 }
 
 private fun buildMergedPdfTitle(selected: List<KBDocumentEntity>): String {

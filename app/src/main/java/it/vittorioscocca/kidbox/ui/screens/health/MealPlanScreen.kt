@@ -30,7 +30,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -40,7 +39,6 @@ import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.SwipeLeft
-import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.AlertDialog
@@ -264,95 +262,29 @@ private fun IntroCard() {
 
 @Composable
 private fun DataSourcesCard(state: MealPlanUiState) {
-    val kb = MaterialTheme.kidBoxColors
-    val notAvailable = stringResource(R.string.meal_plan_not_available)
-    val manualSuffix = stringResource(R.string.meal_plan_manual_suffix)
-    val manualAge = state.input.manualAgeValue
-    val manualWeight = state.input.manualWeightValue
-    val manualHeight = state.input.manualHeightValue
     PlanCardContainer {
-        Text(
-            stringResource(R.string.meal_plan_data_used),
-            fontWeight = FontWeight.Bold,
-            fontSize = 15.sp,
-            color = kb.title,
+        PlanDataSourcesContent(
+            data = state.toPlanDataSources(),
+            tint = MEAL_PLAN_TINT,
+            missingMetricsText = stringResource(R.string.meal_plan_missing_metrics),
         )
-        Spacer(Modifier.height(10.dp))
-
-        val rows = listOf(
-            Triple(
-                stringResource(R.string.meal_plan_data_age),
-                state.ageYears?.let { stringResource(R.string.meal_plan_years, it) }
-                    ?: manualAge?.let { stringResource(R.string.meal_plan_years, it) + manualSuffix }
-                    ?: notAvailable,
-                state.ageYears != null || manualAge != null,
-            ),
-            Triple(
-                stringResource(R.string.meal_plan_data_weight),
-                state.weightKg?.let { String.format(Locale.getDefault(), "%.1f kg", it) }
-                    ?: manualWeight?.let { String.format(Locale.getDefault(), "%.1f kg", it) + manualSuffix }
-                    ?: notAvailable,
-                state.weightKg != null || manualWeight != null,
-            ),
-            Triple(
-                stringResource(R.string.meal_plan_data_height),
-                state.heightCm?.let { "${it.toInt()} cm" }
-                    ?: manualHeight?.let { "${it.toInt()} cm" + manualSuffix }
-                    ?: notAvailable,
-                state.heightCm != null || manualHeight != null,
-            ),
-            Triple(
-                stringResource(R.string.meal_plan_data_workouts),
-                state.workoutCount.toString(),
-                state.workoutCount > 0,
-            ),
-            Triple(
-                stringResource(R.string.meal_plan_data_visits),
-                state.visitCount.toString(),
-                state.visitCount > 0,
-            ),
-            Triple(
-                stringResource(R.string.meal_plan_data_exams),
-                state.examCount.toString(),
-                state.examCount > 0,
-            ),
-            Triple(
-                stringResource(R.string.meal_plan_data_treatments),
-                state.activeTreatmentCount.toString(),
-                state.activeTreatmentCount > 0,
-            ),
-        )
-
-        rows.forEach { (label, value, available) ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 3.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    if (available) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
-                    contentDescription = null,
-                    tint = if (available) MEAL_PLAN_TINT else Color(0xFFE0952F),
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(label, fontSize = 14.sp, color = kb.title)
-                Spacer(Modifier.weight(1f))
-                Text(value, fontSize = 12.sp, color = kb.subtitle)
-            }
-        }
-
-        if (!state.hasBodyMetrics) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(R.string.meal_plan_missing_metrics),
-                fontSize = 12.sp,
-                color = Color(0xFFE0952F),
-            )
-        }
     }
 }
+
+private fun MealPlanUiState.toPlanDataSources() = PlanDataSources(
+    ageYears = ageYears,
+    manualAgeYears = input.manualAgeValue,
+    weightKg = weightKg,
+    manualWeightKg = input.manualWeightValue,
+    heightCm = heightCm,
+    manualHeightCm = input.manualHeightValue,
+    workoutCount = workoutCount,
+    activeEnergyKcal = activeEnergyKcal,
+    visitCount = visitCount,
+    examCount = examCount,
+    activeTreatmentCount = activeTreatmentCount,
+    hasBodyMetrics = hasBodyMetrics,
+)
 
 @Composable
 private fun LockedCard(onUpgrade: () -> Unit) {

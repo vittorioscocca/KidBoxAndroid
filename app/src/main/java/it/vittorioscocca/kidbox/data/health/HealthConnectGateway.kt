@@ -328,15 +328,40 @@ class HealthConnectGateway @Inject constructor(
                 .div(60.0)
                 .roundToInt()
                 .coerceAtLeast(1)
+            // Health Connect, a differenza di HealthKit, non allega calorie e
+            // battito alla sessione: vanno aggregati sul suo intervallo. È una
+            // chiamata in più per allenamento, ma la finestra è di pochi giorni.
+            val metrics = sessionMetrics(client, session.startTime, session.endTime)
             HealthWorkoutEntry(
                 id = session.metadata.id,
                 title = exerciseTitle(session.exerciseType),
                 startedAtEpochMillis = session.startTime.toEpochMilli(),
                 durationMinutes = durationMin,
-                activeEnergyKcal = null,
+                activeEnergyKcal = metrics.first,
+                averageHeartRateBpm = metrics.second,
             )
         }
     }
+
+    /** Calorie attive e battito medio nell'intervallo dell'allenamento. */
+    private suspend fun sessionMetrics(
+        client: HealthConnectClient,
+        start: Instant,
+        end: Instant,
+    ): Pair<Double?, Double?> = runCatching {
+        val response = client.aggregate(
+            AggregateRequest(
+                metrics = setOf(
+                    ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL,
+                    HeartRateRecord.BPM_AVG,
+                ),
+                timeRangeFilter = TimeRangeFilter.between(start, end),
+            ),
+        )
+        val kcal = response[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories
+        val bpm = response[HeartRateRecord.BPM_AVG]?.toDouble()
+        kcal?.takeIf { it > 0.0 } to bpm?.takeIf { it > 0.0 }
+    }.getOrDefault(null to null)
 
     private fun exerciseTitle(type: Int): String = when (type) {
         ExerciseSessionRecord.EXERCISE_TYPE_RUNNING -> "Corsa"

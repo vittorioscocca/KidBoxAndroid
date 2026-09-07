@@ -381,6 +381,26 @@ fun NotificationSettingsScreen(
                 onCheckedChange = { viewModel.setNudgesEnabled(it) },
             )
             NotificationToggleRow(
+                title = stringResource(R.string.settings_notif_document),
+                subtitle = stringResource(R.string.settings_notif_document_sub),
+                checked = state.notifyOnNewDocument && !systemDenied,
+                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
+                onCheckedChange = { enabled ->
+                    updatePreferenceWithPermission(
+                        key = PreferenceKeys.NOTIFY_ON_NEW_DOCUMENT,
+                        enabled = enabled,
+                        context = context,
+                        setPendingKey = { pendingEnableKey = it },
+                        requestPermission = {
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        },
+                        onSet = { key, value, register ->
+                            viewModel.setPreference(key = key, enabled = value, registerToken = register)
+                        },
+                    )
+                },
+            )
+            NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_wallet),
                 subtitle = stringResource(R.string.settings_notif_wallet_sub),
                 checked = state.notifyOnWallet && !systemDenied,

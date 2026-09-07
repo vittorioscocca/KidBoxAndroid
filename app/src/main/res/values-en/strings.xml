@@ -162,8 +162,9 @@
     <string name="fitness_session_minutes">%1$d min</string>
     <string name="fitness_done_manual">Marked as done</string>
     <string name="fitness_done_notification">Marked as done from the notification</string>
-    <string name="fitness_done_health">Closed by Health Connect: %1$d min</string>
-    <string name="fitness_done_health_kcal">Closed by Health Connect: %1$d min, %2$d kcal</string>
+    <string name="fitness_done_health">Recorded by Health Connect</string>
+    <string name="fitness_planned_program">Planned programme</string>
+    <string name="fitness_planned_recap">Planned: %1$s · %2$s</string>
     <string name="fitness_undo">Undo</string>
     <string name="fitness_health_title">Health Connect</string>
     <string name="fitness_sync_now">Sync now</string>
@@ -282,9 +283,16 @@
     <string name="fitness_copilot_suggestion_rest">What should I do today?</string>
     <string name="fitness_copilot_suggestion_rain">It\'s raining today, I can\'t run</string>
     <string name="fitness_copilot_suggestion_pain">My knee hurts, is that normal?</string>
+    <string name="fitness_copilot_actions_failed">⚠️ Heads-up: not every change described was applied to the plan. Check the calendar.</string>
     <string name="fitness_copilot_changed_replaced">Session on %1$s replaced</string>
     <string name="fitness_copilot_changed_moved">Session moved to %1$s</string>
     <string name="fitness_copilot_changed_status">Session on %1$s updated</string>
+    <string name="fitness_copilot_changed_added">Session added on %1$s</string>
+    <string name="fitness_copilot_delete_title">Delete the session?</string>
+    <string name="fitness_copilot_delete_body">They will be removed from the plan and cannot be recovered:\n%1$s</string>
+    <string name="fitness_copilot_delete_confirm">Delete</string>
+    <string name="fitness_copilot_delete_cancel">Cancel</string>
+    <string name="fitness_copilot_deleted_summary">Sessions deleted: %1$d</string>
     <string name="fitness_copilot_thinking">Thinking…</string>
     <string name="fitness_reminder_title">Today\'s workout</string>
     <string name="fitness_reminder_body_fallback">Open the Fitness Plan for today\'s session.</string>
@@ -296,4 +304,20 @@
     <string name="fitness_error_format">The AI replied in an unrecognized format. Try again: it usually works on the second attempt.</string>
     <string name="fitness_error_timeout">Creating the plan took too long. Try again: it usually works on the second attempt.</string>
     <string name="fitness_error_generic">Could not create the fitness plan. Try again.</string>
+
+    <string name="fitness_logged_title">Activities recorded by Health Connect</string>
+    <string name="fitness_logged_hint">Workouts you did that don\'t match any planned session.</string>
+    <string name="fitness_count_as">Count as…</string>
+    <string name="fitness_done_different">Done: %1$s — different from what was planned</string>
+    <string name="fitness_sync_logged">Activities recorded outside the plan: %1$d. Open the day to assign them to a session.</string>
+    <string name="fitness_edit_session">Edit</string>
+    <string name="fitness_edit_session_title">Edit session</string>
+    <string name="fitness_edit_status">How it went</string>
+    <string name="fitness_edit_activity">Activity performed</string>
+    <string name="fitness_edit_minutes">Minutes</string>
+    <string name="fitness_edit_kcal">Calories</string>
+    <string name="fitness_edit_hint">If you did something different from what was planned, write it here: the end-of-week summary will take it into account.</string>
+    <string name="fitness_edit_save">Save</string>
+    <string name="fitness_chat_clear">New conversation</string>
+    <string name="fitness_sync_repaired">Sessions reopened because they were closed by a different kind of activity: %1$d</string>
 </resources>

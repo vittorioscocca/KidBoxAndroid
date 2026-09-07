@@ -67,6 +67,35 @@ class LoginViewModel @Inject constructor(
     val registrationPendingVerification: StateFlow<Boolean> =
         _registrationPendingVerification.asStateFlow()
 
+    /**
+     * Rete di sicurezza per i login che passano dal browser (Apple): se il
+     * sistema distrugge l'activity mentre l'utente è sulla pagina del provider,
+     * Firebase completa comunque l'autenticazione ma il ramo di successo del
+     * ViewModel non viene mai raggiunto, e la schermata di login resta lì pur
+     * essendo la sessione già valida. Qui ce ne accorgiamo e proseguiamo.
+     */
+    private val authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+        val user = firebaseAuth.currentUser ?: return@AuthStateListener
+        // Solo con la schermata di login già a video: durante `Checking` se ne
+        // occupa l'init, e con `isBusy` c'è un login esplicito in corso che
+        // arriva da sé al ramo di successo. Senza questi due filtri
+        // `onSignedInSuccessfully` verrebbe eseguito due volte, e con lui il
+        // reset della persistenza Firestore.
+        if (_authCheckState.value !is AuthCheckState.NotAuthenticated || _isBusy.value) {
+            return@AuthStateListener
+        }
+        KBLog.auth.info("Auth state: sessione valida con login a video, proseguo uid=${user.uid}", "KidBoxAuth")
+        viewModelScope.launch {
+            runCatching { onSignedInSuccessfully() }
+                .onFailure { KBLog.auth.warning("Recupero sessione fallito: ${it.message}", "KidBoxAuth") }
+        }
+    }
+
+    override fun onCleared() {
+        FirebaseAuth.getInstance().removeAuthStateListener(authStateListener)
+        super.onCleared()
+    }
+
     init {
         viewModelScope.launch {
             val user = FirebaseAuth.getInstance().currentUser
@@ -87,7 +116,9 @@ class LoginViewModel @Inject constructor(
                 AuthCheckState.Authenticated(hasFamily)
             }
         }
+        FirebaseAuth.getInstance().addAuthStateListener(authStateListener)
     }
+
 
     fun clearError() {
         _errorMessage.value = null

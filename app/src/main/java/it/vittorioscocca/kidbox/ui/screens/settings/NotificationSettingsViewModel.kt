@@ -24,10 +24,11 @@ data class NotificationSettingsUiState(
     val notifyOnNewNote: Boolean = true,
     val notifyOnNewCalendarEvent: Boolean = true,
     val notifyOnNewExpense: Boolean = true,
+    val notifyOnNewDocument: Boolean = true,
     /**
-     * Un solo toggle per tutto il Wallet (biglietti, documenti, carte
-     * fedeltà): assorbe le vecchie `notifyOnNewDocs` e
-     * `notifyOnNewWalletTicket`. Vedi [PreferenceKeys.NOTIFY_ON_WALLET].
+     * Biglietti e carte fedeltà. I documenti hanno il loro toggle
+     * ([PreferenceKeys.NOTIFY_ON_NEW_DOCUMENT]): stavano qui dentro e spegnere
+     * i biglietti li zittiva insieme.
      */
     val notifyOnWallet: Boolean = true,
     /** Suggerimenti su aree mai usate. Locale, indipendente dalle push. */
@@ -58,6 +59,11 @@ class NotificationSettingsViewModel @Inject constructor(
                         notifyOnNewNote = prefs[PreferenceKeys.NOTIFY_ON_NEW_NOTE] ?: true,
                         notifyOnNewCalendarEvent = prefs[PreferenceKeys.NOTIFY_ON_NEW_CALENDAR_EVENT] ?: true,
                         notifyOnNewExpense = prefs[PreferenceKeys.NOTIFY_ON_NEW_EXPENSE] ?: true,
+                        // Ricaduta su `notifyOnWallet` come fa il server: senza,
+                        // il toggle si mostrerebbe acceso a chi ha i documenti
+                        // ancora silenziati dalla vecchia preferenza.
+                        notifyOnNewDocument = prefs[PreferenceKeys.NOTIFY_ON_NEW_DOCUMENT]
+                            ?: prefs[PreferenceKeys.NOTIFY_ON_WALLET] ?: true,
                         notifyOnWallet = prefs[PreferenceKeys.NOTIFY_ON_WALLET] ?: true,
                         message = null,
                     )
@@ -80,6 +86,7 @@ class NotificationSettingsViewModel @Inject constructor(
             PreferenceKeys.NOTIFY_ON_NEW_NOTE -> _uiState.value.copy(notifyOnNewNote = enabled)
             PreferenceKeys.NOTIFY_ON_NEW_CALENDAR_EVENT -> _uiState.value.copy(notifyOnNewCalendarEvent = enabled)
             PreferenceKeys.NOTIFY_ON_NEW_EXPENSE -> _uiState.value.copy(notifyOnNewExpense = enabled)
+            PreferenceKeys.NOTIFY_ON_NEW_DOCUMENT -> _uiState.value.copy(notifyOnNewDocument = enabled)
             PreferenceKeys.NOTIFY_ON_WALLET -> _uiState.value.copy(notifyOnWallet = enabled)
             else -> _uiState.value
         }

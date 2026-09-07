@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox.data.health.fitness
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -81,6 +82,56 @@ class FitnessPlanJsonTest {
             "date con millisecondi nel payload",
             Regex("\"[^\"]*\\d\\.\\d{3}Z\"").find(encoded) == null,
         )
+    }
+
+    @Test
+    fun `attivita svolte e sostituzioni sopravvivono al round-trip`() {
+        // Sono i campi che dicono cosa è stato fatto davvero: se li perdessimo
+        // nel salvataggio, il calendario tornerebbe a dichiarare solo il previsto.
+        val base = requireNotNull(FitnessPlanJson.decode(payload()))
+        val firstId = base.allSessions.first().id
+        val withActuals = base
+            .updateSession(firstId) {
+                it.copy(
+                    status = FitnessSessionStatus.DONE,
+                    actualActivityTitle = "Corsa",
+                    actualMinutes = 32,
+                    actualKcal = 280,
+                    actualHeartRateBpm = 142,
+                )
+            }
+            .copy(
+                loggedWorkouts = listOf(
+                    FitnessLoggedWorkout(
+                        id = "workout-1",
+                        dateEpochMillis = FitnessPlanDates.today(),
+                        title = "Corsa all'aperto",
+                        durationMinutes = 32,
+                        kcal = 280,
+                        heartRateBpm = 142,
+                    ),
+                ),
+            )
+
+        val roundTrip = requireNotNull(FitnessPlanJson.decode(FitnessPlanJson.encode(withActuals)))
+        val session = requireNotNull(roundTrip.session(firstId))
+        assertEquals("Corsa", session.actualActivityTitle)
+        assertEquals(32, session.actualMinutes)
+        assertEquals(280, session.actualKcal)
+        assertEquals(142, session.actualHeartRateBpm)
+        assertEquals(1, roundTrip.loggedWorkouts.size)
+        assertEquals("Corsa all'aperto", roundTrip.loggedWorkouts.first().title)
+        assertEquals("workout-1", roundTrip.loggedWorkouts.first().id)
+        assertEquals(142, roundTrip.loggedWorkouts.first().heartRateBpm)
+    }
+
+    @Test
+    fun `una corsa non chiude una seduta di bici`() {
+        // Il bug del 2 settembre: senza corrispondenza di disciplina la vecchia
+        // euristica chiudeva la seduta con l'allenamento più lungo del giorno.
+        assertTrue(FitnessDisciplineMatcher.matches("Corsa all'aperto", "corsa Corsa progressiva"))
+        assertFalse(FitnessDisciplineMatcher.matches("Corsa all'aperto", "cardio Ciclismo + tonificazione"))
+        assertFalse(FitnessDisciplineMatcher.matches("Corsa all'aperto", "forza Esercizi a corpo libero"))
     }
 
     @Test

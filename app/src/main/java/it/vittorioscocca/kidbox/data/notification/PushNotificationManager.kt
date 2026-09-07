@@ -123,10 +123,17 @@ class PushNotificationManager @Inject constructor(
         const val NOTIFY_ON_NEW_CALENDAR_EVENT = "notifyOnNewCalendarEvent"
         const val NOTIFY_ON_NEW_EXPENSE = "notifyOnNewExpense"
         /**
-         * Unico toggle Wallet: assorbe le vecchie `notifyOnNewDocs` (che
-         * copriva anche i documenti d'identità del Wallet, collezione
-         * Firestore condivisa) e `notifyOnNewWalletTicket`. Nome identico a
-         * iOS: path Firestore `notificationPrefs.notifyOnWallet`.
+         * Documenti, separati dal Wallet. Erano lo stesso interruttore, e
+         * spegnere i biglietti zittiva anche i documenti. Se il campo non c'è,
+         * il server ricade su `notifyOnWallet`, così chi aveva già scelto non
+         * si ritrova la preferenza ribaltata.
+         */
+        const val NOTIFY_ON_NEW_DOCUMENT = "notifyOnNewDocument"
+
+        /**
+         * Toggle Wallet: biglietti e carte fedeltà. Assorbiva anche i documenti
+         * (vecchia `notifyOnNewDocs`), che ora hanno [NOTIFY_ON_NEW_DOCUMENT].
+         * Nome identico a iOS: path Firestore `notificationPrefs.notifyOnWallet`.
          */
         const val NOTIFY_ON_WALLET = "notifyOnWallet"
 
@@ -138,6 +145,7 @@ class PushNotificationManager @Inject constructor(
             NOTIFY_ON_NEW_NOTE,
             NOTIFY_ON_NEW_CALENDAR_EVENT,
             NOTIFY_ON_NEW_EXPENSE,
+            NOTIFY_ON_NEW_DOCUMENT,
             NOTIFY_ON_WALLET,
         )
     }

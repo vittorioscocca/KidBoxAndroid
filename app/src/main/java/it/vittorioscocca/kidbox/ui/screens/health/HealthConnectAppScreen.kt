@@ -175,6 +175,8 @@ fun HealthConnectAppScreen(
                             fontSize = 13.sp,
                             color = kb.subtitle,
                         )
+                        Spacer(Modifier.height(16.dp))
+                        HealthReadTypesList()
                     }
                     else -> {
                         Text(
@@ -182,6 +184,8 @@ fun HealthConnectAppScreen(
                             fontSize = 15.sp,
                             color = kb.subtitle,
                         )
+                        Spacer(Modifier.height(16.dp))
+                        HealthReadTypesList()
                     }
                 }
             }
@@ -273,6 +277,46 @@ private fun SectionLabel(text: String, kb: androidx.compose.ui.graphics.Color) {
     Spacer(Modifier.height(6.dp))
 }
 
+/**
+ * L'elenco dei tipi di dato che KidBox legge, con la finalità di ciascuno.
+ *
+ * Serve quando non c'è nulla da mostrare: senza dati la schermata non dava
+ * modo di capire cosa venga letto né perché, e un permesso concesso che non
+ * produce mai niente a schermo sembra un permesso di troppo.
+ */
+@Composable
+private fun HealthReadTypesList() {
+    val kb = MaterialTheme.kidBoxColors
+    val rows = listOf(
+        R.string.health_read_types_steps,
+        R.string.health_read_types_heart,
+        R.string.health_read_types_weight,
+        R.string.health_read_types_height,
+        R.string.health_read_types_energy,
+        R.string.health_read_types_exercise,
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            stringResource(R.string.health_read_types_title),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = kb.title,
+        )
+        rows.forEach { res ->
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text("•", fontSize = 13.sp, color = kb.subtitle)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(res), fontSize = 13.sp, color = kb.subtitle)
+            }
+        }
+        Text(
+            stringResource(R.string.health_read_types_note),
+            fontSize = 12.sp,
+            color = kb.subtitle,
+        )
+    }
+}
+
 @Composable
 private fun HealthDetailedMetrics(snapshot: HealthImportSnapshot) {
     val kb = MaterialTheme.kidBoxColors
@@ -280,34 +324,59 @@ private fun HealthDetailedMetrics(snapshot: HealthImportSnapshot) {
     val dayFmt = remember { SimpleDateFormat("d MMM yyyy", KBLocale.current()) }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        snapshot.heartRateBpm?.let { bpm ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Favorite, null, tint = Color(0xFFFF2D55), modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    String.format(KBLocale.current(), "Ultimo battito: %.0f bpm", bpm),
-                    fontSize = 14.sp,
-                    color = kb.title,
-                )
-            }
+        // Battito e passi seguono la stessa regola delle calorie qui sotto: la
+        // riga resta anche senza dato, così si vede sempre quale permesso
+        // Health Connect alimenta cosa.
+        val bpm = snapshot.heartRateBpm
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Favorite, null, tint = Color(0xFFFF2D55), modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                if (bpm != null) {
+                    stringResource(
+                        R.string.health_last_heart_rate,
+                        String.format(KBLocale.current(), "%.0f", bpm),
+                    )
+                } else {
+                    stringResource(R.string.health_last_heart_rate_empty)
+                },
+                fontSize = 14.sp,
+                color = if (bpm != null) kb.title else kb.subtitle,
+            )
         }
-        snapshot.stepsToday?.takeIf { it > 0 }?.let { steps ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.DirectionsWalk, null, tint = kb.subtitle, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Passi oggi: $steps", fontSize = 14.sp, color = kb.title)
-            }
+        val steps = snapshot.stepsToday?.takeIf { it > 0 }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.DirectionsWalk, null, tint = kb.subtitle, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                if (steps != null) {
+                    stringResource(R.string.health_steps_today, "$steps")
+                } else {
+                    stringResource(R.string.health_steps_today_empty)
+                },
+                fontSize = 14.sp,
+                color = if (steps != null) kb.title else kb.subtitle,
+            )
         }
-        snapshot.activeEnergyKcal?.takeIf { it > 0 }?.let { kcal ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.LocalFireDepartment, null, tint = Color(0xFFFF9500), modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    String.format(KBLocale.current(), "Energia attiva oggi: %.0f kcal", kcal),
-                    fontSize = 14.sp,
-                    color = kb.title,
-                )
-            }
+        // Le calorie attive arrivano solo da orologio o app fitness: la riga
+        // resta anche quando mancano, altrimenti chi non ha un indossabile non
+        // ha modo di capire che il dato viene letto e a cosa serve.
+        val activeKcal = snapshot.activeEnergyKcal?.takeIf { it > 0 }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.LocalFireDepartment, null, tint = Color(0xFFFF9500), modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                if (activeKcal != null) {
+                    stringResource(
+                        R.string.health_active_energy_today,
+                        String.format(KBLocale.current(), "%.0f", activeKcal),
+                    )
+                } else {
+                    stringResource(R.string.health_active_energy_empty)
+                },
+                fontSize = 14.sp,
+                color = if (activeKcal != null) kb.title else kb.subtitle,
+            )
         }
 
         if (snapshot.recentHeartRates.isNotEmpty()) {
@@ -411,17 +480,22 @@ private fun HealthMetricsSummary(
     val height = snapshot.heightCm ?: childHeightCm
 
     val tiles = buildList {
-        snapshot.stepsToday?.takeIf { it > 0 }?.let {
-            add(
-                MetricTileData(
-                    title = stringResource(R.string.health_metric_steps),
-                    value = "$it",
-                    subtitle = stringResource(R.string.health_metric_steps_sub),
-                    icon = Icons.Default.DirectionsWalk,
-                    tint = Color(0xFF34C759),
-                )
+        // Passi, battito e battito a riposo restano in griglia anche senza
+        // dato: la tile assente farebbe sembrare inutilizzato il permesso.
+        val stepsToday = snapshot.stepsToday?.takeIf { it > 0 }
+        add(
+            MetricTileData(
+                title = stringResource(R.string.health_metric_steps),
+                value = stepsToday?.let { "$it" } ?: "\u2014",
+                subtitle = if (stepsToday != null) {
+                    stringResource(R.string.health_metric_steps_sub)
+                } else {
+                    stringResource(R.string.health_metric_no_data)
+                },
+                icon = Icons.Default.DirectionsWalk,
+                tint = Color(0xFF34C759),
             )
-        }
+        )
         weight?.let {
             add(
                 MetricTileData(
@@ -444,39 +518,49 @@ private fun HealthMetricsSummary(
                 )
             )
         }
-        snapshot.heartRateBpm?.let {
-            add(
-                MetricTileData(
-                    title = stringResource(R.string.health_metric_heart),
-                    value = String.format(locale, "%.0f", it),
-                    subtitle = stringResource(R.string.health_metric_heart_sub),
-                    icon = Icons.Default.Favorite,
-                    tint = Color(0xFFFF2D55),
-                )
+        add(
+            MetricTileData(
+                title = stringResource(R.string.health_metric_heart),
+                value = snapshot.heartRateBpm?.let { String.format(locale, "%.0f", it) } ?: "\u2014",
+                subtitle = if (snapshot.heartRateBpm != null) {
+                    stringResource(R.string.health_metric_heart_sub)
+                } else {
+                    stringResource(R.string.health_metric_no_data)
+                },
+                icon = Icons.Default.Favorite,
+                tint = Color(0xFFFF2D55),
             )
-        }
-        snapshot.restingHeartRateBpm?.let {
-            add(
-                MetricTileData(
-                    title = stringResource(R.string.health_metric_resting),
-                    value = String.format(locale, "%.0f", it),
-                    subtitle = stringResource(R.string.health_metric_resting_sub),
-                    icon = Icons.Default.MonitorHeart,
-                    tint = Color(0xFFD94080),
-                )
+        )
+        add(
+            MetricTileData(
+                title = stringResource(R.string.health_metric_resting),
+                value = snapshot.restingHeartRateBpm?.let { String.format(locale, "%.0f", it) }
+                    ?: "\u2014",
+                subtitle = if (snapshot.restingHeartRateBpm != null) {
+                    stringResource(R.string.health_metric_resting_sub)
+                } else {
+                    stringResource(R.string.health_metric_no_data)
+                },
+                icon = Icons.Default.MonitorHeart,
+                tint = Color(0xFFD94080),
             )
-        }
-        snapshot.activeEnergyKcal?.takeIf { it > 0 }?.let {
-            add(
-                MetricTileData(
-                    title = stringResource(R.string.health_metric_energy),
-                    value = String.format(locale, "%.0f kcal", it),
-                    subtitle = stringResource(R.string.health_metric_energy_sub),
-                    icon = Icons.Default.LocalFireDepartment,
-                    tint = Color(0xFFFF9500),
-                )
+        )
+        // Come la riga di dettaglio: la tile c'è sempre, e senza dato mostra
+        // un trattino invece di sparire.
+        val activeKcal = snapshot.activeEnergyKcal?.takeIf { it > 0 }
+        add(
+            MetricTileData(
+                title = stringResource(R.string.health_metric_energy),
+                value = activeKcal?.let { String.format(locale, "%.0f kcal", it) } ?: "—",
+                subtitle = if (activeKcal != null) {
+                    stringResource(R.string.health_metric_energy_sub)
+                } else {
+                    stringResource(R.string.health_metric_energy_empty)
+                },
+                icon = Icons.Default.LocalFireDepartment,
+                tint = Color(0xFFFF9500),
             )
-        }
+        )
         add(
             MetricTileData(
                 title = stringResource(R.string.health_metric_workouts),

@@ -173,8 +173,9 @@
     <string name="fitness_session_minutes">%1$d min</string>
     <string name="fitness_done_manual">Segnata come fatta</string>
     <string name="fitness_done_notification">Segnata come fatta dalla notifica</string>
-    <string name="fitness_done_health">Chiusa da Health Connect: %1$d min</string>
-    <string name="fitness_done_health_kcal">Chiusa da Health Connect: %1$d min, %2$d kcal</string>
+    <string name="fitness_done_health">Registrato da Health Connect</string>
+    <string name="fitness_planned_program">Programma previsto</string>
+    <string name="fitness_planned_recap">Previsto: %1$s · %2$s</string>
     <string name="fitness_undo">Annulla</string>
     <string name="fitness_health_title">Health Connect</string>
     <string name="fitness_sync_now">Sincronizza ora</string>
@@ -293,9 +294,16 @@
     <string name="fitness_copilot_suggestion_rest">Cosa mi conviene fare oggi?</string>
     <string name="fitness_copilot_suggestion_rain">Oggi piove, non posso correre</string>
     <string name="fitness_copilot_suggestion_pain">Ho dolore al ginocchio, è normale?</string>
+    <string name="fitness_copilot_actions_failed">⚠️ Attenzione: non tutte le modifiche descritte sono state applicate al piano. Controlla il calendario.</string>
     <string name="fitness_copilot_changed_replaced">Seduta del %1$s sostituita</string>
     <string name="fitness_copilot_changed_moved">Seduta spostata al %1$s</string>
     <string name="fitness_copilot_changed_status">Seduta del %1$s aggiornata</string>
+    <string name="fitness_copilot_changed_added">Seduta aggiunta il %1$s</string>
+    <string name="fitness_copilot_delete_title">Elimino la seduta?</string>
+    <string name="fitness_copilot_delete_body">Verranno rimosse dal piano e non si potranno recuperare:\n%1$s</string>
+    <string name="fitness_copilot_delete_confirm">Elimina</string>
+    <string name="fitness_copilot_delete_cancel">Annulla</string>
+    <string name="fitness_copilot_deleted_summary">Sedute eliminate: %1$d</string>
     <string name="fitness_copilot_thinking">Sto pensando…</string>
     <string name="fitness_reminder_title">Allenamento di oggi</string>
     <string name="fitness_reminder_body_fallback">Apri il Piano Fitness per la seduta di oggi.</string>
@@ -307,4 +315,20 @@
     <string name="fitness_error_format">L\'AI ha risposto in un formato non riconosciuto. Riprova: di solito al secondo tentativo va a buon fine.</string>
     <string name="fitness_error_timeout">La creazione del piano ha superato il tempo massimo. Riprova, di solito al secondo tentativo va a buon fine.</string>
     <string name="fitness_error_generic">Impossibile creare il piano fitness. Riprova.</string>
+
+    <string name="fitness_logged_title">Attività registrate da Health Connect</string>
+    <string name="fitness_logged_hint">Allenamenti che hai svolto e che non corrispondono a nessuna seduta in programma.</string>
+    <string name="fitness_count_as">Conta come…</string>
+    <string name="fitness_done_different">Svolto: %1$s — diverso da quanto programmato</string>
+    <string name="fitness_sync_logged">Attività registrate fuori programma: %1$d. Aprile nel giorno per attribuirle a una seduta.</string>
+    <string name="fitness_edit_session">Modifica</string>
+    <string name="fitness_edit_session_title">Modifica seduta</string>
+    <string name="fitness_edit_status">Com\'è andata</string>
+    <string name="fitness_edit_activity">Attività svolta</string>
+    <string name="fitness_edit_minutes">Minuti</string>
+    <string name="fitness_edit_kcal">Calorie</string>
+    <string name="fitness_edit_hint">Se hai svolto un\'attività diversa da quella prevista, scrivila qui: il consuntivo di fine settimana ne terrà conto.</string>
+    <string name="fitness_edit_save">Salva</string>
+    <string name="fitness_chat_clear">Nuova conversazione</string>
+    <string name="fitness_sync_repaired">Sedute riaperte perché chiuse da un\'attività di un altro tipo: %1$d</string>
 </resources>
