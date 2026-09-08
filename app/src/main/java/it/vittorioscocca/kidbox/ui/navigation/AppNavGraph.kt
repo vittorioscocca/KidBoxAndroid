@@ -53,6 +53,7 @@ import it.vittorioscocca.kidbox.ui.screens.settings.family.EditFamilyScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.family.FamilySettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.InviteCodeScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.JoinFamilyScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.AlexaSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.MessageSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.NotificationSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.AIChatScreen
@@ -462,6 +463,7 @@ fun AppNavGraph(
                 onUsageGuide = { navController.navigate(AppDestination.UsageGuide.route) },
                 onFamilySettings = { navController.navigate(AppDestination.FamilySettings.route) },
                 onMessageSettings = { navController.navigate(AppDestination.MessageSettings.route) },
+                onAlexaSettings = { navController.navigate(AppDestination.AlexaSettings.route) },
                 onNotifications = { navController.navigate(AppDestination.NotificationSettings.route) },
                 onAiSettings = { navController.navigate(AppDestination.AiSettings.route) },
                 onStorageUsage = { navController.navigate(AppDestination.StorageUsage.route) },
@@ -519,6 +521,10 @@ fun AppNavGraph(
 
         composable(AppDestination.MessageSettings.route) {
             MessageSettingsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(AppDestination.AlexaSettings.route) {
+            AlexaSettingsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(AppDestination.NotificationSettings.route) {

@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Contrast
@@ -78,6 +79,7 @@ fun SettingsScreen(
     onFamilySettings: () -> Unit,
     onFamilyLeft: () -> Unit,
     onMessageSettings: () -> Unit,
+    onAlexaSettings: () -> Unit,
     onNotifications: () -> Unit,
     onAiSettings: () -> Unit,
     onStorageUsage: () -> Unit,
@@ -119,6 +121,13 @@ fun SettingsScreen(
             icon = Icons.AutoMirrored.Filled.Chat,
             showChevron = true,
             onClick = onMessageSettings,
+        ),
+        SettingRowItem(
+            title = stringResource(R.string.settings_row_alexa),
+            subtitle = stringResource(R.string.settings_row_alexa_sub),
+            icon = Icons.Filled.RecordVoiceOver,
+            showChevron = true,
+            onClick = onAlexaSettings,
         ),
         SettingRowItem(
             title = stringResource(R.string.settings_row_ai),
