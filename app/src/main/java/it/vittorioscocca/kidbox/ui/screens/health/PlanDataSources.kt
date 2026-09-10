@@ -44,7 +44,22 @@ data class PlanDataSources(
     val manualHeightCm: Double?,
     val workoutCount: Int,
     val activeEnergyKcal: Double?,
-    /** Metri percorsi negli allenamenti letti da Health Connect. */
+    /**
+     * Metri percorsi negli allenamenti letti da Health Connect, e se questo
+     * piano quel dato lo legga davvero.
+     *
+     * Il flag esiste perché la card è condivisa: il Piano Fitness legge la
+     * distanza, il Piano Alimentare no. Senza flag, il Piano Alimentare non
+     * passava i metri e la riga «Distanza» compariva lì per sempre come «non
+     * disponibile» — un tipo di dato dichiarato in una schermata che non lo
+     * usa, cioè l'opposto di quello che serve per giustificare il permesso
+     * READ_DISTANCE a Google Play.
+     *
+     * Dove invece la distanza si legge, la riga resta visibile anche a zero o
+     * senza permesso: una metrica che sparisce quando manca il dato rende il
+     * permesso indimostrabile.
+     */
+    val readsDistance: Boolean = false,
     val workoutDistanceMeters: Double? = null,
     val visitCount: Int,
     val examCount: Int,
@@ -70,65 +85,87 @@ fun PlanDataSourcesContent(
     val manualSuffix = stringResource(R.string.meal_plan_manual_suffix)
     val locale = Locale.getDefault()
 
-    val rows = listOf(
-        PlanDataRow(
-            stringResource(R.string.meal_plan_data_age),
-            data.ageYears?.let { stringResource(R.string.meal_plan_years, it) }
-                ?: data.manualAgeYears?.let { stringResource(R.string.meal_plan_years, it) + manualSuffix }
-                ?: notAvailable,
-            data.ageYears != null || data.manualAgeYears != null,
-        ),
-        PlanDataRow(
-            stringResource(R.string.meal_plan_data_weight),
-            data.weightKg?.let { String.format(locale, "%.1f kg", it) }
-                ?: data.manualWeightKg?.let { String.format(locale, "%.1f kg", it) + manualSuffix }
-                ?: notAvailable,
-            data.weightKg != null || data.manualWeightKg != null,
-        ),
-        PlanDataRow(
-            stringResource(R.string.meal_plan_data_height),
-            data.heightCm?.let { "${it.toInt()} cm" }
-                ?: data.manualHeightCm?.let { "${it.toInt()} cm" + manualSuffix }
-                ?: notAvailable,
-            data.heightCm != null || data.manualHeightCm != null,
-        ),
-        PlanDataRow(
-            stringResource(R.string.meal_plan_data_workouts),
-            data.workoutCount.toString(),
-            data.workoutCount > 0,
-        ),
+    val rows = buildList {
+        add(
+            PlanDataRow(
+                stringResource(R.string.meal_plan_data_age),
+                data.ageYears?.let { stringResource(R.string.meal_plan_years, it) }
+                    ?: data.manualAgeYears?.let { stringResource(R.string.meal_plan_years, it) + manualSuffix }
+                    ?: notAvailable,
+                data.ageYears != null || data.manualAgeYears != null,
+            ),
+        )
+        add(
+            PlanDataRow(
+                stringResource(R.string.meal_plan_data_weight),
+                data.weightKg?.let { String.format(locale, "%.1f kg", it) }
+                    ?: data.manualWeightKg?.let { String.format(locale, "%.1f kg", it) + manualSuffix }
+                    ?: notAvailable,
+                data.weightKg != null || data.manualWeightKg != null,
+            ),
+        )
+        add(
+            PlanDataRow(
+                stringResource(R.string.meal_plan_data_height),
+                data.heightCm?.let { "${it.toInt()} cm" }
+                    ?: data.manualHeightCm?.let { "${it.toInt()} cm" + manualSuffix }
+                    ?: notAvailable,
+                data.heightCm != null || data.manualHeightCm != null,
+            ),
+        )
+        add(
+            PlanDataRow(
+                stringResource(R.string.meal_plan_data_workouts),
+                data.workoutCount.toString(),
+                data.workoutCount > 0,
+            ),
+        )
         // Le calorie attive alimentano il resoconto del Piano Fitness e la
         // stima del fabbisogno del Piano Alimentare: vanno dichiarate in
         // entrambe le schede, non solo dove capita.
-        PlanDataRow(
-            stringResource(R.string.fitness_data_active_energy),
-            data.activeEnergyKcal?.takeIf { it > 0 }
-                ?.let { String.format(locale, "%.0f kcal", it) } ?: notAvailable,
-            (data.activeEnergyKcal ?: 0.0) > 0.0,
-        ),
+        add(
+            PlanDataRow(
+                stringResource(R.string.fitness_data_active_energy),
+                data.activeEnergyKcal?.takeIf { it > 0 }
+                    ?.let { String.format(locale, "%.0f kcal", it) } ?: notAvailable,
+                (data.activeEnergyKcal ?: 0.0) > 0.0,
+            ),
+        )
         // La distanza degli allenamenti è un tipo di dato letto a sé: va
-        // dichiarata qui e mostrata anche quando manca, come le calorie.
-        PlanDataRow(
-            stringResource(R.string.fitness_sessions_distance),
-            FitnessDistanceFormatter.kilometers(data.workoutDistanceMeters) ?: notAvailable,
-            (data.workoutDistanceMeters ?: 0.0) > 0.0,
-        ),
-        PlanDataRow(
-            stringResource(R.string.meal_plan_data_visits),
-            data.visitCount.toString(),
-            data.visitCount > 0,
-        ),
-        PlanDataRow(
-            stringResource(R.string.meal_plan_data_exams),
-            data.examCount.toString(),
-            data.examCount > 0,
-        ),
-        PlanDataRow(
-            stringResource(R.string.meal_plan_data_treatments),
-            data.activeTreatmentCount.toString(),
-            data.activeTreatmentCount > 0,
-        ),
-    )
+        // dichiarata dove si legge, e lì mostrata anche quando manca. Dove non
+        // si legge — il Piano Alimentare — la riga non deve comparire affatto:
+        // vedi `readsDistance`.
+        if (data.readsDistance) {
+            add(
+                PlanDataRow(
+                    stringResource(R.string.fitness_sessions_distance),
+                    FitnessDistanceFormatter.kilometers(data.workoutDistanceMeters) ?: notAvailable,
+                    (data.workoutDistanceMeters ?: 0.0) > 0.0,
+                ),
+            )
+        }
+        add(
+            PlanDataRow(
+                stringResource(R.string.meal_plan_data_visits),
+                data.visitCount.toString(),
+                data.visitCount > 0,
+            ),
+        )
+        add(
+            PlanDataRow(
+                stringResource(R.string.meal_plan_data_exams),
+                data.examCount.toString(),
+                data.examCount > 0,
+            ),
+        )
+        add(
+            PlanDataRow(
+                stringResource(R.string.meal_plan_data_treatments),
+                data.activeTreatmentCount.toString(),
+                data.activeTreatmentCount > 0,
+            ),
+        )
+    }
 
     Text(
         stringResource(R.string.meal_plan_data_used),

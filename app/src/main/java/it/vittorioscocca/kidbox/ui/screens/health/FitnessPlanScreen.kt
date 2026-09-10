@@ -464,6 +464,10 @@ private fun FitnessPlanUiState.toPlanDataSources() = PlanDataSources(
     manualHeightCm = input.manualHeightValue,
     workoutCount = workoutCount,
     activeEnergyKcal = activeEnergyKcal,
+    // Il Piano Fitness è l'unico che legge la distanza da Health Connect: qui
+    // la riga deve esserci sempre, anche a zero, perché è la sola schermata
+    // che dimostra READ_DISTANCE senza abbonamento.
+    readsDistance = true,
     workoutDistanceMeters = workoutDistanceMeters,
     visitCount = visitCount,
     examCount = examCount,
