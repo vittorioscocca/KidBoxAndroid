@@ -75,6 +75,8 @@ data class FitnessPlanUiState(
     val workoutCount: Int = 0,
     /** Calorie attive lette da Health Connect, usate nel resoconto settimanale. */
     val activeEnergyKcal: Double? = null,
+    /** Metri percorsi negli allenamenti letti da Health Connect. */
+    val workoutDistanceMeters: Double? = null,
     val visitCount: Int = 0,
     val examCount: Int = 0,
     val activeTreatmentCount: Int = 0,
@@ -118,6 +120,14 @@ class FitnessPlanViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(FitnessPlanUiState())
     val uiState: StateFlow<FitnessPlanUiState> = _uiState.asStateFlow()
+
+    /**
+     * I permessi da chiedere prima di sincronizzare. Chi aveva già collegato
+     * Health Connect non è mai stato interrogato sulla distanza: senza questa
+     * richiesta i chilometri resterebbero vuoti per sempre. Health Connect
+     * mostra la schermata solo per i permessi ancora non concessi.
+     */
+    val healthPermissions: Set<String> get() = healthConnect.allPermissions
 
     private val pullToRefresh = PullToRefreshController(viewModelScope)
     val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
@@ -395,6 +405,9 @@ class FitnessPlanViewModel @Inject constructor(
         if (result.loggedWorkouts.isNotEmpty()) {
             add(context.getString(R.string.fitness_sync_logged, result.loggedWorkouts.size))
         }
+        if (result.enrichedSessions > 0) {
+            add(context.getString(R.string.fitness_sync_distance_backfill, result.enrichedSessions))
+        }
     }.joinToString("\n")
 
     // ── Report settimanale ─────────────────────────────────────────────────
@@ -506,6 +519,8 @@ class FitnessPlanViewModel @Inject constructor(
                     heightCm = inputs.health?.heightCm,
                     workoutCount = inputs.health?.recentWorkouts?.size ?: 0,
                     activeEnergyKcal = inputs.health?.activeEnergyKcal,
+                    workoutDistanceMeters = inputs.health?.recentWorkouts
+                        ?.mapNotNull { it.distanceMeters }?.sum(),
                     visitCount = inputs.visits.size,
                     examCount = inputs.exams.size,
                     activeTreatmentCount = inputs.activeTreatments.size,

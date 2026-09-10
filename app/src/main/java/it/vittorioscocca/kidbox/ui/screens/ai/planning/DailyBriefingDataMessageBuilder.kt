@@ -61,9 +61,9 @@ class DailyBriefingDataMessageBuilder @Inject constructor(
             .filter { it.startDateEpochMillis in now..horizon }
             .sortedBy { it.startDateEpochMillis }
 
-        val allTodos = children.flatMap { child ->
-            todoItemDao.getByFamilyAndChild(familyId, child.id)
-        }.filterNot { it.isDeleted }
+        // I to-do sono di famiglia: una query sola invece di una per figlio.
+        // Prima questo giro perdeva i to-do con childId vuoto.
+        val allTodos = todoItemDao.getByFamily(familyId).filterNot { it.isDeleted }
 
         val dueTodos = allTodos.filter { todo ->
             !todo.isDone && (

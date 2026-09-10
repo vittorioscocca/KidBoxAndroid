@@ -265,4 +265,6 @@
     <string name="onboarding_link_invite_fallback">Ça ne marche pas ? Passe à la méthode manuelle</string>
     <string name="onboarding_close">Fermer</string>
     <string name="onboarding_scanner_hint">Visez le QR code</string>
+    <string name="travel_place_details">Détails</string>
+    <string name="travel_hub_duration">~2 MIN</string>
 </resources>

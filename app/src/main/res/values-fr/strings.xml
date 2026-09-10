@@ -160,6 +160,22 @@
     <string name="fitness_action_move">Déplacer</string>
     <string name="fitness_action_skip">Sauter</string>
     <string name="fitness_session_minutes">%1$d min</string>
+    <string name="fitness_sessions_title">Séances</string>
+    <string name="fitness_sessions_recorded">%1$d séances enregistrées</string>
+    <string name="fitness_sessions_total">Total</string>
+    <string name="fitness_sessions_average">Moyenne</string>
+    <string name="fitness_sessions_time">Temps</string>
+    <string name="fitness_sessions_calories">Calories</string>
+    <string name="fitness_sessions_distance">Distance</string>
+    <string name="fitness_sessions_kcal">%1$d kcal</string>
+    <string name="fitness_sessions_kcal_big">%1$d KCAL</string>
+    <string name="fitness_sessions_min_big">%1$d MIN</string>
+    <string name="fitness_sessions_hours">%1$dh %2$02dmin</string>
+    <string name="fitness_sessions_today">aujourd’hui</string>
+    <string name="fitness_sessions_yesterday">hier</string>
+    <string name="fitness_sessions_planned">Prévu : %1$s</string>
+    <string name="fitness_sessions_empty_title">Aucune séance enregistrée</string>
+    <string name="fitness_sessions_empty_body">Les séances marquées comme faites, à la main ou par Health Connect, apparaissent ici.</string>
     <string name="fitness_done_manual">Marquée comme faite</string>
     <string name="fitness_done_notification">Marquée comme faite depuis la notification</string>
     <string name="fitness_done_health">Enregistré par Health Connect</string>
@@ -310,6 +326,7 @@
     <string name="fitness_count_as">Compter comme…</string>
     <string name="fitness_done_different">Fait : %1$s — différent de ce qui était prévu</string>
     <string name="fitness_sync_logged">Activités enregistrées hors programme : %1$d. Ouvrez la journée pour les attribuer à une séance.</string>
+    <string name="fitness_sync_distance_backfill">Kilomètres récupérés sur des activités déjà enregistrées : %1$d</string>
     <string name="fitness_edit_session">Modifier</string>
     <string name="fitness_edit_session_title">Modifier la séance</string>
     <string name="fitness_edit_status">Comment ça s\'est passé</string>
@@ -320,4 +337,29 @@
     <string name="fitness_edit_save">Enregistrer</string>
     <string name="fitness_chat_clear">Nouvelle conversation</string>
     <string name="fitness_sync_repaired">Séances rouvertes car clôturées par une activité d\'un autre type : %1$d</string>
+
+    <!-- Boîtes de dialogue système : consentement aux rapports, mise à jour, annonces -->
+    <string name="crash_consent_title">Aidez-nous à améliorer KidBox</string>
+    <string name="crash_consent_body">Nous avons détecté %1$s. Pouvez-vous nous envoyer un rapport anonyme ? Aucune donnée personnelle ou familiale ne sera envoyée.</string>
+    <plurals name="crash_consent_issues">
+        <item quantity="one">%1$d anomalie technique</item>
+        <item quantity="other">%1$d anomalies techniques</item>
+    </plurals>
+    <string name="crash_consent_send">Envoyer le rapport</string>
+    <string name="crash_consent_decline">Non merci</string>
+    <string name="update_available_title">Une mise à jour est disponible</string>
+    <string name="update_available_body">Pour profiter au mieux de KidBox, nous vous conseillons de passer à la dernière version : elle contient des améliorations et des corrections.</string>
+    <string name="update_available_update">Mettre à jour</string>
+    <string name="update_available_later">Pas maintenant</string>
+    <string name="broadcast_action_go">Aller</string>
+    <string name="broadcast_action_ok">J\'ai compris</string>
+    <string name="broadcast_action_later">Pas maintenant</string>
+    <string name="grocery_added_by">Ajouté par %1$s · %2$s</string>
+    <string name="grocery_added_today">aujourd\'hui</string>
+    <string name="grocery_added_yesterday">hier</string>
+    <string name="grocery_added_days_ago">il y a %1$d jours</string>
+    <string name="grocery_added_now">à l\'instant</string>
+    <string name="grocery_added_minutes_ago">il y a %1$d minutes</string>
+    <string name="grocery_added_hour_ago">il y a une heure</string>
+    <string name="grocery_added_hours_ago">il y a %1$d heures</string>
 </resources>

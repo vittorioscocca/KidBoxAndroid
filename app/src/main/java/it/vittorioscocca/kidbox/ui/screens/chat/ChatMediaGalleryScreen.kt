@@ -286,7 +286,7 @@ internal fun ChatMediaGalleryScreen(
                     IconButton(onClick = onDismiss) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Indietro",
+                            contentDescription = stringResource(R.string.chat_back),
                             tint = MaterialTheme.kidBoxColors.title,
                         )
                     }

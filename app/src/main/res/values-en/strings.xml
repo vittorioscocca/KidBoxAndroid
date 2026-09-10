@@ -160,6 +160,22 @@
     <string name="fitness_action_move">Move</string>
     <string name="fitness_action_skip">Skip</string>
     <string name="fitness_session_minutes">%1$d min</string>
+    <string name="fitness_sessions_title">Sessions</string>
+    <string name="fitness_sessions_recorded">%1$d recorded sessions</string>
+    <string name="fitness_sessions_total">Total</string>
+    <string name="fitness_sessions_average">Average</string>
+    <string name="fitness_sessions_time">Time</string>
+    <string name="fitness_sessions_calories">Calories</string>
+    <string name="fitness_sessions_distance">Distance</string>
+    <string name="fitness_sessions_kcal">%1$d kcal</string>
+    <string name="fitness_sessions_kcal_big">%1$d KCAL</string>
+    <string name="fitness_sessions_min_big">%1$d MIN</string>
+    <string name="fitness_sessions_hours">%1$dh %2$02dmin</string>
+    <string name="fitness_sessions_today">today</string>
+    <string name="fitness_sessions_yesterday">yesterday</string>
+    <string name="fitness_sessions_planned">Planned: %1$s</string>
+    <string name="fitness_sessions_empty_title">No recorded session</string>
+    <string name="fitness_sessions_empty_body">Sessions marked as done, by hand or by Health Connect, show up here.</string>
     <string name="fitness_done_manual">Marked as done</string>
     <string name="fitness_done_notification">Marked as done from the notification</string>
     <string name="fitness_done_health">Recorded by Health Connect</string>
@@ -310,6 +326,7 @@
     <string name="fitness_count_as">Count as…</string>
     <string name="fitness_done_different">Done: %1$s — different from what was planned</string>
     <string name="fitness_sync_logged">Activities recorded outside the plan: %1$d. Open the day to assign them to a session.</string>
+    <string name="fitness_sync_distance_backfill">Distances recovered on activities already recorded: %1$d</string>
     <string name="fitness_edit_session">Edit</string>
     <string name="fitness_edit_session_title">Edit session</string>
     <string name="fitness_edit_status">How it went</string>
@@ -320,4 +337,29 @@
     <string name="fitness_edit_save">Save</string>
     <string name="fitness_chat_clear">New conversation</string>
     <string name="fitness_sync_repaired">Sessions reopened because they were closed by a different kind of activity: %1$d</string>
+
+    <!-- System dialogs: crash report consent, update, announcements -->
+    <string name="crash_consent_title">Help us improve KidBox</string>
+    <string name="crash_consent_body">We detected %1$s. Can you send us an anonymous report? No personal or family data will be sent.</string>
+    <plurals name="crash_consent_issues">
+        <item quantity="one">%1$d technical issue</item>
+        <item quantity="other">%1$d technical issues</item>
+    </plurals>
+    <string name="crash_consent_send">Send report</string>
+    <string name="crash_consent_decline">No thanks</string>
+    <string name="update_available_title">An update is available</string>
+    <string name="update_available_body">To get the best out of KidBox we recommend updating to the latest version: it contains improvements and fixes.</string>
+    <string name="update_available_update">Update</string>
+    <string name="update_available_later">Not now</string>
+    <string name="broadcast_action_go">Go</string>
+    <string name="broadcast_action_ok">Got it</string>
+    <string name="broadcast_action_later">Not now</string>
+    <string name="grocery_added_by">Added by %1$s · %2$s</string>
+    <string name="grocery_added_today">today</string>
+    <string name="grocery_added_yesterday">yesterday</string>
+    <string name="grocery_added_days_ago">%1$d days ago</string>
+    <string name="grocery_added_now">just now</string>
+    <string name="grocery_added_minutes_ago">%1$d minutes ago</string>
+    <string name="grocery_added_hour_ago">an hour ago</string>
+    <string name="grocery_added_hours_ago">%1$d hours ago</string>
 </resources>

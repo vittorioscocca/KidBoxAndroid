@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Lock
@@ -48,6 +49,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.health.connect.client.PermissionController
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -77,6 +80,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessCompletionSource
+import it.vittorioscocca.kidbox.data.health.fitness.FitnessDistanceFormatter
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanDates
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanDocument
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessSession
@@ -114,6 +118,7 @@ fun FitnessPlanScreen(
     var setupMode by remember { mutableStateOf(FitnessSetupMode.ONBOARDING) }
     var pendingInput by remember { mutableStateOf<it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanInput?>(null) }
     var sessionToMove by remember { mutableStateOf<FitnessSession?>(null) }
+    var showSessions by remember { mutableStateOf(false) }
 
     LaunchedEffect(familyId, childId, subjectName) {
         viewModel.bind(familyId, childId, subjectName)
@@ -146,6 +151,15 @@ fun FitnessPlanScreen(
             },
             onDelete = { viewModel.deletePlan() },
             onBack = { showSetup = false },
+        )
+        return
+    }
+
+    val planForSessions = state.plan
+    if (showSessions && planForSessions != null) {
+        FitnessSessionsScreen(
+            plan = planForSessions,
+            onBack = { showSessions = false },
         )
         return
     }
@@ -216,7 +230,7 @@ fun FitnessPlanScreen(
                         state.weeklyReport?.let { report ->
                             WeeklyReportCard(state, report, viewModel)
                         }
-                        CalendarCard(state, viewModel)
+                        CalendarCard(state, viewModel) { showSessions = true }
                         DayDetailCard(state, viewModel) { sessionToMove = it }
                         HealthSyncCard(state, viewModel)
                     } else {
@@ -313,6 +327,56 @@ fun FitnessPlanScreen(
     }
 }
 
+// ── Storico sessioni ───────────────────────────────────────────────────────
+
+/**
+ * Accesso all'elenco delle sedute già svolte. Sta sotto il calendario perché è
+ * la domanda che viene dopo "cosa devo fare oggi": cosa ho fatto finora.
+ */
+@Composable
+private fun SessionsButton(plan: FitnessPlanDocument, onClick: () -> Unit) {
+    val kb = MaterialTheme.kidBoxColors
+    val done = plan.allSessions.count { it.status == FitnessSessionStatus.DONE }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(FITNESS_TINT.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Default.FormatListBulleted, contentDescription = null, tint = FITNESS_TINT)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                stringResource(R.string.fitness_sessions_title),
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = kb.title,
+            )
+            Text(
+                stringResource(R.string.fitness_sessions_recorded, done),
+                fontSize = 14.sp,
+                color = kb.subtitle,
+            )
+        }
+        Icon(
+            Icons.Default.KeyboardArrowRight,
+            contentDescription = null,
+            tint = kb.subtitle,
+        )
+    }
+}
+
 // ── Introduzione e paywall ─────────────────────────────────────────────────
 
 @Composable
@@ -400,6 +464,7 @@ private fun FitnessPlanUiState.toPlanDataSources() = PlanDataSources(
     manualHeightCm = input.manualHeightValue,
     workoutCount = workoutCount,
     activeEnergyKcal = activeEnergyKcal,
+    workoutDistanceMeters = workoutDistanceMeters,
     visitCount = visitCount,
     examCount = examCount,
     activeTreatmentCount = activeTreatmentCount,
@@ -430,7 +495,11 @@ private fun SetupCard(estimatedUnits: Int, onSetup: () -> Unit) {
 // ── Calendario mensile ─────────────────────────────────────────────────────
 
 @Composable
-private fun CalendarCard(state: FitnessPlanUiState, viewModel: FitnessPlanViewModel) {
+private fun CalendarCard(
+    state: FitnessPlanUiState,
+    viewModel: FitnessPlanViewModel,
+    onOpenSessions: () -> Unit,
+) {
     val kb = MaterialTheme.kidBoxColors
     val plan = state.plan ?: return
 
@@ -483,6 +552,11 @@ private fun CalendarCard(state: FitnessPlanUiState, viewModel: FitnessPlanViewMo
                 }
             }
         }
+
+        Spacer(Modifier.height(12.dp))
+        HorizontalDivider(color = kb.subtitle.copy(alpha = 0.15f))
+        Spacer(Modifier.height(4.dp))
+        SessionsButton(plan, onOpenSessions)
     }
 }
 
@@ -748,6 +822,7 @@ private fun LoggedWorkoutRow(
                     add(stringResource(R.string.fitness_session_minutes, it))
                 }
                 workout.kcal?.let { add("$it kcal") }
+                FitnessDistanceFormatter.kilometers(workout.distanceMeters)?.let { add(it) }
                 workout.heartRateBpm?.let { add("$it bpm") }
             }
             if (parts.isNotEmpty()) {
@@ -970,6 +1045,7 @@ private fun headlineSubtitle(session: FitnessSession): String {
             parts += stringResource(R.string.fitness_session_kcal_missing)
         else -> Unit
     }
+    FitnessDistanceFormatter.kilometers(session.actualDistanceMeters)?.let { parts += it }
     session.actualHeartRateBpm?.let { parts += "$it bpm" }
     return parts.joinToString(" · ")
 }
@@ -1125,8 +1201,11 @@ private fun HealthSyncCard(state: FitnessPlanUiState, viewModel: FitnessPlanView
             if (state.isSyncingHealth) {
                 CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp, color = FITNESS_TINT)
             } else {
+                val permissionLauncher = rememberLauncherForActivityResult(
+                    PermissionController.createRequestPermissionResultContract(),
+                ) { viewModel.syncHealthNow() }
                 OutlinedButton(
-                    onClick = { viewModel.syncHealthNow() },
+                    onClick = { permissionLauncher.launch(viewModel.healthPermissions) },
                     enabled = state.healthConnectAvailable,
                 ) { Text(stringResource(R.string.fitness_sync_now), fontSize = 13.sp) }
             }
@@ -1193,6 +1272,10 @@ private fun WeeklyReportCard(
             )
             ReportMetric(stringResource(R.string.fitness_report_minutes), "${report.totalMinutes}")
             // Zero è un risultato, non un motivo per nascondere la metrica.
+            ReportMetric(
+                stringResource(R.string.fitness_sessions_distance),
+                FitnessDistanceFormatter.kilometers(report.totalDistanceMeters) ?: "—",
+            )
             ReportMetric(stringResource(R.string.fitness_report_kcal), "${report.totalKcal}")
         }
 

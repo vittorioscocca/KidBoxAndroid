@@ -5,6 +5,7 @@ import it.vittorioscocca.kidbox.util.KBLog
 import android.content.Context
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import it.vittorioscocca.kidbox.data.crypto.FamilyKeyEscrow
 import it.vittorioscocca.kidbox.data.crypto.FamilyKeyStore
@@ -98,9 +99,24 @@ class JoinWrapService(
                 throw JoinInviteError.InvalidSecret
             }
 
+            // Consuma l'invito: lo marca usato e ne SVUOTA il materiale
+            // crittografico. Il documento non viene più cancellato dopo il join
+            // — serve alle regole come prova per creare `members/{uid}` — quindi
+            // non deve restare in giro con la chiave di famiglia wrappata
+            // dentro: il segreto viaggia nel link, e un link riemerso mesi dopo
+            // aprirebbe di nuovo la famiglia. Consumato, l'invito resta una
+            // ricevuta: chi, quando.
+            //
+            // `d` è già stato letto qui sopra, quindi l'unwrap più in basso
+            // lavora sui valori di prima della cancellazione.
             txn.update(docRef, mapOf(
                 "usedAt" to Timestamp(Date()),
                 "usedBy" to uid,
+                "kdfSalt" to FieldValue.delete(),
+                "secretHash" to FieldValue.delete(),
+                "wrappedKeyCipher" to FieldValue.delete(),
+                "wrappedKeyNonce" to FieldValue.delete(),
+                "wrappedKeyTag" to FieldValue.delete(),
             ))
 
             inviteData = d
@@ -131,12 +147,10 @@ class JoinWrapService(
 
         FamilyKeyEscrow.backupRawKey(familyKeyBytes, familyId, uid)
 
-        try {
-            docRef.delete().await()
-            KBLog.data.debug("invite deleted inviteId=$inviteId", TAG)
-        } catch (e: Exception) {
-            KBLog.data.debug("invite delete failed (best effort): ${e.message}", TAG)
-        }
+        // L'invito NON si cancella più. È già a uso singolo — la transazione qui
+        // sopra rifiuta un `usedAt` non nullo — e il documento che resta, con
+        // `usedBy = uid`, è la prova che le regole chiedono per lasciar creare
+        // `members/{uid}`: cancellandolo l'iscrizione verrebbe negata.
 
         if (FamilyKeyStore.hasFamilyKey(context, familyId, uid)) {
             KBLog.data.info("keychain verify OK familyId=$familyId", TAG)

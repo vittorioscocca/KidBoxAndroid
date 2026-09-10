@@ -276,8 +276,7 @@ class HealthPatternBroadcastReceiver : BroadcastReceiver() {
             // riportare avanti quello esistente.
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP,
             )
             putExtra("push_type", "health_pattern")
             putExtra("push_family_id", familyId)

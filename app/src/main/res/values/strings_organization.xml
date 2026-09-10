@@ -124,6 +124,8 @@
     <string name="calendar_back_cd">Indietro</string>
     <string name="calendar_title">Calendario</string>
     <string name="calendar_new_event_cd">Nuovo evento</string>
+    <string name="calendar_day_tab">Giorno</string>
+    <string name="calendar_week_tab">Settimana</string>
     <string name="calendar_month_tab">Mese</string>
     <string name="calendar_year_tab">Anno</string>
     <string name="calendar_weekday_sun">D</string>
@@ -137,6 +139,8 @@
     <string name="calendar_next_month_cd">Mese successivo</string>
     <string name="calendar_no_events">Nessun evento</string>
     <string name="calendar_today_badge">oggi</string>
+    <string name="calendar_all_day_short">tutto il g.</string>
+    <string name="calendar_today_btn">Oggi</string>
     <string name="calendar_all_day">Tutto il giorno</string>
     <string name="calendar_delete">Elimina</string>
     <string name="calendar_category_children">Bambini</string>

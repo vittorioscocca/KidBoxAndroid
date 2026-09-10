@@ -14,7 +14,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.notifications.BroadcastMessage
 
 /**
@@ -72,14 +74,18 @@ fun BroadcastMessageDialog(
         },
         confirmButton = {
             TextButton(onClick = { if (hasAction) onAction(message) else onDismiss() }) {
-                Text(if (hasAction) "Vai" else "Ho capito")
+                Text(
+                    stringResource(
+                        if (hasAction) R.string.broadcast_action_go else R.string.broadcast_action_ok,
+                    ),
+                )
             }
         },
         dismissButton = if (hasAction) {
             {
                 // "Non ora" chiude e basta. Non ripianifica e non penalizza:
                 // il tetto della campagna vale già di suo.
-                TextButton(onClick = onDismiss) { Text("Non ora") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.broadcast_action_later)) }
             }
         } else {
             null

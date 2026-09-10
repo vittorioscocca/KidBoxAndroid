@@ -123,7 +123,10 @@ class ChatStorageService @Inject constructor(
         fun defaultFileInfo(type: ChatMessageType): Pair<String, String> = when (type) {
             ChatMessageType.PHOTO -> "photo.jpg" to "image/jpeg"
             ChatMessageType.VIDEO -> "video.mp4" to "video/mp4"
-            ChatMessageType.AUDIO -> "audio.m4a" to "audio/x-m4a"
+            // `audio/mp4` è il tipo registrato per l'AAC in contenitore MP4
+            // (RFC 4337). Prima ogni client ne dichiarava uno diverso per lo
+            // stesso file: `audio/m4a` da iPhone, `audio/x-m4a` da qui.
+            ChatMessageType.AUDIO -> "audio.m4a" to "audio/mp4"
             ChatMessageType.DOCUMENT -> "document" to "application/octet-stream"
             ChatMessageType.MEDIA_GROUP -> "photo.jpg" to "image/jpeg"
             ChatMessageType.CONTACT -> "contact.json" to "application/json"

@@ -23,6 +23,11 @@ data class HealthWorkoutEntry(
     val activeEnergyKcal: Double? = null,
     /** Battito medio dell'allenamento, aggregato sull'intervallo della sessione. */
     val averageHeartRateBpm: Double? = null,
+    /**
+     * Distanza percorsa in metri, quando la disciplina ne ha una (corsa,
+     * camminata, bici, nuoto). Nulla per palestra, yoga e simili.
+     */
+    val distanceMeters: Double? = null,
 )
 
 data class HealthECGEntry(

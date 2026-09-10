@@ -13,6 +13,7 @@ import it.vittorioscocca.kidbox.data.repository.PasswordsRepository
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import java.util.UUID
 import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.R
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -71,7 +72,7 @@ class PasswordsGroupsViewModel @Inject constructor(
                     rows = sorted.map { g ->
                         PasswordGroupRowUi(
                             id = g.id,
-                            label = decryptName(g, uid).ifBlank { "Gruppo" },
+                            label = decryptName(g, uid).ifBlank { appContext.getString(R.string.passwords_group_fallback_label) },
                             iconRaw = g.icon.ifBlank { "folder" },
                             colorHex = g.color.ifBlank { "#7C6FDE" },
                             count = counts[g.id] ?: 0,

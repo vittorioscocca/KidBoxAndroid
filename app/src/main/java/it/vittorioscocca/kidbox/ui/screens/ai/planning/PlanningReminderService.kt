@@ -41,7 +41,7 @@ class PlanningReminderService @Inject constructor(
         val children = childDao.getChildrenByFamilyId(familyId)
         val resolvedChild = childId ?: children.firstOrNull()?.id ?: familyId
         val resolvedList = listId?.takeIf { it.isNotBlank() }
-            ?: todoListDao.getByFamilyAndChild(familyId, resolvedChild).firstOrNull()?.id
+            ?: todoListDao.getByFamily(familyId).firstOrNull()?.id
         val now = System.currentTimeMillis()
         todoItemDao.upsert(
             KBTodoItemEntity(

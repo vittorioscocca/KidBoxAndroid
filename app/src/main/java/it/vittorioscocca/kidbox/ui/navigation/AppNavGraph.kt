@@ -157,7 +157,17 @@ fun AppNavGraph(
     navController: NavHostController,
     startDestination: String,
     onboardingPreferences: OnboardingPreferences,
+    deepLinkOwnerToken: Long,
 ) {
+    // Solo l'istanza di MainActivity che possiede la coda la consuma.
+    //
+    // Il tap su una notifica può far nascere una seconda Activity mentre la
+    // prima è ancora STARTED: entrambe osservano gli stessi StateFlow del
+    // router (è un singleton), e senza questo guard è quella morente a
+    // consumare — naviga sul proprio NavController inerte, chiama `clear()`, e
+    // la nuova istanza trova la coda vuota e resta dov'è.
+    val deepLinkOwner by NotificationDeepLinkRouter.ownerToken.collectAsStateWithLifecycle()
+    val ownsDeepLink = deepLinkOwner == deepLinkOwnerToken
     val pendingAiRoute by NotificationDeepLinkRouter.pendingRoute.collectAsStateWithLifecycle()
     val pendingFamilyId by NotificationDeepLinkRouter.pendingFamilyId.collectAsStateWithLifecycle()
     val familySwitcherVm: FamilySwitcherViewModel = hiltViewModel()
@@ -169,7 +179,8 @@ fun AppNavGraph(
     // su Splash/Login, e il ramo qui sotto lo lascia in coda — senza un retry
     // guidato da stato osservabile la navigazione non avverrebbe mai.
     val currentEntry by navController.currentBackStackEntryAsState()
-    LaunchedEffect(pendingAiRoute, pendingFamilyId, activeFamilyId, currentEntry) {
+    LaunchedEffect(ownsDeepLink, pendingAiRoute, pendingFamilyId, activeFamilyId, currentEntry) {
+        if (!ownsDeepLink) return@LaunchedEffect
         val route = pendingAiRoute ?: return@LaunchedEffect
         val current = currentEntry?.destination?.route ?: return@LaunchedEffect
         if (current == AppDestination.Splash.route ||
@@ -200,7 +211,8 @@ fun AppNavGraph(
     // e la si impila sopra la sezione To-Do già aperta.
     val pendingTodoId by NotificationDeepLinkRouter.pendingTodoId.collectAsStateWithLifecycle()
     val todoDeepLinkResolver: TodoDeepLinkResolverViewModel = hiltViewModel()
-    LaunchedEffect(pendingTodoId) {
+    LaunchedEffect(ownsDeepLink, pendingTodoId) {
+        if (!ownsDeepLink) return@LaunchedEffect
         val todoId = pendingTodoId ?: return@LaunchedEffect
         val location = todoDeepLinkResolver.resolveLocation(todoId)
         if (location == null) {
@@ -265,7 +277,7 @@ fun AppNavGraph(
         currentRouteForTodoWait == AppDestination.Splash.route ||
         currentRouteForTodoWait == AppDestination.Login.route ||
         currentRouteForTodoWait == AppDestination.Onboarding.route
-    if (pendingTodoId != null && !isBootRoute) {
+    if (ownsDeepLink && pendingTodoId != null && !isBootRoute) {
         Dialog(onDismissRequest = { NotificationDeepLinkRouter.clearPendingTodoId() }) {
             Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.kidBoxColors.card) {
                 Row(
@@ -287,7 +299,10 @@ fun AppNavGraph(
     // NavHost e non tocca il back stack.
     val pendingBroadcast by NotificationDeepLinkRouter.pendingBroadcast.collectAsStateWithLifecycle()
     BroadcastMessageDialog(
-        message = pendingBroadcast,
+        // Stesso guard della coda di navigazione: l'annuncio non deve comparire
+        // (e soprattutto non deve essere consumato) da un'istanza che sta per
+        // sparire, o l'utente non lo vedrebbe mai.
+        message = pendingBroadcast.takeIf { ownsDeepLink },
         onDismiss = {
             pendingBroadcast?.campaignId?.let { KBAnalytics.logNudge("nudge_dismissed", it) }
             NotificationDeepLinkRouter.clearBroadcast()

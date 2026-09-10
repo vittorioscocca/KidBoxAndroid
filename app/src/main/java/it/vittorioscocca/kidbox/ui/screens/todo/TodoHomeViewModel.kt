@@ -91,7 +91,8 @@ class TodoHomeViewModel @Inject constructor(
                 todoRepository.observeTodos(familyId, childId),
                 memberDao.observeActiveByFamilyId(familyId),
                 error,
-            ) { lists, todos, members, err ->
+                todoRepository.todosLoadedFamilyId,
+            ) { lists, todos, members, err, todosLoadedFor ->
                 val meUid = auth.currentUser?.uid.orEmpty()
                 val uidForVis = meUid.takeIf { it.isNotBlank() }
                 val todosInChild = todos.filter { !it.isDeleted }
@@ -129,8 +130,18 @@ class TodoHomeViewModel @Inject constructor(
                     },
                     isLoading = false,
                     errorMessage = err,
-                )
-            }.collect { stateBacking.value = it }
+                ) to (todosLoadedFor == familyId)
+            }.collect { (state, todosLoaded) ->
+                // Finché i to-do non sono arrivati, l'elenco delle liste
+                // calcolato qui è provvisorio: `TodoListExposure` nasconde le
+                // liste i cui to-do sono tutti privati di altri, ma con zero
+                // to-do in mano applica la regola delle liste vuote e le mostra.
+                // Sovrascrivere lo stato adesso farebbe comparire liste che un
+                // istante dopo spariscono. Si tiene quello di prima, che è
+                // l'ultimo verdetto completo.
+                if (!todosLoaded && stateBacking.value.lists.isNotEmpty()) return@collect
+                stateBacking.value = state
+            }
         }
     }
 

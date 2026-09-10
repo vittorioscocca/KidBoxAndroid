@@ -66,8 +66,7 @@ class HealthReminderReceiver : BroadcastReceiver() {
                     // stesso fix in KidBoxFirebaseMessagingService.
                     addFlags(
                         Intent.FLAG_ACTIVITY_NEW_TASK or
-                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP,
                     )
                     putExtra("push_type", TYPE_TREATMENT_REMINDER)
                     putExtra("push_treatment_id", treatmentId)
@@ -107,8 +106,7 @@ class HealthReminderReceiver : BroadcastReceiver() {
                     // un contesto non-Activity.
                     addFlags(
                         Intent.FLAG_ACTIVITY_NEW_TASK or
-                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP,
                     )
                     putExtra("push_type", TYPE_FITNESS_SESSION)
                     putExtra("push_family_id", familyId)
@@ -167,8 +165,7 @@ class HealthReminderReceiver : BroadcastReceiver() {
                     // stesso fix in KidBoxFirebaseMessagingService.
                     addFlags(
                         Intent.FLAG_ACTIVITY_NEW_TASK or
-                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP,
                     )
                     putExtra("push_type", "wallet_ticket_reminder")
                     putExtra("push_family_id", familyId)
@@ -207,8 +204,7 @@ class HealthReminderReceiver : BroadcastReceiver() {
                     // stesso fix in KidBoxFirebaseMessagingService.
                     addFlags(
                         Intent.FLAG_ACTIVITY_NEW_TASK or
-                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP,
                     )
                     putExtra("push_type", "wallet_document_reminder")
                     putExtra("push_family_id", familyId)
@@ -247,8 +243,7 @@ class HealthReminderReceiver : BroadcastReceiver() {
                     // stesso fix in KidBoxFirebaseMessagingService.
                     addFlags(
                         Intent.FLAG_ACTIVITY_NEW_TASK or
-                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP,
                     )
                     putExtra("push_type", TYPE_PASSWORD_EXPIRY)
                     putExtra("push_family_id", familyId)
@@ -285,8 +280,7 @@ class HealthReminderReceiver : BroadcastReceiver() {
                     // stesso fix in KidBoxFirebaseMessagingService.
                     addFlags(
                         Intent.FLAG_ACTIVITY_NEW_TASK or
-                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP,
                     )
                     putExtra("push_type", TYPE_VACCINE_REMINDER)
                     putExtra("push_vaccine_id", vaccineId)
@@ -345,8 +339,7 @@ class HealthReminderReceiver : BroadcastReceiver() {
                     // stesso fix in KidBoxFirebaseMessagingService.
                     addFlags(
                         Intent.FLAG_ACTIVITY_NEW_TASK or
-                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP,
                     )
                     putExtra("push_type", TYPE_VEHICLE_DEADLINE)
                     putExtra("push_family_id", familyId)
@@ -398,8 +391,7 @@ class HealthReminderReceiver : BroadcastReceiver() {
                     // stesso fix in KidBoxFirebaseMessagingService.
                     addFlags(
                         Intent.FLAG_ACTIVITY_NEW_TASK or
-                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP,
                     )
                     putExtra("push_type", TYPE_HOUSE_PAYMENT)
                     putExtra("push_family_id", familyId)
@@ -452,8 +444,7 @@ class HealthReminderReceiver : BroadcastReceiver() {
                     // stesso fix in KidBoxFirebaseMessagingService.
                     addFlags(
                         Intent.FLAG_ACTIVITY_NEW_TASK or
-                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP,
                     )
                     putExtra("push_type", type)
                     putExtra("push_family_id", familyId)

@@ -29,6 +29,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -51,11 +54,25 @@ class TodoRepository @Inject constructor(
     private var listeningFamilyId: String? = null
     private var listeningChildId: String? = null
 
+    /**
+     * Famiglia per cui i to-do sono stati caricati almeno una volta in questa
+     * sessione di listener.
+     *
+     * Serve alla UI, non alla sync: la riga di una lista è visibile o no a
+     * seconda dei to-do che contiene ([TodoListExposure]), quindi valutarla
+     * mentre i to-do stanno ancora arrivando dà un verdetto provvisorio — e la
+     * lista compare o sparisce sotto gli occhi dell'utente («entro e ne vedo 5,
+     * rientro e ne vedo 6»). Finché questo flow non indica la famiglia corrente,
+     * l'elenco visibile non va ricalcolato.
+     */
+    private val _todosLoadedFamilyId = MutableStateFlow<String?>(null)
+    val todosLoadedFamilyId: StateFlow<String?> = _todosLoadedFamilyId.asStateFlow()
+
     fun observeLists(familyId: String, childId: String): Flow<List<KBTodoListEntity>> =
-        listDao.observeByFamilyAndChild(familyId, childId)
+        listDao.observeByFamily(familyId)
 
     fun observeTodos(familyId: String, childId: String): Flow<List<KBTodoItemEntity>> =
-        itemDao.observeByFamilyAndChild(familyId, childId)
+        itemDao.observeByFamily(familyId)
 
     fun startRealtime(
         familyId: String,
@@ -193,7 +210,7 @@ class TodoRepository @Inject constructor(
 
     suspend fun deleteList(listId: String) {
         val list = listDao.getById(listId) ?: return
-        val todos = itemDao.getByFamilyAndChild(list.familyId, list.childId).filter { it.listId == listId }
+        val todos = itemDao.getByFamily(list.familyId).filter { it.listId == listId }
         todos.forEach { todo ->
             reminderScheduler.cancel(todo.reminderId)
             remoteStore.softDeleteTodo(todo.familyId, todo.id)
@@ -404,12 +421,8 @@ class TodoRepository @Inject constructor(
                         // sincronizzato localmente — non a bloccare il caso "nessun bambino".
                         if (dto.childId.isBlank()) {
                             ensureNoChildPlaceholder()
-                        } else if (childDao.getById(dto.childId) == null) {
-                            KBLog.sync.debug(
-                                "applyListInbound SKIP unknown local child childId=${dto.childId}",
-                                tag = "todo",
-                            )
-                            return@forEach
+                        } else {
+                            ensureChildExists(dto.childId)
                         }
                         val local = listDao.getById(dto.id)
                         if (local != null && (dto.updatedAtEpochMillis ?: 0L) < local.updatedAtEpochMillis) {
@@ -441,7 +454,7 @@ class TodoRepository @Inject constructor(
         // Tutto ciò che non è più nel result set confermato dal server va rimosso.
         if (snapshotIds != null) {
             runCatching {
-                listDao.getByFamilyAndChild(familyId, childId)
+                listDao.getByFamily(familyId)
                     .filter { it.id !in snapshotIds }
                     .forEach { stale ->
                         KBLog.sync.info("applyListInbound RECONCILE delete listId=${stale.id}", tag = "todo")
@@ -500,17 +513,13 @@ class TodoRepository @Inject constructor(
                     ensureFamilyExists(dto.familyId)
                     if (dto.childId.isBlank()) {
                         ensureNoChildPlaceholder()
-                    } else if (childDao.getById(dto.childId) == null) {
-                        KBLog.sync.debug(
-                            "applyTodoInbound SKIP unknown local child childId=${dto.childId} todoId=${dto.id}",
-                            tag = "todo",
-                        )
-                        return@forEach
+                    } else {
+                        ensureChildExists(dto.childId)
                     }
                     val now = System.currentTimeMillis()
                     val remoteScope = KBVisibilityScope.normalized(dto.visibilityScope)
                     val remoteMemberIds = dto.visibilityMemberIds
-                    val safeListId = resolveReferencedListId(dto.listId)
+                    val safeListId = resolveReferencedListId(dto.familyId, dto.listId)
                     itemDao.upsert(
                         KBTodoItemEntity(
                             id = dto.id,
@@ -551,7 +560,7 @@ class TodoRepository @Inject constructor(
         // ci sono ancora arrivati, non perché siano stati cancellati.
         if (snapshotIds != null) {
             runCatching {
-                itemDao.getByFamilyAndChild(familyId, childId)
+                itemDao.getByFamily(familyId)
                     .filter { local ->
                         if (local.id in snapshotIds) return@filter false
                         val sync = KBSyncState.fromRaw(local.syncStateRaw ?: 0)
@@ -566,13 +575,100 @@ class TodoRepository @Inject constructor(
                 KBLog.sync.error("applyTodoInbound RECONCILE failed", tag = "todo", throwable = it)
             }
         }
+
+        // Da qui in poi l'insieme dei to-do di questa famiglia è quello vero, e
+        // l'esposizione delle liste si può calcolare.
+        _todosLoadedFamilyId.value = familyId
     }
 
-    /** Evita SQLITE_CONSTRAINT_FOREIGNKEY: liste possono arrivare dopo i todo nello snapshot. */
-    private suspend fun resolveReferencedListId(listId: String?): String? {
+    /**
+     * Evita SQLITE_CONSTRAINT_FOREIGNKEY: le liste possono arrivare dopo i to-do
+     * nello snapshot.
+     *
+     * Prima qui si restituiva `null` e basta, e il to-do finiva in Room
+     * scollegato dalla sua lista — per sempre, perché quando la lista arrivava
+     * nessuno tornava a rilegarlo. Da lì la lista che "a volte" risulta vuota, e
+     * il deep link da notifica che gira a vuoto perché il `listId` non c'è.
+     *
+     * Ora la lista mancante viene letta da Firestore e salvata: una lettura
+     * singola, solo nel caso raro in cui l'ordine di arrivo sia sfavorevole.
+     * Resta `null` solo per l'orfano vero — lista cancellata senza cancellare i
+     * suoi to-do (succede quando a cancellarla è un client che non fa il
+     * cascade).
+     */
+    private suspend fun resolveReferencedListId(familyId: String, listId: String?): String? {
         val id = listId?.trim().orEmpty()
         if (id.isEmpty()) return null
-        return if (listDao.getById(id) != null) id else null
+        if (listDao.getById(id) != null) return id
+        val remote = runCatching { remoteStore.fetchList(familyId, id) }
+            .onFailure {
+                KBLog.sync.warning("resolveReferencedListId fetch FAILED listId=$id", tag = "todo")
+            }
+            .getOrNull()
+        if (remote == null) {
+            KBLog.sync.info(
+                "resolveReferencedListId lista non recuperabile listId=$id — to-do orfano",
+                tag = "todo",
+            )
+            return null
+        }
+        ensureFamilyExists(remote.familyId)
+        if (remote.childId.isBlank()) ensureNoChildPlaceholder() else ensureChildExists(remote.childId)
+        val now = System.currentTimeMillis()
+        listDao.upsert(
+            KBTodoListEntity(
+                id = remote.id,
+                familyId = remote.familyId,
+                childId = remote.childId,
+                name = remote.name,
+                createdAtEpochMillis = remote.updatedAtEpochMillis ?: now,
+                updatedAtEpochMillis = remote.updatedAtEpochMillis ?: now,
+                isDeleted = false,
+                createdBy = remote.createdBy,
+            ),
+        )
+        KBLog.sync.info("resolveReferencedListId lista recuperata listId=$id", tag = "todo")
+        return id
+    }
+
+    /**
+     * Garantisce la riga `kb_children` richiesta dalle foreign key di liste e
+     * to-do.
+     *
+     * Il bambino esiste sul remoto (è quello della famiglia), ma la sua
+     * sincronizzazione può arrivare DOPO lo snapshot dei to-do: prima, in quel
+     * caso, liste e to-do venivano scartati in silenzio e nessuno ci tornava
+     * sopra — è il "a volte le liste non si caricano". Si inserisce quindi un
+     * segnaposto con il solo id, che la sync dei bambini riempirà con i dati
+     * veri (stesso id → upsert, non duplicato).
+     *
+     * `familyId = null` di proposito: senza famiglia il segnaposto non compare
+     * in nessuna schermata finché non arrivano i dati veri. Stessa logica del
+     * segnaposto per `childId` vuoto in [ensureNoChildPlaceholder].
+     */
+    private suspend fun ensureChildExists(childId: String) {
+        if (childId.isBlank()) return
+        if (childDao.getById(childId) != null) return
+        val now = System.currentTimeMillis()
+        runCatching {
+            childDao.upsert(
+                KBChildEntity(
+                    id = childId,
+                    familyId = null,
+                    name = "",
+                    birthDateEpochMillis = null,
+                    weightKg = null,
+                    heightCm = null,
+                    createdBy = "local",
+                    createdAtEpochMillis = now,
+                    updatedBy = null,
+                    updatedAtEpochMillis = null,
+                ),
+            )
+            KBLog.sync.info("ensureChildExists segnaposto creato childId=$childId", tag = "todo")
+        }.onFailure {
+            KBLog.sync.error("ensureChildExists FAILED childId=$childId", tag = "todo", throwable = it)
+        }
     }
 
     private suspend fun ensureFamilyExists(familyId: String) {
@@ -637,6 +733,7 @@ class TodoRepository @Inject constructor(
     }
 
     private fun stopRealtimeLocked() {
+        _todosLoadedFamilyId.value = null
         listListener?.remove()
         todoListener?.remove()
         listListener = null

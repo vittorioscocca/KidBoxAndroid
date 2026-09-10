@@ -14,6 +14,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -27,6 +28,9 @@ enum class GroceryFilter { ALL, TO_BUY, PURCHASED }
 data class GroceryListUiState(
     val familyId: String = "",
     val items: List<KBGroceryItemEntity> = emptyList(),
+    /** uid -> nome del membro, per la riga "Aggiunto da ...". Un uid a schermo
+     * non servirebbe a nessuno, e il nome vive nella tabella dei membri. */
+    val memberNames: Map<String, String> = emptyMap(),
     val trips: List<KBShoppingTripEntity> = emptyList(),
     val filter: GroceryFilter = GroceryFilter.TO_BUY,
     val isLoading: Boolean = true,
@@ -57,6 +61,7 @@ class GroceryListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val groceryRepository: GroceryRepository,
     private val shoppingTripRepository: ShoppingTripRepository,
+    private val familyMemberDao: KBFamilyMemberDao,
 ) : ViewModel() {
     private val familyId: String = savedStateHandle.get<String>("familyId").orEmpty()
     private val _uiState = MutableStateFlow(GroceryListUiState(familyId = familyId))
@@ -73,6 +78,7 @@ class GroceryListViewModel @Inject constructor(
     }
 
     private var observeJob: Job? = null
+    private var membersJob: Job? = null
     private var tripsJob: Job? = null
 
     init {
@@ -92,6 +98,21 @@ class GroceryListViewModel @Inject constructor(
                 )
             }
         }
+        // I nomi si osservano, non si leggono una volta: un membro che cambia
+        // nome o che entra in famiglia dopo deve comparire senza riaprire la
+        // schermata.
+        membersJob = viewModelScope.launch {
+            familyMemberDao.observeActiveByFamilyId(familyId).collectLatest { members ->
+                val names = members
+                    .mapNotNull { m ->
+                        val name = m.displayName?.trim()
+                        if (name.isNullOrEmpty()) null else m.userId to name
+                    }
+                    .toMap()
+                _uiState.value = _uiState.value.copy(memberNames = names)
+            }
+        }
+
         tripsJob = viewModelScope.launch {
             shoppingTripRepository.observeByFamilyId(familyId).collectLatest { trips ->
                 _uiState.value = _uiState.value.copy(trips = trips)

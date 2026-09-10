@@ -55,6 +55,16 @@ class MainActivity : AppCompatActivity() {
     @Inject
     lateinit var appUpdateChecker: AppUpdateChecker
 
+    /**
+     * Identità di QUESTA istanza per il router dei deep link.
+     *
+     * La coda delle notifiche è un singleton, e per un istante può avere due
+     * Activity in ascolto (una che muore, una che nasce): senza un padrone
+     * dichiarato la consuma quella morente, che naviga su un NavController
+     * ormai inerte. Vedi `NotificationDeepLinkRouter.ownerToken`.
+     */
+    private val deepLinkOwnerToken = NotificationDeepLinkRouter.newOwnerToken()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -73,6 +83,9 @@ class MainActivity : AppCompatActivity() {
         applySystemBarAppearance(resolveDarkTheme())
 
         val onboardingPreferences = OnboardingPreferences(applicationContext)
+        // Prima di mettere in coda: se la coda finisse a un'istanza che non è
+        // ancora la padrona, a consumarla sarebbe quella precedente.
+        NotificationDeepLinkRouter.claimOwnership(deepLinkOwnerToken)
         NotificationDeepLinkRouter.handleLaunchIntent(this, intent)
         showPrivacyPolicyIfRequestedByHealthConnect(intent)
         storePendingInviteIfAny(intent)
@@ -153,6 +166,7 @@ class MainActivity : AppCompatActivity() {
                         navController = navController,
                         startDestination = AppDestination.Splash.route,
                         onboardingPreferences = onboardingPreferences,
+                        deepLinkOwnerToken = deepLinkOwnerToken,
                     )
                     CrashReportConsentDialog(
                         visible = showConsent,
@@ -194,9 +208,22 @@ class MainActivity : AppCompatActivity() {
         PendingFamilyInvite.store(this, invite)
     }
 
+    /**
+     * Riprende la proprietà della coda quando questa istanza torna davanti.
+     *
+     * Serve al caso simmetrico: se una seconda Activity era nata e poi è stata
+     * chiusa (indietro) lasciando una rotta in coda, il padrone registrato
+     * sarebbe un'istanza che non esiste più e nessuno la consumerebbe.
+     */
+    override fun onResume() {
+        super.onResume()
+        NotificationDeepLinkRouter.claimOwnership(deepLinkOwnerToken)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        NotificationDeepLinkRouter.claimOwnership(deepLinkOwnerToken)
         NotificationDeepLinkRouter.handleLaunchIntent(this, intent)
         showPrivacyPolicyIfRequestedByHealthConnect(intent)
         storePendingInviteIfAny(intent)

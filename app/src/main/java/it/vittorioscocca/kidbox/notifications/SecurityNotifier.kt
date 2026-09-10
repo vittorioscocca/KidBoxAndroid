@@ -26,8 +26,7 @@ class SecurityNotifier @Inject constructor(
             // NEW_TASK necessario: parte da un contesto non-Activity (ApplicationContext).
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP,
             )
             putExtra("push_type", "password_security_summary")
         }

@@ -177,7 +177,7 @@ fun AddWalletDocumentSheet(
                     } else {
                         OutlinedButton(onClick = onUpgrade, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
-                            Text("Leggi con AI (Max)")
+                            Text(stringResource(R.string.wallet_read_ai_plan_max))
                         }
                     }
                 }

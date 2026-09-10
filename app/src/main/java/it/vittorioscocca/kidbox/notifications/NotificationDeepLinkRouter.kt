@@ -11,6 +11,7 @@ import it.vittorioscocca.kidbox.util.KBLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.concurrent.atomic.AtomicLong
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsEntryPoint
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
 
@@ -50,6 +51,37 @@ object NotificationDeepLinkRouter {
     private const val KEY_ACTIVE_FAMILY_ID = "active_family_id"
     private const val KEY_LAST_BRIEFING = "kb_dailyBriefing_lastText"
     private const val TAG = "NotificationDeepLink"
+
+    /**
+     * Istanza di `MainActivity` che ha diritto a consumare la coda.
+     *
+     * La coda vive in un singleton, ma le Activity che la osservano possono
+     * essere DUE per un istante: quando il tap ricrea l'Activity (è successo
+     * con `FLAG_ACTIVITY_CLEAR_TOP`), quella morente è ancora STARTED, quindi
+     * `collectAsStateWithLifecycle` continua a consegnarle gli aggiornamenti e
+     * lei consuma la rotta navigando su un NavController ormai inerte — poi
+     * chiama `clear()` e la nuova istanza trova la coda vuota.
+     *
+     * Il token risolve la cosa alla radice: l'ultima Activity che parte
+     * rivendica la proprietà, e solo quella consuma. Non sostituisce il fix
+     * sui flag dell'intent, lo rende innocuo se dovesse tornare — o se a
+     * ricreare l'Activity fosse altro (rotazione, cambio tema, ripristino di
+     * processo): in quel caso la proprietà passa alla nuova istanza, che trova
+     * la coda ancora piena e la consuma lei.
+     */
+    private val ownerSequence = AtomicLong(0L)
+    private val _ownerToken = MutableStateFlow(0L)
+    val ownerToken: StateFlow<Long> = _ownerToken.asStateFlow()
+
+    /** Token da assegnare a una nuova istanza di `MainActivity`. */
+    fun newOwnerToken(): Long = ownerSequence.incrementAndGet()
+
+    /** L'istanza [token] diventa l'unica autorizzata a consumare la coda. */
+    fun claimOwnership(token: Long) {
+        if (_ownerToken.value == token) return
+        _ownerToken.value = token
+        KBLog.app.debug("NotificationDeepLink: proprietà della coda → $token", TAG)
+    }
 
     private val _pendingRoute = MutableStateFlow<String?>(null)
     val pendingRoute: StateFlow<String?> = _pendingRoute.asStateFlow()

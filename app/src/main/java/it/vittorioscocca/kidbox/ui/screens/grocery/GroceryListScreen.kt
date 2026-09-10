@@ -60,6 +60,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -288,6 +289,7 @@ fun GroceryListScreen(
                         item(key = "group_$category") {
                             GroceryGroupCard(
                                 items = itemsInCategory,
+                                memberNames = state.memberNames,
                                 onToggle = { viewModel.togglePurchased(it.id) },
                                 onClick = { item ->
                                     editingItem = item
@@ -423,6 +425,7 @@ private fun GroceryFilterChips(
 @Composable
 private fun GroceryGroupCard(
     items: List<KBGroceryItemEntity>,
+    memberNames: Map<String, String>,
     onToggle: (KBGroceryItemEntity) -> Unit,
     onClick: (KBGroceryItemEntity) -> Unit,
     onDelete: (KBGroceryItemEntity) -> Unit,
@@ -437,6 +440,7 @@ private fun GroceryGroupCard(
             items.forEachIndexed { idx, item ->
                 GroceryRow(
                     item = item,
+                    authorName = item.createdBy?.let { memberNames[it] },
                     onToggle = { onToggle(item) },
                     onClick = { onClick(item) },
                     onDelete = { onDelete(item) },
@@ -458,11 +462,13 @@ private fun GroceryGroupCard(
 @Composable
 private fun GroceryRow(
     item: KBGroceryItemEntity,
+    authorName: String?,
     onToggle: () -> Unit,
     onClick: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
+    val context = LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -503,6 +509,21 @@ private fun GroceryRow(
                     maxLines = 1,
                 )
             }
+            // Chi e quando: in una lista condivisa e' cio' che evita di
+            // ricomprare la stessa cosa, e per gli articoli dettati ad Alexa
+            // e' l'unica traccia della loro provenienza.
+            // Due righe, non una: "Aggiunto da " piu' un nome proprio e un
+            // riferimento temporale non ci stanno in una riga sola su un
+            // telefono stretto, e a una riga il pezzo che si perde e' proprio
+            // il quando. `overflow` esplicito perche' il default di Compose
+            // taglia netto invece di mettere i puntini.
+            Text(
+                text = GroceryAuthorLine.text(context, authorName, item.createdAtEpochMillis),
+                style = MaterialTheme.typography.bodySmall,
+                color = kb.subtitle,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         TextButton(onClick = onDelete) { Text(stringResource(R.string.life_delete), color = GroceryRed) }
     }

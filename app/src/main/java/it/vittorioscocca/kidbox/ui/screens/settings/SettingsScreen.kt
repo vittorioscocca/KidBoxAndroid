@@ -61,6 +61,7 @@ import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.components.KBBackButton
 import it.vittorioscocca.kidbox.ui.screens.settings.family.SettingsFamilyCard
+import it.vittorioscocca.kidbox.util.AlexaAvailability
 
 private data class SettingRowItem(
     val title: String,
@@ -102,7 +103,8 @@ fun SettingsScreen(
         }.getOrDefault("—" to "—")
     }
 
-    val rows = listOf(
+    // `listOfNotNull`: la voce Alexa non c'è in tutte le lingue (vedi sotto).
+    val rows = listOfNotNull(
         SettingRowItem(
             title = stringResource(R.string.settings_row_theme),
             subtitle = theme.toSubtitle(),
@@ -122,13 +124,18 @@ fun SettingsScreen(
             showChevron = true,
             onClick = onMessageSettings,
         ),
-        SettingRowItem(
-            title = stringResource(R.string.settings_row_alexa),
-            subtitle = stringResource(R.string.settings_row_alexa_sub),
-            icon = Icons.Filled.RecordVoiceOver,
-            showChevron = true,
-            onClick = onAlexaSettings,
-        ),
+        // La skill esiste solo in italiano: vedi `AlexaAvailability`.
+        if (AlexaAvailability.isAvailable()) {
+            SettingRowItem(
+                title = stringResource(R.string.settings_row_alexa),
+                subtitle = stringResource(R.string.settings_row_alexa_sub),
+                icon = Icons.Filled.RecordVoiceOver,
+                showChevron = true,
+                onClick = onAlexaSettings,
+            )
+        } else {
+            null
+        },
         SettingRowItem(
             title = stringResource(R.string.settings_row_ai),
             icon = Icons.Filled.AutoAwesome,

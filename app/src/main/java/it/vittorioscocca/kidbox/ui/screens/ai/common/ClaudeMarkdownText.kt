@@ -44,9 +44,17 @@ fun ClaudeMarkdownText(
                     is MarkdownBlock.Heading -> {
                         Text(
                             text = inlineMarkdown(block.text),
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = if (block.level == 2) 22.sp else 18.sp,
-                            lineHeight = if (block.level == 2) 30.sp else 26.sp,
+                            fontWeight = if (block.level == 1) FontWeight.Bold else FontWeight.SemiBold,
+                            fontSize = when (block.level) {
+                                1 -> 26.sp
+                                2 -> 22.sp
+                                else -> 18.sp
+                            },
+                            lineHeight = when (block.level) {
+                                1 -> 34.sp
+                                2 -> 30.sp
+                                else -> 26.sp
+                            },
                             color = MaterialTheme.colorScheme.onBackground,
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -123,8 +131,14 @@ private fun parseBlocks(raw: String): List<MarkdownBlock> {
             continue
         }
 
-        if (trimmed.startsWith("## ") || trimmed.startsWith("### ")) {
-            val level = if (trimmed.startsWith("### ")) 3 else 2
+        // `# ` compreso: senza, il titolo di primo livello finiva a video col
+        // cancelletto, dentro un paragrafo qualsiasi.
+        if (trimmed.startsWith("# ") || trimmed.startsWith("## ") || trimmed.startsWith("### ")) {
+            val level = when {
+                trimmed.startsWith("### ") -> 3
+                trimmed.startsWith("## ") -> 2
+                else -> 1
+            }
             out.add(MarkdownBlock.Heading(level, trimmed.drop(level + 1)))
             i++
             continue
@@ -163,7 +177,7 @@ private fun parseBlocks(raw: String): List<MarkdownBlock> {
         i++
         while (i < lines.size) {
             val t = lines[i].trim()
-            if (t.isBlank() || t.startsWith("## ") || t.startsWith("### ") || t.startsWith("```") ||
+            if (t.isBlank() || t.startsWith("# ") || t.startsWith("## ") || t.startsWith("### ") || t.startsWith("```") ||
                 t.startsWith("- ") || t.startsWith("* ") || t.matches(Regex("""^\d+\.\s+.*$"""))
             ) break
             paragraph.add(lines[i]); i++

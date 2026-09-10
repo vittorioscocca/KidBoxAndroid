@@ -436,6 +436,7 @@
     <string name="health_write_message">Write a message…</string>
     <string name="health_send">Send</string>
     <string name="health_history_deleted">The history will be deleted.</string>
+    <string name="health_history_context_deleted">The history will be deleted and the context rebuilt.</string>
     <string name="health_wide_context">Large health context</string>
     <string name="health_take_photo">Take a photo</string>
     <string name="health_pick_library">Choose from library</string>

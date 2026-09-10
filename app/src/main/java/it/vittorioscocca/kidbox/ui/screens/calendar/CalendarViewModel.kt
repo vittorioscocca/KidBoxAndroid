@@ -31,7 +31,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
-enum class CalendarMode { MONTH, YEAR }
+enum class CalendarMode { DAY, WEEK, MONTH, YEAR }
 
 data class CalendarUiState(
     val familyId: String = "",

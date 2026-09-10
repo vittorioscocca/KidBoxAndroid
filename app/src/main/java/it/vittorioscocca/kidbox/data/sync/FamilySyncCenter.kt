@@ -138,6 +138,82 @@ class FamilySyncCenter @Inject constructor(
         }
     }
 
+    /** Esito della verifica che precede la revoca. */
+    private enum class RevocationVerdict {
+        /** Il documento membro non c'è più (o è soft-deleted): revoca reale. */
+        CONFIRMED,
+        /** Il documento membro è ancora al suo posto: NON è una revoca. */
+        NOT_REVOKED,
+        /** Non si è potuto stabilire nulla: nel dubbio non si tocca niente. */
+        UNDETERMINED,
+    }
+
+    /**
+     * Verifica sul server se l'utente è ancora membro, prima di trattare un
+     * PERMISSION_DENIED come revoca.
+     *
+     * I due casi arrivano al client **identici**, ma le conseguenze sono opposte:
+     * la revoca porta a svuotare Room e a cancellare le chiavi di famiglia locali
+     * (vedi [triggerAccessLostIfEligible]), mentre un rifiuto infrastrutturale
+     * — attestazione App Check, credenziali, regole Firestore sbagliate — è
+     * transitorio e non deve toccare nulla.
+     *
+     * L'unica prova che vale è **positiva**: leggere `members/{uid}`. Quel
+     * documento ha una regola sua (`allow get` sul proprio uid) che non passa dal
+     * wildcard delle sottocollezioni, quindi resta leggibile anche quando il resto
+     * della famiglia non lo è — ed è esattamente ciò che è successo l'8/09/2026,
+     * quando un errore nelle rules ha negato ogni query di collezione.
+     *
+     * Assenza di prove non è prova: solo [RevocationVerdict.CONFIRMED] autorizza il wipe.
+     */
+    private suspend fun verifyRevocation(familyId: String, uid: String): RevocationVerdict {
+        if (uid.isEmpty()) return RevocationVerdict.UNDETERMINED
+        // Una sola domanda, fatta al server: il mio documento membro c'è ancora?
+        //
+        // ⚠️ Qui prima c'era un controllo preliminare sul token App Check, che
+        // tornava UNDETERMINED se il token non si otteneva. Era sbagliato e ha
+        // fatto danni: sul device di sviluppo il debug token non è in allow list,
+        // App Check risponde «403 App attestation failed», e una revoca VERA non
+        // veniva mai riconosciuta — l'utente restava nella famiglia da cui era
+        // stato tolto. Quel controllo non aggiungeva niente: se App Check
+        // bloccasse davvero tutto, sarebbe la get qui sotto a fallire e a
+        // ricadere in UNDETERMINED da sé. Con l'enforcement spento, invece, un
+        // token mancante non nega proprio nulla e la get risponde benissimo.
+        //
+        // `Source.SERVER` è obbligatorio: dalla cache locale il documento
+        // risulterebbe presente anche dopo una revoca vera.
+        return try {
+            val snap = db.collection("families").document(familyId)
+                .collection("members").document(uid)
+                .get(Source.SERVER).await()
+            when {
+                !snap.exists() -> {
+                    KBLog.sync.info("Revoca confermata: members/$uid non esiste più familyId=$familyId", TAG)
+                    RevocationVerdict.CONFIRMED
+                }
+                snap.data?.get("isDeleted") as? Boolean == true -> {
+                    KBLog.sync.info("Revoca confermata: members/$uid è soft-deleted familyId=$familyId", TAG)
+                    RevocationVerdict.CONFIRMED
+                }
+                else -> RevocationVerdict.NOT_REVOKED
+            }
+        } catch (e: Exception) {
+            KBLog.sync.error("members/$uid non leggibile → verifica impossibile: ${e.message}", TAG, e)
+            RevocationVerdict.UNDETERMINED
+        }
+    }
+
+    /**
+     * PERMISSION_DENIED che la verifica non ha confermato come revoca: si sblocca
+     * la UI (altrimenti resta in caricamento all'infinito sui dati già in Room) e
+     * si riprova più tardi, senza toccare Room, chiavi o preferenze.
+     */
+    private fun recoverFromUnconfirmedDenial(familyId: String) {
+        _initialSyncDone.value = true
+        isJoining = false
+        restartSyncAfterDelay(familyId, 30_000L)
+    }
+
     /**
      * Solo wipe **locale** (Room, chiavi, prefs) + evento UI. Non chiama [FamilyLeaveService] e non tocca
      * `users/{uid}/memberships` su Firestore.
@@ -407,12 +483,42 @@ class FamilySyncCenter @Inject constructor(
                                     checkAllFirstDone()
                                     return@launch
                                 }
-                                KBLog.sync.warning("membersListener PERMISSION_DENIED — trattato come revoca accesso", TAG)
-                                triggerAccessLostIfEligible(
-                                    familyId,
-                                    uid,
-                                    "members listener PERMISSION_DENIED",
-                                )
+                                // Un PERMISSION_DENIED da solo non basta: prima si
+                                // verifica sul server di non essere più membri.
+                                // Se la verifica non conferma, i listener si
+                                // ripescano da soli più tardi — 30s e non gli 8s
+                                // del ramo creator, perché qui la causa può essere
+                                // un guasto lato server che dura, e non va
+                                // martellato ogni 8 secondi.
+                                when (verifyRevocation(familyId, uid)) {
+                                    RevocationVerdict.CONFIRMED -> {
+                                        KBLog.sync.warning("membersListener PERMISSION_DENIED — revoca verificata", TAG)
+                                        triggerAccessLostIfEligible(
+                                            familyId,
+                                            uid,
+                                            "members listener PERMISSION_DENIED",
+                                        )
+                                    }
+                                    RevocationVerdict.NOT_REVOKED -> {
+                                        KBLog.sync.warning(
+                                            "membersListener PERMISSION_DENIED ma il documento membro è al suo posto: " +
+                                                "nessun wipe, riprovo tra 30s",
+                                            TAG,
+                                        )
+                                        recoverFromUnconfirmedDenial(familyId)
+                                        membersFirstDone = true
+                                        checkAllFirstDone()
+                                    }
+                                    RevocationVerdict.UNDETERMINED -> {
+                                        KBLog.sync.warning(
+                                            "membersListener PERMISSION_DENIED non verificabile: nessun wipe, riprovo tra 30s",
+                                            TAG,
+                                        )
+                                        recoverFromUnconfirmedDenial(familyId)
+                                        membersFirstDone = true
+                                        checkAllFirstDone()
+                                    }
+                                }
                             }
                             return@addSnapshotListener
                         }

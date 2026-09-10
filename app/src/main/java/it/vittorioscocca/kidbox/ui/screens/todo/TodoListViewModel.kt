@@ -84,7 +84,7 @@ class TodoListViewModel @Inject constructor(
         }
         val listName = lists.firstOrNull { it.id == listId }?.name ?: titleForKind(kind)
         val todosForChild = todos.filter {
-            it.familyId == familyId && it.childId == childId && !it.isDeleted
+            it.familyId == familyId && !it.isDeleted
         }
         val listAccessDenied = kind == null && listId.isNotBlank() &&
             !TodoListExposure.memberCanSeeListRow(

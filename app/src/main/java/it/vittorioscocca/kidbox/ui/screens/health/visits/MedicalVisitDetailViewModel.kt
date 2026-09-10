@@ -1,9 +1,12 @@
 package it.vittorioscocca.kidbox.ui.screens.health.visits
 
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import it.vittorioscocca.kidbox.R
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
 import it.vittorioscocca.kidbox.data.health.VisitAttachmentTag
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
@@ -65,6 +68,7 @@ data class MedicalVisitDetailState(
 
 @HiltViewModel
 class MedicalVisitDetailViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val repository: MedicalVisitRepository,
     private val treatmentRepository: TreatmentRepository,
     private val examRepository: MedicalExamRepository,
@@ -227,12 +231,12 @@ class MedicalVisitDetailViewModel @Inject constructor(
         if (t == null) {
             return LinkedPrescriptionRow(
                 id = "",
-                title = "Caricamento...",
-                subtitle = "Terapia/Farmaco in sincronizzazione",
+                title = appContext.getString(R.string.health_loading),
+                subtitle = appContext.getString(R.string.health_treatment_syncing),
             )
         }
         val dosage = if (t.dosageValue % 1.0 == 0.0) "%.0f".format(t.dosageValue) else "%.1f".format(t.dosageValue)
-        val tail = if (t.isLongTerm) "lungo termine" else "${t.durationDays}gg"
+        val tail = if (t.isLongTerm) appContext.getString(R.string.health_long_term) else "${t.durationDays}gg"
         return LinkedPrescriptionRow(
             id = t.id,
             title = t.drugName,
@@ -246,8 +250,8 @@ class MedicalVisitDetailViewModel @Inject constructor(
         } else {
             LinkedPrescriptionRow(
                 id = "",
-                title = "Caricamento...",
-                subtitle = "Esame prescritto in sincronizzazione",
+                title = appContext.getString(R.string.health_loading),
+                subtitle = appContext.getString(R.string.health_prescribed_exam_syncing),
             )
         }
     }

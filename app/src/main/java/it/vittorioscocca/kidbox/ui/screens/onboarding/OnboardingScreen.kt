@@ -715,12 +715,7 @@ private fun NamePageContent(state: OnboardingNameUiState, viewModel: OnboardingN
             },
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
             shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = OrangeAccent,
-                unfocusedBorderColor = GrayFieldBorder,
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-            ),
+            colors = onboardingFieldColors(OrangeAccent),
         )
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -736,12 +731,7 @@ private fun NamePageContent(state: OnboardingNameUiState, viewModel: OnboardingN
             },
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
             shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = OrangeAccent,
-                unfocusedBorderColor = GrayFieldBorder,
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-            ),
+            colors = onboardingFieldColors(OrangeAccent),
         )
 
         if (!state.error.isNullOrBlank()) {
@@ -863,12 +853,7 @@ private fun LinkInviteConfirmPageContent(
             },
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
             shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = PurpleAccent,
-                unfocusedBorderColor = GrayFieldBorder,
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-            ),
+            colors = onboardingFieldColors(PurpleAccent),
         )
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -884,12 +869,7 @@ private fun LinkInviteConfirmPageContent(
             },
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
             shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = PurpleAccent,
-                unfocusedBorderColor = GrayFieldBorder,
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-            ),
+            colors = onboardingFieldColors(PurpleAccent),
         )
 
         val errorText = nameState.error ?: joinState.error
@@ -1020,12 +1000,7 @@ private fun CreateFamilyPageContent(
                 Text("👨‍👩‍👧", fontSize = 20.sp)
             },
             shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = OrangeAccent,
-                unfocusedBorderColor = GrayFieldBorder,
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-            ),
+            colors = onboardingFieldColors(OrangeAccent),
         )
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -1044,12 +1019,7 @@ private fun CreateFamilyPageContent(
                 Text("🚶", fontSize = 20.sp)
             },
             shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = OrangeAccent,
-                unfocusedBorderColor = GrayFieldBorder,
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-            ),
+            colors = onboardingFieldColors(OrangeAccent),
         )
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -1820,3 +1790,27 @@ private fun JoinFamilyPageContent(
         }
     }
 }
+
+/**
+ * Colori delle caselle di testo dell'onboarding.
+ *
+ * Il contenitore e' bianco fisso perche' questa schermata ha un suo aspetto
+ * chiaro a prescindere dal tema. Ma senza dichiarare anche il colore del TESTO,
+ * Compose usa `onSurface` del tema: in dark mode e' quasi bianco, e il nome che
+ * si sta scrivendo diventa invisibile. Bianco su bianco.
+ *
+ * Definirli qui, e non in sei punti, e' cio' che impedisce di correggerne cinque
+ * e dimenticare il sesto.
+ */
+@Composable
+private fun onboardingFieldColors(focusedBorder: Color) = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = focusedBorder,
+    unfocusedBorderColor = GrayFieldBorder,
+    focusedContainerColor = Color.White,
+    unfocusedContainerColor = Color.White,
+    disabledContainerColor = Color.White,
+    focusedTextColor = BlackText,
+    unfocusedTextColor = BlackText,
+    disabledTextColor = GrayDisabled,
+    cursorColor = focusedBorder,
+)

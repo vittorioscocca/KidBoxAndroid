@@ -247,7 +247,10 @@ class GroceryRepository @Inject constructor(
                             purchasedAtEpochMillis = dto.purchasedAtEpochMillis,
                             purchasedBy = dto.purchasedBy,
                             isDeleted = false,
-                            createdAtEpochMillis = local?.createdAtEpochMillis ?: (dto.updatedAtEpochMillis ?: now),
+                            createdAtEpochMillis = local?.createdAtEpochMillis
+                                ?: dto.createdAtEpochMillis
+                                ?: dto.updatedAtEpochMillis
+                                ?: now,
                             updatedAtEpochMillis = dto.updatedAtEpochMillis ?: now,
                             updatedBy = dto.updatedBy,
                             createdBy = local?.createdBy ?: dto.createdBy,

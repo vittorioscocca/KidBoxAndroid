@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  KidBox è escluso dal backup di sistema, in entrambe le forme: copia su cloud
+  e trasferimento diretto fra due telefoni.
+
+  PERCHÉ. I dati locali sono una copia di lavoro: Room si ricostruisce da
+  Firestore al primo login e la master key si recupera dall'escrow. Un utente
+  che reinstalla non perde nulla senza backup — quindi il backup qui non offre
+  niente, e in cambio crea l'unica copia dei dati di famiglia che NON passa dal
+  controllo di appartenenza. Firestore chiede "sei ancora membro?" a ogni
+  lettura; un backup non chiede niente a nessuno e sopravvive alla rimozione
+  dalla famiglia: chi viene tolto oggi, ripristinando su un telefono nuovo un
+  backup di ieri, si ritrova nomi dei figli, note e calendario.
+
+  Non è teoria: in Room i dati stanno DECIFRATI (KBNoteEntity.title/body,
+  KBChildEntity.name/birthDate/weight… — le sole password restano ciphertext),
+  e la cache di persistenza di Firestore si legge senza consultare le rules.
+
+  PERCHÉ SERVE ANCHE QUESTO FILE, oltre ad android:allowBackup="false".
+  Su Android 12+ la documentazione avverte che, su alcuni produttori,
+  `allowBackup="false"` disabilita il backup su cloud ma NON il trasferimento
+  device-to-device. Le esclusioni qui sotto chiudono anche quella strada.
+  Sotto Android 12 questo file è ignorato e vale `allowBackup="false"`.
+
+  Le esclusioni sono elencate dominio per dominio di proposito: i caratteri
+  jolly non esistono in questo formato, e una sezione lasciata vuota si presta
+  a letture ambigue. `path="."` copre la cartella e tutte le sottocartelle.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+    </cloud-backup>
+
+    <device-transfer>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+    </device-transfer>
+</data-extraction-rules>

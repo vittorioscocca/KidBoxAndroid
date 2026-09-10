@@ -1421,7 +1421,7 @@ private fun mimeFromFileName(name: String): String {
         "jpg", "jpeg" -> "image/jpeg"
         "png" -> "image/png"
         "mp3" -> "audio/mpeg"
-        "m4a" -> "audio/x-m4a"
+        "m4a" -> "audio/mp4"
         else -> "application/octet-stream"
     }
 }

@@ -870,7 +870,7 @@ fun ChatScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showClearConfirm = false }) { Text("Annulla") }
+                TextButton(onClick = { showClearConfirm = false }) { Text(stringResource(R.string.chat_cancel)) }
             },
         )
     }
@@ -896,7 +896,7 @@ fun ChatScreen(
                 ) { Text(stringResource(R.string.chat_save)) }
             },
             dismissButton = {
-                TextButton(onClick = { editTarget = null }) { Text("Annulla") }
+                TextButton(onClick = { editTarget = null }) { Text(stringResource(R.string.chat_cancel)) }
             },
         )
     }
@@ -2112,7 +2112,7 @@ private fun LocationPickerSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                TextButton(onClick = onDismiss) { Text("Annulla") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.chat_cancel)) }
                 TextButton(onClick = { onConfirm(marker.latitude, marker.longitude) }) { Text(stringResource(R.string.chat_send)) }
             }
             Spacer(Modifier.height(18.dp))

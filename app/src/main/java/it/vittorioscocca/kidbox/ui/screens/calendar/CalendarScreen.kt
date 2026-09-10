@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -26,7 +27,12 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -116,6 +122,8 @@ fun CalendarScreen(
     TrackSectionPresence(AppSection.CALENDAR, familyId)
     var showForm by remember { mutableStateOf(false) }
     var editingEvent by remember { mutableStateOf<KBCalendarEventEntity?>(null) }
+    // Ora scelta toccando la griglia di Giorno/Settimana; null = mezzanotte.
+    var newEventTime by remember { mutableStateOf<LocalTime?>(null) }
     val currentUid = remember { FirebaseAuth.getInstance().currentUser?.uid }
 
     // Evento aperto da notifica: si attende che la sincronizzazione lo porti in
@@ -214,6 +222,7 @@ fun CalendarScreen(
                         contentDescription = stringResource(R.string.calendar_new_event_cd),
                         onClick = {
                             editingEvent = null
+                            newEventTime = null
                             showForm = true
                         },
                     )
@@ -242,6 +251,16 @@ fun CalendarScreen(
                         .padding(3.dp),
                 ) {
                     TogglePill(
+                        text = stringResource(R.string.calendar_day_tab),
+                        selected = state.mode == CalendarMode.DAY,
+                        modifier = Modifier.weight(1f),
+                    ) { viewModel.setMode(CalendarMode.DAY) }
+                    TogglePill(
+                        text = stringResource(R.string.calendar_week_tab),
+                        selected = state.mode == CalendarMode.WEEK,
+                        modifier = Modifier.weight(1f),
+                    ) { viewModel.setMode(CalendarMode.WEEK) }
+                    TogglePill(
                         text = stringResource(R.string.calendar_month_tab),
                         selected = state.mode == CalendarMode.MONTH,
                         modifier = Modifier.weight(1f),
@@ -254,6 +273,24 @@ fun CalendarScreen(
                 }
 
                 when (state.mode) {
+                    CalendarMode.DAY, CalendarMode.WEEK -> CalendarTimeGridView(
+                        selectedDate = state.selectedDate,
+                        events = state.events,
+                        isWeek = state.mode == CalendarMode.WEEK,
+                        onSelectDate = viewModel::setSelectedDate,
+                        onEditEvent = {
+                            editingEvent = it
+                            newEventTime = null
+                            showForm = true
+                        },
+                        onAddEvent = { at ->
+                            viewModel.setSelectedDate(at.toLocalDate())
+                            editingEvent = null
+                            newEventTime = at.toLocalTime()
+                            showForm = true
+                        },
+                    )
+
                     CalendarMode.MONTH -> CalendarMonthView(
                         selectedDate = state.selectedDate,
                         displayedMonth = state.displayedMonth,
@@ -262,11 +299,13 @@ fun CalendarScreen(
                         onChangeDisplayedMonth = viewModel::setDisplayedMonth,
                         onEditEvent = {
                             editingEvent = it
+                            newEventTime = null
                             showForm = true
                         },
                         onDeleteEvent = viewModel::deleteEvent,
                         onAddEvent = {
                             editingEvent = null
+                            newEventTime = null
                             showForm = true
                         },
                     )
@@ -288,6 +327,7 @@ fun CalendarScreen(
         CalendarEventDialog(
             initial = editingEvent,
             selectedDate = state.selectedDate,
+            initialTime = newEventTime,
             currentUid = currentUid,
             visibilityScope = draftVisibilityScope,
             visibilityMemberIds = draftVisibilityMemberIds,
@@ -468,6 +508,365 @@ private fun CalendarMonthView(
             }
         }
     }
+}
+
+/** Altezza di un'ora nella griglia: gemella di `HOUR_HEIGHT` in calendarUtils.js. */
+private val HOUR_HEIGHT = 52.dp
+private val HOUR_GUTTER_WIDTH = 42.dp
+
+/**
+ * Viste Giorno e Settimana: la stessa griglia oraria della web app
+ * (`TimeGridView` di Calendario.jsx) e di `TimeGridView` su iOS.
+ */
+@Composable
+private fun CalendarTimeGridView(
+    selectedDate: LocalDate,
+    events: List<KBCalendarEventEntity>,
+    isWeek: Boolean,
+    onSelectDate: (LocalDate) -> Unit,
+    onEditEvent: (KBCalendarEventEntity) -> Unit,
+    onAddEvent: (LocalDateTime) -> Unit,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    val locale = KBLocale.current()
+    val days = remember(selectedDate, isWeek) {
+        if (isWeek) {
+            // Prima colonna lunedì, come la griglia del mese.
+            val first = selectedDate.minusDays((selectedDate.dayOfWeek.value - 1).toLong())
+            (0L..6L).map { first.plusDays(it) }
+        } else {
+            listOf(selectedDate)
+        }
+    }
+    val eventsByDate = remember(events) { buildEventsByDay(events) }
+    val scrollState = rememberScrollState()
+    val density = LocalDensity.current
+
+    // Si apre sull'orario utile: a mezzanotte non c'è niente da vedere.
+    LaunchedEffect(Unit) {
+        scrollState.scrollTo(with(density) { (HOUR_HEIGHT * 7).roundToPx() })
+    }
+
+    val step = if (isWeek) 7L else 1L
+    val title = remember(days, locale) {
+        if (!isWeek) {
+            selectedDate.format(DateTimeFormatter.ofPattern("d MMMM yyyy", locale))
+        } else {
+            val first = days.first()
+            val last = days.last()
+            val startPattern = if (first.month == last.month) "d" else "d MMM"
+            "${first.format(DateTimeFormatter.ofPattern(startPattern, locale))} – " +
+                last.format(DateTimeFormatter.ofPattern("d MMMM yyyy", locale))
+        }.replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = { onSelectDate(selectedDate.minusDays(step)) }) {
+                Icon(
+                    Icons.Default.ChevronLeft,
+                    contentDescription = stringResource(R.string.calendar_previous_month_cd),
+                    tint = kb.title,
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = kb.title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (!isWeek) {
+                    Text(
+                        selectedDate.format(DateTimeFormatter.ofPattern("EEEE", locale))
+                            .replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() },
+                        color = kb.subtitle,
+                        fontSize = 12.sp,
+                    )
+                }
+            }
+            PillButton(text = stringResource(R.string.calendar_today_btn)) {
+                onSelectDate(LocalDate.now())
+            }
+            IconButton(onClick = { onSelectDate(selectedDate.plusDays(step)) }) {
+                Icon(
+                    Icons.Default.ChevronRight,
+                    contentDescription = stringResource(R.string.calendar_next_month_cd),
+                    tint = kb.title,
+                )
+            }
+        }
+
+        if (isWeek) {
+            Row(modifier = Modifier.fillMaxWidth().padding(end = 4.dp)) {
+                Spacer(modifier = Modifier.width(HOUR_GUTTER_WIDTH))
+                days.forEach { day ->
+                    val isToday = day == LocalDate.now()
+                    Column(
+                        modifier = Modifier.weight(1f).padding(vertical = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            day.format(DateTimeFormatter.ofPattern("EEE", locale)),
+                            color = kb.subtitle,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                        )
+                        Text(
+                            day.dayOfMonth.toString(),
+                            color = if (isToday) Color(0xFF2196F3) else kb.title,
+                            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                            fontSize = 13.sp,
+                        )
+                    }
+                }
+            }
+            Divider()
+        }
+
+        // Riga "tutto il giorno": gli eventi senza orario non stanno nella griglia.
+        // Esiste solo se c'è qualcosa da metterci, altrimenti ruba una striscia
+        // di spazio sopra la griglia (come su iOS).
+        val hasAllDayEvents = days.any { day ->
+            eventsByDate[day].orEmpty().any { it.isAllDay }
+        }
+        if (hasAllDayEvents) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp, horizontal = 0.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Text(
+                    stringResource(R.string.calendar_all_day_short),
+                    modifier = Modifier.width(HOUR_GUTTER_WIDTH).padding(end = 4.dp),
+                    color = kb.subtitle,
+                    fontSize = 9.sp,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                )
+                days.forEach { day ->
+                    Column(
+                        modifier = Modifier.weight(1f).padding(horizontal = 1.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        eventsByDate[day].orEmpty().filter { it.isAllDay }.forEach { event ->
+                            Text(
+                                event.title,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(categoryColor(event.categoryRaw))
+                                    .clickable { onEditEvent(event) }
+                                    .padding(horizontal = 6.dp, vertical = 3.dp),
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+            Divider()
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(scrollState)
+                .padding(end = 4.dp),
+        ) {
+            Column(modifier = Modifier.width(HOUR_GUTTER_WIDTH)) {
+                (0..23).forEach { hour ->
+                    Text(
+                        text = "%02d:00".format(hour),
+                        modifier = Modifier
+                            .height(HOUR_HEIGHT)
+                            .fillMaxWidth()
+                            .padding(end = 4.dp),
+                        color = kb.subtitle,
+                        fontSize = 10.sp,
+                        textAlign = TextAlign.End,
+                    )
+                }
+            }
+            days.forEach { day ->
+                TimeGridDayColumn(
+                    day = day,
+                    events = eventsByDate[day].orEmpty().filterNot { it.isAllDay },
+                    onEditEvent = onEditEvent,
+                    onAddEvent = onAddEvent,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RowScope.TimeGridDayColumn(
+    day: LocalDate,
+    events: List<KBCalendarEventEntity>,
+    onEditEvent: (KBCalendarEventEntity) -> Unit,
+    onAddEvent: (LocalDateTime) -> Unit,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    val laid = remember(events, day) { layoutTimedEvents(events, day) }
+    val hourHeightPx = with(LocalDensity.current) { HOUR_HEIGHT.toPx() }
+
+    BoxWithConstraints(
+        modifier = Modifier
+            .weight(1f)
+            .height(HOUR_HEIGHT * 24)
+            // Doppio tocco su uno spazio vuoto: nuovo evento a quell'ora, come
+            // il doppio click della web app.
+            .pointerInput(day) {
+                detectTapGestures(
+                    onDoubleTap = { offset ->
+                        val hour = (offset.y / hourHeightPx).toInt().coerceIn(0, 23)
+                        onAddEvent(LocalDateTime.of(day, LocalTime.of(hour, 0)))
+                    },
+                )
+            },
+    ) {
+        val columnWidth = maxWidth
+
+        Column {
+            repeat(24) {
+                Box(modifier = Modifier.fillMaxWidth().height(HOUR_HEIGHT)) {
+                    Divider(color = kb.subtitle.copy(alpha = 0.18f), thickness = 0.5.dp)
+                }
+            }
+        }
+
+        laid.forEach { item ->
+            val slot = columnWidth / item.columns
+            val color = categoryColor(item.event.categoryRaw)
+            val height = maxOf(HOUR_HEIGHT * (item.heightMinutes / 60f), 18.dp)
+            val start = Instant.ofEpochMilli(item.event.startDateEpochMillis)
+                .atZone(ZoneId.systemDefault()).toLocalTime()
+            val end = Instant.ofEpochMilli(item.event.endDateEpochMillis)
+                .atZone(ZoneId.systemDefault()).toLocalTime()
+
+            Column(
+                modifier = Modifier
+                    .offset(x = slot * item.column + 1.dp, y = HOUR_HEIGHT * (item.topMinutes / 60f))
+                    .width(maxOf(slot - 3.dp, 20.dp))
+                    .height(height)
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(color.copy(alpha = 0.26f))
+                    .clickable { onEditEvent(item.event) }
+                    .padding(start = 5.dp, end = 3.dp, top = 2.dp),
+            ) {
+                Text(
+                    item.event.title,
+                    color = color,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = if (height > 32.dp) 2 else 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (height > 32.dp) {
+                    Text(
+                        "${start.format(DateTimeFormatter.ofPattern("HH:mm"))} - " +
+                            end.format(DateTimeFormatter.ofPattern("HH:mm")),
+                        color = kb.subtitle,
+                        fontSize = 9.sp,
+                        maxLines = 1,
+                    )
+                }
+            }
+            // Barra della categoria a sinistra del blocco.
+            Box(
+                modifier = Modifier
+                    .offset(x = slot * item.column + 1.dp, y = HOUR_HEIGHT * (item.topMinutes / 60f))
+                    .width(3.dp)
+                    .height(height)
+                    .background(color),
+            )
+        }
+    }
+}
+
+private data class TimedEventLayout(
+    val event: KBCalendarEventEntity,
+    val topMinutes: Float,
+    val heightMinutes: Float,
+    val column: Int,
+    val columns: Int,
+)
+
+/**
+ * Posizione, altezza e colonna di ogni evento a orario dentro un giorno.
+ * Porting di `layoutOverlaps` (calendarUtils.js): gli eventi che si sovrappongono
+ * si dividono la larghezza invece di coprirsi.
+ */
+private fun layoutTimedEvents(
+    events: List<KBCalendarEventEntity>,
+    day: LocalDate,
+): List<TimedEventLayout> {
+    data class Box(val event: KBCalendarEventEntity, val top: Float, val height: Float)
+
+    val dayStart = day.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    val boxes = events.map { event ->
+        val startMillis = minOf(event.startDateEpochMillis, event.endDateEpochMillis)
+        val endMillis = maxOf(event.startDateEpochMillis, event.endDateEpochMillis)
+        // Un evento su più giorni viene tagliato agli estremi del giorno, così si
+        // vede su ognuno di essi.
+        val from = ((startMillis - dayStart) / 60_000f).coerceIn(0f, 1440f)
+        val to = minOf(maxOf((endMillis - dayStart) / 60_000f, from + 15f), 1440f)
+        Box(event = event, top = from, height = to - from)
+    }.sortedBy { it.top }
+
+    val result = mutableListOf<TimedEventLayout>()
+
+    fun flush(group: List<Box>) {
+        if (group.isEmpty()) return
+        val columnEnds = mutableListOf<Float>()
+        val assigned = mutableListOf<Pair<Box, Int>>()
+        group.forEach { item ->
+            var col = columnEnds.indexOfFirst { item.top >= it }
+            if (col == -1) {
+                columnEnds.add(0f)
+                col = columnEnds.lastIndex
+            }
+            columnEnds[col] = item.top + item.height
+            assigned += item to col
+        }
+        val total = maxOf(columnEnds.size, 1)
+        assigned.forEach { (box, col) ->
+            result += TimedEventLayout(
+                event = box.event,
+                topMinutes = box.top,
+                heightMinutes = box.height,
+                column = col,
+                columns = total,
+            )
+        }
+    }
+
+    val group = mutableListOf<Box>()
+    var groupEnd = -1f
+    boxes.forEach { item ->
+        if (group.isNotEmpty() && item.top >= groupEnd) {
+            flush(group.toList())
+            group.clear()
+            groupEnd = -1f
+        }
+        group += item
+        groupEnd = maxOf(groupEnd, item.top + item.height)
+    }
+    flush(group.toList())
+
+    return result
 }
 
 @Composable
@@ -718,6 +1117,8 @@ private fun CalendarEventCard(
 private fun CalendarEventDialog(
     initial: KBCalendarEventEntity?,
     selectedDate: LocalDate,
+    /** Ora scelta toccando la griglia oraria; null = mezzanotte. */
+    initialTime: LocalTime?,
     currentUid: String?,
     /** Current visibility selection – owned by CalendarScreen so the picker can open outside this sheet. */
     visibilityScope: String,
@@ -735,7 +1136,7 @@ private fun CalendarEventDialog(
 
     val initialStart = initial?.let {
         Instant.ofEpochMilli(it.startDateEpochMillis).atZone(ZoneId.systemDefault()).toLocalDateTime()
-    } ?: LocalDateTime.of(selectedDate, LocalTime.of(0, 0))
+    } ?: LocalDateTime.of(selectedDate, initialTime ?: LocalTime.of(0, 0))
 
     val initialEnd = initial?.let {
         Instant.ofEpochMilli(it.endDateEpochMillis).atZone(ZoneId.systemDefault()).toLocalDateTime()
@@ -1001,7 +1402,7 @@ private fun CalendarEventDialog(
                                     fontSize = 15.sp,
                                 )
                             }
-                            Text("Cambia ›", color = kb.subtitle, fontSize = 14.sp)
+                            Text(stringResource(R.string.calendar_change_visibility), color = kb.subtitle, fontSize = 14.sp)
                         }
                     } else {
                         Text(
@@ -1224,7 +1625,14 @@ private fun TogglePill(
             .padding(vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.title)
+        Text(
+            text,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.kidBoxColors.title,
+        )
     }
 }
 

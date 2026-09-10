@@ -251,7 +251,7 @@ class PlanningActionExecutor @Inject constructor(
     ): TodoTarget {
         val resolvedChild = childId ?: children.firstOrNull()?.id ?: familyId
         if (!listId.isNullOrBlank()) return TodoTarget(resolvedChild, listId)
-        val lists = todoListDao.getByFamilyAndChild(familyId, resolvedChild)
+        val lists = todoListDao.getByFamily(familyId)
         return TodoTarget(resolvedChild, lists.firstOrNull()?.id)
     }
 

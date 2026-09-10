@@ -14,11 +14,18 @@ interface KBTodoItemDao {
     suspend fun getById(id: String): KBTodoItemEntity?
 
 
-    @Query("SELECT * FROM kb_todo_items WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 ORDER BY dueAtEpochMillis")
-    fun observeByFamilyAndChild(familyId: String, childId: String): Flow<List<KBTodoItemEntity>>
+    /**
+     * I to-do sono di FAMIGLIA: nessun filtro sul bambino, come già faceva
+     * `observeOpenByFamilyId` qui sotto per la Dashboard. Il campo `childId`
+     * resta sull'entity e continua a essere scritto, ma non è mai stato uno
+     * scoping affidabile — veniva da `children.first()` su un elenco senza
+     * ordinamento garantito. Vedi il commento esteso in TodoHomeView.swift.
+     */
+    @Query("SELECT * FROM kb_todo_items WHERE familyId = :familyId AND isDeleted = 0 ORDER BY dueAtEpochMillis")
+    fun observeByFamily(familyId: String): Flow<List<KBTodoItemEntity>>
 
-    @Query("SELECT * FROM kb_todo_items WHERE familyId = :familyId AND childId = :childId AND isDeleted = 0 ORDER BY dueAtEpochMillis")
-    suspend fun getByFamilyAndChild(familyId: String, childId: String): List<KBTodoItemEntity>
+    @Query("SELECT * FROM kb_todo_items WHERE familyId = :familyId AND isDeleted = 0 ORDER BY dueAtEpochMillis")
+    suspend fun getByFamily(familyId: String): List<KBTodoItemEntity>
 
     /**
      * Tutti i to-do aperti della famiglia, senza filtro sul bambino: la Dashboard

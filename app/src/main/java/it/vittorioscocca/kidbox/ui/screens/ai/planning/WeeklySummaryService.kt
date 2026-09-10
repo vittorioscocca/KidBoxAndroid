@@ -243,8 +243,7 @@ class WeeklySummaryBroadcastReceiver : BroadcastReceiver() {
             // riportare avanti quello esistente.
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP,
             )
             putExtra("push_type", "weekly_summary")
             putExtra("push_family_id", familyId)

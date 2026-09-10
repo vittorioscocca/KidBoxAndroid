@@ -18,7 +18,16 @@ class InviteRemoteStore(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
 ) {
     private val db get() = FirebaseFirestore.getInstance()
-    suspend fun addMember(familyId: String, role: String = "member") {
+    /**
+     * @param inviteId l'invito da cui nasce questa iscrizione. Finisce sul
+     * documento membro perché è **la prova** che le regole Firestore chiedono
+     * per l'auto-iscrizione: senza, chiunque conosca il `familyId` può
+     * aggiungersi da sé a una famiglia altrui. L'invito è già marcato
+     * `usedBy = uid` da [JoinWrapService], e la regola verifica proprio quella
+     * corrispondenza. È opzionale solo per l'owner, che alla creazione della
+     * famiglia non ha nessun invito.
+     */
+    suspend fun addMember(familyId: String, role: String = "member", inviteId: String? = null) {
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
         val memberRef = db.collection("families")
             .document(familyId)
@@ -36,6 +45,9 @@ class InviteRemoteStore(
             "updatedAt" to FieldValue.serverTimestamp(),
             "createdAt" to FieldValue.serverTimestamp(),
         )
+        if (!inviteId.isNullOrEmpty()) {
+            memberFields["inviteId"] = inviteId
+        }
         auth.currentUser?.displayName?.trim()?.takeIf { it.isNotEmpty() && it != "Utente" }?.let {
             memberFields["displayName"] = it
         }

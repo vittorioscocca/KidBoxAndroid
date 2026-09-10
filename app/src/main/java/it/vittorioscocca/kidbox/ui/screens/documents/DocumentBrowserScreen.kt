@@ -1906,7 +1906,7 @@ private fun UnlockPdfBottomSheet(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 CapsuleActionButton(
-                    label = "Annulla",
+                    label = stringResource(R.string.documents_cancel),
                     onClick = onDismiss,
                     enabled = true,
                     modifier = Modifier.width(92.dp),
@@ -1921,7 +1921,7 @@ private fun UnlockPdfBottomSheet(
                         .padding(horizontal = 10.dp),
                 )
                 CapsuleActionButton(
-                    label = "Sblocca",
+                    label = stringResource(R.string.documents_action_unlock),
                     onClick = { onConfirm(password) },
                     enabled = password.isNotEmpty() && nameDraft.isNotBlank(),
                     modifier = Modifier.width(92.dp),
@@ -1985,7 +1985,7 @@ private fun UnlockPdfBottomSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 6.dp),
-                placeholder = { Text("Inserisci la password") },
+                placeholder = { Text(stringResource(R.string.documents_password_placeholder)) },
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp),
                 visualTransformation = if (showPassword) {
@@ -2001,7 +2001,9 @@ private fun UnlockPdfBottomSheet(
                     androidx.compose.material3.IconButton(onClick = { showPassword = !showPassword }) {
                         Icon(
                             imageVector = if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = if (showPassword) "Nascondi password" else "Mostra password",
+                            contentDescription = stringResource(
+                                if (showPassword) R.string.documents_hide_password else R.string.documents_show_password,
+                            ),
                             tint = MaterialTheme.kidBoxColors.subtitle,
                         )
                     }
@@ -2028,7 +2030,7 @@ private fun UnlockPdfBottomSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 6.dp),
-                placeholder = { Text("Documento sbloccato") },
+                placeholder = { Text(stringResource(R.string.documents_unlocked_pdf_name_placeholder)) },
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp),
             )
@@ -2087,7 +2089,7 @@ private fun MergePdfRow(
         )
         Icon(
             imageVector = Icons.Default.Menu,
-            contentDescription = "Trascina per riordinare",
+            contentDescription = stringResource(R.string.documents_drag_to_reorder),
             tint = Color(0xFFB0B0B0),
             modifier = Modifier
                 .padding(start = 8.dp)
@@ -2166,10 +2168,10 @@ private suspend fun openDocument(
         KBLog.ui.info("startActivity success docId=${document.id}", TAG_DOC_OPEN)
     } catch (_: ActivityNotFoundException) {
         KBLog.ui.error("no app found to open docId=${document.id} mime=${document.mimeType}", TAG_DOC_OPEN)
-        Toast.makeText(context, "Nessuna app disponibile per aprire questo file", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, context.getString(R.string.documents_no_app_to_open), Toast.LENGTH_LONG).show()
     } catch (_: TimeoutCancellationException) {
         KBLog.ui.error("openDocument timeout docId=${document.id}", TAG_DOC_OPEN)
-        Toast.makeText(context, "Timeout apertura documento", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, context.getString(R.string.documents_timeout_opening), Toast.LENGTH_LONG).show()
     } catch (e: Exception) {
         KBLog.ui.error("openDocument failed docId=${document.id}", TAG_DOC_OPEN, e)
         Toast.makeText(
@@ -2205,7 +2207,7 @@ private suspend fun shareDocuments(
         }
     }
     if (uris.isEmpty()) {
-        Toast.makeText(context, "Nessun file condivisibile", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.documents_no_shareable_file), Toast.LENGTH_SHORT).show()
         return
     }
     val shareIntent = Intent().apply {

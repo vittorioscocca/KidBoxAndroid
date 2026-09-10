@@ -236,6 +236,11 @@ data class FitnessSession(
     val actualKcal: Int? = null,
     /** Frequenza cardiaca media dell'allenamento svolto, se Health Connect ce l'ha. */
     val actualHeartRateBpm: Int? = null,
+    /**
+     * Distanza percorsa, in metri, quando l'attività ne ha una (corsa, bici,
+     * nuoto). Nulla per le discipline senza distanza.
+     */
+    val actualDistanceMeters: Double? = null,
 ) {
     val isRest: Boolean
         get() = activityType.lowercase().let { type ->
@@ -268,6 +273,8 @@ data class FitnessLoggedWorkout(
     val durationMinutes: Int? = null,
     val kcal: Int? = null,
     val heartRateBpm: Int? = null,
+    /** Distanza percorsa, in metri, quando l'attività ne ha una. */
+    val distanceMeters: Double? = null,
 )
 
 /**
@@ -298,6 +305,22 @@ object FitnessDisciplineMatcher {
         return families.any { keys ->
             keys.any { activity.contains(it) } && keys.any { session.contains(it) }
         }
+    }
+}
+
+/**
+ * Chilometri come li scrive l'app: una cifra decimale, separatore locale. Sta
+ * qui perché serve alla dashboard, all'elenco sessioni e al consuntivo.
+ */
+object FitnessDistanceFormatter {
+
+    /**
+     * `null` quando la distanza non c'è o è trascurabile: le discipline senza
+     * distanza non devono mostrare "0,0 km".
+     */
+    fun kilometers(meters: Double?): String? {
+        if (meters == null || meters < 10.0) return null
+        return String.format(java.util.Locale.getDefault(), "%.1f km", meters / 1000.0)
     }
 }
 
@@ -381,6 +404,11 @@ data class FitnessWeeklyReport(
     val skippedSessions: Int,
     val totalMinutes: Int,
     val totalKcal: Int,
+    /**
+     * Metri percorsi nelle sedute chiuse della settimana. Vale zero quando
+     * nessuna attività ha una distanza.
+     */
+    val totalDistanceMeters: Double = 0.0,
     /** Sedute completate con un'attività diversa da quella programmata. */
     val substitutedSessions: Int = 0,
     /** Giorni della settimana (convenzione [Calendar]) sistematicamente saltati. */

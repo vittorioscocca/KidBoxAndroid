@@ -436,6 +436,7 @@
     <string name="health_write_message">Scrivi un messaggio...</string>
     <string name="health_send">Invia</string>
     <string name="health_history_deleted">La cronologia verrà eliminata.</string>
+    <string name="health_history_context_deleted">La cronologia verrà eliminata e il contesto verrà ricostruito.</string>
     <string name="health_wide_context">Contesto sanitario ampio</string>
     <string name="health_take_photo">Scatta foto</string>
     <string name="health_pick_library">Scegli dalla libreria</string>

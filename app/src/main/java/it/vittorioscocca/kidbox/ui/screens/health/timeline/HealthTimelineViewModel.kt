@@ -1,8 +1,11 @@
 package it.vittorioscocca.kidbox.ui.screens.health.timeline
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import it.vittorioscocca.kidbox.R
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.mapper.computedStatus
@@ -53,6 +56,7 @@ data class MonthTimelineGroup(
 
 @HiltViewModel
 class HealthTimelineViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val visitRepository: MedicalVisitRepository,
     private val examRepository: MedicalExamRepository,
     private val treatmentRepository: TreatmentRepository,
@@ -124,7 +128,7 @@ class HealthTimelineViewModel @Inject constructor(
                         sourceId = visit.id,
                         dateEpochMillis = visit.dateEpochMillis,
                         kind = HealthTimelineEventKind.VISIT,
-                        title = visit.reason.ifBlank { "Visita medica" },
+                        title = visit.reason.ifBlank { appContext.getString(R.string.health_visit_lower) },
                         subtitle = visit.doctorName,
                     )
                 }

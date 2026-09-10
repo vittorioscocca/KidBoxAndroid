@@ -160,6 +160,22 @@
     <string name="fitness_action_move">Mover</string>
     <string name="fitness_action_skip">Omitir</string>
     <string name="fitness_session_minutes">%1$d min</string>
+    <string name="fitness_sessions_title">Sesiones</string>
+    <string name="fitness_sessions_recorded">%1$d sesiones registradas</string>
+    <string name="fitness_sessions_total">Total</string>
+    <string name="fitness_sessions_average">Media</string>
+    <string name="fitness_sessions_time">Tiempo</string>
+    <string name="fitness_sessions_calories">Calorías</string>
+    <string name="fitness_sessions_distance">Distancia</string>
+    <string name="fitness_sessions_kcal">%1$d kcal</string>
+    <string name="fitness_sessions_kcal_big">%1$d KCAL</string>
+    <string name="fitness_sessions_min_big">%1$d MIN</string>
+    <string name="fitness_sessions_hours">%1$dh %2$02dmin</string>
+    <string name="fitness_sessions_today">hoy</string>
+    <string name="fitness_sessions_yesterday">ayer</string>
+    <string name="fitness_sessions_planned">Previsto: %1$s</string>
+    <string name="fitness_sessions_empty_title">Ninguna sesión registrada</string>
+    <string name="fitness_sessions_empty_body">Las sesiones marcadas como hechas, a mano o por Health Connect, aparecen aquí.</string>
     <string name="fitness_done_manual">Marcada como hecha</string>
     <string name="fitness_done_notification">Marcada como hecha desde la notificación</string>
     <string name="fitness_done_health">Registrado por Health Connect</string>
@@ -310,6 +326,7 @@
     <string name="fitness_count_as">Contar como…</string>
     <string name="fitness_done_different">Hecho: %1$s — distinto de lo programado</string>
     <string name="fitness_sync_logged">Actividades registradas fuera del plan: %1$d. Abre el día para asignarlas a una sesión.</string>
+    <string name="fitness_sync_distance_backfill">Kilómetros recuperados en actividades ya registradas: %1$d</string>
     <string name="fitness_edit_session">Editar</string>
     <string name="fitness_edit_session_title">Editar sesión</string>
     <string name="fitness_edit_status">Cómo ha ido</string>
@@ -320,4 +337,29 @@
     <string name="fitness_edit_save">Guardar</string>
     <string name="fitness_chat_clear">Nueva conversación</string>
     <string name="fitness_sync_repaired">Sesiones reabiertas porque se cerraron con una actividad de otro tipo: %1$d</string>
+
+    <!-- Diálogos del sistema: consentimiento de informes, actualización, anuncios -->
+    <string name="crash_consent_title">Ayúdanos a mejorar KidBox</string>
+    <string name="crash_consent_body">Hemos detectado %1$s. ¿Puedes enviarnos un informe anónimo? No se enviarán datos personales ni familiares.</string>
+    <plurals name="crash_consent_issues">
+        <item quantity="one">%1$d anomalía técnica</item>
+        <item quantity="other">%1$d anomalías técnicas</item>
+    </plurals>
+    <string name="crash_consent_send">Enviar informe</string>
+    <string name="crash_consent_decline">No, gracias</string>
+    <string name="update_available_title">Hay una actualización disponible</string>
+    <string name="update_available_body">Para aprovechar KidBox al máximo te recomendamos actualizar a la última versión: incluye mejoras y correcciones.</string>
+    <string name="update_available_update">Actualizar</string>
+    <string name="update_available_later">Ahora no</string>
+    <string name="broadcast_action_go">Ir</string>
+    <string name="broadcast_action_ok">Entendido</string>
+    <string name="broadcast_action_later">Ahora no</string>
+    <string name="grocery_added_by">Añadido por %1$s · %2$s</string>
+    <string name="grocery_added_today">hoy</string>
+    <string name="grocery_added_yesterday">ayer</string>
+    <string name="grocery_added_days_ago">hace %1$d días</string>
+    <string name="grocery_added_now">ahora</string>
+    <string name="grocery_added_minutes_ago">hace %1$d minutos</string>
+    <string name="grocery_added_hour_ago">hace una hora</string>
+    <string name="grocery_added_hours_ago">hace %1$d horas</string>
 </resources>

@@ -32,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -329,7 +330,7 @@ private fun SelectedPlaceCard(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(Icons.Filled.Info, contentDescription = null, tint = MapAccent, modifier = Modifier.size(16.dp))
-                        Text(" Dettagli", color = MapAccent, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Text(" " + stringResource(R.string.travel_place_details), color = MapAccent, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     }
                 }
                 Surface(
@@ -343,7 +344,7 @@ private fun SelectedPlaceCard(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(Icons.Filled.Navigation, contentDescription = null, tint = kb.title, modifier = Modifier.size(16.dp))
-                        Text(" Indicazioni", color = kb.title, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Text(" " + stringResource(R.string.travel_directions), color = kb.title, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     }
                 }
             }

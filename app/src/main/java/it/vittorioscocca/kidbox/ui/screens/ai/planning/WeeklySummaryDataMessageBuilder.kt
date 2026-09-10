@@ -98,9 +98,8 @@ class WeeklySummaryDataMessageBuilder @Inject constructor(
                 ev.startDateEpochMillis < windowEndExclusive
         }.sortedBy { it.startDateEpochMillis }
 
-        val allTodos = children.flatMap { child ->
-            todoItemDao.getByFamilyAndChild(familyId, child.id)
-        }.filterNot { it.isDeleted }
+        // I to-do sono di famiglia: una query sola invece di una per figlio.
+        val allTodos = todoItemDao.getByFamily(familyId).filterNot { it.isDeleted }
 
         val urgent = allTodos.filter { todo ->
             !todo.isDone &&

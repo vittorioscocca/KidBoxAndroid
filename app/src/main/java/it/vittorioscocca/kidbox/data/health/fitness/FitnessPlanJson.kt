@@ -55,6 +55,7 @@ object FitnessPlanJson {
                                 workout.durationMinutes?.let { put("durationMinutes", it) }
                                 workout.kcal?.let { put("kcal", it) }
                                 workout.heartRateBpm?.let { put("heartRateBpm", it) }
+                                workout.distanceMeters?.let { put("distanceMeters", it) }
                             },
                         )
                     }
@@ -131,6 +132,11 @@ object FitnessPlanJson {
                 durationMinutes = if (item.has("durationMinutes")) item.optInt("durationMinutes") else null,
                 kcal = if (item.has("kcal")) item.optInt("kcal") else null,
                 heartRateBpm = if (item.has("heartRateBpm")) item.optInt("heartRateBpm") else null,
+                distanceMeters = if (item.has("distanceMeters")) {
+                    item.optDouble("distanceMeters")
+                } else {
+                    null
+                },
             )
         }
     }
@@ -229,6 +235,7 @@ object FitnessPlanJson {
         session.actualMinutes?.let { put("actualMinutes", it) }
         session.actualKcal?.let { put("actualKcal", it) }
         session.actualHeartRateBpm?.let { put("actualHeartRateBpm", it) }
+        session.actualDistanceMeters?.let { put("actualDistanceMeters", it) }
     }
 
     private fun decodeSession(json: JSONObject): FitnessSession? {
@@ -270,6 +277,11 @@ object FitnessPlanJson {
             actualKcal = if (json.has("actualKcal")) json.optInt("actualKcal") else null,
             actualHeartRateBpm = if (json.has("actualHeartRateBpm")) {
                 json.optInt("actualHeartRateBpm")
+            } else {
+                null
+            },
+            actualDistanceMeters = if (json.has("actualDistanceMeters")) {
+                json.optDouble("actualDistanceMeters")
             } else {
                 null
             },

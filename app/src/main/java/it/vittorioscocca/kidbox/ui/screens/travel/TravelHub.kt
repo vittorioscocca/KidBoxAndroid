@@ -88,7 +88,7 @@ private fun PlanTripCard(enabled: Boolean, onClick: () -> Unit) {
         Column {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(stringResource(R.string.travel_plan_a_trip), color = TravelAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                Text("~2 MIN", color = Color.White.copy(0.55f), fontSize = 11.sp)
+                Text(stringResource(R.string.travel_hub_duration), color = Color.White.copy(0.55f), fontSize = 11.sp)
             }
             Spacer(Modifier.height(12.dp))
             Text(stringResource(R.string.travel_i_know), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)

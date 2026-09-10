@@ -154,7 +154,7 @@ class ShareActionHandler @Inject constructor(
     private suspend fun handleTodo(input: ShareActionInput) {
         val childId = childDao.getChildrenByFamilyId(input.familyId).firstOrNull()?.id
             ?: error(appContext.getString(R.string.share_error_no_child_for_todo))
-        val existingList = todoListDao.getByFamilyAndChild(input.familyId, childId).firstOrNull()
+        val existingList = todoListDao.getByFamily(input.familyId).firstOrNull()
         val listId = existingList?.id ?: todoRepository.addList(input.familyId, childId, appContext.getString(R.string.share_default_todo_list_name))
         val todoTitle = input.title.ifBlank { input.text.lineSequence().firstOrNull().orEmpty().ifBlank { appContext.getString(R.string.share_default_todo_title) } }
         todoRepository.addTodo(

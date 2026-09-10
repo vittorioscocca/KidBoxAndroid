@@ -84,7 +84,6 @@ class TodoRemoteStore @Inject constructor(
         onError: (Exception) -> Unit,
     ): ListenerRegistration {
         return db.collection("families").document(familyId).collection("todoLists")
-            .whereEqualTo("childId", childId)
             .whereEqualTo("isDeleted", false)
             .addSnapshotListener(
                 MetadataChanges.EXCLUDE,
@@ -144,7 +143,6 @@ class TodoRemoteStore @Inject constructor(
         onError: (Exception) -> Unit,
     ): ListenerRegistration {
         return db.collection("families").document(familyId).collection("todos")
-            .whereEqualTo("childId", childId)
             .whereEqualTo("isDeleted", false)
             .addSnapshotListener(
                 MetadataChanges.INCLUDE,
@@ -202,6 +200,36 @@ class TodoRemoteStore @Inject constructor(
                     }
                 },
             )
+    }
+
+    /**
+     * Legge una singola lista, per il caso in cui un to-do ne citi una che non è
+     * (ancora) in Room.
+     *
+     * Serve perché la FK di `kb_todo_items.listId` impone che la lista esista in
+     * locale: senza questa lettura il to-do verrebbe salvato con `listId = null`
+     * e resterebbe scollegato dalla sua lista anche dopo che la lista arriva.
+     *
+     * Ritorna `null` anche per una lista cancellata: in quel caso il to-do è un
+     * orfano vero (la lista è stata cancellata senza cancellare i suoi to-do) e
+     * `listId = null` è la descrizione onesta della situazione.
+     */
+    suspend fun fetchList(familyId: String, listId: String): TodoListRemoteDto? {
+        val doc = db.collection("families").document(familyId)
+            .collection("todoLists").document(listId).get().await()
+        val d = doc.data ?: return null
+        if (d["isDeleted"] as? Boolean == true) return null
+        val name = (d["name"] as? String)?.trim().orEmpty()
+        if (name.isEmpty()) return null
+        return TodoListRemoteDto(
+            id = doc.id,
+            familyId = familyId,
+            childId = (d["childId"] as? String)?.trim().orEmpty(),
+            name = name,
+            isDeleted = false,
+            createdBy = (d["createdBy"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+            updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
+        )
     }
 
     suspend fun upsertList(list: KBTodoListEntity) {

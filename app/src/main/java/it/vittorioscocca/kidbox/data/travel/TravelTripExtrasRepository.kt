@@ -187,7 +187,7 @@ class TravelTripExtrasRepository @Inject constructor(
 
         // Lista già esistente di questo viaggio, rimasta scollegata: si
         // riaggancia invece di crearne un'altra.
-        val orphanList = todoListDao.getByFamilyAndChild(trip.familyId, childId)
+        val orphanList = todoListDao.getByFamily(trip.familyId)
             .firstOrNull { it.name.trim() == trip.name.trim() }
         if (orphanList != null) {
             tripDao.upsert(trip.copy(todoListId = orphanList.id, updatedAtEpoch = System.currentTimeMillis()))
@@ -213,7 +213,7 @@ class TravelTripExtrasRepository @Inject constructor(
 
     suspend fun openTodoCount(listId: String, familyId: String, childId: String): Int {
         if (listId.isBlank()) return 0
-        return todoItemDao.getByFamilyAndChild(familyId, childId)
+        return todoItemDao.getByFamily(familyId)
             .count { !it.isDeleted && !it.isDone && it.listId == listId }
     }
 

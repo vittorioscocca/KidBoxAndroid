@@ -11,7 +11,7 @@ import kotlin.math.max
 data class RecordedAudio(
     val file: File,
     val durationSeconds: Int,
-    val mimeType: String = "audio/x-m4a",
+    val mimeType: String = "audio/mp4",
 )
 
 class AudioRecorderManager(

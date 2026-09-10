@@ -63,6 +63,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -72,6 +73,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatListScrollEffect
 import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatStandardMessageRow
 import it.vittorioscocca.kidbox.ui.screens.ai.common.rememberStreamScrollTick
@@ -152,7 +154,7 @@ fun ExamAiChatScreen(
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Indietro",
+                        contentDescription = stringResource(R.string.health_back),
                     )
                 }
             },
@@ -161,7 +163,7 @@ fun ExamAiChatScreen(
                     IconButton(onClick = { showMenu = true }) {
                         Icon(
                             imageVector = Icons.Default.MoreVert,
-                            contentDescription = "Menu",
+                            contentDescription = stringResource(R.string.health_menu),
                         )
                     }
                     DropdownMenu(
@@ -169,14 +171,14 @@ fun ExamAiChatScreen(
                         onDismissRequest = { showMenu = false },
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Nuova conversazione", color = Color(0xFFD32F2F)) },
+                            text = { Text(stringResource(R.string.health_new_conversation), color = Color(0xFFD32F2F)) },
                             onClick = {
                                 showMenu = false
                                 showClearDialog = true
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("Impostazioni AI") },
+                            text = { Text(stringResource(R.string.health_ai_settings)) },
                             onClick = {
                                 showMenu = false
                                 onOpenAiSettings()
@@ -305,7 +307,7 @@ fun ExamAiChatScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.KeyboardArrowDown,
-                            contentDescription = "Scorri in basso",
+                            contentDescription = stringResource(R.string.health_scroll_down),
                             tint = Color.White,
                         )
                     }
@@ -337,7 +339,7 @@ fun ExamAiChatScreen(
                 value = input,
                 onValueChange = { input = it },
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Scrivi un messaggio...") },
+                placeholder = { Text(stringResource(R.string.health_write_message)) },
                 enabled = !uiState.isLoading,
                 maxLines = 4,
                 shape = RoundedCornerShape(24.dp),
@@ -381,7 +383,7 @@ fun ExamAiChatScreen(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Invia",
+                    contentDescription = stringResource(R.string.health_send),
                     tint = if (!uiState.isLoading && input.isNotBlank()) {
                         Color.White
                     } else {
@@ -397,8 +399,8 @@ fun ExamAiChatScreen(
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
-            title = { Text("Nuova conversazione") },
-            text = { Text("La cronologia verrà eliminata e il contesto verrà ricostruito.") },
+            title = { Text(stringResource(R.string.health_new_conversation)) },
+            text = { Text(stringResource(R.string.health_history_context_deleted)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -406,12 +408,12 @@ fun ExamAiChatScreen(
                         showClearDialog = false
                     },
                 ) {
-                    Text("Conferma", color = Color(0xFFD32F2F))
+                    Text(stringResource(R.string.health_confirm), color = Color(0xFFD32F2F))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showClearDialog = false }) {
-                    Text("Annulla")
+                    Text(stringResource(R.string.health_cancel))
                 }
             },
         )

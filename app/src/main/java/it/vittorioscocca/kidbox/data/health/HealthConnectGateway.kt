@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
+import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.HeightRecord
@@ -46,6 +47,11 @@ class HealthConnectGateway @Inject constructor(
     /** In più, se l'utente le concede. Senza, si importa tutto il resto. */
     val optionalPermissions: Set<String> = setOf(
         HealthPermission.getReadPermission(HeightRecord::class),
+        // La distanza serve ai chilometri delle sedute: senza, corsa e bici
+        // restano senza km, ma tutto il resto continua a funzionare. Sta fra le
+        // opzionali perché chi aveva già dato l'accesso non deve ritrovarsi
+        // bloccato da un permesso nuovo.
+        HealthPermission.getReadPermission(DistanceRecord::class),
     )
 
     /** L'insieme da chiedere a Health Connect. */
@@ -337,31 +343,43 @@ class HealthConnectGateway @Inject constructor(
                 title = exerciseTitle(session.exerciseType),
                 startedAtEpochMillis = session.startTime.toEpochMilli(),
                 durationMinutes = durationMin,
-                activeEnergyKcal = metrics.first,
-                averageHeartRateBpm = metrics.second,
+                activeEnergyKcal = metrics.kcal,
+                averageHeartRateBpm = metrics.bpm,
+                distanceMeters = metrics.distanceMeters,
             )
         }
     }
 
-    /** Calorie attive e battito medio nell'intervallo dell'allenamento. */
+    /** Calorie attive, battito medio e distanza nell'intervallo dell'allenamento. */
+    private data class SessionMetrics(
+        val kcal: Double? = null,
+        val bpm: Double? = null,
+        val distanceMeters: Double? = null,
+    )
+
     private suspend fun sessionMetrics(
         client: HealthConnectClient,
         start: Instant,
         end: Instant,
-    ): Pair<Double?, Double?> = runCatching {
+    ): SessionMetrics = runCatching {
         val response = client.aggregate(
             AggregateRequest(
                 metrics = setOf(
                     ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL,
                     HeartRateRecord.BPM_AVG,
+                    DistanceRecord.DISTANCE_TOTAL,
                 ),
                 timeRangeFilter = TimeRangeFilter.between(start, end),
             ),
         )
-        val kcal = response[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories
-        val bpm = response[HeartRateRecord.BPM_AVG]?.toDouble()
-        kcal?.takeIf { it > 0.0 } to bpm?.takeIf { it > 0.0 }
-    }.getOrDefault(null to null)
+        SessionMetrics(
+            kcal = response[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]
+                ?.inKilocalories?.takeIf { it > 0.0 },
+            bpm = response[HeartRateRecord.BPM_AVG]?.toDouble()?.takeIf { it > 0.0 },
+            distanceMeters = response[DistanceRecord.DISTANCE_TOTAL]
+                ?.inMeters?.takeIf { it > 0.0 },
+        )
+    }.getOrDefault(SessionMetrics())
 
     private fun exerciseTitle(type: Int): String = when (type) {
         ExerciseSessionRecord.EXERCISE_TYPE_RUNNING -> "Corsa"

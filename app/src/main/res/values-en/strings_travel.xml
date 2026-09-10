@@ -265,4 +265,6 @@
     <string name="onboarding_link_invite_fallback">Not working? Switch to the manual method</string>
     <string name="onboarding_close">Close</string>
     <string name="onboarding_scanner_hint">Point the camera at the QR code</string>
+    <string name="travel_place_details">Details</string>
+    <string name="travel_hub_duration">~2 MIN</string>
 </resources>

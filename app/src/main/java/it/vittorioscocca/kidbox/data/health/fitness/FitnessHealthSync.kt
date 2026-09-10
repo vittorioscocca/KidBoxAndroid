@@ -36,10 +36,12 @@ class FitnessHealthSync @Inject constructor(
         val loggedWorkouts: List<FitnessLoggedWorkout> = emptyList(),
         /** Sedute riaperte perché chiuse da un'attività di un'altra disciplina. */
         val repairedSessions: Int = 0,
+        /** Attività già registrate a cui è stata aggiunta la distanza letta ora. */
+        val enrichedSessions: Int = 0,
     ) {
         val didChange: Boolean
             get() = matchedSessions.isNotEmpty() || loggedWorkouts.isNotEmpty() ||
-                repairedSessions > 0
+                repairedSessions > 0 || enrichedSessions > 0
     }
 
     /**
@@ -102,6 +104,7 @@ class FitnessHealthSync @Inject constructor(
                             actualMinutes = null,
                             actualKcal = null,
                             actualHeartRateBpm = null,
+                            actualDistanceMeters = null,
                         )
                     }
                     repaired++
@@ -116,7 +119,7 @@ class FitnessHealthSync @Inject constructor(
             .filter {
                 it.matchedWorkoutId != null || it.actualMinutes != null ||
                     it.actualKcal != null || it.actualActivityTitle != null ||
-                    it.actualHeartRateBpm != null
+                    it.actualHeartRateBpm != null || it.actualDistanceMeters != null
             }
             .forEach { session ->
                 updated = updated.updateSession(session.id) {
@@ -125,12 +128,44 @@ class FitnessHealthSync @Inject constructor(
                         actualMinutes = null,
                         actualKcal = null,
                         actualHeartRateBpm = null,
+                        actualDistanceMeters = null,
                         actualActivityTitle = null,
                         completedAtEpochMillis = null,
                         completionSource = null,
                     )
                 }
             }
+
+        // Chi usava l'app prima che leggessimo le distanze ha sedute chiuse e
+        // attività registrate senza chilometri: l'allenamento è lo stesso, il
+        // dato c'era già in Health Connect, mancava solo a noi. Si recupera qui
+        // invece di lasciare buchi permanenti nello storico.
+        var enriched = 0
+        updated.allSessions
+            .filter { it.status == FitnessSessionStatus.DONE && it.actualDistanceMeters == null }
+            .forEach { session ->
+                val meters = workouts
+                    .firstOrNull { it.id == session.matchedWorkoutId }
+                    ?.distanceMeters
+                    ?: return@forEach
+                updated = updated.updateSession(session.id) {
+                    it.copy(actualDistanceMeters = meters)
+                }
+                enriched++
+            }
+
+        if (updated.loggedWorkouts.isNotEmpty()) {
+            val backfilled = updated.loggedWorkouts.map { entry ->
+                if (entry.distanceMeters != null) return@map entry
+                val meters = workouts.firstOrNull { it.id == entry.id }?.distanceMeters
+                    ?: return@map entry
+                enriched++
+                entry.copy(distanceMeters = meters)
+            }
+            if (backfilled != updated.loggedWorkouts) {
+                updated = updated.copy(loggedWorkouts = backfilled)
+            }
+        }
 
         // Le sedute da valutare si leggono dal piano già riparato: una riaperta
         // qui sopra può essere richiusa subito dall'allenamento giusto.
@@ -162,6 +197,7 @@ class FitnessHealthSync @Inject constructor(
                     actualMinutes = workout.durationMinutes,
                     actualKcal = workout.activeEnergyKcal?.roundToInt(),
                     actualHeartRateBpm = workout.averageHeartRateBpm?.roundToInt(),
+                    actualDistanceMeters = workout.distanceMeters,
                 )
             }
             updated.session(session.id)?.let { matched += it }
@@ -180,6 +216,7 @@ class FitnessHealthSync @Inject constructor(
                     durationMinutes = workout.durationMinutes,
                     kcal = workout.activeEnergyKcal?.roundToInt(),
                     heartRateBpm = workout.averageHeartRateBpm?.roundToInt(),
+                    distanceMeters = workout.distanceMeters,
                 )
             }
         if (newlyLogged.isNotEmpty()) {
@@ -188,10 +225,10 @@ class FitnessHealthSync @Inject constructor(
 
         KBLog.sync.info(
             "pending=${pending.size} workouts=${workouts.size} matched=${matched.size} " +
-                "logged=${newlyLogged.size} repaired=$repaired",
+                "logged=${newlyLogged.size} repaired=$repaired enriched=$enriched",
             TAG,
         )
-        return Result(updated, matched, newlyLogged, repaired)
+        return Result(updated, matched, newlyLogged, repaired, enriched)
     }
 
     /**

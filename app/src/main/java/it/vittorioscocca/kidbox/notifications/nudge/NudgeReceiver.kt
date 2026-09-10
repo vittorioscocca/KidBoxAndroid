@@ -42,8 +42,7 @@ class NudgeReceiver : BroadcastReceiver() {
             // NEW_TASK necessario: parte da un BroadcastReceiver, un contesto non-Activity.
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP,
             )
             putExtra("push_type", "nudge")
             putExtra("push_campaign_id", campaignId)

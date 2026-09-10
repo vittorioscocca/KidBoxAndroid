@@ -36,6 +36,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -75,6 +77,7 @@ import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
+import com.google.maps.android.compose.MapType
 import it.vittorioscocca.kidbox.ui.EdgeToEdgeController
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
@@ -138,6 +141,9 @@ fun FamilyLocationScreen(
     var showTemporaryDialog by remember { mutableStateOf(false) }
     var temporaryHours by remember { mutableIntStateOf(2) }
     var followingUserId by remember { mutableStateOf<String?>(null) }
+    // Vista satellitare. Non si persiste: la mappa riparte sempre da quella
+    // standard, come fa Google Maps.
+    var isSatellite by remember { mutableStateOf(false) }
     var hasAutoCenteredOnDevice by remember(familyId) { mutableStateOf(false) }
     val cameraPositionState = rememberCameraPositionState()
 
@@ -246,7 +252,10 @@ fun FamilyLocationScreen(
             cameraPositionState = cameraPositionState,
             properties = MapProperties(
                 isMyLocationEnabled = viewModel.hasLocationPermissionNow(),
-                mapStyleOptions = darkMapStyle,
+                mapType = if (isSatellite) MapType.HYBRID else MapType.NORMAL,
+                // Lo stile scuro vale solo per le tessere vettoriali: applicato
+                // al satellite non fa nulla di utile e sporca le etichette.
+                mapStyleOptions = if (isSatellite) null else darkMapStyle,
             ),
             uiSettings = MapUiSettings(
                 myLocationButtonEnabled = false,
@@ -324,6 +333,34 @@ fun FamilyLocationScreen(
                     )
                 }
             }
+            Card(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clickable { isSatellite = !isSatellite },
+                shape = CircleShape,
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isSatellite) {
+                        Color(0xFFFF6B00)
+                    } else {
+                        Color.White.copy(alpha = 0.9f)
+                    },
+                ),
+            ) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = if (isSatellite) Icons.Default.Public else Icons.Default.Map,
+                        contentDescription = stringResource(
+                            if (isSatellite) {
+                                R.string.location_map_standard_content_description
+                            } else {
+                                R.string.location_map_satellite_content_description
+                            },
+                        ),
+                        tint = if (isSatellite) Color.White else Color(0xFFFF6B00),
+                    )
+                }
+            }
+
             val currentFollowed = followingUserId?.let { followId ->
                 state.sharedUsers.firstOrNull { it.id == followId }
             }

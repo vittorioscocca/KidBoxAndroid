@@ -428,7 +428,7 @@ fun PlanningAIChatScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showClearDialog = false }) {
-                    Text("Annulla")
+                    Text(stringResource(R.string.ai_cancel))
                 }
             },
         )

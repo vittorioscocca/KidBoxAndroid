@@ -171,4 +171,8 @@
     <string name="ai_consent_accept_terms">Aceptar y continuar</string>
     <string name="ai_consent_terms_checkbox">He leído y acepto las condiciones de uso de la IA</string>
     <string name="ai_consent_cancel">Cancelar</string>
+    <string name="chat_cancel">Cancelar</string>
+    <string name="chat_back">Atrás</string>
+    <string name="ai_cancel">Cancelar</string>
+    <string name="ai_back">Atrás</string>
 </resources>

@@ -171,6 +171,22 @@
     <string name="fitness_action_move">Sposta</string>
     <string name="fitness_action_skip">Salta</string>
     <string name="fitness_session_minutes">%1$d min</string>
+    <string name="fitness_sessions_title">Sessioni</string>
+    <string name="fitness_sessions_recorded">%1$d sedute registrate</string>
+    <string name="fitness_sessions_total">Totale</string>
+    <string name="fitness_sessions_average">Media</string>
+    <string name="fitness_sessions_time">Tempo</string>
+    <string name="fitness_sessions_calories">Calorie</string>
+    <string name="fitness_sessions_distance">Distanza</string>
+    <string name="fitness_sessions_kcal">%1$d kcal</string>
+    <string name="fitness_sessions_kcal_big">%1$d KCAL</string>
+    <string name="fitness_sessions_min_big">%1$d MIN</string>
+    <string name="fitness_sessions_hours">%1$dh %2$02dmin</string>
+    <string name="fitness_sessions_today">oggi</string>
+    <string name="fitness_sessions_yesterday">ieri</string>
+    <string name="fitness_sessions_planned">Previsto: %1$s</string>
+    <string name="fitness_sessions_empty_title">Nessuna seduta registrata</string>
+    <string name="fitness_sessions_empty_body">Le sedute segnate come fatte, a mano o da Health Connect, compaiono qui.</string>
     <string name="fitness_done_manual">Segnata come fatta</string>
     <string name="fitness_done_notification">Segnata come fatta dalla notifica</string>
     <string name="fitness_done_health">Registrato da Health Connect</string>
@@ -321,6 +337,7 @@
     <string name="fitness_count_as">Conta come…</string>
     <string name="fitness_done_different">Svolto: %1$s — diverso da quanto programmato</string>
     <string name="fitness_sync_logged">Attività registrate fuori programma: %1$d. Aprile nel giorno per attribuirle a una seduta.</string>
+    <string name="fitness_sync_distance_backfill">Chilometri recuperati su attività già registrate: %1$d</string>
     <string name="fitness_edit_session">Modifica</string>
     <string name="fitness_edit_session_title">Modifica seduta</string>
     <string name="fitness_edit_status">Com\'è andata</string>
@@ -331,4 +348,29 @@
     <string name="fitness_edit_save">Salva</string>
     <string name="fitness_chat_clear">Nuova conversazione</string>
     <string name="fitness_sync_repaired">Sedute riaperte perché chiuse da un\'attività di un altro tipo: %1$d</string>
+
+    <!-- Dialoghi di sistema: consenso ai report tecnici, aggiornamento, annunci -->
+    <string name="crash_consent_title">Aiutaci a migliorare KidBox</string>
+    <string name="crash_consent_body">Abbiamo rilevato %1$s. Puoi inviarci un report anonimo? Non verranno inviati dati personali o familiari.</string>
+    <plurals name="crash_consent_issues">
+        <item quantity="one">%1$d anomalia tecnica</item>
+        <item quantity="other">%1$d anomalie tecniche</item>
+    </plurals>
+    <string name="crash_consent_send">Invia report</string>
+    <string name="crash_consent_decline">No grazie</string>
+    <string name="update_available_title">È disponibile un aggiornamento</string>
+    <string name="update_available_body">Per usare KidBox al meglio ti consigliamo di aggiornare all\'ultima versione: contiene miglioramenti e correzioni.</string>
+    <string name="update_available_update">Aggiorna</string>
+    <string name="update_available_later">Non ora</string>
+    <string name="broadcast_action_go">Vai</string>
+    <string name="broadcast_action_ok">Ho capito</string>
+    <string name="broadcast_action_later">Non ora</string>
+    <string name="grocery_added_by">Aggiunto da %1$s · %2$s</string>
+    <string name="grocery_added_today">oggi</string>
+    <string name="grocery_added_yesterday">ieri</string>
+    <string name="grocery_added_days_ago">%1$d giorni fa</string>
+    <string name="grocery_added_now">adesso</string>
+    <string name="grocery_added_minutes_ago">%1$d minuti fa</string>
+    <string name="grocery_added_hour_ago">un\'ora fa</string>
+    <string name="grocery_added_hours_ago">%1$d ore fa</string>
 </resources>

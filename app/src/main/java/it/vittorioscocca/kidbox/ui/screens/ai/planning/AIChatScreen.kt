@@ -150,7 +150,7 @@ fun AIChatScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showClearDialog = false }) { Text("Annulla") }
+                TextButton(onClick = { showClearDialog = false }) { Text(stringResource(R.string.ai_cancel)) }
             },
         )
     }
@@ -181,7 +181,7 @@ fun AIChatScreen(
                 navigationIcon = {
                     KidBoxHeaderCircleButton(
                         icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Indietro",
+                        contentDescription = stringResource(R.string.ai_back),
                         onClick = onBack,
                     )
                 },

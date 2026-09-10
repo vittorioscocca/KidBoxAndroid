@@ -99,7 +99,7 @@ class JoinFamilyViewModel @Inject constructor(
                 joinWrapService.join(getApplication(), invite.qrEquivalentPayload)
                 KBLog.ui.info("invito: master key sbloccata familyId=${invite.familyId}", TAG)
 
-                inviteRemote.addMember(invite.familyId)
+                inviteRemote.addMember(invite.familyId, inviteId = invite.inviteId)
                 KBLog.ui.info("invito: membership creata familyId=${invite.familyId}", TAG)
 
                 // `addMember` crea il membro senza `displayName`: senza questa

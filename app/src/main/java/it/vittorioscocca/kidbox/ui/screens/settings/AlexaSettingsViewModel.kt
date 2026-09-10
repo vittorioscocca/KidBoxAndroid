@@ -23,9 +23,14 @@ import kotlinx.coroutines.tasks.await
  * `name` può essere null: un membro senza displayName esiste, e la schermata
  * ricade su un'etichetta generica invece di mostrare una riga vuota.
  */
+/** Account da' accesso alla lista, voce da' solo l'attribuzione: sono cose
+ * diverse e la schermata deve poterle distinguere. */
+enum class AlexaLinkKind { ACCOUNT, VOICE }
+
 data class AlexaFamilyLinkUi(
     val uid: String,
     val name: String?,
+    val kind: AlexaLinkKind,
     val linkedAt: Long?,
 )
 
@@ -34,6 +39,9 @@ data class AlexaSettingsUiState(
     val isGenerating: Boolean = false,
     /** Questo account ha un collegamento suo. */
     val linked: Boolean = false,
+    /** La mia voce e' riconosciuta e associata a me. Senza, quello che detto
+     * risulta aggiunto da chi ha collegato l'account. */
+    val voiceLinked: Boolean = false,
     val linkedAt: Long? = null,
     /** Collegamenti di ALTRI membri: il proprio è già in `linked`. */
     val otherLinks: List<AlexaFamilyLinkUi> = emptyList(),
@@ -112,25 +120,29 @@ class AlexaSettingsViewModel @Inject constructor(
                     AlexaFamilyLinkUi(
                         uid = uid,
                         name = entry["name"] as? String,
+                        kind = if (entry["kind"] == "voice") AlexaLinkKind.VOICE else AlexaLinkKind.ACCOUNT,
                         linkedAt = (entry["linkedAt"] as? Number)?.toLong(),
                     )
                 }
                 .sortedBy { it.linkedAt ?: Long.MAX_VALUE }
 
             val linked = data["linked"] == true
+            val voiceLinked = data["voiceLinked"] == true
+            // Il codice si toglie solo quando non resta niente da legare: con
+            // l'account collegato ma la voce no, lo stesso codice serve ancora.
+            val done = linked && voiceLinked
             _uiState.update {
                 it.copy(
                     isLoading = false,
                     linked = linked,
+                    voiceLinked = voiceLinked,
                     linkedAt = (data["linkedAt"] as? Number)?.toLong(),
                     otherLinks = others,
-                    // Collegamento fatto: il codice non serve più, e lasciarlo a
-                    // schermo farebbe credere che manchi ancora un passo.
-                    pairingCode = if (linked) null else it.pairingCode,
-                    secondsLeft = if (linked) 0 else it.secondsLeft,
+                    pairingCode = if (done) null else it.pairingCode,
+                    secondsLeft = if (done) 0 else it.secondsLeft,
                 )
             }
-            if (linked) tickJob?.cancel()
+            if (done) tickJob?.cancel()
         }.onFailure {
             _uiState.update {
                 it.copy(isLoading = false, errorMessage = if (silent) it.errorMessage else STATUS_ERROR)
@@ -195,7 +207,8 @@ class AlexaSettingsViewModel @Inject constructor(
                 }
                 if (elapsed > 0 && elapsed % 5 == 0) {
                     fetchStatus(familyId, silent = true)
-                    if (_uiState.value.linked) return@launch
+                    val st = _uiState.value
+                    if (st.linked && st.voiceLinked) return@launch
                 }
                 delay(1_000)
                 elapsed++
@@ -211,7 +224,14 @@ class AlexaSettingsViewModel @Inject constructor(
             }.onSuccess {
                 tickJob?.cancel()
                 _uiState.update {
-                    it.copy(isLoading = false, linked = false, linkedAt = null, pairingCode = null, secondsLeft = 0)
+                    it.copy(
+                        isLoading = false,
+                        linked = false,
+                        voiceLinked = false,
+                        linkedAt = null,
+                        pairingCode = null,
+                        secondsLeft = 0,
+                    )
                 }
             }.onFailure {
                 _uiState.update { it.copy(isLoading = false, errorMessage = UNLINK_ERROR) }

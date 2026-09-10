@@ -47,8 +47,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.components.KBBackButton
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
-import java.text.DateFormat
-import java.util.Date
 
 @Composable
 fun AlexaSettingsScreen(
@@ -106,15 +104,28 @@ fun AlexaSettingsScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        if (state.linked) {
-            SectionTitle(stringResource(R.string.settings_alexa_phrases_section))
-            PhrasesCard()
+        if (state.linked && !state.voiceLinked) {
+            // Il codice non sparisce col collegamento dell'account: se la voce
+            // non e' ancora associata serve ancora, ed e' proprio il caso del
+            // secondo membro di casa, che l'account ce l'ha gia' per riflesso.
+            SectionTitle(stringResource(R.string.settings_alexa_voice_section))
+            PairingCard(
+                state = state,
+                onGenerate = viewModel::generateCode,
+                buttonLabel = stringResource(R.string.settings_alexa_voice_cta),
+            )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = stringResource(R.string.settings_alexa_phrases_note),
+                text = stringResource(R.string.settings_alexa_voice_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = kb.subtitle,
             )
+            Spacer(Modifier.height(16.dp))
+        }
+
+        if (state.linked) {
+            SectionTitle(stringResource(R.string.settings_alexa_phrases_section))
+            PhrasesCard()
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = { showUnlinkDialog = true },
@@ -128,6 +139,24 @@ fun AlexaSettingsScreen(
                 Text(stringResource(R.string.settings_alexa_unlink))
             }
         } else {
+            // Prima del codice viene la skill: senza, il codice si detta a vuoto
+            // e non c'e' modo di capire perche'. E' il primo passo, e fino a ieri
+            // non era scritto da nessuna parte.
+            SectionTitle(stringResource(R.string.settings_alexa_skill_section))
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.settings_alexa_skill_step),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.settings_alexa_skill_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = kb.subtitle,
+            )
+            Spacer(Modifier.height(16.dp))
+
             SectionTitle(stringResource(R.string.settings_alexa_pairing_section))
             PairingCard(state = state, onGenerate = viewModel::generateCode)
             Spacer(Modifier.height(8.dp))
@@ -195,9 +224,8 @@ private fun StatusCard(state: AlexaSettingsUiState) {
         else -> R.string.settings_alexa_status_not_linked
     }
     val subtitle = when {
-        state.linked && state.linkedAt != null ->
-            stringResource(R.string.settings_alexa_status_linked_on, formatDate(state.linkedAt))
-        state.linked -> stringResource(R.string.settings_alexa_status_active)
+        state.linked && state.voiceLinked -> stringResource(R.string.settings_alexa_status_voice)
+        state.linked -> stringResource(R.string.settings_alexa_status_no_voice)
         hasOthers -> stringResource(R.string.settings_alexa_status_not_this_account)
         else -> stringResource(R.string.settings_alexa_status_needs_code)
     }
@@ -268,20 +296,28 @@ private fun FamilyLinkCard(link: AlexaFamilyLinkUi) {
                     style = MaterialTheme.typography.titleMedium,
                     color = kb.title,
                 )
-                link.linkedAt?.let {
-                    Text(
-                        text = stringResource(R.string.settings_alexa_status_linked_on, formatDate(it)),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = kb.subtitle,
-                    )
-                }
+                Text(
+                    text = stringResource(
+                        if (link.kind == AlexaLinkKind.VOICE) {
+                            R.string.settings_alexa_kind_voice
+                        } else {
+                            R.string.settings_alexa_kind_account
+                        },
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = kb.subtitle,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun PairingCard(state: AlexaSettingsUiState, onGenerate: () -> Unit) {
+private fun PairingCard(
+    state: AlexaSettingsUiState,
+    onGenerate: () -> Unit,
+    buttonLabel: String? = null,
+) {
     val kb = MaterialTheme.kidBoxColors
     Card(
         shape = RoundedCornerShape(18.dp),
@@ -299,7 +335,7 @@ private fun PairingCard(state: AlexaSettingsUiState, onGenerate: () -> Unit) {
                     Icon(imageVector = Icons.Filled.Pin, contentDescription = null)
                     Spacer(Modifier.height(0.dp))
                     Text(
-                        text = stringResource(R.string.settings_alexa_generate_code),
+                        text = buttonLabel ?: stringResource(R.string.settings_alexa_generate_code),
                         modifier = Modifier.padding(start = 8.dp),
                     )
                 }
@@ -375,10 +411,6 @@ private fun PhrasesCard() {
         }
     }
 }
-
-/** Data locale del dispositivo: il server manda millisecondi epoch. */
-private fun formatDate(millis: Long): String =
-    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(millis))
 
 private fun errorLabel(key: String): Int = when (key) {
     AlexaSettingsViewModel.NO_FAMILY -> R.string.settings_alexa_error_no_family

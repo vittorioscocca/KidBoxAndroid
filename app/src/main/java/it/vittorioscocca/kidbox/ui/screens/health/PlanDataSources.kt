@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.data.health.fitness.FitnessDistanceFormatter
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.util.Locale
 
@@ -43,6 +44,8 @@ data class PlanDataSources(
     val manualHeightCm: Double?,
     val workoutCount: Int,
     val activeEnergyKcal: Double?,
+    /** Metri percorsi negli allenamenti letti da Health Connect. */
+    val workoutDistanceMeters: Double? = null,
     val visitCount: Int,
     val examCount: Int,
     val activeTreatmentCount: Int,
@@ -102,6 +105,13 @@ fun PlanDataSourcesContent(
             data.activeEnergyKcal?.takeIf { it > 0 }
                 ?.let { String.format(locale, "%.0f kcal", it) } ?: notAvailable,
             (data.activeEnergyKcal ?: 0.0) > 0.0,
+        ),
+        // La distanza degli allenamenti è un tipo di dato letto a sé: va
+        // dichiarata qui e mostrata anche quando manca, come le calorie.
+        PlanDataRow(
+            stringResource(R.string.fitness_sessions_distance),
+            FitnessDistanceFormatter.kilometers(data.workoutDistanceMeters) ?: notAvailable,
+            (data.workoutDistanceMeters ?: 0.0) > 0.0,
         ),
         PlanDataRow(
             stringResource(R.string.meal_plan_data_visits),

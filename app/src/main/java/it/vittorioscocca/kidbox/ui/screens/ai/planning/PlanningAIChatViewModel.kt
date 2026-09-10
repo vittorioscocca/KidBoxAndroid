@@ -515,9 +515,8 @@ class PlanningAIChatViewModel @Inject constructor(
             emptyList()
         }
 
-        val allTodos = childrenEntities.flatMap { child ->
-            todoItemDao.getByFamilyAndChild(effectiveFamilyId, child.id)
-        }.filterNot { it.isDeleted }
+        // I to-do sono di famiglia: una query sola invece di una per figlio.
+        val allTodos = todoItemDao.getByFamily(effectiveFamilyId).filterNot { it.isDeleted }
 
         val allRoutines = childrenEntities.flatMap { child ->
             routineDao.observeByFamilyAndChild(effectiveFamilyId, child.id).first()

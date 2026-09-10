@@ -133,10 +133,20 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
             // SECONDO task con una MainActivity nuova invece di riportare avanti quello
             // esistente — sembra un riavvio completo dell'app e l'intent, finendo in una
             // istanza mai esistita prima, non passa da onNewIntent quindi non naviga.
+            //
+            // CLEAR_TOP invece NON va messo, e c'era: con l'app in FOREGROUND
+            // faceva chiudere la MainActivity viva e ricrearne una nuova
+            // (verificato: ActivityRecord diverso, splash + login daccapo).
+            // L'istanza morente resta un istante osservatrice degli StateFlow di
+            // NotificationDeepLinkRouter: consuma la rotta in coda e chiama
+            // `clear()` sul proprio NavController ormai inerte, così la nuova
+            // istanza trova la coda vuota e resta in Home. In background non si
+            // vedeva perché `collectAsStateWithLifecycle` smette di raccogliere
+            // sotto STARTED — il difetto era visibile solo da app aperta.
+            // Con una sola Activity non c'è comunque niente da "clearare".
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP,
             )
             putExtra("push_type", type)
             putExtra("push_family_id", data["familyId"])

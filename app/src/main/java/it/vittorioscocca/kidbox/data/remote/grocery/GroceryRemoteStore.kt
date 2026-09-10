@@ -27,6 +27,10 @@ data class GroceryRemoteDto(
     val updatedAtEpochMillis: Long?,
     val updatedBy: String?,
     val createdBy: String?,
+    /** Quando l'articolo e' nato secondo il server. Serve alla riga
+     * "Aggiunto da ... - oggi": senza, un articolo dettato ad Alexa a telefono
+     * spento risulterebbe aggiunto il giorno del sync. */
+    val createdAtEpochMillis: Long?,
 )
 
 sealed interface GroceryRemoteChange {
@@ -92,6 +96,7 @@ class GroceryRemoteStore @Inject constructor(
                             updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
                             updatedBy = d["updatedBy"] as? String,
                             createdBy = d["createdBy"] as? String,
+                            createdAtEpochMillis = (d["createdAt"] as? Timestamp)?.toDate()?.time,
                         ),
                     )
                 }

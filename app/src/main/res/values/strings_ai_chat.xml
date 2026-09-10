@@ -184,4 +184,8 @@
     <string name="ai_consent_accept_terms">Accetta e continua</string>
     <string name="ai_consent_terms_checkbox">Ho letto e accetto le condizioni d\'uso dell\'AI</string>
     <string name="ai_consent_cancel">Annulla</string>
+    <string name="chat_cancel">Annulla</string>
+    <string name="chat_back">Indietro</string>
+    <string name="ai_cancel">Annulla</string>
+    <string name="ai_back">Indietro</string>
 </resources>

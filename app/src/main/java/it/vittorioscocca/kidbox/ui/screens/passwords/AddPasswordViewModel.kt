@@ -17,6 +17,7 @@ import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.notifications.PasswordExpiryReminderScheduler
 import java.util.UUID
 import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.R
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -121,7 +122,7 @@ class AddPasswordViewModel @Inject constructor(
                     .map { g ->
                         AddPasswordPickerGroup(
                             id = g.id,
-                            label = decryptGroupName(g, uid).ifBlank { "Gruppo" },
+                            label = decryptGroupName(g, uid).ifBlank { appContext.getString(R.string.passwords_group_fallback_label) },
                             icon = g.icon,
                             colorHex = g.color,
                         )

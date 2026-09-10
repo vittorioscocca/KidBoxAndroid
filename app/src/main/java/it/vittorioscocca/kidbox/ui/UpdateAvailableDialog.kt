@@ -4,6 +4,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 
 @Composable
 fun UpdateAvailableDialog(
@@ -15,21 +17,18 @@ fun UpdateAvailableDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("È disponibile un aggiornamento") },
+        title = { Text(stringResource(R.string.update_available_title)) },
         text = {
-            Text(
-                "Per usare KidBox al meglio ti consigliamo di aggiornare all'ultima " +
-                    "versione: contiene miglioramenti e correzioni.",
-            )
+            Text(stringResource(R.string.update_available_body))
         },
         confirmButton = {
             TextButton(onClick = onUpdate) {
-                Text("Aggiorna")
+                Text(stringResource(R.string.update_available_update))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Non ora")
+                Text(stringResource(R.string.update_available_later))
             }
         },
     )

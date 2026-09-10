@@ -114,7 +114,7 @@ fun TodoHomeScreen(
                     )
                 }
                 Spacer(Modifier.height(12.dp))
-                Text("To-Do", fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, color = kb.title)
+                Text(stringResource(R.string.todo_home_title), fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, color = kb.title)
                 Spacer(Modifier.height(18.dp))
 
                 if (state.lists.isEmpty()) {

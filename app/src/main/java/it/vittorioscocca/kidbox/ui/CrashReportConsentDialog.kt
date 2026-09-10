@@ -5,6 +5,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.util.CrashAnalyzer
 
 @Composable
@@ -16,20 +19,18 @@ fun CrashReportConsentDialog(
     val context = LocalContext.current
     if (!visible || issueCount <= 0) return
 
-    val label = if (issueCount == 1) "1 anomalia tecnica" else "$issueCount anomalie tecniche"
+    // Il plurale lo decide la lingua, non un `if`: in inglese e spagnolo le
+    // regole non coincidono con quelle italiane.
+    val label = pluralStringResource(R.plurals.crash_consent_issues, issueCount, issueCount)
 
     AlertDialog(
         onDismissRequest = {
             CrashAnalyzer.onConsentDecline(context)
             onDismiss()
         },
-        title = { Text("Aiutaci a migliorare KidBox") },
+        title = { Text(stringResource(R.string.crash_consent_title)) },
         text = {
-            Text(
-                "Abbiamo rilevato $label. " +
-                    "Puoi inviarci un report anonimo? " +
-                    "Non verranno inviati dati personali o familiari.",
-            )
+            Text(stringResource(R.string.crash_consent_body, label))
         },
         confirmButton = {
             TextButton(
@@ -38,7 +39,7 @@ fun CrashReportConsentDialog(
                     onDismiss()
                 },
             ) {
-                Text("Invia report")
+                Text(stringResource(R.string.crash_consent_send))
             }
         },
         dismissButton = {
@@ -48,7 +49,7 @@ fun CrashReportConsentDialog(
                     onDismiss()
                 },
             ) {
-                Text("No grazie")
+                Text(stringResource(R.string.crash_consent_decline))
             }
         },
     )

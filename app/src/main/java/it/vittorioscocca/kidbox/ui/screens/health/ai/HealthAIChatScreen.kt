@@ -257,7 +257,7 @@ fun HealthAIChatScreen(
                                 },
                             )
                             DropdownMenuItem(
-                                text = { Text("Contesto chat Salute") },
+                                text = { Text(stringResource(R.string.settings_ai_health_context)) },
                                 onClick = {
                                     showMenu = false
                                     healthContextPreference = aiSettingsStore.getHealthContextSendPreference()

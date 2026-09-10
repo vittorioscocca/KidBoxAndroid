@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.dao.PasswordGroupDao
 
 sealed class PasswordHomeFilter {
@@ -244,7 +245,7 @@ class PasswordsHomeViewModel @Inject constructor(
             result.add(
                 PasswordSectionUi(
                     id = g.id,
-                    title = decryptGroupName(g, uid).ifBlank { "Gruppo" },
+                    title = decryptGroupName(g, uid).ifBlank { appContext.getString(R.string.passwords_group_fallback_label) },
                     headerIconRaw = g.icon.ifBlank { "folder" },
                     headerColorHex = g.color.ifBlank { "#5E5CE6" },
                     isExpanded = !collapsedSectionIds.contains(g.id),
@@ -266,7 +267,7 @@ class PasswordsHomeViewModel @Inject constructor(
             result.add(
                 PasswordSectionUi(
                     id = unassignedId,
-                    title = "Senza gruppo",
+                    title = appContext.getString(R.string.passwords_no_group_section),
                     headerIconRaw = "tray",
                     headerColorHex = "#8E8E93",
                     isExpanded = !collapsedSectionIds.contains(unassignedId),
@@ -324,7 +325,7 @@ class PasswordsHomeViewModel @Inject constructor(
             .map { g ->
                 PasswordGroupChipUi(
                     id = g.id,
-                    label = decryptGroupName(g, uid).ifBlank { "Gruppo" },
+                    label = decryptGroupName(g, uid).ifBlank { appContext.getString(R.string.passwords_group_fallback_label) },
                 )
             }
     }
