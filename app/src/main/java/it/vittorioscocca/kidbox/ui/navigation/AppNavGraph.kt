@@ -720,7 +720,10 @@ fun AppNavGraph(
             route = AppDestination.ShoppingList.route,
             arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
         ) {
-            GroceryListScreen(onBack = { navController.popBackStack() })
+            GroceryListScreen(
+                onBack = { navController.popBackStack() },
+                onAlexaSettings = { navController.navigate(AppDestination.AlexaSettings.route) },
+            )
         }
 
         composable(

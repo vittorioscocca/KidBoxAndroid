@@ -57,6 +57,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.ui.components.AlexaPromoBanner
+import it.vittorioscocca.kidbox.ui.components.AlexaPromoContext
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.ui.res.stringResource
@@ -113,6 +115,16 @@ fun TodoHomeScreen(
                         },
                     )
                 }
+
+                // L'invito a collegare Alexa si mostra da solo quando ha senso:
+                // lingua giusta, famiglia non ancora collegata, invito non già
+                // rifiutato. Vedi `AlexaPromoBanner`.
+                Spacer(Modifier.height(10.dp))
+                AlexaPromoBanner(
+                    familyId = state.familyId,
+                    context = AlexaPromoContext.TODO,
+                    onConnect = { onNavigate(AppDestination.AlexaSettings.route) },
+                )
                 Spacer(Modifier.height(12.dp))
                 Text(stringResource(R.string.todo_home_title), fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, color = kb.title)
                 Spacer(Modifier.height(18.dp))

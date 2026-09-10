@@ -14,6 +14,24 @@ import org.json.JSONObject
 
 /** Campi biglietto letti dall'AI: partenza/arrivo separati, titolare, codice. */
 data class WalletTicketExtraction(
+    /**
+     * Nome dell'evento o della tratta: «GNUT e l'OFB», «Roma → Milano».
+     * Campo che mancava del tutto: senza, il titolo restava quello costruito
+     * dal nome del file, e su un biglietto importato da un link diventava
+     * «URL file» — cioè l'unica cosa che chi guarda la card vuole leggere era
+     * l'unica che non c'era.
+     */
+    val eventTitle: String? = null,
+    /**
+     * Settore, fila e posto. Il campo esiste sull'entity da sempre ma non lo
+     * riempiva nessuno: quei dati finivano nelle note grezze, come
+     * «IP-INTERO [W] / POSTO UNICO», dove non li cerca nessuno.
+     */
+    val seat: String? = null,
+    /** Prezzo pagato, come stampato sul biglietto. */
+    val price: String? = null,
+    /** Solo quello che non è entrato in nessun altro campo, o `null`. */
+    val notes: String? = null,
     val holderName: String? = null,
     val bookingCode: String? = null,
     val emitter: String? = null,
@@ -131,6 +149,10 @@ class WalletTicketAIExtractor @Inject constructor(
         val kind = str("kind")?.let { raw -> WalletTicketKind.entries.firstOrNull { it.raw == raw } }
 
         return WalletTicketExtraction(
+            eventTitle = str("eventTitle"),
+            seat = str("seat"),
+            price = str("price"),
+            notes = str("notes"),
             holderName = str("holderName"),
             bookingCode = str("bookingCode"),
             emitter = str("emitter"),
@@ -162,6 +184,10 @@ class WalletTicketAIExtractor @Inject constructor(
             Rispondi ESCLUSIVAMENTE con un oggetto JSON valido, senza testo prima o
             dopo, senza markdown, senza ```. Schema:
             {
+              "eventTitle": "nome dell'evento/spettacolo/film/artista, o la tratta per un viaggio, o null",
+              "seat": "settore, fila e posto (es. «Platea, fila C, posto 12», «POSTO UNICO»), o null",
+              "price": "prezzo TOTALE pagato con la valuta (es. «19,50 €»), o null",
+              "notes": "solo ciò che non è entrato negli altri campi, una riga breve, o null",
               "holderName": "nome e cognome del titolare/passeggero, o null",
               "bookingCode": "codice di prenotazione/PNR/biglietto, o null",
               "emitter": "nome del vettore/emittente (es. Trenitalia, Ryanair), o null",
@@ -180,6 +206,26 @@ class WalletTicketAIExtractor @Inject constructor(
             - Per biglietti che non sono viaggi (cinema, concerto, parcheggio, museo)
               "departureLocation"/"departureDateTime" rappresentano semplicemente
               luogo e orario dell'evento; "arrivalLocation"/"arrivalDateTime" restano null.
+            - "eventTitle" è la cosa che si va a fare, non chi la vende: per un
+              concerto è l'artista o il nome dello spettacolo («GNUT e l'OFB»), per
+              un film il titolo, per una mostra il nome della mostra, per un viaggio
+              la tratta nella forma «Partenza → Arrivo». NON metterci l'emittente
+              (i-Ticket, TicketOne, Trenitalia): quello va in "emitter". NON metterci
+              la sede o la data: quelle hanno già i loro campi. Se il documento non
+              nomina l'evento, usa null invece di ripetere il venditore.
+            - Nei biglietti degli eventi il nome sta spesso in una riga isolata e in
+              evidenza, lontano dai dati anagrafici e vicino a formule come «QUESTO È
+              IL TUO BIGLIETTO»: cercalo in tutto il testo, non solo in cima.
+            - "price" è quanto è stato pagato in tutto. Se il biglietto distingue
+              prezzo, prevendita e totale, prendi il TOTALE. Riporta la valuta come
+              la trovi. Se non c'è un importo, null: un biglietto omaggio o senza
+              prezzo stampato non vale zero, vale niente.
+            - "notes" è il campo di scarto, non un riassunto: mettici SOLO quello
+              che non è entrato in nessun altro campo ed è utile a chi userà il
+              biglietto (una regola d'accesso, un vincolo d'orario, il numero di
+              posti). Se non resta niente del genere, usa null. Non ripetere
+              titolo, luogo, data, posto, prezzo, codice o titolare: hanno già il
+              loro campo, e ripeterli riempie la scheda di doppioni.
         """.trimIndent()
     }
 }

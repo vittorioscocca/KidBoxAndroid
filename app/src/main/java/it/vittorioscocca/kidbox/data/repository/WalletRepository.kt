@@ -145,7 +145,8 @@ class WalletRepository @Inject constructor(
                 eventDateEpochMillis = parsed.eventDate,
                 eventEndDateEpochMillis = parsed.eventEndDate,
                 location = parsed.location,
-                seat = null,
+                seat = parsed.seat,
+                price = parsed.price,
                 bookingCode = parsed.bookingCode,
                 arrivalLocation = parsed.arrivalLocation,
                 holderName = parsed.holderName,
@@ -358,6 +359,7 @@ class WalletRepository @Inject constructor(
                                 eventEndDateEpochMillis = dto.eventEndDateEpochMillis,
                                 location = decrypted.location,
                                 seat = decrypted.seat,
+                                price = decrypted.price,
                                 bookingCode = decrypted.bookingCode,
                                 arrivalLocation = decrypted.arrivalLocation,
                                 holderName = decrypted.holderName,
@@ -405,6 +407,8 @@ class WalletRepository @Inject constructor(
                 ?: dto.locationPlain?.trim()?.takeIf { it.isNotEmpty() },
             seat = decryptField(dto.seatEnc, familyId)
                 ?: dto.seatPlain?.trim()?.takeIf { it.isNotEmpty() },
+            price = decryptField(dto.priceEnc, familyId)
+                ?: dto.pricePlain?.trim()?.takeIf { it.isNotEmpty() },
             bookingCode = decryptField(dto.bookingCodeEnc, familyId)
                 ?: dto.bookingCodePlain?.trim()?.takeIf { it.isNotEmpty() },
             arrivalLocation = decryptField(dto.arrivalLocationEnc, familyId)
@@ -424,6 +428,7 @@ class WalletRepository @Inject constructor(
         val title: String,
         val location: String?,
         val seat: String?,
+        val price: String?,
         val bookingCode: String?,
         val arrivalLocation: String?,
         val holderName: String?,

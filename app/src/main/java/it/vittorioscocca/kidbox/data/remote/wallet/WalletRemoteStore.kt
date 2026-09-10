@@ -28,6 +28,8 @@ data class WalletTicketRemoteDto(
     val locationPlain: String?,
     val seatEnc: String?,
     val seatPlain: String?,
+    val priceEnc: String?,
+    val pricePlain: String?,
     val bookingCodeEnc: String?,
     val bookingCodePlain: String?,
     val arrivalLocationEnc: String?,
@@ -113,6 +115,8 @@ class WalletRemoteStore @Inject constructor(
                                 locationPlain = d["location"] as? String,
                                 seatEnc = d["seatEnc"] as? String,
                                 seatPlain = d["seat"] as? String,
+                                priceEnc = d["priceEnc"] as? String,
+                                pricePlain = d["price"] as? String,
                                 bookingCodeEnc = d["bookingCodeEnc"] as? String,
                                 bookingCodePlain = d["bookingCode"] as? String,
                                 arrivalLocationEnc = d["arrivalLocationEnc"] as? String,
@@ -175,6 +179,9 @@ class WalletRemoteStore @Inject constructor(
             "fileNameEnc" to ticket.pdfFileName?.let { encryptField(it, ticket.familyId) },
             "locationEnc" to ticket.location?.let { encryptField(it, ticket.familyId) },
             "seatEnc" to ticket.seat?.let { encryptField(it, ticket.familyId) },
+            // Cifrato come il posto: quanto è costato un biglietto è un dato
+            // di famiglia, non un'etichetta pubblica come l'emittente.
+            "priceEnc" to ticket.price?.let { encryptField(it, ticket.familyId) },
             "bookingCodeEnc" to ticket.bookingCode?.let { encryptField(it, ticket.familyId) },
             "arrivalLocationEnc" to ticket.arrivalLocation?.let { encryptField(it, ticket.familyId) },
             "holderNameEnc" to ticket.holderName?.let { encryptField(it, ticket.familyId) },

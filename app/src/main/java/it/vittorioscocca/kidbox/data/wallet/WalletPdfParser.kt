@@ -31,6 +31,13 @@ data class WalletParsedData(
     val bookingCode: String?,
     val barcodeText: String?,
     val barcodeFormat: String?,
+    /**
+     * Note del biglietto. **Non** più ricavate dal PDF: le riempie solo la
+     * lettura AI, che sa cosa è già finito negli altri campi. Un parser cieco
+     * non può distinguere una nota da una riga qualunque, e riempire il campo
+     * con righe pescate dal documento lo trasformava nel posto dove finiva
+     * tutto ciò che non era stato riconosciuto. Meglio vuoto.
+     */
     val notes: String?,
     val thumbnailBase64: String?,
     /** Orario di arrivo (`eventDate` resta l'orario di partenza). Popolato da lettura AI o inserito a mano. */
@@ -39,6 +46,10 @@ data class WalletParsedData(
     val arrivalLocation: String? = null,
     /** Nome del titolare del biglietto. */
     val holderName: String? = null,
+    /** Settore, fila e posto. Non estratto da regex, popolato dalla lettura AI. */
+    val seat: String? = null,
+    /** Prezzo pagato. Non estratto da regex, popolato dalla lettura AI. */
+    val price: String? = null,
     /** Testo grezzo estratto dal PDF (per la lettura AI). */
     val rawText: String? = null,
 )
@@ -72,7 +83,6 @@ object WalletPdfParser {
         val eventDate = extractWalletEventMillis(normalizePdfPlainText(text))
         val location = extractLocation(text)
         val bookingCode = extractBookingCode(text, barcodeResult?.first)
-        val notes = extractNotes(text)
 
         val suggestedTitle = when {
             !fileName.isNullOrBlank() -> fileName.removeSuffix(".pdf").trim()
@@ -89,7 +99,7 @@ object WalletPdfParser {
             bookingCode = bookingCode,
             barcodeText = barcodeResult?.first,
             barcodeFormat = barcodeResult?.second,
-            notes = notes,
+            notes = null,
             thumbnailBase64 = thumbnail,
             rawText = text,
         )
@@ -513,16 +523,4 @@ object WalletPdfParser {
         return null
     }
 
-    private fun extractNotes(text: String): String? {
-        val lines = text.lines()
-            .map { it.trim() }
-            .filter { it.isNotBlank() && it.length > 8 }
-        val interesting = lines.filter { line ->
-            val lower = line.lowercase(Locale.ITALIAN)
-            lower.contains("via") || lower.contains("p.iva") || lower.contains("iva") ||
-                lower.contains("tel") || lower.contains("email") || lower.contains("info")
-        }
-        if (interesting.isEmpty()) return null
-        return interesting.take(5).joinToString("\n")
-    }
 }

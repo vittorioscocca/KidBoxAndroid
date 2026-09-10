@@ -199,6 +199,8 @@
     <string name="wallet_ticket_not_found">Ticket not found</string>
     <string name="wallet_only_creator_can_edit_visibility">Only whoever created the ticket can change its visibility.</string>
     <string name="wallet_open_pdf">Open PDF</string>
+    <string name="wallet_share_pdf">Share PDF</string>
+    <string name="wallet_ticket_file_fallback">Ticket</string>
     <string name="wallet_access_code_label">Access code</string>
     <string name="wallet_barcode_cd">Barcode</string>
     <string name="wallet_copy">Copy</string>
@@ -238,6 +240,10 @@
     <string name="wallet_label_title">Title</string>
     <string name="wallet_label_type">Type</string>
     <string name="wallet_holder_name_optional_label">Holder name (optional)</string>
+    <string name="wallet_seat_optional_label">Section, row, seat (optional)</string>
+    <string name="wallet_seat_label">Seat</string>
+    <string name="wallet_price_optional_label">Price (optional)</string>
+    <string name="wallet_price_label">Price</string>
     <string name="wallet_departure_time_label">Departure time</string>
     <string name="wallet_departure_datetime_label">Departure date &amp; time</string>
     <string name="wallet_departure_location_optional_label">Departure location (optional)</string>

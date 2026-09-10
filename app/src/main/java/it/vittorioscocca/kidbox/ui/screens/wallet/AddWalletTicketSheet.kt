@@ -107,7 +107,15 @@ fun AddWalletTicketSheet(
     var location by rememberSaveable { mutableStateOf("") }
     var arrivalLocation by rememberSaveable { mutableStateOf("") }
     var holderName by rememberSaveable { mutableStateOf("") }
+    var seat by rememberSaveable { mutableStateOf("") }
+    var price by rememberSaveable { mutableStateOf("") }
     var bookingCode by rememberSaveable { mutableStateOf("") }
+    // Ultimo titolo messo AUTOMATICAMENTE (parser o lettura AI): serve a
+    // distinguerlo da uno scritto a mano, che non va sovrascritto.
+    var autoTitle by rememberSaveable { mutableStateOf("") }
+    // Stessa cosa per le note: quelle del parser sono un ripiego grezzo e
+    // vanno cedute alla lettura AI, quelle scritte a mano no.
+    var autoNotes by rememberSaveable { mutableStateOf("") }
     var notes by rememberSaveable { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -127,7 +135,10 @@ fun AddWalletTicketSheet(
 
     LaunchedEffect(parsedData) {
         val p = parsedData ?: return@LaunchedEffect
-        if (title.isBlank()) title = p.suggestedTitle
+        if (title.isBlank()) {
+            title = p.suggestedTitle
+            autoTitle = p.suggestedTitle
+        }
         selectedKind = p.kind
         if (p.eventDate != null) {
             hasDate = true
@@ -135,10 +146,34 @@ fun AddWalletTicketSheet(
         }
         if (location.isBlank() && !p.location.isNullOrBlank()) location = p.location
         if (bookingCode.isBlank() && !p.bookingCode.isNullOrBlank()) bookingCode = p.bookingCode
-        if (notes.isBlank() && !p.notes.isNullOrBlank()) notes = p.notes
+        if (notes.isBlank() && !p.notes.isNullOrBlank()) {
+            notes = p.notes
+            autoNotes = p.notes
+        }
     }
 
     fun applyAiExtraction(ext: it.vittorioscocca.kidbox.data.wallet.WalletTicketExtraction) {
+        // Il titolo è l'unico campo che l'utente può aver scritto a mano prima
+        // di premere «leggi con l'AI»: si sovrascrive solo se è ancora quello
+        // messo automaticamente — nome del file o formula «emittente • data» —
+        // che è esattamente il caso da correggere.
+        ext.eventTitle?.let {
+            if (title.isBlank() || title == autoTitle) {
+                title = it
+                autoTitle = it
+            }
+        }
+        ext.seat?.let { seat = it }
+        ext.price?.let { price = it }
+        // Le note del parser sono righe grezze del PDF: quelle dell'AI sono
+        // quello che resta dopo aver riempito gli altri campi, quindi vincono.
+        // E se la lettura non trova nulla da annotare, le note automatiche
+        // vanno via lo stesso: tenerle vorrebbe dire lasciare in scheda dei
+        // frammenti che ora hanno il loro campo.
+        if (notes.isBlank() || notes == autoNotes) {
+            notes = ext.notes.orEmpty()
+            autoNotes = notes
+        }
         ext.holderName?.let { holderName = it }
         ext.bookingCode?.let { bookingCode = it }
         ext.kind?.let { selectedKind = it }
@@ -372,6 +407,8 @@ fun AddWalletTicketSheet(
                                 location = location.ifBlank { null },
                                 arrivalLocation = arrivalLocation.ifBlank { null },
                                 holderName = holderName.ifBlank { null },
+                                seat = seat.ifBlank { null },
+                                price = price.ifBlank { null },
                                 bookingCode = bookingCode.ifBlank { null },
                                 notes = notes.ifBlank { null },
                             ),
@@ -570,6 +607,22 @@ fun AddWalletTicketSheet(
                 value = holderName,
                 onValueChange = { holderName = it },
                 label = { Text(stringResource(R.string.wallet_holder_name_optional_label)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            OutlinedTextField(
+                value = seat,
+                onValueChange = { seat = it },
+                label = { Text(stringResource(R.string.wallet_seat_optional_label)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            OutlinedTextField(
+                value = price,
+                onValueChange = { price = it },
+                label = { Text(stringResource(R.string.wallet_price_optional_label)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )

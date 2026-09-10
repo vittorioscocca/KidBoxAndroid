@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.settings
 
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -104,44 +105,36 @@ fun AlexaSettingsScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        if (state.linked && !state.voiceLinked) {
-            // Il codice non sparisce col collegamento dell'account: se la voce
-            // non e' ancora associata serve ancora, ed e' proprio il caso del
-            // secondo membro di casa, che l'account ce l'ha gia' per riflesso.
-            SectionTitle(stringResource(R.string.settings_alexa_voice_section))
-            PairingCard(
-                state = state,
-                onGenerate = viewModel::generateCode,
-                buttonLabel = stringResource(R.string.settings_alexa_voice_cta),
-            )
+        // Chi ha l'account collegato può già dettare: le frasi vengono prima,
+        // perché sono quello che funziona adesso. I passi restano sotto per chi
+        // deve ancora far riconoscere la propria voce — il caso del secondo
+        // membro di casa, che l'account ce l'ha già per riflesso di quello
+        // Amazon condiviso e vedeva solo «La tua voce», senza sapere che prima
+        // gli serve la skill attiva sul proprio account.
+        if (state.linked) {
+            SectionTitle(stringResource(R.string.settings_alexa_phrases_section))
+            PhrasesCard()
             Spacer(Modifier.height(8.dp))
+            // Il promemoria e' l'unico comando che non si esaurisce in una
+            // frase, e senza dirlo qui l'utente non si aspetta le due domande
+            // e riattacca. Non e' una scelta di stile: AMAZON.SearchQuery, lo
+            // slot che regge il testo libero del titolo, non puo' convivere con
+            // nessun altro slot nella stessa frase, quindi assegnatario e
+            // orario devono per forza arrivare nei turni dopo.
             Text(
-                text = stringResource(R.string.settings_alexa_voice_note),
+                text = stringResource(R.string.settings_alexa_phrases_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = kb.subtitle,
             )
             Spacer(Modifier.height(16.dp))
         }
 
-        if (state.linked) {
-            SectionTitle(stringResource(R.string.settings_alexa_phrases_section))
-            PhrasesCard()
-            Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = { showUnlinkDialog = true },
-                enabled = !state.isLoading,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = MaterialTheme.colorScheme.onError,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.settings_alexa_unlink))
-            }
-        } else {
-            // Prima del codice viene la skill: senza, il codice si detta a vuoto
-            // e non c'e' modo di capire perche'. E' il primo passo, e fino a ieri
-            // non era scritto da nessuna parte.
+        // Il codice serve finché non è legata anche la voce, e serve partendo
+        // dalla skill: senza quella attiva sul proprio account Amazon si detta a
+        // vuoto e non c'e' modo di capire perche'. Una `PairingCard` sola sulla
+        // schermata: due pulsanti genererebbero lo stesso codice a sei cifre e
+        // non si capirebbe quale premere.
+        if (!state.linked || !state.voiceLinked) {
             SectionTitle(stringResource(R.string.settings_alexa_skill_section))
             Spacer(Modifier.height(8.dp))
             Text(
@@ -157,14 +150,59 @@ fun AlexaSettingsScreen(
             )
             Spacer(Modifier.height(16.dp))
 
-            SectionTitle(stringResource(R.string.settings_alexa_pairing_section))
-            PairingCard(state = state, onGenerate = viewModel::generateCode)
+            // Col proprio account già collegato, «2. Collega l'account»
+            // contraddice il «Account collegato» in cima alla schermata: resta
+            // il passo 2, ma di un'altra cosa.
+            SectionTitle(
+                stringResource(
+                    if (state.linked) {
+                        R.string.settings_alexa_voice_step_section
+                    } else {
+                        R.string.settings_alexa_pairing_section
+                    },
+                ),
+            )
+            PairingCard(
+                state = state,
+                onGenerate = viewModel::generateCode,
+                // Con l'account già collegato quel codice non serve più a
+                // collegarlo: serve a legare la voce. Il pulsante lo dice, o
+                // sembrerebbe di rifare un passo già fatto.
+                buttonLabel = if (state.linked) {
+                    stringResource(R.string.settings_alexa_voice_cta)
+                } else {
+                    null
+                },
+            )
             Spacer(Modifier.height(8.dp))
+            if (state.linked) {
+                Text(
+                    text = stringResource(R.string.settings_alexa_voice_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = kb.subtitle,
+                )
+                Spacer(Modifier.height(8.dp))
+            }
             Text(
                 text = stringResource(R.string.settings_alexa_pairing_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = kb.subtitle,
             )
+        }
+
+        if (state.linked) {
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = { showUnlinkDialog = true },
+                enabled = !state.isLoading,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.settings_alexa_unlink))
+            }
         }
 
         state.errorMessage?.let { key ->
@@ -385,6 +423,7 @@ private fun PhrasesCard() {
         R.string.settings_alexa_phrase_add,
         R.string.settings_alexa_phrase_read,
         R.string.settings_alexa_phrase_remove,
+        R.string.settings_alexa_phrase_remind,
         R.string.settings_alexa_phrase_open,
     )
     Card(

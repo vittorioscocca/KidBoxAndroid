@@ -31,9 +31,12 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Euro
+import androidx.compose.material.icons.filled.EventSeat
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Place
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -135,21 +138,54 @@ fun WalletTicketDetailScreen(
         if (state.familyId.isBlank()) viewModel.bind(familyId)
     }
 
+    // Aprire e condividere partono dallo stesso posto: il PDF vive cifrato su
+    // Storage e i byte arrivano una volta sola, con lo stesso evento. Cosa
+    // farne lo decide il pulsante che è stato premuto.
+    var pdfIntentAction by remember { mutableStateOf(Intent.ACTION_VIEW) }
+
     LaunchedEffect(state.pdfBytesEvent) {
         val bytes = state.pdfBytesEvent ?: return@LaunchedEffect
         viewModel.consumePdfBytes()
-        val tmpFile = File(context.cacheDir, "wallet_tmp_$ticketId.pdf")
+
+        // Il nome è quello del file originale, non `wallet_tmp_<id>.pdf`:
+        // condividere un allegato chiamato così lo rende irriconoscibile a chi
+        // lo riceve. Una cartella per biglietto perché due biglietti diversi
+        // possono chiamarsi entrambi `biglietto.pdf`, e si ricrea da zero ogni
+        // volta per non lasciare in cache la copia di un nome precedente.
+        val safeName = ticket?.pdfFileName
+            ?.trim()
+            ?.replace(Regex("[/\\\\]"), "_")
+            ?.takeIf { it.isNotEmpty() }
+            ?: "${context.getString(R.string.wallet_ticket_file_fallback)}.pdf"
+        val dir = File(context.cacheDir, "wallet_share/$ticketId")
+        dir.deleteRecursively()
+        dir.mkdirs()
+        val tmpFile = File(dir, safeName)
         tmpFile.writeBytes(bytes)
+
         val uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
             tmpFile,
         )
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/pdf")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        val intent = if (pdfIntentAction == Intent.ACTION_SEND) {
+            Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        } else {
+            Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/pdf")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
         }
-        runCatching { context.startActivity(intent) }
+        val launched = if (pdfIntentAction == Intent.ACTION_SEND) {
+            Intent.createChooser(intent, context.getString(R.string.wallet_share_pdf))
+        } else {
+            intent
+        }
+        runCatching { context.startActivity(launched) }
             .onFailure { Toast.makeText(context, context.getString(R.string.wallet_no_app_to_open_pdf), Toast.LENGTH_SHORT).show() }
     }
 
@@ -304,7 +340,10 @@ fun WalletTicketDetailScreen(
 
             // Actions
             Button(
-                onClick = { viewModel.openPdf(ticketId) },
+                onClick = {
+                    pdfIntentAction = Intent.ACTION_VIEW
+                    viewModel.openPdf(ticketId)
+                },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !state.isImporting,
             ) {
@@ -314,6 +353,18 @@ fun WalletTicketDetailScreen(
                     Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
                     Text(stringResource(R.string.wallet_open_pdf))
                 }
+            }
+
+            OutlinedButton(
+                onClick = {
+                    pdfIntentAction = Intent.ACTION_SEND
+                    viewModel.openPdf(ticketId)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !state.isImporting,
+            ) {
+                Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                Text(stringResource(R.string.wallet_share_pdf))
             }
 
             OutlinedButton(
@@ -512,6 +563,24 @@ private fun DetailsSection(ticket: KBWalletTicketEntity) {
                 DetailRow(
                     icon = { Icon(Icons.Filled.Place, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
                     label = stringResource(R.string.wallet_arrival_location_label),
+                    value = it,
+                )
+            }
+            // Sta fra il luogo e il codice perché è così che si legge un
+            // biglietto: dove si va, dove ci si siede, e poi il numero da
+            // esibire. Il campo esisteva già sull'entity ma non lo riempiva
+            // nessuno, quindi questa riga non compariva mai.
+            ticket.seat?.takeIf { it.isNotBlank() }?.let {
+                DetailRow(
+                    icon = { Icon(Icons.Filled.EventSeat, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
+                    label = stringResource(R.string.wallet_seat_label),
+                    value = it,
+                )
+            }
+            ticket.price?.takeIf { it.isNotBlank() }?.let {
+                DetailRow(
+                    icon = { Icon(Icons.Filled.Euro, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
+                    label = stringResource(R.string.wallet_price_label),
                     value = it,
                 )
             }

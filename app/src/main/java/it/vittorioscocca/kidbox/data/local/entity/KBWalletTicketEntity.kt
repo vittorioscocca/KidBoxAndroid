@@ -27,6 +27,8 @@ data class KBWalletTicketEntity(
     val eventEndDateEpochMillis: Long?,
     val location: String?,
     val seat: String?,
+    /** Prezzo come stampato sul biglietto, valuta compresa («19,50 €»). */
+    val price: String? = null,
     val bookingCode: String?,
     /** Luogo di arrivo (`location` resta il luogo di partenza). */
     val arrivalLocation: String? = null,

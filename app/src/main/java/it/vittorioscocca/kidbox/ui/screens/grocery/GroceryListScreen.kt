@@ -73,6 +73,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import it.vittorioscocca.kidbox.ui.components.AlexaPromoBanner
+import it.vittorioscocca.kidbox.ui.components.AlexaPromoContext
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.entity.KBGroceryItemEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBShoppingTripEntity
@@ -98,6 +100,8 @@ private val GroceryRed = Color(0xFFE35156)
 @Composable
 fun GroceryListScreen(
     onBack: () -> Unit,
+    /** Per l'invito a collegare Alexa: la schermata non conosce il NavController. */
+    onAlexaSettings: () -> Unit = {},
     viewModel: GroceryListViewModel = hiltViewModel(),
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -177,7 +181,22 @@ fun GroceryListScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = kb.subtitle,
                 )
+                // L'invito a collegare Alexa sta qui, subito sotto i
+                // contatori e sopra i filtri, come su iOS: più in basso
+                // finirebbe dentro la lista e scorrerebbe via prima di essere
+                // letto. Si mostra da solo quando ha senso — lingua giusta,
+                // famiglia non ancora collegata, invito non già rifiutato.
+                // Vedi `AlexaPromoBanner`.
                 Spacer(Modifier.height(10.dp))
+                AlexaPromoBanner(
+                    familyId = state.familyId,
+                    context = AlexaPromoContext.GROCERY,
+                    onConnect = onAlexaSettings,
+                    // Il banner sparisce del tutto quando non serve, quindi lo
+                    // stacco dai chip viaggia con lui e non con uno Spacer che
+                    // resterebbe lì a vuoto.
+                    modifier = Modifier.padding(bottom = 10.dp),
+                )
                 GroceryFilterChips(
                     selected = state.filter,
                     onSelect = { viewModel.setFilter(it) },

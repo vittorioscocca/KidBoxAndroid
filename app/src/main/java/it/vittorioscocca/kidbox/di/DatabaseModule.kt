@@ -265,6 +265,18 @@ object DatabaseModule {
      * righe. La copia è sicura perché le uniche righe esistenti sono quelle che
      * il vincolo lasciava passare, cioè i profili dei figli.
      */
+    /**
+     * Aggiunge `price` a `kb_wallet_tickets`: il prezzo pagato, letto dall'AI
+     * insieme agli altri campi del biglietto. Nullable e senza backfill — i
+     * biglietti già importati non hanno l'informazione e non c'è modo di
+     * ricavarla senza rileggere il PDF.
+     */
+    private val MIGRATION_46_47 = object : Migration(46, 47) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `kb_wallet_tickets` ADD COLUMN `price` TEXT")
+        }
+    }
+
     private val MIGRATION_45_46 = object : Migration(45, 46) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(
@@ -1399,6 +1411,7 @@ object DatabaseModule {
         MIGRATION_43_44,
         MIGRATION_44_45,
         MIGRATION_45_46,
+        MIGRATION_46_47,
     )
         .fallbackToDestructiveMigration()
         .build()
