@@ -204,6 +204,48 @@ class FamilySyncCenter @Inject constructor(
     }
 
     /**
+     * Ingresso per i rifiuti che arrivano dalle **Cloud Function** invece che dai
+     * listener Firestore.
+     *
+     * Quando l'utente esce (o viene tolto) da una famiglia, le schermate
+     * continuano a chiamare `getAIUsage`, `getStorageUsage`, `askAI` sulla
+     * famiglia rimasta in preferenze: il server risponde `permission-denied`
+     * ogni volta e il client ritenta. Qui il caso viene fatto passare per la
+     * stessa verifica dei listener — l'unica che sa distinguere un'espulsione
+     * da un rifiuto infrastrutturale — e solo un CONFIRMED autorizza il wipe.
+     *
+     * @return `true` se è stata confermata (e gestita) una revoca.
+     */
+    suspend fun handleCallableAccessDenied(familyId: String, source: String): Boolean {
+        val uid = auth.currentUser?.uid.orEmpty()
+        if (familyId.isEmpty() || uid.isEmpty()) return false
+        if (isJoining) {
+            KBLog.sync.debug("Callable denied ignorata: join in corso familyId=$familyId", TAG)
+            return false
+        }
+        return when (verifyRevocation(familyId, uid)) {
+            RevocationVerdict.CONFIRMED ->
+                triggerAccessLostIfEligible(familyId, uid, "callable:$source")
+            RevocationVerdict.NOT_REVOKED -> {
+                KBLog.sync.warning(
+                    "Callable rifiutata ma il documento membro è al suo posto: " +
+                        "nessuna revoca. source=$source familyId=$familyId",
+                    TAG,
+                )
+                false
+            }
+            RevocationVerdict.UNDETERMINED -> {
+                KBLog.sync.warning(
+                    "Callable rifiutata, verifica impossibile (rete o credenziali): " +
+                        "nessuna revoca. source=$source familyId=$familyId",
+                    TAG,
+                )
+                false
+            }
+        }
+    }
+
+    /**
      * PERMISSION_DENIED che la verifica non ha confermato come revoca: si sblocca
      * la UI (altrimenti resta in caricamento all'infinito sui dati già in Room) e
      * si riprova più tardi, senza toccare Room, chiavi o preferenze.

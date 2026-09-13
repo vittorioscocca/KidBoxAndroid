@@ -80,6 +80,7 @@
     <string name="auth_error_network">Errore di rete. Controlla la connessione.</string>
     <string name="auth_error_too_many_requests">Troppi tentativi. Riprova tra qualche minuto.</string>
     <string name="auth_error_user_disabled">Account disabilitato. Contatta il supporto.</string>
+    <string name="auth_error_email_not_verified">Email non verificata. Ti abbiamo inviato di nuovo il link: apri l\'email, verifica l\'indirizzo e poi accedi.</string>
     <string name="family_key_missing_title">Chiave di famiglia mancante</string>
     <string name="family_key_missing_message">Su questo dispositivo manca la chiave che protegge i contenuti condivisi, quindi documenti, wallet, foto e allegati della chat non possono essere aperti.\n\nPer recuperarla, fatti invitare di nuovo da chi ha creato la famiglia e inquadra il codice QR che genera.</string>
     <string name="family_key_missing_short">Manca la chiave di famiglia: fatti invitare di nuovo da chi ha creato la famiglia e inquadra il suo codice QR.</string>

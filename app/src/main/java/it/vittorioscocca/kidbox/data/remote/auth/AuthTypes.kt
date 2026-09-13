@@ -66,6 +66,16 @@ sealed class AuthError(
         "Sign-in did not complete in time.",
         R.string.auth_error_timed_out,
     )
+
+    /**
+     * Account email/password con indirizzo non ancora verificato: le
+     * credenziali sono giuste, ma non si entra finché il link di verifica non
+     * è stato aperto. Stessa regola su iOS e web.
+     */
+    object EmailNotVerified : AuthError(
+        "Email address not verified.",
+        R.string.auth_error_email_not_verified,
+    )
 }
 
 /**

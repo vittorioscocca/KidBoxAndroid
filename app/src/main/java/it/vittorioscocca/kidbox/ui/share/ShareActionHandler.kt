@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.share
 
+import it.vittorioscocca.kidbox.data.sync.FamilyAccessGuard
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
@@ -49,6 +50,7 @@ class ShareActionHandler @Inject constructor(
     private val subscriptionRepository: SubscriptionRepository,
     private val childDao: KBChildDao,
     private val todoListDao: KBTodoListDao,
+    private val familyAccessGuard: FamilyAccessGuard,
 ) {
 
     suspend fun execute(input: ShareActionInput, resolver: ContentResolver) {
@@ -249,11 +251,13 @@ class ShareActionHandler @Inject constructor(
         val plan = subscriptionRepository.getPlan(familyId)
         val planBytes = plan.bytesLimit()
         if (planBytes == Long.MAX_VALUE) return
-        val result = FirebaseFunctions.getInstance("europe-west1")
-            .getHttpsCallable("getStorageUsage")
-            .call(hashMapOf("familyId" to familyId))
-            .await()
-            .getData() as? Map<*, *>
+        val result = familyAccessGuard.guarded(familyId, "ShareActionHandler") {
+            FirebaseFunctions.getInstance("europe-west1")
+                .getHttpsCallable("getStorageUsage")
+                .call(hashMapOf("familyId" to familyId))
+                .await()
+                .getData()
+        } as? Map<*, *>
         val usedBytes = (result?.get("usedBytes") as? Number)?.toLong() ?: 0L
         if (usedBytes >= planBytes) {
             error(appContext.getString(R.string.share_error_storage_full))

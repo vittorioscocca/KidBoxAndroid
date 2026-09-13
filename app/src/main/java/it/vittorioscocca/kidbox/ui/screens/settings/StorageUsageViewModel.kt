@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.settings
 
+import it.vittorioscocca.kidbox.data.sync.FamilyAccessGuard
 import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -56,6 +57,7 @@ class StorageUsageViewModel @Inject constructor(
     private val subscriptionRepository: SubscriptionRepository,
     private val billingManager: KBBillingManager,
     private val auth: FirebaseAuth,
+    private val familyAccessGuard: FamilyAccessGuard,
 ) : ViewModel() {
 
     private val functions = FirebaseFunctions.getInstance("europe-west1")
@@ -115,9 +117,11 @@ class StorageUsageViewModel @Inject constructor(
             val uid = auth.currentUser?.uid.orEmpty()
             val isFamilyOwner = isFamilySubscriptionManager(familyDao, familyMemberDao, familyId, uid)
             runCatching {
-                val result = functions.getHttpsCallable("getStorageUsage")
-                    .call(hashMapOf("familyId" to familyId))
-                    .await()
+                val result = familyAccessGuard.guarded(familyId, "StorageUsageViewModel") {
+                    functions.getHttpsCallable("getStorageUsage")
+                        .call(hashMapOf("familyId" to familyId))
+                        .await()
+                }
                 @Suppress("UNCHECKED_CAST")
                 result.getData() as? Map<String, Any?>
             }.onSuccess { data ->

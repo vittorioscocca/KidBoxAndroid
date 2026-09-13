@@ -98,12 +98,34 @@ class LoginViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            // Chi ha una sessione email non verificata viene fatto uscire prima
+            // di toccare qualunque dato: gemello del controllo in
+            // `AppCoordinator.startSessionListener` su iOS.
+            if (emailAuth.signOutIfEmailUnverified()) {
+                KBLog.auth.info("Email non verificata: sessione chiusa all'avvio", "KidBoxAuth")
+                _errorMessage.value = appContext.getString(R.string.auth_error_email_not_verified)
+            }
             val user = FirebaseAuth.getInstance().currentUser
             if (user != null) {
                 userProfileRepository.ensureSeededFromAuth()
                 runCatching { userProfileRepository.hydrateFromFirestore() }
                 writePlatformToFirestore(user.uid)
-                resetFirestoreClientAfterAuthChange()
+                // Solo a identità cambiata. Qui siamo all'avvio con una sessione
+                // già valida: se l'uid è lo stesso dell'ultimo reset, ripulire la
+                // persistenza significherebbe buttare la cache Firestore a OGNI
+                // apertura dell'app. Misurato l'11/09/2026 su device: due avvii
+                // consecutivi, 179 document_change identici ciascuno (104
+                // passwords, 51 trips, 15 passwordGroups) e ~236 letture, mentre
+                // senza reset il server conferma il set invariato con un
+                // existence filter e non trasferisce nulla.
+                if (lastFirestoreResetUid() != user.uid) {
+                    resetFirestoreClientAfterAuthChange()
+                } else {
+                    KBLog.auth.debug(
+                        "reset persistenza saltato: stessa identita uid=${user.uid}",
+                        "KidBoxDebug",
+                    )
+                }
             }
             val hasFamily = if (user != null) checkHasFamily() else false
             val hasOnboarding = onboardingPreferences.hasSeenOnboarding()
@@ -279,18 +301,39 @@ class LoginViewModel @Inject constructor(
     /**
      * Dopo login/logout con wipe locale, forza nuovo token e resetta il client Firestore
      * per evitare PERMISSION_DENIED transitori dovuti a credenziali/cache stale.
+     *
+     * ATTENZIONE: `clearPersistence()` cancella l'INTERA cache locale — documenti e
+     * resume token — quindi dopo questa chiamata ogni listener riscarica dal server
+     * la sua collezione intera. Va invocata solo quando l'identita' e' davvero
+     * cambiata (login esplicito) o in reazione a un PERMISSION_DENIED, mai come
+     * profilassi a ogni avvio. Registra l'uid trattato cosi' che l'`init` possa
+     * saltarla a sessione invariata.
      */
     private suspend fun resetFirestoreClientAfterAuthChange() {
         try {
+            val uid = FirebaseAuth.getInstance().currentUser?.uid
             FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.await()
             delay(400)
             FirebaseFirestore.getInstance().terminate().await()
             FirebaseFirestore.getInstance().clearPersistence().await()
             delay(250)
+            if (uid != null) rememberFirestoreResetUid(uid)
             KBLog.auth.debug("resetFirestoreClientAfterAuthChange: OK", "KidBoxDebug")
         } catch (e: Exception) {
             KBLog.auth.warning("resetFirestoreClientAfterAuthChange: ${e.message}", "KidBoxDebug")
         }
+    }
+
+    /** uid per cui la persistenza Firestore e' stata ripulita l'ultima volta. */
+    private fun lastFirestoreResetUid(): String? =
+        appContext.getSharedPreferences(AUTH_PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_LAST_FIRESTORE_RESET_UID, null)
+
+    private fun rememberFirestoreResetUid(uid: String) {
+        appContext.getSharedPreferences(AUTH_PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_LAST_FIRESTORE_RESET_UID, uid)
+            .apply()
     }
 
     private suspend fun checkHasFamily(): Boolean {
@@ -415,6 +458,10 @@ class LoginViewModel @Inject constructor(
     }
 
     private companion object {
+        /** Dove ricordiamo per quale uid abbiamo gia' ripulito la persistenza Firestore. */
+        private const val AUTH_PREFS = "auth_state"
+        private const val KEY_LAST_FIRESTORE_RESET_UID = "last_firestore_reset_uid"
+
         private const val ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL =
             "ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL"
         private const val ERROR_EMAIL_ALREADY_IN_USE = "ERROR_EMAIL_ALREADY_IN_USE"

@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.home
 
+import it.vittorioscocca.kidbox.data.sync.FamilyAccessGuard
 import it.vittorioscocca.kidbox.data.remote.ActiveFamilyRemoteStore
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.util.KBLog
@@ -148,6 +149,7 @@ class HomeViewModel @Inject constructor(
     private val familyMemoryService: FamilyMemoryService,
     private val homeViewModePreference: it.vittorioscocca.kidbox.data.local.HomeViewModePreference,
     @ApplicationContext private val appContext: Context,
+    private val familyAccessGuard: FamilyAccessGuard,
 ) : ViewModel() {
     val homeViewMode: StateFlow<it.vittorioscocca.kidbox.data.local.HomeViewMode> =
         homeViewModePreference.getViewModeFlow()
@@ -280,6 +282,9 @@ class HomeViewModel @Inject constructor(
 
                 if (syncedFamilyId != familyId) {
                     syncedFamilyId = familyId
+                    // Famiglia diversa da quella su cui stavamo: eventuali
+                    // sospensioni del presidio non valgono più.
+                    familyAccessGuard.clear(familyId)
                     heroAbsentCacheKeys.clear()
                     initialSyncCompleted = false
                     KBLog.ui.info("startSync familyId=$familyId", MEMBERS_SYNC_TAG)

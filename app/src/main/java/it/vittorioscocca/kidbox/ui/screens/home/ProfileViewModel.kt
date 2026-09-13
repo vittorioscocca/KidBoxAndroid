@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.home
 
+import it.vittorioscocca.kidbox.data.sync.FamilyAccessGuard
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.util.KBLog
 
@@ -88,6 +89,7 @@ class ProfileViewModel @Inject constructor(
     private val avatarRemoteStore: AvatarRemoteStore,
     private val auth: FirebaseAuth,
     private val logoutUseCase: LogoutUseCase,
+    private val familyAccessGuard: FamilyAccessGuard,
 ) : AndroidViewModel(application) {
     companion object {
         private const val TAG = "ProfileViewModel"
@@ -170,9 +172,11 @@ class ProfileViewModel @Inject constructor(
             auth.currentUser?.uid.orEmpty(),
         )
         runCatching {
-            val result = functions.getHttpsCallable("getStorageUsage")
-                .call(hashMapOf("familyId" to familyId))
-                .await()
+            val result = familyAccessGuard.guarded(familyId, "ProfileViewModel") {
+                functions.getHttpsCallable("getStorageUsage")
+                    .call(hashMapOf("familyId" to familyId))
+                    .await()
+            }
             @Suppress("UNCHECKED_CAST")
             result.getData() as? Map<String, Any?>
         }.onSuccess { payload ->

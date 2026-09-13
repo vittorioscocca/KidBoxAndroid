@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.family
 
+import it.vittorioscocca.kidbox.data.sync.FamilyAccessGuard
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -31,6 +32,7 @@ class FamilySwitcherViewModel @Inject constructor(
     private val familySessionPreferences: FamilySessionPreferences,
     private val familyRepository: FamilyRepository,
     private val authRepository: AuthRepository,
+    private val familyAccessGuard: FamilyAccessGuard,
 ) : ViewModel() {
 
     val families: StateFlow<List<KBFamilyEntity>> = familyDao.observeAll()
@@ -54,6 +56,10 @@ class FamilySwitcherViewModel @Inject constructor(
     fun switchToFamily(familyId: String) {
         viewModelScope.launch {
             familySyncCenter.stopSync()
+            // Cambio famiglia: se le chiamate verso questa erano sospese perché
+            // il server aveva risposto «non sei membro», qui la situazione è
+            // cambiata e il presidio va riaperto.
+            familyAccessGuard.clear(familyId)
             familySessionPreferences.setActiveFamilyId(familyId)
             familySyncCenter.startSync(familyId)
             _activeFamilyId.value = familyId

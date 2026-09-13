@@ -22,6 +22,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
+import it.vittorioscocca.kidbox.data.sync.FamilyAccessGuard
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
@@ -31,6 +32,7 @@ class AIService @Inject constructor(
     private val familySessionPreferences: FamilySessionPreferences,
     private val subscriptionRepository: SubscriptionRepository,
     private val aiUsageTracker: AIUsageTracker,
+    private val familyAccessGuard: FamilyAccessGuard,
 ) {
     private val functions = FirebaseFunctions.getInstance("europe-west1")
 
@@ -64,8 +66,9 @@ class AIService @Inject constructor(
             )
             purpose?.trim()?.takeIf { it.isNotEmpty() }?.let { payload["purpose"] = it }
             @Suppress("UNCHECKED_CAST")
-            val data = functions.getHttpsCallable("askAI").call(payload).await().getData() as? Map<String, Any?>
-                ?: error("Risposta AI non valida")
+            val data = familyAccessGuard.guarded(resolvedFamilyId, "AIService.sendMessages") {
+                functions.getHttpsCallable("askAI").call(payload).await().getData() as? Map<String, Any?>
+            } ?: error("Risposta AI non valida")
             val usageToday = (data["usageToday"] as? Number)?.toInt() ?: 0
             val dailyLimit = (data["dailyLimit"] as? Number)?.toInt() ?: 30
             val period = AIQuotaPeriod.fromRaw(data["period"] as? String)
@@ -84,7 +87,9 @@ class AIService @Inject constructor(
             val resolvedFamilyId = resolveFamilyId(familyId)
             val payload = hashMapOf("familyId" to resolvedFamilyId)
             @Suppress("UNCHECKED_CAST")
-            val data = functions.getHttpsCallable("getAIUsage").call(payload).await().getData() as? Map<String, Any?>
+            val data = familyAccessGuard.guarded(resolvedFamilyId, "AIService.fetchUsage") {
+                functions.getHttpsCallable("getAIUsage").call(payload).await().getData() as? Map<String, Any?>
+            }
                 ?: error("Risposta usage non valida")
             val usageToday = (data["usageToday"] as? Number)?.toInt() ?: 0
             val dailyLimit = (data["dailyLimit"] as? Number)?.toInt() ?: 30

@@ -69,6 +69,7 @@
     <string name="auth_error_network">Error de red. Comprueba la conexión.</string>
     <string name="auth_error_too_many_requests">Demasiados intentos. Inténtalo de nuevo en unos minutos.</string>
     <string name="auth_error_user_disabled">Cuenta desactivada. Contacta con soporte.</string>
+    <string name="auth_error_email_not_verified">Correo no verificado. Te hemos enviado el enlace de nuevo: abre el correo, verifica la dirección y luego inicia sesión.</string>
     <string name="family_key_missing_title">Falta la clave de la familia</string>
     <string name="family_key_missing_message">Este dispositivo no tiene la clave que protege el contenido compartido, así que los documentos, el wallet, las fotos y los adjuntos del chat no se pueden abrir.\n\nPara recuperarla, pide a quien creó la familia que te invite de nuevo y escanea el código QR que genera.</string>
     <string name="family_key_missing_short">Falta la clave de la familia: pide a quien creó la familia que te invite de nuevo y escanea su código QR.</string>

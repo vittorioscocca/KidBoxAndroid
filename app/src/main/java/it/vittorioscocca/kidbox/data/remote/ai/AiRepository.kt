@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.data.remote.ai
 
+import it.vittorioscocca.kidbox.data.sync.FamilyAccessGuard
 import com.google.firebase.functions.FirebaseFunctions
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
 import it.vittorioscocca.kidbox.ai.CurrentPlanStore
@@ -24,6 +25,7 @@ data class AiReply(
 @Singleton
 class AiRepository @Inject constructor(
     private val aiUsageTracker: AIUsageTracker,
+    private val familyAccessGuard: FamilyAccessGuard,
 ) {
 
     private val functions = FirebaseFunctions.getInstance("europe-west1")
@@ -61,9 +63,9 @@ class AiRepository @Inject constructor(
             "mealPlan", "fitnessPlan" -> callable.setTimeout(300, java.util.concurrent.TimeUnit.SECONDS)
             "clinicalRecord" -> callable.setTimeout(240, java.util.concurrent.TimeUnit.SECONDS)
         }
-        val result = callable
-            .call(payload)
-            .await()
+        val result = familyAccessGuard.guarded(familyId, "AiRepository.askAI") {
+            callable.call(payload).await()
+        }
 
         @Suppress("UNCHECKED_CAST")
         val data = result.getData() as? Map<String, Any> ?: error("Risposta non valida dall'AI")
