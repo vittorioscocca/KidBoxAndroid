@@ -321,7 +321,7 @@ class SupportViewModel @Inject constructor(
     private fun mapAiError(err: Throwable): String = when (err) {
         is AIServiceException -> when (err.serviceError) {
             AIServiceError.RateLimitReached ->
-                "Limite messaggi AI giornaliero raggiunto. Riprova domani."
+                err.message ?: "Limite messaggi AI giornaliero raggiunto. Riprova domani."
             AIServiceError.NetworkError ->
                 "Connessione assente. Controlla la rete e riprova."
             is AIServiceError.ServerError ->

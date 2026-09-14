@@ -127,6 +127,7 @@ import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.util.KBLocale
 import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.ui.components.KidBoxAvatar
+import it.vittorioscocca.kidbox.ui.components.KidBoxWordmark
 import it.vittorioscocca.kidbox.ui.family.FamilySwitcherBottomSheet
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.permissions.rememberNotificationPermissionRequester
@@ -261,13 +262,7 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "KidBox",
-                            fontSize = 34.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = (-0.5).sp,
-                            color = MaterialTheme.kidBoxColors.title,
-                        )
+                        KidBoxWordmark()
                         if (state.familyName.isNotBlank()) {
                             Text(
                                 text = state.familyName,

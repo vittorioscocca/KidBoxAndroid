@@ -55,14 +55,33 @@ object FitnessCopilotPrompt {
             - "add_session": aggiunge una seduta nuova in un giorno che non ne ha, con "date" in
               formato AAAA-MM-GG, "title" e "activityType" obbligatori. La data deve cadere dentro
               le settimane del piano: fuori non viene applicata;
-            - "delete_session": elimina una seduta. È l'unica azione che NON viene applicata subito:
-              l'utente riceve una richiesta di conferma. Nel testo chiedi conferma invece di darla
-              per fatta, e proponila solo se l'utente ha chiesto di togliere quella seduta; per
-              saltarne una senza perderla usa "mark_session" con "skipped".
+            - "delete_session": rimuove la seduta dal piano. Si applica subito, come le altre.
+              Quando l'utente chiede di cancellare, togliere, eliminare o rimuovere una seduta usa
+              SEMPRE "delete_session": "mark_session" con "skipped" la lascia sul calendario, e
+              l'utente la vedrebbe ancora lì. Usa "skipped" solo se l'utente dice di averla saltata
+              o di non poterla fare, senza chiedere di toglierla.
             Usa SEMPRE il "sessionId" esatto preso dall'elenco delle sedute qui sotto (tranne per
             "add_session", che non ne ha uno).
             Nel testo della risposta spiega in una riga cosa hai cambiato e perché; il blocco JSON non
             viene mostrato all'utente. Se non serve modificare nulla, non allegare alcun blocco.
+
+            REGOLE VINCOLANTI SULLE MODIFICHE:
+            - Una modifica esiste SOLO se è nel blocco. Scrivere "ho spostato", "ho aggiunto", "ho
+              modificato" senza allegare il blocco è una conferma falsa: il piano resta com'era.
+            - Le tue risposte precedenti in questa conversazione appaiono SENZA blocco perché l'app lo
+              rimuove dopo averlo eseguito. Non prenderle a modello: ogni volta che modifichi, allega
+              di nuovo il blocco completo.
+            - L'elenco "SEDUTE E STATO DI COMPLETAMENTO" qui sotto è lo stato REALE del piano, già
+              aggiornato con tutte le modifiche applicate. Se una modifica annunciata in un messaggio
+              precedente non compare, non è stata applicata: rifalla ora con il blocco.
+            - Un solo blocco per risposta, con un'azione per ogni seduta toccata (es. aggiungere un
+              giorno di allenamento a tutto il piano = un "add_session" per ogni settimana rimasta;
+              togliere un giorno = un "delete_session" per ogni seduta di quel giorno).
+            - La risposta ha una lunghezza massima: quando tocchi più di 3 sedute scrivi al massimo 5
+              esercizi per seduta con "detail" brevissimo, e il testo in 2-3 righe. Se le sedute da
+              toccare sono più di 12, applica le prime 12 e chiedi se proseguire.
+            - I "Giorni di allenamento" indicati sotto sono quelli scelti alla creazione: se l'elenco
+              delle sedute dice altro, vale l'elenco.
             """.trimIndent(),
         )
 

@@ -214,7 +214,7 @@
     <string name="fitness_keep_plan">Mantieni il piano</string>
     <string name="fitness_apply_changes">Applica le modifiche</string>
     <string name="fitness_ask_adjustment">Chiedi un adeguamento</string>
-    <string name="fitness_adjust_cost">La proposta costa 1 messaggio AI.</string>
+    <string name="fitness_adjust_cost">La proposta costa 3 messaggi AI.</string>
     <string name="fitness_proposal_applied">Piano aggiornato con le modifiche proposte dall\'AI.</string>
     <string name="fitness_safety_title">Adattamenti per la tua salute</string>
     <string name="fitness_safety_detail">Come l\'AI ha adattato il piano ai tuoi dati clinici.</string>
@@ -295,7 +295,7 @@
     <string name="fitness_status_moved">Spostato</string>
     <string name="fitness_move_title">Sposta seduta</string>
     <string name="fitness_move_current">Prevista per il %1$s</string>
-    <string name="fitness_move_hint">L\'AI riorganizza i giorni rimanenti della settimana per non perdere l\'obiettivo. Costa 1 messaggio AI.</string>
+    <string name="fitness_move_hint">L\'AI riorganizza i giorni rimanenti della settimana per non perdere l\'obiettivo. Costa 3 messaggi AI.</string>
     <string name="fitness_move_cta">Sposta la seduta</string>
     <string name="fitness_copilot_open">Chiedi al Fitness Copilot</string>
     <string name="fitness_copilot_title">Fitness Copilot</string>
@@ -316,6 +316,11 @@
     <string name="fitness_copilot_changed_moved">Seduta spostata al %1$s</string>
     <string name="fitness_copilot_changed_status">Seduta del %1$s aggiornata</string>
     <string name="fitness_copilot_changed_added">Seduta aggiunta il %1$s</string>
+    <string name="fitness_copilot_changed_deleted">Seduta del %1$s eliminata</string>
+    <string name="fitness_copilot_cost_estimate">Questo messaggio costa circa %1$d messaggi AI.</string>
+    <string name="fitness_copilot_cost_exceeds">Questo messaggio costa circa %1$d messaggi AI, oggi ne restano %2$d.</string>
+    <string name="ai_quota_message_too_expensive">Questo messaggio costa %1$d messaggi AI perché il contesto è ampio, e oggi alla famiglia ne restano %2$d su %3$d. Riprova domani.</string>
+    <string name="ai_quota_daily_reached">La famiglia ha raggiunto il limite di %1$d messaggi AI per oggi. Riprova domani.</string>
     <string name="fitness_copilot_delete_title">Elimino la seduta?</string>
     <string name="fitness_copilot_delete_body">Verranno rimosse dal piano e non si potranno recuperare:\n%1$s</string>
     <string name="fitness_copilot_delete_confirm">Elimina</string>

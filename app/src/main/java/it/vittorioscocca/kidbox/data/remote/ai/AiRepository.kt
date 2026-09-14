@@ -61,7 +61,9 @@ class AiRepository @Inject constructor(
         // alimentare (8192 token di output) sforavano i 120s → DEADLINE_EXCEEDED.
         when (purpose) {
             "mealPlan", "fitnessPlan" -> callable.setTimeout(300, java.util.concurrent.TimeUnit.SECONDS)
-            "clinicalRecord" -> callable.setTimeout(240, java.util.concurrent.TimeUnit.SECONDS)
+            // Su Sonnet una modifica a più sedute supera i 70s di default.
+            "clinicalRecord", "fitnessAdjust", "fitnessCopilot" ->
+                callable.setTimeout(240, java.util.concurrent.TimeUnit.SECONDS)
         }
         val result = familyAccessGuard.guarded(familyId, "AiRepository.askAI") {
             callable.call(payload).await()

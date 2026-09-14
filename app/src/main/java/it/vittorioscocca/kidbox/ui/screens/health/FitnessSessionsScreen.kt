@@ -357,24 +357,8 @@ private fun EmptySessions() {
 
 // ── Icone, date e numeri ───────────────────────────────────────────────────
 
-private fun sessionIcon(session: FitnessSession): ImageVector {
-    val text = "${session.activityType} ${session.title}".lowercase()
-    return when {
-        listOf("cors", "run", "jog").any { text.contains(it) } ->
-            Icons.Default.DirectionsRun
-        listOf("camm", "walk", "passeg").any { text.contains(it) } ->
-            Icons.Default.DirectionsWalk
-        listOf("bici", "cicl", "cycl", "spinning").any { text.contains(it) } ->
-            Icons.Default.DirectionsBike
-        listOf("nuot", "swim", "piscina").any { text.contains(it) } ->
-            Icons.Default.Pool
-        listOf("mobil", "stretch", "yoga", "pilates").any { text.contains(it) } ->
-            Icons.Default.SelfImprovement
-        listOf("forza", "pesi", "strength", "tonific", "hiit", "circuit")
-            .any { text.contains(it) } -> Icons.Default.FitnessCenter
-        else -> Icons.Default.DirectionsRun
-    }
-}
+private fun sessionIcon(session: FitnessSession): ImageVector =
+    FitnessActivityIcons.forPerformed(session)
 
 /** Giorno in cui la seduta è stata svolta. */
 private fun performedAt(session: FitnessSession): Long =

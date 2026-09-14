@@ -12,6 +12,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import it.vittorioscocca.kidbox.data.remote.family.InviteRemoteStore
 import it.vittorioscocca.kidbox.data.remote.family.InviteWrapService
 import it.vittorioscocca.kidbox.data.user.UserProfileRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -103,6 +105,28 @@ class InviteCodeViewModel @Inject constructor(
         }
     }
 
+    /** La generazione in corso, per poterla annullare in [clearInvite]. */
+    private var generateJob: Job? = null
+
+    /**
+     * Riporta il ViewModel allo stato di partenza, senza toccare Firestore.
+     *
+     * Serve al foglio rapido della Home: `hiltViewModel()` lo lega alla
+     * schermata Home e non al foglio, quindi il ViewModel sopravvive alla
+     * chiusura. Senza questo, al secondo tocco del "+" il foglio saltava la
+     * spiegazione e mostrava il QR di prima — scaduto, se la Home era rimasta
+     * in memoria oltre le 24h. Su iOS il foglio crea un ViewModel nuovo a ogni
+     * apertura, quindi il problema non c'è.
+     *
+     * L'invito già creato resta valido fino alla scadenza, come su iOS.
+     */
+    fun clearInvite() {
+        generateJob?.cancel()
+        generateJob = null
+        resetInviteUiState()
+        _isBusy.value = false
+    }
+
     private fun resetInviteUiState() {
         _qrPayload.value = null
         _shareLink.value = null
@@ -118,7 +142,7 @@ class InviteCodeViewModel @Inject constructor(
         _shareLink.value = null
         _currentInviteFamilyId.value = null
         _currentInviteId.value = null
-        viewModelScope.launch {
+        generateJob = viewModelScope.launch {
             try {
                 val families = familyDao.observeAll().first()
                 val familyId = preferredFamilyId
@@ -149,6 +173,9 @@ class InviteCodeViewModel @Inject constructor(
                     "kidbox://join?familyId=$familyId&inviteId=${invite.inviteId}&secret=${invite.secretBase64url}"
                 _shareLink.value = invite.shareLink
 
+            } catch (e: CancellationException) {
+                // Annullata da clearInvite: il foglio è già chiuso, niente errore.
+                throw e
             } catch (e: Exception) {
                 _errorMessage.value = e.localizedMessage ?: "Errore generazione invito"
             } finally {

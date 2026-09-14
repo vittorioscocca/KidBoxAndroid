@@ -35,7 +35,6 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsRun
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -43,7 +42,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,7 +53,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import it.vittorioscocca.kidbox.util.KBLocale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -66,7 +63,6 @@ import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.SimpleDateFormat
-import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 
@@ -98,31 +94,6 @@ fun FitnessCopilotScreen(
             viewModel.consumeActionSummary()
         }
     }
-    // L'eliminazione è l'unica azione che non si applica da sola: una seduta
-    // cancellata non torna indietro, quindi l'ultima parola resta all'utente.
-    if (state.pendingDeletions.isNotEmpty()) {
-        val list = state.pendingDeletions.joinToString("\n") { session ->
-            val date = DateFormat.getDateInstance(DateFormat.MEDIUM, KBLocale.current())
-                .format(Date(session.dateEpochMillis))
-            "${session.title} — $date"
-        }
-        AlertDialog(
-            onDismissRequest = { viewModel.cancelPendingDeletions() },
-            title = { Text(stringResource(R.string.fitness_copilot_delete_title)) },
-            text = { Text(stringResource(R.string.fitness_copilot_delete_body, list)) },
-            confirmButton = {
-                TextButton(onClick = { viewModel.confirmPendingDeletions() }) {
-                    Text(stringResource(R.string.fitness_copilot_delete_confirm))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.cancelPendingDeletions() }) {
-                    Text(stringResource(R.string.fitness_copilot_delete_cancel))
-                }
-            },
-        )
-    }
-
     LaunchedEffect(state.messages.size, state.isLoading) {
         if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.size)
     }
@@ -261,12 +232,15 @@ fun FitnessCopilotScreen(
             }
         }
 
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.ime)
                 .navigationBarsPadding()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Bottom,
         ) {
             OutlinedTextField(
@@ -313,6 +287,22 @@ fun FitnessCopilotScreen(
                     }
                 }
             }
+        }
+        if (state.dailyLimit > 0 && state.systemPromptChars > 0) {
+            val units = state.estimatedUnits
+            val remaining = (state.dailyLimit - state.usageToday).coerceAtLeast(0)
+            val exceeds = units > remaining
+            Text(
+                if (exceeds) {
+                    stringResource(R.string.fitness_copilot_cost_exceeds, units, remaining)
+                } else {
+                    stringResource(R.string.fitness_copilot_cost_estimate, units)
+                },
+                fontSize = 11.sp,
+                color = if (exceeds) AI_ORANGE else kb.subtitle,
+                modifier = Modifier.padding(top = 4.dp, start = 4.dp),
+            )
+        }
         }
     }
 }

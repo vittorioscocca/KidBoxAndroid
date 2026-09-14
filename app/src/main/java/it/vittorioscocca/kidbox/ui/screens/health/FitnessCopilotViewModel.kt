@@ -14,7 +14,6 @@ import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanDocument
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanGenerator
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanRemoteStore
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanStore
-import it.vittorioscocca.kidbox.data.health.fitness.FitnessSession
 import it.vittorioscocca.kidbox.data.local.dao.KBAIConversationDao
 import it.vittorioscocca.kidbox.data.local.dao.KBAIMessageDao
 import it.vittorioscocca.kidbox.data.local.entity.KBAIConversationEntity
@@ -25,6 +24,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBMedicalVisitDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTreatmentDao
 import it.vittorioscocca.kidbox.data.remote.ai.AiRepository
 import it.vittorioscocca.kidbox.data.repository.PediatricProfileRepository
+import it.vittorioscocca.kidbox.data.remote.ai.AIAskAIPayload
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
 import it.vittorioscocca.kidbox.notifications.FitnessPlanReminderScheduler
 import java.text.DateFormat
@@ -58,11 +58,22 @@ data class FitnessCopilotUiState(
     val safetyNoteCount: Int = 0,
     val hasTodaySession: Boolean = false,
     val actionSummary: String? = null,
-    /** Sedute che l'AI ha proposto di eliminare, in attesa di conferma. */
-    val pendingDeletions: List<FitnessSession> = emptyList(),
     val message: String? = null,
+    /** Caratteri del prompt di sistema, per la stima del costo. */
+    val systemPromptChars: Int = 0,
 ) {
     val canSend: Boolean get() = !isLoading && inputText.isNotBlank()
+
+    /**
+     * Unità che il prossimo messaggio scalerà, con la formula del server
+     * (`fitnessAssist`: caratteri di system prompt + cronologia + testo, ×3
+     * per Sonnet). Senza questa riga chi vede 95/100 non capisce perché un
+     * messaggio venga rifiutato.
+     */
+    val estimatedUnits: Int
+        get() = AIAskAIPayload.fitnessAssistMessageUnits(
+            systemPromptChars + messages.sumOf { it.text.length } + inputText.trim().length,
+        )
 }
 
 /**
@@ -255,8 +266,6 @@ class FitnessCopilotViewModel @Inject constructor(
                     usageToday = reply.usageToday,
                     dailyLimit = reply.dailyLimit,
                     actionSummary = summary(processed.changes),
-                    // L'eliminazione aspetta l'utente: qui si apre solo la richiesta.
-                    pendingDeletions = processed.pendingDeletions,
                     messages = _uiState.value.messages + assistantMessage,
                 )
             }.onFailure { error ->
@@ -267,35 +276,6 @@ class FitnessCopilotViewModel @Inject constructor(
                 )
             }
         }
-    }
-
-    /** L'utente ha confermato: le sedute vengono rimosse e il piano risalvato. */
-    fun confirmPendingDeletions() {
-        val pending = _uiState.value.pendingDeletions
-        val current = plan ?: return
-        if (pending.isEmpty()) return
-
-        val updated = pending.fold(current) { doc, session -> doc.removeSession(session.id) }
-        plan = updated
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                planStore.save(childId, updated)
-                remoteStore.upsert(childId, updated)
-                reminderScheduler.reschedule(childId, familyId, updated)
-            }
-            buildContext()
-            _uiState.value = _uiState.value.copy(
-                pendingDeletions = emptyList(),
-                actionSummary = context.getString(
-                    R.string.fitness_copilot_deleted_summary,
-                    pending.size,
-                ),
-            )
-        }
-    }
-
-    fun cancelPendingDeletions() {
-        _uiState.value = _uiState.value.copy(pendingDeletions = emptyList())
     }
 
     private fun summary(changes: List<FitnessCopilotChange>): String? {
@@ -312,6 +292,8 @@ class FitnessCopilotViewModel @Inject constructor(
                     context.getString(R.string.fitness_copilot_changed_status, date)
                 is FitnessCopilotChange.Added ->
                     context.getString(R.string.fitness_copilot_changed_added, date)
+                is FitnessCopilotChange.Deleted ->
+                    context.getString(R.string.fitness_copilot_changed_deleted, date)
             }
         }
     }
@@ -354,6 +336,7 @@ class FitnessCopilotViewModel @Inject constructor(
         )
         _uiState.value = _uiState.value.copy(
             subjectName = subjectName,
+            systemPromptChars = systemPrompt.length,
             sessionCount = current.allSessions.size,
             safetyNoteCount = current.safetyNotes.size,
             hasTodaySession = current.sessionsOn(System.currentTimeMillis()).isNotEmpty(),

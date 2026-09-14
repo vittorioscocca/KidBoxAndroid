@@ -28,6 +28,7 @@ import it.vittorioscocca.kidbox.util.KBCrashHandler
 import it.vittorioscocca.kidbox.util.KBFileLogger
 import it.vittorioscocca.kidbox.util.KBLog
 import it.vittorioscocca.kidbox.util.KidBoxApplicationHolder
+import it.vittorioscocca.kidbox.util.ReviewPrompter
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsLifecycleObserver
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -107,6 +108,8 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
         KidBoxFirebaseMessagingService.createNotificationChannels(this)
         // Analytics utenti attivi — internal/analytics-active-users.md
         registerActivityLifecycleCallbacks(KBAnalyticsLifecycleObserver())
+        // Dopo quello analytics: il primo avvio parte dalla data d'installazione che scrive lui.
+        registerActivityLifecycleCallbacks(ReviewPrompter)
         appInitScope.launch {
             CrashAnalyzer.analyzeIfNeeded(this@KidBoxApplication)
         }

@@ -3,6 +3,7 @@ package it.vittorioscocca.kidbox.util.analytics
 import android.content.Context
 import android.os.Bundle
 import com.google.firebase.analytics.FirebaseAnalytics
+import it.vittorioscocca.kidbox.util.ReviewPrompter
 
 object OnboardingAnalyticsState {
     var lastStepSeen: String? = null
@@ -131,11 +132,22 @@ object AppAnalytics {
         log(context, "content_created") {
             putString("content_type", type)
         }
+        // Stesso punto di passaggio di tutti i salvataggi: evita di ripetere
+        // la chiamata in ogni schermata.
+        ReviewPrompter.note(context, ReviewPrompter.Moment.CONTENT_CREATED)
     }
 
     fun contentSharedRead(context: Context, type: String) {
         log(context, "content_shared_read") {
             putString("content_type", type)
+        }
+        ReviewPrompter.note(context, ReviewPrompter.Moment.SHARED_CONTENT_READ)
+    }
+
+    /** Richiesta del popup di recensione: Play può non mostrarlo, e non dice mai se l'ha fatto. */
+    fun reviewPromptRequested(context: Context, trigger: String) {
+        log(context, "review_prompt_requested") {
+            putString("trigger", trigger)
         }
     }
 

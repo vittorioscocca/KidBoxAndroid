@@ -812,7 +812,7 @@ private fun LoggedWorkoutRow(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                Icons.Default.DirectionsRun,
+                FitnessActivityIcons.forWorkout(workout.title),
                 contentDescription = null,
                 tint = FITNESS_TINT,
                 modifier = Modifier.size(18.dp),
@@ -892,7 +892,7 @@ private fun SessionCard(
                     .background(FITNESS_TINT.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Default.DirectionsRun, contentDescription = null, tint = FITNESS_TINT)
+                Icon(FitnessActivityIcons.forPerformed(session), contentDescription = null, tint = FITNESS_TINT)
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {

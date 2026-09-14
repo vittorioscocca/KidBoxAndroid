@@ -21,7 +21,7 @@ import java.util.Locale
  * Generazione del Piano Fitness via Cloud Function `askAI`:
  * - `purpose: "fitnessPlan"` per il piano mensile (JSON, max_tokens esteso);
  * - `purpose: "fitnessAdjust"` per lo spostamento di una seduta e per la
- *   proposta di adeguamento settimanale (payload piccolo, 1 messaggio).
+ *   proposta di adeguamento settimanale (payload piccolo: 3 messaggi, Sonnet).
  */
 object FitnessPlanGenerator {
 
@@ -187,7 +187,7 @@ object FitnessPlanGenerator {
         val userContent = rescheduleUserContent(plan, session, newDateEpochMillis, session.weekIndex)
         assertQuota(
             usageTracker,
-            AIAskAIPayload.messageUnits(
+            AIAskAIPayload.fitnessAssistMessageUnits(
                 AIAskAIPayload.totalChars(systemPrompt, listOf(aiUserMessage(userContent))),
             ),
         )
@@ -251,7 +251,7 @@ object FitnessPlanGenerator {
         val userContent = weeklyAdjustUserContent(plan, report, nextWeekIndex)
         assertQuota(
             usageTracker,
-            AIAskAIPayload.messageUnits(
+            AIAskAIPayload.fitnessAssistMessageUnits(
                 AIAskAIPayload.totalChars(systemPrompt, listOf(aiUserMessage(userContent))),
             ),
         )

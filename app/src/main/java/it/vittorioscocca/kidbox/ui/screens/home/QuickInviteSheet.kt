@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,6 +74,13 @@ internal fun QuickInviteSheet(
     val qrPayload by viewModel.qrPayload.collectAsStateWithLifecycle()
     val shareLink by viewModel.shareLink.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
+
+    // Il ViewModel appartiene alla Home, non al foglio: senza azzerarlo alla
+    // chiusura, la riapertura mostrerebbe il QR precedente saltando la
+    // spiegazione. Vale per «Chiudi», per lo swipe e per il tocco fuori.
+    DisposableEffect(Unit) {
+        onDispose { viewModel.clearInvite() }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,

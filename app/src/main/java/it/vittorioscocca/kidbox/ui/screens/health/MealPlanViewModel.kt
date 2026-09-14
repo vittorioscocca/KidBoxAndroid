@@ -27,6 +27,7 @@ import it.vittorioscocca.kidbox.data.repository.PediatricProfileRepository
 import it.vittorioscocca.kidbox.domain.model.HealthImportSnapshot
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
+import it.vittorioscocca.kidbox.util.ReviewPrompter
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -165,6 +166,7 @@ class MealPlanViewModel @Inject constructor(
                     mealPlanStore.save(childId, result.document)
                     mealPlanRemoteStore.upsert(childId, result.document)
                 }
+                ReviewPrompter.note(context, ReviewPrompter.Moment.AI_PLAN_GENERATED)
                 _uiState.value = _uiState.value.copy(
                     isGenerating = false,
                     document = result.document,

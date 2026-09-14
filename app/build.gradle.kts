@@ -32,8 +32,8 @@ android {
         applicationId = "it.vittorioscocca.kidbox"
         minSdk = 26
         targetSdk = 36
-        versionCode = 51
-        versionName = "2.2.7"
+        versionCode = 52
+        versionName = "2.2.8"
         manifestPlaceholders["googleMapsApiKey"] = mapsApiKey
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
         buildConfigField("Boolean", "AI_ENABLED", "true")
@@ -172,6 +172,9 @@ dependencies {
     // Play In-App Updates: chiede a Play se esiste un versionCode più recente
     // sul canale a cui l'utente è idoneo (rispetta i rollout graduali).
     implementation(libs.app.update.ktx)
+
+    // Play In-App Review: il popup di voto nativo, vedi `ReviewPrompter`.
+    implementation(libs.review.ktx)
 
     // ML Kit barcode (legge QR dalla camera)
     implementation(libs.mlkit.barcode)

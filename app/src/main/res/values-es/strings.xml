@@ -203,7 +203,7 @@
     <string name="fitness_keep_plan">Mantener el plan</string>
     <string name="fitness_apply_changes">Aplicar los cambios</string>
     <string name="fitness_ask_adjustment">Pedir un ajuste</string>
-    <string name="fitness_adjust_cost">La propuesta cuesta 1 mensaje de IA.</string>
+    <string name="fitness_adjust_cost">La propuesta cuesta 3 mensajes de IA.</string>
     <string name="fitness_proposal_applied">Plan actualizado con los cambios propuestos por la IA.</string>
     <string name="fitness_safety_title">Adaptaciones para tu salud</string>
     <string name="fitness_safety_detail">Cómo la IA ha adaptado el plan a tus datos clínicos.</string>
@@ -284,7 +284,7 @@
     <string name="fitness_status_moved">Movido</string>
     <string name="fitness_move_title">Mover sesión</string>
     <string name="fitness_move_current">Prevista para el %1$s</string>
-    <string name="fitness_move_hint">La IA reorganiza los días restantes de la semana para no perder el objetivo. Cuesta 1 mensaje de IA.</string>
+    <string name="fitness_move_hint">La IA reorganiza los días restantes de la semana para no perder el objetivo. Cuesta 3 mensajes de IA.</string>
     <string name="fitness_move_cta">Mover la sesión</string>
     <string name="fitness_copilot_open">Pregunta al Fitness Copilot</string>
     <string name="fitness_copilot_title">Fitness Copilot</string>
@@ -305,6 +305,11 @@
     <string name="fitness_copilot_changed_moved">Sesión movida al %1$s</string>
     <string name="fitness_copilot_changed_status">Sesión del %1$s actualizada</string>
     <string name="fitness_copilot_changed_added">Sesión añadida el %1$s</string>
+    <string name="fitness_copilot_changed_deleted">Sesión del %1$s eliminada</string>
+    <string name="fitness_copilot_cost_estimate">Este mensaje cuesta unos %1$d mensajes de IA.</string>
+    <string name="fitness_copilot_cost_exceeds">Este mensaje cuesta unos %1$d mensajes de IA; hoy quedan %2$d.</string>
+    <string name="ai_quota_message_too_expensive">Este mensaje cuesta %1$d mensajes de IA porque el contexto es amplio, y hoy a la familia le quedan solo %2$d de %3$d. Vuelve a intentarlo mañana.</string>
+    <string name="ai_quota_daily_reached">La familia ha alcanzado el límite de %1$d mensajes de IA de hoy. Vuelve a intentarlo mañana.</string>
     <string name="fitness_copilot_delete_title">¿Eliminar la sesión?</string>
     <string name="fitness_copilot_delete_body">Se eliminarán del plan y no se podrán recuperar:\n%1$s</string>
     <string name="fitness_copilot_delete_confirm">Eliminar</string>

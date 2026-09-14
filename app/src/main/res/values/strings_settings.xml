@@ -16,6 +16,8 @@
     <string name="settings_row_autofill_sub">AutoFill e compilazione automatica</string>
     <string name="settings_row_support">Assistente &amp; Supporto</string>
     <string name="settings_row_support_sub">Domande, problemi e suggerimenti</string>
+    <string name="settings_row_rate">Valuta KidBox</string>
+    <string name="settings_row_rate_sub">Lascia una recensione su Google Play</string>
     <string name="settings_row_guide">Guida all\'utilizzo</string>
     <string name="settings_row_website">Sito web</string>
     <string name="settings_common_back">Indietro</string>

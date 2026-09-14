@@ -16,6 +16,8 @@
     <string name="settings_row_autofill_sub">Autorrelleno y relleno automático</string>
     <string name="settings_row_support">Ayuda y soporte</string>
     <string name="settings_row_support_sub">Preguntas, problemas y sugerencias</string>
+    <string name="settings_row_rate">Valora KidBox</string>
+    <string name="settings_row_rate_sub">Deja una reseña en Google Play</string>
     <string name="settings_row_guide">Guía de uso</string>
     <string name="settings_row_website">Sitio web</string>
     <string name="settings_common_back">Atrás</string>

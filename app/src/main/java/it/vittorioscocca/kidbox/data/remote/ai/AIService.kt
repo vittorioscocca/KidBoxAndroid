@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.data.remote.ai
 
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.util.KBLog
 
 import android.content.Context
@@ -79,7 +80,7 @@ class AIService @Inject constructor(
                 dailyLimit = dailyLimit,
                 period = period,
             )
-        }.mapError()
+        }.mapError(context)
     }
 
     suspend fun fetchUsage(familyId: String): Result<AIResponse> = withContext(Dispatchers.IO) {
@@ -101,7 +102,7 @@ class AIService @Inject constructor(
                 dailyLimit = dailyLimit,
                 period = period,
             )
-        }.mapError()
+        }.mapError(context)
     }
 
     suspend fun suggestTravelDestinations(
@@ -254,7 +255,7 @@ private fun <T> Result<T>.mapTravelCallableError(): Result<T> =
         },
     )
 
-private fun Result<AIResponse>.mapError(): Result<AIResponse> =
+private fun Result<AIResponse>.mapError(context: Context): Result<AIResponse> =
     fold(
         onSuccess = { Result.success(it) },
         onFailure = { throwable ->
@@ -264,7 +265,10 @@ private fun Result<AIResponse>.mapError(): Result<AIResponse> =
                     AIServiceException(AIServiceError.RateLimitReached)
                 throwable is FirebaseFunctionsException &&
                     throwable.code == FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED ->
-                    AIServiceException(AIServiceError.RateLimitReached)
+                    AIServiceException(
+                        AIServiceError.RateLimitReached,
+                        quotaExceededMessage(context, throwable.details),
+                    )
                 throwable is FirebaseNetworkException ->
                     AIServiceException(AIServiceError.NetworkError)
                 else ->
@@ -274,7 +278,31 @@ private fun Result<AIResponse>.mapError(): Result<AIResponse> =
         },
     )
 
-class AIServiceException(val serviceError: AIServiceError) : Exception()
+/**
+ * Frase localizzata per il limite giornaliero, dai `details` del server.
+ *
+ * Un messaggio del copilota fitness o della cartella clinica scala più di
+ * un'unità: chi vede 95/100 e si sente dire "limite raggiunto" non capisce. Il
+ * testo del server è solo in italiano, i numeri invece viaggiano nei details.
+ */
+private fun quotaExceededMessage(context: Context, details: Any?): String? {
+    val map = details as? Map<*, *> ?: return null
+    if (map["reason"] != "daily-limit") return null
+    val units = (map["units"] as? Number)?.toInt() ?: return null
+    val remaining = (map["remaining"] as? Number)?.toInt() ?: return null
+    val limit = (map["limit"] as? Number)?.toInt() ?: return null
+    return if (units > 1 && remaining > 0) {
+        context.getString(R.string.ai_quota_message_too_expensive, units, remaining, limit)
+    } else {
+        context.getString(R.string.ai_quota_daily_reached, limit)
+    }
+}
+
+/** [message], quando c'è, è già nella lingua dell'utente e va mostrato com'è. */
+class AIServiceException(
+    val serviceError: AIServiceError,
+    message: String? = null,
+) : Exception(message)
 
 /** Messaggio askAI: [content] può essere String o List di blocchi Anthropic (vision). */
 data class AIMessagePayload(

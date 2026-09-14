@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Notifications
@@ -62,6 +63,7 @@ import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.components.KBBackButton
 import it.vittorioscocca.kidbox.ui.screens.settings.family.SettingsFamilyCard
 import it.vittorioscocca.kidbox.util.AlexaAvailability
+import it.vittorioscocca.kidbox.util.ReviewPrompter
 
 private data class SettingRowItem(
     val title: String,
@@ -176,6 +178,15 @@ fun SettingsScreen(
             icon = Icons.Filled.SupportAgent,
             showChevron = true,
             onClick = onSupportChat,
+        ),
+        // Sempre visibile, a differenza del popup di `ReviewPrompter` che decide
+        // Play. Chi è scontento ha la voce qui sopra.
+        SettingRowItem(
+            title = stringResource(R.string.settings_row_rate),
+            subtitle = stringResource(R.string.settings_row_rate_sub),
+            icon = Icons.Filled.Star,
+            showChevron = true,
+            onClick = { runCatching { context.startActivity(ReviewPrompter.storeIntent(context)) } },
         ),
         SettingRowItem(
             title = stringResource(R.string.settings_row_guide),

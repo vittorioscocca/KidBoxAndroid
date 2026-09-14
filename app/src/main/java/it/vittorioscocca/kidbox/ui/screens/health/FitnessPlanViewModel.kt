@@ -42,6 +42,7 @@ import it.vittorioscocca.kidbox.domain.model.KBPediatricProfile
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.notifications.FitnessPlanReminderScheduler
 import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
+import it.vittorioscocca.kidbox.util.ReviewPrompter
 import java.util.Calendar
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -209,6 +210,9 @@ class FitnessPlanViewModel @Inject constructor(
                 }
             }.onSuccess { result ->
                 persist(result.document)
+                // Se subito dopo si apre la richiesta dei permessi Health Connect,
+                // `ReviewPrompter` vede l'Activity senza focus e rinuncia.
+                ReviewPrompter.note(context, ReviewPrompter.Moment.AI_PLAN_GENERATED)
                 _uiState.value = _uiState.value.copy(
                     isGenerating = false,
                     lastUsage = result.usage,

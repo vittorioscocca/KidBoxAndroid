@@ -735,7 +735,7 @@ class PlanningAIChatViewModel @Inject constructor(
             AIServiceError.RateLimitReached -> if (_uiState.value.quotaPeriod == AIQuotaPeriod.LIFETIME) {
                 "Hai usato tutti i messaggi AI gratuiti inclusi nel piano Free. Passa a Pro per continuare a usare l'assistente."
             } else {
-                "Limite giornaliero raggiunto."
+                error.message ?: "Limite giornaliero raggiunto."
             }
             AIServiceError.NetworkError -> "Errore di rete."
             is AIServiceError.ServerError -> mapped.message

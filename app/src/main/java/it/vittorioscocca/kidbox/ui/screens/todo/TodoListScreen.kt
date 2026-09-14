@@ -489,6 +489,8 @@ private fun TodoEditDialog(
         initial == null || initial.createdBy.isNullOrBlank() || initial.createdBy == currentUid
     }
     val displayVisScope = KBVisibilityScope.normalized(visScope)
+    // Un to-do «Solo io» non lo vede nessun altro: l'unico assegnatario sensato è chi lo crea.
+    val isPrivateScope = displayVisScope == KBVisibilityScope.ONLY_CREATOR
 
     fun pickDate() {
         val cal = Calendar.getInstance().apply { timeInMillis = dueAt }
@@ -540,7 +542,7 @@ private fun TodoEditDialog(
                         title = cleanTitle,
                         notes = notes.trim().takeIf { it.isNotEmpty() },
                         dueAt = if (dueEnabled) dueAt else null,
-                        assignedTo = assignedTo,
+                        assignedTo = if (isPrivateScope) currentUid.takeIf { it.isNotBlank() } else assignedTo,
                         urgent = urgent,
                         reminderEnabled = dueEnabled && reminderEnabled,
                         visibilityScope = visScope,
@@ -693,21 +695,23 @@ private fun TodoEditDialog(
                     Text(stringResource(R.string.todo_urgent), color = kb.title)
                     Switch(checked = urgent, onCheckedChange = { urgent = it })
                 }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showAssigneePicker = true }
-                        .padding(horizontal = 12.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(stringResource(R.string.todo_assigned_to), fontSize = 13.sp, color = kb.subtitle)
-                    Text(
-                        members.firstOrNull { it.uid == assignedTo }?.displayName
-                            ?: stringResource(R.string.todo_nobody),
-                        fontSize = 15.sp,
-                        color = kb.title,
-                    )
+                if (!isPrivateScope) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showAssigneePicker = true }
+                            .padding(horizontal = 12.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(stringResource(R.string.todo_assigned_to), fontSize = 13.sp, color = kb.subtitle)
+                        Text(
+                            members.firstOrNull { it.uid == assignedTo }?.displayName
+                                ?: stringResource(R.string.todo_nobody),
+                            fontSize = 15.sp,
+                            color = kb.title,
+                        )
+                    }
                 }
             }
         }
@@ -780,6 +784,7 @@ private fun TodoEditDialog(
             onConfirmed = { scope, ids ->
                 visScope = scope
                 visMemberIds = ids.toSet()
+                if (KBVisibilityScope.normalized(scope) == KBVisibilityScope.ONLY_CREATOR) assignedTo = currentUid.takeIf { it.isNotBlank() }
                 showVisPick = false
             },
         )

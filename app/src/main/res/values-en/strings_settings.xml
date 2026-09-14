@@ -16,6 +16,8 @@
     <string name="settings_row_autofill_sub">AutoFill and automatic filling</string>
     <string name="settings_row_support">Help &amp; Support</string>
     <string name="settings_row_support_sub">Questions, issues and feedback</string>
+    <string name="settings_row_rate">Rate KidBox</string>
+    <string name="settings_row_rate_sub">Leave a review on Google Play</string>
     <string name="settings_row_guide">User guide</string>
     <string name="settings_row_website">Website</string>
     <string name="settings_common_back">Back</string>
