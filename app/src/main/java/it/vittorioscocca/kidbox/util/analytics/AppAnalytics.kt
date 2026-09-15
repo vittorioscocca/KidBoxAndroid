@@ -3,10 +3,19 @@ package it.vittorioscocca.kidbox.util.analytics
 import android.content.Context
 import android.os.Bundle
 import com.google.firebase.analytics.FirebaseAnalytics
+import it.vittorioscocca.kidbox.ui.screens.home.onboarding.FirstContentInvitePrompt
 import it.vittorioscocca.kidbox.util.ReviewPrompter
 
 object OnboardingAnalyticsState {
     var lastStepSeen: String? = null
+
+    /**
+     * Step per cui `onboarding_abandoned` è già partito. Senza questo l'evento
+     * scattava a OGNI background finché il wizard era aperto — telefonata,
+     * mail di verifica, condivisione del link d'invito dall'ultima pagina — e
+     * GA4 lo leggeva come «80% di abbandono». Al massimo uno per step.
+     */
+    var abandonReportedStep: String? = null
 }
 
 object AppAnalytics {
@@ -100,6 +109,29 @@ object AppAnalytics {
         }
     }
 
+    // Foglio d'invito contestuale (FirstContentInvitePrompt). `trigger` dice
+    // quale occasione l'ha aperto (oggi solo `first_content`).
+    fun invitePromptShown(context: Context, trigger: String, contentType: String) {
+        log(context, "invite_prompt_shown") {
+            putString("trigger", trigger)
+            putString("content_type", contentType)
+        }
+    }
+
+    fun invitePromptAccepted(context: Context, trigger: String, contentType: String) {
+        log(context, "invite_prompt_accepted") {
+            putString("trigger", trigger)
+            putString("content_type", contentType)
+        }
+    }
+
+    fun invitePromptDismissed(context: Context, trigger: String, contentType: String) {
+        log(context, "invite_prompt_dismissed") {
+            putString("trigger", trigger)
+            putString("content_type", contentType)
+        }
+    }
+
     fun familyJoinAttempted(context: Context) {
         log(context, "family_join_attempted")
     }
@@ -135,6 +167,7 @@ object AppAnalytics {
         // Stesso punto di passaggio di tutti i salvataggi: evita di ripetere
         // la chiamata in ogni schermata.
         ReviewPrompter.note(context, ReviewPrompter.Moment.CONTENT_CREATED)
+        FirstContentInvitePrompt.noteContentCreated(context, type)
     }
 
     fun contentSharedRead(context: Context, type: String) {

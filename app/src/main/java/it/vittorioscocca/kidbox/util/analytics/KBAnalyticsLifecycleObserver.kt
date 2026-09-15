@@ -38,9 +38,14 @@ class KBAnalyticsLifecycleObserver : Application.ActivityLifecycleCallbacks {
             // partono. Se si perde qualcosa è un costo accettabile.
             KBAnalytics.flush()
 
-            OnboardingAnalyticsState.lastStepSeen?.let { step ->
-                AppAnalytics.onboardingAbandoned(activity.applicationContext, step)
-            }
+            // Uno per step, non uno per background: il perché in
+            // `OnboardingAnalyticsState.abandonReportedStep`.
+            OnboardingAnalyticsState.lastStepSeen
+                ?.takeIf { it != OnboardingAnalyticsState.abandonReportedStep }
+                ?.let { step ->
+                    OnboardingAnalyticsState.abandonReportedStep = step
+                    AppAnalytics.onboardingAbandoned(activity.applicationContext, step)
+                }
         }
     }
 

@@ -561,4 +561,18 @@
     <string name="house_payment_reminder_body">%1$s — en 3 días.</string>
     <string name="house_payment_reminder_body_fallback">En 3 días — abre Casa.</string>
     <string name="exam_reminder_body_format_urgent">Prueba para %1$s: %2$s (urgente)</string>
+    <!-- Historial clínico: resumen con IA -->
+    <string name="health_ai_usage_summary">%1$d mensajes de IA · %2$d/%3$d hoy</string>
+    <string name="health_ai_usage_summary_lifetime">%1$d mensajes de IA · %2$d/%3$d del bono gratuito</string>
+    <string name="health_ai_large_context">Contexto de salud amplio: este resumen ha contado %1$d mensajes de IA.</string>
+    <string name="health_ai_error_payload">Contexto demasiado grande (%1$d caracteres, máx. %2$d). Reduce los documentos adjuntos en Salud.</string>
+    <string name="health_refresh_reading">Leyendo visitas, análisis e informes…</string>
+    <string name="health_refresh_ai">Redactando el resumen clínico…</string>
+    <string name="health_refresh_ai_large_context">Resumen con IA en curso (%1$d mensajes, contexto amplio)…</string>
+    <plurals name="health_refresh_ai_units">
+        <item quantity="one">Redactando el resumen clínico (%1$d mensaje)…</item>
+        <item quantity="other">Redactando el resumen clínico (%1$d mensajes)…</item>
+    </plurals>
+    <string name="health_error_refresh">No se ha podido actualizar el historial. Inténtalo de nuevo.</string>
+    <string name="health_error_export">No se ha podido exportar el PDF. Inténtalo de nuevo.</string>
 </resources>

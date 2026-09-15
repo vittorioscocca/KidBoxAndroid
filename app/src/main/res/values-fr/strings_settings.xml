@@ -343,4 +343,25 @@
     <string name="settings_alexa_kind_voice">Voix reconnue</string>
     <string name="settings_alexa_kind_account">Compte relié</string>
     <string name="settings_alexa_voice_note">Alexa distingue les voix de la maison. Dictez votre code une fois et, à partir de là, ce que vous dites apparaîtra comme ajouté par vous, même depuis l\'Echo de quelqu\'un d\'autre. Sans profil vocal Alexa tout fonctionne pareil : les articles restent attribués à qui a relié le compte.</string>
+
+    <!-- Foglio d'invito contestuale dopo il primo contenuto (FirstContentInvitePrompt) -->
+    <string name="first_content_invite_title">Pour l\'instant, vous seul le voyez</string>
+    <string name="first_content_invite_subtitle">Invitez l\'autre parent ou qui vous voulez : la personne qui rejoint avec le lien voit %1$s et tout ce que vous ajouterez, en temps réel.</string>
+    <string name="first_content_invite_not_now">Pas maintenant</string>
+    <string name="first_content_invite_subject_documents">ce document</string>
+    <string name="first_content_invite_subject_photos">cette photo</string>
+    <string name="first_content_invite_subject_calendar">cet événement</string>
+    <string name="first_content_invite_subject_expenses">cette dépense</string>
+    <string name="first_content_invite_subject_grocery">cette liste de courses</string>
+    <string name="first_content_invite_subject_todo">cette tâche</string>
+    <string name="first_content_invite_subject_notes">cette note</string>
+    <string name="first_content_invite_subject_wallet">ce billet</string>
+    <string name="first_content_invite_subject_loyalty_card">cette carte</string>
+    <string name="first_content_invite_subject_passwords">ce mot de passe</string>
+    <string name="first_content_invite_subject_health">cette donnée de santé</string>
+    <string name="first_content_invite_subject_pets">cet animal</string>
+    <string name="first_content_invite_subject_home_vehicles">ce véhicule</string>
+    <string name="first_content_invite_subject_travel">ce voyage</string>
+    <string name="first_content_invite_subject_location">ce lieu</string>
+    <string name="first_content_invite_subject_generic">ce contenu</string>
 </resources>

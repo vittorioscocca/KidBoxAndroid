@@ -33,7 +33,7 @@ object ClinicalRecordAISynthesizer {
         val userContent = buildUserContent(nativeReport, healthContext)
         val estimate = estimatePayload(nativeReport, healthContext)
         if (estimate.totalChars > AIAskAIPayload.ABSOLUTE_MAX_CHARS) {
-            throw IllegalStateException("Contesto troppo grande per l'AI.")
+            throw ClinicalRecordPayloadTooLargeException(estimate.totalChars, AIAskAIPayload.ABSOLUTE_MAX_CHARS)
         }
 
         val reply = aiRepository.askAI(

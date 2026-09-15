@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.health.clinical.ClinicalRecordAIUsageInfo
+import it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod
 import it.vittorioscocca.kidbox.data.health.clinical.ClinicalRecordSection
 import it.vittorioscocca.kidbox.data.health.clinical.ClinicalRecordSnapshot
 import it.vittorioscocca.kidbox.data.health.clinical.ClinicalRecordTextSanitizer
@@ -149,7 +150,7 @@ fun ClinicalRecordScreen(
                     ) {
                         CircularProgressIndicator()
                         Text(
-                            state.refreshStatusMessage,
+                            state.refreshStatusMessage.ifBlank { stringResource(R.string.health_integrating) },
                             fontSize = 14.sp,
                             color = kb.subtitle,
                             textAlign = TextAlign.Center,
@@ -172,11 +173,11 @@ fun ClinicalRecordScreen(
                 else -> ClinicalRecordEmptyState(
                     kb = kb,
                     isRefreshing = state.isRefreshing,
-                    refreshMessage = state.refreshStatusMessage,
+                    refreshMessage = state.refreshStatusMessage.ifBlank { stringResource(R.string.health_integrating) },
                 )
             }
             if (state.isRefreshing && state.snapshot != null) {
-                RefreshingOverlay(message = state.refreshStatusMessage, kb = kb)
+                RefreshingOverlay(message = state.refreshStatusMessage.ifBlank { stringResource(R.string.health_integrating) }, kb = kb)
             }
         }
 
@@ -318,10 +319,20 @@ private fun AiUsageBanner(usage: ClinicalRecordAIUsageInfo, kb: KidBoxColorSchem
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = CLINICAL_TINT, modifier = Modifier.size(18.dp))
-                Text(usage.usageSummary, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = kb.title)
+                // Sul Free il contatore è il bonus a vita, non si azzera: «oggi» sarebbe falso.
+                val summary = if (usage.period == AIQuotaPeriod.LIFETIME) {
+                    stringResource(R.string.health_ai_usage_summary_lifetime, usage.messageUnitsConsumed, usage.usageToday, usage.dailyLimit)
+                } else {
+                    stringResource(R.string.health_ai_usage_summary, usage.messageUnitsConsumed, usage.usageToday, usage.dailyLimit)
+                }
+                Text(summary, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = kb.title)
             }
-            usage.largeContextNotice?.let {
-                Text(it, fontSize = 11.sp, color = kb.subtitle)
+            if (usage.isLargeContext) {
+                Text(
+                    stringResource(R.string.health_ai_large_context, usage.messageUnitsConsumed),
+                    fontSize = 11.sp,
+                    color = kb.subtitle,
+                )
             }
         }
     }

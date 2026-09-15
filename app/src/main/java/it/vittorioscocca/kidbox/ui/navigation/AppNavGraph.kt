@@ -7,6 +7,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
@@ -43,6 +46,9 @@ import it.vittorioscocca.kidbox.ui.screens.vehicles.VehicleDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.vehicles.VehicleInterventionsListScreen
 import it.vittorioscocca.kidbox.ui.screens.vehicles.VehiclesScreen
 import it.vittorioscocca.kidbox.ui.screens.home.HomeScreen
+import it.vittorioscocca.kidbox.ui.screens.home.QuickInviteSheet
+import it.vittorioscocca.kidbox.ui.screens.home.onboarding.FirstContentInvitePrompt
+import it.vittorioscocca.kidbox.ui.screens.home.onboarding.FirstContentInviteViewModel
 import it.vittorioscocca.kidbox.ui.screens.home.ProfileScreen
 import it.vittorioscocca.kidbox.ui.screens.home.SuggestionsScreen
 import it.vittorioscocca.kidbox.ui.screens.onboarding.OnboardingScreen
@@ -293,6 +299,29 @@ fun AppNavGraph(
                 }
             }
         }
+    }
+
+    // Invito contestuale dopo il primo contenuto creato (FirstContentInvitePrompt):
+    // come l'annuncio qui sotto, vive sopra il NavHost e non tocca il back stack.
+    val firstContentInviteVm: FirstContentInviteViewModel = hiltViewModel()
+    val pendingFirstContent by FirstContentInvitePrompt.pending.collectAsStateWithLifecycle()
+    var firstContentInvite by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(pendingFirstContent, ownsDeepLink) {
+        val type = pendingFirstContent ?: return@LaunchedEffect
+        if (!ownsDeepLink) return@LaunchedEffect
+        // Il salvataggio avviene quasi sempre dentro un foglio o una schermata
+        // che si sta chiudendo: un secondo e mezzo lascia finire l'animazione.
+        delay(1_500)
+        FirstContentInvitePrompt.clearPending()
+        if (firstContentInviteVm.shouldPresent(activeFamilyId)) {
+            firstContentInvite = type
+        }
+    }
+    firstContentInvite?.let { type ->
+        QuickInviteSheet(
+            onDismiss = { firstContentInvite = null },
+            firstContent = type,
+        )
     }
 
     // Annuncio dalla console admin: non è una destinazione, quindi vive sopra il

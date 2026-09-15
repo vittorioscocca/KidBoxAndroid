@@ -561,4 +561,18 @@
     <string name="house_payment_reminder_body">%1$s — dans 3 jours.</string>
     <string name="house_payment_reminder_body_fallback">Dans 3 jours — ouvrez Maison.</string>
     <string name="exam_reminder_body_format_urgent">Examen pour %1$s : %2$s (urgent)</string>
+    <!-- Dossier médical : synthèse IA -->
+    <string name="health_ai_usage_summary">%1$d messages IA · %2$d/%3$d aujourd’hui</string>
+    <string name="health_ai_usage_summary_lifetime">%1$d messages IA · %2$d/%3$d du bonus gratuit</string>
+    <string name="health_ai_large_context">Contexte de santé étendu : cette synthèse a compté %1$d messages IA.</string>
+    <string name="health_ai_error_payload">Contexte trop volumineux (%1$d caractères, max %2$d). Réduisez les documents joints dans Santé.</string>
+    <string name="health_refresh_reading">Lecture des visites, examens et comptes rendus…</string>
+    <string name="health_refresh_ai">Rédaction de la synthèse clinique…</string>
+    <string name="health_refresh_ai_large_context">Synthèse IA en cours (%1$d messages, contexte étendu)…</string>
+    <plurals name="health_refresh_ai_units">
+        <item quantity="one">Rédaction de la synthèse clinique (%1$d message)…</item>
+        <item quantity="other">Rédaction de la synthèse clinique (%1$d messages)…</item>
+    </plurals>
+    <string name="health_error_refresh">Impossible de mettre à jour le dossier. Réessayez.</string>
+    <string name="health_error_export">Impossible d’exporter le PDF. Réessayez.</string>
 </resources>

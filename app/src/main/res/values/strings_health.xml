@@ -561,4 +561,18 @@
     <string name="house_payment_reminder_body">%1$s — tra 3 giorni.</string>
     <string name="house_payment_reminder_body_fallback">Tra 3 giorni — apri Casa.</string>
     <string name="exam_reminder_body_format_urgent">Esame per %1$s: %2$s (urgente)</string>
+    <!-- Cartella clinica: sintesi AI (allineata a iOS ClinicalRecordAIUsageInfo) -->
+    <string name="health_ai_usage_summary">%1$d messaggi AI · %2$d/%3$d oggi</string>
+    <string name="health_ai_usage_summary_lifetime">%1$d messaggi AI · %2$d/%3$d del bonus gratuito</string>
+    <string name="health_ai_large_context">Contesto sanitario ampio: questa sintesi ha conteggiato %1$d messaggi AI.</string>
+    <string name="health_ai_error_payload">Contesto troppo grande (%1$d caratteri, max %2$d). Riduci i documenti allegati in Salute.</string>
+    <string name="health_refresh_reading">Lettura visite, esami e referti…</string>
+    <string name="health_refresh_ai">Sintesi clinica narrativa in corso…</string>
+    <string name="health_refresh_ai_large_context">Sintesi AI in corso (%1$d messaggi, contesto ampio)…</string>
+    <plurals name="health_refresh_ai_units">
+        <item quantity="one">Sintesi clinica narrativa in corso (%1$d messaggio)…</item>
+        <item quantity="other">Sintesi clinica narrativa in corso (%1$d messaggi)…</item>
+    </plurals>
+    <string name="health_error_refresh">Impossibile aggiornare la cartella. Riprova.</string>
+    <string name="health_error_export">Impossibile esportare il PDF. Riprova.</string>
 </resources>

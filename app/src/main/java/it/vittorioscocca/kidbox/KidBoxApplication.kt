@@ -29,6 +29,7 @@ import it.vittorioscocca.kidbox.util.KBFileLogger
 import it.vittorioscocca.kidbox.util.KBLog
 import it.vittorioscocca.kidbox.util.KidBoxApplicationHolder
 import it.vittorioscocca.kidbox.util.ReviewPrompter
+import it.vittorioscocca.kidbox.util.analytics.InternalTraffic
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsLifecycleObserver
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -187,6 +188,9 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
     private fun startFcmTokenOwnershipObserver() {
         var observedUid: String? = FirebaseAuth.getInstance().currentUser?.uid
         FirebaseAuth.getInstance().addAuthStateListener { auth ->
+            // Prima del guard sull'uid: il parametro va rimesso anche quando
+            // l'utente è lo stesso (riavvio dell'app), e tolto al logout.
+            InternalTraffic.apply(this, auth.currentUser)
             val newUid = auth.currentUser?.uid
             val oldUid = observedUid
             if (oldUid == newUid) return@addAuthStateListener

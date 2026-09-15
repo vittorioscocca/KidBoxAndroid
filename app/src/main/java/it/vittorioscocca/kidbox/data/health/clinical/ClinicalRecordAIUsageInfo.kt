@@ -9,17 +9,8 @@ data class ClinicalRecordAIUsageInfo(
     val isLargeContext: Boolean,
     val totalPayloadChars: Int?,
     val period: AIQuotaPeriod = AIQuotaPeriod.DAILY,
-) {
-    val usageSummary: String get() = if (period == AIQuotaPeriod.LIFETIME) {
-        "$usageToday/$dailyLimit messaggi gratuiti"
-    } else {
-        "$usageToday/$dailyLimit messaggi oggi"
-    }
+)
 
-    val largeContextNotice: String?
-        get() = if (isLargeContext) {
-            "Contesto ampio: questa generazione ha conteggiato $messageUnitsConsumed messaggi AI."
-        } else {
-            null
-        }
-}
+/** Il contesto supera il massimo assoluto di `askAI`: la UI lo traduce in `health_ai_error_payload`. */
+class ClinicalRecordPayloadTooLargeException(val chars: Int, val maxChars: Int) :
+    IllegalStateException("Clinical record payload too large: $chars > $maxChars")

@@ -561,4 +561,18 @@
     <string name="house_payment_reminder_body">%1$s — in 3 days.</string>
     <string name="house_payment_reminder_body_fallback">In 3 days — open Home.</string>
     <string name="exam_reminder_body_format_urgent">Exam for %1$s: %2$s (urgent)</string>
+    <!-- Clinical record: AI summary -->
+    <string name="health_ai_usage_summary">%1$d AI messages · %2$d/%3$d today</string>
+    <string name="health_ai_usage_summary_lifetime">%1$d AI messages · %2$d/%3$d of the free bonus</string>
+    <string name="health_ai_large_context">Large health context: this summary counted as %1$d AI messages.</string>
+    <string name="health_ai_error_payload">Context too large (%1$d characters, max %2$d). Reduce the documents attached in Health.</string>
+    <string name="health_refresh_reading">Reading visits, tests and reports…</string>
+    <string name="health_refresh_ai">Writing the clinical summary…</string>
+    <string name="health_refresh_ai_large_context">AI summary in progress (%1$d messages, large context)…</string>
+    <plurals name="health_refresh_ai_units">
+        <item quantity="one">Writing the clinical summary (%1$d message)…</item>
+        <item quantity="other">Writing the clinical summary (%1$d messages)…</item>
+    </plurals>
+    <string name="health_error_refresh">Couldn\'t update the record. Try again.</string>
+    <string name="health_error_export">Couldn\'t export the PDF. Try again.</string>
 </resources>

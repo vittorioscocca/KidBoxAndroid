@@ -343,4 +343,25 @@
     <string name="settings_alexa_kind_voice">Voz reconocida</string>
     <string name="settings_alexa_kind_account">Cuenta vinculada</string>
     <string name="settings_alexa_voice_note">Alexa distingue las voces de casa. Dicta tu código una vez y a partir de ahí lo que digas aparecerá añadido por ti, incluso desde el Echo de otra persona. Si no tienes un perfil de voz en Alexa todo funciona igual: los artículos siguen atribuidos a quien vinculó la cuenta.</string>
+
+    <!-- Foglio d'invito contestuale dopo il primo contenuto (FirstContentInvitePrompt) -->
+    <string name="first_content_invite_title">Por ahora solo lo ves tú</string>
+    <string name="first_content_invite_subtitle">Invita al otro progenitor o a quien quieras: quien entre con el enlace verá %1$s y todo lo que añadáis, en tiempo real.</string>
+    <string name="first_content_invite_not_now">Ahora no</string>
+    <string name="first_content_invite_subject_documents">este documento</string>
+    <string name="first_content_invite_subject_photos">esta foto</string>
+    <string name="first_content_invite_subject_calendar">este evento</string>
+    <string name="first_content_invite_subject_expenses">este gasto</string>
+    <string name="first_content_invite_subject_grocery">esta lista de la compra</string>
+    <string name="first_content_invite_subject_todo">esta tarea</string>
+    <string name="first_content_invite_subject_notes">esta nota</string>
+    <string name="first_content_invite_subject_wallet">esta entrada</string>
+    <string name="first_content_invite_subject_loyalty_card">esta tarjeta</string>
+    <string name="first_content_invite_subject_passwords">esta contraseña</string>
+    <string name="first_content_invite_subject_health">este dato de salud</string>
+    <string name="first_content_invite_subject_pets">esta mascota</string>
+    <string name="first_content_invite_subject_home_vehicles">este vehículo</string>
+    <string name="first_content_invite_subject_travel">este viaje</string>
+    <string name="first_content_invite_subject_location">este lugar</string>
+    <string name="first_content_invite_subject_generic">este contenido</string>
 </resources>

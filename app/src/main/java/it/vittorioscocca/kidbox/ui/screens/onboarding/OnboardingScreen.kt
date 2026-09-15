@@ -265,6 +265,7 @@ fun OnboardingScreen(
         val elapsedSeconds = ((System.currentTimeMillis() - onboardingStartTime) / 1000).toInt()
         AppAnalytics.onboardingCompleted(context, elapsedSeconds)
         OnboardingAnalyticsState.lastStepSeen = null
+        OnboardingAnalyticsState.abandonReportedStep = null
         onFamilyCreated(familyId)
     }
 

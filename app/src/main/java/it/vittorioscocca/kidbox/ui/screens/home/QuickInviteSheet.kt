@@ -29,7 +29,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.screens.home.onboarding.FirstContentInvitePrompt
 import it.vittorioscocca.kidbox.ui.screens.onboarding.InviteCodeViewModel
 import it.vittorioscocca.kidbox.ui.screens.onboarding.QRCodeView
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
@@ -58,11 +63,18 @@ import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
  * creazione cifrata e lo stesso link. Qui cambia solo quanto si legge — chi
  * tocca il "+" dalla Home vuole mandare un invito, non studiare come funziona.
  * Le spiegazioni lunghe e la revoca restano nella schermata piena.
+ *
+ * Con [firstContent] valorizzato è lo stesso foglio nella sua seconda veste:
+ * aperto dal root subito dopo il primo contenuto creato in una famiglia con
+ * un solo membro (vedi [FirstContentInvitePrompt]). Cambiano il testo — che
+ * nomina la cosa appena aggiunta — e i due eventi analytics che dicono se
+ * l'occasione è stata colta.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun QuickInviteSheet(
     onDismiss: () -> Unit,
+    firstContent: String? = null,
     viewModel: InviteCodeViewModel = hiltViewModel(),
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -80,6 +92,22 @@ internal fun QuickInviteSheet(
     // spiegazione. Vale per «Chiudi», per lo swipe e per il tocco fuori.
     DisposableEffect(Unit) {
         onDispose { viewModel.clearInvite() }
+    }
+
+    // Nella veste contestuale: mostrato una volta; chiuso in qualunque modo
+    // (bottone, swipe, tocco fuori) senza aver creato l'invito è un «Non ora».
+    var accepted by remember { mutableStateOf(false) }
+    if (firstContent != null) {
+        LaunchedEffect(Unit) {
+            AppAnalytics.invitePromptShown(context, FirstContentInvitePrompt.TRIGGER, firstContent)
+        }
+        DisposableEffect(Unit) {
+            onDispose {
+                if (!accepted) {
+                    AppAnalytics.invitePromptDismissed(context, FirstContentInvitePrompt.TRIGGER, firstContent)
+                }
+            }
+        }
     }
 
     ModalBottomSheet(
@@ -112,13 +140,23 @@ internal fun QuickInviteSheet(
             }
 
             Text(
-                stringResource(R.string.quick_invite_title),
+                stringResource(
+                    if (firstContent == null) R.string.quick_invite_title
+                    else R.string.first_content_invite_title,
+                ),
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = kb.title,
             )
             Text(
-                stringResource(R.string.quick_invite_subtitle),
+                if (firstContent == null) {
+                    stringResource(R.string.quick_invite_subtitle)
+                } else {
+                    stringResource(
+                        R.string.first_content_invite_subtitle,
+                        stringResource(FirstContentInvitePrompt.subjectRes(firstContent)),
+                    )
+                },
                 fontSize = 13.sp,
                 color = kb.subtitle,
                 textAlign = TextAlign.Center,
@@ -160,7 +198,13 @@ internal fun QuickInviteSheet(
                 }
             } else {
                 Button(
-                    onClick = viewModel::generateInviteCode,
+                    onClick = {
+                        if (firstContent != null) {
+                            accepted = true
+                            AppAnalytics.invitePromptAccepted(context, FirstContentInvitePrompt.TRIGGER, firstContent)
+                        }
+                        viewModel.generateInviteCode()
+                    },
                     enabled = !isBusy,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = orange),
@@ -197,7 +241,13 @@ internal fun QuickInviteSheet(
             }
 
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.quick_invite_close), color = kb.subtitle)
+                Text(
+                    stringResource(
+                        if (firstContent == null) R.string.quick_invite_close
+                        else R.string.first_content_invite_not_now,
+                    ),
+                    color = kb.subtitle,
+                )
             }
         }
     }

@@ -4,12 +4,14 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
 import it.vittorioscocca.kidbox.BuildConfig
+import it.vittorioscocca.kidbox.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.health.HealthLinkStore
 import it.vittorioscocca.kidbox.data.health.clinical.ClinicalRecordAIUsageInfo
+import it.vittorioscocca.kidbox.data.health.clinical.ClinicalRecordPayloadTooLargeException
 import it.vittorioscocca.kidbox.data.health.clinical.ClinicalRecordContentBuilder
 import it.vittorioscocca.kidbox.data.health.clinical.ClinicalRecordOrchestrator
 import it.vittorioscocca.kidbox.data.health.clinical.ClinicalRecordPdfGenerator
@@ -46,7 +48,7 @@ data class ClinicalRecordUiState(
     val examCount: Int = 0,
     val treatmentCount: Int = 0,
     val isRefreshing: Boolean = false,
-    val refreshStatusMessage: String = "Integrazione dati e sintesi…",
+    val refreshStatusMessage: String = "",
     val pendingAIUnits: Int? = null,
     val lastAIUsage: ClinicalRecordAIUsageInfo? = null,
     val isExporting: Boolean = false,
@@ -92,7 +94,7 @@ class ClinicalRecordViewModel @Inject constructor(
             val useAI = shouldUseAI()
             _uiState.value = _uiState.value.copy(
                 isRefreshing = true,
-                refreshStatusMessage = "Lettura visite, esami e referti…",
+                refreshStatusMessage = context.getString(R.string.health_refresh_reading),
                 message = null,
                 lastAIUsage = null,
                 pendingAIUnits = null,
@@ -118,15 +120,18 @@ class ClinicalRecordViewModel @Inject constructor(
                             _uiState.value = _uiState.value.copy(
                                 pendingAIUnits = estimate.messageUnits,
                                 refreshStatusMessage = if (estimate.isLargeContext) {
-                                    "Sintesi AI in corso (${estimate.messageUnits} messaggi, contesto ampio)…"
+                                    context.getString(R.string.health_refresh_ai_large_context, estimate.messageUnits)
                                 } else {
-                                    val unitLabel = if (estimate.messageUnits == 1) "messaggio" else "messaggi"
-                                    "Sintesi clinica narrativa in corso (${estimate.messageUnits} $unitLabel)…"
+                                    context.resources.getQuantityString(
+                                        R.plurals.health_refresh_ai_units,
+                                        estimate.messageUnits,
+                                        estimate.messageUnits,
+                                    )
                                 },
                             )
                         } else {
                             _uiState.value = _uiState.value.copy(
-                                refreshStatusMessage = "Sintesi clinica narrativa in corso…",
+                                refreshStatusMessage = context.getString(R.string.health_refresh_ai),
                             )
                         }
                     }
@@ -140,8 +145,12 @@ class ClinicalRecordViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     isRefreshing = false,
                     pendingAIUnits = null,
-                    message = it.message?.takeIf { msg -> msg.isNotBlank() }
-                        ?: "Impossibile aggiornare la cartella. Riprova.",
+                    message = when (it) {
+                        is ClinicalRecordPayloadTooLargeException ->
+                            context.getString(R.string.health_ai_error_payload, it.chars, it.maxChars)
+                        else -> it.message?.takeIf { msg -> msg.isNotBlank() }
+                            ?: context.getString(R.string.health_error_refresh)
+                    },
                 )
             }
         }
@@ -174,7 +183,7 @@ class ClinicalRecordViewModel @Inject constructor(
             }.onFailure {
                 _uiState.value = _uiState.value.copy(
                     isExporting = false,
-                    message = "Impossibile esportare il PDF. Riprova.",
+                    message = context.getString(R.string.health_error_export),
                 )
             }
         }
@@ -280,7 +289,7 @@ class ClinicalRecordViewModel @Inject constructor(
         val docs = documentDao.observeByFamilyId(familyId).first()
             .filter { !it.isDeleted && (it.childId == null || it.childId == childId) }
         val (byExam, byVisit, byTreatment) = groupHealthDocuments(docs)
-        val name = subjectName.ifBlank { child?.name ?: "Profilo" }
+        val name = subjectName.ifBlank { child?.name ?: context.getString(R.string.health_profile) }
         return ClinicalInputs(
             name = name,
             birthMillis = child?.birthDateEpochMillis,

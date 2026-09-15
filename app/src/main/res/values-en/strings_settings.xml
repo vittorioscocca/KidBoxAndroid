@@ -343,4 +343,25 @@
     <string name="settings_alexa_kind_voice">Voice recognised</string>
     <string name="settings_alexa_kind_account">Account linked</string>
     <string name="settings_alexa_voice_note">Alexa tells the voices in your home apart. Read out your code once and from then on what you say shows up as added by you, even from someone else\'s Echo. If you have no Alexa voice profile everything still works: items stay attributed to whoever linked the account.</string>
+
+    <!-- Foglio d'invito contestuale dopo il primo contenuto (FirstContentInvitePrompt) -->
+    <string name="first_content_invite_title">Only you can see this for now</string>
+    <string name="first_content_invite_subtitle">Invite the other parent or anyone you like: whoever joins with the link sees %1$s and everything you add from now on, in real time.</string>
+    <string name="first_content_invite_not_now">Not now</string>
+    <string name="first_content_invite_subject_documents">this document</string>
+    <string name="first_content_invite_subject_photos">this photo</string>
+    <string name="first_content_invite_subject_calendar">this event</string>
+    <string name="first_content_invite_subject_expenses">this expense</string>
+    <string name="first_content_invite_subject_grocery">this shopping list</string>
+    <string name="first_content_invite_subject_todo">this to-do</string>
+    <string name="first_content_invite_subject_notes">this note</string>
+    <string name="first_content_invite_subject_wallet">this ticket</string>
+    <string name="first_content_invite_subject_loyalty_card">this card</string>
+    <string name="first_content_invite_subject_passwords">this password</string>
+    <string name="first_content_invite_subject_health">this health record</string>
+    <string name="first_content_invite_subject_pets">this pet</string>
+    <string name="first_content_invite_subject_home_vehicles">this vehicle</string>
+    <string name="first_content_invite_subject_travel">this trip</string>
+    <string name="first_content_invite_subject_location">this place</string>
+    <string name="first_content_invite_subject_generic">this item</string>
 </resources>
