@@ -61,6 +61,7 @@ import it.vittorioscocca.kidbox.ui.screens.settings.InviteCodeScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.JoinFamilyScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.AlexaSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.MessageSettingsScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.DevicesScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.NotificationSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.AIChatScreen
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.PlanningAIChatScreen
@@ -514,6 +515,7 @@ fun AppNavGraph(
                 onMessageSettings = { navController.navigate(AppDestination.MessageSettings.route) },
                 onAlexaSettings = { navController.navigate(AppDestination.AlexaSettings.route) },
                 onNotifications = { navController.navigate(AppDestination.NotificationSettings.route) },
+                onDevices = { navController.navigate(AppDestination.Devices.route) },
                 onAiSettings = { navController.navigate(AppDestination.AiSettings.route) },
                 onStorageUsage = { navController.navigate(AppDestination.StorageUsage.route) },
                 onAutoFillSettings = { navController.navigate(AppDestination.AutoFillSettings.route) },
@@ -578,6 +580,17 @@ fun AppNavGraph(
 
         composable(AppDestination.NotificationSettings.route) {
             NotificationSettingsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(AppDestination.Devices.route) {
+            val devicesContext = androidx.compose.ui.platform.LocalContext.current
+            DevicesScreen(
+                onBack = { navController.popBackStack() },
+                // Uscendo dal proprio account non si torna indietro in una
+                // schermata di impostazioni che non ha più un utente: l'app
+                // riparte, come dopo l'uscita da una famiglia.
+                onSignedOut = { restartApp(devicesContext) },
+            )
         }
 
         composable(AppDestination.Theme.route) {

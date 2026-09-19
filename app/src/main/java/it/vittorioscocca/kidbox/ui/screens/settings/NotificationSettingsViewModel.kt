@@ -17,6 +17,13 @@ import kotlinx.coroutines.launch
 
 data class NotificationSettingsUiState(
     val isLoading: Boolean = true,
+    /**
+     * Interruttore di QUESTO dispositivo: quando è spento il server non manda
+     * niente qui, quindi le preferenze sotto non hanno più effetto e vanno
+     * mostrate spente e non toccabili. Le categorie restano invece
+     * dell'account e valgono su tutti i dispositivi.
+     */
+    val pushEnabled: Boolean = true,
     val notifyOnNewMessages: Boolean = true,
     val notifyOnLocationSharing: Boolean = true,
     val notifyOnTodoAssigned: Boolean = true,
@@ -52,6 +59,8 @@ class NotificationSettingsViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         nudgesEnabled = !NudgeState.isOptedOut(appContext),
+                        // Locale, non remota: la scelta è di questo dispositivo.
+                        pushEnabled = pushNotificationManager.isPushEnabledOnThisDevice(),
                         notifyOnNewMessages = prefs[PreferenceKeys.NOTIFY_ON_NEW_MESSAGES] ?: true,
                         notifyOnLocationSharing = prefs[PreferenceKeys.NOTIFY_ON_LOCATION_SHARING] ?: true,
                         notifyOnTodoAssigned = prefs[PreferenceKeys.NOTIFY_ON_TODO_ASSIGNED] ?: true,
@@ -100,6 +109,28 @@ class NotificationSettingsViewModel @Inject constructor(
                 load()
                 _uiState.value = _uiState.value.copy(message = err.message ?: "Errore salvataggio preferenze")
             }
+        }
+    }
+
+    /**
+     * Interruttore di questo dispositivo. In caso di errore torna al valore
+     * PRECEDENTE, non a un default fisso: se lo spegnimento fallisce, lasciare
+     * l'interruttore spento direbbe "non ricevi niente" mentre le notifiche
+     * continuano ad arrivare.
+     */
+    fun setPushEnabledOnThisDevice(enabled: Boolean) {
+        val previous = _uiState.value.pushEnabled
+        _uiState.value = _uiState.value.copy(pushEnabled = enabled)
+        viewModelScope.launch {
+            runCatching { pushNotificationManager.setPushEnabledOnThisDevice(enabled) }
+                .onFailure { err ->
+                    // Basta rimettere a posto la UI: a non lasciare in giro una
+                    // copia locale disallineata ci pensa il manager.
+                    _uiState.value = _uiState.value.copy(
+                        pushEnabled = previous,
+                        message = err.message ?: "Errore salvataggio notifiche",
+                    )
+                }
         }
     }
 

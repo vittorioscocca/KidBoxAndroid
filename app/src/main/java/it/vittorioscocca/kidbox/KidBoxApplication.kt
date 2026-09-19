@@ -38,6 +38,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import it.vittorioscocca.kidbox.data.local.ChatAvailability
+import it.vittorioscocca.kidbox.data.local.PhotoPreviewCache
+import it.vittorioscocca.kidbox.data.remote.auth.DeviceSessionRegistry
 import it.vittorioscocca.kidbox.data.local.KBFeatureFlags
 
 @HiltAndroidApp
@@ -51,6 +53,9 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
 
     @Inject
     lateinit var pushNotificationManager: PushNotificationManager
+
+    @Inject
+    lateinit var deviceSessionRegistry: DeviceSessionRegistry
 
     @Inject
     lateinit var nudgeEngine: NudgeEngine
@@ -118,6 +123,7 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
             runCatching { geofenceMonitorRestorer.restore() }
         }
         startFcmTokenOwnershipObserver()
+        startDeviceSessionObserver()
         registerActivityLifecycleCallbacks(NudgeForegroundObserver())
     }
 
@@ -174,7 +180,13 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
      * al toggle di una preferenza in Impostazioni. `onNewToken` scatta però
      * *prima* del login al primo avvio: lì `uid` è null, il token viene
      * scartato e non viene mai più ritentato, quindi il dispositivo resta
-     * invisibile al server per sempre.
+     * invisibile al server per sempre. E scatta *solo* quando il token ruota:
+     * se il documento sparisce dopo (prune di un token dato per morto, o una
+     * registrazione fallita perché all'avvio la rete non c'era ancora), niente
+     * lo riscrive e il telefono resta muto per sempre, mentre lo stesso account
+     * su iOS continua a ricevere — lì il token si ripersiste a ogni avvio.
+     * Per questo la registrazione gira a ogni sessione autenticata, non solo
+     * al cambio di uid: è l'unico punto in cui Android si autoripara.
      *
      * Senza la parte di pulizia, al cambio account (es. due membri della
      * stessa famiglia che si alternano sullo stesso device per test) il
@@ -185,50 +197,104 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
      *
      * Gemello di `startAuthStateObserver` su iOS.
      */
+    /**
+     * Registra questo dispositivo fra le sessioni dell'account e resta in
+     * ascolto: se un altro dispositivo cancella il documento, qui si esegue il
+     * logout.
+     *
+     * Osservatore separato da quello dei token di proposito: quello esce subito
+     * quando l'uid non cambia (il caso normale a ogni riavvio), mentre questo
+     * deve rimettersi in ascolto a ogni avvio. `start` è idempotente, quindi
+     * può essere chiamato a ogni risveglio del listener senza conseguenze.
+     */
+    private fun startDeviceSessionObserver() {
+        FirebaseAuth.getInstance().addAuthStateListener { auth ->
+            val uid = auth.currentUser?.uid
+            if (uid == null) {
+                deviceSessionRegistry.stop()
+                return@addAuthStateListener
+            }
+            appInitScope.launch {
+                deviceSessionRegistry.start(uid, onRevoked = {
+                    runCatching {
+                        FirebaseAuth.getInstance().signOut()
+                        PhotoPreviewCache.clearAll(this@KidBoxApplication)
+                    }
+                })
+            }
+        }
+    }
+
     private fun startFcmTokenOwnershipObserver() {
         var observedUid: String? = FirebaseAuth.getInstance().currentUser?.uid
+        // uid per cui il token è già stato ripersistito in questo processo. Il
+        // listener può rifiatare più volte a parità di utente (il rinnovo
+        // periodico dell'id token lo sveglia): senza questo guard sarebbe una
+        // scrittura Firestore ogni volta, per nulla.
+        var registeredUid: String? = null
         FirebaseAuth.getInstance().addAuthStateListener { auth ->
-            // Prima del guard sull'uid: il parametro va rimesso anche quando
+            // Prima di ogni guard: il parametro va rimesso anche quando
             // l'utente è lo stesso (riavvio dell'app), e tolto al logout.
             InternalTraffic.apply(this, auth.currentUser)
             val newUid = auth.currentUser?.uid
             val oldUid = observedUid
-            if (oldUid == newUid) return@addAuthStateListener
+            val userChanged = oldUid != newUid
             observedUid = newUid
+            if (newUid == null) registeredUid = null
 
-            // La chat è una preferenza dell'account: al cambio utente si rilegge,
-            // così su questo telefono arriva la scelta fatta su un altro dispositivo.
-            appInitScope.launch { ChatAvailability.refreshFromRemote(this@KidBoxApplication) }
+            if (userChanged) {
+                // La chat è una preferenza dell'account: al cambio utente si rilegge,
+                // così su questo telefono arriva la scelta fatta su un altro dispositivo.
+                appInitScope.launch { ChatAvailability.refreshFromRemote(this@KidBoxApplication) }
+            }
+
+            if (!userChanged && (newUid == null || registeredUid == newUid)) {
+                return@addAuthStateListener
+            }
 
             appInitScope.launch {
-                val currentToken = runCatching {
-                    FirebaseMessaging.getInstance().token.await()
-                }.getOrNull()
+                // Solo quando c'era davvero un altro account prima. Con
+                // `oldUid` null non c'è nessuno da cui sfilare il token e
+                // nessuna eredità da spezzare: ruotarlo comunque buttava via un
+                // token valido a ogni avvio in cui l'auth si ripristina dopo
+                // `onCreate`, e se la registrazione subito dopo falliva (rete
+                // assente all'avvio, che all'avvio è la norma) il telefono
+                // restava senza alcun token valido fino al cold start
+                // successivo — invisibile al server, mentre iOS riceveva tutto.
+                if (oldUid != null) {
+                    val currentToken = runCatching {
+                        FirebaseMessaging.getInstance().token.await()
+                    }.getOrNull()
 
-                if (oldUid != null && !currentToken.isNullOrBlank()) {
-                    runCatching { pushNotificationManager.removeToken(currentToken, oldUid) }
+                    if (!currentToken.isNullOrBlank()) {
+                        runCatching { pushNotificationManager.removeToken(currentToken, oldUid) }
+                            .onFailure {
+                                KBLog.app.warning(
+                                    "Rimozione token utente precedente fallita: ${it.message}",
+                                    "PushToken",
+                                )
+                            }
+                    }
+
+                    // Forza la rotazione del token così il nuovo utente (se presente)
+                    // non eredita lo stesso token già eventualmente visto altrove.
+                    runCatching { pushNotificationManager.deleteCurrentToken() }
                         .onFailure {
                             KBLog.app.warning(
-                                "Rimozione token utente precedente fallita: ${it.message}",
+                                "Rotazione token al cambio account fallita: ${it.message}",
                                 "PushToken",
                             )
                         }
                 }
 
-                // Forza la rotazione del token così il nuovo utente (se presente)
-                // non eredita lo stesso token già eventualmente visto altrove.
-                runCatching { pushNotificationManager.deleteCurrentToken() }
-                    .onFailure {
-                        KBLog.app.warning(
-                            "Rotazione token al cambio account fallita: ${it.message}",
-                            "PushToken",
-                        )
-                    }
-
                 if (newUid == null) return@launch
 
                 runCatching { pushNotificationManager.registerCurrentFcmToken() }
+                    .onSuccess { registeredUid = newUid }
                     .onFailure {
+                        // `registeredUid` resta com'era: al prossimo giro del
+                        // listener si riprova, invece di dare per registrato un
+                        // token che non è mai arrivato al server.
                         KBLog.app.warning(
                             "FCM token non persistito: ${it.message}",
                             "PushToken",

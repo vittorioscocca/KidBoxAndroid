@@ -22,6 +22,7 @@ import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.remote.auth.AuthError
 import it.vittorioscocca.kidbox.data.remote.auth.AuthFacade
 import it.vittorioscocca.kidbox.data.remote.auth.AuthPresentation
+import it.vittorioscocca.kidbox.data.remote.auth.DeviceSessionRegistry
 import it.vittorioscocca.kidbox.data.remote.auth.AuthProvider
 import it.vittorioscocca.kidbox.data.remote.auth.EmailAuthService
 import it.vittorioscocca.kidbox.data.remote.auth.FacebookAuthService
@@ -32,6 +33,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 @HiltViewModel
@@ -42,6 +44,7 @@ class LoginViewModel @Inject constructor(
     private val onboardingPreferences: OnboardingPreferences,
     private val userProfileRepository: UserProfileRepository,
     private val familyDao: KBFamilyDao,
+    private val deviceSessionRegistry: DeviceSessionRegistry,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -265,11 +268,19 @@ class LoginViewModel @Inject constructor(
     }
 
     fun signOut() {
-        try {
-            auth.signOut()
-            PhotoPreviewCache.clearAll(appContext)
-        } catch (e: Exception) {
-            // log only — come su iOS non esponiamo errore UI per signOut
+        // La rimozione della sessione va PRIMA del sign-out — dopo le rules non
+        // lascerebbero più scrivere, e questo dispositivo resterebbe per sempre
+        // nell'elenco degli altri. Il sign-out avviene comunque, anche se la
+        // cancellazione fallisce: un errore di rete non deve impedire a
+        // qualcuno di uscire dal proprio account.
+        viewModelScope.launch {
+            runCatching { deviceSessionRegistry.stopAndRemove() }
+            try {
+                auth.signOut()
+                PhotoPreviewCache.clearAll(appContext)
+            } catch (e: Exception) {
+                // log only — come su iOS non esponiamo errore UI per signOut
+            }
         }
     }
 
@@ -284,11 +295,28 @@ class LoginViewModel @Inject constructor(
                 AppAnalytics.signupCompleted(appContext, provider)
             }
         }
-        userProfileRepository.ensureSeededFromAuth()
+        // Qui l'autenticazione è GIÀ riuscita: da questo punto in poi nulla
+        // deve poter riportare l'utente alla schermata di login, o al tocco
+        // successivo si riaprirebbe la pagina del provider come se il login non
+        // fosse mai avvenuto.
+        //
+        // `ensureSeededFromAuth` scrive su Firestore e ne aspetta la conferma,
+        // che arriva solo dal server: offline quel Task non si completa MAI e
+        // il login resta appeso con lo spinner acceso. Non è un passo
+        // indispensabile per entrare — lo rifà il prossimo avvio — quindi ha un
+        // tetto di tempo e un fallimento che non blocca.
+        withTimeoutOrNull(SEED_TIMEOUT_MS) {
+            runCatching { userProfileRepository.ensureSeededFromAuth() }
+                .onFailure { KBLog.auth.warning("Seeding profilo fallito: ${it.message}", "KidBoxAuth") }
+        } ?: KBLog.auth.warning("Seeding profilo oltre il tempo massimo: proseguo", "KidBoxAuth")
+
         runCatching { userProfileRepository.hydrateFromFirestore() }
         writePlatformToFirestore(user.uid)
         resetFirestoreClientAfterAuthChange()
-        _authCheckState.value = AuthCheckState.Authenticated(checkHasFamily())
+        val hasFamily = runCatching { checkHasFamily() }
+            .onFailure { KBLog.auth.warning("Controllo famiglia fallito: ${it.message}", "KidBoxAuth") }
+            .getOrDefault(false)
+        _authCheckState.value = AuthCheckState.Authenticated(hasFamily)
     }
 
     private fun writePlatformToFirestore(uid: String) {
@@ -458,6 +486,9 @@ class LoginViewModel @Inject constructor(
     }
 
     private companion object {
+        /** Tetto al seeding del profilo: vedi `onSignedInSuccessfully`. */
+        private const val SEED_TIMEOUT_MS = 8_000L
+
         /** Dove ricordiamo per quale uid abbiamo gia' ripulito la persistenza Firestore. */
         private const val AUTH_PREFS = "auth_state"
         private const val KEY_LAST_FIRESTORE_RESET_UID = "last_firestore_reset_uid"

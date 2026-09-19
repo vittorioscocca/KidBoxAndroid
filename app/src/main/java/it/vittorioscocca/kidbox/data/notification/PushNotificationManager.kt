@@ -1,8 +1,10 @@
 package it.vittorioscocca.kidbox.data.notification
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
+import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.AppLanguage
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -11,9 +13,75 @@ import kotlinx.coroutines.tasks.await
 @Singleton
 class PushNotificationManager @Inject constructor(
     private val auth: FirebaseAuth,
+    @ApplicationContext private val appContext: Context,
 ) {
     private val db: FirebaseFirestore
         get() = FirebaseFirestore.getInstance()
+
+    private val devicePrefs
+        get() = appContext.getSharedPreferences(DEVICE_PREFS, Context.MODE_PRIVATE)
+
+    /**
+     * `true` se QUESTO dispositivo riceve notifiche per l'utente loggato.
+     *
+     * La scelta è della coppia account+dispositivo: lo stesso utente può
+     * volerle spente sul tablet e accese sul telefono, e chi si logga dopo su
+     * questo telefono con un altro account parte dalle proprie, accese — la
+     * chiave contiene l'uid.
+     *
+     * Per il server la fonte di verità è `fcmTokens/{token}.enabled`; qui se ne
+     * tiene una copia perché il token ruota (reinstallazione, ripristino,
+     * cambio account) e con lui sparirebbe la scelta, riaccendendo le notifiche
+     * da sole e in silenzio. Mai scritta = accese, come ogni altra preferenza.
+     */
+    fun isPushEnabledOnThisDevice(): Boolean {
+        val uid = auth.currentUser?.uid ?: return true
+        return devicePrefs.getBoolean(pushEnabledKey(uid), true)
+    }
+
+    /**
+     * L'ordine delle due scritture non è indifferente: un fallimento non deve
+     * lasciare la copia locale che dice una cosa e il documento del token
+     * un'altra, perché è la copia locale a riscriverlo a ogni avvio — e
+     * vincerebbe lei, in silenzio.
+     */
+    suspend fun setPushEnabledOnThisDevice(enabled: Boolean) {
+        val uid = auth.currentUser?.uid ?: return
+        val key = pushEnabledKey(uid)
+        val previous = isPushEnabledOnThisDevice()
+
+        if (enabled) {
+            // Accendendo il locale va PRIMA: è `persistFcmToken` a rileggerlo
+            // per scrivere il campo.
+            devicePrefs.edit().putBoolean(key, true).apply()
+            runCatching { registerCurrentFcmToken() }
+                .onFailure {
+                    devicePrefs.edit().putBoolean(key, previous).apply()
+                    throw it
+                }
+            return
+        }
+
+        // Spegnendo, il token NON si cancella: dice dove consegnare, non se.
+        // Basta marcarlo, e a tacere pensa il server. Il locale va DOPO, così
+        // se la scrittura fallisce resta acceso com'era e il toggle può dire
+        // la verità.
+        val token = FirebaseMessaging.getInstance().token.await()
+        if (token.isNotBlank()) {
+            db.collection("users").document(uid)
+                .collection("fcmTokens").document(token)
+                .set(mapOf("enabled" to false), com.google.firebase.firestore.SetOptions.merge())
+                .await()
+        }
+        devicePrefs.edit().putBoolean(key, false).apply()
+    }
+
+    /**
+     * Per uid e non per dispositivo e basta: se su questo telefono si logga un
+     * altro membro della famiglia, deve partire dalle proprie notifiche,
+     * accese, non ereditare lo spegnimento di chi c'era prima.
+     */
+    private fun pushEnabledKey(uid: String) = "kb_pushEnabled_$uid"
 
     suspend fun fetchPreferences(): Map<String, Boolean> {
         val uid = auth.currentUser?.uid ?: return PreferenceKeys.all.associateWith { defaultEnabled(it) }
@@ -48,9 +116,14 @@ class PushNotificationManager @Inject constructor(
             .collection("fcmTokens")
             .document(token)
             .set(
+                // `enabled` si riscrive a OGNI registrazione, dalla copia
+                // locale: il token ruota, e senza questo la scelta di tenere
+                // spento il dispositivo sparirebbe con lui, riaccendendo le
+                // notifiche in silenzio.
                 mapOf(
                     "token" to token,
                     "platform" to "android",
+                    "enabled" to isPushEnabledOnThisDevice(),
                     "updatedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
                 ),
                 com.google.firebase.firestore.SetOptions.merge(),
@@ -113,6 +186,10 @@ class PushNotificationManager @Inject constructor(
      * riceveva notifiche che secondo le Impostazioni aveva disattivate.
      */
     private fun defaultEnabled(key: String): Boolean = true
+
+    private companion object {
+        const val DEVICE_PREFS = "kidbox_device_push"
+    }
 
     object PreferenceKeys {
         const val NOTIFY_ON_NEW_MESSAGES = "notifyOnNewMessages"

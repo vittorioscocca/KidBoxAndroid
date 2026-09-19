@@ -10,37 +10,36 @@ import android.provider.Settings
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import dagger.hilt.android.AndroidEntryPoint
+import it.vittorioscocca.kidbox.data.notification.PushNotificationManager
+import javax.inject.Inject
 import it.vittorioscocca.kidbox.MainActivity
 import it.vittorioscocca.kidbox.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
+@AndroidEntryPoint
 class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
+
+    @Inject lateinit var pushNotificationManager: PushNotificationManager
+
+    /**
+     * Delega a `persistFcmToken` invece di scrivere il documento per conto suo.
+     *
+     * La copia a mano che c'era qui non scriveva `enabled`: questo metodo scatta
+     * proprio quando il token RUOTA, cioè quando nasce un documento nuovo, e un
+     * documento senza quel campo vale acceso. Chi aveva spento le notifiche su
+     * questo dispositivo se le ritrovava accese da solo, in silenzio, alla
+     * prima rotazione — esattamente ciò che la copia locale della scelta serve
+     * a impedire. Un solo punto di scrittura, e il problema non si ripresenta.
+     */
     override fun onNewToken(token: String) {
         super.onNewToken(token)
         CoroutineScope(Dispatchers.IO).launch {
-            val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@launch
-            FirebaseFirestore.getInstance()
-                .collection("users")
-                .document(uid)
-                .collection("fcmTokens")
-                .document(token)
-                .set(
-                    mapOf(
-                        "token" to token,
-                        "platform" to "android",
-                        "updatedAt" to FieldValue.serverTimestamp(),
-                    ),
-                    com.google.firebase.firestore.SetOptions.merge(),
-                )
-                .await()
+            runCatching { pushNotificationManager.persistFcmToken(token) }
         }
     }
 

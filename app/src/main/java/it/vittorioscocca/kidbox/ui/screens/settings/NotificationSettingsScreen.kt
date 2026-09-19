@@ -95,12 +95,23 @@ fun NotificationSettingsScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    // Le preferenze per categoria contano solo se le notifiche sono accese sia
+    // nelle impostazioni di sistema sia in quelle di KidBox su questo
+    // dispositivo: quando una delle due manca vanno mostrate spente e non
+    // toccabili, altrimenti l'interfaccia direbbe "attivo" mentre non arriva
+    // niente. Non vale per i suggerimenti, che sono notifiche locali.
+    val pushAllowed = state.pushEnabled && !systemDenied
+
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
         val key = pendingEnableKey
         if (key == null) return@rememberLauncherForActivityResult
-        if (granted) {
+        if (key == DEVICE_PUSH_KEY) {
+            // Non è una preferenza di `notificationPrefs`: vive in locale e sul
+            // documento del token, quindi passa da un'altra strada.
+            viewModel.setPushEnabledOnThisDevice(granted)
+        } else if (granted) {
             viewModel.setPreference(key = key, enabled = true, registerToken = true)
         } else {
             viewModel.setPreference(key = key, enabled = false, registerToken = false)
@@ -224,6 +235,30 @@ fun NotificationSettingsScreen(
                     )
                 }
             }
+            // In cima: spegne le notifiche su QUESTO dispositivo, lasciando
+            // accesi gli altri dello stesso account. Chi vuole silenzio qui la
+            // trova subito, senza spegnere nove interruttori uno per uno — che
+            // per giunta valgono ovunque, non solo qui. `pushAllowed` non si
+            // usa: contiene già `pushEnabled`, e l'interruttore si
+            // disabiliterebbe da sé senza più poter essere riacceso.
+            NotificationToggleRow(
+                title = stringResource(R.string.settings_notif_master),
+                subtitle = stringResource(R.string.settings_notif_master_sub),
+                checked = state.pushEnabled && !systemDenied,
+                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
+                onCheckedChange = { enabled ->
+                    updatePreferenceWithPermission(
+                        key = DEVICE_PUSH_KEY,
+                        enabled = enabled,
+                        context = context,
+                        setPendingKey = { pendingEnableKey = it },
+                        requestPermission = {
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        },
+                        onSet = { _, value, _ -> viewModel.setPushEnabledOnThisDevice(value) },
+                    )
+                },
+            )
             // Con la chat spenta la riga resta ma non si tocca: riaccenderla
             // manderebbe notifiche per una schermata che si rifiuta di aprirsi.
             NotificationToggleRow(
@@ -233,8 +268,8 @@ fun NotificationSettingsScreen(
                 } else {
                     stringResource(R.string.settings_notif_chat_disabled)
                 },
-                checked = state.notifyOnNewMessages && !systemDenied && chatEnabled,
-                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied && chatEnabled,
+                checked = state.notifyOnNewMessages && pushAllowed && chatEnabled,
+                enabled = !state.isLoading && pendingEnableKey == null && pushAllowed && chatEnabled,
                 onCheckedChange = { enabled ->
                     updatePreferenceWithPermission(
                         key = PreferenceKeys.NOTIFY_ON_NEW_MESSAGES,
@@ -253,8 +288,8 @@ fun NotificationSettingsScreen(
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_location),
                 subtitle = stringResource(R.string.settings_notif_location_sub),
-                checked = state.notifyOnLocationSharing && !systemDenied,
-                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
+                checked = state.notifyOnLocationSharing && pushAllowed,
+                enabled = !state.isLoading && pendingEnableKey == null && pushAllowed,
                 onCheckedChange = { enabled ->
                     updatePreferenceWithPermission(
                         key = PreferenceKeys.NOTIFY_ON_LOCATION_SHARING,
@@ -273,8 +308,8 @@ fun NotificationSettingsScreen(
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_todo),
                 subtitle = stringResource(R.string.settings_notif_todo_sub),
-                checked = state.notifyOnTodoAssigned && !systemDenied,
-                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
+                checked = state.notifyOnTodoAssigned && pushAllowed,
+                enabled = !state.isLoading && pendingEnableKey == null && pushAllowed,
                 onCheckedChange = { enabled ->
                     updatePreferenceWithPermission(
                         key = PreferenceKeys.NOTIFY_ON_TODO_ASSIGNED,
@@ -293,8 +328,8 @@ fun NotificationSettingsScreen(
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_shopping),
                 subtitle = stringResource(R.string.settings_notif_shopping_sub),
-                checked = state.notifyOnNewGroceryItem && !systemDenied,
-                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
+                checked = state.notifyOnNewGroceryItem && pushAllowed,
+                enabled = !state.isLoading && pendingEnableKey == null && pushAllowed,
                 onCheckedChange = { enabled ->
                     updatePreferenceWithPermission(
                         key = PreferenceKeys.NOTIFY_ON_NEW_GROCERY_ITEM,
@@ -313,8 +348,8 @@ fun NotificationSettingsScreen(
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_notes),
                 subtitle = stringResource(R.string.settings_notif_notes_sub),
-                checked = state.notifyOnNewNote && !systemDenied,
-                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
+                checked = state.notifyOnNewNote && pushAllowed,
+                enabled = !state.isLoading && pendingEnableKey == null && pushAllowed,
                 onCheckedChange = { enabled ->
                     updatePreferenceWithPermission(
                         key = PreferenceKeys.NOTIFY_ON_NEW_NOTE,
@@ -333,8 +368,8 @@ fun NotificationSettingsScreen(
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_calendar),
                 subtitle = stringResource(R.string.settings_notif_calendar_sub),
-                checked = state.notifyOnNewCalendarEvent && !systemDenied,
-                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
+                checked = state.notifyOnNewCalendarEvent && pushAllowed,
+                enabled = !state.isLoading && pendingEnableKey == null && pushAllowed,
                 onCheckedChange = { enabled ->
                     updatePreferenceWithPermission(
                         key = PreferenceKeys.NOTIFY_ON_NEW_CALENDAR_EVENT,
@@ -353,8 +388,8 @@ fun NotificationSettingsScreen(
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_expenses),
                 subtitle = stringResource(R.string.settings_notif_expenses_sub),
-                checked = state.notifyOnNewExpense && !systemDenied,
-                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
+                checked = state.notifyOnNewExpense && pushAllowed,
+                enabled = !state.isLoading && pendingEnableKey == null && pushAllowed,
                 onCheckedChange = { enabled ->
                     updatePreferenceWithPermission(
                         key = PreferenceKeys.NOTIFY_ON_NEW_EXPENSE,
@@ -383,8 +418,8 @@ fun NotificationSettingsScreen(
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_document),
                 subtitle = stringResource(R.string.settings_notif_document_sub),
-                checked = state.notifyOnNewDocument && !systemDenied,
-                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
+                checked = state.notifyOnNewDocument && pushAllowed,
+                enabled = !state.isLoading && pendingEnableKey == null && pushAllowed,
                 onCheckedChange = { enabled ->
                     updatePreferenceWithPermission(
                         key = PreferenceKeys.NOTIFY_ON_NEW_DOCUMENT,
@@ -403,8 +438,8 @@ fun NotificationSettingsScreen(
             NotificationToggleRow(
                 title = stringResource(R.string.settings_notif_wallet),
                 subtitle = stringResource(R.string.settings_notif_wallet_sub),
-                checked = state.notifyOnWallet && !systemDenied,
-                enabled = !state.isLoading && pendingEnableKey == null && !systemDenied,
+                checked = state.notifyOnWallet && pushAllowed,
+                enabled = !state.isLoading && pendingEnableKey == null && pushAllowed,
                 onCheckedChange = { enabled ->
                     updatePreferenceWithPermission(
                         key = PreferenceKeys.NOTIFY_ON_WALLET,
@@ -471,6 +506,13 @@ private fun NotificationToggleRow(
         )
     }
 }
+
+/**
+ * Marcatore per `pendingEnableKey`: l'interruttore del dispositivo non è una
+ * preferenza di `notificationPrefs`, ma riusa lo stesso giro per chiedere il
+ * permesso notifiche prima di accendersi.
+ */
+private const val DEVICE_PUSH_KEY = "__devicePush"
 
 private fun updatePreferenceWithPermission(
     key: String,

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Public
@@ -84,6 +85,7 @@ fun SettingsScreen(
     onMessageSettings: () -> Unit,
     onAlexaSettings: () -> Unit,
     onNotifications: () -> Unit,
+    onDevices: () -> Unit,
     onAiSettings: () -> Unit,
     onStorageUsage: () -> Unit,
     onAutoFillSettings: () -> Unit,
@@ -149,6 +151,13 @@ fun SettingsScreen(
             icon = Icons.Filled.Notifications,
             showChevron = true,
             onClick = onNotifications,
+        ),
+        SettingRowItem(
+            title = stringResource(R.string.settings_devices_row),
+            subtitle = stringResource(R.string.settings_devices_row_sub),
+            icon = Icons.Filled.Devices,
+            showChevron = true,
+            onClick = onDevices,
         ),
         SettingRowItem(
             title = stringResource(R.string.settings_row_privacy),

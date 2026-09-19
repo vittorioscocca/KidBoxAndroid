@@ -47,6 +47,29 @@ class FirebaseAppleAuthService @Inject constructor(
             if (pending != null) {
                 KBLog.auth.debug("Apple sign-in resumed from pending result", TAG)
             }
+
+            // Nessun risultato pendente ma una sessione Apple già valida: il
+            // login è GIÀ avvenuto e il risultato è stato consumato. Riaprire
+            // il browser rimanderebbe l'utente sulla pagina di Apple pur
+            // essendo autenticato — è il sintomo per cui «sembra di doverlo
+            // rifare».
+            //
+            // Ci si arriva quando un passo POST-autenticazione fallisce o
+            // resta appeso e la schermata di login resta a video: il tocco
+            // successivo deve ripartire da qui, non da Apple. Si pretende che
+            // fra i provider ci sia apple.com, così una sessione aperta con un
+            // altro metodo non viene scambiata per questa.
+            val existing = firebaseAuth.currentUser
+            if (pending == null &&
+                existing != null &&
+                existing.providerData.any { it.providerId == APPLE_PROVIDER_ID }
+            ) {
+                KBLog.auth.info(
+                    "Apple sign-in: sessione già valida, nessun nuovo giro sul browser uid=${existing.uid}",
+                    TAG,
+                )
+                return existing
+            }
             // `startActivityForSignInWithProvider` autentica già di suo: la
             // credenziale restituita non va riusata, sarebbe un secondo login
             // con un'autorizzazione Apple monouso.
@@ -85,5 +108,6 @@ class FirebaseAppleAuthService @Inject constructor(
 
     private companion object {
         private const val TAG = "KidBoxAuthApple"
+        private const val APPLE_PROVIDER_ID = "apple.com"
     }
 }
