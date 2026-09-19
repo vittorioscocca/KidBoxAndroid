@@ -421,6 +421,11 @@ fun AppNavGraph(
                         popUpTo(AppDestination.Onboarding.route) { inclusive = true }
                     }
                 },
+                onSignedOut = {
+                    navController.navigate(AppDestination.Login.route) {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                    }
+                },
             )
         }
 

@@ -36,6 +36,7 @@ private const val TAG = "InviteWrapService"
 class InviteWrapService(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
 ) {
+
     private val db get() = FirebaseFirestore.getInstance()
     data class Result(
         val inviteId: String,
@@ -47,6 +48,14 @@ class InviteWrapService(
     )
 
     companion object {
+        /**
+         * Durata di un invito: 7 giorni, uso singolo. Era 24 ore fino alla
+         * 2.2.8: troppo poco per un link mandato su WhatsApp la sera e aperto
+         * dal partner un giorno o due dopo. Stesso valore di
+         * `InviteWrapService.defaultTTL` su iOS e del web.
+         */
+        const val DEFAULT_TTL_SECONDS: Long = 7 * 24 * 3600
+
         /**
          * Dominio degli inviti. Deve combaciare con l'`intent-filter` in
          * AndroidManifest e con `assetlinks.json` sul dominio.
@@ -84,7 +93,7 @@ class InviteWrapService(
         familyId: String,
         familyName: String,
         inviterDisplayName: String,
-        ttlSeconds: Long = 24 * 3600,
+        ttlSeconds: Long = DEFAULT_TTL_SECONDS,
     ): Result {
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
         require(familyId.isNotBlank()) { "familyId vuoto" }

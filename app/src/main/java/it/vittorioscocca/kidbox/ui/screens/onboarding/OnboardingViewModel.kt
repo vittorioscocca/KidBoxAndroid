@@ -8,6 +8,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.remote.family.FamilyFirestoreCreationRepository
 import it.vittorioscocca.kidbox.data.remote.family.isPermissionDenied
+import it.vittorioscocca.kidbox.domain.auth.LogoutUseCase
+import it.vittorioscocca.kidbox.util.analytics.OnboardingAnalyticsState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,7 +20,31 @@ import javax.inject.Inject
 class OnboardingViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val familyCreation: FamilyFirestoreCreationRepository,
+    private val logoutUseCase: LogoutUseCase,
 ) : ViewModel() {
+
+    private val _isSigningOut = MutableStateFlow(false)
+    val isSigningOut: StateFlow<Boolean> = _isSigningOut.asStateFlow()
+
+    /**
+     * «Esci» dal wizard: chi si è registrato con l'account sbagliato, o vuole
+     * solo tornare al login, prima non aveva nessuna uscita se non
+     * disinstallare. Stesso logout del Profilo (sign-out + wipe locale).
+     */
+    fun signOut(onDone: () -> Unit) {
+        if (_isSigningOut.value) return
+        _isSigningOut.value = true
+        OnboardingAnalyticsState.lastStepSeen = null
+        OnboardingAnalyticsState.abandonReportedStep = null
+        viewModelScope.launch {
+            try {
+                logoutUseCase.logout()
+            } finally {
+                _isSigningOut.value = false
+            }
+            onDone()
+        }
+    }
 
     private val _createdFamilyId = MutableStateFlow<String?>(null)
     val createdFamilyId: StateFlow<String?> = _createdFamilyId.asStateFlow()

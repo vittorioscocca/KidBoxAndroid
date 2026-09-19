@@ -7,14 +7,8 @@ import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -46,27 +40,21 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -76,13 +64,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -110,7 +97,6 @@ import it.vittorioscocca.kidbox.data.remote.family.InviteRemoteStore
 import it.vittorioscocca.kidbox.data.remote.family.PendingFamilyInvite
 import it.vittorioscocca.kidbox.ui.screens.settings.JoinFamilyViewModel
 import it.vittorioscocca.kidbox.ui.screens.settings.QRScannerView
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
@@ -126,61 +112,26 @@ private val GrayCaption = Color(0xFF888888)
 private val GrayFieldBorder = Color(0xFFE0E0E0)
 private val GrayDisabled = Color(0xFFBDBDBD)
 
-private data class IntroSlide(
-    val icon: ImageVector,
-    val iconTint: Color,
-    val accent: Color,
-    val glow: Color,
-    val title: String,
-    val subtitle: String,
-)
-
-@Composable
-private fun introslides() = listOf(
-    IntroSlide(
-        icon = Icons.Filled.Favorite,
-        iconTint = Color(0xFFFFBF40),
-        accent = OrangeAccent,
-        glow = OrangeAccent.copy(alpha = 0.35f),
-        title = stringResource(R.string.onboarding_slide1_title),
-        subtitle = stringResource(R.string.onboarding_slide1),
-    ),
-    IntroSlide(
-        icon = Icons.Filled.PhotoLibrary,
-        iconTint = Color(0xFF9B7BC9),
-        accent = PurpleAccent,
-        glow = PurpleAccent.copy(alpha = 0.35f),
-        title = stringResource(R.string.onboarding_slide2_title),
-        subtitle = stringResource(R.string.onboarding_slide2),
-    ),
-    IntroSlide(
-        icon = Icons.Filled.MedicalServices,
-        iconTint = Color(0xFF4CAF74),
-        accent = GreenAccent,
-        glow = GreenAccent.copy(alpha = 0.35f),
-        title = stringResource(R.string.onboarding_slide3_title),
-        subtitle = stringResource(R.string.onboarding_slide3),
-    ),
-)
-
 private enum class FamilyPath {
     Create,
     Join,
 
     /**
      * Impostato in automatico quando c'è un [PendingFamilyInvite] da link:
-     * sostituisce la scelta percorso con la conferma d'invito.
+     * sostituisce tutto il wizard con la conferma d'invito.
      */
     LinkJoin,
 }
 
-private fun stepName(page: Int, familyPath: FamilyPath?): String = when (page) {
-    0 -> "info_0"
-    1 -> "info_1"
-    2 -> "info_2"
-    3 -> if (familyPath == FamilyPath.LinkJoin) "link_invite_confirm" else "path_picker"
-    4 -> "name"
-    5 -> if (familyPath == FamilyPath.Join) "join_family" else "create_family"
+/**
+ * Nomi dei passi per GA4. `setup` è nuovo; `create_family`, `name`,
+ * `join_family`, `invite` e `link_invite_confirm` restano quelli di prima,
+ * così il funnel per passo della routine continua a leggersi.
+ */
+private fun stepName(page: Int, familyPath: FamilyPath): String = when {
+    familyPath == FamilyPath.LinkJoin -> "link_invite_confirm"
+    page == 0 -> "setup"
+    familyPath == FamilyPath.Join -> "join_family"
     else -> "invite"
 }
 
@@ -188,9 +139,13 @@ private fun stepName(page: Int, familyPath: FamilyPath?): String = when (page) {
 @Composable
 fun OnboardingScreen(
     onFamilyCreated: (familyId: String) -> Unit,
+    onSignedOut: () -> Unit,
     viewModel: OnboardingViewModel = hiltViewModel(),
 ) {
-    var familyPath by remember { mutableStateOf<FamilyPath?>(null) }
+    // `.Create` è il default: la scelta esplicita «Come vuoi iniziare?» non c'è
+    // più. Chi ha un QR tocca «Ho un invito» e passa a Join; chi ha toccato un
+    // link arriva già in LinkJoin.
+    var familyPath by rememberSaveable { mutableStateOf(FamilyPath.Create) }
     // Il wizard disegna sotto le barre di sistema: il gradiente d'accento parte
     // dal bordo superiore e le pagine hanno già il loro `statusBarsPadding()`.
     // Senza questa richiesta la radice della UI (MainActivity) applica il
@@ -198,30 +153,22 @@ fun OnboardingScreen(
     // con una fascia sopra e una sotto.
     EdgeToEdgeController.RequestFullBleed()
 
-
     val pagerState = rememberPagerState(
-        // 0-2 intro · 3 scelta percorso (o conferma invito da link) ·
-        // 4 nome e cognome · 5 crea famiglia / entra con QR ·
-        // 6 invita (solo percorso "crea").
-        //
-        // Percorso LinkJoin: solo 4 pagine (0-2 intro + 3), perché la 3 chiede
-        // già nome e cognome e fa il join — non serve altro.
-        pageCount = {
-            when (familyPath) {
-                FamilyPath.LinkJoin -> 4
-                FamilyPath.Join -> 6
-                else -> 7
-            }
-        },
+        // 0 setup (nome, cognome, nome famiglia) · 1 invita (Create) o QR (Join).
+        // Percorso LinkJoin: una pagina sola, la conferma d'invito.
+        pageCount = { if (familyPath == FamilyPath.LinkJoin) 1 else 2 },
     )
     val scope = rememberCoroutineScope()
 
     val nameViewModel: OnboardingNameViewModel = hiltViewModel()
     val nameState by nameViewModel.uiState.collectAsStateWithLifecycle()
+    var familyName by rememberSaveable { mutableStateOf("") }
 
     val createdFamilyId by viewModel.createdFamilyId.collectAsStateWithLifecycle()
     val isCreatingFamily by viewModel.isCreatingFamily.collectAsStateWithLifecycle()
     val createFamilyError by viewModel.createFamilyError.collectAsStateWithLifecycle()
+    val isSigningOut by viewModel.isSigningOut.collectAsStateWithLifecycle()
+    var showSignOutConfirm by remember { mutableStateOf(false) }
 
     // Invito da link, se il wizard è partito da un App Link. Controllato una
     // volta sola: `familyPath` diventa poi lo stato di navigazione, e un
@@ -231,7 +178,7 @@ fun OnboardingScreen(
     var pendingLinkInvite by remember { mutableStateOf<PendingFamilyInvite?>(null) }
     var linkInvitePreview by remember { mutableStateOf<InviteRemoteStore.InvitePreview?>(null) }
     LaunchedEffect(Unit) {
-        if (familyPath != null) return@LaunchedEffect
+        if (familyPath != FamilyPath.Create) return@LaunchedEffect
         val invite = PendingFamilyInvite.load(context) ?: return@LaunchedEffect
         pendingLinkInvite = invite
         familyPath = FamilyPath.LinkJoin
@@ -242,15 +189,29 @@ fun OnboardingScreen(
     val accent = pageAccent(currentPage, familyPath)
     val iconTint = pageIconTint(currentPage, familyPath)
 
+    // Il cognome, se c'è, propone il nome della famiglia («Famiglia Rossi»):
+    // una cosa in meno da scrivere, e si può sempre cambiare.
+    val familyPrefix = stringResource(R.string.onboarding_family_name_prefill)
+    LaunchedEffect(nameState.lastName) {
+        if (familyName.isBlank() && nameState.lastName.isNotBlank()) {
+            familyName = familyPrefix.format(nameState.lastName.trim())
+        }
+    }
+
     // Una volta creata la famiglia (o completato un join) non si torna più
-    // indietro: la scrittura su Firestore è già avvenuta, e riproporre le
-    // pagine precedenti farebbe pensare all'utente di poterla ancora annullare.
-    val canGoBack = currentPage > 0 && !nameState.isSaving && createdFamilyId == null
+    // indietro: la scrittura su Firestore è già avvenuta, e riproporre la
+    // pagina precedente farebbe pensare all'utente di poterla ancora annullare.
+    val canGoBack = currentPage > 0 && !nameState.isSaving && !isCreatingFamily && createdFamilyId == null
 
     // Percorso "crea": il documento membro owner nasce senza displayName, quindi
-    // appena la famiglia esiste ci si porta il nome raccolto a pagina 4.
+    // appena la famiglia esiste ci si porta il nome raccolto a pagina 0 — e si
+    // passa alla pagina invito.
     LaunchedEffect(createdFamilyId) {
-        createdFamilyId?.let { nameViewModel.propagateNameToMember(it) }
+        val id = createdFamilyId ?: return@LaunchedEffect
+        nameViewModel.propagateNameToMember(id)
+        AppAnalytics.onboardingStepCompleted(context, "create_family")
+        AppAnalytics.onboardingStepCompleted(context, "setup")
+        if (pagerState.currentPage == 0) pagerState.animateScrollToPage(1)
     }
 
     val onboardingStartTime = rememberSaveable { System.currentTimeMillis() }
@@ -279,10 +240,9 @@ fun OnboardingScreen(
         Column(
             // L'app è edge-to-edge (`setDecorFitsSystemWindows(window, false)`),
             // quindi `adjustResize` da solo non rimpicciolisce il contenuto e la
-            // tastiera finisce sopra i campi — sulla pagina Nome copriva
-            // "Cognome". Applicato qui e non dentro la singola pagina così a
-            // salire sono anche indicatori e CTA, altrimenti il pulsante
-            // "Continua" resterebbe comunque sotto la tastiera.
+            // tastiera finisce sopra i campi. Applicato qui e non dentro la
+            // singola pagina così a salire sono anche indicatori e CTA,
+            // altrimenti il pulsante resterebbe comunque sotto la tastiera.
             //
             // `union` e non modificatori separati in catena: si sommerebbero, e a
             // tastiera aperta resterebbe un vuoto pari alla barra di navigazione.
@@ -292,10 +252,7 @@ fun OnboardingScreen(
             //
             // Il padding sta QUI e non sul Box esterno di proposito: lo sfondo e
             // il gradiente d'accento devono arrivare ai bordi dello schermo, solo
-            // il contenuto va tenuto dentro le barre. Copre anche le pagine che
-            // non hanno un `statusBarsPadding()` proprio (intro e invito); in
-            // quelle che ce l'hanno diventa inerte, perché l'inset è già
-            // consumato qui.
+            // il contenuto va tenuto dentro le barre.
             modifier = Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(
@@ -313,8 +270,7 @@ fun OnboardingScreen(
                 userScrollEnabled = false,
             ) { page ->
                 when {
-                    page in 0..2 -> IntroPageContent(slide = introslides()[page])
-                    page == 3 && familyPath == FamilyPath.LinkJoin && pendingLinkInvite != null ->
+                    familyPath == FamilyPath.LinkJoin && pendingLinkInvite != null ->
                         LinkInviteConfirmPageContent(
                             invite = pendingLinkInvite!!,
                             preview = linkInvitePreview,
@@ -324,35 +280,31 @@ fun OnboardingScreen(
                             onFallbackToManual = {
                                 PendingFamilyInvite.clear(context)
                                 pendingLinkInvite = null
-                                familyPath = null
+                                familyPath = FamilyPath.Create
                             },
                         )
-                    page == 3 -> FamilyPathPickerPageContent(
-                        selected = familyPath,
-                        onSelect = { familyPath = it },
-                    )
-                    page == 4 -> NamePageContent(state = nameState, viewModel = nameViewModel)
-                    page == 5 && familyPath == FamilyPath.Create -> CreateFamilyPageContent(
-                        isCreating = isCreatingFamily,
+                    page == 0 -> SetupPageContent(
+                        state = nameState,
+                        viewModel = nameViewModel,
+                        familyName = familyName,
+                        onFamilyNameChange = {
+                            familyName = it
+                            viewModel.clearCreateError()
+                        },
+                        isJoin = familyPath == FamilyPath.Join,
+                        isBusy = nameState.isSaving || isCreatingFamily,
                         errorText = createFamilyError,
-                        familyCreated = createdFamilyId != null,
-                        onClearError = viewModel::clearCreateError,
-                        onCreateFamily = { fam, child, birth ->
-                            viewModel.createFamily(fam, child, birth)
+                        onTogglePath = {
+                            familyPath = if (familyPath == FamilyPath.Join) FamilyPath.Create else FamilyPath.Join
                         },
                     )
-                    page == 5 && familyPath == FamilyPath.Join -> JoinFamilyPageContent(
+                    familyPath == FamilyPath.Join -> JoinFamilyPageContent(
                         onJoined = { familyId ->
                             // Il nome sul documento membro lo scrive
                             // JoinFamilyViewModel, attraversato da ogni join.
                             AppAnalytics.onboardingStepCompleted(context, "join_family")
                             onFamilyCreatedTracked(familyId)
                         },
-                    )
-                    // Fallback: familyPath == null (non dovrebbe succedere, il CTA pag.3 è disabled)
-                    page == 5 -> FamilyPathPickerPageContent(
-                        selected = familyPath,
-                        onSelect = { familyPath = it },
                     )
                     else -> InvitePartnerPageContent(
                         familyId = createdFamilyId.orEmpty(),
@@ -361,43 +313,38 @@ fun OnboardingScreen(
                 }
             }
 
-            val totalPages = when (familyPath) {
-                FamilyPath.LinkJoin -> 4
-                FamilyPath.Join -> 6
-                else -> 7
-            }
+            val totalPages = if (familyPath == FamilyPath.LinkJoin) 1 else 2
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp),
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                PageIndicators(
-                    pageCount = totalPages,
-                    currentPage = currentPage,
-                    accent = accent,
-                )
-            }
-
-            val isJoinPage = currentPage == 5 && familyPath == FamilyPath.Join
-            val isInvitePage = currentPage == 6 && familyPath == FamilyPath.Create
-            val isLinkJoinPage = currentPage == 3 && familyPath == FamilyPath.LinkJoin
-            val ctaEnabled = when (currentPage) {
-                3 -> familyPath != null
-                4 -> nameState.canSubmit
-                5 -> when (familyPath) {
-                    FamilyPath.Create -> createdFamilyId != null
-                    FamilyPath.Join -> false
-                    FamilyPath.LinkJoin -> false
-                    null -> false
+            if (totalPages > 1) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 24.dp),
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    PageIndicators(
+                        pageCount = totalPages,
+                        currentPage = currentPage,
+                        accent = accent,
+                    )
                 }
-                6 -> createdFamilyId != null
-                else -> true
             }
-            val ctaLabel = if (currentPage == totalPages - 1) stringResource(R.string.onboarding_start) else stringResource(R.string.travel_continue)
 
-            if (isJoinPage || isInvitePage || isLinkJoinPage) {
+            val isSetupPage = currentPage == 0 && familyPath != FamilyPath.LinkJoin
+            val isBusy = nameState.isSaving || isCreatingFamily
+            // Nome e cognome sono obbligatori; il nome famiglia solo nel
+            // percorso «crea» (nel join lo porta l'invito).
+            val ctaEnabled = nameState.canSubmit && !isBusy &&
+                (familyPath == FamilyPath.Join || familyName.isNotBlank())
+            val ctaLabel = when {
+                isBusy && familyPath == FamilyPath.Join -> stringResource(R.string.onboarding_saving)
+                isBusy -> stringResource(R.string.onboarding_creating)
+                familyPath == FamilyPath.Join -> stringResource(R.string.travel_continue)
+                else -> stringResource(R.string.onboarding_create_family_cta)
+            }
+
+            if (!isSetupPage) {
+                // Le altre pagine hanno i loro pulsanti dentro il contenuto.
                 Spacer(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -412,37 +359,19 @@ fun OnboardingScreen(
                     iconTint = iconTint,
                     enabled = ctaEnabled,
                     onClick = {
-                        when (currentPage) {
-                            3 -> if (familyPath != null) {
-                                AppAnalytics.onboardingStepCompleted(context, stepName(currentPage, familyPath))
-                                scope.launch { pagerState.animateScrollToPage(4) }
-                            }
-                            // Si avanza solo a salvataggio riuscito: proseguire
-                            // dopo un errore lascerebbe l'utente convinto di aver
-                            // messo il nome, e la famiglia nascerebbe comunque
-                            // con un membro anonimo.
-                            4 -> nameViewModel.save {
-                                AppAnalytics.onboardingStepCompleted(context, stepName(currentPage, familyPath))
-                                scope.launch { pagerState.animateScrollToPage(5) }
-                            }
-                            5 -> when (familyPath) {
-                                FamilyPath.Create -> if (createdFamilyId != null) {
-                                    AppAnalytics.onboardingStepCompleted(context, stepName(currentPage, familyPath))
-                                    scope.launch { pagerState.animateScrollToPage(6) }
-                                }
-                                FamilyPath.Join -> Unit
-                                FamilyPath.LinkJoin -> Unit
-                                null -> Unit
-                            }
-                            6 -> createdFamilyId?.let {
-                                AppAnalytics.onboardingStepCompleted(context, stepName(currentPage, familyPath))
-                                onFamilyCreatedTracked(it)
-                            }
-                            else -> {
-                                AppAnalytics.onboardingStepCompleted(context, stepName(currentPage, familyPath))
-                                scope.launch {
-                                    pagerState.animateScrollToPage(currentPage + 1)
-                                }
+                        // Si avanza solo a salvataggio riuscito: proseguire dopo
+                        // un errore lascerebbe l'utente convinto di aver messo il
+                        // nome, e la famiglia nascerebbe comunque con un membro
+                        // anonimo.
+                        nameViewModel.save {
+                            AppAnalytics.onboardingStepCompleted(context, "name")
+                            if (familyPath == FamilyPath.Join) {
+                                AppAnalytics.onboardingStepCompleted(context, "setup")
+                                scope.launch { pagerState.animateScrollToPage(1) }
+                            } else {
+                                // Il passaggio alla pagina invito lo fa il
+                                // LaunchedEffect(createdFamilyId) qui sopra.
+                                viewModel.createFamily(familyName, "", null)
                             }
                         }
                     },
@@ -453,12 +382,8 @@ fun OnboardingScreen(
             }
         }
 
-        // Dichiarato DOPO la Column apposta: in un Box, l'ultimo figlio è quello
-        // in cima nello z-order e riceve i tap per primo. Prima stava sopra
-        // TopAccentGradient ma sotto la Column con l'HorizontalPager — restava
-        // visibile (la Column è trasparente) ma i tap in quell'angolo venivano
-        // intercettati dallo scroll gesture della pagina sottostante, quindi il
-        // pulsante appariva ma non rispondeva.
+        // Dichiarati DOPO la Column apposta: in un Box, l'ultimo figlio è quello
+        // in cima nello z-order e riceve i tap per primo.
         if (canGoBack) {
             OnboardingBackButton(
                 accent = accent,
@@ -469,22 +394,67 @@ fun OnboardingScreen(
                     .padding(start = 20.dp, top = 8.dp),
             )
         }
+        OnboardingSignOutButton(
+            accent = accent,
+            enabled = !isSigningOut && !nameState.isSaving && !isCreatingFamily,
+            onClick = { showSignOutConfirm = true },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(end = 20.dp, top = 8.dp),
+        )
+    }
+
+    if (showSignOutConfirm) {
+        AlertDialog(
+            onDismissRequest = { showSignOutConfirm = false },
+            title = { Text(stringResource(R.string.onboarding_sign_out_title)) },
+            text = { Text(stringResource(R.string.onboarding_sign_out_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showSignOutConfirm = false
+                    viewModel.signOut(onSignedOut)
+                }) { Text(stringResource(R.string.onboarding_sign_out), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSignOutConfirm = false }) { Text(stringResource(R.string.travel_cancel)) }
+            },
+        )
     }
 }
 
-private fun pageAccent(page: Int, familyPath: FamilyPath?): Color = when (page) {
-    1 -> PurpleAccent
-    2 -> GreenAccent
-    5 -> if (familyPath == FamilyPath.Join) PurpleAccent else OrangeAccent
-    else -> OrangeAccent
+/** «Esci», in alto a destra su ogni pagina del wizard. */
+@Composable
+private fun OnboardingSignOutButton(
+    accent: Color,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .height(36.dp)
+            .shadow(elevation = 8.dp, shape = CircleShape, spotColor = accent.copy(alpha = 0.12f))
+            .clip(CircleShape)
+            .background(Color.White)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            stringResource(R.string.onboarding_sign_out),
+            color = if (enabled) accent else GrayDisabled,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
 }
 
-private fun pageIconTint(page: Int, familyPath: FamilyPath?): Color = when (page) {
-    1 -> Color(0xFF9B7BC9)
-    2 -> Color(0xFF4CAF74)
-    5 -> if (familyPath == FamilyPath.Join) Color(0xFF9B7BC9) else Color(0xFFFFBF40)
-    else -> Color(0xFFFFBF40)
-}
+private fun pageAccent(page: Int, familyPath: FamilyPath): Color =
+    if (page == 1 && familyPath == FamilyPath.Join) PurpleAccent else OrangeAccent
+
+private fun pageIconTint(page: Int, familyPath: FamilyPath): Color =
+    if (page == 1 && familyPath == FamilyPath.Join) Color(0xFF9B7BC9) else Color(0xFFFFBF40)
 
 @Composable
 private fun TopAccentGradient(accent: Color, pageIndex: Int) {
@@ -525,77 +495,6 @@ private fun OnboardingBackButton(
             tint = accent,
             modifier = Modifier.size(18.dp),
         )
-    }
-}
-
-@Composable
-private fun IntroPageContent(slide: IntroSlide) {
-    val textAlpha = remember { Animatable(0f) }
-    val textOffset = remember { Animatable(24f) }
-    LaunchedEffect(slide.title) {
-        textAlpha.snapTo(0f)
-        textOffset.snapTo(24f)
-        coroutineScope {
-            launch { textAlpha.animateTo(1f, tween(450)) }
-            launch { textOffset.animateTo(0f, tween(450)) }
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Spacer(modifier = Modifier.height(48.dp))
-        IconHeroCard(
-            icon = slide.icon,
-            iconTint = slide.iconTint,
-            accent = slide.accent,
-            glow = slide.glow,
-        )
-        Spacer(modifier = Modifier.height(40.dp))
-        AnimatedContent(
-            targetState = slide.title to slide.subtitle,
-            transitionSpec = {
-                (fadeIn(tween(280, delayMillis = 60)) +
-                    slideInVertically(tween(380)) { it / 10 })
-                    .togetherWith(
-                        fadeOut(tween(120)) +
-                            slideOutVertically(tween(200)) { -it / 12 },
-                    )
-            },
-            label = "intro_text",
-        ) { (title, subtitle) ->
-            Column(
-                modifier = Modifier
-                    .graphicsLayer {
-                        alpha = textAlpha.value
-                        translationY = textOffset.value
-                    }
-                    .padding(horizontal = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    text = title,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = BlackText,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 38.sp,
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-                Text(
-                    text = subtitle,
-                    fontSize = 17.sp,
-                    color = GraySubtitle,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 24.sp,
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
@@ -654,15 +553,27 @@ private fun IconHeroCard(
 }
 
 /**
- * Pagina 4: nome e cognome dell'utente, prima dei dati della famiglia.
+ * Pagina 0: nome e cognome dell'utente e nome della famiglia, in una
+ * schermata sola. Il salvataggio e la creazione li fa il CTA del parent.
  *
- * Sta prima apposta: il documento membro nasce alla creazione/join, quindi
- * avere già il nome permette di scriverlo lì subito invece di lasciare il
- * membro anonimo agli altri finché non apre il Profilo.
- * Gemello di `NameOnboardingCard` su iOS.
+ * Il nome sta qui, prima della famiglia, apposta: il documento membro nasce
+ * alla creazione/join, quindi avere già il nome permette di scriverlo lì
+ * subito invece di lasciare il membro anonimo agli altri.
+ *
+ * Nel percorso «entra» (QR) il campo famiglia sparisce: il nome della
+ * famiglia lo porta l'invito. Gemello di `SetupFamilyCard` su iOS.
  */
 @Composable
-private fun NamePageContent(state: OnboardingNameUiState, viewModel: OnboardingNameViewModel) {
+private fun SetupPageContent(
+    state: OnboardingNameUiState,
+    viewModel: OnboardingNameViewModel,
+    familyName: String,
+    onFamilyNameChange: (String) -> Unit,
+    isJoin: Boolean,
+    isBusy: Boolean,
+    errorText: String?,
+    onTogglePath: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -680,7 +591,7 @@ private fun NamePageContent(state: OnboardingNameUiState, viewModel: OnboardingN
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                Icons.Filled.Person,
+                if (isJoin) Icons.Filled.QrCodeScanner else Icons.Filled.Home,
                 contentDescription = null,
                 tint = OrangeAccent,
                 modifier = Modifier.size(28.dp),
@@ -688,14 +599,14 @@ private fun NamePageContent(state: OnboardingNameUiState, viewModel: OnboardingN
         }
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            stringResource(R.string.onboarding_name_title),
+            stringResource(if (isJoin) R.string.onboarding_setup_join_title else R.string.onboarding_setup_title),
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
             color = BlackText,
             textAlign = TextAlign.Center,
         )
         Text(
-            stringResource(R.string.onboarding_name_subtitle),
+            stringResource(if (isJoin) R.string.onboarding_setup_join_subtitle else R.string.onboarding_setup_subtitle),
             fontSize = 15.sp,
             color = GraySubtitle,
             textAlign = TextAlign.Center,
@@ -709,7 +620,7 @@ private fun NamePageContent(state: OnboardingNameUiState, viewModel: OnboardingN
             value = state.firstName,
             onValueChange = viewModel::setFirstName,
             modifier = Modifier.fillMaxWidth(),
-            enabled = !state.isSaving,
+            enabled = !isBusy,
             singleLine = true,
             placeholder = {
                 Text(stringResource(R.string.onboarding_name_first_placeholder), color = GrayCaption)
@@ -725,7 +636,7 @@ private fun NamePageContent(state: OnboardingNameUiState, viewModel: OnboardingN
             value = state.lastName,
             onValueChange = viewModel::setLastName,
             modifier = Modifier.fillMaxWidth(),
-            enabled = !state.isSaving,
+            enabled = !isBusy,
             singleLine = true,
             placeholder = {
                 Text(stringResource(R.string.onboarding_name_last_placeholder), color = GrayCaption)
@@ -735,22 +646,52 @@ private fun NamePageContent(state: OnboardingNameUiState, viewModel: OnboardingN
             colors = onboardingFieldColors(OrangeAccent),
         )
 
-        if (!state.error.isNullOrBlank()) {
+        if (!isJoin) {
+            Spacer(modifier = Modifier.height(12.dp))
+            FormFieldLabel(stringResource(R.string.onboarding_family_name))
+            OutlinedTextField(
+                value = familyName,
+                onValueChange = onFamilyNameChange,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isBusy,
+                singleLine = true,
+                placeholder = { Text(stringResource(R.string.onboarding_family_hint), color = GrayCaption) },
+                leadingIcon = { Text("👨‍👩‍👧", fontSize = 20.sp) },
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                shape = RoundedCornerShape(16.dp),
+                colors = onboardingFieldColors(OrangeAccent),
+            )
+        }
+
+        val error = errorText?.takeIf { it.isNotBlank() } ?: state.error?.takeIf { it.isNotBlank() }
+        if (error != null) {
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                state.error,
+                error,
                 color = MaterialTheme.colorScheme.error,
                 fontSize = 13.sp,
                 textAlign = TextAlign.Center,
             )
         }
+
+        // Percorso alternativo, in fondo e discreto: chi ha un invito è una
+        // minoranza, e chi ha toccato un link non passa nemmeno di qui.
+        TextButton(onClick = onTogglePath, enabled = !isBusy) {
+            Text(
+                stringResource(if (isJoin) R.string.onboarding_switch_to_create else R.string.onboarding_switch_to_join),
+                color = OrangeAccent,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 
 /**
- * Sostituisce la scelta percorso quando il wizard parte da un App Link:
+ * Sostituisce tutto il wizard quando parte da un App Link:
  * mostra la famiglia (e chi ha invitato, se noti), chiede nome e cognome e fa
- * il join in un solo passaggio — niente QR, niente scelta manuale.
+ * il join in un solo passaggio — niente QR, niente pagina di setup.
  *
  * Gemello di `LinkInviteConfirmCard` su iOS.
  */
@@ -927,225 +868,6 @@ private fun LinkInviteConfirmPageContent(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CreateFamilyPageContent(
-    isCreating: Boolean,
-    errorText: String?,
-    familyCreated: Boolean,
-    onClearError: () -> Unit,
-    onCreateFamily: (familyName: String, childName: String, birthMillis: Long?) -> Unit,
-) {
-    var familyName by remember { mutableStateOf("") }
-    var childName by remember { mutableStateOf("") }
-    var birthMillis by remember { mutableStateOf<Long?>(null) }
-    var showDatePicker by remember { mutableStateOf(false) }
-    val datePickerState = rememberDatePickerState()
-
-    // Il nome del figlio è facoltativo: non entra nella condizione.
-    val canCreate = familyName.isNotBlank() && !isCreating && !familyCreated
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .padding(start = 24.dp, top = 16.dp, end = 24.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(72.dp)
-                .clip(CircleShape)
-                .background(OrangeAccent.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Filled.Home,
-                contentDescription = null,
-                tint = OrangeAccent,
-                modifier = Modifier.size(28.dp),
-            )
-        }
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            stringResource(R.string.onboarding_create_family),
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Bold,
-            color = BlackText,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            stringResource(R.string.onboarding_create_family_hint),
-            fontSize = 15.sp,
-            color = GraySubtitle,
-            textAlign = TextAlign.Center,
-            lineHeight = 22.sp,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-
-        FormFieldLabel(stringResource(R.string.onboarding_family_name))
-        OutlinedTextField(
-            value = familyName,
-            onValueChange = {
-                familyName = it
-                onClearError()
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !familyCreated,
-            singleLine = true,
-            placeholder = { Text(stringResource(R.string.onboarding_family_hint), color = GrayCaption) },
-            leadingIcon = {
-                Text("👨‍👩‍👧", fontSize = 20.sp)
-            },
-            shape = RoundedCornerShape(16.dp),
-            colors = onboardingFieldColors(OrangeAccent),
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-
-        FormFieldLabel(stringResource(R.string.onboarding_first_child))
-        OutlinedTextField(
-            value = childName,
-            onValueChange = {
-                childName = it
-                onClearError()
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !familyCreated,
-            singleLine = true,
-            placeholder = { Text(stringResource(R.string.onboarding_child_name), color = GrayCaption) },
-            leadingIcon = {
-                Text("🚶", fontSize = 20.sp)
-            },
-            shape = RoundedCornerShape(16.dp),
-            colors = onboardingFieldColors(OrangeAccent),
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, GrayFieldBorder, RoundedCornerShape(16.dp))
-                .background(Color.White)
-                .clickable(enabled = !familyCreated) { showDatePicker = true }
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                Icons.Filled.CalendarMonth,
-                contentDescription = null,
-                tint = OrangeAccent,
-                modifier = Modifier.size(22.dp),
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = birthMillis?.let { formatBirthLabel(it) }
-                    ?: stringResource(R.string.onboarding_birthdate_optional),
-                color = if (birthMillis != null) BlackText else GrayCaption,
-                fontSize = 16.sp,
-                modifier = Modifier.weight(1f),
-            )
-            Icon(
-                if (showDatePicker) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                contentDescription = null,
-                tint = GrayCaption,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-
-        if (showDatePicker && !familyCreated) {
-            DatePickerDialog(
-                onDismissRequest = { showDatePicker = false },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            datePickerState.selectedDateMillis?.let { birthMillis = it }
-                            showDatePicker = false
-                        },
-                    ) { Text("OK") }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDatePicker = false }) { Text(stringResource(R.string.travel_cancel)) }
-                },
-            ) {
-                DatePicker(state = datePickerState)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (familyCreated) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(
-                    Icons.Filled.CheckCircle,
-                    contentDescription = null,
-                    tint = SuccessGreen,
-                    modifier = Modifier.size(22.dp),
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    stringResource(R.string.onboarding_family_created),
-                    color = SuccessGreen,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
-        } else {
-            Button(
-                onClick = {
-                    onCreateFamily(familyName, childName, birthMillis)
-                },
-                enabled = canCreate,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = OrangeAccent,
-                    disabledContainerColor = GrayDisabled.copy(alpha = 0.4f),
-                    contentColor = Color.White,
-                    disabledContentColor = Color.White.copy(alpha = 0.7f),
-                ),
-            ) {
-                if (isCreating) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text(stringResource(R.string.onboarding_create), fontWeight = FontWeight.SemiBold)
-                }
-            }
-        }
-
-        errorText?.takeIf { it.isNotBlank() }?.let { err ->
-            Text(
-                err,
-                color = MaterialTheme.colorScheme.error,
-                fontSize = 13.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
-
-        Text(
-            stringResource(R.string.onboarding_later_hint),
-            fontSize = 12.sp,
-            color = GrayCaption.copy(alpha = 0.85f),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 12.dp, bottom = 24.dp),
-        )
-    }
-}
-
 @Composable
 private fun FormFieldLabel(text: String) {
     Text(
@@ -1157,11 +879,6 @@ private fun FormFieldLabel(text: String) {
             .fillMaxWidth()
             .padding(bottom = 6.dp),
     )
-}
-
-private fun formatBirthLabel(millis: Long): String {
-    val sdf = java.text.SimpleDateFormat("d MMMM yyyy", java.util.Locale.ITALY)
-    return sdf.format(java.util.Date(millis))
 }
 
 @Composable
@@ -1350,7 +1067,7 @@ private fun InvitePartnerPageContent(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     QRCodeView(payload = qrPayload.orEmpty(), modifier = Modifier.size(140.dp))
-                    Text(stringResource(R.string.onboarding_valid_24h), fontSize = 12.sp, color = GrayCaption)
+                    Text(stringResource(R.string.onboarding_valid_7d), fontSize = 12.sp, color = GrayCaption)
                     Text(
                         stringResource(R.string.invite_qr_safer),
                         fontSize = 11.sp,
@@ -1487,117 +1204,6 @@ private fun MainCtaButton(
 }
 
 // MARK: - Pagina 3: scelta fra "Crea" / "Entra con QR"
-
-@Composable
-private fun FamilyPathPickerPageContent(
-    selected: FamilyPath?,
-    onSelect: (FamilyPath) -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .padding(horizontal = 24.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            stringResource(R.string.onboarding_how_start),
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Bold,
-            color = BlackText,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            stringResource(R.string.onboarding_choose_hint),
-            fontSize = 15.sp,
-            color = GraySubtitle,
-            textAlign = TextAlign.Center,
-            lineHeight = 22.sp,
-            modifier = Modifier.padding(horizontal = 8.dp),
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-
-        PathOptionCard(
-            path = FamilyPath.Create,
-            isSelected = selected == FamilyPath.Create,
-            icon = Icons.Filled.Home,
-            accent = OrangeAccent,
-            title = stringResource(R.string.onboarding_create_family),
-            subtitle = stringResource(R.string.onboarding_creator_hint),
-            onSelect = onSelect,
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        PathOptionCard(
-            path = FamilyPath.Join,
-            isSelected = selected == FamilyPath.Join,
-            icon = Icons.Filled.QrCodeScanner,
-            accent = PurpleAccent,
-            title = stringResource(R.string.onboarding_join_family),
-            subtitle = stringResource(R.string.onboarding_join_hint),
-            onSelect = onSelect,
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-    }
-}
-
-@Composable
-private fun PathOptionCard(
-    path: FamilyPath,
-    isSelected: Boolean,
-    icon: ImageVector,
-    accent: Color,
-    title: String,
-    subtitle: String,
-    onSelect: (FamilyPath) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (isSelected) accent.copy(alpha = 0.08f) else Color.White)
-            .border(
-                width = if (isSelected) 1.5.dp else 1.dp,
-                color = if (isSelected) accent else GrayFieldBorder,
-                shape = RoundedCornerShape(16.dp),
-            )
-            .clickable { onSelect(path) }
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(accent.copy(alpha = if (isSelected) 0.20f else 0.12f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = accent,
-                modifier = Modifier.size(22.dp),
-            )
-        }
-        Spacer(modifier = Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = BlackText)
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(subtitle, fontSize = 13.sp, color = GraySubtitle, lineHeight = 18.sp)
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        Icon(
-            imageVector = if (isSelected) Icons.Filled.CheckCircle else Icons.Filled.KeyboardArrowDown,
-            contentDescription = null,
-            tint = if (isSelected) accent else GrayCaption.copy(alpha = 0.6f),
-            modifier = Modifier.size(22.dp),
-        )
-    }
-}
-
-// MARK: - Pagina 4 (percorso Join): codice + scansiona QR
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -160,7 +160,7 @@ class InviteCodeViewModel @Inject constructor(
                     familyId = familyId,
                     familyName = familyName,
                     inviterDisplayName = currentUserDisplayName(),
-                    ttlSeconds = 86400,
+                    ttlSeconds = InviteWrapService.DEFAULT_TTL_SECONDS,
                 )
                 _currentInviteFamilyId.value = familyId
                 _currentInviteId.value = invite.inviteId
