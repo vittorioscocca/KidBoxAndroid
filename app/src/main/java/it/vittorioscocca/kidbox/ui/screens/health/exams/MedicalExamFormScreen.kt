@@ -69,6 +69,8 @@ import androidx.core.content.FileProvider
 import it.vittorioscocca.kidbox.domain.model.KBExamStatus
 import it.vittorioscocca.kidbox.ui.screens.health.attachments.HealthAttachmentsCard
 import it.vittorioscocca.kidbox.ui.screens.health.attachments.KidBoxDocumentPickerSheet
+import it.vittorioscocca.kidbox.ui.permissions.NotificationsBlockedCard
+import it.vittorioscocca.kidbox.ui.permissions.rememberReminderPermission
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.io.File
 import java.text.SimpleDateFormat
@@ -95,6 +97,7 @@ fun MedicalExamFormScreen(
 ) {
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
+    val reminderPermission = rememberReminderPermission(onEnable = { viewModel.setReminderOn(true) })
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(familyId, childId, examId, prescribingVisitId, saveAsDraftHidden, bindNonce) {
@@ -306,9 +309,16 @@ fun MedicalExamFormScreen(
             ExamSwitchRow(
                 label = stringResource(R.string.health_notify_day_before),
                 checked = state.reminderOn,
-                onChecked = { if (state.hasDeadline) viewModel.setReminderOn(it) },
+                onChecked = { on ->
+                    if (!state.hasDeadline) return@ExamSwitchRow
+                    if (on) reminderPermission.requestEnable() else viewModel.setReminderOn(false)
+                },
                 enabled = state.hasDeadline,
             )
+            if (reminderPermission.showNotice(state.reminderOn)) {
+                Spacer(Modifier.height(8.dp))
+                NotificationsBlockedCard()
+            }
             if (!state.hasDeadline) {
                 Text(
                     stringResource(R.string.health_set_deadline_hint),

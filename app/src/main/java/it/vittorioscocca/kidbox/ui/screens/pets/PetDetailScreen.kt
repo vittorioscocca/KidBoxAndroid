@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -71,6 +72,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import it.vittorioscocca.kidbox.ui.components.ExtendDialogWindowToScreen
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -907,9 +909,16 @@ private fun PetEventDialog(
     val orange = Color(0xFFFF6B00)
     val canSave = title.trim().isNotBlank()
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        // Il 92% era del display, non della finestra: il fondo della card
+        // finiva sotto la barra di navigazione. Vedi ExtendDialogWindowToScreen.
+        ExtendDialogWindowToScreen()
         Surface(
             modifier = Modifier
+                .systemBarsPadding()
                 .fillMaxWidth(0.94f)
                 .fillMaxHeight(0.92f),
             shape = RoundedCornerShape(16.dp),
@@ -1141,9 +1150,16 @@ private fun EditPetDialog(
     val orange = Color(0xFFFF6B00)
     val canSave = name.trim().isNotBlank()
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        // Il 92% era del display, non della finestra: il fondo della card
+        // finiva sotto la barra di navigazione. Vedi ExtendDialogWindowToScreen.
+        ExtendDialogWindowToScreen()
         Surface(
             modifier = Modifier
+                .systemBarsPadding()
                 .fillMaxWidth(0.94f)
                 .fillMaxHeight(0.92f),
             shape = RoundedCornerShape(16.dp),

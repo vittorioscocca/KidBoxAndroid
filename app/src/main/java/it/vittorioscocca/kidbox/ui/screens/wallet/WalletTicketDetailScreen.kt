@@ -85,6 +85,8 @@ import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.data.local.entity.KBWalletTicketEntity
 import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
+import it.vittorioscocca.kidbox.ui.permissions.NotificationsBlockedCard
+import it.vittorioscocca.kidbox.ui.permissions.rememberReminderPermission
 import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerFullscreenDialog
 import it.vittorioscocca.kidbox.domain.model.WalletTicketKind
 import java.io.File
@@ -108,6 +110,10 @@ fun WalletTicketDetailScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val ticket = state.tickets.firstOrNull { it.id == ticketId }
+    var pendingReminderOffset by remember { mutableStateOf<Int?>(null) }
+    val reminderPermission = rememberReminderPermission(
+        onEnable = { viewModel.updateTicketReminderOffset(ticketId, pendingReminderOffset) },
+    )
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
@@ -309,10 +315,23 @@ fun WalletTicketDetailScreen(
                 }
             }
 
+            // `0` = nessun promemoria, libero; ogni altra scelta (compreso il
+            // default `null`) arma un alarm e passa dal permesso notifiche.
             ReminderOffsetRow(
                 reminderOffsetHours = ticket.reminderOffsetHours,
-                onSelected = { viewModel.updateTicketReminderOffset(ticketId, it) },
+                onSelected = { value ->
+                    if (value == 0) {
+                        reminderPermission.clearAttempt()
+                        viewModel.updateTicketReminderOffset(ticketId, 0)
+                    } else {
+                        pendingReminderOffset = value
+                        reminderPermission.requestEnable()
+                    }
+                },
             )
+            if (reminderPermission.showNotice(ticket.reminderOffsetHours != 0)) {
+                NotificationsBlockedCard()
+            }
 
             // Header card
             WalletTicketCard(

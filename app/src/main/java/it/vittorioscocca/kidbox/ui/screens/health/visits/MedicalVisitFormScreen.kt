@@ -128,6 +128,8 @@ import it.vittorioscocca.kidbox.ui.screens.health.attachments.KidBoxDocumentPick
 import it.vittorioscocca.kidbox.ui.screens.health.exams.MedicalExamFormScreen
 import it.vittorioscocca.kidbox.ui.screens.health.treatments.MedicalTreatmentFormScreen
 import it.vittorioscocca.kidbox.ui.theme.KidBoxColorScheme
+import it.vittorioscocca.kidbox.ui.permissions.NotificationsBlockedCard
+import it.vittorioscocca.kidbox.ui.permissions.rememberReminderPermission
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.io.File
 import java.text.SimpleDateFormat
@@ -482,6 +484,7 @@ private fun Step1InfoVisit(
     kb: KidBoxColorScheme,
     onPickDate: () -> Unit,
 ) {
+    val reminderPermission = rememberReminderPermission(onEnable = { vm.setVisitReminderOn(true) })
     Text(stringResource(R.string.health_visit_type), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = kb.title)
     Text(stringResource(R.string.health_visit_type_hint), fontSize = 12.sp, color = kb.subtitle)
     Spacer(Modifier.height(6.dp))
@@ -634,9 +637,15 @@ private fun Step1InfoVisit(
         }
         Switch(
             checked = state.visitReminderOn,
-            onCheckedChange = vm::setVisitReminderOn,
+            // Accensione dietro il permesso notifiche, come le cure: senza,
+            // l'alarm scatterebbe ma notify() verrebbe scartato in silenzio.
+            onCheckedChange = { on -> if (on) reminderPermission.requestEnable() else vm.setVisitReminderOn(false) },
             colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = tint),
         )
+    }
+    if (reminderPermission.showNotice(state.visitReminderOn)) {
+        Spacer(Modifier.height(8.dp))
+        NotificationsBlockedCard()
     }
     Spacer(Modifier.height(18.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1269,6 +1278,7 @@ private fun Step5Summary(
     visitIdParam: String?,
     onPickNextDate: () -> Unit,
 ) {
+    val nextReminderPermission = rememberReminderPermission(onEnable = { vm.setNextVisitReminder(true) })
     Text(stringResource(R.string.health_visit_summary), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = kb.title)
     Spacer(Modifier.height(10.dp))
     summaryCard(kb) {
@@ -1417,9 +1427,13 @@ private fun Step5Summary(
                     }
                     Switch(
                         checked = state.nextVisitReminder,
-                        onCheckedChange = vm::setNextVisitReminder,
+                        onCheckedChange = { on -> if (on) nextReminderPermission.requestEnable() else vm.setNextVisitReminder(false) },
                         colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = tint),
                     )
+                }
+                if (nextReminderPermission.showNotice(state.nextVisitReminder)) {
+                    Spacer(Modifier.height(8.dp))
+                    NotificationsBlockedCard()
                 }
             }
         }

@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import it.vittorioscocca.kidbox.ui.components.ExtendDialogWindowToScreen
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
@@ -141,7 +142,13 @@ fun LinkExistingWalletDocumentSheet(
         )
     }
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        // L'ultima riga del form (l'interruttore «Avvisami…») finiva fuori
+        // finestra, sotto la barra di navigazione: vedi ExtendDialogWindowToScreen.
+        ExtendDialogWindowToScreen()
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = MaterialTheme.kidBoxColors.background,

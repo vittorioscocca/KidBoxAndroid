@@ -18,6 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import it.vittorioscocca.kidbox.ui.permissions.NotificationsBlockedCard
+import it.vittorioscocca.kidbox.ui.permissions.rememberReminderPermission
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
 /**
@@ -52,19 +54,33 @@ fun FormSection(title: String?, content: @Composable () -> Unit) {
     }
 }
 
-/** Riga "Avvisami una settimana prima della scadenza" (toggle), riusata da add/link/edit sheet. */
+/**
+ * Riga "Avvisami una settimana prima della scadenza" (toggle), riusata da add/link/edit sheet.
+ * L'accensione passa dal permesso notifiche come gli altri promemoria locali:
+ * senza, l'alarm scatterebbe ma `notify()` verrebbe scartato in silenzio.
+ * Il cancello vive qui, una volta sola, così vale per tutti i fogli.
+ */
 @Composable
 fun NotifyRow(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            stringResource(R.string.wallet_document_notify_before_expiry),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f).padding(end = 12.dp),
-        )
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    val reminderPermission = rememberReminderPermission(onEnable = { onCheckedChange(true) })
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.wallet_document_notify_before_expiry),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f).padding(end = 12.dp),
+            )
+            Switch(
+                checked = checked,
+                onCheckedChange = { on -> if (on) reminderPermission.requestEnable() else onCheckedChange(false) },
+            )
+        }
+        if (reminderPermission.showNotice(checked)) {
+            NotificationsBlockedCard()
+        }
     }
 }

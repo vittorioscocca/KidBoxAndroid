@@ -29,7 +29,9 @@ import it.vittorioscocca.kidbox.notifications.TreatmentNotificationManager
 import it.vittorioscocca.kidbox.ui.screens.health.common.PrescribingVisitSummary
 import java.io.File
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -180,11 +182,8 @@ class MedicalTreatmentDetailViewModel @Inject constructor(
     /** True se il giorno terapeutico [dayNumber] cade in un giorno di calendario dopo oggi (timezone dispositivo). */
     private fun isTherapeuticDayCalendarFuture(dayNumber: Int): Boolean {
         val t = _uiState.value.treatment ?: return false
-        val dayMillis = t.startDateEpochMillis + TimeUnit.DAYS.toMillis((dayNumber - 1).toLong())
-        val zone = ZoneId.systemDefault()
-        val dayDate = Instant.ofEpochMilli(dayMillis).atZone(zone).toLocalDate()
-        val today = Instant.ofEpochMilli(System.currentTimeMillis()).atZone(zone).toLocalDate()
-        return dayDate.isAfter(today)
+        val dayDate = t.startLocalDate().plusDays((dayNumber - 1).toLong())
+        return dayDate.isAfter(LocalDate.now())
     }
 
     fun markTaken(dayNumber: Int, slotIndex: Int, scheduledTime: String, takenAtEpochMillis: Long = System.currentTimeMillis()) {
@@ -358,9 +357,7 @@ class MedicalTreatmentDetailViewModel @Inject constructor(
     }
 
     private fun buildTodaySlots(treatment: KBTreatment, logs: List<KBDoseLog>): List<DoseSlot> {
-        val now = System.currentTimeMillis()
-        val start = treatment.startDateEpochMillis
-        val daysSinceStart = TimeUnit.MILLISECONDS.toDays(now - start).toInt()
+        val daysSinceStart = treatment.daysSinceStart()
         if (daysSinceStart < 0) return emptyList()
         val dayNumber = daysSinceStart + 1
         if (!treatment.isLongTerm && dayNumber > treatment.durationDays) return emptyList()
@@ -371,20 +368,25 @@ class MedicalTreatmentDetailViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Giorni di calendario a partire dall'inizio cura. Contati in giorni di
+     * calendario locali (come `Calendar.dateComponents([.day])` su iOS), non in
+     * multipli di 86.400.000 ms: `startDate` nasce con l'ora di creazione e la
+     * somma di millisecondi salta un giorno attraversando l'ora legale. Nessun
+     * tetto, come su iOS: la striscia è lazy e regge anche anni di cura.
+     */
     private fun buildCalendarDays(treatment: KBTreatment, logs: List<KBDoseLog>): List<DayEntry> {
-        val now = System.currentTimeMillis()
-        val startMillis = treatment.startDateEpochMillis
+        val startDate = treatment.startLocalDate()
         val totalDays = if (treatment.isLongTerm) {
-            val daysSince = TimeUnit.MILLISECONDS.toDays(now - startMillis).toInt().coerceAtLeast(0)
-            maxOf(daysSince + 7, 7)
+            maxOf(treatment.daysSinceStart() + 7, 7)
         } else {
             treatment.durationDays
         }
         val times = treatment.scheduleTimesList()
-        val capped = totalDays.coerceAtMost(365)
+        val zone = ZoneId.systemDefault()
         val order = sortedSlotIndices(times)
-        return (1..capped).map { dayNum ->
-            val dayMillis = startMillis + TimeUnit.DAYS.toMillis((dayNum - 1).toLong())
+        return (1..totalDays).map { dayNum ->
+            val dayMillis = startDate.plusDays((dayNum - 1).toLong()).atStartOfDay(zone).toInstant().toEpochMilli()
             val slots = if (treatment.isScheduledDoseDayTherapeutic(dayNum)) {
                 order.map { idx ->
                     val time = times[idx]
@@ -396,6 +398,13 @@ class MedicalTreatmentDetailViewModel @Inject constructor(
             DayEntry(dayNumber = dayNum, dateMillis = dayMillis, slots = slots)
         }
     }
+
+    private fun KBTreatment.startLocalDate(): LocalDate =
+        Instant.ofEpochMilli(startDateEpochMillis).atZone(ZoneId.systemDefault()).toLocalDate()
+
+    /** Giorni di calendario da inizio cura a oggi (0 = primo giorno); negativo se la cura deve ancora iniziare. */
+    private fun KBTreatment.daysSinceStart(): Int =
+        ChronoUnit.DAYS.between(startLocalDate(), LocalDate.now()).toInt()
 
     private suspend fun resolveSubjectName(childId: String, petId: String): String {
         if (petId.isNotBlank()) {

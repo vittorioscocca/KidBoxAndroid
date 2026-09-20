@@ -87,6 +87,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.schedulePeriodLabel
 import it.vittorioscocca.kidbox.ui.screens.health.attachments.HealthAttachmentsCard
 import it.vittorioscocca.kidbox.ui.screens.health.attachments.KidBoxDocumentPickerSheet
+import it.vittorioscocca.kidbox.ui.permissions.NotificationsBlockedCard
+import it.vittorioscocca.kidbox.ui.permissions.rememberReminderPermission
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.io.File
 import java.text.SimpleDateFormat
@@ -118,6 +120,7 @@ fun MedicalTreatmentFormScreen(
 ) {
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
+    val reminderPermission = rememberReminderPermission(onEnable = { viewModel.setReminderEnabled(true) })
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val frequencySummary = if (state.intervalBetweenDosesDays > 0) {
         "Ogni ${state.intervalBetweenDosesDays} giorni"
@@ -456,7 +459,13 @@ fun MedicalTreatmentFormScreen(
                 Spacer(Modifier.height(16.dp))
 
                 TreatSectionLabel(stringResource(R.string.health_reminder))
-                TreatSwitchRow(stringResource(R.string.health_notify_at_times), state.reminderEnabled, viewModel::setReminderEnabled)
+                TreatSwitchRow(stringResource(R.string.health_notify_at_times), state.reminderEnabled) { on ->
+                    if (on) reminderPermission.requestEnable() else viewModel.setReminderEnabled(false)
+                }
+                if (reminderPermission.showNotice(state.reminderEnabled)) {
+                    Spacer(Modifier.height(8.dp))
+                    NotificationsBlockedCard()
+                }
                 Text(
                     if (state.intervalBetweenDosesDays > 0) {
                         "Le notifiche arrivano nei giorni di dose (ogni ${state.intervalBetweenDosesDays} giorni), all'orario impostato."

@@ -23,6 +23,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -77,6 +80,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -114,12 +118,16 @@ import it.vittorioscocca.kidbox.ui.screens.health.attachments.HealthAttachmentsC
 import it.vittorioscocca.kidbox.ui.screens.health.common.PrescribingVisitLinkCard
 import it.vittorioscocca.kidbox.ui.screens.health.attachments.KidBoxDocumentPickerSheet
 import it.vittorioscocca.kidbox.ui.theme.KidBoxColorScheme
+import it.vittorioscocca.kidbox.ui.permissions.NotificationsBlockedCard
+import it.vittorioscocca.kidbox.ui.permissions.rememberReminderPermission
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.io.File
+import kotlinx.coroutines.flow.first
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
-import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -136,30 +144,28 @@ private fun DATE_FMT_RANGE() = SimpleDateFormat("d MMM yyyy", KBLocale.current()
 private fun DOSE_TAKEN_DETAIL_FMT() = SimpleDateFormat("d MMMM yyyy · HH:mm", KBLocale.current())
 private val LocaleItIT = Locale.forLanguageTag("it-IT")
 
-/** Giorno terapia 1-based (allineato a iOS): 1 = primo giorno dalla data di inizio cura. */
-private fun therapeuticDayNumber1Based(treatment: KBTreatment, nowMillis: Long = System.currentTimeMillis()): Int {
-    val start = Calendar.getInstance().apply {
-        timeInMillis = treatment.startDateEpochMillis
-        stripToStartOfDay()
-    }
-    val today = Calendar.getInstance().apply {
-        timeInMillis = nowMillis
-        stripToStartOfDay()
-    }
-    val diffDays = ((today.timeInMillis - start.timeInMillis) / (24L * 60 * 60 * 1000)).toInt()
-    val day = diffDays + 1
+/** Striscia dei giorni: stesse misure della timeline iOS (frame 44×52, spacing 8). */
+private val DAY_RING_CARD_WIDTH = 44.dp
+private val DAY_RING_CARD_HEIGHT = 52.dp
+private val DAY_RING_SPACING = 8.dp
+
+private fun startLocalDate(treatment: KBTreatment): LocalDate =
+    Instant.ofEpochMilli(treatment.startDateEpochMillis).atZone(ZoneId.systemDefault()).toLocalDate()
+
+/**
+ * Giorno terapia 1-based (allineato a iOS): 1 = primo giorno dalla data di inizio cura.
+ * Contato in giorni di calendario (`ChronoUnit.DAYS`), non dividendo i millisecondi
+ * fra due mezzanotti: attraversando l'ora legale mancano 60 minuti e la divisione
+ * troncava al giorno prima — tutte le cure lunghe iniziate prima di fine marzo
+ * avevano l'anello «oggi» su ieri.
+ */
+private fun therapeuticDayNumber1Based(treatment: KBTreatment, today: LocalDate = LocalDate.now()): Int {
+    val day = ChronoUnit.DAYS.between(startLocalDate(treatment), today).toInt() + 1
     return if (!treatment.isLongTerm) {
         day.coerceIn(1, treatment.durationDays)
     } else {
         day.coerceAtLeast(1)
     }
-}
-
-private fun Calendar.stripToStartOfDay() {
-    set(Calendar.HOUR_OF_DAY, 0)
-    set(Calendar.MINUTE, 0)
-    set(Calendar.SECOND, 0)
-    set(Calendar.MILLISECOND, 0)
 }
 
 private fun dayListIndexForTherapeuticDay(wantDay: Int, days: List<DayEntry>): Int {
@@ -199,6 +205,7 @@ fun MedicalTreatmentDetailScreen(
 ) {
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
+    val reminderPermission = rememberReminderPermission(onEnable = { viewModel.setReminderEnabled(true) })
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(familyId, childId, petId, treatmentId) { viewModel.bind(familyId, childId, petId, treatmentId) }
@@ -272,19 +279,23 @@ fun MedicalTreatmentDetailScreen(
     }
     val takenDoses = allSlots.count { it.state == DoseState.TAKEN }
     val progressPct = if (totalDoses > 0) ((takenDoses * 100f) / totalDoses).toInt() else 0
-    val endMillis = treatment.endDateEpochMillis ?: (treatment.startDateEpochMillis + 24L * 60L * 60L * 1000L * (treatment.durationDays - 1))
+    val endMillis = treatment.endDateEpochMillis
+        ?: startLocalDate(treatment).plusDays((treatment.durationDays - 1).toLong())
+            .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
     var selectedDayIndex by remember { mutableIntStateOf(0) }
-    val dayRingScroll = rememberScrollState()
+    val dayRingState = rememberLazyListState()
     val density = LocalDensity.current
-    LaunchedEffect(treatment.id, state.calendarDays.size, density) {
+    LaunchedEffect(treatment.id, state.calendarDays.size) {
         val days = state.calendarDays
         if (days.isEmpty()) return@LaunchedEffect
         selectedDayIndex = currentDayRingIndex(treatment, days).coerceAtMost(days.lastIndex)
-        delay(120)
-        val idx = selectedDayIndex
-        val stepPx = with(density) { (52.dp + 8.dp).toPx().roundToInt() }
-        dayRingScroll.scrollTo((idx * stepPx).coerceIn(0, dayRingScroll.maxValue))
+        // Oggi al centro, come `scrollTo(id, anchor: .center)` su iOS. L'offset
+        // negativo lascia mezza viewport prima della card; la lista lo tronca
+        // da sola all'inizio, quindi per i primi giorni resta allineata a sinistra.
+        val viewportPx = snapshotFlow { dayRingState.layoutInfo.viewportSize.width }.first { it > 0 }
+        val cardPx = with(density) { DAY_RING_CARD_WIDTH.toPx() }.roundToInt()
+        dayRingState.scrollToItem(selectedDayIndex, -((viewportPx - cardPx) / 2).coerceAtLeast(0))
     }
     if (state.calendarDays.isNotEmpty() && selectedDayIndex >= state.calendarDays.size) {
         selectedDayIndex = state.calendarDays.lastIndex
@@ -451,35 +462,49 @@ fun MedicalTreatmentDetailScreen(
 
             Text(stringResource(R.string.health_dose_times), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = kb.title)
 
-            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(dayRingScroll), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val ringDays = state.calendarDays
-                val todayRingIndex =
-                    if (ringDays.isEmpty()) 0 else currentDayRingIndex(treatment, ringDays).coerceAtMost(ringDays.lastIndex)
-                ringDays.forEachIndexed { index, day ->
+            // LazyRow, non Row+horizontalScroll: una cura lunga ha centinaia di giorni
+            // e comporli tutti insieme bloccava il main thread (ANR nel layout della Row).
+            // Card a larghezza fissa (44×52 come iOS), così l'indice basta a centrare oggi.
+            val ringDays = state.calendarDays
+            val todayRingIndex =
+                if (ringDays.isEmpty()) 0 else currentDayRingIndex(treatment, ringDays).coerceAtMost(ringDays.lastIndex)
+            val dayFmt = remember(KBLocale.current()) { SimpleDateFormat("d", KBLocale.current()) }
+            val monthFmt = remember(KBLocale.current()) { SimpleDateFormat("MMM", KBLocale.current()) }
+            LazyRow(
+                state = dayRingState,
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DAY_RING_SPACING),
+            ) {
+                itemsIndexed(ringDays, key = { _, day -> day.dayNumber }) { index, day ->
                     val selected = index == selectedDayIndex
                     val isTodayRing = index == todayRingIndex
+                    val allDosesTaken = day.slots.isNotEmpty() &&
+                        day.slots.all { it.state == DoseState.TAKEN }
                     Card(
                         onClick = { selectedDayIndex = index },
-                        modifier = Modifier.border(
-                            width = if (isTodayRing && !selected) 1.5.dp else 0.dp,
-                            color = if (isTodayRing && !selected) PURPLE_DETAIL else Color.Transparent,
-                            shape = RoundedCornerShape(10.dp),
-                        ),
+                        modifier = Modifier
+                            .size(width = DAY_RING_CARD_WIDTH, height = DAY_RING_CARD_HEIGHT)
+                            .border(
+                                width = if (isTodayRing && !selected) 1.5.dp else 0.dp,
+                                color = if (isTodayRing && !selected) PURPLE_DETAIL else Color.Transparent,
+                                shape = RoundedCornerShape(10.dp),
+                            ),
                         colors = CardDefaults.cardColors(containerColor = if (selected) PURPLE_DETAIL else kb.card),
                         shape = RoundedCornerShape(10.dp),
                     ) {
-                        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
                             val d = Date(day.dateMillis)
-                            Text(SimpleDateFormat("d", KBLocale.current()).format(d), color = if (selected) Color.White else kb.title, fontWeight = FontWeight.Bold)
-                            Text(SimpleDateFormat("MMM", KBLocale.current()).format(d), color = if (selected) Color.White.copy(alpha = 0.9f) else kb.subtitle, fontSize = 11.sp)
-                            val allDosesTaken = day.slots.isNotEmpty() &&
-                                day.slots.all { it.state == DoseState.TAKEN }
+                            Text(dayFmt.format(d), color = if (selected) Color.White else kb.title, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(monthFmt.format(d), color = if (selected) Color.White.copy(alpha = 0.9f) else kb.subtitle, fontSize = 9.sp)
                             if (allDosesTaken) {
-                                Spacer(Modifier.height(2.dp))
                                 Icon(
                                     Icons.Default.CheckCircle,
                                     contentDescription = null,
-                                    modifier = Modifier.size(12.dp),
+                                    modifier = Modifier.size(10.dp),
                                     tint = if (selected) Color.White else GREEN_DETAIL,
                                 )
                             }
@@ -564,9 +589,17 @@ fun MedicalTreatmentDetailScreen(
                     }
                     Switch(
                         checked = treatment.reminderEnabled,
-                        onCheckedChange = { viewModel.setReminderEnabled(it) },
+                        // L'accensione passa dal permesso notifiche (come
+                        // requestAuthorization() su iOS): senza, l'alarm scatterebbe
+                        // ma notify() verrebbe scartato in silenzio.
+                        onCheckedChange = { on ->
+                            if (on) reminderPermission.requestEnable() else viewModel.setReminderEnabled(false)
+                        },
                         colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PURPLE_DETAIL),
                     )
+                }
+                if (reminderPermission.showNotice(treatment.reminderEnabled)) {
+                    NotificationsBlockedCard(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 14.dp))
                 }
             }
 

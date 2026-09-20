@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -33,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import it.vittorioscocca.kidbox.ui.components.ExtendDialogWindowToScreen
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
@@ -94,6 +96,7 @@ fun VisibilityPickerFullscreenDialog(
             decorFitsSystemWindows = false,
         ),
     ) {
+        ExtendDialogWindowToScreen()
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.surface,
@@ -102,6 +105,8 @@ fun VisibilityPickerFullscreenDialog(
             VisibilityPickerPanel(
                 modifier = Modifier
                     .fillMaxSize()
+                    // La finestra ora copre anche le barre: il contenuto sta fra le due.
+                    .systemBarsPadding()
                     .verticalScroll(scroll)
                     .padding(horizontal = 20.dp)
                     .padding(top = 24.dp, bottom = 24.dp),

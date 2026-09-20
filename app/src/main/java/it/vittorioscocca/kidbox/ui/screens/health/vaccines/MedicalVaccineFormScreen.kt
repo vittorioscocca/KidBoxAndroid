@@ -79,6 +79,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.mapper.KBVaccineType
+import it.vittorioscocca.kidbox.ui.permissions.NotificationsBlockedCard
+import it.vittorioscocca.kidbox.ui.permissions.rememberReminderPermission
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
@@ -104,6 +106,7 @@ fun MedicalVaccineFormScreen(
 ) {
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
+    val reminderPermission = rememberReminderPermission(onEnable = { viewModel.setReminderOn(true) })
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val isEditing = vaccineId != null
 
@@ -350,8 +353,12 @@ fun MedicalVaccineFormScreen(
                         }
                         Switch(
                             checked = state.reminderOn,
-                            onCheckedChange = viewModel::setReminderOn,
+                            onCheckedChange = { on -> if (on) reminderPermission.requestEnable() else viewModel.setReminderOn(false) },
                         )
+                    }
+                    if (reminderPermission.showNotice(state.reminderOn)) {
+                        Spacer(Modifier.height(8.dp))
+                        NotificationsBlockedCard()
                     }
                     if (state.reminderOn) {
                         Spacer(Modifier.height(8.dp))

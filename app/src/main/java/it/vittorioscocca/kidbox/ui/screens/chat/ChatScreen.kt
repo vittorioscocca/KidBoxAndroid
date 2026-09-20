@@ -120,7 +120,6 @@ import androidx.compose.ui.window.DialogWindowProvider
 import android.app.Activity
 import android.content.ContextWrapper
 import android.view.WindowManager
-import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.ui.Alignment
@@ -139,6 +138,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import it.vittorioscocca.kidbox.ui.components.ExtendDialogWindowToScreen
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.maps.model.LatLng
@@ -1743,15 +1743,15 @@ private fun MediaGroupGalleryDialog(
             decorFitsSystemWindows = false,
         ),
     ) {
-        // Force the dialog window to fill the entire screen (height + width).
-        // DialogProperties(usePlatformDefaultWidth = false) only removes the width cap;
-        // the platform still imposes a max-height. This SideEffect must live INSIDE
-        // the Dialog content so that LocalView.current returns the dialog's own view
-        // (whose parent is a DialogWindowProvider), not the activity's root view.
+        // Finestra a tutto schermo come ogni altro dialog a schermo intero
+        // (vedi ExtendDialogWindowToScreen), più quello che serve a una galleria
+        // immersiva: dimensioni MATCH_PARENT, nessun limite ai bordi dello
+        // schermo e sfondo trasparente. Il SideEffect deve stare DENTRO il
+        // contenuto del Dialog, così LocalView è la view del dialog stesso.
+        ExtendDialogWindowToScreen()
         val dialogView = LocalView.current
         SideEffect {
             (dialogView.parent as? DialogWindowProvider)?.window?.apply {
-                WindowCompat.setDecorFitsSystemWindows(this, false)
                 setLayout(
                     WindowManager.LayoutParams.MATCH_PARENT,
                     WindowManager.LayoutParams.MATCH_PARENT,

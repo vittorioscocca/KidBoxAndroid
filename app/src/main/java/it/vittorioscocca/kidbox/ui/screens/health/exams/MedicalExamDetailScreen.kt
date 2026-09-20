@@ -81,6 +81,8 @@ import it.vittorioscocca.kidbox.data.health.ai.HealthAiDocumentText
 import it.vittorioscocca.kidbox.domain.model.KBExamStatus
 import it.vittorioscocca.kidbox.domain.model.KBMedicalExam
 import it.vittorioscocca.kidbox.ui.screens.health.common.PrescribingVisitLinkCard
+import it.vittorioscocca.kidbox.ui.permissions.NotificationsBlockedCard
+import it.vittorioscocca.kidbox.ui.permissions.rememberReminderPermission
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -121,6 +123,7 @@ fun MedicalExamDetailScreen(
 ) {
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
+    val reminderPermission = rememberReminderPermission(onEnable = { viewModel.toggleExamReminder() })
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showAiChat by remember { mutableStateOf(false) }
 
@@ -254,7 +257,11 @@ fun MedicalExamDetailScreen(
                     MedicalExamHeaderCard(
                         exam = exam,
                         status = status,
-                        onToggleReminder = { viewModel.toggleExamReminder() },
+                        // Spegnere è sempre libero; accendere passa dal permesso notifiche.
+                        onToggleReminder = {
+                            if (exam.reminderOn) viewModel.toggleExamReminder() else reminderPermission.requestEnable()
+                        },
+                        showNotificationsBlocked = reminderPermission.showNotice(exam.reminderOn),
                     )
                     Spacer(Modifier.height(12.dp))
 
@@ -428,6 +435,7 @@ private fun MedicalExamHeaderCard(
     exam: KBMedicalExam,
     status: KBExamStatus,
     onToggleReminder: () -> Unit,
+    showNotificationsBlocked: Boolean = false,
 ) {
     val kb = MaterialTheme.kidBoxColors
     val tint = examDetailStatusTint(status)
@@ -543,6 +551,11 @@ private fun MedicalExamHeaderCard(
                         )
                     }
                 }
+            }
+
+            if (showNotificationsBlocked) {
+                Spacer(Modifier.height(10.dp))
+                NotificationsBlockedCard()
             }
 
             if (exam.syncStateRaw == 1) {
