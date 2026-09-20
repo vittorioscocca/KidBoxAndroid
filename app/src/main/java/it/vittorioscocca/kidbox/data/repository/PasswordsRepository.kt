@@ -387,28 +387,45 @@ class PasswordsRepository @Inject constructor(
         entryDao.listVisibleForAutofill(familyId, auth.currentUser?.uid.orEmpty())
     }
 
+    /**
+     * Esito del controllo di sicurezza per una password.
+     *
+     * `updatedAtEpochMillis` NON si tocca, né in locale né in remoto: significa
+     * "quando l'utente ha modificato questa password", e uno scan non è una
+     * modifica sua. La lista è ordinata per data di modifica decrescente
+     * (PasswordsHomeViewModel), quindi ogni verdetto faceva saltare la voce in
+     * cima al gruppo — e, finché qui si faceva l'upsert intero con
+     * `serverTimestamp()`, lo faceva anche sugli altri device della famiglia.
+     *
+     * Verdetto invariato = nessuna scrittura su Firestore: prima ogni scan
+     * settimanale riscriveva TUTTE le password, ~150 scritture a settimana a
+     * pagamento contate come «aggiornamenti» nel rollup. Se cambia, si scrivono
+     * solo i due campi del verdetto; il valore locale si aggiorna solo se il
+     * server l'ha preso, così un fallimento (offline) viene ritentato dal
+     * prossimo scan. La data del controllo resta un dato del device.
+     * Speculare a PasswordsSecurityScanner su iOS.
+     */
     suspend fun updatePwnedVerdict(
         entryId: String,
         pwnedCount: Int?,
         checkedAtEpochMillis: Long,
     ) = withContext(Dispatchers.IO) {
         val existing = entryDao.getById(entryId) ?: return@withContext
-        // `updatedAtEpochMillis` NON si tocca: significa "quando l'utente ha
-        // modificato questa password", e l'esito di uno scan di sicurezza non è
-        // una modifica sua. La data del controllo ha già il suo campo,
-        // `pwnedCheckedAt`, aggiornato qui sopra.
-        //
-        // Non è cosmesi: la lista è ordinata per data di modifica decrescente
-        // (PasswordsHomeViewModel), quindi ogni verdetto faceva saltare quella
-        // voce in cima al gruppo e la lista si riordinava sotto gli occhi
-        // dell'utente per tutta la durata dello scan. Stessa correzione fatta su
-        // iOS in PasswordsSecurityScanner.
-        val updated = existing.copy(
-            pwnedCount = pwnedCount,
-            pwnedCheckedAt = checkedAtEpochMillis,
-            syncStateRaw = 1,
+        val unchanged = existing.pwnedCount == pwnedCount
+        if (unchanged || pwnedCount == null) {
+            entryDao.upsert(existing.copy(pwnedCheckedAt = checkedAtEpochMillis))
+            return@withContext
+        }
+        val written = runCatching {
+            remoteStore.updatePwnedVerdict(entryId, existing.familyId, pwnedCount, checkedAtEpochMillis)
+        }.onFailure { e ->
+            KBLog.security.warning("verdict write failed entryId=$entryId: ${e.message}", TAG)
+        }.isSuccess
+        entryDao.upsert(
+            existing.copy(
+                pwnedCount = if (written) pwnedCount else existing.pwnedCount,
+                pwnedCheckedAt = checkedAtEpochMillis,
+            ),
         )
-        entryDao.upsert(updated)
-        remoteStore.upsertEntry(updated)
     }
 }

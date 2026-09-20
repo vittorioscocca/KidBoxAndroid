@@ -303,6 +303,25 @@ class PasswordRemoteStore @Inject constructor(
         ref.set(payload, SetOptions.merge()).await()
     }
 
+    /**
+     * Esito del controllo di sicurezza: solo i due campi del verdetto, senza
+     * `updatedAt`/`updatedBy`. Uno scan non è una modifica dell'utente: il
+     * documento intero con `serverTimestamp()` faceva risultare «modificate
+     * adesso» tutte le password sugli altri device (lista che si riordina) e
+     * contava come `content_updated` nel rollup.
+     */
+    suspend fun updatePwnedVerdict(entryId: String, familyId: String, pwnedCount: Int, checkedAtEpochMillis: Long) {
+        db.collection("families").document(familyId).collection("passwords").document(entryId)
+            .set(
+                mapOf(
+                    "pwnedCount" to pwnedCount,
+                    "pwnedCheckedAt" to Timestamp(checkedAtEpochMillis / 1000, ((checkedAtEpochMillis % 1000) * 1_000_000).toInt()),
+                ),
+                SetOptions.merge(),
+            )
+            .await()
+    }
+
     suspend fun upsertGroup(entity: PasswordGroupEntity) {
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
         val ref = db.collection("families").document(entity.familyId).collection("passwordGroups").document(entity.id)
