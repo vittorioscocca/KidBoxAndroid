@@ -29,6 +29,7 @@ data class MedicalTreatmentsState(
     val allFiltered: List<KBTreatment> = emptyList(),
     val takenDosesByTreatmentId: Map<String, Int> = emptyMap(),
     val timeFilter: TreatmentTimeFilter = TreatmentTimeFilter.ALL,
+    val searchQuery: String = "",
     val customFilterStartMillis: Long = defaultCustomFilterStartMillis(),
     val customFilterEndMillis: Long = System.currentTimeMillis(),
     val isSelecting: Boolean = false,
@@ -50,6 +51,11 @@ class MedicalTreatmentsViewModel @Inject constructor(
     private var familyId = ""
     private var childId = ""
 
+    // Ultima emissione di Room: filtro e ricerca si riapplicano da qui, perché
+    // il Flow rimette solo quando cambia la tabella e non quando cambia un chip.
+    private var latestTreatments: List<KBTreatment> = emptyList()
+    private var latestTakenMap: Map<String, Int> = emptyMap()
+
     private val pullToRefresh = PullToRefreshController(viewModelScope)
     val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
 
@@ -65,8 +71,6 @@ class MedicalTreatmentsViewModel @Inject constructor(
         this.childId = childId
         syncCenter.start(familyId)
 
-        val now = System.currentTimeMillis()
-
         combine(
             repository.observe(familyId, childId),
             doseLogRepository.observeByFamilyAndChild(familyId, childId),
@@ -77,57 +81,82 @@ class MedicalTreatmentsViewModel @Inject constructor(
                 .mapValues { (_, logs) ->
                     logs.distinctBy { it.dayNumber to it.slotIndex }.size
                 }
-
-            val prev = _uiState.value
-            val filtered = treatments
-                .filter { !it.isDeleted }
-                .filter { it.petId.isBlank() }
-                .filter {
-                    passesTreatmentTimeFilter(
-                        it,
-                        prev.timeFilter,
-                        prev.customFilterStartMillis,
-                        prev.customFilterEndMillis,
-                    )
-                }
-
-            val active = mutableListOf<KBTreatment>()
-            val longTerm = mutableListOf<KBTreatment>()
-            val inactive = mutableListOf<KBTreatment>()
-
-            for (t in filtered) {
-                when {
-                    !t.isActive || t.isDeleted -> inactive.add(t)
-                    t.isLongTerm -> longTerm.add(t)
-                    t.endDateEpochMillis != null && t.endDateEpochMillis < now -> inactive.add(t)
-                    else -> active.add(t)
-                }
-            }
-
-            val anyNonDeleted = treatments.any { !it.isDeleted && it.petId.isBlank() }
-            val emptyDueToFilter = anyNonDeleted && filtered.isEmpty() && prev.timeFilter != TreatmentTimeFilter.ALL
-
-            MedicalTreatmentsState(
-                isLoading = false,
-                active = active.sortedByDescending { it.startDateEpochMillis },
-                longTerm = longTerm.sortedByDescending { it.startDateEpochMillis },
-                inactive = inactive.sortedByDescending { it.startDateEpochMillis },
-                allFiltered = filtered.sortedByDescending { it.startDateEpochMillis },
-                takenDosesByTreatmentId = takenMap,
-                timeFilter = prev.timeFilter,
-                customFilterStartMillis = prev.customFilterStartMillis,
-                customFilterEndMillis = prev.customFilterEndMillis,
-                isSelecting = prev.isSelecting,
-                selectedIds = prev.selectedIds.filter { id -> filtered.any { it.id == id } }.toSet(),
-                isEmptyDueToFilter = emptyDueToFilter,
-            )
+            treatments to takenMap
         }
-            .onEach { _uiState.value = it }
+            .onEach { (treatments, takenMap) ->
+                latestTreatments = treatments
+                latestTakenMap = takenMap
+                rebuild()
+            }
             .launchIn(viewModelScope)
+    }
+
+    private fun rebuild() {
+        val now = System.currentTimeMillis()
+        val prev = _uiState.value
+        val filtered = latestTreatments
+            .filter { !it.isDeleted }
+            .filter { it.petId.isBlank() }
+            .filter {
+                passesTreatmentTimeFilter(
+                    it,
+                    prev.timeFilter,
+                    prev.customFilterStartMillis,
+                    prev.customFilterEndMillis,
+                )
+            }
+            .filter { passesSearch(it, prev.searchQuery) }
+
+        val active = mutableListOf<KBTreatment>()
+        val longTerm = mutableListOf<KBTreatment>()
+        val inactive = mutableListOf<KBTreatment>()
+
+        for (t in filtered) {
+            when {
+                !t.isActive || t.isDeleted -> inactive.add(t)
+                t.isLongTerm -> longTerm.add(t)
+                t.endDateEpochMillis != null && t.endDateEpochMillis < now -> inactive.add(t)
+                else -> active.add(t)
+            }
+        }
+
+        val anyNonDeleted = latestTreatments.any { !it.isDeleted && it.petId.isBlank() }
+        val emptyDueToFilter = anyNonDeleted && filtered.isEmpty() &&
+            (prev.timeFilter != TreatmentTimeFilter.ALL || prev.searchQuery.isNotBlank())
+
+        _uiState.value = MedicalTreatmentsState(
+            isLoading = false,
+            active = active.sortedByDescending { it.startDateEpochMillis },
+            longTerm = longTerm.sortedByDescending { it.startDateEpochMillis },
+            inactive = inactive.sortedByDescending { it.startDateEpochMillis },
+            allFiltered = filtered.sortedByDescending { it.startDateEpochMillis },
+            takenDosesByTreatmentId = latestTakenMap,
+            timeFilter = prev.timeFilter,
+            searchQuery = prev.searchQuery,
+            customFilterStartMillis = prev.customFilterStartMillis,
+            customFilterEndMillis = prev.customFilterEndMillis,
+            isSelecting = prev.isSelecting,
+            selectedIds = prev.selectedIds.filter { id -> filtered.any { it.id == id } }.toSet(),
+            isEmptyDueToFilter = emptyDueToFilter,
+        )
+    }
+
+    private fun passesSearch(t: KBTreatment, query: String): Boolean {
+        val q = query.trim().lowercase()
+        if (q.isEmpty()) return true
+        return t.drugName.lowercase().contains(q) ||
+            (t.activeIngredient?.lowercase()?.contains(q) == true) ||
+            (t.notes?.lowercase()?.contains(q) == true)
+    }
+
+    fun setSearchQuery(q: String) {
+        _uiState.value = _uiState.value.copy(searchQuery = q)
+        rebuild()
     }
 
     fun setTimeFilter(filter: TreatmentTimeFilter) {
         _uiState.value = _uiState.value.copy(timeFilter = filter)
+        rebuild()
     }
 
     fun setCustomFilterStart(millis: Long) {
@@ -151,10 +180,12 @@ class MedicalTreatmentsViewModel @Inject constructor(
             customFilterEndMillis = e,
             timeFilter = TreatmentTimeFilter.CUSTOM,
         )
+        rebuild()
     }
 
     fun clearTimeFilter() {
-        _uiState.value = _uiState.value.copy(timeFilter = TreatmentTimeFilter.ALL)
+        _uiState.value = _uiState.value.copy(timeFilter = TreatmentTimeFilter.ALL, searchQuery = "")
+        rebuild()
     }
 
     fun setSelecting(selecting: Boolean) {

@@ -78,6 +78,7 @@ import it.vittorioscocca.kidbox.domain.model.KBExamStatus
 import it.vittorioscocca.kidbox.domain.model.KBMedicalExam
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListAddBottomButton
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListDualSelectionBottomBar
+import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListSearchField
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListTopToolbar
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.SimpleDateFormat
@@ -211,6 +212,13 @@ fun MedicalExamsScreen(
                 modifier = Modifier.padding(horizontal = 18.dp),
             )
 
+            HealthListSearchField(
+                value = state.searchQuery,
+                onValueChange = { viewModel.setSearchQuery(it) },
+                placeholder = stringResource(R.string.health_exam_search),
+                tint = TEAL,
+            )
+
             if (state.timeFilter != ExamTimeFilter.ALL) {
                 FilterActivePill(
                     label = filterPillLabel(context, state),
@@ -227,13 +235,17 @@ fun MedicalExamsScreen(
                 }
             } else {
                 val isEmpty = !state.hasAnyExam
-                val emptyFilter = state.hasAnyExam && state.filteredExamCount == 0 && state.timeFilter != ExamTimeFilter.ALL
+                val emptyFilter = state.hasAnyExam && state.filteredExamCount == 0 &&
+                    (state.timeFilter != ExamTimeFilter.ALL || state.searchQuery.isNotBlank())
 
                 when {
                     isEmpty -> ExamsEmptyState(modifier = Modifier.fillMaxSize(), onAdd = onAdd)
                     emptyFilter -> EmptyFilterState(
                         modifier = Modifier.fillMaxSize(),
-                        onClearFilter = { viewModel.setTimeFilter(ExamTimeFilter.ALL) },
+                        onClearFilter = {
+                            viewModel.setSearchQuery("")
+                            viewModel.setTimeFilter(ExamTimeFilter.ALL)
+                        },
                     )
                     else -> {
                         PullToRefreshBox(

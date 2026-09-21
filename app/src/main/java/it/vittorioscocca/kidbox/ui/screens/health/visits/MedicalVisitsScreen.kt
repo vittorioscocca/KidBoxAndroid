@@ -49,7 +49,6 @@ import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -63,8 +62,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -94,6 +91,7 @@ import it.vittorioscocca.kidbox.data.local.mapper.KBVisitStatus
 import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListAddBottomButton
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListDualSelectionBottomBar
+import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListSearchField
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListTopToolbar
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.SimpleDateFormat
@@ -129,7 +127,6 @@ fun MedicalVisitsScreen(
 
     var showFilterSheet by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    var searchBarVisible by remember { mutableStateOf(false) }
     val filterSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     LaunchedEffect(familyId, childId) { viewModel.bind(familyId, childId) }
@@ -228,22 +225,11 @@ fun MedicalVisitsScreen(
                 modifier = Modifier.padding(horizontal = 18.dp),
             )
 
-            OutlinedTextField(
+            HealthListSearchField(
                 value = state.searchQuery,
                 onValueChange = { viewModel.setSearchQuery(it) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 8.dp),
-                placeholder = { Text(stringResource(R.string.health_visit_search), color = kb.subtitle) },
-                leadingIcon = {
-                    Icon(Icons.Default.Search, contentDescription = null, tint = kb.subtitle)
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = VISIT_TINT,
-                    unfocusedBorderColor = kb.subtitle.copy(alpha = 0.25f),
-                ),
+                placeholder = stringResource(R.string.health_visit_search),
+                tint = VISIT_TINT,
             )
 
             if (state.periodFilter != VisitPeriodFilter.ALL) {

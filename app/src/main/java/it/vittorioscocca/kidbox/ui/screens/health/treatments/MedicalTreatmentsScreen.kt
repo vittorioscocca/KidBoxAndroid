@@ -73,6 +73,7 @@ import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import it.vittorioscocca.kidbox.domain.model.frequencyDisplayLabel
 import it.vittorioscocca.kidbox.domain.model.plannedFiniteDosesTotal
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListAddBottomButton
+import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListSearchField
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListTopToolbar
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.DateFormat
@@ -224,6 +225,12 @@ fun MedicalTreatmentsScreen(
                 fontWeight = FontWeight.ExtraBold,
                 color = kb.title,
                 modifier = Modifier.padding(horizontal = 18.dp),
+            )
+            HealthListSearchField(
+                value = state.searchQuery,
+                onValueChange = { viewModel.setSearchQuery(it) },
+                placeholder = stringResource(R.string.health_treatment_search),
+                tint = PURPLE,
             )
             if (state.timeFilter != TreatmentTimeFilter.ALL) {
                 Spacer(Modifier.height(8.dp))

@@ -29,6 +29,7 @@ enum class VaccineListTimeFilter {
 data class MedicalVaccinesState(
     val isLoading: Boolean = true,
     val timeFilter: VaccineListTimeFilter = VaccineListTimeFilter.ALL,
+    val searchQuery: String = "",
     /** Tutti i vaccini del bambino (prima del filtro periodo); per UI empty-filter vs libretto vuoto. */
     val unfilteredCount: Int = 0,
     val overdue: List<KBVaccine> = emptyList(),
@@ -52,6 +53,7 @@ class MedicalVaccinesViewModel @Inject constructor(
     private var childId: String = ""
     private var latestVaccines: List<KBVaccine> = emptyList()
     private var timeFilter: VaccineListTimeFilter = VaccineListTimeFilter.ALL
+    private var searchQuery: String = ""
     private var customFilterStartMs: Long = 0L
     private var customFilterEndMs: Long = 0L
 
@@ -82,6 +84,11 @@ class MedicalVaccinesViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
+    fun setSearchQuery(q: String) {
+        searchQuery = q
+        emitPartitioned()
+    }
+
     fun setTimeFilter(filter: VaccineListTimeFilter) {
         timeFilter = filter
         emitPartitioned()
@@ -105,24 +112,24 @@ class MedicalVaccinesViewModel @Inject constructor(
     }
 
     private fun emitPartitioned() {
-        val vaccines = latestVaccines.filter { passesTimeFilter(it) }
+        // Ogni sezione dal più recente al meno recente sulla data di riferimento
+        // del filtro (somministrazione, poi appuntamento, poi aggiornamento),
+        // come iOS e web.
+        val vaccines = latestVaccines
+            .filter { passesTimeFilter(it) && passesSearch(it) }
+            .sortedByDescending { refMillis(it) }
         val now = System.currentTimeMillis()
         val scheduledAll = vaccines.filter { it.statusRaw == "scheduled" }
-        val overdue = scheduledAll
-            .filter { (it.scheduledDateEpochMillis ?: Long.MAX_VALUE) < now }
-            .sortedBy { it.scheduledDateEpochMillis }
-        val scheduled = scheduledAll
-            .filter { (it.scheduledDateEpochMillis ?: Long.MAX_VALUE) >= now }
-            .sortedBy { it.scheduledDateEpochMillis }
-        val administered = vaccines
-            .filter { it.statusRaw == "administered" }
-            .sortedByDescending { it.administeredDateEpochMillis }
+        val overdue = scheduledAll.filter { (it.scheduledDateEpochMillis ?: Long.MAX_VALUE) < now }
+        val scheduled = scheduledAll.filter { (it.scheduledDateEpochMillis ?: Long.MAX_VALUE) >= now }
+        val administered = vaccines.filter { it.statusRaw == "administered" }
         val planned = vaccines.filter { it.statusRaw == "planned" }
         val skipped = vaccines.filter { it.statusRaw == "skipped" }
 
         _uiState.value = MedicalVaccinesState(
             isLoading = false,
             timeFilter = timeFilter,
+            searchQuery = searchQuery,
             unfilteredCount = latestVaccines.size,
             overdue = overdue,
             scheduled = scheduled,
@@ -132,11 +139,27 @@ class MedicalVaccinesViewModel @Inject constructor(
         )
     }
 
-    private fun passesTimeFilter(v: KBVaccine): Boolean {
-        val cutoffMs = cutoffMillis() ?: return true
-        val ref = v.administeredDateEpochMillis
+    private fun refMillis(v: KBVaccine): Long =
+        v.administeredDateEpochMillis
             ?: v.scheduledDateEpochMillis
             ?: v.updatedAtEpochMillis
+
+    private fun passesSearch(v: KBVaccine): Boolean {
+        val q = searchQuery.trim().lowercase()
+        if (q.isEmpty()) return true
+        return v.name.lowercase().contains(q) ||
+            v.vaccineTypeRaw.lowercase().contains(q) ||
+            (v.commercialName?.lowercase()?.contains(q) == true) ||
+            (v.doctorName?.lowercase()?.contains(q) == true) ||
+            (v.administeredBy?.lowercase()?.contains(q) == true) ||
+            (v.location?.lowercase()?.contains(q) == true) ||
+            (v.lotNumber?.lowercase()?.contains(q) == true) ||
+            (v.notes?.lowercase()?.contains(q) == true)
+    }
+
+    private fun passesTimeFilter(v: KBVaccine): Boolean {
+        val cutoffMs = cutoffMillis() ?: return true
+        val ref = refMillis(v)
         if (timeFilter == VaccineListTimeFilter.CUSTOM) {
             val endExclusive = customFilterEndMs + 24L * 60 * 60 * 1000
             return ref >= customFilterStartMs && ref < endExclusive

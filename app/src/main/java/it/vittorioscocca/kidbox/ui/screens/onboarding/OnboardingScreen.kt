@@ -974,6 +974,10 @@ private fun InvitePartnerPageContent(
                                 putExtra(Intent.EXTRA_SUBJECT, shareSubject)
                                 putExtra(Intent.EXTRA_TEXT, shareText)
                             }
+                            // Stesso evento di InviteCodeScreen e QuickInviteSheet: senza,
+                            // il wizard Android era cieco su chi condivide davvero
+                            // (20/09: 16 inviti generati, 0 invite_shared).
+                            AppAnalytics.inviteShared(context, "system_share_sheet")
                             context.startActivity(Intent.createChooser(send, context.getString(R.string.onboarding_share_link)))
                         }
                         .padding(vertical = 16.dp),
@@ -997,7 +1001,10 @@ private fun InvitePartnerPageContent(
                             runCatching {
                                 val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                 cm.setPrimaryClip(ClipData.newPlainText("kidbox_invite_link", value))
-                            }.onSuccess { didCopy = true }
+                            }.onSuccess {
+                                didCopy = true
+                                AppAnalytics.inviteShared(context, "copy")
+                            }
                         }
                     },
                 )

@@ -193,8 +193,9 @@ class MedicalVisitsViewModel @Inject constructor(
             isLoading = false,
             hasAnyVisit = rawVisits.isNotEmpty(),
             filteredVisitCount = filtered.size,
-            booked = bucket(filtered, KBVisitStatus.BOOKED).sortedBy { it.dateEpochMillis },
-            pending = bucket(filtered, KBVisitStatus.PENDING).sortedBy { it.dateEpochMillis },
+            // Anche prenotate e in attesa dal più recente al meno recente, come iOS e web.
+            booked = bucket(filtered, KBVisitStatus.BOOKED),
+            pending = bucket(filtered, KBVisitStatus.PENDING),
             resultAvailable = bucket(filtered, KBVisitStatus.RESULT_AVAILABLE),
             completed = bucket(filtered, KBVisitStatus.COMPLETED),
         )

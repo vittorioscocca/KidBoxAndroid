@@ -70,6 +70,7 @@ import it.vittorioscocca.kidbox.data.local.mapper.computedStatus
 import it.vittorioscocca.kidbox.domain.model.KBVaccine
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListAddBottomButton
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListDualSelectionBottomBar
+import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListSearchField
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListTopToolbar
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.SimpleDateFormat
@@ -125,7 +126,7 @@ fun MedicalVaccinesScreen(
         state.planned.isEmpty() && state.skipped.isEmpty()
     val isTotallyEmpty = !state.isLoading && state.unfilteredCount == 0
     val emptyDueToFilter = !state.isLoading && state.unfilteredCount > 0 && sectionsEmpty &&
-        state.timeFilter != VaccineListTimeFilter.ALL
+        (state.timeFilter != VaccineListTimeFilter.ALL || state.searchQuery.isNotBlank())
 
     val allFilteredIds = remember(state) {
         buildSet {
@@ -193,6 +194,13 @@ fun MedicalVaccinesScreen(
                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp),
             )
 
+            HealthListSearchField(
+                value = state.searchQuery,
+                onValueChange = { viewModel.setSearchQuery(it) },
+                placeholder = stringResource(R.string.health_vaccine_search),
+                tint = SALMON,
+            )
+
             if (state.timeFilter != VaccineListTimeFilter.ALL) {
                 VaccineFilterActivePill(
                     label = timeFilterLabel(context, state.timeFilter),
@@ -216,6 +224,7 @@ fun MedicalVaccinesScreen(
             VaccinesEmptyFilterState(
                 modifier = Modifier.weight(1f),
                 onClearFilter = {
+                    viewModel.setSearchQuery("")
                     viewModel.setTimeFilter(VaccineListTimeFilter.ALL)
                 },
             )

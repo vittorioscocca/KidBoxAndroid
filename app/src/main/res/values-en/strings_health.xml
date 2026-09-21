@@ -126,6 +126,9 @@
     <string name="health_visit_add_new">Add new visit</string>
     <string name="health_visit_medical">Medical visit</string>
     <string name="health_visit_search">Search visit</string>
+    <string name="health_treatment_search">Search treatment</string>
+    <string name="health_exam_search">Search exam</string>
+    <string name="health_vaccine_search">Search vaccine</string>
     <string name="health_filter_all">All</string>
     <string name="health_filter_3m">Last 3 months</string>
     <string name="health_filter_6m">Last 6 months</string>

@@ -40,6 +40,7 @@ data class MedicalExamsState(
     val executed: List<KBMedicalExam> = emptyList(),
     val unknownStatus: List<KBMedicalExam> = emptyList(),
     val hasAnyExam: Boolean = false,
+    val searchQuery: String = "",
     val timeFilter: ExamTimeFilter = ExamTimeFilter.ALL,
     val customFilterStartEpoch: Long = defaultCustomStart(),
     val customFilterEndEpoch: Long = System.currentTimeMillis(),
@@ -104,6 +105,11 @@ class MedicalExamsViewModel @Inject constructor(
                 rebuildBuckets(knownRaws)
             }
             .launchIn(viewModelScope)
+    }
+
+    fun setSearchQuery(q: String) {
+        _uiState.value = _uiState.value.copy(searchQuery = q)
+        rebuildBuckets(KBExamStatus.entries.map { it.rawValue }.toSet())
     }
 
     fun setTimeFilter(filter: ExamTimeFilter) {
@@ -184,32 +190,40 @@ class MedicalExamsViewModel @Inject constructor(
     }
 
     private fun filteredIds(st: MedicalExamsState): List<String> =
-        rawExams.filter { passesTimeFilter(it, st) }.map { it.id }
+        rawExams.filter { passesTimeFilter(it, st) && passesSearch(it, st.searchQuery) }.map { it.id }
+
+    /** Data di riferimento di lista e filtro: la scadenza, altrimenti la creazione. */
+    private fun refMillis(e: KBMedicalExam): Long = e.deadlineEpochMillis ?: e.createdAtEpochMillis
 
     private fun rebuildBuckets(knownRaws: Set<String>) {
         val st = _uiState.value
-        val filtered = rawExams.filter { passesTimeFilter(it, st) }
+        // Ogni sezione dal più recente al meno recente, come iOS e web.
+        val filtered = rawExams
+            .filter { passesTimeFilter(it, st) && passesSearch(it, st.searchQuery) }
+            .sortedByDescending { refMillis(it) }
         _uiState.value = st.copy(
             isLoading = false,
             hasAnyExam = rawExams.isNotEmpty(),
             filteredExamCount = filtered.size,
             childName = st.childName,
-            pending = filtered
-                .filter { it.statusRaw == KBExamStatus.PENDING.rawValue }
-                .sortedBy { it.deadlineEpochMillis ?: Long.MAX_VALUE },
-            booked = filtered
-                .filter { it.statusRaw == KBExamStatus.BOOKED.rawValue }
-                .sortedBy { it.deadlineEpochMillis ?: Long.MAX_VALUE },
-            executed = filtered
-                .filter {
-                    it.statusRaw == KBExamStatus.DONE.rawValue ||
-                        it.statusRaw == KBExamStatus.RESULT_IN.rawValue
-                }
-                .sortedByDescending { it.deadlineEpochMillis ?: it.createdAtEpochMillis },
-            unknownStatus = filtered
-                .filter { it.statusRaw !in knownRaws }
-                .sortedByDescending { it.deadlineEpochMillis ?: it.createdAtEpochMillis },
+            pending = filtered.filter { it.statusRaw == KBExamStatus.PENDING.rawValue },
+            booked = filtered.filter { it.statusRaw == KBExamStatus.BOOKED.rawValue },
+            executed = filtered.filter {
+                it.statusRaw == KBExamStatus.DONE.rawValue ||
+                    it.statusRaw == KBExamStatus.RESULT_IN.rawValue
+            },
+            unknownStatus = filtered.filter { it.statusRaw !in knownRaws },
         )
+    }
+
+    private fun passesSearch(e: KBMedicalExam, query: String): Boolean {
+        val q = query.trim().lowercase()
+        if (q.isEmpty()) return true
+        return e.name.lowercase().contains(q) ||
+            (e.location?.lowercase()?.contains(q) == true) ||
+            (e.preparation?.lowercase()?.contains(q) == true) ||
+            (e.notes?.lowercase()?.contains(q) == true) ||
+            (e.resultText?.lowercase()?.contains(q) == true)
     }
 
     private fun passesTimeFilter(e: KBMedicalExam, st: MedicalExamsState): Boolean {

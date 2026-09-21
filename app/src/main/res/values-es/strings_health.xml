@@ -126,6 +126,9 @@
     <string name="health_visit_add_new">Añadir consulta</string>
     <string name="health_visit_medical">Consulta médica</string>
     <string name="health_visit_search">Buscar consulta</string>
+    <string name="health_treatment_search">Buscar tratamiento</string>
+    <string name="health_exam_search">Buscar examen</string>
+    <string name="health_vaccine_search">Buscar vacuna</string>
     <string name="health_filter_all">Todo</string>
     <string name="health_filter_3m">Últimos 3 meses</string>
     <string name="health_filter_6m">Últimos 6 meses</string>
