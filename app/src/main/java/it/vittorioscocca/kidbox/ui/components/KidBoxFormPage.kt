@@ -1,15 +1,17 @@
 package it.vittorioscocca.kidbox.ui.components
 
-import androidx.compose.foundation.background
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -17,24 +19,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
@@ -42,18 +39,17 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
  * Pagina di inserimento/modifica a tutta larghezza: barra in alto con
  * Annulla a sinistra, titolo al centro e Salva a destra, contenuto che scorre.
  *
- * Il Salva sta in alto e non in fondo perche' la finestra del Dialog viene
- * posizionata sotto la status bar restando alta quanto tutto lo schermo:
- * misurato sul device, la colonna partiva da y=112 ed era alta 2391 su uno
- * schermo di 2392, quindi un pulsante ancorato in basso finiva fuori. In alto
- * il problema non si pone, ed e' anche la stessa barra di
- * `KidBoxIosFormTopBar` usata dagli altri form.
+ * **Prende il posto della schermata**, non si apre sopra in una finestra: chi
+ * la usa la mostra al posto del proprio contenuto e ritorna. Era un `Dialog`, e
+ * quella e' stata una trappola cara: dentro la finestra di un `Dialog`
+ * `WindowInsets.navigationBars` vale zero e `WindowInsets.ime` e' corto
+ * esattamente di quell'altezza, quindi il fondo del form restava sotto la
+ * tastiera anche scorrendo. Qui siamo nella finestra dell'Activity, dove gli
+ * inset sono quelli veri e bastano i padding normali — la stessa struttura dei
+ * form di Salute, dove lo scroll ha sempre funzionato.
  *
- * Sostituisce gli `AlertDialog` stretti usati finora dai form brevi (todo,
- * animali, veicoli, interventi). Resta un `Dialog` invece di una destinazione
- * di navigazione — con `usePlatformDefaultWidth = false` occupa comunque tutto
- * lo schermo — così i punti di chiamata e la logica di salvataggio esistenti
- * non vanno riscritti.
+ * Il Salva sta in alto, nella stessa barra di `KidBoxIosFormTopBar` usata dagli
+ * altri form. Usata da: nuovo animale, nuovo veicolo, nuovo/modifica to-do.
  */
 @Composable
 fun KidBoxFormPage(
@@ -66,24 +62,18 @@ fun KidBoxFormPage(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
-    // Per lo stesso sfasamento descritto sopra, `fillMaxSize()` darebbe una
-    // colonna piu' alta della parte visibile: l'altezza va ridotta dell'inset
-    // alto, cosi' il fondo del contenuto non finisce oltre il bordo.
-    val density = LocalDensity.current
-    val topInset = WindowInsets.statusBars.getTop(density)
-    val visibleHeight = with(density) {
-        (LocalConfiguration.current.screenHeightDp.dp.toPx() - topInset).toDp()
-    }
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
+    BackHandler(onBack = onDismiss)
+    Surface(modifier = Modifier.fillMaxSize(), color = kb.background) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(visibleHeight)
-                .background(kb.background)
+                .fillMaxSize()
+                .statusBarsPadding()
                 .navigationBarsPadding()
+                // La tastiera accorcia la colonna invece di coprirla: il blocco
+                // che scorre qui sotto riduce l'area visibile e porta da se' il
+                // campo a fuoco sopra i tasti. Nella finestra dell'Activity
+                // questo basta; dentro un Dialog non bastava (vedi il commento
+                // in testa).
                 .imePadding(),
         ) {
             Row(

@@ -48,6 +48,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -123,6 +124,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import it.vittorioscocca.kidbox.ui.components.ReportKeyboardInsetsToDialog
 import androidx.compose.ui.window.DialogWindowProvider
 import android.view.WindowManager
 import androidx.core.content.FileProvider
@@ -2443,12 +2445,16 @@ private fun PhotoAdjustEditorDialog(
             decorFitsSystemWindows = false,
         ),
     ) {
+        // La finestra di un Dialog nasce su ADJUST_PAN: senza questo l'inset
+        // della tastiera non viene riportato e lo strumento Testo finisce sotto.
+        ReportKeyboardInsetsToDialog()
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black),
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            // Il nero resta a tutto schermo, il contenuto si accorcia.
+            Column(modifier = Modifier.fillMaxSize().imePadding()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

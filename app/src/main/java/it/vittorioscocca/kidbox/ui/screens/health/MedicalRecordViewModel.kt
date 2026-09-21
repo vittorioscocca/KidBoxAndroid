@@ -57,6 +57,8 @@ class MedicalRecordViewModel @Inject constructor(
     private var familyId: String = ""
     private var childId: String = ""
     private var observeJobStarted = false
+    /** Bozza modificata e non ancora salvata: un'emissione remota non deve sovrascriverla. */
+    private var hasUnsavedChanges = false
     private val firestore get() = FirebaseFirestore.getInstance()
 
     fun bind(familyId: String, childId: String) {
@@ -101,7 +103,7 @@ class MedicalRecordViewModel @Inject constructor(
         isChild: Boolean,
         fromRemote: Boolean,
     ) {
-        if (fromRemote && (_uiState.value.isSaving || _uiState.value.saveError != null)) {
+        if (fromRemote && (hasUnsavedChanges || _uiState.value.isSaving || _uiState.value.saveError != null)) {
             return
         }
 
@@ -158,22 +160,27 @@ class MedicalRecordViewModel @Inject constructor(
         return BirthResolveResult(blood, birthMillis, linked != null, ageDesc)
     }
 
-    fun setBloodGroup(v: String) { _uiState.value = _uiState.value.copy(bloodGroup = v) }
+    fun setBloodGroup(v: String) { markDirty(); _uiState.value = _uiState.value.copy(bloodGroup = v) }
 
     fun setLinkedBirthDate(epochMillis: Long) {
+        markDirty()
         _uiState.value = _uiState.value.copy(
             linkedBirthDateEpochMillis = epochMillis,
             linkedAgeDescription = HealthAgeFormatting.ageDescriptionFromBirth(epochMillis),
         )
     }
 
-    fun setAllergies(v: String) { _uiState.value = _uiState.value.copy(allergies = v) }
-    fun setMedicalNotes(v: String) { _uiState.value = _uiState.value.copy(medicalNotes = v) }
+    fun setAllergies(v: String) { markDirty(); _uiState.value = _uiState.value.copy(allergies = v) }
+    fun setMedicalNotes(v: String) { markDirty(); _uiState.value = _uiState.value.copy(medicalNotes = v) }
     fun setReferenceDoctor(draft: ReferenceDoctorDraft) {
+        markDirty()
         _uiState.value = _uiState.value.copy(referenceDoctor = draft)
     }
 
+    private fun markDirty() { hasUnsavedChanges = true }
+
     fun upsertContact(contact: KBEmergencyContact) {
+        markDirty()
         val current = _uiState.value.emergencyContacts.toMutableList()
         val idx = current.indexOfFirst { it.id == contact.id }
         if (idx >= 0) current[idx] = contact else current.add(contact)
@@ -181,6 +188,7 @@ class MedicalRecordViewModel @Inject constructor(
     }
 
     fun removeContact(id: String) {
+        markDirty()
         _uiState.value = _uiState.value.copy(
             emergencyContacts = _uiState.value.emergencyContacts.filterNot { it.id == id },
         )
@@ -203,6 +211,7 @@ class MedicalRecordViewModel @Inject constructor(
                 )
             }.fold(
                 onSuccess = {
+                    hasUnsavedChanges = false
                     refreshFromLocal()
                     _uiState.value = _uiState.value.copy(
                         isSaving = false,
@@ -220,29 +229,44 @@ class MedicalRecordViewModel @Inject constructor(
         }
     }
 
+    /**
+     * La riga in `kb_children` esiste solo se il soggetto e' un figlio: la
+     * scheda medica si apre anche su un membro adulto, e li' `childId` e' il
+     * suo uid. Prima un `childDao.getById(childId) ?: return` usciva subito e
+     * si portava via anche lo snapshot: per un adulto la data di nascita non
+     * veniva salvata da nessuna parte, in silenzio, e al rientro la schermata
+     * ripartiva dal valore di ripiego — la data di oggi.
+     *
+     * Lo snapshot si scrive **sempre**, la riga figlio e Firestore solo quando
+     * il figlio c'e'. E' quello che fa `persistBirthDate` su iOS, dove il
+     * salvataggio dello snapshot sta fuori da `if let child`.
+     */
     private suspend fun persistBirthDate(birthMillis: Long?) {
         val millis = birthMillis ?: return
-        val child = childDao.getById(childId) ?: return
-        val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
         val now = System.currentTimeMillis()
-        val updated = child.copy(
-            birthDateEpochMillis = millis,
-            updatedBy = uid.ifBlank { child.updatedBy },
-            updatedAtEpochMillis = now,
-        )
-        childDao.upsert(updated)
-        val data = hashMapOf<String, Any?>(
-            "birthDate" to com.google.firebase.Timestamp(
-                millis / 1000,
-                ((millis % 1000) * 1_000_000).toInt(),
-            ),
-            "updatedBy" to (updated.updatedBy ?: uid),
-            "updatedAt" to FieldValue.serverTimestamp(),
-        )
-        firestore.collection("families").document(familyId)
-            .collection("children").document(child.id)
-            .set(data, SetOptions.merge())
-            .await()
+
+        val child = childDao.getById(childId)
+        if (child != null) {
+            val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+            val updated = child.copy(
+                birthDateEpochMillis = millis,
+                updatedBy = uid.ifBlank { child.updatedBy },
+                updatedAtEpochMillis = now,
+            )
+            childDao.upsert(updated)
+            val data = hashMapOf<String, Any?>(
+                "birthDate" to com.google.firebase.Timestamp(
+                    millis / 1000,
+                    ((millis % 1000) * 1_000_000).toInt(),
+                ),
+                "updatedBy" to (updated.updatedBy ?: uid),
+                "updatedAt" to FieldValue.serverTimestamp(),
+            )
+            firestore.collection("families").document(familyId)
+                .collection("children").document(child.id)
+                .set(data, SetOptions.merge())
+                .await()
+        }
 
         val existing = healthLinkStore.load(childId)
         val snapshot = (existing ?: HealthImportSnapshot(syncedAtEpochMillis = now)).copy(

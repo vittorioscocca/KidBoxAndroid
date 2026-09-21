@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.homeitems
 
+import androidx.activity.compose.BackHandler
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -17,11 +18,19 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -73,7 +82,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -269,6 +277,106 @@ fun HomeItemsScreen(
         }
     }
 
+    // Il form prende il posto della schermata invece di aprirsi sopra in una
+    // finestra: gli inset cosi' sono quelli veri dell'Activity. In un `Dialog`
+    // la barra di navigazione non viene riportata e la tastiera copriva il
+    // fondo del form.
+    if (showAdd && homeAddDraftId != null) {
+        val hid = homeAddDraftId!!
+        AddHomeItemScreen(
+            draftAttachments = homeDraftAttachments,
+            attachmentUploading = draftAttachmentUploading,
+            onPickFile = { pickFileHomeAdd.launch(arrayOf("*/*")) },
+            onPickPhoto = {
+                pickPhotoHomeAdd.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            },
+            onTakePhoto = {
+                when {
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                        PackageManager.PERMISSION_GRANTED -> takePictureHomeAdd.launch(camUriHomeAdd)
+                    else -> camPermHomeAdd.launch(Manifest.permission.CAMERA)
+                }
+            },
+            onPickKidBoxDocuments = { kidBoxCasaDraftRef = KidBoxCasaDraftRef(hid, isHomeItem = true) },
+            onOpenAttachment = { viewModel.openDraftAttachment(it) },
+            onDeleteAttachment = { viewModel.deleteDraftAttachment(it) },
+            onDismiss = {
+                viewModel.discardDraftHomeItemAttachments(hid)
+                homeAddDraftId = null
+                showAdd = false
+            },
+            onConfirm = { name, category, brand, model, serial, purchase, warranty, nextSvc, months, notes, reminder ->
+                viewModel.addHomeItem(
+                    name = name,
+                    category = category,
+                    brand = brand,
+                    model = model,
+                    serialNumber = serial,
+                    purchaseDate = purchase,
+                    warrantyExpiryDate = warranty,
+                    nextServiceDate = nextSvc,
+                    servicePeriodMonths = months,
+                    notes = notes,
+                    reminderEnabled = reminder,
+                    presetItemId = hid,
+                ) { err -> toast = err }
+                homeAddDraftId = null
+                showAdd = false
+            },
+        )
+        return
+    }
+
+    // Il form prende il posto della schermata invece di aprirsi sopra in una
+    // finestra: gli inset cosi' sono quelli veri dell'Activity. In un `Dialog`
+    // la barra di navigazione non viene riportata e la tastiera copriva il
+    // fondo del form.
+    if (showAddPayment && paymentAddDraftId != null) {
+        val pid = paymentAddDraftId!!
+        AddHousePaymentScreen(
+            draftAttachments = paymentDraftAttachments,
+            attachmentUploading = draftAttachmentUploading,
+            onPickFile = { pickFilePaymentAdd.launch(arrayOf("*/*")) },
+            onPickPhoto = {
+                pickPhotoPaymentAdd.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            },
+            onTakePhoto = {
+                when {
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                        PackageManager.PERMISSION_GRANTED -> takePicturePaymentAdd.launch(camUriPaymentAdd)
+                    else -> camPermPaymentAdd.launch(Manifest.permission.CAMERA)
+                }
+            },
+            onPickKidBoxDocuments = { kidBoxCasaDraftRef = KidBoxCasaDraftRef(pid, isHomeItem = false) },
+            onOpenAttachment = { viewModel.openDraftAttachment(it) },
+            onDeleteAttachment = { viewModel.deleteDraftAttachment(it) },
+            onDismiss = {
+                viewModel.discardDraftHousePaymentAttachments(pid)
+                paymentAddDraftId = null
+                showAddPayment = false
+            },
+            onConfirm = { name, typeRaw, subtypeRaw, importo, giorno, dataScadenza, dataContratto, fornitore, note, reminderOn ->
+                viewModel.addHousePayment(
+                    name = name,
+                    typeRaw = typeRaw,
+                    subtypeRaw = subtypeRaw,
+                    importo = importo,
+                    giornoDiScadenzaMensile = giorno,
+                    dataScadenza = dataScadenza,
+                    dataScadenzaContratto = dataContratto,
+                    fornitore = fornitore,
+                    note = note,
+                    reminderOn = reminderOn,
+                    presetPaymentId = pid,
+                    expenseFallbackTitle = context.getString(R.string.home_items_expense_fallback_title),
+                ) { err -> toast = err }
+                paymentAddDraftId = null
+                showAddPayment = false
+            },
+        )
+        return
+    }
+
     Scaffold(
         containerColor = kb.background,
         topBar = {
@@ -419,96 +527,6 @@ fun HomeItemsScreen(
         )
     }
 
-    if (showAdd && homeAddDraftId != null) {
-        val hid = homeAddDraftId!!
-        AddHomeItemDialog(
-            draftAttachments = homeDraftAttachments,
-            attachmentUploading = draftAttachmentUploading,
-            onPickFile = { pickFileHomeAdd.launch(arrayOf("*/*")) },
-            onPickPhoto = {
-                pickPhotoHomeAdd.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            },
-            onTakePhoto = {
-                when {
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                        PackageManager.PERMISSION_GRANTED -> takePictureHomeAdd.launch(camUriHomeAdd)
-                    else -> camPermHomeAdd.launch(Manifest.permission.CAMERA)
-                }
-            },
-            onPickKidBoxDocuments = { kidBoxCasaDraftRef = KidBoxCasaDraftRef(hid, isHomeItem = true) },
-            onOpenAttachment = { viewModel.openDraftAttachment(it) },
-            onDeleteAttachment = { viewModel.deleteDraftAttachment(it) },
-            onDismiss = {
-                viewModel.discardDraftHomeItemAttachments(hid)
-                homeAddDraftId = null
-                showAdd = false
-            },
-            onConfirm = { name, category, brand, model, serial, purchase, warranty, nextSvc, months, notes, reminder ->
-                viewModel.addHomeItem(
-                    name = name,
-                    category = category,
-                    brand = brand,
-                    model = model,
-                    serialNumber = serial,
-                    purchaseDate = purchase,
-                    warrantyExpiryDate = warranty,
-                    nextServiceDate = nextSvc,
-                    servicePeriodMonths = months,
-                    notes = notes,
-                    reminderEnabled = reminder,
-                    presetItemId = hid,
-                ) { err -> toast = err }
-                homeAddDraftId = null
-                showAdd = false
-            },
-        )
-    }
-
-    if (showAddPayment && paymentAddDraftId != null) {
-        val pid = paymentAddDraftId!!
-        AddHousePaymentDialog(
-            draftAttachments = paymentDraftAttachments,
-            attachmentUploading = draftAttachmentUploading,
-            onPickFile = { pickFilePaymentAdd.launch(arrayOf("*/*")) },
-            onPickPhoto = {
-                pickPhotoPaymentAdd.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            },
-            onTakePhoto = {
-                when {
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                        PackageManager.PERMISSION_GRANTED -> takePicturePaymentAdd.launch(camUriPaymentAdd)
-                    else -> camPermPaymentAdd.launch(Manifest.permission.CAMERA)
-                }
-            },
-            onPickKidBoxDocuments = { kidBoxCasaDraftRef = KidBoxCasaDraftRef(pid, isHomeItem = false) },
-            onOpenAttachment = { viewModel.openDraftAttachment(it) },
-            onDeleteAttachment = { viewModel.deleteDraftAttachment(it) },
-            onDismiss = {
-                viewModel.discardDraftHousePaymentAttachments(pid)
-                paymentAddDraftId = null
-                showAddPayment = false
-            },
-            onConfirm = { name, typeRaw, subtypeRaw, importo, giorno, dataScadenza, dataContratto, fornitore, note, reminderOn ->
-                viewModel.addHousePayment(
-                    name = name,
-                    typeRaw = typeRaw,
-                    subtypeRaw = subtypeRaw,
-                    importo = importo,
-                    giornoDiScadenzaMensile = giorno,
-                    dataScadenza = dataScadenza,
-                    dataScadenzaContratto = dataContratto,
-                    fornitore = fornitore,
-                    note = note,
-                    reminderOn = reminderOn,
-                    presetPaymentId = pid,
-                    expenseFallbackTitle = context.getString(R.string.home_items_expense_fallback_title),
-                ) { err -> toast = err }
-                paymentAddDraftId = null
-                showAddPayment = false
-            },
-        )
-    }
-
     val kidPick = kidBoxCasaDraftRef
     val fidPicker = viewModel.familyIdForPicker
     if (kidPick != null && fidPicker.isNotBlank()) {
@@ -551,7 +569,7 @@ fun HomeItemsScreen(
 }
 
 @Composable
-private fun AddHomeItemDialog(
+private fun AddHomeItemScreen(
     draftAttachments: List<KBDocumentEntity>,
     attachmentUploading: Boolean,
     onPickFile: () -> Unit,
@@ -601,308 +619,314 @@ private fun AddHomeItemDialog(
     val orange = Color(0xFFFF6B00)
     val canSave = name.trim().isNotBlank()
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .fillMaxHeight(0.92f),
-            shape = RoundedCornerShape(16.dp),
-            color = kb.background,
+    BackHandler(onBack = onDismiss)
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = kb.background,
+    ) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                // Nella finestra dell'Activity gli inset sono quelli veri e
+                // questo basta. Dentro un Dialog no: la barra di navigazione
+                // non veniva riportata e il fondo del form restava sotto i
+                // tasti. Per questo il form e' una schermata, non una finestra.
+                .imePadding(),
         ) {
-            Column(Modifier.fillMaxSize()) {
-                KidBoxIosFormTopBar(
-                    title = stringResource(R.string.home_items_new_item),
-                    onCancel = onDismiss,
-                    onSave = {
-                        if (canSave) {
-                            val reminderEnabled = hasWarranty || hasService
-                            onConfirm(
-                                name.trim(),
-                                category,
-                                brand.trim().takeIf { it.isNotEmpty() },
-                                model.trim().takeIf { it.isNotEmpty() },
-                                serialNumber.trim().takeIf { it.isNotEmpty() },
-                                if (hasPurchase) purchaseDate else null,
-                                if (hasWarranty) warrantyDate else null,
-                                if (hasService) serviceDate else null,
-                                if (hasService && hasPeriod) serviceMonths else null,
-                                notes.trim().takeIf { it.isNotEmpty() },
-                                reminderEnabled,
-                            )
-                        }
-                    },
-                    saveEnabled = canSave,
-                    kb = kb,
-                    orange = orange,
-                )
-                HorizontalDivider(color = kb.divider)
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp)
-                        .padding(top = 12.dp, bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    IosGroupedCard(kb) {
-                        IosPlainTextFieldRow(name, { name = it }, stringResource(R.string.life_name), kb = kb)
-                        IosFormDivider(kb)
-                        Box(Modifier.fillMaxWidth()) {
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable { categoryMenuOpen = true }
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(stringResource(R.string.life_category), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(casaCategoryPickerLabel(context, category), color = kb.subtitle)
-                                    Icon(
-                                        Icons.Filled.KeyboardArrowDown,
-                                        contentDescription = null,
-                                        tint = kb.subtitle,
-                                        modifier = Modifier.size(20.dp),
-                                    )
-                                }
-                            }
-                            DropdownMenu(
-                                expanded = categoryMenuOpen,
-                                onDismissRequest = { categoryMenuOpen = false },
-                            ) {
-                                cats.forEach { c ->
-                                    DropdownMenuItem(
-                                        text = { Text(casaCategoryPickerLabel(context, c)) },
-                                        onClick = {
-                                            category = c
-                                            categoryMenuOpen = false
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                        IosFormDivider(kb)
-                        IosPlainTextFieldRow(brand, { brand = it }, stringResource(R.string.home_items_brand), kb = kb)
-                        IosFormDivider(kb)
-                        IosPlainTextFieldRow(model, { model = it }, stringResource(R.string.home_items_model), kb = kb)
-                        IosFormDivider(kb)
-                        IosPlainTextFieldRow(serialNumber, { serialNumber = it }, stringResource(R.string.home_items_serial), kb = kb)
-                    }
-
-                    IosGroupedCard(kb) {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(stringResource(R.string.home_items_purchase_date), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                            Switch(
-                                checked = hasPurchase,
-                                onCheckedChange = { on ->
-                                    hasPurchase = on
-                                    if (on) purchaseDate = System.currentTimeMillis()
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = orange,
-                                    checkedTrackColor = orange.copy(alpha = 0.35f),
-                                ),
-                            )
-                        }
-                        if (hasPurchase) {
-                            IosFormDivider(kb)
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable { pickPurchase(purchaseDate) }
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(stringResource(R.string.home_items_purchase), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                                Text(
-                                    formatItDate(purchaseDate),
-                                    color = orange,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                        }
-                        IosFormDivider(kb)
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(stringResource(R.string.home_items_warranty_expiry), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                            Switch(
-                                checked = hasWarranty,
-                                onCheckedChange = { on ->
-                                    hasWarranty = on
-                                    if (on) warrantyDate = System.currentTimeMillis()
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = orange,
-                                    checkedTrackColor = orange.copy(alpha = 0.35f),
-                                ),
-                            )
-                        }
-                        if (hasWarranty) {
-                            IosFormDivider(kb)
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable { pickWarranty(warrantyDate) }
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(stringResource(R.string.home_items_warranty), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                                Text(
-                                    formatItDate(warrantyDate),
-                                    color = orange,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                        }
-                        IosFormDivider(kb)
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(stringResource(R.string.home_items_next_maintenance), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                            Switch(
-                                checked = hasService,
-                                onCheckedChange = { on ->
-                                    hasService = on
-                                    if (on) serviceDate = System.currentTimeMillis()
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = orange,
-                                    checkedTrackColor = orange.copy(alpha = 0.35f),
-                                ),
-                            )
-                        }
-                        if (hasService) {
-                            IosFormDivider(kb)
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable { pickService(serviceDate) }
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(stringResource(R.string.home_items_maintenance), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                                Text(
-                                    formatItDate(serviceDate),
-                                    color = orange,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                            IosFormDivider(kb)
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(stringResource(R.string.home_items_period_months), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                                Switch(
-                                    checked = hasPeriod,
-                                    onCheckedChange = { hasPeriod = it },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = orange,
-                                        checkedTrackColor = orange.copy(alpha = 0.35f),
-                                    ),
-                                )
-                            }
-                            if (hasPeriod) {
-                                IosFormDivider(kb)
-                                Row(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    TextButton(
-                                        onClick = { if (serviceMonths > 1) serviceMonths-- },
-                                        enabled = serviceMonths > 1,
-                                    ) { Text("−", style = MaterialTheme.typography.titleLarge) }
-                                    Text(
-                                        "Ogni $serviceMonths mesi",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = kb.title,
-                                    )
-                                    TextButton(
-                                        onClick = { if (serviceMonths < 60) serviceMonths++ },
-                                        enabled = serviceMonths < 60,
-                                    ) { Text("+", style = MaterialTheme.typography.titleLarge) }
-                                }
-                            }
-                        }
-                    }
-
-                    Text(
-                        stringResource(R.string.life_notes),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = kb.subtitle,
-                        modifier = Modifier.padding(start = 4.dp),
-                    )
-                    IosGroupedCard(kb) {
-                        TextField(
-                            value = notes,
-                            onValueChange = { notes = it },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 120.dp)
-                                .padding(16.dp),
-                            placeholder = { Text(stringResource(R.string.life_notes), color = kb.subtitle) },
-                            singleLine = false,
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                focusedTextColor = kb.title,
-                                unfocusedTextColor = kb.title,
-                                cursorColor = kb.title,
-                                focusedPlaceholderColor = kb.subtitle,
-                                unfocusedPlaceholderColor = kb.subtitle,
-                            ),
-                            textStyle = MaterialTheme.typography.bodyMedium,
+            KidBoxIosFormTopBar(
+                title = stringResource(R.string.home_items_new_item),
+                onCancel = onDismiss,
+                onSave = {
+                    if (canSave) {
+                        val reminderEnabled = hasWarranty || hasService
+                        onConfirm(
+                            name.trim(),
+                            category,
+                            brand.trim().takeIf { it.isNotEmpty() },
+                            model.trim().takeIf { it.isNotEmpty() },
+                            serialNumber.trim().takeIf { it.isNotEmpty() },
+                            if (hasPurchase) purchaseDate else null,
+                            if (hasWarranty) warrantyDate else null,
+                            if (hasService) serviceDate else null,
+                            if (hasService && hasPeriod) serviceMonths else null,
+                            notes.trim().takeIf { it.isNotEmpty() },
+                            reminderEnabled,
                         )
                     }
-                    Text(
-                        stringResource(R.string.life_attachments),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = kb.subtitle,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(start = 4.dp),
-                    )
-                    HealthAttachmentsCard(
-                        attachments = draftAttachments,
-                        tintColor = orange,
-                        isUploading = attachmentUploading,
-                        onPickFile = onPickFile,
-                        onPickPhoto = onPickPhoto,
-                        onTakePhoto = onTakePhoto,
-                        onOpenAttachment = onOpenAttachment,
-                        onDeleteAttachment = onDeleteAttachment,
-                        onPickFromKidBoxDocuments = onPickKidBoxDocuments,
+                },
+                saveEnabled = canSave,
+                kb = kb,
+                orange = orange,
+            )
+            HorizontalDivider(color = kb.divider)
+            Column(
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 12.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                IosGroupedCard(kb) {
+                    IosPlainTextFieldRow(name, { name = it }, stringResource(R.string.life_name), kb = kb)
+                    IosFormDivider(kb)
+                    Box(Modifier.fillMaxWidth()) {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { categoryMenuOpen = true }
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(stringResource(R.string.life_category), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(casaCategoryPickerLabel(context, category), color = kb.subtitle)
+                                Icon(
+                                    Icons.Filled.KeyboardArrowDown,
+                                    contentDescription = null,
+                                    tint = kb.subtitle,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = categoryMenuOpen,
+                            onDismissRequest = { categoryMenuOpen = false },
+                        ) {
+                            cats.forEach { c ->
+                                DropdownMenuItem(
+                                    text = { Text(casaCategoryPickerLabel(context, c)) },
+                                    onClick = {
+                                        category = c
+                                        categoryMenuOpen = false
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    IosFormDivider(kb)
+                    IosPlainTextFieldRow(brand, { brand = it }, stringResource(R.string.home_items_brand), kb = kb)
+                    IosFormDivider(kb)
+                    IosPlainTextFieldRow(model, { model = it }, stringResource(R.string.home_items_model), kb = kb)
+                    IosFormDivider(kb)
+                    IosPlainTextFieldRow(serialNumber, { serialNumber = it }, stringResource(R.string.home_items_serial), kb = kb)
+                }
+
+                IosGroupedCard(kb) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.home_items_purchase_date), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                        Switch(
+                            checked = hasPurchase,
+                            onCheckedChange = { on ->
+                                hasPurchase = on
+                                if (on) purchaseDate = System.currentTimeMillis()
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = orange,
+                                checkedTrackColor = orange.copy(alpha = 0.35f),
+                            ),
+                        )
+                    }
+                    if (hasPurchase) {
+                        IosFormDivider(kb)
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { pickPurchase(purchaseDate) }
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(stringResource(R.string.home_items_purchase), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Text(
+                                formatItDate(purchaseDate),
+                                color = orange,
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
+                    }
+                    IosFormDivider(kb)
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.home_items_warranty_expiry), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                        Switch(
+                            checked = hasWarranty,
+                            onCheckedChange = { on ->
+                                hasWarranty = on
+                                if (on) warrantyDate = System.currentTimeMillis()
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = orange,
+                                checkedTrackColor = orange.copy(alpha = 0.35f),
+                            ),
+                        )
+                    }
+                    if (hasWarranty) {
+                        IosFormDivider(kb)
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { pickWarranty(warrantyDate) }
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(stringResource(R.string.home_items_warranty), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Text(
+                                formatItDate(warrantyDate),
+                                color = orange,
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
+                    }
+                    IosFormDivider(kb)
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.home_items_next_maintenance), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                        Switch(
+                            checked = hasService,
+                            onCheckedChange = { on ->
+                                hasService = on
+                                if (on) serviceDate = System.currentTimeMillis()
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = orange,
+                                checkedTrackColor = orange.copy(alpha = 0.35f),
+                            ),
+                        )
+                    }
+                    if (hasService) {
+                        IosFormDivider(kb)
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { pickService(serviceDate) }
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(stringResource(R.string.home_items_maintenance), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Text(
+                                formatItDate(serviceDate),
+                                color = orange,
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
+                        IosFormDivider(kb)
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(stringResource(R.string.home_items_period_months), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Switch(
+                                checked = hasPeriod,
+                                onCheckedChange = { hasPeriod = it },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = orange,
+                                    checkedTrackColor = orange.copy(alpha = 0.35f),
+                                ),
+                            )
+                        }
+                        if (hasPeriod) {
+                            IosFormDivider(kb)
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                TextButton(
+                                    onClick = { if (serviceMonths > 1) serviceMonths-- },
+                                    enabled = serviceMonths > 1,
+                                ) { Text("−", style = MaterialTheme.typography.titleLarge) }
+                                Text(
+                                    "Ogni $serviceMonths mesi",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = kb.title,
+                                )
+                                TextButton(
+                                    onClick = { if (serviceMonths < 60) serviceMonths++ },
+                                    enabled = serviceMonths < 60,
+                                ) { Text("+", style = MaterialTheme.typography.titleLarge) }
+                            }
+                        }
+                    }
+                }
+
+                Text(
+                    stringResource(R.string.life_notes),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = kb.subtitle,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+                IosGroupedCard(kb) {
+                    TextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 120.dp)
+                            .padding(16.dp),
+                        placeholder = { Text(stringResource(R.string.life_notes), color = kb.subtitle) },
+                        singleLine = false,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedTextColor = kb.title,
+                            unfocusedTextColor = kb.title,
+                            cursorColor = kb.title,
+                            focusedPlaceholderColor = kb.subtitle,
+                            unfocusedPlaceholderColor = kb.subtitle,
+                        ),
+                        textStyle = MaterialTheme.typography.bodyMedium,
                     )
                 }
+                Text(
+                    stringResource(R.string.life_attachments),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = kb.subtitle,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+                HealthAttachmentsCard(
+                    attachments = draftAttachments,
+                    tintColor = orange,
+                    isUploading = attachmentUploading,
+                    onPickFile = onPickFile,
+                    onPickPhoto = onPickPhoto,
+                    onTakePhoto = onTakePhoto,
+                    onOpenAttachment = onOpenAttachment,
+                    onDeleteAttachment = onDeleteAttachment,
+                    onPickFromKidBoxDocuments = onPickKidBoxDocuments,
+                )
             }
         }
     }

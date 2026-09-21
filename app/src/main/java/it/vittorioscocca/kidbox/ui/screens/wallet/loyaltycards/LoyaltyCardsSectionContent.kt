@@ -52,7 +52,7 @@ import androidx.compose.material.icons.filled.AddCircle
  * Contenuto del terzo tab "Carte" del Wallet: griglia 2 colonne di carte
  * fedeltà e ricerca. I controlli Seleziona/+/Elimina vivono nella `TopAppBar`
  * di `WalletHomeScreen` (stessa disposizione della sezione "Documenti"): qui
- * arrivano solo gli stati sollevati (`showAddFlow`, `showDeleteConfirm`).
+ * arrivano solo gli stati sollevati (`showDeleteConfirm`).
  * Mirror Compose di `LoyaltyCardsSectionView` (iOS).
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,7 +60,6 @@ import androidx.compose.material.icons.filled.AddCircle
 fun LoyaltyCardsSectionContent(
     familyId: String,
     onCardClick: (cardId: String) -> Unit,
-    showAddFlow: Boolean,
     onShowAddFlowChange: (Boolean) -> Unit,
     showDeleteConfirm: Boolean,
     onShowDeleteConfirmChange: (Boolean) -> Unit,
@@ -79,17 +78,6 @@ fun LoyaltyCardsSectionContent(
     val visibleCards = remember(state.cards, searchText) {
         val q = searchText.trim()
         if (q.isEmpty()) state.cards else state.cards.filter { it.brandName.contains(q, ignoreCase = true) }
-    }
-
-    if (showAddFlow) {
-        AddLoyaltyCardFlow(
-            viewModel = viewModel,
-            onDismiss = { onShowAddFlowChange(false) },
-            onSaved = { cardId ->
-                onShowAddFlowChange(false)
-                onCardClick(cardId)
-            },
-        )
     }
 
     Column(modifier = Modifier.fillMaxSize()) {

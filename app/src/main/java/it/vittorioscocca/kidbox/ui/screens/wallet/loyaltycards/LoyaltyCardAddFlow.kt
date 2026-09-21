@@ -2,6 +2,7 @@
 
 package it.vittorioscocca.kidbox.ui.screens.wallet.loyaltycards
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -82,35 +84,36 @@ fun AddLoyaltyCardFlow(
     // dentro un Dialog full-screen le WindowInsets arrivano a ZERO, quindi
     // `statusBarsPadding()`/`navigationBarsPadding()` negli step interni non
     // producono alcuno spazio e i contenuti finiscono sotto le system bar.
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false,
-        ),
+    BackHandler(onBack = onDismiss)
+    // La finestra di un Dialog nasce su ADJUST_PAN: senza questo l'inset
+    // della tastiera non viene riportato.
+    // La tastiera accorcia il contenuto degli step invece di coprirlo.
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .imePadding(),
     ) {
-        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            when (val s = step) {
-                is AddLoyaltyCardStep.Picker -> BrandPickerStep(
-                    onBrandSelected = { brand -> step = AddLoyaltyCardStep.Scan(brand) },
-                    onManualEntry = { step = AddLoyaltyCardStep.Form(null, null, null) },
-                    onClose = onDismiss,
-                )
-                is AddLoyaltyCardStep.Scan -> ScanStep(
-                    brand = s.brand,
-                    onBack = { step = AddLoyaltyCardStep.Picker },
-                    onDetected = { text, format -> step = AddLoyaltyCardStep.Form(s.brand, text, format) },
-                    onManualFallback = { step = AddLoyaltyCardStep.Form(s.brand, null, null) },
-                )
-                is AddLoyaltyCardStep.Form -> FormStep(
-                    brand = s.brand,
-                    prefilledNumber = s.prefilledNumber,
-                    prefilledFormat = s.prefilledFormat,
-                    viewModel = viewModel,
-                    onBack = { step = if (s.brand == null) AddLoyaltyCardStep.Picker else AddLoyaltyCardStep.Scan(s.brand) },
-                    onSaved = onSaved,
-                )
-            }
+        when (val s = step) {
+            is AddLoyaltyCardStep.Picker -> BrandPickerStep(
+                onBrandSelected = { brand -> step = AddLoyaltyCardStep.Scan(brand) },
+                onManualEntry = { step = AddLoyaltyCardStep.Form(null, null, null) },
+                onClose = onDismiss,
+            )
+            is AddLoyaltyCardStep.Scan -> ScanStep(
+                brand = s.brand,
+                onBack = { step = AddLoyaltyCardStep.Picker },
+                onDetected = { text, format -> step = AddLoyaltyCardStep.Form(s.brand, text, format) },
+                onManualFallback = { step = AddLoyaltyCardStep.Form(s.brand, null, null) },
+            )
+            is AddLoyaltyCardStep.Form -> FormStep(
+                brand = s.brand,
+                prefilledNumber = s.prefilledNumber,
+                prefilledFormat = s.prefilledFormat,
+                viewModel = viewModel,
+                onBack = { step = if (s.brand == null) AddLoyaltyCardStep.Picker else AddLoyaltyCardStep.Scan(s.brand) },
+                onSaved = onSaved,
+            )
         }
     }
 }

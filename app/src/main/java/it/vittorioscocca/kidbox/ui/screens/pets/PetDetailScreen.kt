@@ -21,7 +21,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -71,8 +78,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import it.vittorioscocca.kidbox.ui.components.ExtendDialogWindowToScreen
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -207,6 +212,139 @@ fun PetDetailScreen(
         if (p.createdBy.isNotBlank() && p.createdBy != currentUid) {
             AppAnalytics.contentSharedRead(context, "pets")
         }
+    }
+
+    // Il form prende il posto della schermata invece di aprirsi sopra in una
+    // finestra: gli inset cosi' sono quelli veri dell'Activity. In un `Dialog`
+    // la barra di navigazione non viene riportata e la tastiera copriva il
+    // fondo del form.
+    if (showAddEvent && pendingEventDraftId != null) {
+        PetEventScreen(
+            initial = null,
+            attachments = eventDraftAttachments,
+            attachmentUploading = attachmentUploading,
+            onDismiss = {
+                // Chi annulla non lascia allegati appesi in Documenti: senza
+                // evento a cui appartenere non li ritroverebbe più nessuno.
+                pendingEventDraftId?.let { viewModel.discardDraftAttachments(it) }
+                viewModel.bindEventDraftAttachments(null)
+                pendingEventDraftId = null
+                showAddEvent = false
+            },
+            onConfirm = { title, type, date, nextDue, vet, cost, notes, reminder ->
+                viewModel.addPetEvent(
+                    pendingEventDraftId, title, type, date, nextDue, vet, cost, notes, reminder,
+                ) { err -> toast = err }
+                viewModel.bindEventDraftAttachments(null)
+                pendingEventDraftId = null
+                showAddEvent = false
+            },
+            onTakePhoto = {
+                attachmentTarget = PetAttachmentPickTarget.EventDraft
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                    PackageManager.PERMISSION_GRANTED
+                ) {
+                    takePictureLauncher.launch(petCameraUri)
+                } else {
+                    cameraPermLauncher.launch(Manifest.permission.CAMERA)
+                }
+            },
+            onPickPhoto = {
+                attachmentTarget = PetAttachmentPickTarget.EventDraft
+                pickPhotoLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
+            },
+            onPickFile = {
+                attachmentTarget = PetAttachmentPickTarget.EventDraft
+                pickFileLauncher.launch(arrayOf("*/*"))
+            },
+            onPickKidBox = {
+                attachmentTarget = PetAttachmentPickTarget.EventDraft
+                showKidBoxPicker = true
+            },
+            onOpenAttachment = { viewModel.openAttachment(it) },
+            onDeleteAttachment = { viewModel.deleteAttachment(it) },
+        )
+        return
+    }
+
+    // Il form prende il posto della schermata invece di aprirsi sopra in una
+    // finestra: gli inset cosi' sono quelli veri dell'Activity. In un `Dialog`
+    // la barra di navigazione non viene riportata e la tastiera copriva il
+    // fondo del form.
+    editingEvent?.let { existing ->
+        PetEventScreen(
+            initial = existing,
+            attachments = eventDraftAttachments,
+            attachmentUploading = attachmentUploading,
+            onDismiss = {
+                // Niente pulizia degli allegati: qui appartengono a un evento
+                // che esiste, non a una bozza abbandonata.
+                viewModel.bindEventDraftAttachments(null)
+                editingEvent = null
+            },
+            onConfirm = { title, type, date, nextDue, vet, cost, notes, reminder ->
+                viewModel.updatePetEvent(
+                    existing.copy(
+                        title = title,
+                        eventType = type,
+                        date = date,
+                        nextDueDate = nextDue,
+                        vetName = vet,
+                        cost = cost,
+                        notes = notes,
+                        reminderEnabled = reminder,
+                    ),
+                ) { err -> toast = err }
+                viewModel.bindEventDraftAttachments(null)
+                editingEvent = null
+            },
+            onDelete = { confirmDeleteEvent = existing },
+            onTakePhoto = {
+                attachmentTarget = PetAttachmentPickTarget.EventDraft
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                    PackageManager.PERMISSION_GRANTED
+                ) {
+                    takePictureLauncher.launch(petCameraUri)
+                } else {
+                    cameraPermLauncher.launch(Manifest.permission.CAMERA)
+                }
+            },
+            onPickPhoto = {
+                attachmentTarget = PetAttachmentPickTarget.EventDraft
+                pickPhotoLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
+            },
+            onPickFile = {
+                attachmentTarget = PetAttachmentPickTarget.EventDraft
+                pickFileLauncher.launch(arrayOf("*/*"))
+            },
+            onPickKidBox = {
+                attachmentTarget = PetAttachmentPickTarget.EventDraft
+                showKidBoxPicker = true
+            },
+            onOpenAttachment = { viewModel.openAttachment(it) },
+            onDeleteAttachment = { viewModel.deleteAttachment(it) },
+        )
+        return
+    }
+
+    // Il form prende il posto della schermata invece di aprirsi sopra in una
+    // finestra: gli inset cosi' sono quelli veri dell'Activity. In un `Dialog`
+    // la barra di navigazione non viene riportata e la tastiera copriva il
+    // fondo del form.
+    if (showEditPet && pet != null) {
+        EditPetScreen(
+            initial = pet!!,
+            onDismiss = { showEditPet = false },
+            onConfirm = { updated ->
+                viewModel.updatePet(updated) { err -> toast = err }
+                showEditPet = false
+            },
+        )
+        return
     }
 
     if (showAllAttachments) {
@@ -480,113 +618,6 @@ fun PetDetailScreen(
 
     } // fine else: scheda animale
 
-    if (showAddEvent && pendingEventDraftId != null) {
-        PetEventDialog(
-            initial = null,
-            attachments = eventDraftAttachments,
-            attachmentUploading = attachmentUploading,
-            onDismiss = {
-                // Chi annulla non lascia allegati appesi in Documenti: senza
-                // evento a cui appartenere non li ritroverebbe più nessuno.
-                pendingEventDraftId?.let { viewModel.discardDraftAttachments(it) }
-                viewModel.bindEventDraftAttachments(null)
-                pendingEventDraftId = null
-                showAddEvent = false
-            },
-            onConfirm = { title, type, date, nextDue, vet, cost, notes, reminder ->
-                viewModel.addPetEvent(
-                    pendingEventDraftId, title, type, date, nextDue, vet, cost, notes, reminder,
-                ) { err -> toast = err }
-                viewModel.bindEventDraftAttachments(null)
-                pendingEventDraftId = null
-                showAddEvent = false
-            },
-            onTakePhoto = {
-                attachmentTarget = PetAttachmentPickTarget.EventDraft
-                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                    PackageManager.PERMISSION_GRANTED
-                ) {
-                    takePictureLauncher.launch(petCameraUri)
-                } else {
-                    cameraPermLauncher.launch(Manifest.permission.CAMERA)
-                }
-            },
-            onPickPhoto = {
-                attachmentTarget = PetAttachmentPickTarget.EventDraft
-                pickPhotoLauncher.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                )
-            },
-            onPickFile = {
-                attachmentTarget = PetAttachmentPickTarget.EventDraft
-                pickFileLauncher.launch(arrayOf("*/*"))
-            },
-            onPickKidBox = {
-                attachmentTarget = PetAttachmentPickTarget.EventDraft
-                showKidBoxPicker = true
-            },
-            onOpenAttachment = { viewModel.openAttachment(it) },
-            onDeleteAttachment = { viewModel.deleteAttachment(it) },
-        )
-    }
-
-    editingEvent?.let { existing ->
-        PetEventDialog(
-            initial = existing,
-            attachments = eventDraftAttachments,
-            attachmentUploading = attachmentUploading,
-            onDismiss = {
-                // Niente pulizia degli allegati: qui appartengono a un evento
-                // che esiste, non a una bozza abbandonata.
-                viewModel.bindEventDraftAttachments(null)
-                editingEvent = null
-            },
-            onConfirm = { title, type, date, nextDue, vet, cost, notes, reminder ->
-                viewModel.updatePetEvent(
-                    existing.copy(
-                        title = title,
-                        eventType = type,
-                        date = date,
-                        nextDueDate = nextDue,
-                        vetName = vet,
-                        cost = cost,
-                        notes = notes,
-                        reminderEnabled = reminder,
-                    ),
-                ) { err -> toast = err }
-                viewModel.bindEventDraftAttachments(null)
-                editingEvent = null
-            },
-            onDelete = { confirmDeleteEvent = existing },
-            onTakePhoto = {
-                attachmentTarget = PetAttachmentPickTarget.EventDraft
-                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                    PackageManager.PERMISSION_GRANTED
-                ) {
-                    takePictureLauncher.launch(petCameraUri)
-                } else {
-                    cameraPermLauncher.launch(Manifest.permission.CAMERA)
-                }
-            },
-            onPickPhoto = {
-                attachmentTarget = PetAttachmentPickTarget.EventDraft
-                pickPhotoLauncher.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                )
-            },
-            onPickFile = {
-                attachmentTarget = PetAttachmentPickTarget.EventDraft
-                pickFileLauncher.launch(arrayOf("*/*"))
-            },
-            onPickKidBox = {
-                attachmentTarget = PetAttachmentPickTarget.EventDraft
-                showKidBoxPicker = true
-            },
-            onOpenAttachment = { viewModel.openAttachment(it) },
-            onDeleteAttachment = { viewModel.deleteAttachment(it) },
-        )
-    }
-
     confirmDeleteEvent?.let { target ->
         AlertDialog(
             onDismissRequest = { confirmDeleteEvent = null },
@@ -618,17 +649,6 @@ fun PetDetailScreen(
             onPickedUri = { uri ->
                 uploadUri(uri)
                 showKidBoxPicker = false
-            },
-        )
-    }
-
-    if (showEditPet && pet != null) {
-        EditPetDialog(
-            initial = pet!!,
-            onDismiss = { showEditPet = false },
-            onConfirm = { updated ->
-                viewModel.updatePet(updated) { err -> toast = err }
-                showEditPet = false
             },
         )
     }
@@ -867,7 +887,7 @@ private fun PetEventRow(
 }
 
 @Composable
-private fun PetEventDialog(
+private fun PetEventScreen(
     /** `null` per un evento nuovo; l'evento salvato quando lo apri dallo storico. */
     initial: PetEventEntity?,
     attachments: List<KBDocumentEntity>,
@@ -909,217 +929,216 @@ private fun PetEventDialog(
     val orange = Color(0xFFFF6B00)
     val canSave = title.trim().isNotBlank()
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    BackHandler(onBack = onDismiss)
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = kb.background,
     ) {
-        // Il 92% era del display, non della finestra: il fondo della card
-        // finiva sotto la barra di navigazione. Vedi ExtendDialogWindowToScreen.
-        ExtendDialogWindowToScreen()
-        Surface(
-            modifier = Modifier
-                .systemBarsPadding()
-                .fillMaxWidth(0.94f)
-                .fillMaxHeight(0.92f),
-            shape = RoundedCornerShape(16.dp),
-            color = kb.background,
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                // Nella finestra dell'Activity gli inset sono quelli veri e
+                // questo basta. Dentro un Dialog no: la barra di navigazione
+                // non veniva riportata e il fondo del form restava sotto i
+                // tasti. Per questo il form e' una schermata, non una finestra.
+                .imePadding(),
         ) {
-            Column(Modifier.fillMaxSize()) {
-                KidBoxIosFormTopBar(
-                    title = stringResource(
-                        if (initial == null) R.string.pets_new_event_dialog_title
-                        else R.string.pets_edit_event_dialog_title,
-                    ),
-                    onCancel = onDismiss,
-                    onSave = {
-                        if (canSave) {
-                            val cost = costText.replace(',', '.').toDoubleOrNull()
-                            onConfirm(
-                                title.trim(),
-                                type,
-                                dateMillis,
-                                nextDue,
-                                vet.trim().takeIf { it.isNotEmpty() },
-                                cost,
-                                notes.trim().takeIf { it.isNotEmpty() },
-                                nextDue != null,
-                            )
-                        }
-                    },
-                    saveEnabled = canSave,
-                    kb = kb,
-                    orange = orange,
-                )
-                HorizontalDivider(color = kb.divider)
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp)
-                        .padding(top = 12.dp, bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    IosGroupedCard(kb) {
-                        IosPlainTextFieldRow(title, { title = it }, stringResource(R.string.pets_field_title), kb = kb)
-                        IosFormDivider(kb)
-                        Box(Modifier.fillMaxWidth()) {
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable { typeMenuOpen = true }
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(stringResource(R.string.pets_field_event_type), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(petEventTypeLabel(context, type), color = kb.subtitle)
-                                    Icon(
-                                        Icons.Filled.KeyboardArrowDown,
-                                        contentDescription = null,
-                                        tint = kb.subtitle,
-                                        modifier = Modifier.size(20.dp),
-                                    )
-                                }
-                            }
-                            DropdownMenu(
-                                expanded = typeMenuOpen,
-                                onDismissRequest = { typeMenuOpen = false },
-                            ) {
-                                types.forEach { t ->
-                                    DropdownMenuItem(
-                                        text = { Text(petEventTypeLabel(context, t)) },
-                                        onClick = {
-                                            type = t
-                                            typeMenuOpen = false
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                        IosFormDivider(kb)
+            KidBoxIosFormTopBar(
+                title = stringResource(
+                    if (initial == null) R.string.pets_new_event_dialog_title
+                    else R.string.pets_edit_event_dialog_title,
+                ),
+                onCancel = onDismiss,
+                onSave = {
+                    if (canSave) {
+                        val cost = costText.replace(',', '.').toDoubleOrNull()
+                        onConfirm(
+                            title.trim(),
+                            type,
+                            dateMillis,
+                            nextDue,
+                            vet.trim().takeIf { it.isNotEmpty() },
+                            cost,
+                            notes.trim().takeIf { it.isNotEmpty() },
+                            nextDue != null,
+                        )
+                    }
+                },
+                saveEnabled = canSave,
+                kb = kb,
+                orange = orange,
+            )
+            HorizontalDivider(color = kb.divider)
+            Column(
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 12.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                IosGroupedCard(kb) {
+                    IosPlainTextFieldRow(title, { title = it }, stringResource(R.string.pets_field_title), kb = kb)
+                    IosFormDivider(kb)
+                    Box(Modifier.fillMaxWidth()) {
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .clickable { pickDate(dateMillis) }
+                                .clickable { typeMenuOpen = true }
                                 .padding(horizontal = 16.dp, vertical = 14.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(stringResource(R.string.pets_field_date), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                            Text(formatItDate(dateMillis), color = orange, style = MaterialTheme.typography.bodyLarge)
-                        }
-                    }
-
-                    IosGroupedCard(kb) {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(stringResource(R.string.pets_field_next_due), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                            Switch(
-                                checked = nextDue != null,
-                                onCheckedChange = { on ->
-                                    if (on) nextDue = nextDue ?: dateMillis
-                                    if (!on) nextDue = null
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = orange,
-                                    checkedTrackColor = orange.copy(alpha = 0.35f),
-                                ),
-                            )
-                        }
-                        if (nextDue != null) {
-                            IosFormDivider(kb)
+                            Text(stringResource(R.string.pets_field_event_type), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                             Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable { pickNext(nextDue) }
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(stringResource(R.string.pets_field_next_due), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                                Text(
-                                    nextDue?.let { formatItDate(it) }.orEmpty(),
-                                    color = orange,
-                                    style = MaterialTheme.typography.bodyLarge,
+                                Text(petEventTypeLabel(context, type), color = kb.subtitle)
+                                Icon(
+                                    Icons.Filled.KeyboardArrowDown,
+                                    contentDescription = null,
+                                    tint = kb.subtitle,
+                                    modifier = Modifier.size(20.dp),
                                 )
                             }
                         }
-                        IosFormDivider(kb)
-                        IosPlainTextFieldRow(vet, { vet = it }, stringResource(R.string.pets_field_vet), kb = kb)
-                        IosFormDivider(kb)
-                        IosPlainTextFieldRow(costText, { costText = it }, stringResource(R.string.pets_field_cost), kb = kb)
+                        DropdownMenu(
+                            expanded = typeMenuOpen,
+                            onDismissRequest = { typeMenuOpen = false },
+                        ) {
+                            types.forEach { t ->
+                                DropdownMenuItem(
+                                    text = { Text(petEventTypeLabel(context, t)) },
+                                    onClick = {
+                                        type = t
+                                        typeMenuOpen = false
+                                    },
+                                )
+                            }
+                        }
                     }
+                    IosFormDivider(kb)
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { pickDate(dateMillis) }
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.pets_field_date), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                        Text(formatItDate(dateMillis), color = orange, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
 
-                    Text(
-                        stringResource(R.string.pets_field_notes),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = kb.subtitle,
-                        modifier = Modifier.padding(start = 4.dp),
-                    )
-                    IosGroupedCard(kb) {
-                        TextField(
-                            value = notes,
-                            onValueChange = { notes = it },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 120.dp)
-                                .padding(16.dp),
-                            placeholder = { Text(stringResource(R.string.pets_field_notes), color = kb.subtitle) },
-                            singleLine = false,
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                focusedTextColor = kb.title,
-                                unfocusedTextColor = kb.title,
-                                cursorColor = kb.title,
-                                focusedPlaceholderColor = kb.subtitle,
-                                unfocusedPlaceholderColor = kb.subtitle,
+                IosGroupedCard(kb) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.pets_field_next_due), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                        Switch(
+                            checked = nextDue != null,
+                            onCheckedChange = { on ->
+                                if (on) nextDue = nextDue ?: dateMillis
+                                if (!on) nextDue = null
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = orange,
+                                checkedTrackColor = orange.copy(alpha = 0.35f),
                             ),
-                            textStyle = MaterialTheme.typography.bodyMedium,
                         )
                     }
-
-                    Text(
-                        stringResource(R.string.life_attachments),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = kb.subtitle,
-                        modifier = Modifier.padding(start = 4.dp),
-                    )
-                    HealthAttachmentsCard(
-                        attachments = attachments,
-                        tintColor = orange,
-                        isUploading = attachmentUploading,
-                        onPickFile = onPickFile,
-                        onPickPhoto = onPickPhoto,
-                        onTakePhoto = onTakePhoto,
-                        onOpenAttachment = onOpenAttachment,
-                        onDeleteAttachment = onDeleteAttachment,
-                        onPickFromKidBoxDocuments = onPickKidBox,
-                    )
-
-                    if (onDelete != null) {
-                        IosGroupedCard(kb) {
+                    if (nextDue != null) {
+                        IosFormDivider(kb)
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { pickNext(nextDue) }
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(stringResource(R.string.pets_field_next_due), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                             Text(
-                                stringResource(R.string.pets_delete_event_item),
+                                nextDue?.let { formatItDate(it) }.orEmpty(),
+                                color = orange,
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = Color(0xFFE53935),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable(onClick = onDelete)
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
                             )
                         }
+                    }
+                    IosFormDivider(kb)
+                    IosPlainTextFieldRow(vet, { vet = it }, stringResource(R.string.pets_field_vet), kb = kb)
+                    IosFormDivider(kb)
+                    IosPlainTextFieldRow(costText, { costText = it }, stringResource(R.string.pets_field_cost), kb = kb)
+                }
+
+                Text(
+                    stringResource(R.string.pets_field_notes),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = kb.subtitle,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+                IosGroupedCard(kb) {
+                    TextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 120.dp)
+                            .padding(16.dp),
+                        placeholder = { Text(stringResource(R.string.pets_field_notes), color = kb.subtitle) },
+                        singleLine = false,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedTextColor = kb.title,
+                            unfocusedTextColor = kb.title,
+                            cursorColor = kb.title,
+                            focusedPlaceholderColor = kb.subtitle,
+                            unfocusedPlaceholderColor = kb.subtitle,
+                        ),
+                        textStyle = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+
+                Text(
+                    stringResource(R.string.life_attachments),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = kb.subtitle,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+                HealthAttachmentsCard(
+                    attachments = attachments,
+                    tintColor = orange,
+                    isUploading = attachmentUploading,
+                    onPickFile = onPickFile,
+                    onPickPhoto = onPickPhoto,
+                    onTakePhoto = onTakePhoto,
+                    onOpenAttachment = onOpenAttachment,
+                    onDeleteAttachment = onDeleteAttachment,
+                    onPickFromKidBoxDocuments = onPickKidBox,
+                )
+
+                if (onDelete != null) {
+                    IosGroupedCard(kb) {
+                        Text(
+                            stringResource(R.string.pets_delete_event_item),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color(0xFFE53935),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(onClick = onDelete)
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                        )
                     }
                 }
             }
@@ -1128,7 +1147,7 @@ private fun PetEventDialog(
 }
 
 @Composable
-private fun EditPetDialog(
+private fun EditPetScreen(
     initial: PetEntity,
     onDismiss: () -> Unit,
     onConfirm: (PetEntity) -> Unit,
@@ -1150,171 +1169,170 @@ private fun EditPetDialog(
     val orange = Color(0xFFFF6B00)
     val canSave = name.trim().isNotBlank()
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    BackHandler(onBack = onDismiss)
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = kb.background,
     ) {
-        // Il 92% era del display, non della finestra: il fondo della card
-        // finiva sotto la barra di navigazione. Vedi ExtendDialogWindowToScreen.
-        ExtendDialogWindowToScreen()
-        Surface(
-            modifier = Modifier
-                .systemBarsPadding()
-                .fillMaxWidth(0.94f)
-                .fillMaxHeight(0.92f),
-            shape = RoundedCornerShape(16.dp),
-            color = kb.background,
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                // Nella finestra dell'Activity gli inset sono quelli veri e
+                // questo basta. Dentro un Dialog no: la barra di navigazione
+                // non veniva riportata e il fondo del form restava sotto i
+                // tasti. Per questo il form e' una schermata, non una finestra.
+                .imePadding(),
         ) {
-            Column(Modifier.fillMaxSize()) {
-                KidBoxIosFormTopBar(
-                    title = stringResource(R.string.pets_edit_pet_title),
-                    onCancel = onDismiss,
-                    onSave = {
-                        if (canSave) {
-                            val trimmed = name.trim()
-                            onConfirm(
-                                initial.copy(
-                                    name = trimmed,
-                                    species = species,
-                                    breed = breed.trim().takeIf { it.isNotEmpty() },
-                                    birthDate = if (hasBirthDate) birthDate else null,
-                                    color = color.trim().takeIf { it.isNotEmpty() },
-                                    chipCode = chipCode.trim().takeIf { it.isNotEmpty() },
-                                    notes = notes.trim().takeIf { it.isNotEmpty() },
-                                ),
-                            )
-                        }
-                    },
-                    saveEnabled = canSave,
-                    kb = kb,
-                    orange = orange,
-                )
-                HorizontalDivider(color = kb.divider)
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp)
-                        .padding(top = 12.dp, bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    IosGroupedCard(kb) {
-                        IosPlainTextFieldRow(name, { name = it }, stringResource(R.string.pets_field_name), kb = kb)
-                        IosFormDivider(kb)
-                        Box(Modifier.fillMaxWidth()) {
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable { speciesMenuOpen = true }
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(stringResource(R.string.pets_field_species), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(speciesLabel(context, species), color = kb.subtitle)
-                                    Icon(
-                                        Icons.Filled.KeyboardArrowDown,
-                                        contentDescription = null,
-                                        tint = kb.subtitle,
-                                        modifier = Modifier.size(20.dp),
-                                    )
-                                }
-                            }
-                            DropdownMenu(
-                                expanded = speciesMenuOpen,
-                                onDismissRequest = { speciesMenuOpen = false },
-                            ) {
-                                speciesOptions.forEach { opt ->
-                                    DropdownMenuItem(
-                                        text = { Text(speciesLabel(context, opt)) },
-                                        onClick = {
-                                            species = opt
-                                            speciesMenuOpen = false
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                        IosFormDivider(kb)
-                        IosPlainTextFieldRow(breed, { breed = it }, stringResource(R.string.pets_field_breed_optional), kb = kb)
+            KidBoxIosFormTopBar(
+                title = stringResource(R.string.pets_edit_pet_title),
+                onCancel = onDismiss,
+                onSave = {
+                    if (canSave) {
+                        val trimmed = name.trim()
+                        onConfirm(
+                            initial.copy(
+                                name = trimmed,
+                                species = species,
+                                breed = breed.trim().takeIf { it.isNotEmpty() },
+                                birthDate = if (hasBirthDate) birthDate else null,
+                                color = color.trim().takeIf { it.isNotEmpty() },
+                                chipCode = chipCode.trim().takeIf { it.isNotEmpty() },
+                                notes = notes.trim().takeIf { it.isNotEmpty() },
+                            ),
+                        )
                     }
-
-                    IosGroupedCard(kb) {
+                },
+                saveEnabled = canSave,
+                kb = kb,
+                orange = orange,
+            )
+            HorizontalDivider(color = kb.divider)
+            Column(
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 12.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                IosGroupedCard(kb) {
+                    IosPlainTextFieldRow(name, { name = it }, stringResource(R.string.pets_field_name), kb = kb)
+                    IosFormDivider(kb)
+                    Box(Modifier.fillMaxWidth()) {
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                                .clickable { speciesMenuOpen = true }
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(stringResource(R.string.pets_field_birth_date), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                            Switch(
-                                checked = hasBirthDate,
-                                onCheckedChange = { on ->
-                                    hasBirthDate = on
-                                    if (on && initial.birthDate == null) {
-                                        birthDate = System.currentTimeMillis()
-                                    }
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = orange,
-                                    checkedTrackColor = orange.copy(alpha = 0.35f),
-                                ),
-                            )
-                        }
-                        if (hasBirthDate) {
-                            IosFormDivider(kb)
+                            Text(stringResource(R.string.pets_field_species), style = MaterialTheme.typography.bodyLarge, color = kb.title)
                             Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable { pickBirth(birthDate) }
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(stringResource(R.string.pets_field_date), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                                Text(formatItDate(birthDate), color = orange, style = MaterialTheme.typography.bodyLarge)
+                                Text(speciesLabel(context, species), color = kb.subtitle)
+                                Icon(
+                                    Icons.Filled.KeyboardArrowDown,
+                                    contentDescription = null,
+                                    tint = kb.subtitle,
+                                    modifier = Modifier.size(20.dp),
+                                )
                             }
                         }
-                        IosFormDivider(kb)
-                        IosPlainTextFieldRow(color, { color = it }, stringResource(R.string.pets_field_color), kb = kb)
-                        IosFormDivider(kb)
-                        IosPlainTextFieldRow(chipCode, { chipCode = it }, stringResource(R.string.pets_field_microchip), kb = kb)
+                        DropdownMenu(
+                            expanded = speciesMenuOpen,
+                            onDismissRequest = { speciesMenuOpen = false },
+                        ) {
+                            speciesOptions.forEach { opt ->
+                                DropdownMenuItem(
+                                    text = { Text(speciesLabel(context, opt)) },
+                                    onClick = {
+                                        species = opt
+                                        speciesMenuOpen = false
+                                    },
+                                )
+                            }
+                        }
                     }
+                    IosFormDivider(kb)
+                    IosPlainTextFieldRow(breed, { breed = it }, stringResource(R.string.pets_field_breed_optional), kb = kb)
+                }
 
-                    Text(
-                        stringResource(R.string.pets_field_notes),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = kb.subtitle,
-                        modifier = Modifier.padding(start = 4.dp),
-                    )
-                    IosGroupedCard(kb) {
-                        TextField(
-                            value = notes,
-                            onValueChange = { notes = it },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 120.dp)
-                                .padding(16.dp),
-                            placeholder = { Text(stringResource(R.string.pets_field_notes), color = kb.subtitle) },
-                            singleLine = false,
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                focusedTextColor = kb.title,
-                                unfocusedTextColor = kb.title,
-                                cursorColor = kb.title,
-                                focusedPlaceholderColor = kb.subtitle,
-                                unfocusedPlaceholderColor = kb.subtitle,
+                IosGroupedCard(kb) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.pets_field_birth_date), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                        Switch(
+                            checked = hasBirthDate,
+                            onCheckedChange = { on ->
+                                hasBirthDate = on
+                                if (on && initial.birthDate == null) {
+                                    birthDate = System.currentTimeMillis()
+                                }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = orange,
+                                checkedTrackColor = orange.copy(alpha = 0.35f),
                             ),
-                            textStyle = MaterialTheme.typography.bodyMedium,
                         )
                     }
+                    if (hasBirthDate) {
+                        IosFormDivider(kb)
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { pickBirth(birthDate) }
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(stringResource(R.string.pets_field_date), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Text(formatItDate(birthDate), color = orange, style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                    IosFormDivider(kb)
+                    IosPlainTextFieldRow(color, { color = it }, stringResource(R.string.pets_field_color), kb = kb)
+                    IosFormDivider(kb)
+                    IosPlainTextFieldRow(chipCode, { chipCode = it }, stringResource(R.string.pets_field_microchip), kb = kb)
+                }
+
+                Text(
+                    stringResource(R.string.pets_field_notes),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = kb.subtitle,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+                IosGroupedCard(kb) {
+                    TextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 120.dp)
+                            .padding(16.dp),
+                        placeholder = { Text(stringResource(R.string.pets_field_notes), color = kb.subtitle) },
+                        singleLine = false,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedTextColor = kb.title,
+                            unfocusedTextColor = kb.title,
+                            cursorColor = kb.title,
+                            focusedPlaceholderColor = kb.subtitle,
+                            unfocusedPlaceholderColor = kb.subtitle,
+                        ),
+                        textStyle = MaterialTheme.typography.bodyMedium,
+                    )
                 }
             }
         }

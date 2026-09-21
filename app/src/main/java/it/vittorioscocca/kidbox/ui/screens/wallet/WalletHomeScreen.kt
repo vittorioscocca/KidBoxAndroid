@@ -2,6 +2,8 @@
 
 package it.vittorioscocca.kidbox.ui.screens.wallet
 
+import it.vittorioscocca.kidbox.ui.screens.wallet.documents.LinkExistingWalletDocumentScreen
+import it.vittorioscocca.kidbox.ui.screens.wallet.loyaltycards.AddLoyaltyCardFlow
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import it.vittorioscocca.kidbox.ui.components.FamilyKeyMissingGate
 import it.vittorioscocca.kidbox.R
@@ -157,6 +159,31 @@ fun WalletHomeScreen(
         )
     }
 
+    // I form prendono il posto della schermata invece di aprirsi sopra in una
+    // finestra: gli inset cosi' sono quelli veri dell'Activity. In un `Dialog`
+    // la barra di navigazione non viene riportata e la tastiera copre il fondo.
+    if (showLoyaltyCardAddFlow) {
+        AddLoyaltyCardFlow(
+            viewModel = loyaltyCardsViewModel,
+            onDismiss = { showLoyaltyCardAddFlow = false },
+            onSaved = { cardId ->
+                showLoyaltyCardAddFlow = false
+                onLoyaltyCardClick(cardId)
+            },
+        )
+        return
+    }
+
+    if (showDocLinkSheet) {
+        LinkExistingWalletDocumentScreen(
+            familyId = familyId,
+            viewModel = documentsViewModel,
+            onUpgrade = onUpgrade,
+            onDismiss = { showDocLinkSheet = false },
+        )
+        return
+    }
+
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
@@ -273,7 +300,6 @@ fun WalletHomeScreen(
                 LoyaltyCardsSectionContent(
                     familyId = familyId,
                     onCardClick = onLoyaltyCardClick,
-                    showAddFlow = showLoyaltyCardAddFlow,
                     onShowAddFlowChange = { showLoyaltyCardAddFlow = it },
                     showDeleteConfirm = showLoyaltyDeleteConfirm,
                     onShowDeleteConfirmChange = { showLoyaltyDeleteConfirm = it },
@@ -291,8 +317,6 @@ fun WalletHomeScreen(
                     onUpgrade = onUpgrade,
                     showAddSheet = showDocAddSheet,
                     onShowAddSheetChange = { showDocAddSheet = it },
-                    showLinkSheet = showDocLinkSheet,
-                    onShowLinkSheetChange = { showDocLinkSheet = it },
                     viewModel = documentsViewModel,
                 )
             }

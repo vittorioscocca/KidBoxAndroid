@@ -19,6 +19,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -193,6 +194,9 @@ fun MedicalExamFormScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
+                // La tastiera accorcia il contenitore invece di coprirlo, cosi'
+                // l'area che scorre porta da se' il campo a fuoco sopra i tasti.
+                .imePadding()
                 .padding(horizontal = 18.dp)
                 .verticalScroll(rememberScrollState()),
         ) {

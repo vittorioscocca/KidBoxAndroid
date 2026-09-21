@@ -228,9 +228,13 @@ fun MedicalRecordScreen(
 
             // ── Età / data di nascita ───────────────────────────────────────────
             SectionLabel(stringResource(R.string.health_age))
-            val birthMillis = state.linkedBirthDateEpochMillis ?: System.currentTimeMillis()
+            // Il ripiego «oggi» va congelato: `System.currentTimeMillis()` letto
+            // in composizione cambia a ogni ricomposizione, e usato come chiave
+            // del selettore lo ricreava mentre era aperto — bastava un'emissione
+            // del listener perche' la scelta sparisse e «OK» confermasse oggi.
+            val fallbackNow = remember { System.currentTimeMillis() }
+            val birthMillis = state.linkedBirthDateEpochMillis ?: fallbackNow
             var showBirthDatePicker by remember { mutableStateOf(false) }
-            val birthDatePickerState = rememberDatePickerState(initialSelectedDateMillis = birthMillis)
             val birthDateLabel = remember(birthMillis) {
                 SimpleDateFormat("d MMMM yyyy", KBLocale.current()).format(java.util.Date(birthMillis))
             }
@@ -265,6 +269,14 @@ fun MedicalRecordScreen(
                 }
             }
             if (showBirthDatePicker) {
+                // Lo stato del selettore nasce insieme al dialog, dal valore
+                // corrente, e vive finche' il dialog resta aperto: nessuna chiave,
+                // quindi nessun reset a meta' scelta. Riaprendolo si riparte dalla
+                // data gia' salvata, non da quella del primo passaggio.
+                val birthDatePickerState = rememberDatePickerState(
+                    initialSelectedDateMillis = birthMillis,
+                    initialDisplayedMonthMillis = birthMillis,
+                )
                 DatePickerDialog(
                     onDismissRequest = { showBirthDatePicker = false },
                     confirmButton = {

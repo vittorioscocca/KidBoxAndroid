@@ -155,16 +155,6 @@ fun WalletDocumentDetailScreen(
         )
     }
 
-    if (showEditSheet && item != null) {
-        EditWalletDocumentSheet(
-            document = item.document,
-            metadata = item.metadata,
-            owners = state.owners,
-            viewModel = viewModel,
-            onDismiss = { showEditSheet = false },
-        )
-    }
-
     if (showImageViewer) {
         val viewerKind = item?.metadata?.kind ?: DocumentKind.ALTRO
         FullscreenPageViewer(
@@ -173,6 +163,19 @@ fun WalletDocumentDetailScreen(
             kind = viewerKind,
             onDismiss = { showImageViewer = false },
         )
+    }
+
+    // Il form prende il posto della schermata invece di aprirsi sopra in una
+    // finestra: gli inset cosi' sono quelli veri dell'Activity.
+    if (showEditSheet && item != null) {
+        EditWalletDocumentScreen(
+            document = item.document,
+            metadata = item.metadata,
+            owners = state.owners,
+            viewModel = viewModel,
+            onDismiss = { showEditSheet = false },
+        )
+        return
     }
 
     Scaffold(

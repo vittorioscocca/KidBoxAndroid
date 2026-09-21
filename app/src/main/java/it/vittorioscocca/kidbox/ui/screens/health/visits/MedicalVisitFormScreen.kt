@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -349,7 +350,11 @@ fun MedicalVisitFormScreen(
             .fillMaxSize()
             .background(kb.background)
             .statusBarsPadding()
-            .navigationBarsPadding(),
+            .navigationBarsPadding()
+            // La tastiera accorcia la colonna invece di coprirla: il blocco che
+            // scorre riduce l'area visibile e porta da se' il campo a fuoco
+            // sopra i tasti, e la barra Avanti/Salva resta raggiungibile.
+            .imePadding(),
     ) {
         Row(
             modifier = Modifier
@@ -1654,6 +1659,9 @@ private fun AsNeededDrugSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
+                // ModalBottomSheet non gestisce l'IME: con i due campi del
+                // farmaco al bisogno la tastiera coprirebbe il foglio.
+                .imePadding()
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 24.dp)
                 .verticalScroll(rememberScrollState()),

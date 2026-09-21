@@ -185,6 +185,58 @@ fun TodoListScreen(
         showEditor = false
     }
 
+    // Il form prende il posto della schermata invece di aprirsi sopra in una
+    // finestra: una sola cosa a video per volta, e soprattutto gli inset sono
+    // quelli veri dell'Activity. Dentro un `Dialog` la barra di navigazione non
+    // viene riportata e la tastiera copriva il fondo del form.
+    if (showEditor) {
+        TodoEditScreen(
+            initial = editingTodo,
+            members = state.members,
+            currentUid = state.currentUid,
+            onDismiss = { showEditor = false },
+            onSave = { form ->
+                val mustAskPermission = form.reminderEnabled &&
+                    !RuntimePermissions.hasNotificationPermission(context)
+                if (mustAskPermission) {
+                    pendingSaveAfterPermission = form
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    val editing = editingTodo
+                    if (editing == null) {
+                        viewModel.addTodo(
+                            title = form.title,
+                            notes = form.notes,
+                            dueAtEpochMillis = form.dueAt,
+                            assignedTo = form.assignedTo,
+                            priorityRaw = if (form.urgent) 1 else 0,
+                            reminderEnabled = form.reminderEnabled,
+                            visibilityScope = form.visibilityScope,
+                            visibilityMemberIds = form.visibilityMemberIds,
+                        )
+                    } else {
+                        viewModel.updateTodo(
+                            todoId = editing.id,
+                            title = form.title,
+                            notes = form.notes,
+                            dueAtEpochMillis = form.dueAt,
+                            assignedTo = form.assignedTo,
+                            priorityRaw = if (form.urgent) 1 else 0,
+                            reminderEnabled = form.reminderEnabled,
+                            visibilityScope = form.visibilityScope,
+                            visibilityMemberIds = form.visibilityMemberIds,
+                        )
+                    }
+                    if (form.reminderEnabled && form.dueAt != null) {
+                        pendingSnackbarMessage = "Promemoria programmato per ${formatDate(form.dueAt)}"
+                    }
+                    showEditor = false
+                }
+            },
+        )
+        return
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -297,52 +349,6 @@ fun TodoListScreen(
         )
     }
 
-    if (showEditor) {
-        TodoEditDialog(
-            initial = editingTodo,
-            members = state.members,
-            currentUid = state.currentUid,
-            onDismiss = { showEditor = false },
-            onSave = { form ->
-                val mustAskPermission = form.reminderEnabled &&
-                    !RuntimePermissions.hasNotificationPermission(context)
-                if (mustAskPermission) {
-                    pendingSaveAfterPermission = form
-                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                } else {
-                    val editing = editingTodo
-                    if (editing == null) {
-                        viewModel.addTodo(
-                            title = form.title,
-                            notes = form.notes,
-                            dueAtEpochMillis = form.dueAt,
-                            assignedTo = form.assignedTo,
-                            priorityRaw = if (form.urgent) 1 else 0,
-                            reminderEnabled = form.reminderEnabled,
-                            visibilityScope = form.visibilityScope,
-                            visibilityMemberIds = form.visibilityMemberIds,
-                        )
-                    } else {
-                        viewModel.updateTodo(
-                            todoId = editing.id,
-                            title = form.title,
-                            notes = form.notes,
-                            dueAtEpochMillis = form.dueAt,
-                            assignedTo = form.assignedTo,
-                            priorityRaw = if (form.urgent) 1 else 0,
-                            reminderEnabled = form.reminderEnabled,
-                            visibilityScope = form.visibilityScope,
-                            visibilityMemberIds = form.visibilityMemberIds,
-                        )
-                    }
-                    if (form.reminderEnabled && form.dueAt != null) {
-                        pendingSnackbarMessage = "Promemoria programmato per ${formatDate(form.dueAt)}"
-                    }
-                    showEditor = false
-                }
-            },
-        )
-    }
 }
 
 @Composable
@@ -446,7 +452,7 @@ private data class TodoEditForm(
 )
 
 @Composable
-private fun TodoEditDialog(
+private fun TodoEditScreen(
     initial: KBTodoItemEntity?,
     members: List<TodoMemberUi>,
     currentUid: String,

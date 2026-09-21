@@ -78,6 +78,21 @@ fun PetsScreen(
     val kb = MaterialTheme.kidBoxColors
     val orange = Color(0xFFFF6B00)
 
+    // Il form prende il posto della schermata invece di aprirsi sopra in una
+    // finestra: una sola cosa a video per volta, e soprattutto gli inset sono
+    // quelli veri dell'Activity. Dentro un `Dialog` la barra di navigazione non
+    // viene riportata e la tastiera copriva il fondo del form.
+    if (showAdd) {
+        AddPetScreen(
+            onDismiss = { showAdd = false },
+            onConfirm = { name, species, breed, notes ->
+                viewModel.addPet(name, species, breed, null, null, null, notes) { err -> toast = err }
+                showAdd = false
+            },
+        )
+        return
+    }
+
     Scaffold(
         containerColor = kb.background,
         topBar = {
@@ -158,16 +173,6 @@ fun PetsScreen(
         }
     }
 
-    if (showAdd) {
-        AddPetDialog(
-            onDismiss = { showAdd = false },
-            onConfirm = { name, species, breed, notes ->
-                viewModel.addPet(name, species, breed, null, null, null, notes) { err -> toast = err }
-                showAdd = false
-            },
-        )
-    }
-
     petToDelete?.let { target ->
         AlertDialog(
             onDismissRequest = { petToDelete = null },
@@ -195,7 +200,7 @@ fun PetsScreen(
 }
 
 @Composable
-private fun AddPetDialog(
+private fun AddPetScreen(
     onDismiss: () -> Unit,
     onConfirm: (name: String, species: String, breed: String?, notes: String?) -> Unit,
 ) {

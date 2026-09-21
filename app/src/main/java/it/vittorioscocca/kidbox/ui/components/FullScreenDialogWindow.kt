@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.components
 
+import android.os.Build
 import android.view.WindowManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
@@ -34,5 +35,44 @@ fun ExtendDialogWindowToScreen() {
                     WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR,
             )
         }
+    }
+}
+
+/**
+ * Da chiamare dentro ogni `Dialog` che contiene campi di testo, insieme a un
+ * `imePadding()` sul contenuto.
+ *
+ * Le finestre dei `Dialog` di Compose nascono con
+ * `softInputMode = SOFT_INPUT_ADJUST_PAN`: `windowSoftInputMode` del manifest
+ * vale per l'Activity, non per loro. Misurato su device con la tastiera aperta
+ * (`dumpsys window windows`): la finestra dell'Activity riporta
+ * `sim={adjust=resize}`, quella del dialog `sim={adjust=pan}`.
+ *
+ * Con `ADJUST_PAN` Android non riporta l'inset dell'IME: `WindowInsets.ime`
+ * misura **zero** e `imePadding()` non fa niente — silenziosamente.
+ *
+ * `ADJUST_RESIZE` **non** è la risposta, anche se sembra: accorcia il frame
+ * della finestra e proprio per questo riporta comunque inset zero. Misurato sul
+ * device, il risultato è il peggiore dei due — `frame=[32,112][1047,1542]` con
+ * dentro un contenuto Compose ancora alto 2200: la metà bassa del form finisce
+ * fuori finestra, ritagliata e non raggiungibile nemmeno scorrendo.
+ *
+ * Serve `ADJUST_NOTHING`: la finestra non viene né spostata né accorciata,
+ * l'inset **viene riportato**, e ad accorciare il contenuto ci pensa
+ * `imePadding()`. È la stessa scelta che Material3 fa sulle proprie
+ * `ModalBottomSheet` (`ADJUST_NOTHING` su API ≥ 30, `ADJUST_RESIZE` sotto), ed
+ * è il motivo per cui i fogli funzionavano già mentre i dialog no.
+ */
+@Composable
+fun ReportKeyboardInsetsToDialog() {
+    val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
+    SideEffect {
+        dialogWindow?.setSoftInputMode(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
+            } else {
+                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+            },
+        )
     }
 }

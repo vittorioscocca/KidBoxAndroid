@@ -241,6 +241,28 @@ fun VehicleDetailScreen(
     // sopra in una finestra: una sola cosa a video per volta.
     val isAddingEvent = showAddEvent && pendingEventDraftId != null
 
+    // Il form prende il posto della schermata invece di aprirsi sopra in una
+    // finestra: gli inset cosi' sono quelli veri dell'Activity.
+    if (showEditVehicle && vehicle != null) {
+        EditVehicleScreen(
+            initial = vehicle!!,
+            vehicleAttachments = vehicleAttachments,
+            attachmentUploading = attachmentUploading,
+            onDismiss = { showEditVehicle = false },
+            onConfirm = { updated ->
+                viewModel.updateVehicle(updated) { err -> toast = err }
+                showEditVehicle = false
+            },
+            onTakePhoto = { requestTakePhoto(GarageAttachmentPickTarget.EditVehicle) },
+            onPickPhoto = { requestPickPhoto(GarageAttachmentPickTarget.EditVehicle) },
+            onPickFile = { requestPickFile(GarageAttachmentPickTarget.EditVehicle) },
+            onPickKidBox = { requestKidBoxDocuments(GarageAttachmentPickTarget.EditVehicle) },
+            onOpenAttachment = { viewModel.openAttachment(it) },
+            onDeleteAttachment = { viewModel.deleteAttachment(it) },
+        )
+        return
+    }
+
     if (isAddingEvent) {
         AddVehicleEventScreen(
             eventDraftAttachments = eventDraftAttachments,
@@ -446,25 +468,6 @@ fun VehicleDetailScreen(
     }
 
     } // fine else: schermata veicolo
-
-    if (showEditVehicle && vehicle != null) {
-        EditVehicleDialog(
-            initial = vehicle!!,
-            vehicleAttachments = vehicleAttachments,
-            attachmentUploading = attachmentUploading,
-            onDismiss = { showEditVehicle = false },
-            onConfirm = { updated ->
-                viewModel.updateVehicle(updated) { err -> toast = err }
-                showEditVehicle = false
-            },
-            onTakePhoto = { requestTakePhoto(GarageAttachmentPickTarget.EditVehicle) },
-            onPickPhoto = { requestPickPhoto(GarageAttachmentPickTarget.EditVehicle) },
-            onPickFile = { requestPickFile(GarageAttachmentPickTarget.EditVehicle) },
-            onPickKidBox = { requestKidBoxDocuments(GarageAttachmentPickTarget.EditVehicle) },
-            onOpenAttachment = { viewModel.openAttachment(it) },
-            onDeleteAttachment = { viewModel.deleteAttachment(it) },
-        )
-    }
 
     val familyIdForPicker = vehicle?.familyId.orEmpty()
     if (showKidBoxPicker && familyIdForPicker.isNotBlank()) {
@@ -839,7 +842,7 @@ private fun AddVehicleEventScreen(
 }
 
 @Composable
-private fun EditVehicleDialog(
+private fun EditVehicleScreen(
     initial: it.vittorioscocca.kidbox.data.local.entity.VehicleEntity,
     vehicleAttachments: List<KBDocumentEntity>,
     attachmentUploading: Boolean,
@@ -932,355 +935,358 @@ private fun EditVehicleDialog(
         )
     }
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        // A tutto schermo come `MedicalVisitFormScreen`: prima era una card al
-        // 94%x92% con gli angoli tondi, che lasciava i margini ai lati.
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = kb.background,
+    BackHandler(onBack = onDismiss)
+    // La finestra di un Dialog nasce su ADJUST_PAN: senza questo l'inset
+    // della tastiera non viene riportato e l'`imePadding()` misura zero.
+    // A tutto schermo come `MedicalVisitFormScreen`: prima era una card al
+    // 94%x92% con gli angoli tondi, che lasciava i margini ai lati.
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = kb.background,
+    ) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                // La tastiera accorcia la colonna invece di coprirla.
+                .imePadding(),
         ) {
+            KidBoxIosFormTopBar(
+                title = stringResource(R.string.vehicles_edit),
+                onCancel = onDismiss,
+                onSave = { if (canSave) commitSave() },
+                saveEnabled = canSave,
+                kb = kb,
+                orange = orange,
+            )
+            HorizontalDivider(color = kb.divider)
             Column(
                 Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .navigationBarsPadding(),
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 12.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                KidBoxIosFormTopBar(
-                    title = stringResource(R.string.vehicles_edit),
-                    onCancel = onDismiss,
-                    onSave = { if (canSave) commitSave() },
-                    saveEnabled = canSave,
-                    kb = kb,
-                    orange = orange,
+                IosGroupedCard(kb) {
+                    IosPlainTextFieldRow(name, { name = it }, stringResource(R.string.life_name), kb = kb)
+                    IosFormDivider(kb)
+                    IosPlainTextFieldRow(plate, { plate = it }, stringResource(R.string.vehicles_plate), kb = kb)
+                    IosFormDivider(kb)
+                    IosPlainTextFieldRow(brand, { brand = it }, stringResource(R.string.home_items_brand), kb = kb)
+                    IosFormDivider(kb)
+                    IosPlainTextFieldRow(model, { model = it }, stringResource(R.string.home_items_model), kb = kb)
+                    IosFormDivider(kb)
+                    IosPlainTextFieldRow(
+                        yearText,
+                        { yearText = it },
+                        stringResource(R.string.vehicles_year),
+                        kb = kb,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    )
+                    IosFormDivider(kb)
+                    Box(Modifier.fillMaxWidth()) {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { fuelMenuOpen = true }
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(stringResource(R.string.vehicles_fuel), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(vehicleFuelLabel(context, fuel), color = kb.subtitle)
+                                Icon(
+                                    Icons.Filled.KeyboardArrowDown,
+                                    contentDescription = null,
+                                    tint = kb.subtitle,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = fuelMenuOpen,
+                            onDismissRequest = { fuelMenuOpen = false },
+                        ) {
+                            fuels.forEach { f ->
+                                DropdownMenuItem(
+                                    text = { Text(vehicleFuelLabel(context, f)) },
+                                    onClick = {
+                                        fuel = f
+                                        fuelMenuOpen = false
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    IosFormDivider(kb)
+                    IosPlainTextFieldRow(color, { color = it }, stringResource(R.string.vehicles_color), kb = kb)
+                    IosFormDivider(kb)
+                    IosPlainTextFieldRow(vin, { vin = it }, stringResource(R.string.vehicles_vin), kb = kb)
+                }
+
+                Text(
+                    stringResource(R.string.home_items_deadlines),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = kb.subtitle,
+                    modifier = Modifier.padding(start = 4.dp),
                 )
-                HorizontalDivider(color = kb.divider)
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp)
-                        .padding(top = 12.dp, bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    IosGroupedCard(kb) {
-                        IosPlainTextFieldRow(name, { name = it }, stringResource(R.string.life_name), kb = kb)
-                        IosFormDivider(kb)
-                        IosPlainTextFieldRow(plate, { plate = it }, stringResource(R.string.vehicles_plate), kb = kb)
-                        IosFormDivider(kb)
-                        IosPlainTextFieldRow(brand, { brand = it }, stringResource(R.string.home_items_brand), kb = kb)
-                        IosFormDivider(kb)
-                        IosPlainTextFieldRow(model, { model = it }, stringResource(R.string.home_items_model), kb = kb)
-                        IosFormDivider(kb)
-                        IosPlainTextFieldRow(
-                            yearText,
-                            { yearText = it },
-                            stringResource(R.string.vehicles_year),
-                            kb = kb,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        )
-                        IosFormDivider(kb)
-                        Box(Modifier.fillMaxWidth()) {
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable { fuelMenuOpen = true }
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(stringResource(R.string.vehicles_fuel), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(vehicleFuelLabel(context, fuel), color = kb.subtitle)
-                                    Icon(
-                                        Icons.Filled.KeyboardArrowDown,
-                                        contentDescription = null,
-                                        tint = kb.subtitle,
-                                        modifier = Modifier.size(20.dp),
-                                    )
-                                }
-                            }
-                            DropdownMenu(
-                                expanded = fuelMenuOpen,
-                                onDismissRequest = { fuelMenuOpen = false },
-                            ) {
-                                fuels.forEach { f ->
-                                    DropdownMenuItem(
-                                        text = { Text(vehicleFuelLabel(context, f)) },
-                                        onClick = {
-                                            fuel = f
-                                            fuelMenuOpen = false
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                        IosFormDivider(kb)
-                        IosPlainTextFieldRow(color, { color = it }, stringResource(R.string.vehicles_color), kb = kb)
-                        IosFormDivider(kb)
-                        IosPlainTextFieldRow(vin, { vin = it }, stringResource(R.string.vehicles_vin), kb = kb)
-                    }
-
-                    Text(
-                        stringResource(R.string.home_items_deadlines),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = kb.subtitle,
-                        modifier = Modifier.padding(start = 4.dp),
-                    )
-                    IosGroupedCard(kb) {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(stringResource(R.string.vehicles_insurance), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                            Switch(
-                                checked = hasIns,
-                                onCheckedChange = {
-                                    hasIns = it
-                                    if (!it) ins = null else if (ins == null) ins = System.currentTimeMillis()
-                                },
-                                colors = switchColors,
-                            )
-                        }
-                        if (hasIns) {
-                            IosFormDivider(kb)
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(stringResource(R.string.home_items_deadline), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = kb.surfaceOverlay,
-                                    modifier = Modifier.clickable { pickIns(ins) },
-                                ) {
-                                    Text(
-                                        formatItDateMedium(ins ?: System.currentTimeMillis()),
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = kb.title,
-                                    )
-                                }
-                            }
-                            ReminderOffsetChips(
-                                selected = insOffsets,
-                                onToggle = { d -> insOffsets = if (d in insOffsets) insOffsets - d else insOffsets + d },
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            )
-                        }
-
-                        IosFormDivider(kb)
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(stringResource(R.string.vehicles_inspection), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                            Switch(
-                                checked = hasRev,
-                                onCheckedChange = {
-                                    hasRev = it
-                                    if (!it) rev = null else if (rev == null) rev = System.currentTimeMillis()
-                                },
-                                colors = switchColors,
-                            )
-                        }
-                        if (hasRev) {
-                            IosFormDivider(kb)
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(stringResource(R.string.home_items_deadline), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = kb.surfaceOverlay,
-                                    modifier = Modifier.clickable { pickRev(rev) },
-                                ) {
-                                    Text(
-                                        formatItDateMedium(rev ?: System.currentTimeMillis()),
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = kb.title,
-                                    )
-                                }
-                            }
-                            ReminderOffsetChips(
-                                selected = revOffsets,
-                                onToggle = { d -> revOffsets = if (d in revOffsets) revOffsets - d else revOffsets + d },
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            )
-                        }
-
-                        IosFormDivider(kb)
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(stringResource(R.string.vehicles_road_tax), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                            Switch(
-                                checked = hasTax,
-                                onCheckedChange = {
-                                    hasTax = it
-                                    if (!it) tax = null else if (tax == null) tax = System.currentTimeMillis()
-                                },
-                                colors = switchColors,
-                            )
-                        }
-                        if (hasTax) {
-                            IosFormDivider(kb)
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(stringResource(R.string.home_items_deadline), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = kb.surfaceOverlay,
-                                    modifier = Modifier.clickable { pickTax(tax) },
-                                ) {
-                                    Text(
-                                        formatItDateMedium(tax ?: System.currentTimeMillis()),
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = kb.title,
-                                    )
-                                }
-                            }
-                            ReminderOffsetChips(
-                                selected = taxOffsets,
-                                onToggle = { d -> taxOffsets = if (d in taxOffsets) taxOffsets - d else taxOffsets + d },
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            )
-                        }
-
-                        IosFormDivider(kb)
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                stringResource(R.string.vehicles_next_service),
-                                modifier = Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = kb.title,
-                            )
-                            Switch(
-                                checked = hasNextSvc,
-                                onCheckedChange = {
-                                    hasNextSvc = it
-                                    if (!it) nextSvc = null else if (nextSvc == null) nextSvc = System.currentTimeMillis()
-                                },
-                                colors = switchColors,
-                            )
-                        }
-                        if (hasNextSvc) {
-                            IosFormDivider(kb)
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(stringResource(R.string.vehicles_date), style = MaterialTheme.typography.bodyLarge, color = kb.title)
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = kb.surfaceOverlay,
-                                    modifier = Modifier.clickable { pickNext(nextSvc) },
-                                ) {
-                                    Text(
-                                        formatItDateMedium(nextSvc ?: System.currentTimeMillis()),
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = kb.title,
-                                    )
-                                }
-                            }
-                            ReminderOffsetChips(
-                                selected = nextSvcOffsets,
-                                onToggle = { d -> nextSvcOffsets = if (d in nextSvcOffsets) nextSvcOffsets - d else nextSvcOffsets + d },
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            )
-                        }
-                    }
-
-                    Text(
-                        stringResource(R.string.life_notes),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = kb.subtitle,
-                        modifier = Modifier.padding(start = 4.dp),
-                    )
-                    IosGroupedCard(kb) {
-                        IosPlainTextFieldRow(
-                            kmText,
-                            { kmText = it },
-                            stringResource(R.string.vehicles_current_km),
-                            kb = kb,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        )
-                        IosFormDivider(kb)
-                        TextField(
-                            value = notes,
-                            onValueChange = { notes = it },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 120.dp),
-                            placeholder = { Text(stringResource(R.string.life_notes), color = kb.subtitle) },
-                            singleLine = false,
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                focusedTextColor = kb.title,
-                                unfocusedTextColor = kb.title,
-                                cursorColor = kb.title,
-                                focusedPlaceholderColor = kb.subtitle,
-                                unfocusedPlaceholderColor = kb.subtitle,
-                            ),
-                            textStyle = MaterialTheme.typography.bodyLarge,
+                IosGroupedCard(kb) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.vehicles_insurance), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                        Switch(
+                            checked = hasIns,
+                            onCheckedChange = {
+                                hasIns = it
+                                if (!it) ins = null else if (ins == null) ins = System.currentTimeMillis()
+                            },
+                            colors = switchColors,
                         )
                     }
-                    Text(
-                        stringResource(R.string.life_attachments),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = kb.subtitle,
-                        modifier = Modifier.padding(start = 4.dp),
+                    if (hasIns) {
+                        IosFormDivider(kb)
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(stringResource(R.string.home_items_deadline), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = kb.surfaceOverlay,
+                                modifier = Modifier.clickable { pickIns(ins) },
+                            ) {
+                                Text(
+                                    formatItDateMedium(ins ?: System.currentTimeMillis()),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = kb.title,
+                                )
+                            }
+                        }
+                        ReminderOffsetChips(
+                            selected = insOffsets,
+                            onToggle = { d -> insOffsets = if (d in insOffsets) insOffsets - d else insOffsets + d },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+
+                    IosFormDivider(kb)
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.vehicles_inspection), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                        Switch(
+                            checked = hasRev,
+                            onCheckedChange = {
+                                hasRev = it
+                                if (!it) rev = null else if (rev == null) rev = System.currentTimeMillis()
+                            },
+                            colors = switchColors,
+                        )
+                    }
+                    if (hasRev) {
+                        IosFormDivider(kb)
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(stringResource(R.string.home_items_deadline), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = kb.surfaceOverlay,
+                                modifier = Modifier.clickable { pickRev(rev) },
+                            ) {
+                                Text(
+                                    formatItDateMedium(rev ?: System.currentTimeMillis()),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = kb.title,
+                                )
+                            }
+                        }
+                        ReminderOffsetChips(
+                            selected = revOffsets,
+                            onToggle = { d -> revOffsets = if (d in revOffsets) revOffsets - d else revOffsets + d },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+
+                    IosFormDivider(kb)
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.vehicles_road_tax), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                        Switch(
+                            checked = hasTax,
+                            onCheckedChange = {
+                                hasTax = it
+                                if (!it) tax = null else if (tax == null) tax = System.currentTimeMillis()
+                            },
+                            colors = switchColors,
+                        )
+                    }
+                    if (hasTax) {
+                        IosFormDivider(kb)
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(stringResource(R.string.home_items_deadline), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = kb.surfaceOverlay,
+                                modifier = Modifier.clickable { pickTax(tax) },
+                            ) {
+                                Text(
+                                    formatItDateMedium(tax ?: System.currentTimeMillis()),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = kb.title,
+                                )
+                            }
+                        }
+                        ReminderOffsetChips(
+                            selected = taxOffsets,
+                            onToggle = { d -> taxOffsets = if (d in taxOffsets) taxOffsets - d else taxOffsets + d },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+
+                    IosFormDivider(kb)
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(R.string.vehicles_next_service),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = kb.title,
+                        )
+                        Switch(
+                            checked = hasNextSvc,
+                            onCheckedChange = {
+                                hasNextSvc = it
+                                if (!it) nextSvc = null else if (nextSvc == null) nextSvc = System.currentTimeMillis()
+                            },
+                            colors = switchColors,
+                        )
+                    }
+                    if (hasNextSvc) {
+                        IosFormDivider(kb)
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(stringResource(R.string.vehicles_date), style = MaterialTheme.typography.bodyLarge, color = kb.title)
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = kb.surfaceOverlay,
+                                modifier = Modifier.clickable { pickNext(nextSvc) },
+                            ) {
+                                Text(
+                                    formatItDateMedium(nextSvc ?: System.currentTimeMillis()),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = kb.title,
+                                )
+                            }
+                        }
+                        ReminderOffsetChips(
+                            selected = nextSvcOffsets,
+                            onToggle = { d -> nextSvcOffsets = if (d in nextSvcOffsets) nextSvcOffsets - d else nextSvcOffsets + d },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+
+                Text(
+                    stringResource(R.string.life_notes),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = kb.subtitle,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+                IosGroupedCard(kb) {
+                    IosPlainTextFieldRow(
+                        kmText,
+                        { kmText = it },
+                        stringResource(R.string.vehicles_current_km),
+                        kb = kb,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     )
-                    HealthAttachmentsCard(
-                        attachments = vehicleAttachments,
-                        tintColor = orange,
-                        isUploading = attachmentUploading,
-                        onPickFile = onPickFile,
-                        onPickPhoto = onPickPhoto,
-                        onTakePhoto = onTakePhoto,
-                        onOpenAttachment = onOpenAttachment,
-                        onDeleteAttachment = onDeleteAttachment,
-                        onPickFromKidBoxDocuments = onPickKidBox,
+                    IosFormDivider(kb)
+                    TextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 120.dp),
+                        placeholder = { Text(stringResource(R.string.life_notes), color = kb.subtitle) },
+                        singleLine = false,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedTextColor = kb.title,
+                            unfocusedTextColor = kb.title,
+                            cursorColor = kb.title,
+                            focusedPlaceholderColor = kb.subtitle,
+                            unfocusedPlaceholderColor = kb.subtitle,
+                        ),
+                        textStyle = MaterialTheme.typography.bodyLarge,
                     )
                 }
+                Text(
+                    stringResource(R.string.life_attachments),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = kb.subtitle,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+                HealthAttachmentsCard(
+                    attachments = vehicleAttachments,
+                    tintColor = orange,
+                    isUploading = attachmentUploading,
+                    onPickFile = onPickFile,
+                    onPickPhoto = onPickPhoto,
+                    onTakePhoto = onTakePhoto,
+                    onOpenAttachment = onOpenAttachment,
+                    onDeleteAttachment = onDeleteAttachment,
+                    onPickFromKidBoxDocuments = onPickKidBox,
+                )
             }
         }
     }

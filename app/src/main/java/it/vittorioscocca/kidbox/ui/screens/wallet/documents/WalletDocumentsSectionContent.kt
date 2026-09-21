@@ -55,8 +55,6 @@ fun WalletDocumentsSectionContent(
     onUpgrade: () -> Unit,
     showAddSheet: Boolean,
     onShowAddSheetChange: (Boolean) -> Unit,
-    showLinkSheet: Boolean,
-    onShowLinkSheetChange: (Boolean) -> Unit,
     viewModel: WalletDocumentsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -135,14 +133,6 @@ fun WalletDocumentsSectionContent(
             viewModel = viewModel,
             onUpgrade = onUpgrade,
             onDismiss = { onShowAddSheetChange(false) },
-        )
-    }
-    if (showLinkSheet) {
-        LinkExistingWalletDocumentSheet(
-            familyId = familyId,
-            viewModel = viewModel,
-            onUpgrade = onUpgrade,
-            onDismiss = { onShowLinkSheetChange(false) },
         )
     }
 }

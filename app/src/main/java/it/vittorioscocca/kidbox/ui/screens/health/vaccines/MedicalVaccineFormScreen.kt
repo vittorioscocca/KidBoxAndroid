@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -135,7 +136,10 @@ fun MedicalVaccineFormScreen(
     val cardBg = if (isDark) Color.White.copy(alpha = 0.07f) else Color.Black.copy(alpha = 0.04f)
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        // Lo Scaffold non gestisce l'IME: senza `imePadding()` la tastiera
+        // copre i campi e il pulsante in fondo. Consumato qui, il
+        // `navigationBarsPadding()` della bottomBar non si somma.
+        modifier = Modifier.fillMaxSize().imePadding(),
         containerColor = kb.background,
         topBar = {
             CenterAlignedTopAppBar(
