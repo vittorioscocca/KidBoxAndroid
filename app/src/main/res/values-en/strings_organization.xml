@@ -208,4 +208,5 @@
     <string name="calendar_reminder_who_can_see">Who can see this reminder</string>
     <string name="calendar_reminder_visibility_locked_hint">Only whoever created the reminder can change who sees it.</string>
     <string name="calendar_event_who_can_see">Who can see this event</string>
+    <string name="reminder_notifications_blocked_body">The reminder is saved, but without notification permission KidBox can\'t alert you. You can grant it in your phone settings.</string>
 </resources>

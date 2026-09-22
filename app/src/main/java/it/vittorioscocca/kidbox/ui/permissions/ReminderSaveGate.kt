@@ -2,6 +2,8 @@ package it.vittorioscocca.kidbox.ui.permissions
 
 import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,6 +48,7 @@ class ReminderSaveGate<T> internal constructor(
     private val pending: MutableState<Pending<T>?>,
     private val requestNotifications: State<() -> Unit>,
     private val noticeState: MutableState<Boolean>,
+    private val blockedState: MutableState<Boolean>,
     private val onSave: State<(item: T, reminderAllowed: Boolean) -> Unit>,
 ) {
     internal data class Pending<T>(val item: T, val isUrgent: Boolean)
@@ -55,6 +58,20 @@ class ReminderSaveGate<T> internal constructor(
 
     fun dismissFullScreenNotice() {
         noticeState.value = false
+    }
+
+    /**
+     * Le notifiche sono negate e l'elemento è stato salvato senza avviso.
+     *
+     * Conta soprattutto alla **seconda** negazione: da Android 13 il sistema
+     * non mostra più niente e `launch()` torna «negato» all'istante, quindi
+     * senza questo l'utente vedrebbe solo il form chiudersi — promemoria
+     * salvato, muto, e nessuno che gliel'ha detto.
+     */
+    val showNotificationsBlockedNotice: Boolean get() = blockedState.value
+
+    fun dismissNotificationsBlockedNotice() {
+        blockedState.value = false
     }
 
     /**
@@ -87,6 +104,7 @@ fun <T> rememberReminderSaveGate(
     val context = LocalContext.current
     val pending = remember { mutableStateOf<ReminderSaveGate.Pending<T>?>(null) }
     val notice = remember { mutableStateOf(false) }
+    val blocked = remember { mutableStateOf(false) }
     // `onSave` è una lambda del chiamante e cambia a ogni ricomposizione: il
     // gate deve chiamare sempre l'ultima, non quella catturata alla nascita.
     val currentOnSave = rememberUpdatedState(onSave)
@@ -101,6 +119,7 @@ fun <T> rememberReminderSaveGate(
         if (granted && p.isUrgent && !RuntimePermissions.canUseFullScreenIntent(context)) {
             notice.value = true
         }
+        if (!granted) blocked.value = true
         currentOnSave.value(p.item, granted)
     }
 
@@ -110,7 +129,42 @@ fun <T> rememberReminderSaveGate(
             onGranted = { resume(true) },
         ),
     )
-    return remember { ReminderSaveGate(context, pending, request, notice, currentOnSave) }
+    return remember { ReminderSaveGate(context, pending, request, notice, blocked, currentOnSave) }
+}
+
+/**
+ * Avviso dopo un salvataggio con le notifiche negate: l'elemento c'è, l'avviso
+ * no. Porta alle impostazioni notifiche dell'app.
+ */
+@Composable
+fun NotificationsBlockedNoticeDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_notif_blocked)) },
+        text = { Text(stringResource(R.string.reminder_notifications_blocked_body)) },
+        confirmButton = {
+            TextButton(onClick = {
+                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                runCatching { context.startActivity(intent) }.onFailure { e ->
+                    if (e is ActivityNotFoundException) {
+                        KBLog.app.error("impostazioni notifiche assenti", TAG, e)
+                    }
+                }
+                onDismiss()
+            }) {
+                Text(stringResource(R.string.urgent_reminder_fullscreen_permission_open))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.urgent_reminder_fullscreen_permission_later))
+            }
+        },
+    )
 }
 
 /**

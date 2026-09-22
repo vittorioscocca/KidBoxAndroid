@@ -114,6 +114,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.AddCircle
 import it.vittorioscocca.kidbox.ui.util.visibilityChipLabel
 import it.vittorioscocca.kidbox.ui.permissions.FullScreenAlarmNoticeDialog
+import it.vittorioscocca.kidbox.ui.permissions.NotificationsBlockedNoticeDialog
 import it.vittorioscocca.kidbox.ui.permissions.rememberReminderSaveGate
 
 /**
@@ -434,6 +435,10 @@ fun CalendarScreen(
                 )
             },
         )
+    }
+
+    if (saveGate.showNotificationsBlockedNotice) {
+        NotificationsBlockedNoticeDialog(onDismiss = saveGate::dismissNotificationsBlockedNotice)
     }
 
     if (saveGate.showFullScreenNotice) {

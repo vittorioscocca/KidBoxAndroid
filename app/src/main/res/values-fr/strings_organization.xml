@@ -208,4 +208,5 @@
     <string name="calendar_reminder_who_can_see">Qui peut voir ce rappel</string>
     <string name="calendar_reminder_visibility_locked_hint">Seule la personne qui a créé le rappel peut en modifier la visibilité.</string>
     <string name="calendar_event_who_can_see">Qui peut voir cet événement</string>
+    <string name="reminder_notifications_blocked_body">Le rappel est enregistré, mais sans l\'autorisation de notification KidBox ne peut pas vous prévenir. Vous pouvez l\'accorder dans les réglages du téléphone.</string>
 </resources>

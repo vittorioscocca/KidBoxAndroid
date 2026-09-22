@@ -69,6 +69,7 @@ import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerMember
 import it.vittorioscocca.kidbox.ui.navigation.CONTENT_NO_LONGER_AVAILABLE_MESSAGE
 import it.vittorioscocca.kidbox.ui.permissions.RuntimePermissions
 import it.vittorioscocca.kidbox.ui.permissions.FullScreenAlarmNoticeDialog
+import it.vittorioscocca.kidbox.ui.permissions.NotificationsBlockedNoticeDialog
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.time.Instant
 import java.time.ZoneId
@@ -146,6 +147,7 @@ fun TodoListScreen(
     // verificarne la presenza invece di darla per scontata: senza, l'avviso
     // diventa una finestra mobile visibile un minuto.
     var showFullScreenNotice by remember { mutableStateOf(false) }
+    var showNotificationsBlocked by remember { mutableStateOf(false) }
     var pendingSnackbarMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(pendingSnackbarMessage) {
@@ -159,6 +161,10 @@ fun TodoListScreen(
     ) { granted ->
         val form = pendingSaveAfterPermission ?: return@rememberLauncherForActivityResult
         pendingSaveAfterPermission = null
+        // Alla seconda negazione il sistema non mostra più niente e la
+        // risposta torna «negato» all'istante: senza avviso l'utente vedrebbe
+        // solo il form chiudersi, con un to-do muto.
+        if (!granted && form.reminderEnabled) showNotificationsBlocked = true
         val effective = form.copy(reminderEnabled = granted && form.reminderEnabled)
         val editing = editingTodo
         if (editing == null) {
@@ -251,6 +257,10 @@ fun TodoListScreen(
             },
         )
         return
+    }
+
+    if (showNotificationsBlocked) {
+        NotificationsBlockedNoticeDialog(onDismiss = { showNotificationsBlocked = false })
     }
 
     if (showFullScreenNotice) {

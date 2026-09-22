@@ -65,7 +65,11 @@ object RuntimePermissions {
         return Intent(
             Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
             Uri.fromParts("package", context.packageName, null),
-        )
+        ).apply {
+            // Come gli altri rimandi alle impostazioni dell'app: senza
+            // NEW_TASK il lancio fallisce quando il context non è l'Activity.
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
     }
 }
 

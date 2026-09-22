@@ -208,4 +208,5 @@
     <string name="calendar_reminder_who_can_see">Quién puede ver este recordatorio</string>
     <string name="calendar_reminder_visibility_locked_hint">Solo quien creó el recordatorio puede cambiar su visibilidad.</string>
     <string name="calendar_event_who_can_see">Quién puede ver este evento</string>
+    <string name="reminder_notifications_blocked_body">El recordatorio está guardado, pero sin permiso de notificaciones KidBox no puede avisarte. Puedes concederlo en los ajustes del teléfono.</string>
 </resources>
