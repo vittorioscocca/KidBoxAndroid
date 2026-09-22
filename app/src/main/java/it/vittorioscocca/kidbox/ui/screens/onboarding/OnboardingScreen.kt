@@ -93,6 +93,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.EdgeToEdgeController
 import it.vittorioscocca.kidbox.ui.screens.settings.CornerBrackets
+import it.vittorioscocca.kidbox.data.remote.family.InviteReferrerPickup
 import it.vittorioscocca.kidbox.data.remote.family.InviteRemoteStore
 import it.vittorioscocca.kidbox.data.remote.family.PendingFamilyInvite
 import it.vittorioscocca.kidbox.ui.screens.settings.JoinFamilyViewModel
@@ -183,6 +184,27 @@ fun OnboardingScreen(
         pendingLinkInvite = invite
         familyPath = FamilyPath.LinkJoin
         linkInvitePreview = InviteRemoteStore().fetchInvitePreview(invite.familyId, invite.inviteId)
+    }
+
+    // Invito noto dal referrer di Play ma senza segreto (gli appunti non
+    // l'avevano): invece del wizard generico si dice all'utente che l'invito
+    // esiste e come completarlo. Vedi InviteReferrerPickup.
+    var partialInvite by remember { mutableStateOf(InviteReferrerPickup.partialInvite(context)) }
+    var partialFamilyName by remember { mutableStateOf<String?>(null) }
+    var retryTick by remember { mutableStateOf(0) }
+    LaunchedEffect(partialInvite, retryTick) {
+        val p = partialInvite ?: return@LaunchedEffect
+        // Gli appunti possono arrivare dopo: l'utente installa, apre l'app, e
+        // solo allora torna sul messaggio a copiare il link.
+        InviteReferrerPickup.pickUp(context)
+        PendingFamilyInvite.load(context)?.let { found ->
+            pendingLinkInvite = found
+            familyPath = FamilyPath.LinkJoin
+            linkInvitePreview = InviteRemoteStore().fetchInvitePreview(found.familyId, found.inviteId)
+            partialInvite = null
+            return@LaunchedEffect
+        }
+        partialFamilyName = InviteRemoteStore().fetchInvitePreview(p.familyId, p.inviteId).familyName
     }
 
     val currentPage = pagerState.currentPage
@@ -284,6 +306,8 @@ fun OnboardingScreen(
                             },
                         )
                     page == 0 -> SetupPageContent(
+                        pendingInviteFamilyName = partialInvite?.let { partialFamilyName ?: "" },
+                        onRetryInvite = { retryTick++ },
                         state = nameState,
                         viewModel = nameViewModel,
                         familyName = familyName,
@@ -565,6 +589,13 @@ private fun IconHeroCard(
  */
 @Composable
 private fun SetupPageContent(
+    /**
+     * Non nullo quando il referrer di Play dice che c'è un invito ma il
+     * segreto non è stato trovato negli appunti: stringa vuota se il nome
+     * della famiglia non è ancora arrivato.
+     */
+    pendingInviteFamilyName: String?,
+    onRetryInvite: () -> Unit,
     state: OnboardingNameUiState,
     viewModel: OnboardingNameViewModel,
     familyName: String,
@@ -613,6 +644,36 @@ private fun SetupPageContent(
             lineHeight = 22.sp,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
         )
+        if (pendingInviteFamilyName != null) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(OrangeAccent.copy(alpha = 0.10f))
+                    .padding(16.dp),
+            ) {
+                Text(
+                    if (pendingInviteFamilyName.isBlank()) {
+                        stringResource(R.string.onboarding_pending_invite_generic)
+                    } else {
+                        stringResource(R.string.onboarding_pending_invite, pendingInviteFamilyName)
+                    },
+                    fontSize = 14.sp,
+                    color = BlackText,
+                    lineHeight = 20.sp,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.onboarding_pending_invite_retry),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = OrangeAccent,
+                    modifier = Modifier.clickable(enabled = !isBusy, onClick = onRetryInvite),
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(12.dp))
 
         FormFieldLabel(stringResource(R.string.onboarding_name_first_label))

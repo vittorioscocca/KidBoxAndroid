@@ -190,6 +190,9 @@
     <string name="onboarding_sign_out">Sign out</string>
     <string name="onboarding_sign_out_title">Sign out of your account?</string>
     <string name="onboarding_sign_out_message">You\'ll go back to the sign-in screen. Anything you\'ve already created stays on your account.</string>
+    <string name="onboarding_pending_invite">You\'ve been invited to the %1$s family. To join, go back to the message you received and tap the invite link again.</string>
+    <string name="onboarding_pending_invite_generic">You\'ve been invited to a family. To join, go back to the message you received and tap the invite link again.</string>
+    <string name="onboarding_pending_invite_retry">I tapped the link, try again</string>
     <string name="onboarding_retry">Try again</string>
     <string name="onboarding_share">Share</string>
     <string name="onboarding_copied">Copied!</string>

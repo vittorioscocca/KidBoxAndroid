@@ -37,6 +37,7 @@ data class TodoItemRemoteDto(
     val isDeleted: Boolean,
     val notes: String?,
     val dueAtEpochMillis: Long?,
+    val dueHasTime: Boolean?,
     val doneAtEpochMillis: Long?,
     val doneBy: String?,
     val updatedAtEpochMillis: Long?,
@@ -174,6 +175,7 @@ class TodoRemoteStore @Inject constructor(
                                         isDeleted = d["isDeleted"] as? Boolean ?: false,
                                         notes = (d["notes"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
                                         dueAtEpochMillis = (d["dueAt"] as? Timestamp)?.toDate()?.time,
+                                        dueHasTime = d["dueHasTime"] as? Boolean,
                                         doneAtEpochMillis = (d["doneAt"] as? Timestamp)?.toDate()?.time,
                                         doneBy = d["doneBy"] as? String,
                                         updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
@@ -278,6 +280,7 @@ class TodoRemoteStore @Inject constructor(
             "updatedAt" to FieldValue.serverTimestamp(),
         )
         payload["dueAt"] = todo.dueAtEpochMillis?.let { Timestamp(it / 1000, ((it % 1000) * 1_000_000).toInt()) }
+        payload["dueHasTime"] = todo.dueHasTime
         payload["doneAt"] = todo.doneAtEpochMillis?.let { Timestamp(it / 1000, ((it % 1000) * 1_000_000).toInt()) }
         if (!todo.createdBy.isNullOrBlank()) payload["createdBy"] = todo.createdBy
         payload["visibilityScope"] = todo.visibilityScope

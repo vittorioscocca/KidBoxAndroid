@@ -190,6 +190,9 @@
     <string name="onboarding_sign_out">Esci</string>
     <string name="onboarding_sign_out_title">Vuoi uscire dall\'account?</string>
     <string name="onboarding_sign_out_message">Torni alla schermata di accesso. Quello che hai già creato resta sul tuo account.</string>
+    <string name="onboarding_pending_invite">Ti hanno invitato nella famiglia %1$s. Per entrare, torna sul messaggio che hai ricevuto e tocca di nuovo il link d\'invito.</string>
+    <string name="onboarding_pending_invite_generic">Ti hanno invitato in una famiglia. Per entrare, torna sul messaggio che hai ricevuto e tocca di nuovo il link d\'invito.</string>
+    <string name="onboarding_pending_invite_retry">Ho toccato il link, riprova</string>
     <string name="onboarding_retry">Riprova</string>
     <string name="onboarding_share">Condividi</string>
     <string name="onboarding_copied">Copiato!</string>

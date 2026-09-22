@@ -17,6 +17,12 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!--
+      Promemoria «urgenti»: a schermo bloccato la sveglia deve comparire a
+      tutto schermo, non come una riga in cima. Android la degrada da sé in un
+      avviso normale quando lo schermo è già sbloccato.
+    -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
     <uses-permission android:name="android.permission.health.READ_STEPS" />
@@ -208,6 +214,14 @@
 
         <receiver
             android:name=".notifications.HealthReminderReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".notifications.UrgentAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".notifications.CalendarEventReminderReceiver"
             android:exported="false" />
 
         <receiver

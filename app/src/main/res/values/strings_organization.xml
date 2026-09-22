@@ -177,4 +177,28 @@
     <string name="todo_deeplink_opening">Apro il to-do…</string>
     <string name="calendar_deeplink_opening">Apro l\'evento…</string>
     <string name="calendar_previous_month_cd">Mese precedente</string>
+
+    <string name="calendar_kind_event">Evento</string>
+    <string name="calendar_kind_reminder">Promemoria</string>
+    <string name="calendar_new_reminder_title">Nuovo promemoria</string>
+    <string name="calendar_edit_reminder_title">Modifica promemoria</string>
+    <string name="calendar_reminder_title_placeholder">Nome o descrizione del promemoria</string>
+    <string name="calendar_date_and_time">Data e ora</string>
+    <string name="calendar_date_label">Data</string>
+    <string name="calendar_time_label">Ora</string>
+    <string name="calendar_reminder_list_label">Elenco</string>
+    <string name="calendar_reminder_list_default">Promemoria</string>
+    <string name="calendar_add_reminder">Aggiungi promemoria</string>
+    <string name="calendar_save_reminder">Salva promemoria</string>
+    <string name="calendar_reminders_section">Promemoria</string>
+    <string name="calendar_events_section">Eventi</string>
+    <string name="calendar_event_reminder_title">Promemoria evento</string>
+    <string name="calendar_event_reminder_fallback">Evento</string>
+    <string name="calendar_event_reminder_channel_description">Avvisi degli eventi del calendario</string>
+    <string name="urgent_reminder_notification_title">Promemoria urgente</string>
+    <string name="urgent_reminder_channel_name">Promemoria urgenti</string>
+    <string name="urgent_reminder_channel_description">Sveglie dei promemoria segnati come urgenti</string>
+    <string name="urgent_reminder_hint">Un promemoria urgente attiva una sveglia: suona anche se il telefono è silenzioso o in Non disturbare.</string>
+    <string name="todo_me">Me</string>
+    <string name="todo_due_time">Ora</string>
 </resources>

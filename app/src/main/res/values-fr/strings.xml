@@ -70,6 +70,7 @@
     <string name="auth_error_too_many_requests">Trop de tentatives. Réessayez dans quelques minutes.</string>
     <string name="auth_error_user_disabled">Compte désactivé. Contactez le support.</string>
     <string name="auth_error_email_not_verified">E-mail non vérifié. Nous vous avons renvoyé le lien : ouvrez l\'e-mail, vérifiez votre adresse, puis connectez-vous.</string>
+    <string name="auth_error_session_expired">Session non valide. Déconnectez-vous et reconnectez-vous.</string>
     <string name="family_key_missing_title">Clé de famille manquante</string>
     <string name="family_key_missing_message">Cet appareil n\'a pas la clé qui protège les contenus partagés : les documents, le wallet, les photos et les pièces jointes du chat ne peuvent pas être ouverts.\n\nPour la récupérer, demande à la personne qui a créé la famille de t\'inviter à nouveau et scanne le QR code qu\'elle génère.</string>
     <string name="family_key_missing_short">Clé de famille manquante : demande à la personne qui a créé la famille de t\'inviter à nouveau et scanne son QR code.</string>

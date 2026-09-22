@@ -12,7 +12,13 @@ import it.vittorioscocca.kidbox.data.local.mapper.encodeStringList
 import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.data.notification.CountersService
 import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
+import it.vittorioscocca.kidbox.data.local.CalendarViewModePreference
+import it.vittorioscocca.kidbox.data.local.entity.KBTodoItemEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBTodoListEntity
+import it.vittorioscocca.kidbox.data.notification.CalendarEventReminderScheduler
 import it.vittorioscocca.kidbox.data.repository.CalendarRepository
+import it.vittorioscocca.kidbox.data.repository.TodoRepository
+import it.vittorioscocca.kidbox.domain.model.TodoListExposure
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
 import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerMember
@@ -33,16 +39,50 @@ import kotlinx.coroutines.launch
 
 enum class CalendarMode { DAY, WEEK, MONTH, YEAR }
 
+/** Le quattro sorgenti che disegnano il calendario, tenute insieme. */
+private data class CalendarSources(
+    val familyId: String = "",
+    val events: List<KBCalendarEventEntity> = emptyList(),
+    val todos: List<KBTodoItemEntity> = emptyList(),
+    val lists: List<KBTodoListEntity> = emptyList(),
+    val allMembers: List<VisibilityPickerMember> = emptyList(),
+)
+
 data class CalendarUiState(
     val familyId: String = "",
     val mode: CalendarMode = CalendarMode.MONTH,
     val selectedDate: LocalDate = LocalDate.now(),
     val displayedMonth: LocalDate = LocalDate.now().withDayOfMonth(1),
     val events: List<KBCalendarEventEntity> = emptyList(),
+    /**
+     * I promemoria del calendario **sono** to-do con una scadenza: stessa
+     * collezione, stesse liste, stessa visibilità. Il calendario è solo
+     * un'altra porta d'ingresso.
+     */
+    val reminders: List<KBTodoItemEntity> = emptyList(),
+    /** Liste To-Do in cui si può mettere un promemoria creato da qui. */
+    val todoLists: List<KBTodoListEntity> = emptyList(),
     /** Membri (escluso utente corrente) per il foglio visibilità in creazione evento. */
     val visibilityMembers: List<VisibilityPickerMember> = emptyList(),
+    /** Tutti i membri, incluso me: serve al selettore «Assegnato a». */
+    val assignableMembers: List<VisibilityPickerMember> = emptyList(),
+    val currentUid: String = "",
+    val childId: String = "",
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
+)
+
+/** I campi di un promemoria creato o modificato dal calendario. */
+data class CalendarReminderDraft(
+    val title: String,
+    val notes: String?,
+    val dueAtEpochMillis: Long,
+    val dueHasTime: Boolean,
+    val isUrgent: Boolean,
+    val listId: String,
+    val assignedTo: String?,
+    val visibilityScope: String = KBVisibilityScope.FAMILY,
+    val visibilityMemberIds: List<String> = emptyList(),
 )
 
 data class CalendarDraftInput(
@@ -53,6 +93,8 @@ data class CalendarDraftInput(
     val recurrenceRaw: String,
     val isAllDay: Boolean,
     val reminderMinutes: Int?,
+    /** Urgente: il promemoria dell'evento diventa una sveglia. */
+    val isUrgent: Boolean = false,
     val startEpochMillis: Long,
     val endEpochMillis: Long,
     val visibilityScope: String = KBVisibilityScope.FAMILY,
@@ -64,11 +106,21 @@ class CalendarViewModel @Inject constructor(
     private val familyDao: KBFamilyDao,
     private val familyMemberDao: KBFamilyMemberDao,
     private val calendarRepository: CalendarRepository,
+    private val todoRepository: TodoRepository,
+    private val calendarReminderScheduler: CalendarEventReminderScheduler,
+    private val viewModePreference: CalendarViewModePreference,
     private val countersService: CountersService,
     private val homeBadgeManager: HomeBadgeManager,
     private val auth: FirebaseAuth,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(CalendarUiState())
+    private val _uiState = MutableStateFlow(
+        // La vista scelta l'ultima volta, non sempre il mese: è una
+        // preferenza del dispositivo e sopravvive alla chiusura dell'app.
+        CalendarUiState(
+            mode = runCatching { CalendarMode.valueOf(viewModePreference.read().orEmpty()) }
+                .getOrDefault(CalendarMode.MONTH),
+        ),
+    )
     val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow()
     private val forcedFamilyId = MutableStateFlow<String?>(null)
 
@@ -112,21 +164,24 @@ class CalendarViewModel @Inject constructor(
                             )
                         },
                     )
+                    startTodoRealtime(familyId)
                     clearCalendarBadge(familyId)
                     runCatching { calendarRepository.flushPending(familyId) }
                 }
                 .flatMapLatest { familyId ->
                     if (familyId.isBlank()) {
-                        flowOf(Triple("", emptyList(), emptyList()))
+                        flowOf(CalendarSources())
                     } else {
                         combine(
                             calendarRepository.observeEvents(familyId),
                             familyMemberDao.observeActiveByFamilyId(familyId),
-                        ) { events, members ->
+                            todoRepository.observeTodos(familyId, ""),
+                            todoRepository.observeLists(familyId, ""),
+                        ) { events, members, todos, lists ->
                             val uid = auth.currentUser?.uid
-                            val visibilityMembers = members
+                            val allMembers = members
                                 .asSequence()
-                                .filter { it.userId.isNotBlank() && (uid == null || it.userId != uid) }
+                                .filter { it.userId.isNotBlank() }
                                 .map { row ->
                                     VisibilityPickerMember(
                                         uid = row.userId,
@@ -138,14 +193,21 @@ class CalendarViewModel @Inject constructor(
                                 .distinctBy { it.uid }
                                 .sortedBy { it.displayName.lowercase() }
                                 .toList()
-                            Triple(familyId, events, visibilityMembers)
+                            CalendarSources(
+                                familyId = familyId,
+                                events = events,
+                                todos = todos,
+                                lists = lists,
+                                allMembers = allMembers,
+                            )
                         }
                     }
                 }
-                .collect { (familyId, rawEvents, visibilityMembers) ->
+                .collect { sources ->
+                    val familyId = sources.familyId
                     if (familyId.isBlank()) return@collect
                     val uid = auth.currentUser?.uid
-                    val visible = rawEvents.filterNot { it.isDeleted }.filter { event ->
+                    val visible = sources.events.filterNot { it.isDeleted }.filter { event ->
                         KBVisibilityScope.isVisible(
                             scope = KBVisibilityScope.normalized(event.visibilityScope),
                             memberIds = decodeStringList(event.visibilityMemberIdsJson),
@@ -153,10 +215,39 @@ class CalendarViewModel @Inject constructor(
                             currentUid = uid,
                         )
                     }
+                    val visibleTodos = sources.todos.filterNot { it.isDeleted }.filter { todo ->
+                        KBVisibilityScope.isVisible(
+                            scope = KBVisibilityScope.normalized(todo.visibilityScope),
+                            memberIds = decodeStringList(todo.visibilityMemberIdsJson),
+                            createdBy = todo.createdBy?.takeIf { it.isNotBlank() },
+                            currentUid = uid,
+                        )
+                    }
+                    // Solo i to-do con una scadenza: gli altri vivono nel
+                    // backlog e non hanno un giorno in cui disegnarli.
+                    val reminders = visibleTodos.filter { it.dueAtEpochMillis != null }
+                    // Le stesse liste che si vedono in To-Do: una lista di soli
+                    // elementi privati di un altro membro non deve comparire.
+                    val visibleLists = sources.lists.filterNot { it.isDeleted }.filter { list ->
+                        TodoListExposure.memberCanSeeListRow(
+                            listId = list.id,
+                            todosForChild = sources.todos.filterNot { it.isDeleted },
+                            currentUid = uid,
+                            listCreatedBy = list.createdBy,
+                        )
+                    }
                     _uiState.value = _uiState.value.copy(
                         familyId = familyId,
                         events = visible,
-                        visibilityMembers = visibilityMembers,
+                        reminders = reminders,
+                        todoLists = visibleLists,
+                        visibilityMembers = sources.allMembers.filter { it.uid != uid },
+                        assignableMembers = sources.allMembers,
+                        currentUid = uid.orEmpty(),
+                        // `childId` non filtra più niente ma i to-do lo
+                        // pretendono ancora nel documento: si riusa quello che
+                        // la famiglia sta già scrivendo.
+                        childId = sources.todos.firstOrNull { it.childId.isNotBlank() }?.childId.orEmpty(),
                         isLoading = false,
                         errorMessage = null,
                     )
@@ -169,6 +260,7 @@ class CalendarViewModel @Inject constructor(
     }
 
     fun setMode(mode: CalendarMode) {
+        viewModePreference.write(mode.name)
         _uiState.value = _uiState.value.copy(mode = mode)
     }
 
@@ -220,6 +312,7 @@ class CalendarViewModel @Inject constructor(
                 categoryRaw = input.categoryRaw,
                 recurrenceRaw = input.recurrenceRaw,
                 reminderMinutes = input.reminderMinutes,
+                priorityRaw = if (input.isUrgent) 1 else 0,
                 linkedHealthItemId = null,
                 linkedHealthItemType = null,
                 visibilityScope = effectiveScope,
@@ -243,6 +336,7 @@ class CalendarViewModel @Inject constructor(
                 categoryRaw = input.categoryRaw,
                 recurrenceRaw = input.recurrenceRaw,
                 reminderMinutes = input.reminderMinutes,
+                priorityRaw = if (input.isUrgent) 1 else 0,
                 visibilityScope = effectiveScope,
                 visibilityMemberIdsJson = memberIdsJson,
                 isDeleted = false,
@@ -257,6 +351,16 @@ class CalendarViewModel @Inject constructor(
             runCatching {
                 calendarRepository.upsertEventLocal(entity)
                 calendarRepository.flushPending(familyId)
+                // Fino a oggi `reminderMinutes` veniva salvato e basta: nessuno
+                // lo leggeva, su nessun client. Qui l'avviso viene armato.
+                calendarReminderScheduler.sync(
+                    eventId = entity.id,
+                    familyId = familyId,
+                    title = entity.title,
+                    startEpochMillis = entity.startDateEpochMillis,
+                    reminderMinutes = entity.reminderMinutes,
+                    isUrgent = entity.priorityRaw == 1,
+                )
             }.onFailure {
                 _uiState.value = _uiState.value.copy(errorMessage = it.localizedMessage ?: "Errore salvataggio evento")
             }
@@ -266,6 +370,8 @@ class CalendarViewModel @Inject constructor(
     fun deleteEvent(event: KBCalendarEventEntity) {
         viewModelScope.launch {
             runCatching {
+                // L'evento sparisce: il suo avviso non deve sopravvivergli.
+                calendarReminderScheduler.cancel(event.id)
                 calendarRepository.deleteEventLocal(event)
                 calendarRepository.flushPending(event.familyId)
             }.onFailure {
@@ -274,10 +380,107 @@ class CalendarViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Salva un promemoria creato o modificato dal calendario. È un to-do vero,
+     * nella lista scelta: chi lo apre da To-Do lo trova identico.
+     */
+    fun saveReminder(draft: CalendarReminderDraft, editingId: String?) {
+        val familyId = _uiState.value.familyId
+        if (familyId.isBlank() || draft.title.isBlank()) return
+        val childId = _uiState.value.childId
+        viewModelScope.launch {
+            runCatching {
+                val listId = draft.listId.ifBlank {
+                    // Senza `listId` il to-do esisterebbe ma non si vedrebbe in
+                    // nessuna lista: è la trappola degli orfani già nota.
+                    _uiState.value.todoLists.firstOrNull()?.id
+                        ?: todoRepository.addList(familyId, childId, "Promemoria")
+                }
+                if (editingId == null) {
+                    todoRepository.addTodo(
+                        familyId = familyId,
+                        childId = childId,
+                        listId = listId,
+                        title = draft.title,
+                        notes = draft.notes,
+                        dueAtEpochMillis = draft.dueAtEpochMillis,
+                        dueHasTime = draft.dueHasTime,
+                        assignedTo = draft.assignedTo,
+                        priorityRaw = if (draft.isUrgent) 1 else 0,
+                        // Un promemoria creato dal calendario ha una scadenza:
+                        // l'avviso è il motivo per cui esiste.
+                        reminderEnabled = true,
+                        visibilityScope = draft.visibilityScope,
+                        visibilityMemberIds = draft.visibilityMemberIds,
+                    )
+                } else {
+                    todoRepository.updateTodo(
+                        todoId = editingId,
+                        title = draft.title,
+                        notes = draft.notes,
+                        dueAtEpochMillis = draft.dueAtEpochMillis,
+                        dueHasTime = draft.dueHasTime,
+                        assignedTo = draft.assignedTo,
+                        priorityRaw = if (draft.isUrgent) 1 else 0,
+                        reminderEnabled = true,
+                        visibilityScope = draft.visibilityScope,
+                        visibilityMemberIds = draft.visibilityMemberIds,
+                    )
+                }
+            }.onFailure {
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = it.localizedMessage ?: "Errore salvataggio promemoria",
+                )
+            }
+        }
+    }
+
+    /** Spunta o despunta un promemoria dal calendario, senza aprirlo. */
+    fun toggleReminderDone(todoId: String) {
+        viewModelScope.launch {
+            runCatching { todoRepository.toggleTodoDone(todoId) }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = it.localizedMessage ?: "Errore aggiornamento promemoria",
+                    )
+                }
+        }
+    }
+
+    fun deleteReminder(todoId: String) {
+        viewModelScope.launch {
+            runCatching { todoRepository.deleteTodo(todoId) }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = it.localizedMessage ?: "Errore eliminazione promemoria",
+                    )
+                }
+        }
+    }
+
     fun onCalendarOpened() {
         val familyId = _uiState.value.familyId
         if (familyId.isBlank()) return
+        // Si riaggancia anche il listener dei to-do: `TodoRepository` è un
+        // singleton con UN solo listener, e `TodoListViewModel.onCleared()`
+        // lo spegne uscendo da To-Do. Senza questo, chi passa da To-Do al
+        // calendario non vedrebbe più arrivare promemoria nuovi — è la stessa
+        // trappola del listener condiviso già pagata su iOS.
+        startTodoRealtime(familyId)
         clearCalendarBadge(familyId)
+    }
+
+    /**
+     * I promemoria sono to-do: per vederli arrivare serve il loro listener,
+     * che altrimenti parte solo entrando nella sezione To-Do. `startRealtime`
+     * è idempotente (salta se è già agganciato sulla stessa famiglia).
+     */
+    private fun startTodoRealtime(familyId: String) {
+        if (familyId.isBlank()) return
+        todoRepository.startRealtime(
+            familyId = familyId,
+            childId = _uiState.value.childId,
+        )
     }
 
     private fun clearCalendarBadge(familyId: String) {
@@ -289,6 +492,9 @@ class CalendarViewModel @Inject constructor(
 
     override fun onCleared() {
         calendarRepository.stopRealtime()
+        // `todoRepository.stopRealtime()` NON si chiama qui: il listener è
+        // condiviso con le schermate To-Do, e spegnerlo uscendo dal calendario
+        // lascerebbe cieca la sezione To-Do aperta subito dopo.
         super.onCleared()
     }
 }

@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.ManageAccounts
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
@@ -53,6 +54,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SheetState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -79,6 +81,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -113,6 +116,8 @@ fun ProfileScreen(
     var showDeleteSheet by remember { mutableStateOf(false) }
     var deleteConfirmText by remember { mutableStateOf("") }
     val deleteSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var showChangePasswordSheet by remember { mutableStateOf(false) }
+    val changePasswordSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = androidx.compose.ui.platform.LocalContext.current
     val kb = MaterialTheme.kidBoxColors
 
@@ -234,6 +239,20 @@ fun ProfileScreen(
                 }
             }
         }
+    }
+
+    if (showChangePasswordSheet) {
+        ChangePasswordSheet(
+            sheetState = changePasswordSheetState,
+            isSaving = state.isChangingPassword,
+            errorText = state.changePasswordError,
+            succeeded = state.changePasswordSucceeded,
+            onSubmit = viewModel::changePassword,
+            onDismiss = {
+                showChangePasswordSheet = false
+                viewModel.dismissChangePassword()
+            },
+        )
     }
 
     if (showRemoveAvatarDialog) {
@@ -514,6 +533,18 @@ fun ProfileScreen(
             InfoRow(Icons.Default.Email, Color(0xFF5EA8E2), stringResource(R.string.home_profile_email_label), state.email.ifBlank { stringResource(R.string.home_profile_placeholder_dash) })
             HorizontalDivider(color = kb.divider)
             InfoRow(Icons.Default.Update, Color(0xFF67B96D), stringResource(R.string.home_profile_last_login_label), "13 Apr 2026 at 9:17")
+            // Apple e Google non hanno una password da cambiare: la voce
+            // compare solo per chi è entrato con email e password.
+            if (state.isPasswordAccount) {
+                HorizontalDivider(color = kb.divider)
+                ActionRow(
+                    icon = Icons.Default.Key,
+                    tint = Color(0xFF8C66E6),
+                    label = stringResource(R.string.home_profile_change_password_action),
+                    onClick = { showChangePasswordSheet = true },
+                    modifier = Modifier.padding(horizontal = 0.dp, vertical = 0.dp),
+                )
+            }
         }
 
         SectionCard(icon = Icons.Default.Star, iconColor = Color(0xFF3DA668), title = stringResource(R.string.home_profile_subscription_section_title)) {
@@ -689,19 +720,129 @@ private fun InfoRow(icon: ImageVector, tint: Color, label: String, value: String
     }
 }
 
+/**
+ * Foglio di cambio password dell'account, come `ChangePasswordSheet` su iOS.
+ * La validazione di forma (almeno 6 caratteri, conferma uguale) è qui; la
+ * riautenticazione e gli errori di Firebase stanno nel ViewModel.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChangePasswordSheet(
+    sheetState: SheetState,
+    isSaving: Boolean,
+    errorText: String?,
+    succeeded: Boolean,
+    onSubmit: (current: String, new: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    var current by remember { mutableStateOf("") }
+    var new by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    val mismatch = confirm.isNotEmpty() && new != confirm
+    val canSubmit = current.isNotEmpty() && new.length >= 6 && new == confirm && !isSaving
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedContainerColor = kb.card,
+        unfocusedContainerColor = kb.card,
+        focusedTextColor = kb.title,
+        unfocusedTextColor = kb.title,
+        focusedLabelColor = kb.subtitle,
+        unfocusedLabelColor = kb.subtitle,
+    )
+
+    ModalBottomSheet(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                // Senza, la tastiera copre i pulsanti sotto i campi.
+                .imePadding()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                stringResource(R.string.home_profile_change_password_title),
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                color = kb.title,
+            )
+            if (succeeded) {
+                Text(stringResource(R.string.home_profile_change_password_done_title), fontWeight = FontWeight.SemiBold, color = kb.title)
+                Text(stringResource(R.string.home_profile_change_password_done_body), color = kb.subtitle)
+                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                    Button(onClick = onDismiss) { Text(stringResource(R.string.subscription_ok)) }
+                }
+                return@Column
+            }
+            Text(stringResource(R.string.home_profile_change_password_hint), color = kb.subtitle)
+            OutlinedTextField(
+                value = current,
+                onValueChange = { current = it },
+                label = { Text(stringResource(R.string.home_profile_change_password_current)) },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth(),
+                colors = fieldColors,
+            )
+            OutlinedTextField(
+                value = new,
+                onValueChange = { new = it },
+                label = { Text(stringResource(R.string.home_profile_change_password_new)) },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                supportingText = { Text(stringResource(R.string.home_profile_change_password_min_length)) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = fieldColors,
+            )
+            OutlinedTextField(
+                value = confirm,
+                onValueChange = { confirm = it },
+                label = { Text(stringResource(R.string.home_profile_change_password_confirm)) },
+                singleLine = true,
+                isError = mismatch,
+                visualTransformation = PasswordVisualTransformation(),
+                supportingText = if (mismatch) {
+                    { Text(stringResource(R.string.login_passwords_mismatch), color = MaterialTheme.colorScheme.error) }
+                } else null,
+                modifier = Modifier.fillMaxWidth(),
+                colors = fieldColors,
+            )
+            errorText?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TextButton(onClick = onDismiss, enabled = !isSaving) { Text(stringResource(R.string.home_profile_cancel)) }
+                Button(
+                    onClick = { onSubmit(current, new) },
+                    enabled = canSubmit,
+                ) {
+                    if (isSaving) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text(stringResource(R.string.home_profile_change_password_save))
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun ActionRow(
     icon: ImageVector,
     tint: Color,
     label: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
 ) {
     val kb = MaterialTheme.kidBoxColors
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .then(modifier),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, contentDescription = null, tint = tint)

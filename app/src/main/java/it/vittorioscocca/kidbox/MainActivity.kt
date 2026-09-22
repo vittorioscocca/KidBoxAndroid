@@ -25,6 +25,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import it.vittorioscocca.kidbox.data.local.AppTheme
@@ -43,8 +44,10 @@ import it.vittorioscocca.kidbox.ui.theme.KidBoxTheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import it.vittorioscocca.kidbox.util.CrashAnalyzer
 import it.vittorioscocca.kidbox.util.KBLog
+import it.vittorioscocca.kidbox.data.remote.family.InviteReferrerPickup
 import it.vittorioscocca.kidbox.data.remote.family.PendingFamilyInvite
 import javax.inject.Inject
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -89,6 +92,10 @@ class MainActivity : AppCompatActivity() {
         NotificationDeepLinkRouter.handleLaunchIntent(this, intent)
         showPrivacyPolicyIfRequestedByHealthConnect(intent)
         storePendingInviteIfAny(intent)
+        // Invito toccato PRIMA di installare: Play referrer + appunti.
+        // Silenzioso, non blocca l'avvio; se non trova niente l'app si
+        // comporta come prima. Vedi InviteReferrerPickup.
+        lifecycleScope.launch { InviteReferrerPickup.pickUp(this@MainActivity) }
 
         setContent {
             val appTheme by themePreference.getThemeFlow().collectAsStateWithLifecycle(

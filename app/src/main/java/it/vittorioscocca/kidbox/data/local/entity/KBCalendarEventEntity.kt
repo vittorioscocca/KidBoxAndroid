@@ -36,6 +36,11 @@ data class KBCalendarEventEntity(
     val categoryRaw: String,
     val recurrenceRaw: String,
     val reminderMinutes: Int?,
+    /**
+     * Urgente: il promemoria diventa una **sveglia** invece di una notifica.
+     * Stesso vocabolario dei to-do, dove l'urgenza vive su `priorityRaw`.
+     */
+    val priorityRaw: Int = 0,
     val linkedHealthItemId: String?,
     val linkedHealthItemType: String?,
     /** `"family"` | `"members"` | `"private"` (solo creatore) — come note/to‑do e iOS. */

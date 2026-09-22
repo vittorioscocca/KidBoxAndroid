@@ -177,4 +177,28 @@
     <string name="todo_deeplink_opening">Abriendo la tarea…</string>
     <string name="calendar_deeplink_opening">Abriendo el evento…</string>
     <string name="calendar_previous_month_cd">Mes anterior</string>
+
+    <string name="calendar_kind_event">Evento</string>
+    <string name="calendar_kind_reminder">Recordatorio</string>
+    <string name="calendar_new_reminder_title">Nuevo recordatorio</string>
+    <string name="calendar_edit_reminder_title">Editar recordatorio</string>
+    <string name="calendar_reminder_title_placeholder">Nombre o descripción del recordatorio</string>
+    <string name="calendar_date_and_time">Fecha y hora</string>
+    <string name="calendar_date_label">Fecha</string>
+    <string name="calendar_time_label">Hora</string>
+    <string name="calendar_reminder_list_label">Lista</string>
+    <string name="calendar_reminder_list_default">Recordatorios</string>
+    <string name="calendar_add_reminder">Añadir recordatorio</string>
+    <string name="calendar_save_reminder">Guardar recordatorio</string>
+    <string name="calendar_reminders_section">Recordatorios</string>
+    <string name="calendar_events_section">Eventos</string>
+    <string name="calendar_event_reminder_title">Recordatorio de evento</string>
+    <string name="calendar_event_reminder_fallback">Evento</string>
+    <string name="calendar_event_reminder_channel_description">Avisos de los eventos del calendario</string>
+    <string name="urgent_reminder_notification_title">Recordatorio urgente</string>
+    <string name="urgent_reminder_channel_name">Recordatorios urgentes</string>
+    <string name="urgent_reminder_channel_description">Alarmas de los recordatorios marcados como urgentes</string>
+    <string name="urgent_reminder_hint">Un recordatorio urgente activa una alarma: suena aunque el teléfono esté en silencio o en No molestar.</string>
+    <string name="todo_me">Yo</string>
+    <string name="todo_due_time">Hora</string>
 </resources>

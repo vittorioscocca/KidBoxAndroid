@@ -41,7 +41,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -76,6 +78,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
@@ -83,6 +86,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.data.local.entity.KBCalendarEventEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBTodoItemEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBTodoListEntity
 import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerFullscreenDialog
@@ -122,6 +127,7 @@ fun CalendarScreen(
     TrackSectionPresence(AppSection.CALENDAR, familyId)
     var showForm by remember { mutableStateOf(false) }
     var editingEvent by remember { mutableStateOf<KBCalendarEventEntity?>(null) }
+    var editingReminder by remember { mutableStateOf<KBTodoItemEntity?>(null) }
     // Ora scelta toccando la griglia di Giorno/Settimana; null = mezzanotte.
     var newEventTime by remember { mutableStateOf<LocalTime?>(null) }
     val currentUid = remember { FirebaseAuth.getInstance().currentUser?.uid }
@@ -222,6 +228,7 @@ fun CalendarScreen(
                         contentDescription = stringResource(R.string.calendar_new_event_cd),
                         onClick = {
                             editingEvent = null
+                            editingReminder = null
                             newEventTime = null
                             showForm = true
                         },
@@ -276,16 +283,25 @@ fun CalendarScreen(
                     CalendarMode.DAY, CalendarMode.WEEK -> CalendarTimeGridView(
                         selectedDate = state.selectedDate,
                         events = state.events,
+                        reminders = state.reminders,
+                        onEditReminder = {
+                            editingReminder = it
+                            editingEvent = null
+                            newEventTime = null
+                            showForm = true
+                        },
                         isWeek = state.mode == CalendarMode.WEEK,
                         onSelectDate = viewModel::setSelectedDate,
                         onEditEvent = {
                             editingEvent = it
+                            editingReminder = null
                             newEventTime = null
                             showForm = true
                         },
                         onAddEvent = { at ->
                             viewModel.setSelectedDate(at.toLocalDate())
                             editingEvent = null
+                            editingReminder = null
                             newEventTime = at.toLocalTime()
                             showForm = true
                         },
@@ -295,16 +311,27 @@ fun CalendarScreen(
                         selectedDate = state.selectedDate,
                         displayedMonth = state.displayedMonth,
                         events = state.events,
+                        reminders = state.reminders,
+                        onEditReminder = {
+                            editingReminder = it
+                            editingEvent = null
+                            newEventTime = null
+                            showForm = true
+                        },
+                        onToggleReminder = { viewModel.toggleReminderDone(it.id) },
+                        onDeleteReminder = { viewModel.deleteReminder(it.id) },
                         onSelectDate = viewModel::setSelectedDate,
                         onChangeDisplayedMonth = viewModel::setDisplayedMonth,
                         onEditEvent = {
                             editingEvent = it
+                            editingReminder = null
                             newEventTime = null
                             showForm = true
                         },
                         onDeleteEvent = viewModel::deleteEvent,
                         onAddEvent = {
                             editingEvent = null
+                            editingReminder = null
                             newEventTime = null
                             showForm = true
                         },
@@ -324,24 +351,31 @@ fun CalendarScreen(
     }
 
     if (showForm) {
-        CalendarEventDialog(
-            initial = editingEvent,
+        CalendarItemSheet(
+            editingEvent = editingEvent,
+            editingReminder = editingReminder,
             selectedDate = state.selectedDate,
             initialTime = newEventTime,
             currentUid = currentUid,
             visibilityScope = draftVisibilityScope,
             visibilityMemberIds = draftVisibilityMemberIds,
+            todoLists = state.todoLists,
+            assignableMembers = state.assignableMembers,
             onRequestVisibilityPicker = { showVisibilityPicker = true },
             onDismiss = { showForm = false },
-            onSave = { draft ->
+            onSaveEvent = { draft ->
                 viewModel.saveEvent(draft, editingEvent)
+                showForm = false
+            },
+            onSaveReminder = { draft ->
+                viewModel.saveReminder(draft, editingReminder?.id)
                 showForm = false
             },
         )
     }
 
     // The picker is a sibling of CalendarEventDialog (NOT nested inside its ModalBottomSheet).
-    if (showVisibilityPicker && showForm) {
+    if (showVisibilityPicker && showForm && editingReminder == null) {
         VisibilityPickerFullscreenDialog(
             currentUid = currentUid,
             scopeSectionTitle = "Chi può vedere questo evento?",
@@ -363,15 +397,20 @@ private fun CalendarMonthView(
     selectedDate: LocalDate,
     displayedMonth: LocalDate,
     events: List<KBCalendarEventEntity>,
+    reminders: List<KBTodoItemEntity>,
     onSelectDate: (LocalDate) -> Unit,
     onChangeDisplayedMonth: (LocalDate) -> Unit,
     onEditEvent: (KBCalendarEventEntity) -> Unit,
     onDeleteEvent: (KBCalendarEventEntity) -> Unit,
+    onEditReminder: (KBTodoItemEntity) -> Unit,
+    onToggleReminder: (KBTodoItemEntity) -> Unit,
+    onDeleteReminder: (KBTodoItemEntity) -> Unit,
     onAddEvent: () -> Unit,
 ) {
     val eventsByDate = remember(events) {
         buildEventsByDay(events)
     }
+    val remindersByDate = remember(reminders) { buildRemindersByDay(reminders) }
 
     val days = remember(displayedMonth) { monthGridDays(displayedMonth.withDayOfMonth(1)) }
     val kb = MaterialTheme.kidBoxColors
@@ -464,7 +503,17 @@ private fun CalendarMonthView(
                                 modifier = Modifier
                                     .padding(top = 2.dp)
                                     .size(4.dp)
-                                    .background(if (hasEvents) Color(0xFF42A5F5) else Color.Transparent, CircleShape),
+                                    .background(
+                                        // Anche i promemoria accendono il
+                                        // pallino: un giorno che ne ha uno non
+                                        // può sembrare vuoto.
+                                        if (hasEvents || remindersByDate[day]?.isNotEmpty() == true) {
+                                            Color(0xFF42A5F5)
+                                        } else {
+                                            Color.Transparent
+                                        },
+                                        CircleShape,
+                                    ),
                             )
                         }
                     }
@@ -474,7 +523,11 @@ private fun CalendarMonthView(
 
         Divider(modifier = Modifier.padding(top = 6.dp))
         val selectedEvents = eventsByDate[selectedDate].orEmpty().sortedBy { it.startDateEpochMillis }
-        if (selectedEvents.isEmpty()) {
+        val selectedReminders = remindersByDate[selectedDate].orEmpty()
+            // I fatti in fondo: restano visibili, ma non rubano la riga in
+            // cima a quelli ancora da fare.
+            .sortedWith(compareBy({ it.isDone }, { it.dueAtEpochMillis ?: Long.MAX_VALUE }))
+        if (selectedEvents.isEmpty() && selectedReminders.isEmpty()) {
             // `weight` + scroll: senza, lo spazio residuo sotto la griglia del mese può
             // essere minore dell'empty state e il pulsante finisce schiacciato/tagliato.
             Box(
@@ -498,12 +551,30 @@ private fun CalendarMonthView(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(vertical = 5.dp),
             ) {
+                if (selectedEvents.isNotEmpty() && selectedReminders.isNotEmpty()) {
+                    item(key = "events-header") {
+                        CalendarSectionHeader(stringResource(R.string.calendar_events_section))
+                    }
+                }
                 items(selectedEvents, key = { it.id }) { event ->
                     CalendarEventCard(
                         event = event,
                         onEdit = { onEditEvent(event) },
                         onDelete = { onDeleteEvent(event) },
                     )
+                }
+                if (selectedReminders.isNotEmpty()) {
+                    item(key = "reminders-header") {
+                        CalendarSectionHeader(stringResource(R.string.calendar_reminders_section))
+                    }
+                    items(selectedReminders, key = { "r-${it.id}" }) { reminder ->
+                        CalendarReminderCard(
+                            todo = reminder,
+                            onEdit = { onEditReminder(reminder) },
+                            onToggleDone = { onToggleReminder(reminder) },
+                            onDelete = { onDeleteReminder(reminder) },
+                        )
+                    }
                 }
             }
         }
@@ -522,9 +593,11 @@ private val HOUR_GUTTER_WIDTH = 42.dp
 private fun CalendarTimeGridView(
     selectedDate: LocalDate,
     events: List<KBCalendarEventEntity>,
+    reminders: List<KBTodoItemEntity>,
     isWeek: Boolean,
     onSelectDate: (LocalDate) -> Unit,
     onEditEvent: (KBCalendarEventEntity) -> Unit,
+    onEditReminder: (KBTodoItemEntity) -> Unit,
     onAddEvent: (LocalDateTime) -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -539,6 +612,7 @@ private fun CalendarTimeGridView(
         }
     }
     val eventsByDate = remember(events) { buildEventsByDay(events) }
+    val remindersByDate = remember(reminders) { buildRemindersByDay(reminders) }
     val scrollState = rememberScrollState()
     val density = LocalDensity.current
 
@@ -673,6 +747,56 @@ private fun CalendarTimeGridView(
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
+                    }
+                }
+            }
+            Divider()
+        }
+
+        // I promemoria stanno in una riga propria sopra la griglia, come fa
+        // Calendario di Apple: hanno un istante, non una durata, e disegnarli
+        // come blocchi li farebbe sembrare appuntamenti di un'ora.
+        if (days.any { remindersByDate[it].orEmpty().isNotEmpty() }) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Text(
+                    stringResource(R.string.calendar_reminders_section),
+                    modifier = Modifier.width(HOUR_GUTTER_WIDTH).padding(end = 4.dp),
+                    color = kb.subtitle,
+                    fontSize = 9.sp,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                )
+                days.forEach { day ->
+                    Column(
+                        modifier = Modifier.weight(1f).padding(horizontal = 1.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        remindersByDate[day].orEmpty()
+                            .sortedBy { it.dueAtEpochMillis ?: Long.MAX_VALUE }
+                            .forEach { todo ->
+                                Text(
+                                    todo.title,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(
+                                            MaterialTheme.colorScheme.primary
+                                                .copy(alpha = if (todo.isDone) 0.08f else 0.16f),
+                                        )
+                                        .clickable { onEditReminder(todo) }
+                                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                                    // Senza colore esplicito dentro un
+                                    // contenitore tinto il testo resta nero
+                                    // anche in tema scuro.
+                                    color = if (todo.isDone) kb.subtitle else kb.title,
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                     }
                 }
             }
@@ -1112,9 +1236,107 @@ private fun CalendarEventCard(
     }
 }
 
+/** Titoletto «Eventi» / «Promemoria» nell'elenco del giorno. */
+@Composable
+private fun CalendarSectionHeader(text: String) {
+    Text(
+        text = text,
+        modifier = Modifier.padding(start = 20.dp, top = 10.dp, bottom = 4.dp),
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.kidBoxColors.subtitle,
+    )
+}
+
+/**
+ * Riga di un promemoria nell'elenco del giorno. Il cerchio a sinistra spunta
+ * senza aprire la scheda, come nelle liste To-Do.
+ */
+@Composable
+private fun CalendarReminderCard(
+    todo: KBTodoItemEntity,
+    onEdit: () -> Unit,
+    onToggleDone: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    val due = todo.dueAtEpochMillis
+    val timeLabel = when {
+        due == null -> ""
+        todo.dueHasTime -> Instant.ofEpochMilli(due).atZone(ZoneId.systemDefault())
+            .format(DateTimeFormatter.ofPattern("HH:mm"))
+        else -> stringResource(R.string.calendar_all_day)
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 3.dp)
+            .clickable(onClick = onEdit),
+        colors = CardDefaults.cardColors(containerColor = kb.card),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onToggleDone, modifier = Modifier.size(38.dp)) {
+                Icon(
+                    if (todo.isDone) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
+                    contentDescription = stringResource(R.string.calendar_reminders_section),
+                    tint = if (todo.isDone) MaterialTheme.colorScheme.primary else kb.subtitle,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(vertical = 10.dp, horizontal = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(1.dp),
+            ) {
+                Text(
+                    todo.title,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp,
+                    color = if (todo.isDone) kb.subtitle else kb.title,
+                    textDecoration = if (todo.isDone) TextDecoration.LineThrough else null,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (timeLabel.isNotBlank()) {
+                        Text(timeLabel, color = kb.subtitle, fontSize = 12.sp, maxLines = 1)
+                    }
+                    if (todo.priorityRaw == 1) {
+                        Text("·", color = kb.subtitle, fontSize = 12.sp)
+                        Text(
+                            stringResource(R.string.todo_urgent),
+                            color = Color(0xFFEF6C00),
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+            IconButton(onClick = onDelete, modifier = Modifier.size(38.dp)) {
+                Icon(
+                    Icons.Default.DeleteOutline,
+                    contentDescription = stringResource(R.string.calendar_delete),
+                    tint = Color(0xFFD32F2F),
+                    modifier = Modifier.size(19.dp),
+                )
+            }
+            Spacer(modifier = Modifier.width(4.dp))
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun CalendarEventDialog(
+private fun CalendarEventFormContent(
     initial: KBCalendarEventEntity?,
     selectedDate: LocalDate,
     /** Ora scelta toccando la griglia oraria; null = mezzanotte. */
@@ -1127,6 +1349,8 @@ private fun CalendarEventDialog(
     onRequestVisibilityPicker: () -> Unit,
     onDismiss: () -> Unit,
     onSave: (CalendarDraftInput) -> Unit,
+    /** Il selettore Evento/Promemoria, mostrato solo in creazione. */
+    kindSelector: (@Composable () -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val locale = KBLocale.current()
@@ -1149,6 +1373,7 @@ private fun CalendarEventDialog(
     var recurrence by remember { mutableStateOf(initial?.recurrenceRaw ?: "none") }
     var isAllDay by remember { mutableStateOf(initial?.isAllDay ?: false) }
     var reminderOn by remember { mutableStateOf((initial?.reminderMinutes ?: 0) > 0) }
+    var urgent by remember { mutableStateOf(initial?.priorityRaw == 1) }
     var startDate by remember { mutableStateOf(initialStart.toLocalDate()) }
     var startTime by remember { mutableStateOf(initialStart.toLocalTime().withSecond(0).withNano(0)) }
     var endDate by remember { mutableStateOf(initialEnd.toLocalDate()) }
@@ -1204,17 +1429,9 @@ private fun CalendarEventDialog(
         ).show()
     }
 
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val titleText = if (initial == null) stringResource(R.string.calendar_new_event_title) else stringResource(R.string.calendar_edit_event_title)
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.kidBoxColors.background,
-        dragHandle = null,
-    ) {
-        Column(
+    Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     // Il foglio è a tutta altezza (`skipPartiallyExpanded`) e vive
@@ -1241,6 +1458,8 @@ private fun CalendarEventDialog(
                 Spacer(modifier = Modifier.weight(1f))
                 Spacer(modifier = Modifier.size(74.dp))
             }
+
+            kindSelector?.invoke()
 
             Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1352,26 +1571,51 @@ private fun CalendarEventDialog(
             }
 
             Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card)) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        "Promemoria",
-                        modifier = Modifier.weight(1f),
-                        fontSize = 16.sp,
-                        color = kb.title,
-                    )
-                    Switch(
-                        checked = reminderOn,
-                        onCheckedChange = { reminderOn = it },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = colorScheme.surface,
-                            checkedTrackColor = colorScheme.primary,
-                            uncheckedThumbColor = kb.subtitle,
-                            uncheckedTrackColor = kb.surfaceOverlay,
-                        ),
-                    )
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            stringResource(R.string.calendar_reminder_label),
+                            modifier = Modifier.weight(1f),
+                            fontSize = 16.sp,
+                            color = kb.title,
+                        )
+                        Switch(
+                            checked = reminderOn,
+                            onCheckedChange = { reminderOn = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = colorScheme.surface,
+                                checkedTrackColor = colorScheme.primary,
+                                uncheckedThumbColor = kb.subtitle,
+                                uncheckedTrackColor = kb.surfaceOverlay,
+                            ),
+                        )
+                    }
+                    if (reminderOn) {
+                        Divider(modifier = Modifier.padding(vertical = 6.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                stringResource(R.string.todo_urgent),
+                                modifier = Modifier.weight(1f),
+                                fontSize = 16.sp,
+                                color = kb.title,
+                            )
+                            Switch(
+                                checked = urgent,
+                                onCheckedChange = { urgent = it },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = colorScheme.surface,
+                                    checkedTrackColor = colorScheme.primary,
+                                    uncheckedThumbColor = kb.subtitle,
+                                    uncheckedTrackColor = kb.surfaceOverlay,
+                                ),
+                            )
+                        }
+                        Text(
+                            stringResource(R.string.urgent_reminder_hint),
+                            fontSize = 12.sp,
+                            color = kb.subtitle,
+                        )
+                    }
                 }
             }
 
@@ -1465,6 +1709,9 @@ private fun CalendarEventDialog(
                             recurrenceRaw = recurrence,
                             isAllDay = isAllDay,
                             reminderMinutes = if (reminderOn) 30 else null,
+                            // Urgente senza promemoria non vuol dire niente:
+                            // non c'è nulla da far suonare.
+                            isUrgent = reminderOn && urgent,
                             startEpochMillis = startDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
                             endEpochMillis = endDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
                             visibilityScope = visibilityScope,
@@ -1483,9 +1730,8 @@ private fun CalendarEventDialog(
                     color = colorScheme.onPrimary,
                 )
             }
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-        }
+        Spacer(modifier = Modifier.height(8.dp))
+    }
 }
 
 @Composable
@@ -1723,6 +1969,17 @@ private fun categoryColor(raw: String): Color = when (raw) {
     else -> Color(0xFF9E9E9E)
 }
 
+/** Un promemoria cade in un giorno solo: ha un istante, non una durata. */
+private fun buildRemindersByDay(reminders: List<KBTodoItemEntity>): Map<LocalDate, List<KBTodoItemEntity>> {
+    val map = mutableMapOf<LocalDate, MutableList<KBTodoItemEntity>>()
+    reminders.forEach { todo ->
+        val due = todo.dueAtEpochMillis ?: return@forEach
+        val day = Instant.ofEpochMilli(due).atZone(ZoneId.systemDefault()).toLocalDate()
+        map.getOrPut(day) { mutableListOf() }.add(todo)
+    }
+    return map
+}
+
 private fun buildEventsByDay(events: List<KBCalendarEventEntity>): Map<LocalDate, List<KBCalendarEventEntity>> {
     val grouped = linkedMapOf<LocalDate, MutableList<KBCalendarEventEntity>>()
     events.forEach { event ->
@@ -1759,3 +2016,101 @@ private fun eventCoveredDates(event: KBCalendarEventEntity): List<LocalDate> {
 
 /** Quanto si attende che la sincronizzazione porti l'evento aperto da notifica. */
 private const val EVENT_SYNC_WAIT_MS = 25_000L
+
+/** Quale dei due si sta inserendo dal calendario. */
+enum class CalendarNewItemKind { EVENT, REMINDER }
+
+/**
+ * Il foglio di inserimento del calendario. In modifica mostra la scheda
+ * dell'elemento; in creazione mostra sopra il selettore `Evento | Promemoria`,
+ * come in Calendario di Apple.
+ *
+ * Le due schede non condividono nulla se non quella barra: un evento è un
+ * `KBCalendarEventEntity`, un promemoria è un to-do in una lista.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CalendarItemSheet(
+    editingEvent: KBCalendarEventEntity?,
+    editingReminder: KBTodoItemEntity?,
+    selectedDate: LocalDate,
+    initialTime: LocalTime?,
+    currentUid: String?,
+    visibilityScope: String,
+    visibilityMemberIds: Set<String>,
+    todoLists: List<KBTodoListEntity>,
+    assignableMembers: List<VisibilityPickerMember>,
+    onRequestVisibilityPicker: () -> Unit,
+    onDismiss: () -> Unit,
+    onSaveEvent: (CalendarDraftInput) -> Unit,
+    onSaveReminder: (CalendarReminderDraft) -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val isNew = editingEvent == null && editingReminder == null
+    var kind by remember(isNew, editingReminder?.id) {
+        mutableStateOf(
+            if (editingReminder != null) CalendarNewItemKind.REMINDER else CalendarNewItemKind.EVENT,
+        )
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = MaterialTheme.kidBoxColors.background,
+        dragHandle = null,
+    ) {
+        val selector: (@Composable () -> Unit)? = if (!isNew) {
+            null
+        } else {
+            {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(MaterialTheme.kidBoxColors.card)
+                        .padding(3.dp),
+                ) {
+                    TogglePill(
+                        text = stringResource(R.string.calendar_kind_event),
+                        selected = kind == CalendarNewItemKind.EVENT,
+                        modifier = Modifier.weight(1f),
+                    ) { kind = CalendarNewItemKind.EVENT }
+                    TogglePill(
+                        text = stringResource(R.string.calendar_kind_reminder),
+                        selected = kind == CalendarNewItemKind.REMINDER,
+                        modifier = Modifier.weight(1f),
+                    ) { kind = CalendarNewItemKind.REMINDER }
+                }
+            }
+        }
+
+        when {
+            kind == CalendarNewItemKind.REMINDER || editingReminder != null ->
+                CalendarReminderFormContent(
+                    initial = editingReminder,
+                    selectedDate = selectedDate,
+                    initialTime = initialTime,
+                    currentUid = currentUid,
+                    todoLists = todoLists,
+                    members = assignableMembers,
+                    onDismiss = onDismiss,
+                    onSave = onSaveReminder,
+                    kindSelector = selector,
+                )
+
+            else -> CalendarEventFormContent(
+                initial = editingEvent,
+                selectedDate = selectedDate,
+                initialTime = initialTime,
+                currentUid = currentUid,
+                visibilityScope = visibilityScope,
+                visibilityMemberIds = visibilityMemberIds,
+                onRequestVisibilityPicker = onRequestVisibilityPicker,
+                onDismiss = onDismiss,
+                onSave = onSaveEvent,
+                kindSelector = selector,
+            )
+        }
+    }
+}

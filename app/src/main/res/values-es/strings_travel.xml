@@ -190,6 +190,9 @@
     <string name="onboarding_sign_out">Cerrar sesión</string>
     <string name="onboarding_sign_out_title">¿Cerrar sesión?</string>
     <string name="onboarding_sign_out_message">Volverás a la pantalla de acceso. Lo que ya has creado se queda en tu cuenta.</string>
+    <string name="onboarding_pending_invite">Te han invitado a la familia %1$s. Para entrar, vuelve al mensaje que recibiste y toca de nuevo el enlace de invitación.</string>
+    <string name="onboarding_pending_invite_generic">Te han invitado a una familia. Para entrar, vuelve al mensaje que recibiste y toca de nuevo el enlace de invitación.</string>
+    <string name="onboarding_pending_invite_retry">He tocado el enlace, reintentar</string>
     <string name="onboarding_retry">Reintentar</string>
     <string name="onboarding_share">Compartir</string>
     <string name="onboarding_copied">¡Copiado!</string>

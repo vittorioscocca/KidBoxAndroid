@@ -212,7 +212,7 @@ class TodoRepository @Inject constructor(
         val list = listDao.getById(listId) ?: return
         val todos = itemDao.getByFamily(list.familyId).filter { it.listId == listId }
         todos.forEach { todo ->
-            reminderScheduler.cancel(todo.reminderId)
+            reminderScheduler.cancel(todo.id)
             remoteStore.softDeleteTodo(todo.familyId, todo.id)
             itemDao.deleteById(todo.id)
         }
@@ -227,6 +227,7 @@ class TodoRepository @Inject constructor(
         title: String,
         notes: String?,
         dueAtEpochMillis: Long?,
+        dueHasTime: Boolean = true,
         assignedTo: String?,
         priorityRaw: Int?,
         reminderEnabled: Boolean,
@@ -249,6 +250,7 @@ class TodoRepository @Inject constructor(
             title = title,
             notes = notes,
             dueAtEpochMillis = dueAtEpochMillis,
+            dueHasTime = dueHasTime,
             isDone = false,
             doneAtEpochMillis = null,
             doneBy = null,
@@ -275,6 +277,9 @@ class TodoRepository @Inject constructor(
                 familyId = familyId,
                 childId = childId,
                 listId = listId,
+                // «Urgente» decide fra sveglia e notifica: senza questo la
+                // sveglia non partirebbe mai al primo salvataggio.
+                isUrgent = (priorityRaw ?: 0) == 1,
             )
         } else {
             null
@@ -309,6 +314,7 @@ class TodoRepository @Inject constructor(
         title: String,
         notes: String?,
         dueAtEpochMillis: Long?,
+        dueHasTime: Boolean = true,
         assignedTo: String?,
         priorityRaw: Int?,
         reminderEnabled: Boolean,
@@ -317,9 +323,10 @@ class TodoRepository @Inject constructor(
         visibilityMemberIds: List<String>? = null,
     ) {
         val existing = itemDao.getById(todoId) ?: return
-        if (!existing.reminderId.isNullOrBlank() && (!reminderEnabled || dueAtEpochMillis == null)) {
-            reminderScheduler.cancel(existing.reminderId)
-        }
+        // Si annulla sempre, non solo quando il promemoria viene spento:
+        // cambiare urgenza cambia *strada* (sveglia ⇄ notifica), e senza
+        // questo resterebbe armata anche quella vecchia.
+        reminderScheduler.cancel(todoId)
         val normalizedScope = visibilityScope?.let { KBVisibilityScope.normalized(it) }
             ?: existing.visibilityScope
         val memberIdsJson = if (visibilityMemberIds != null) {
@@ -333,6 +340,7 @@ class TodoRepository @Inject constructor(
             title = title,
             notes = notes,
             dueAtEpochMillis = dueAtEpochMillis,
+            dueHasTime = dueHasTime,
             assignedTo = assignedTo,
             priorityRaw = priorityRaw ?: 0,
             reminderEnabled = reminderEnabled && dueAtEpochMillis != null,
@@ -351,6 +359,7 @@ class TodoRepository @Inject constructor(
                 familyId = local.familyId,
                 childId = local.childId,
                 listId = local.listId,
+                isUrgent = (priorityRaw ?: 0) == 1,
             )
         } else {
             null
@@ -366,7 +375,7 @@ class TodoRepository @Inject constructor(
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()
         val done = !existing.isDone
-        if (done) reminderScheduler.cancel(existing.reminderId)
+        if (done) reminderScheduler.cancel(todoId)
         val local = existing.copy(
             isDone = done,
             doneAtEpochMillis = if (done) now else null,
@@ -385,7 +394,7 @@ class TodoRepository @Inject constructor(
 
     suspend fun deleteTodo(todoId: String) {
         val existing = itemDao.getById(todoId) ?: return
-        reminderScheduler.cancel(existing.reminderId)
+        reminderScheduler.cancel(todoId)
         remoteStore.softDeleteTodo(existing.familyId, todoId)
         itemDao.deleteById(todoId)
     }
@@ -520,6 +529,15 @@ class TodoRepository @Inject constructor(
                     val remoteScope = KBVisibilityScope.normalized(dto.visibilityScope)
                     val remoteMemberIds = dto.visibilityMemberIds
                     val safeListId = resolveReferencedListId(dto.familyId, dto.listId)
+                    // Il sync non **arma** promemoria (restano del device), ma
+                    // deve poterli **spegnere**: un to-do chiuso da un altro
+                    // membro o dal web continuerebbe altrimenti a suonare qui —
+                    // e da quando gli urgenti sono sveglie a tutto schermo,
+                    // quella dimenticanza si sente.
+                    val closedRemotely = dto.isDone || dto.isDeleted
+                    if (closedRemotely && local?.reminderEnabled == true) {
+                        reminderScheduler.cancel(dto.id)
+                    }
                     itemDao.upsert(
                         KBTodoItemEntity(
                             id = dto.id,
@@ -528,6 +546,7 @@ class TodoRepository @Inject constructor(
                             title = dto.title,
                             notes = dto.notes,
                             dueAtEpochMillis = dto.dueAtEpochMillis,
+                            dueHasTime = dto.dueHasTime ?: true,
                             isDone = dto.isDone,
                             doneAtEpochMillis = dto.doneAtEpochMillis,
                             doneBy = dto.doneBy,
@@ -536,8 +555,8 @@ class TodoRepository @Inject constructor(
                             updatedBy = dto.updatedBy ?: local?.updatedBy ?: "",
                             isDeleted = false,
                             listId = safeListId,
-                            reminderEnabled = local?.reminderEnabled ?: false,
-                            reminderId = local?.reminderId,
+                            reminderEnabled = if (closedRemotely) false else local?.reminderEnabled ?: false,
+                            reminderId = if (closedRemotely) null else local?.reminderId,
                             syncStateRaw = KBSyncState.SYNCED.rawValue,
                             lastSyncError = null,
                             assignedTo = dto.assignedTo,
@@ -568,7 +587,7 @@ class TodoRepository @Inject constructor(
                     }
                     .forEach { stale ->
                         KBLog.sync.info("applyTodoInbound RECONCILE delete todoId=${stale.id}", tag = "todo")
-                        reminderScheduler.cancel(stale.reminderId)
+                        reminderScheduler.cancel(stale.id)
                         itemDao.deleteById(stale.id)
                     }
             }.onFailure {

@@ -271,6 +271,17 @@ object DatabaseModule {
      * biglietti già importati non hanno l'informazione e non c'è modo di
      * ricavarla senza rileggere il PDF.
      */
+    /**
+     * «Urgente» sugli eventi del calendario e la scadenza senza orario sui
+     * to-do: due colonne, nessuna riscrittura di tabella.
+     */
+    private val MIGRATION_47_48 = object : Migration(47, 48) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `kb_calendar_events` ADD COLUMN `priorityRaw` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `kb_todo_items` ADD COLUMN `dueHasTime` INTEGER NOT NULL DEFAULT 1")
+        }
+    }
+
     private val MIGRATION_46_47 = object : Migration(46, 47) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE `kb_wallet_tickets` ADD COLUMN `price` TEXT")
@@ -1412,6 +1423,7 @@ object DatabaseModule {
         MIGRATION_44_45,
         MIGRATION_45_46,
         MIGRATION_46_47,
+        MIGRATION_47_48,
     )
         .fallbackToDestructiveMigration()
         .build()

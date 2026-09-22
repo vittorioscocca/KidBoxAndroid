@@ -30,6 +30,7 @@ data class CalendarEventRemoteDto(
     val categoryRaw: String,
     val recurrenceRaw: String,
     val reminderMinutes: Int?,
+    val priority: Int?,
     val linkedHealthItemId: String?,
     val linkedHealthItemType: String?,
     val visibilityScope: String,
@@ -91,6 +92,7 @@ class CalendarRemoteStore @Inject constructor(
                                     categoryRaw = (d["categoryRaw"] as? String)?.trim().orEmpty().ifBlank { "family" },
                                     recurrenceRaw = (d["recurrenceRaw"] as? String)?.trim().orEmpty().ifBlank { "none" },
                                     reminderMinutes = (d["reminderMinutes"] as? Number)?.toInt(),
+                                    priority = (d["priority"] as? Number)?.toInt(),
                                     linkedHealthItemId = (d["linkedHealthItemId"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
                                     linkedHealthItemType = (d["linkedHealthItemType"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
                                     visibilityScope = KBVisibilityScope.normalized(d["visibilityScope"] as? String),
@@ -127,6 +129,9 @@ class CalendarRemoteStore @Inject constructor(
             "categoryRaw" to event.categoryRaw,
             "recurrenceRaw" to event.recurrenceRaw,
             "reminderMinutes" to event.reminderMinutes,
+            // `priority` si scrive sempre, anche a zero: è l'unico modo perché
+            // togliere «urgente» arrivi agli altri device invece di restare qui.
+            "priority" to event.priorityRaw,
             "linkedHealthItemId" to event.linkedHealthItemId,
             "linkedHealthItemType" to event.linkedHealthItemType,
             "visibilityScope" to KBVisibilityScope.normalized(event.visibilityScope),

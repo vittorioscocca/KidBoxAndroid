@@ -221,6 +221,7 @@ class CalendarRepository @Inject constructor(
                             categoryRaw = dto.categoryRaw,
                             recurrenceRaw = dto.recurrenceRaw,
                             reminderMinutes = dto.reminderMinutes,
+                            priorityRaw = dto.priority ?: 0,
                             linkedHealthItemId = dto.linkedHealthItemId,
                             linkedHealthItemType = dto.linkedHealthItemType,
                             visibilityScope = remoteScope,

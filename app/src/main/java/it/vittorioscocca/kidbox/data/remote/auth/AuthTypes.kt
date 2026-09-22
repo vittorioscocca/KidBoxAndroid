@@ -76,6 +76,15 @@ sealed class AuthError(
         "Email address not verified.",
         R.string.auth_error_email_not_verified,
     )
+
+    /**
+     * Nessun utente loggato (o senza email) al momento di un'operazione che lo
+     * richiede, come il cambio password: la sessione è caduta sotto i piedi.
+     */
+    object SessionExpired : AuthError(
+        "No signed-in user for this operation.",
+        R.string.auth_error_session_expired,
+    )
 }
 
 /**

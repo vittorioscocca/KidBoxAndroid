@@ -32,8 +32,8 @@ android {
         applicationId = "it.vittorioscocca.kidbox"
         minSdk = 26
         targetSdk = 36
-        versionCode = 57
-        versionName = "2.3.3"
+        versionCode = 58
+        versionName = "2.3.4"
         manifestPlaceholders["googleMapsApiKey"] = mapsApiKey
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
         buildConfigField("Boolean", "AI_ENABLED", "true")
@@ -209,6 +209,9 @@ dependencies {
     // WorkManager (wallet reminders)
     implementation("androidx.work:work-runtime-ktx:2.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // Play Install Referrer: l'invito toccato PRIMA di installare arriva
+    // all'app al primo avvio. Vedi InviteReferrerPickup.
+    implementation("com.android.installreferrer:installreferrer:2.2")
 
     debugImplementation("com.google.firebase:firebase-appcheck-debug")
     releaseImplementation("com.google.firebase:firebase-appcheck-playintegrity")

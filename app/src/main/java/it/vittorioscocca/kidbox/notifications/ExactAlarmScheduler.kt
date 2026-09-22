@@ -34,6 +34,33 @@ object ExactAlarmScheduler {
         }
     }
 
+    /**
+     * Sveglia vera: `setAlarmClock` è l'unica API che Android tratta come una
+     * sveglia dell'orologio — esente da Doze e dalle restrizioni in standby,
+     * con l'icona nella barra di stato. Serve ai promemoria «urgenti», che
+     * devono suonare anche in Non disturbare.
+     *
+     * Senza il permesso agli allarmi esatti si ripiega su
+     * [scheduleRtcWakeupAllowWhileIdle]: l'orario diventa approssimativo, ma
+     * l'avviso arriva comunque.
+     */
+    fun scheduleAlarmClock(
+        context: Context,
+        triggerAtMillis: Long,
+        pendingIntent: PendingIntent,
+    ) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        try {
+            alarmManager.setAlarmClock(
+                AlarmManager.AlarmClockInfo(triggerAtMillis, pendingIntent),
+                pendingIntent,
+            )
+        } catch (security: SecurityException) {
+            KBLog.app.error("setAlarmClock negato, fallback inesatto", TAG, security)
+            scheduleRtcWakeupAllowWhileIdle(context, triggerAtMillis, pendingIntent)
+        }
+    }
+
     fun scheduleRtcWakeupAllowWhileIdle(
         context: Context,
         triggerAtMillis: Long,

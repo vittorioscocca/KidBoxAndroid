@@ -8,6 +8,8 @@ data class KBTodoItem(
     val title: String,
     val notes: String?,
     val dueAtEpochMillis: Long?,
+    /** `false` = scadenza senza orario: l'avviso suona alle 9:00. */
+    val dueHasTime: Boolean = true,
     val isDone: Boolean,
     val doneAtEpochMillis: Long?,
     val doneBy: String?,

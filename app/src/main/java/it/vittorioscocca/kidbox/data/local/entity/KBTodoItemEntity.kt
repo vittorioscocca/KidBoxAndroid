@@ -36,6 +36,13 @@ data class KBTodoItemEntity(
     val title: String,
     val notes: String?,
     val dueAtEpochMillis: Long?,
+    /**
+     * La scadenza porta con sé un orario, oppure vale «tutto il giorno».
+     * Le righe precedenti al campo valgono `true`: ogni `dueAt` nasceva con
+     * data **e** ora. Con `false` la UI mostra solo il giorno e l'avviso
+     * suona alle 9:00.
+     */
+    val dueHasTime: Boolean = true,
     val isDone: Boolean,
     val doneAtEpochMillis: Long?,
     val doneBy: String?,

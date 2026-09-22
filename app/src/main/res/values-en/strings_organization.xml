@@ -177,4 +177,28 @@
     <string name="todo_deeplink_opening">Opening the to-do…</string>
     <string name="calendar_deeplink_opening">Opening the event…</string>
     <string name="calendar_previous_month_cd">Previous month</string>
+
+    <string name="calendar_kind_event">Event</string>
+    <string name="calendar_kind_reminder">Reminder</string>
+    <string name="calendar_new_reminder_title">New reminder</string>
+    <string name="calendar_edit_reminder_title">Edit reminder</string>
+    <string name="calendar_reminder_title_placeholder">Reminder name or description</string>
+    <string name="calendar_date_and_time">Date and time</string>
+    <string name="calendar_date_label">Date</string>
+    <string name="calendar_time_label">Time</string>
+    <string name="calendar_reminder_list_label">List</string>
+    <string name="calendar_reminder_list_default">Reminders</string>
+    <string name="calendar_add_reminder">Add reminder</string>
+    <string name="calendar_save_reminder">Save reminder</string>
+    <string name="calendar_reminders_section">Reminders</string>
+    <string name="calendar_events_section">Events</string>
+    <string name="calendar_event_reminder_title">Event reminder</string>
+    <string name="calendar_event_reminder_fallback">Event</string>
+    <string name="calendar_event_reminder_channel_description">Calendar event alerts</string>
+    <string name="urgent_reminder_notification_title">Urgent reminder</string>
+    <string name="urgent_reminder_channel_name">Urgent reminders</string>
+    <string name="urgent_reminder_channel_description">Alarms for reminders marked as urgent</string>
+    <string name="urgent_reminder_hint">An urgent reminder sets off an alarm: it rings even if the phone is silenced or in Do Not Disturb.</string>
+    <string name="todo_me">Me</string>
+    <string name="todo_due_time">Time</string>
 </resources>

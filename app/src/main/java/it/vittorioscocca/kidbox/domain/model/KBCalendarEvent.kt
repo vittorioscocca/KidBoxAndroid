@@ -14,6 +14,8 @@ data class KBCalendarEvent(
     val categoryRaw: String,
     val recurrenceRaw: String,
     val reminderMinutes: Int?,
+    /** Urgente: il promemoria diventa una sveglia. */
+    val priorityRaw: Int = 0,
     val linkedHealthItemId: String?,
     val linkedHealthItemType: String?,
     val visibilityScope: String = KBVisibilityScope.FAMILY,

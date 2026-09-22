@@ -37,7 +37,7 @@ class ReminderAlarmRegistry @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
     /** Receiver di destinazione dell'alarm. Il nome della classe non viene persistito. */
-    enum class Target { TODO, HEALTH }
+    enum class Target { TODO, HEALTH, URGENT, CALENDAR_EVENT }
 
     data class AlarmSpec(
         /** Chiave stabile del promemoria: identifica il record nel registro. */
@@ -80,10 +80,7 @@ class ReminderAlarmRegistry @Inject constructor(
         var cancelled = 0
         for ((key, raw) in prefs.all) {
             val spec = (raw as? String)?.let { parse(key, it) } ?: continue
-            val target = when (spec.target) {
-                Target.TODO -> TodoReminderReceiver::class.java
-                Target.HEALTH -> HealthReminderReceiver::class.java
-            }
+            val target = receiverFor(spec.target)
             val intent = Intent(context, target).apply {
                 spec.action?.let { action = it }
                 spec.dataUri?.let { data = Uri.parse(it) }
@@ -126,10 +123,7 @@ class ReminderAlarmRegistry @Inject constructor(
     // ── Interni ────────────────────────────────────────────────────────────────
 
     private fun setAlarm(spec: AlarmSpec) {
-        val target = when (spec.target) {
-            Target.TODO -> TodoReminderReceiver::class.java
-            Target.HEALTH -> HealthReminderReceiver::class.java
-        }
+        val target = receiverFor(spec.target)
         val intent = Intent(context, target).apply {
             spec.action?.let { action = it }
             spec.dataUri?.let { data = Uri.parse(it) }
@@ -143,7 +137,20 @@ class ReminderAlarmRegistry @Inject constructor(
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        ExactAlarmScheduler.scheduleRtcWakeupAllowWhileIdle(context, spec.fireAtMillis, pi)
+        if (spec.target == Target.URGENT) {
+            // Una sveglia vera, non un alarm qualunque: `setAlarmClock` è
+            // esente da Doze e mostra l'icona della sveglia in barra di stato.
+            ExactAlarmScheduler.scheduleAlarmClock(context, spec.fireAtMillis, pi)
+        } else {
+            ExactAlarmScheduler.scheduleRtcWakeupAllowWhileIdle(context, spec.fireAtMillis, pi)
+        }
+    }
+
+    private fun receiverFor(target: Target): Class<*> = when (target) {
+        Target.TODO -> TodoReminderReceiver::class.java
+        Target.HEALTH -> HealthReminderReceiver::class.java
+        Target.URGENT -> UrgentAlarmReceiver::class.java
+        Target.CALENDAR_EVENT -> CalendarEventReminderReceiver::class.java
     }
 
     private fun AlarmSpec.toJson(): String = JSONObject().apply {
@@ -191,6 +198,12 @@ class ReminderAlarmRegistry @Inject constructor(
 
     companion object {
         fun todoKey(todoId: String) = "todo:$todoId"
+
+        /** Sveglie dei promemoria urgenti: `kind` distingue to-do ed eventi. */
+        fun urgentKey(kind: String, entityId: String) = "urgent:$kind:$entityId"
+
+        /** Avvisi degli eventi di calendario, non urgenti. */
+        fun calendarEventKey(eventId: String) = "calendarevent:$eventId"
         fun visitKey(reminderKey: String) = "visit:$reminderKey"
         fun examKey(examId: String) = "exam:$examId"
         fun vaccineKey(vaccineId: String) = "vaccine:$vaccineId"

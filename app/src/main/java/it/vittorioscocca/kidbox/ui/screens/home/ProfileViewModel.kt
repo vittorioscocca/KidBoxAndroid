@@ -15,6 +15,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
@@ -24,6 +25,8 @@ import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
+import it.vittorioscocca.kidbox.data.remote.auth.AuthError
+import it.vittorioscocca.kidbox.data.remote.auth.EmailAuthService
 import it.vittorioscocca.kidbox.data.remote.user.AvatarRemoteStore
 import it.vittorioscocca.kidbox.data.user.UserProfileRepository
 import it.vittorioscocca.kidbox.domain.auth.LogoutUseCase
@@ -68,6 +71,11 @@ data class ProfileUiState(
     val isFamilyOwner: Boolean = true,
     val storageUsedBytes: Long = 0L,
     val storageTotalBytes: Long = 1_000_000_000L,
+    /** Solo chi è entrato con email e password vede «Cambia password». */
+    val isPasswordAccount: Boolean = false,
+    val isChangingPassword: Boolean = false,
+    val changePasswordError: String? = null,
+    val changePasswordSucceeded: Boolean = false,
 )
 
 private data class SavedSnapshot(
@@ -90,6 +98,7 @@ class ProfileViewModel @Inject constructor(
     private val auth: FirebaseAuth,
     private val logoutUseCase: LogoutUseCase,
     private val familyAccessGuard: FamilyAccessGuard,
+    private val emailAuth: EmailAuthService,
 ) : AndroidViewModel(application) {
     companion object {
         private const val TAG = "ProfileViewModel"
@@ -115,6 +124,7 @@ class ProfileViewModel @Inject constructor(
             }
             userProfileRepository.ensureSeededFromAuth()
             val email = auth.currentUser?.email.orEmpty()
+            _uiState.update { it.copy(isPasswordAccount = emailAuth.isPasswordAccount()) }
             val local = userProfileRepository.getByUid(uid)
             var first = local?.firstName.orEmpty()
             var last = local?.lastName.orEmpty()
@@ -466,6 +476,51 @@ class ProfileViewModel @Inject constructor(
             logoutUseCase.logout()
             onDone()
         }
+    }
+
+    /**
+     * Cambio password da loggato (solo account email/password). La
+     * validazione di forma — lunghezza minima, conferma uguale — la fa già la
+     * schermata; qui restano la riautenticazione e gli errori di Firebase.
+     */
+    fun changePassword(currentPassword: String, newPassword: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isChangingPassword = true, changePasswordError = null) }
+            try {
+                emailAuth.changePassword(currentPassword, newPassword)
+                KBLog.auth.info("changePassword done", TAG)
+                _uiState.update { it.copy(isChangingPassword = false, changePasswordSucceeded = true) }
+            } catch (e: Exception) {
+                KBLog.auth.error("changePassword failed", TAG, e)
+                _uiState.update { it.copy(isChangingPassword = false, changePasswordError = changePasswordErrorText(e)) }
+            }
+        }
+    }
+
+    /** Chiusura del foglio: azzera esito ed errore per la prossima apertura. */
+    fun dismissChangePassword() {
+        _uiState.update { it.copy(changePasswordError = null, changePasswordSucceeded = false) }
+    }
+
+    /**
+     * Stessi codici di `LoginViewModel.friendlyError`, ma qui la password
+     * sbagliata è quella attuale, e va detto.
+     */
+    private fun changePasswordErrorText(error: Throwable): String {
+        val app = getApplication<Application>()
+        (error as? AuthError ?: error.cause as? AuthError)?.messageRes?.let { return app.getString(it) }
+        val fe = error as? FirebaseAuthException ?: error.cause as? FirebaseAuthException
+        val res = when (fe?.errorCode) {
+            "ERROR_WRONG_PASSWORD", "ERROR_INVALID_CREDENTIAL" -> R.string.home_profile_change_password_error_wrong_current
+            "ERROR_WEAK_PASSWORD" -> R.string.home_profile_change_password_error_weak
+            "ERROR_NETWORK_REQUEST_FAILED" -> R.string.auth_error_network
+            "ERROR_TOO_MANY_REQUESTS" -> R.string.auth_error_too_many_requests
+            "ERROR_REQUIRES_RECENT_LOGIN" -> R.string.auth_error_session_expired
+            else -> null
+        }
+        return res?.let { app.getString(it) }
+            ?: error.localizedMessage
+            ?: app.getString(R.string.auth_error_unknown)
     }
 
     fun deleteAccount(onDone: () -> Unit) {

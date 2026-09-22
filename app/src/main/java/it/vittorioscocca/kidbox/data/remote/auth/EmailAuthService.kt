@@ -67,6 +67,24 @@ class EmailAuthService @Inject constructor(
         firebaseAuth.sendPasswordResetEmail(email).await()
     }
 
+    /** Solo chi è entrato con email e password ha una password da cambiare. */
+    fun isPasswordAccount(): Boolean =
+        firebaseAuth.currentUser?.providerData?.any { it.providerId == EmailAuthProvider.PROVIDER_ID } == true
+
+    /**
+     * Cambio password da loggato, come `ChangePasswordSheet` su iOS. Firebase
+     * rifiuta `updatePassword` su una sessione non recente
+     * (ERROR_REQUIRES_RECENT_LOGIN), quindi si riautentica sempre con la
+     * password attuale prima di scrivere quella nuova: la vecchia password è
+     * anche la conferma di identità.
+     */
+    suspend fun changePassword(currentPassword: String, newPassword: String) {
+        val user = firebaseAuth.currentUser ?: throw AuthError.SessionExpired
+        val email = user.email ?: throw AuthError.SessionExpired
+        user.reauthenticate(EmailAuthProvider.getCredential(email, currentPassword)).await()
+        user.updatePassword(newPassword).await()
+    }
+
     private fun FirebaseUser.isPasswordUnverified(): Boolean =
         providerData.any { it.providerId == EmailAuthProvider.PROVIDER_ID } && !isEmailVerified
 }
