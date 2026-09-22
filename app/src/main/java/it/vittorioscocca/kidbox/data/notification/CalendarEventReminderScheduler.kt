@@ -70,6 +70,20 @@ class CalendarEventReminderScheduler @Inject constructor(
         )
     }
 
+    /**
+     * Vero se questo dispositivo ha un avviso armato per l'evento, in una
+     * qualunque delle due strade. Serve alla sincronizzazione: un evento
+     * spostato o cancellato da un altro device deve poter riallineare
+     * l'avviso **solo** dove era stato acceso.
+     */
+    fun hasArmed(eventId: String): Boolean =
+        eventId.isNotBlank() && (
+            alarmRegistry.isArmed(ReminderAlarmRegistry.calendarEventKey(eventId)) ||
+                alarmRegistry.isArmed(
+                    ReminderAlarmRegistry.urgentKey(UrgentAlarmReceiver.KIND_CALENDAR_EVENT, eventId),
+                )
+            )
+
     /** Toglie notifica **e** sveglia: non si sa quale delle due fosse armata. */
     fun cancel(eventId: String) {
         if (eventId.isBlank()) return

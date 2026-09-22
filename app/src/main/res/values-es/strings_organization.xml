@@ -201,4 +201,11 @@
     <string name="urgent_reminder_hint">Un recordatorio urgente activa una alarma: suena aunque el teléfono esté en silencio o en No molestar.</string>
     <string name="todo_me">Yo</string>
     <string name="todo_due_time">Hora</string>
+    <string name="urgent_reminder_fullscreen_permission_title">Alarma a pantalla completa</string>
+    <string name="urgent_reminder_fullscreen_permission_body">El recordatorio está guardado y sonará. Para que ocupe toda la pantalla como una alarma con el teléfono bloqueado, KidBox necesita el permiso «Notificaciones a pantalla completa». Sin él, será un aviso que desaparece al cabo de un minuto.</string>
+    <string name="urgent_reminder_fullscreen_permission_open">Abrir ajustes</string>
+    <string name="urgent_reminder_fullscreen_permission_later">Ahora no</string>
+    <string name="calendar_reminder_who_can_see">Quién puede ver este recordatorio</string>
+    <string name="calendar_reminder_visibility_locked_hint">Solo quien creó el recordatorio puede cambiar su visibilidad.</string>
+    <string name="calendar_event_who_can_see">Quién puede ver este evento</string>
 </resources>

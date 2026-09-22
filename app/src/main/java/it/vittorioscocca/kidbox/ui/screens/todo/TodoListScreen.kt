@@ -68,6 +68,7 @@ import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerBottomSheet
 import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerMember
 import it.vittorioscocca.kidbox.ui.navigation.CONTENT_NO_LONGER_AVAILABLE_MESSAGE
 import it.vittorioscocca.kidbox.ui.permissions.RuntimePermissions
+import it.vittorioscocca.kidbox.ui.permissions.FullScreenAlarmNoticeDialog
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.time.Instant
 import java.time.ZoneId
@@ -140,6 +141,11 @@ fun TodoListScreen(
         flashingTodoId = null
     }
     var pendingSaveAfterPermission by remember { mutableStateOf<TodoEditForm?>(null) }
+    // Un to-do urgente è una sveglia, e da Android 14 la sveglia copre lo
+    // schermo bloccato solo con `USE_FULL_SCREEN_INTENT`. Google chiede di
+    // verificarne la presenza invece di darla per scontata: senza, l'avviso
+    // diventa una finestra mobile visibile un minuto.
+    var showFullScreenNotice by remember { mutableStateOf(false) }
     var pendingSnackbarMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(pendingSnackbarMessage) {
@@ -181,6 +187,11 @@ fun TodoListScreen(
         }
         if (effective.reminderEnabled && effective.dueAt != null) {
             pendingSnackbarMessage = "Promemoria programmato per ${formatDate(effective.dueAt)}"
+        }
+        if (effective.reminderEnabled && effective.urgent &&
+            !RuntimePermissions.canUseFullScreenIntent(context)
+        ) {
+            showFullScreenNotice = true
         }
         showEditor = false
     }
@@ -230,11 +241,20 @@ fun TodoListScreen(
                     if (form.reminderEnabled && form.dueAt != null) {
                         pendingSnackbarMessage = "Promemoria programmato per ${formatDate(form.dueAt)}"
                     }
+                    if (form.reminderEnabled && form.urgent &&
+                        !RuntimePermissions.canUseFullScreenIntent(context)
+                    ) {
+                        showFullScreenNotice = true
+                    }
                     showEditor = false
                 }
             },
         )
         return
+    }
+
+    if (showFullScreenNotice) {
+        FullScreenAlarmNoticeDialog(onDismiss = { showFullScreenNotice = false })
     }
 
     Box(

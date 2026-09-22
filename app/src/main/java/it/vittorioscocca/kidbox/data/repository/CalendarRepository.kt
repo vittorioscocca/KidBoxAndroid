@@ -12,6 +12,7 @@ import it.vittorioscocca.kidbox.data.local.dao.OnboardingSignalsDao
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBCalendarEventEntity
 import it.vittorioscocca.kidbox.data.local.mapper.encodeStringList
+import it.vittorioscocca.kidbox.data.notification.CalendarEventReminderScheduler
 import it.vittorioscocca.kidbox.data.remote.calendar.CalendarEventRemoteChange
 import it.vittorioscocca.kidbox.data.remote.calendar.CalendarRemoteStore
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
@@ -33,6 +34,7 @@ class CalendarRepository @Inject constructor(
     private val familyDao: KBFamilyDao,
     private val childDao: KBChildDao,
     private val remoteStore: CalendarRemoteStore,
+    private val reminderScheduler: CalendarEventReminderScheduler,
     private val auth: FirebaseAuth,
     private val onboardingSignalsDao: OnboardingSignalsDao,
     @ApplicationContext private val appContext: Context,
@@ -169,12 +171,17 @@ class CalendarRepository @Inject constructor(
         changes.forEach { change ->
             when (change) {
                 is CalendarEventRemoteChange.Remove -> {
+                    // L'evento sparisce: il suo avviso non deve sopravvivergli.
+                    // Senza questo una sveglia continuerebbe a suonare per un
+                    // evento cancellato da un altro device o dal web.
+                    reminderScheduler.cancel(change.id)
                     calendarDao.deleteById(change.id)
                 }
 
                 is CalendarEventRemoteChange.Upsert -> {
                     val dto = change.dto
                     if (dto.isDeleted) {
+                        reminderScheduler.cancel(dto.id)
                         calendarDao.deleteById(dto.id)
                         return@forEach
                     }
@@ -235,6 +242,32 @@ class CalendarRepository @Inject constructor(
                             lastSyncError = null,
                         ),
                     )
+
+                    // I promemoria restano del dispositivo che li accende: qui
+                    // non se ne arma mai uno nuovo. Ma se l'avviso su QUESTO
+                    // telefono esiste già e l'evento è stato spostato altrove —
+                    // o il promemoria è stato tolto, o è diventato urgente —
+                    // va riallineato, altrimenti suona all'ora vecchia.
+                    //
+                    // Solo se qualcosa che l'avviso porta con sé è davvero
+                    // cambiato: ogni salvataggio locale torna indietro come eco
+                    // dal listener, e senza questo confronto si rifarebbe
+                    // cancel+arm a vuoto a ogni giro.
+                    val reminderChanged = local == null ||
+                        local.startDateEpochMillis != dto.startDateEpochMillis ||
+                        local.reminderMinutes != dto.reminderMinutes ||
+                        local.priorityRaw != (dto.priority ?: 0) ||
+                        local.title != dto.title
+                    if (reminderChanged && reminderScheduler.hasArmed(dto.id)) {
+                        reminderScheduler.sync(
+                            eventId = dto.id,
+                            familyId = familyId,
+                            title = dto.title,
+                            startEpochMillis = dto.startDateEpochMillis,
+                            reminderMinutes = dto.reminderMinutes,
+                            isUrgent = (dto.priority ?: 0) == 1,
+                        )
+                    }
                 }
             }
         }

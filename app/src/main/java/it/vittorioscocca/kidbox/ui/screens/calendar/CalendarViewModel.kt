@@ -384,7 +384,16 @@ class CalendarViewModel @Inject constructor(
      * Salva un promemoria creato o modificato dal calendario. È un to-do vero,
      * nella lista scelta: chi lo apre da To-Do lo trova identico.
      */
-    fun saveReminder(draft: CalendarReminderDraft, editingId: String?) {
+    fun saveReminder(
+        draft: CalendarReminderDraft,
+        editingId: String?,
+        /**
+         * `false` quando l'utente ha negato le notifiche: il promemoria si
+         * salva lo stesso — è pur sempre un to-do con una scadenza — ma senza
+         * armare un avviso che il sistema scarterebbe in silenzio.
+         */
+        reminderEnabled: Boolean = true,
+    ) {
         val familyId = _uiState.value.familyId
         if (familyId.isBlank() || draft.title.isBlank()) return
         val childId = _uiState.value.childId
@@ -408,8 +417,9 @@ class CalendarViewModel @Inject constructor(
                         assignedTo = draft.assignedTo,
                         priorityRaw = if (draft.isUrgent) 1 else 0,
                         // Un promemoria creato dal calendario ha una scadenza:
-                        // l'avviso è il motivo per cui esiste.
-                        reminderEnabled = true,
+                        // l'avviso è il motivo per cui esiste — salvo che le
+                        // notifiche siano state negate.
+                        reminderEnabled = reminderEnabled,
                         visibilityScope = draft.visibilityScope,
                         visibilityMemberIds = draft.visibilityMemberIds,
                     )
@@ -422,7 +432,7 @@ class CalendarViewModel @Inject constructor(
                         dueHasTime = draft.dueHasTime,
                         assignedTo = draft.assignedTo,
                         priorityRaw = if (draft.isUrgent) 1 else 0,
-                        reminderEnabled = true,
+                        reminderEnabled = reminderEnabled,
                         visibilityScope = draft.visibilityScope,
                         visibilityMemberIds = draft.visibilityMemberIds,
                     )

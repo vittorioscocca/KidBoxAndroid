@@ -71,6 +71,14 @@ class ReminderAlarmRegistry @Inject constructor(
     }
 
     /**
+     * Vero se **questo** dispositivo ha armato quel promemoria. È l'unico modo
+     * per sapere se un elemento cambiato da un altro device ha un avviso da
+     * riallineare qui: i promemoria sono locali, il documento remoto non ne sa
+     * niente.
+     */
+    fun isArmed(key: String): Boolean = prefs.contains(key)
+
+    /**
      * Annulla e dimentica **tutti** i promemoria registrati. Serve al logout:
      * gli alarm già armati sopravvivono alla cancellazione del database locale,
      * e senza questo continuerebbero a scattare per l'account precedente.

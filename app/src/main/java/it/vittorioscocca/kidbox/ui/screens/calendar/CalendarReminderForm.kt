@@ -51,6 +51,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBTodoListEntity
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerMember
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
+import it.vittorioscocca.kidbox.ui.util.visibilityChipLabel
 import it.vittorioscocca.kidbox.util.KBLocale
 import java.time.Instant
 import java.time.LocalDate
@@ -76,6 +77,14 @@ fun CalendarReminderFormContent(
     currentUid: String?,
     todoLists: List<KBTodoListEntity>,
     members: List<VisibilityPickerMember>,
+    /**
+     * Visibilità in lavorazione. Vive nella schermata e non qui perché il
+     * selettore deve aprirsi **fuori** dal foglio: annidare una finestra
+     * dentro un `ModalBottomSheet` si rompe su MIUI e derivate.
+     */
+    visibilityScope: String,
+    visibilityMemberIds: Set<String>,
+    onRequestVisibilityPicker: () -> Unit,
     onDismiss: () -> Unit,
     onSave: (CalendarReminderDraft) -> Unit,
     kindSelector: (@Composable () -> Unit)? = null,
@@ -100,6 +109,18 @@ fun CalendarReminderFormContent(
     var assignedTo by remember(initial?.id) { mutableStateOf(initial?.assignedTo) }
     var showListPicker by remember { mutableStateOf(false) }
     var showAssigneePicker by remember { mutableStateOf(false) }
+
+    var showVisibilityLocked by remember { mutableStateOf(false) }
+
+    val displayScope = KBVisibilityScope.normalized(visibilityScope)
+    // Un promemoria «solo io» non lo vede nessun altro: l'unico assegnatario
+    // sensato è chi lo ha creato. Stessa regola del form To-Do e di iOS, dove
+    // la scheda dell'assegnatario proprio non compare.
+    val isPrivateScope = displayScope == KBVisibilityScope.ONLY_CREATOR
+    // La visibilità la cambia solo chi l'ha creato, come nel form To-Do.
+    val canEditVisibility = initial == null ||
+        initial.createdBy.isNullOrBlank() ||
+        initial.createdBy == currentUid
 
     fun pickDate() {
         val cal = Calendar.getInstance().apply { timeInMillis = dueAt }
@@ -198,6 +219,50 @@ fun CalendarReminderFormContent(
                     minLines = 2,
                     colors = reminderTextFieldColors(),
                 )
+                Divider()
+                // La visibilità sta qui, in fondo alla scheda del testo, dove
+                // la mette anche iOS (`textCard`): è una proprietà del
+                // promemoria, non della sua scadenza.
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        stringResource(R.string.todo_visibility),
+                        fontSize = 12.sp,
+                        color = kb.subtitle,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                if (canEditVisibility) {
+                                    onRequestVisibilityPicker()
+                                } else {
+                                    showVisibilityLocked = true
+                                }
+                            }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            visibilityChipLabel(displayScope),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(kb.surfaceOverlay)
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            fontSize = 14.sp,
+                            color = kb.title,
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        if (canEditVisibility) {
+                            Text(
+                                stringResource(R.string.health_change),
+                                fontSize = 14.sp,
+                                color = kb.subtitle,
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -314,27 +379,29 @@ fun CalendarReminderFormContent(
                         color = kb.title,
                     )
                 }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(kb.surfaceOverlay)
-                        .clickable { showAssigneePicker = true }
-                        .padding(horizontal = 12.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        stringResource(R.string.todo_assigned_to),
-                        modifier = Modifier.weight(1f),
-                        fontSize = 13.sp,
-                        color = kb.subtitle,
-                    )
-                    Text(
-                        members.firstOrNull { it.uid == assignedTo }?.displayName
-                            ?: stringResource(R.string.todo_nobody),
-                        fontSize = 15.sp,
-                        color = kb.title,
-                    )
+                if (!isPrivateScope) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(kb.surfaceOverlay)
+                            .clickable { showAssigneePicker = true }
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(R.string.todo_assigned_to),
+                            modifier = Modifier.weight(1f),
+                            fontSize = 13.sp,
+                            color = kb.subtitle,
+                        )
+                        Text(
+                            members.firstOrNull { it.uid == assignedTo }?.displayName
+                                ?: stringResource(R.string.todo_nobody),
+                            fontSize = 15.sp,
+                            color = kb.title,
+                        )
+                    }
                 }
             }
         }
@@ -354,8 +421,28 @@ fun CalendarReminderFormContent(
                         dueHasTime = hasTime,
                         isUrgent = urgent,
                         listId = listId,
-                        assignedTo = assignedTo,
-                        visibilityScope = initial?.visibilityScope ?: KBVisibilityScope.FAMILY,
+                        assignedTo = if (isPrivateScope) {
+                            currentUid?.takeIf { it.isNotBlank() }
+                        } else {
+                            assignedTo
+                        },
+                        // Questo form non ha il selettore di visibilità (su iOS
+                        // sì): quindi la visibilità si **riporta**, scope e
+                        // membri insieme. Lasciare i membri vuoti non voleva
+                        // dire «non li tocco» — `updateTodo` distingue `null`
+                        // (mantieni) da lista vuota (sovrascrivi), e un
+                        // promemoria condiviso con persone scelte usciva di qui
+                        // con lo scope «members» e nessuno dentro: sparito
+                        // dalla vista di chi lo vedeva.
+                        visibilityScope = displayScope,
+                        // I membri contano solo per «alcuni membri»: negli
+                        // altri scope una lista piena sarebbe rumore che
+                        // qualcuno prima o poi legge per sbaglio.
+                        visibilityMemberIds = if (displayScope == KBVisibilityScope.MEMBERS) {
+                            visibilityMemberIds.toList().sorted()
+                        } else {
+                            emptyList()
+                        },
                     ),
                 )
                 onDismiss()
@@ -376,6 +463,19 @@ fun CalendarReminderFormContent(
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
+    }
+
+    if (showVisibilityLocked) {
+        AlertDialog(
+            onDismissRequest = { showVisibilityLocked = false },
+            title = { Text(stringResource(R.string.todo_visibility_locked)) },
+            text = { Text(stringResource(R.string.calendar_reminder_visibility_locked_hint)) },
+            confirmButton = {
+                TextButton(onClick = { showVisibilityLocked = false }) {
+                    Text(stringResource(R.string.subscription_ok))
+                }
+            },
+        )
     }
 
     if (showListPicker) {

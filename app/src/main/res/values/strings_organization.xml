@@ -201,4 +201,11 @@
     <string name="urgent_reminder_hint">Un promemoria urgente attiva una sveglia: suona anche se il telefono è silenzioso o in Non disturbare.</string>
     <string name="todo_me">Me</string>
     <string name="todo_due_time">Ora</string>
+    <string name="urgent_reminder_fullscreen_permission_title">Sveglia a schermo intero</string>
+    <string name="urgent_reminder_fullscreen_permission_body">Il promemoria è salvato e suonerà. Perché a telefono bloccato compaia a schermo intero, come una sveglia, KidBox ha bisogno del permesso «Notifiche a schermo intero». Senza, resta un avviso che sparisce dopo un minuto.</string>
+    <string name="urgent_reminder_fullscreen_permission_open">Apri impostazioni</string>
+    <string name="urgent_reminder_fullscreen_permission_later">Non ora</string>
+    <string name="calendar_reminder_who_can_see">Chi può vedere questo promemoria</string>
+    <string name="calendar_reminder_visibility_locked_hint">Solo chi ha creato il promemoria può modificarne la visibilità.</string>
+    <string name="calendar_event_who_can_see">Chi può vedere questo evento</string>
 </resources>

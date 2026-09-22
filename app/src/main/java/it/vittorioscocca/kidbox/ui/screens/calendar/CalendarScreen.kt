@@ -113,6 +113,25 @@ import it.vittorioscocca.kidbox.ui.components.KBEmptyState
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.AddCircle
 import it.vittorioscocca.kidbox.ui.util.visibilityChipLabel
+import it.vittorioscocca.kidbox.ui.permissions.FullScreenAlarmNoticeDialog
+import it.vittorioscocca.kidbox.ui.permissions.rememberReminderSaveGate
+
+/**
+ * Cosa sta aspettando la risposta al permesso notifiche. Porta con sé anche
+ * l'elemento in modifica: quando l'utente risponde, il foglio può essere già
+ * stato chiuso e `editingEvent` azzerato.
+ */
+private sealed interface CalendarPendingSave {
+    data class Event(
+        val draft: CalendarDraftInput,
+        val editing: KBCalendarEventEntity?,
+    ) : CalendarPendingSave
+
+    data class Reminder(
+        val draft: CalendarReminderDraft,
+        val editingId: String?,
+    ) : CalendarPendingSave
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -131,6 +150,25 @@ fun CalendarScreen(
     // Ora scelta toccando la griglia di Giorno/Settimana; null = mezzanotte.
     var newEventTime by remember { mutableStateOf<LocalTime?>(null) }
     val currentUid = remember { FirebaseAuth.getInstance().currentUser?.uid }
+
+    // Un solo cancello per le due schede del foglio: evento e promemoria
+    // accendono lo stesso tipo di avviso e chiedono gli stessi permessi. Se le
+    // notifiche vengono negate l'elemento si salva comunque, senza avviso.
+    val saveGate = rememberReminderSaveGate<CalendarPendingSave> { item, reminderAllowed ->
+        when (item) {
+            is CalendarPendingSave.Event -> viewModel.saveEvent(
+                if (reminderAllowed) item.draft else item.draft.copy(reminderMinutes = null),
+                item.editing,
+            )
+
+            is CalendarPendingSave.Reminder -> viewModel.saveReminder(
+                draft = item.draft,
+                editingId = item.editingId,
+                reminderEnabled = reminderAllowed,
+            )
+        }
+        showForm = false
+    }
 
     // Evento aperto da notifica: si attende che la sincronizzazione lo porti in
     // locale, poi si apre il suo dettaglio. Senza attendere si resterebbe sulla
@@ -176,15 +214,22 @@ fun CalendarScreen(
     // Visibility state hoisted here so the picker dialog can be shown OUTSIDE the bottom sheet,
     // avoiding the nested-sheet issue on MIUI and other ROM variants.
     var showVisibilityPicker by remember { mutableStateOf(false) }
+    // Lo stesso selettore serve a entrambe le schede, ma il titolo cambia:
+    // «questo evento» o «questo promemoria».
+    var visibilityPickerForReminder by remember { mutableStateOf(false) }
     var draftVisibilityScope by remember { mutableStateOf(KBVisibilityScope.FAMILY) }
     var draftVisibilityMemberIds by remember { mutableStateOf<Set<String>>(emptySet()) }
 
-    // Sync draft visibility whenever the form is opened or the edited event changes.
-    LaunchedEffect(showForm, editingEvent?.id) {
+    // Sync draft visibility whenever the form is opened or the edited item changes.
+    // Vale per entrambe le schede: un promemoria in modifica porta la sua
+    // visibilità dentro il draft, altrimenti salvando la perderebbe.
+    LaunchedEffect(showForm, editingEvent?.id, editingReminder?.id) {
         if (showForm) {
-            val evt = editingEvent
-            draftVisibilityScope = KBVisibilityScope.normalized(evt?.visibilityScope)
-            draftVisibilityMemberIds = decodeStringList(evt?.visibilityMemberIdsJson).toSet()
+            val scopeRaw = editingEvent?.visibilityScope ?: editingReminder?.visibilityScope
+            val memberIdsJson =
+                editingEvent?.visibilityMemberIdsJson ?: editingReminder?.visibilityMemberIdsJson
+            draftVisibilityScope = KBVisibilityScope.normalized(scopeRaw)
+            draftVisibilityMemberIds = decodeStringList(memberIdsJson).toSet()
         } else {
             showVisibilityPicker = false
         }
@@ -361,24 +406,49 @@ fun CalendarScreen(
             visibilityMemberIds = draftVisibilityMemberIds,
             todoLists = state.todoLists,
             assignableMembers = state.assignableMembers,
-            onRequestVisibilityPicker = { showVisibilityPicker = true },
+            onRequestVisibilityPicker = {
+                visibilityPickerForReminder = false
+                showVisibilityPicker = true
+            },
+            onRequestReminderVisibilityPicker = {
+                visibilityPickerForReminder = true
+                showVisibilityPicker = true
+            },
             onDismiss = { showForm = false },
+            // Il salvataggio passa dal cancello dei permessi: senza notifiche
+            // l'avviso non arriverebbe mai e l'interruttore direbbe «attivo».
             onSaveEvent = { draft ->
-                viewModel.saveEvent(draft, editingEvent)
-                showForm = false
+                saveGate.save(
+                    item = CalendarPendingSave.Event(draft, editingEvent),
+                    wantsReminder = draft.reminderMinutes != null,
+                    isUrgent = draft.isUrgent,
+                )
             },
             onSaveReminder = { draft ->
-                viewModel.saveReminder(draft, editingReminder?.id)
-                showForm = false
+                saveGate.save(
+                    item = CalendarPendingSave.Reminder(draft, editingReminder?.id),
+                    // Un promemoria del calendario nasce con una scadenza:
+                    // l'avviso è il motivo per cui esiste.
+                    wantsReminder = true,
+                    isUrgent = draft.isUrgent,
+                )
             },
         )
     }
 
+    if (saveGate.showFullScreenNotice) {
+        FullScreenAlarmNoticeDialog(onDismiss = saveGate::dismissFullScreenNotice)
+    }
+
     // The picker is a sibling of CalendarEventDialog (NOT nested inside its ModalBottomSheet).
-    if (showVisibilityPicker && showForm && editingReminder == null) {
+    if (showVisibilityPicker && showForm) {
         VisibilityPickerFullscreenDialog(
             currentUid = currentUid,
-            scopeSectionTitle = "Chi può vedere questo evento?",
+            scopeSectionTitle = if (visibilityPickerForReminder) {
+                stringResource(R.string.calendar_reminder_who_can_see)
+            } else {
+                stringResource(R.string.calendar_event_who_can_see)
+            },
             membersExcludingSelf = state.visibilityMembers,
             initialScope = draftVisibilityScope,
             initialMemberIds = draftVisibilityMemberIds.toList(),
@@ -1863,21 +1933,27 @@ private fun TogglePill(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
+    // La pillola selezionata era `kb.card` **sopra un contenitore `kb.card`**:
+    // stesso identico colore, quindi la scelta non si vedeva — né qui fra
+    // Evento e Promemoria, né nella barra Giorno/Settimana/Mese/Anno, che usa
+    // questo stesso componente. Ora la selezionata è piena di primario, come
+    // il pulsante di salvataggio dei form.
+    val colorScheme = MaterialTheme.colorScheme
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(if (selected) MaterialTheme.kidBoxColors.card else Color.Transparent)
+            .background(if (selected) colorScheme.primary else Color.Transparent)
             .clickable(onClick = onClick)
             .padding(vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             fontSize = 13.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.kidBoxColors.title,
+            color = if (selected) colorScheme.onPrimary else MaterialTheme.kidBoxColors.subtitle,
         )
     }
 }
@@ -2041,6 +2117,11 @@ fun CalendarItemSheet(
     todoLists: List<KBTodoListEntity>,
     assignableMembers: List<VisibilityPickerMember>,
     onRequestVisibilityPicker: () -> Unit,
+    /**
+     * Evento e promemoria chiedono lo stesso selettore ma con un titolo
+     * diverso: la schermata deve sapere chi dei due l'ha aperto.
+     */
+    onRequestReminderVisibilityPicker: () -> Unit,
     onDismiss: () -> Unit,
     onSaveEvent: (CalendarDraftInput) -> Unit,
     onSaveReminder: (CalendarReminderDraft) -> Unit,
@@ -2094,6 +2175,9 @@ fun CalendarItemSheet(
                     currentUid = currentUid,
                     todoLists = todoLists,
                     members = assignableMembers,
+                    visibilityScope = visibilityScope,
+                    visibilityMemberIds = visibilityMemberIds,
+                    onRequestVisibilityPicker = onRequestReminderVisibilityPicker,
                     onDismiss = onDismiss,
                     onSave = onSaveReminder,
                     kindSelector = selector,

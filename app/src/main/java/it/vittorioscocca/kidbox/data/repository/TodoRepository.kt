@@ -52,7 +52,6 @@ class TodoRepository @Inject constructor(
     private var listListener: ListenerRegistration? = null
     private var todoListener: ListenerRegistration? = null
     private var listeningFamilyId: String? = null
-    private var listeningChildId: String? = null
 
     /**
      * Famiglia per cui i to-do sono stati caricati almeno una volta in questa
@@ -81,9 +80,15 @@ class TodoRepository @Inject constructor(
     ) {
         scope.launch {
             realtimeMutex.withLock {
+                // `childId` NON entra nella guardia: le due query sono di
+                // famiglia (`todoLists` e `todos` filtrano solo `isDeleted`) e
+                // il parametro non seleziona niente — i to-do sono della
+                // famiglia, non del figlio. Confrontarlo faceva staccare e
+                // riagganciare i listener a ogni rimbalzo fra Calendario, che
+                // non ha un figlio in mano, e To-Do, che ne passa uno: due
+                // riattacchi per un risultato identico.
                 if (
                     listeningFamilyId == familyId &&
-                    listeningChildId == childId &&
                     listListener != null &&
                     todoListener != null
                 ) {
@@ -95,7 +100,6 @@ class TodoRepository @Inject constructor(
                 }
                 stopRealtimeLocked()
                 listeningFamilyId = familyId
-                listeningChildId = childId
                 KBLog.sync.info("startRealtime ATTACH familyId=$familyId childId=$childId", tag = "todo")
 
                 listListener = remoteStore.listenTodoLists(
@@ -529,15 +533,31 @@ class TodoRepository @Inject constructor(
                     val remoteScope = KBVisibilityScope.normalized(dto.visibilityScope)
                     val remoteMemberIds = dto.visibilityMemberIds
                     val safeListId = resolveReferencedListId(dto.familyId, dto.listId)
-                    // Il sync non **arma** promemoria (restano del device), ma
-                    // deve poterli **spegnere**: un to-do chiuso da un altro
-                    // membro o dal web continuerebbe altrimenti a suonare qui —
-                    // e da quando gli urgenti sono sveglie a tutto schermo,
-                    // quella dimenticanza si sente.
+                    // Il sync non **accende** promemoria su un to-do che qui
+                    // non ne aveva: restano del device. Ma quello già armato su
+                    // QUESTO telefono deve seguire il to-do, perché il to-do
+                    // cambia anche da altre mani.
+                    //
+                    // Si spegne quando l'avviso non ha più un istante a cui
+                    // puntare — to-do chiuso, cancellato, o scadenza tolta da
+                    // un altro membro — e da quando gli urgenti sono sveglie a
+                    // tutto schermo quella dimenticanza si sente.
+                    val remoteDueAt = dto.dueAtEpochMillis
                     val closedRemotely = dto.isDone || dto.isDeleted
-                    if (closedRemotely && local?.reminderEnabled == true) {
+                    val reminderOff = closedRemotely || remoteDueAt == null
+                    val hadReminder = local?.reminderEnabled == true
+                    if (reminderOff && hadReminder) {
                         reminderScheduler.cancel(dto.id)
                     }
+                    // Si sposta quando cambia qualcosa che l'avviso porta con
+                    // sé: l'ora, il titolo che si legge in notifica, o
+                    // l'urgenza — che non è un dettaglio, decide la strada fra
+                    // sveglia e notifica. Senza, suonerebbe all'ora vecchia.
+                    val reminderMoved = hadReminder && !reminderOff && local != null && (
+                        local.dueAtEpochMillis != remoteDueAt ||
+                            local.priorityRaw != (dto.priorityRaw ?: 0) ||
+                            local.title != dto.title
+                        )
                     itemDao.upsert(
                         KBTodoItemEntity(
                             id = dto.id,
@@ -555,8 +575,8 @@ class TodoRepository @Inject constructor(
                             updatedBy = dto.updatedBy ?: local?.updatedBy ?: "",
                             isDeleted = false,
                             listId = safeListId,
-                            reminderEnabled = if (closedRemotely) false else local?.reminderEnabled ?: false,
-                            reminderId = if (closedRemotely) null else local?.reminderId,
+                            reminderEnabled = if (reminderOff) false else local?.reminderEnabled ?: false,
+                            reminderId = if (reminderOff) null else local?.reminderId,
                             syncStateRaw = KBSyncState.SYNCED.rawValue,
                             lastSyncError = null,
                             assignedTo = dto.assignedTo,
@@ -566,6 +586,24 @@ class TodoRepository @Inject constructor(
                             visibilityMemberIdsJson = encodeStringList(remoteMemberIds),
                         ),
                     )
+                    if (reminderMoved && remoteDueAt != null) {
+                        if (remoteDueAt > System.currentTimeMillis()) {
+                            reminderScheduler.schedule(
+                                todoId = dto.id,
+                                title = dto.title,
+                                dueAtEpochMillis = remoteDueAt,
+                                familyId = dto.familyId,
+                                childId = dto.childId,
+                                listId = safeListId,
+                                isUrgent = (dto.priorityRaw ?: 0) == 1,
+                            )
+                        } else {
+                            // Scadenza spostata nel passato: `schedule` armerebbe
+                            // fra tre secondi — una sveglia a sorpresa per una
+                            // modifica fatta da qualcun altro. Si spegne e basta.
+                            reminderScheduler.cancel(dto.id)
+                        }
+                    }
                     KBLog.sync.debug("applyTodoInbound SAVED id=${dto.id}", tag = "todo")
                 }
             }
@@ -758,6 +796,5 @@ class TodoRepository @Inject constructor(
         listListener = null
         todoListener = null
         listeningFamilyId = null
-        listeningChildId = null
     }
 }
