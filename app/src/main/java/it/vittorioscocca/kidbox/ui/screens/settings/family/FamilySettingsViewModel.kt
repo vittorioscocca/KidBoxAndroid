@@ -22,6 +22,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBChildEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
 import it.vittorioscocca.kidbox.data.local.entity.canonicalMemberDisplayName
+import it.vittorioscocca.kidbox.data.remote.family.FamilyIdsResolver
 import it.vittorioscocca.kidbox.data.remote.family.FamilyLeaveService
 import it.vittorioscocca.kidbox.data.remote.family.FamilyFirestoreCreationRepository
 import it.vittorioscocca.kidbox.data.remote.family.InitialChild
@@ -264,38 +265,15 @@ class FamilySettingsViewModel @Inject constructor(
     ): KBFamilyEntity? {
         return try {
             val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty().ifBlank { requestUid }
-            var membershipDocs = emptyList<com.google.firebase.firestore.DocumentSnapshot>()
-            repeat(3) { attempt ->
-                membershipDocs = db.collection("users")
-                    .document(uid)
-                    .collection("memberships")
-                    .get()
-                    .await()
-                    .documents
-                if (membershipDocs.isNotEmpty()) return@repeat
-                if (attempt < 2) kotlinx.coroutines.delay(1000)
-            }
-
-            val candidateFamilyIds = mutableListOf<String>()
-            membershipDocs
-                .asSequence()
-                .mapNotNull { doc ->
-                    doc.id.takeIf { it.isNotBlank() }?.also { candidateFamilyIds.add(it) }
-                    (doc.data?.get("familyId") as? String)?.trim()?.takeIf { it.isNotEmpty() }
-                }
-                .forEach { candidateFamilyIds.add(it) }
-
-            if (candidateFamilyIds.isEmpty()) {
-                KBLog.ui.warning("bootstrapFromFirebase: memberships vuote/incoerenti, fallback members collectionGroup", TAG)
-                val memberDocs = db.collectionGroup("members")
-                    .whereEqualTo("uid", uid)
-                    .get()
-                    .await()
-                    .documents
-                memberDocs
-                    .filter { it.data?.get("isDeleted") as? Boolean != true }
-                    .mapNotNull { it.reference.parent.parent?.id }
-                    .forEach { candidateFamilyIds.add(it) }
+            // Indice `memberships` + documenti membro insieme: l'indice è una
+            // copia e può avere buchi. Il retry resta perché subito dopo un
+            // join nessuna delle due fonti è ancora propagata.
+            var candidateFamilyIds = FamilyIdsResolver.resolve(uid)
+            repeat(2) { attempt ->
+                if (candidateFamilyIds.isNotEmpty()) return@repeat
+                kotlinx.coroutines.delay(1000)
+                KBLog.ui.warning("bootstrapFromFirebase: nessuna famiglia, ritento (${attempt + 1}/2)", TAG)
+                candidateFamilyIds = FamilyIdsResolver.resolve(uid)
             }
             val distinctCandidates = candidateFamilyIds
                 .map { it.trim() }

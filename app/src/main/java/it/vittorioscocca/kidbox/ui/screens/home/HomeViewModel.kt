@@ -31,6 +31,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
 import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.data.notification.HomeBadgeManager
 import it.vittorioscocca.kidbox.data.remote.ai.AIService
+import it.vittorioscocca.kidbox.data.remote.family.FamilyIdsResolver
 import it.vittorioscocca.kidbox.data.remote.family.FamilyHeroPhotoService
 import it.vittorioscocca.kidbox.data.repository.PasswordsRepository
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
@@ -639,38 +640,10 @@ class HomeViewModel @Inject constructor(
     private suspend fun bootstrapFromFirestore(uid: String) {
         try {
             KBLog.ui.info("bootstrapFromFirestore start uid=$uid", TAG)
-            val membershipDocs = db.collection("users")
-                .document(uid)
-                .collection("memberships")
-                .get()
-                .await()
-                .documents
-
-            val candidateFamilyIds = mutableListOf<String>()
-            membershipDocs
-                .asSequence()
-                .mapNotNull { doc ->
-                    doc.id.takeIf { it.isNotBlank() }?.also { candidateFamilyIds.add(it) }
-                    (doc.data?.get("familyId") as? String)?.trim()?.takeIf { it.isNotEmpty() }
-                }
-                .forEach { candidateFamilyIds.add(it) }
-
-            if (candidateFamilyIds.isEmpty()) {
-                KBLog.ui.warning("bootstrapFromFirestore: memberships empty/incoerenti, fallback members collectionGroup", TAG)
-                val memberDocs = db.collectionGroup("members")
-                    .whereEqualTo("uid", uid)
-                    .get()
-                    .await()
-                    .documents
-                memberDocs
-                    .filter { it.data?.get("isDeleted") as? Boolean != true }
-                    .mapNotNull { it.reference.parent.parent?.id }
-                    .forEach { candidateFamilyIds.add(it) }
-            }
-            val distinctCandidates = candidateFamilyIds
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
-                .distinct()
+            // Indice `memberships` + documenti membro insieme: l'indice è una
+            // copia e può avere buchi, e finché il fallback scattava solo a
+            // elenco vuoto un buco parziale restava invisibile.
+            val distinctCandidates = FamilyIdsResolver.resolve(uid)
 
             if (distinctCandidates.isEmpty()) {
                 KBLog.ui.warning("bootstrapFromFirestore: memberships empty uid=$uid", TAG)

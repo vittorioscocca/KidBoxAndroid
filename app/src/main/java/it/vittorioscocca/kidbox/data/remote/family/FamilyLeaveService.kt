@@ -14,10 +14,8 @@ import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
 import it.vittorioscocca.kidbox.notifications.HousePaymentReminderScheduler
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -144,6 +142,9 @@ class FamilyLeaveService @Inject constructor(
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: error("Not authenticated")
         KBLog.data.info("deleteFamily start familyId=$familyId uid=$uid", TAG)
 
+        // Primo filtro, e messaggio comprensibile per chi sta guardando lo
+        // schermo. Non è una prova: Room conosce solo la famiglia attiva (vedi
+        // [deleteFamilyIfServerConfirms]). La prova la dà il server.
         val activeMembers = familyMemberDao.observeActiveByFamilyId(familyId).first()
         if (activeMembers.size > 1) {
             KBLog.data.error("deleteFamily BLOCCATO: ${activeMembers.size} membri attivi in Room (>1) — Cloud Function non invocata", TAG)
@@ -152,28 +153,43 @@ class FamilyLeaveService @Inject constructor(
             )
         }
 
-        // Stop listeners before wipe (mirrors iOS stopFamilyBundleRealtime)
+        deleteFamilyIfServerConfirms(familyId)
+    }
+
+    /**
+     * Cancella la famiglia **solo** se la Cloud Function conferma, e solo dopo
+     * tocca il locale.
+     *
+     * Prima la function partiva in un `CoroutineScope(...).launch`
+     * fire-and-forget e il client cancellava comunque i dati locali **e**
+     * `users/{uid}/memberships/{familyId}`. Un rifiuto del server — per esempio
+     * "la famiglia ha ancora altri membri attivi" — non lo vedeva nessuno: la
+     * famiglia spariva dall'app pur restando intatta su Firestore, e senza
+     * l'indice non c'era più modo di ritrovarla. Su iOS è successo il
+     * 23/09/2026 a una famiglia con cinque membri.
+     *
+     * L'indice non si tocca da qui: lo rimuove la Cloud Function quando la
+     * cancellazione riesce, e il trigger `syncMembershipIndex` lo tiene
+     * allineato ai documenti membro per tutti gli altri.
+     */
+    suspend fun deleteFamilyIfServerConfirms(familyId: String) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: error("Not authenticated")
+        KBLog.data.info("deleteFamilyIfServerConfirms start familyId=$familyId uid=$uid", TAG)
+
+        // 1) Decide il server. Se rifiuta, l'eccezione arriva al chiamante e in
+        // locale non si tocca niente.
+        FirebaseFunctions.getInstance("europe-west1")
+            .getHttpsCallable("deleteFamily")
+            .call(hashMapOf("familyId" to familyId))
+            .await()
+        KBLog.data.info("deleteFamilyIfServerConfirms: il server ha cancellato familyId=$familyId", TAG)
+
+        // 2) Stop listeners before wipe (mirrors iOS stopFamilyBundleRealtime)
         familySyncCenter.stopSync()
         KBLog.data.debug("deleteFamily sync stopped familyId=$familyId", TAG)
 
         // Small delay to let pending snapshots settle (mirrors iOS Task.sleep 150ms)
         kotlinx.coroutines.delay(150)
-
-        // Cloud Function fire-and-forget
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val functions = FirebaseFunctions.getInstance("europe-west1")
-                functions.getHttpsCallable("deleteFamily")
-                    .call(hashMapOf("familyId" to familyId))
-                    .await()
-                KBLog.data.info("deleteFamily CF OK familyId=$familyId", TAG)
-            } catch (e: Exception) {
-                KBLog.data.warning("deleteFamily CF failed (non-fatal): ${e.message}", TAG)
-            }
-        }
-
-        db.collection("users").document(uid)
-            .collection("memberships").document(familyId).delete().await()
 
         withContext(Dispatchers.IO) {
             database.petDao().deleteAllByFamily(familyId)

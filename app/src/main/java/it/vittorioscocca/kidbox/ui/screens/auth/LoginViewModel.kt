@@ -27,6 +27,7 @@ import it.vittorioscocca.kidbox.data.remote.auth.AuthProvider
 import it.vittorioscocca.kidbox.data.remote.auth.EmailAuthService
 import it.vittorioscocca.kidbox.data.remote.auth.FacebookAuthService
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
+import it.vittorioscocca.kidbox.data.remote.family.FamilyIdsResolver
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -397,38 +398,10 @@ class LoginViewModel @Inject constructor(
 
     private suspend fun checkHasFamilyOnce(): Boolean {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return false
-        val membershipsSnap = FirebaseFirestore.getInstance()
-            .collection("users")
-            .document(uid)
-            .collection("memberships")
-            .get(Source.SERVER)
-            .await()
-        val candidateFamilyIds = buildList {
-            membershipsSnap.documents.forEach { doc ->
-                if (doc.id.isNotBlank()) add(doc.id)
-                (doc.data?.get("familyId") as? String)
-                    ?.trim()
-                    ?.takeIf { it.isNotEmpty() }
-                    ?.let { add(it) }
-            }
-        }.distinct()
-
-        // Fallback robusto: se memberships è vuota/incoerente, ricava famiglie da members collectionGroup.
-        val resolvedFamilyIds = if (candidateFamilyIds.isNotEmpty()) {
-            candidateFamilyIds
-        } else {
-            KBLog.auth.warning("checkHasFamily: memberships vuote, fallback collectionGroup(members)", "KidBoxDebug")
-            val memberDocs = FirebaseFirestore.getInstance()
-                .collectionGroup("members")
-                .whereEqualTo("uid", uid)
-                .get(Source.SERVER)
-                .await()
-                .documents
-            memberDocs
-                .filter { it.data?.get("isDeleted") as? Boolean != true }
-                .mapNotNull { it.reference.parent.parent?.id }
-                .distinct()
-        }
+        // Indice `memberships` + documenti membro insieme, dal server: appena
+        // dopo il login la cache non vale, e l'indice è una copia che può avere
+        // buchi (il fallback di prima scattava solo a elenco vuoto).
+        val resolvedFamilyIds = FamilyIdsResolver.resolve(uid, Source.SERVER)
 
         if (resolvedFamilyIds.isEmpty()) {
             KBLog.auth.debug("checkHasFamily: no family ids on server -> false", "KidBoxDebug")
