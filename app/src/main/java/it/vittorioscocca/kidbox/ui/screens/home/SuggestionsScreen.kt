@@ -49,9 +49,11 @@ import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.screens.home.onboarding.OnboardingChecklistState
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 
+// "family" non c'è più: la famiglia si gestisce da Impostazioni, non da una
+// card della Home, e i suggerimenti descrivono le card.
 private val suggestionOrder = listOf(
     "chat", "notes", "todo", "shopping", "calendar", "health", "documents", "expenses",
-    "wallet", "passwords", "location", "photos", "family", "pets", "home_items",
+    "wallet", "passwords", "location", "photos", "pets", "home_items",
     "vehicles", "travel", "ai",
 )
 
@@ -68,7 +70,6 @@ private val suggestionTexts = mapOf(
     "passwords" to R.string.home_suggestions_passwords_body,
     "location" to R.string.home_suggestions_location_body,
     "photos" to R.string.home_suggestions_photos_body,
-    "family" to R.string.home_suggestions_family_body,
     "pets" to R.string.home_suggestions_pets_body,
     "home_items" to R.string.home_suggestions_home_items_body,
     "vehicles" to R.string.home_suggestions_vehicles_body,

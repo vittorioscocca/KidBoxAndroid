@@ -18,14 +18,67 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+/**
+ * Una riga dell'elenco: **un dispositivo**, non un documento.
+ *
+ * I documenti in `users/{uid}/sessions` sono per *installazione* (vedi
+ * `DeviceSessionRegistry.installId`): reinstallando l'app, o svuotandone i
+ * dati, se ne crea uno nuovo e il vecchio resta lì. L'elenco mostrava così lo
+ * stesso telefono due o tre volte, con date diverse. Qui le righe dello stesso
+ * dispositivo diventano una sola, con la data di connessione più recente.
+ */
 data class DeviceSessionUi(
-    val id: String,
+    /**
+     * Tutti i documenti che appartengono a questo dispositivo, dal più recente.
+     * Servono interi: disconnetterlo deve cancellarli tutti, o il duplicato
+     * riapparirebbe al caricamento successivo.
+     */
+    val sessionIds: List<String>,
     val platform: String,
     val deviceName: String,
     val osVersion: String,
     val lastSeenAt: Date?,
     val isCurrent: Boolean,
+) {
+    val id: String get() = sessionIds.firstOrNull() ?: deviceName
+}
+
+/** Un documento `sessions/{id}` così com'è su Firestore, prima di raggruppare. */
+private data class RawDeviceSession(
+    val id: String,
+    val platform: String,
+    val deviceName: String,
+    val osVersion: String,
+    val lastSeenAt: Date?,
 )
+
+/**
+ * Raggruppa i documenti per dispositivo: stessa piattaforma e stesso nome sono
+ * la stessa macchina, e ne resta una riga sola con la connessione più recente.
+ * La versione di sistema non entra nella chiave: un aggiornamento di Android
+ * non crea un documento nuovo (quello esistente viene riscritto in place),
+ * quindi tenerla dentro avrebbe solo rischiato di separare i duplicati veri.
+ *
+ * Il prezzo è dichiarato: due telefoni dello stesso modello, sullo stesso
+ * account, finiscono in una riga sola. Il nome leggibile è il modello (vedi
+ * `DeviceSessionRegistry.deviceName`) e non c'è niente di più fine da usare
+ * senza permessi, quindi l'alternativa era continuare a mostrare righe doppie.
+ */
+private fun collapse(raw: List<RawDeviceSession>, currentId: String): List<DeviceSessionUi> =
+    raw.groupBy { "${it.platform.lowercase()}|${it.deviceName.trim().lowercase()}" }
+        .map { (_, items) ->
+            // Dal più recente: la prima riga detta data, versione e id mostrato.
+            val sorted = items.sortedByDescending { it.lastSeenAt?.time ?: 0L }
+            val newest = sorted.first()
+            DeviceSessionUi(
+                sessionIds = sorted.map { it.id },
+                platform = newest.platform,
+                deviceName = newest.deviceName,
+                osVersion = newest.osVersion,
+                lastSeenAt = newest.lastSeenAt,
+                isCurrent = sorted.any { it.id == currentId },
+            )
+        }
 
 data class DevicesUiState(
     val isLoading: Boolean = true,
@@ -56,16 +109,16 @@ class DevicesViewModel @Inject constructor(
                 db.collection("users").document(uid).collection("sessions").get().await()
             }.onSuccess { snap ->
                 val current = deviceSessionRegistry.installId
-                val list = snap.documents.map { d ->
-                    DeviceSessionUi(
+                val raw = snap.documents.map { d ->
+                    RawDeviceSession(
                         id = d.id,
                         platform = d.getString("platform").orEmpty(),
                         deviceName = d.getString("deviceName").orEmpty(),
                         osVersion = d.getString("osVersion").orEmpty(),
                         lastSeenAt = d.getTimestamp("lastSeenAt")?.toDate(),
-                        isCurrent = d.id == current,
                     )
-                }.sortedWith(
+                }
+                val list = collapse(raw, current).sortedWith(
                     // Questo dispositivo in cima, poi i più recenti.
                     compareByDescending<DeviceSessionUi> { it.isCurrent }
                         .thenByDescending { it.lastSeenAt?.time ?: 0L },
@@ -82,8 +135,11 @@ class DevicesViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(isWorking = true)
         viewModelScope.launch {
             runCatching {
-                db.collection("users").document(uid)
-                    .collection("sessions").document(session.id).delete().await()
+                // Tutti i documenti del dispositivo, non solo quello mostrato: se
+                // ne restasse indietro uno, la riga tornerebbe al prossimo
+                // caricamento e quell'installazione resterebbe collegata.
+                val sessions = db.collection("users").document(uid).collection("sessions")
+                session.sessionIds.forEach { sessions.document(it).delete().await() }
             }.onSuccess {
                 if (session.isCurrent) {
                     // Non si aspetta il proprio listener: il logout è già

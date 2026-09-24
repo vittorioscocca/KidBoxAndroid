@@ -3,6 +3,8 @@
     <string name="settings_language_title">Idioma</string>
     <string name="settings_language_footer">El idioma se aplica de inmediato en toda la app.</string>
     <string name="settings_title">Ajustes</string>
+    <string name="settings_section_app">Ajustes de la app</string>
+    <string name="settings_section_support">Soporte</string>
     <string name="settings_row_theme">Tema</string>
     <string name="settings_row_language">Idioma</string>
     <string name="settings_row_family">Ajustes de familia</string>

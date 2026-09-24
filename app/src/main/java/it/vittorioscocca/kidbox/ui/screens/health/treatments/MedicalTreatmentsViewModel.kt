@@ -7,7 +7,10 @@ import it.vittorioscocca.kidbox.data.repository.DoseLogRepository
 import it.vittorioscocca.kidbox.data.repository.TreatmentRepository
 import it.vittorioscocca.kidbox.data.sync.TreatmentSyncCenter
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
+import it.vittorioscocca.kidbox.domain.model.plannedFiniteDosesTotal
 import it.vittorioscocca.kidbox.notifications.TreatmentNotificationManager
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import it.vittorioscocca.kidbox.ui.state.PullToRefreshController
@@ -24,7 +27,10 @@ data class MedicalTreatmentsState(
     val isLoading: Boolean = true,
     val active: List<KBTreatment> = emptyList(),
     val longTerm: List<KBTreatment> = emptyList(),
-    val inactive: List<KBTreatment> = emptyList(),
+    /** Arrivate a fine corsa: tutte le dosi prese, oppure data di fine passata. */
+    val completed: List<KBTreatment> = emptyList(),
+    /** Spente a mano prima della fine (isActive = false). */
+    val stopped: List<KBTreatment> = emptyList(),
     /** Tutte le cure dopo filtro periodo (per selezione / duplica / elimina). */
     val allFiltered: List<KBTreatment> = emptyList(),
     val takenDosesByTreatmentId: Map<String, Int> = emptyMap(),
@@ -92,7 +98,7 @@ class MedicalTreatmentsViewModel @Inject constructor(
     }
 
     private fun rebuild() {
-        val now = System.currentTimeMillis()
+        val zone = ZoneId.systemDefault()
         val prev = _uiState.value
         val filtered = latestTreatments
             .filter { !it.isDeleted }
@@ -109,14 +115,27 @@ class MedicalTreatmentsViewModel @Inject constructor(
 
         val active = mutableListOf<KBTreatment>()
         val longTerm = mutableListOf<KBTreatment>()
-        val inactive = mutableListOf<KBTreatment>()
+        val completed = mutableListOf<KBTreatment>()
+        val stopped = mutableListOf<KBTreatment>()
 
+        // Stessa scala di iOS [PediatricTreatmentsView.lifecycle]: prima chi è stata
+        // spenta a mano, poi il lungo termine (che non finisce mai), poi le dosi
+        // prese, infine la data di fine — che scade a fine giornata, non all'ora esatta.
+        val startOfToday = LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
         for (t in filtered) {
             when {
-                !t.isActive || t.isDeleted -> inactive.add(t)
+                !t.isActive -> stopped.add(t)
                 t.isLongTerm -> longTerm.add(t)
-                t.endDateEpochMillis != null && t.endDateEpochMillis < now -> inactive.add(t)
-                else -> active.add(t)
+                else -> {
+                    val totalPlanned = t.plannedFiniteDosesTotal()
+                    val taken = latestTakenMap[t.id] ?: 0
+                    val end = t.endDateEpochMillis
+                    when {
+                        totalPlanned > 0 && taken >= totalPlanned -> completed.add(t)
+                        end != null && end < startOfToday -> completed.add(t)
+                        else -> active.add(t)
+                    }
+                }
             }
         }
 
@@ -128,7 +147,8 @@ class MedicalTreatmentsViewModel @Inject constructor(
             isLoading = false,
             active = active.sortedByDescending { it.startDateEpochMillis },
             longTerm = longTerm.sortedByDescending { it.startDateEpochMillis },
-            inactive = inactive.sortedByDescending { it.startDateEpochMillis },
+            completed = completed.sortedByDescending { it.startDateEpochMillis },
+            stopped = stopped.sortedByDescending { it.startDateEpochMillis },
             allFiltered = filtered.sortedByDescending { it.startDateEpochMillis },
             takenDosesByTreatmentId = latestTakenMap,
             timeFilter = prev.timeFilter,

@@ -294,7 +294,8 @@
     <string name="health_new_treatment_cap">Nuova Cura</string>
     <string name="health_active_treatments">Cure Attive</string>
     <string name="health_long_term_cap">Lungo termine</string>
-    <string name="health_completed">Concluse</string>
+    <string name="health_completed">Terminate</string>
+    <string name="health_stopped">Interrotte</string>
     <string name="health_no_treatments_period">Nessuna cura nel periodo selezionato</string>
     <string name="health_custom_period">Periodo personalizzato</string>
     <string name="health_duplicate">Duplica</string>

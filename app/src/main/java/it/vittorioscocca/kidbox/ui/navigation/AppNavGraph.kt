@@ -1038,6 +1038,7 @@ fun AppNavGraph(
                 subjectName = "",
                 onBack = { navController.popBackStack() },
                 onUpgrade = {
+                    UpgradeMessageStore.set(null, triggerFeature = "meal_plan")
                     navController.navigate(AppDestination.Plans.route) { launchSingleTop = true }
                 },
             )
@@ -1058,6 +1059,7 @@ fun AppNavGraph(
                 subjectName = "",
                 onBack = { navController.popBackStack() },
                 onUpgrade = {
+                    UpgradeMessageStore.set(null, triggerFeature = "fitness_plan")
                     navController.navigate(AppDestination.Plans.route) { launchSingleTop = true }
                 },
                 onOpenCopilot = {
@@ -1798,7 +1800,10 @@ fun AppNavGraph(
                 onLoyaltyCardClick = { cardId ->
                     navController.navigate(AppDestination.WalletLoyaltyCardDetail.createRoute(familyId, cardId))
                 },
-                onUpgrade = { navController.navigate(AppDestination.Plans.route) },
+                onUpgrade = {
+                    UpgradeMessageStore.set(null, triggerFeature = "wallet")
+                    navController.navigate(AppDestination.Plans.route)
+                },
             )
         }
 

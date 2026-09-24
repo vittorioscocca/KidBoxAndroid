@@ -52,7 +52,6 @@ import androidx.compose.material.icons.filled.LocalGroceryStore
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Lock
 import it.vittorioscocca.kidbox.ai.AskAiButton
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Place
@@ -1121,7 +1120,6 @@ internal fun featureItems(
         Color(0xFF2563EB),
         state.badgePasswords,
     ),
-    FeatureItem("family", context.getString(R.string.home_feature_family_title), context.getString(R.string.home_feature_family_subtitle), AppDestination.FamilySettings.route, Icons.Filled.Person, Color(0xFFFFF3E6), Color(0xFFFF6B00)),
 )
 
 // ── Variante C: scorciatoie + gruppi tematici ────────────────────────────────
@@ -1143,7 +1141,7 @@ private fun HomeCategorySection(
     // Assistente ("ai") escluso: è il bottone AI flottante.
     val groups = listOf(
         stringResource(R.string.home_group_organization) to listOf("notes", "todo", "shopping", "calendar"),
-        stringResource(R.string.home_group_family_health) to listOf("health", "family", "chat"),
+        stringResource(R.string.home_group_family_health) to listOf("health", "chat"),
         stringResource(R.string.home_group_documents_money) to listOf("documents", "expenses", "wallet", "passwords"),
         stringResource(R.string.home_group_daily_life) to listOf("location", "photos", "travel", "pets", "home_items", "vehicles"),
     )

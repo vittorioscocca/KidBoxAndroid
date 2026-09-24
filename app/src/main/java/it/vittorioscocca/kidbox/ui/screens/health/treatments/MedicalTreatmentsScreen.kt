@@ -100,6 +100,7 @@ fun MedicalTreatmentsScreen(
     val activeTitle = stringResource(R.string.health_active_treatments)
     val longTermTitle = stringResource(R.string.health_long_term_cap)
     val completedTitle = stringResource(R.string.health_completed)
+    val stoppedTitle = stringResource(R.string.health_stopped)
     val kb = MaterialTheme.kidBoxColors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
@@ -249,7 +250,8 @@ fun MedicalTreatmentsScreen(
             } else if (state.isEmptyDueToFilter) {
                 EmptyFilterState(onClear = { viewModel.clearTimeFilter() }, modifier = Modifier.fillMaxSize())
             } else {
-                val isEmpty = state.active.isEmpty() && state.longTerm.isEmpty() && state.inactive.isEmpty()
+                val isEmpty = state.active.isEmpty() && state.longTerm.isEmpty() &&
+                    state.completed.isEmpty() && state.stopped.isEmpty()
                 if (isEmpty) {
                     EmptyTreatments(modifier = Modifier.fillMaxSize())
                 } else {
@@ -288,7 +290,17 @@ fun MedicalTreatmentsScreen(
                             )
                             treatmentSection(
                                 title = completedTitle,
-                                items = state.inactive,
+                                items = state.completed,
+                                takenDosesByTreatmentId = state.takenDosesByTreatmentId,
+                                isSelecting = state.isSelecting,
+                                selectedIds = state.selectedIds,
+                                onRowClick = { t ->
+                                    if (state.isSelecting) viewModel.toggleSelection(t.id) else onOpen(t.id)
+                                },
+                            )
+                            treatmentSection(
+                                title = stoppedTitle,
+                                items = state.stopped,
                                 takenDosesByTreatmentId = state.takenDosesByTreatmentId,
                                 isSelecting = state.isSelecting,
                                 selectedIds = state.selectedIds,

@@ -294,7 +294,8 @@
     <string name="health_new_treatment_cap">New treatment</string>
     <string name="health_active_treatments">Active treatments</string>
     <string name="health_long_term_cap">Long term</string>
-    <string name="health_completed">Completed</string>
+    <string name="health_completed">Ended</string>
+    <string name="health_stopped">Stopped</string>
     <string name="health_no_treatments_period">No treatments in the selected period</string>
     <string name="health_custom_period">Custom period</string>
     <string name="health_duplicate">Duplicate</string>

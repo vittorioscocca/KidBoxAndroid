@@ -295,6 +295,7 @@
     <string name="health_active_treatments">Traitements actifs</string>
     <string name="health_long_term_cap">Long terme</string>
     <string name="health_completed">Terminés</string>
+    <string name="health_stopped">Interrompus</string>
     <string name="health_no_treatments_period">Aucun traitement sur la période choisie</string>
     <string name="health_custom_period">Période personnalisée</string>
     <string name="health_duplicate">Dupliquer</string>

@@ -1051,7 +1051,6 @@ class HomeViewModel @Inject constructor(
         "home_items",
         "vehicles",
         "ai",
-        "family",
     )
 
     private fun todayLabel(): String {

@@ -108,7 +108,7 @@ fun SettingsScreen(
     }
 
     // `listOfNotNull`: la voce Alexa non c'è in tutte le lingue (vedi sotto).
-    val rows = listOfNotNull(
+    val appRows = listOfNotNull(
         SettingRowItem(
             title = stringResource(R.string.settings_row_theme),
             subtitle = theme.toSubtitle(),
@@ -181,6 +181,11 @@ fun SettingsScreen(
             showChevron = true,
             onClick = onStorageUsage,
         ),
+    )
+
+    // Supporto, guida, sito e recensione non cambiano niente dell'app: stanno
+    // in un elenco loro, separato dalle impostazioni vere e proprie.
+    val supportRows = listOf(
         SettingRowItem(
             title = stringResource(R.string.settings_row_support),
             subtitle = stringResource(R.string.settings_row_support_sub),
@@ -240,23 +245,13 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
-        ) {
-            rows.forEachIndexed { index, item ->
-                SettingRow(item)
-                if (index != rows.lastIndex) {
-                    Divider(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.kidBoxColors.divider,
-                    )
-                }
-            }
-        }
+        SettingsSectionHeader(stringResource(R.string.settings_section_app))
+        SettingsRowsCard(appRows)
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        SettingsSectionHeader(stringResource(R.string.settings_section_support))
+        SettingsRowsCard(supportRows)
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -280,6 +275,38 @@ fun SettingsScreen(
                 color = MaterialTheme.kidBoxColors.subtitle,
                 fontWeight = FontWeight.Normal,
             )
+        }
+    }
+}
+
+@Composable
+private fun SettingsSectionHeader(text: String) {
+    Text(
+        text = text,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.kidBoxColors.subtitle,
+        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+    )
+}
+
+@Composable
+private fun SettingsRowsCard(rows: List<SettingRowItem>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
+    ) {
+        rows.forEachIndexed { index, item ->
+            SettingRow(item)
+            if (index != rows.lastIndex) {
+                Divider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.kidBoxColors.divider,
+                )
+            }
         }
     }
 }
