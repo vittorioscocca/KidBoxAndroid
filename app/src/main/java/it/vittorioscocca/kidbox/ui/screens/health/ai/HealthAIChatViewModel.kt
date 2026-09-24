@@ -49,6 +49,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 
 data class HealthAIChatState(
     val isLoadingContext: Boolean = true,
@@ -120,6 +122,7 @@ class HealthAIChatViewModel @Inject constructor(
 
     companion object {
         private const val TAG = "HealthAIChatVM"
+        private const val ESTIMATE_DEBOUNCE_MS = 300L
     }
 
     fun bind(familyId: String, childId: String) {
@@ -291,6 +294,7 @@ class HealthAIChatViewModel @Inject constructor(
         val text = _uiState.value.inputText.trim()
         if (text.isBlank()) return
         if (conversation == null) return
+        estimateJob?.cancel()
         refreshPayloadCostEstimate(messages = _uiState.value.messages, pendingUserText = text)
         if (_uiState.value.estimatedMessageUnits > 1) {
             when (val pref = aiSettingsStore.getHealthContextSendPreference()) {
@@ -461,12 +465,21 @@ class HealthAIChatViewModel @Inject constructor(
         return messagesInSession.toDouble() >= dailyLimit.toDouble() * COMPACTION_THRESHOLD
     }
 
+    private var estimateJob: Job? = null
+
     fun setInput(text: String) {
         _uiState.value = _uiState.value.copy(inputText = text)
-        refreshPayloadCostEstimate(
-            messages = _uiState.value.messages,
-            pendingUserText = text,
-        )
+        // La stima percorre l'intera conversazione e gira sul main thread: rifarla a ogni
+        // tasto rallentava la digitazione. Si aspetta una pausa; send() la ricalcola
+        // comunque in modo sincrono prima di decidere.
+        estimateJob?.cancel()
+        estimateJob = viewModelScope.launch {
+            delay(ESTIMATE_DEBOUNCE_MS)
+            refreshPayloadCostEstimate(
+                messages = _uiState.value.messages,
+                pendingUserText = text,
+            )
+        }
     }
 
     fun dismissContextNotice() {

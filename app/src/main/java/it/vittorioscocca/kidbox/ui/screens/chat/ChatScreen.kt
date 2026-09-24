@@ -151,8 +151,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import coil.Coil
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import coil.size.Scale
-import coil.size.Size
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -285,7 +283,10 @@ fun ChatScreen(
     // Snapshot sempre aggiornato della lista renderizzata, condiviso con il prefetch e con
     // il salvataggio dell'ancora di scroll in dispose.
     val reversedFlatItemsState = rememberUpdatedState(reversedFlatItems)
-    LaunchedEffect(listState, state.familyId) {
+    // Stessa taglia delle bolle (ChatMediaRequests): con taglie diverse Coil scarta la
+    // bitmap prefetchata e ridecodifica durante lo scroll.
+    val mediaWidthPx = chatMediaWidthPx()
+    LaunchedEffect(listState, state.familyId, mediaWidthPx) {
         val loader = Coil.imageLoader(context)
         snapshotFlow { listState.firstVisibleItemIndex }
             .distinctUntilChanged()
@@ -297,22 +298,21 @@ fun ChatScreen(
                     val to = (firstVisible + PREFETCH_AHEAD).coerceAtMost(items.lastIndex)
                     for (i in from..to) {
                         val msg = (items[i] as? ChatListItem.Message)?.message ?: continue
-                        val source: Any? = when (msg.type) {
+                        when (msg.type) {
                             // mediaLocalPath è già validato dal repository.
-                            ChatMessageType.PHOTO -> msg.mediaLocalPath?.let { java.io.File(it) } ?: msg.mediaUrl
-                            ChatMessageType.MEDIA_GROUP -> msg.mediaGroupUrls.firstOrNull()
-                            else -> null
-                        } ?: continue
-                        val cacheKey = "msg_${msg.id}"
-                        loader.enqueue(
-                            ImageRequest.Builder(context)
-                                .data(source)
-                                .memoryCacheKey(cacheKey)
-                                .diskCacheKey(cacheKey)
-                                .size(Size(400, 400))
-                                .scale(Scale.FILL)
-                                .build(),
-                        )
+                            ChatMessageType.PHOTO -> {
+                                val source: Any = msg.mediaLocalPath?.let { java.io.File(it) } ?: msg.mediaUrl ?: continue
+                                loader.enqueue(ChatMediaRequests.single(context, source, msg.id, mediaWidthPx))
+                            }
+                            // Le tessere visibili (max 6), con le loro chiavi. Prima si scaldava
+                            // solo il primo URL sotto la chiave della foto singola, che nessuna
+                            // tessera legge; e i video passavano a Coil, che li scarica interi.
+                            ChatMessageType.MEDIA_GROUP -> msg.mediaGroupUrls.take(6).forEachIndexed { idx, url ->
+                                if (msg.mediaGroupTypes.getOrNull(idx) == "video") return@forEachIndexed
+                                loader.enqueue(ChatMediaRequests.tile(context, url, msg.id, idx, mediaWidthPx))
+                            }
+                            else -> Unit
+                        }
                     }
                 }
             }
@@ -626,6 +626,15 @@ fun ChatScreen(
                                     when (item) {
                                         is ChatListItem.Separator -> "sep_${item.label}"
                                         is ChatListItem.Message -> "msg_${item.message.id}"
+                                    }
+                                },
+                                // Senza contentType Compose ricicla una bolla audio per una foto
+                                // (o un separatore per una bolla) e ricostruisce tutto l'albero:
+                                // col tipo, riusa solo composizioni della stessa forma.
+                                contentType = { _, item ->
+                                    when (item) {
+                                        is ChatListItem.Separator -> "sep"
+                                        is ChatListItem.Message -> item.message.type
                                     }
                                 },
                             ) { _, item ->
@@ -1824,7 +1833,7 @@ private fun MediaGroupGalleryDialog(
                                 initialValue = null,
                                 key1 = url,
                             ) {
-                                value = VideoThumbnailLoader.load(url, context, cacheKey = "gallery_vid_$page")
+                                value = VideoThumbnailLoader.load(url, context, cacheKey = "gallery_vid_$page", maxSide = Int.MAX_VALUE)
                             }
                             if (thumbnail != null) {
                                 Image(

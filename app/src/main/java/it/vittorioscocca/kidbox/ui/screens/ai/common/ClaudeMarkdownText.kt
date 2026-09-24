@@ -12,6 +12,7 @@ import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -35,7 +36,8 @@ fun ClaudeMarkdownText(
     text: String,
     modifier: Modifier = Modifier,
 ) {
-    val blocks = parseBlocks(text)
+    // Il parse si rifà solo quando cambia il testo, non a ogni ricomposizione della lista.
+    val blocks = remember(text) { parseBlocks(text) }
 
     SelectionContainer {
         Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(0.dp)) {
@@ -43,7 +45,7 @@ fun ClaudeMarkdownText(
                 when (block) {
                     is MarkdownBlock.Heading -> {
                         Text(
-                            text = inlineMarkdown(block.text),
+                            text = remember(block.text) { inlineMarkdown(block.text) },
                             fontWeight = if (block.level == 1) FontWeight.Bold else FontWeight.SemiBold,
                             fontSize = when (block.level) {
                                 1 -> 26.sp
@@ -63,7 +65,7 @@ fun ClaudeMarkdownText(
 
                     is MarkdownBlock.Paragraph -> {
                         Text(
-                            text = inlineMarkdown(block.text),
+                            text = remember(block.text) { inlineMarkdown(block.text) },
                             fontSize = 16.sp,
                             lineHeight = 22.sp,
                             color = MaterialTheme.colorScheme.onBackground,
@@ -83,7 +85,7 @@ fun ClaudeMarkdownText(
                                         modifier = Modifier.padding(end = 8.dp),
                                     )
                                     Text(
-                                        text = inlineMarkdown(item),
+                                        text = remember(item) { inlineMarkdown(item) },
                                         fontSize = 16.sp,
                                         lineHeight = 22.sp,
                                         color = MaterialTheme.colorScheme.onBackground,

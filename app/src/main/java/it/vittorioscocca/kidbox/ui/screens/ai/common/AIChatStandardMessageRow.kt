@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -112,8 +113,11 @@ fun AIChatStandardMessageRow(
             }
         }
         Spacer(Modifier.height(2.dp))
+        // Ricordato: SimpleDateFormat è fra le allocazioni più care della stdlib, e prima
+        // se ne costruiva uno per riga a ogni ricomposizione (ogni tasto nel composer).
+        val timeLabel = remember(createdAtEpochMillis) { TIME_FMT().format(Date(createdAtEpochMillis)) }
         Text(
-            TIME_FMT().format(Date(createdAtEpochMillis)),
+            timeLabel,
             fontSize = 10.sp,
             color = kb.subtitle,
         )

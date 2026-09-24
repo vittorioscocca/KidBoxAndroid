@@ -63,6 +63,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -117,6 +118,8 @@ fun AIChatScreen(
 
     LaunchedEffect(familyId) { viewModel.bind(familyId, familyName) }
 
+    // Una lista nuova a ogni tasto premuto nel composer, se non ricordata.
+    val reversedMessages = remember(state.messages) { state.messages.reversed() }
     val (streamScrollTick, onStreamScrollTick) = rememberStreamScrollTick()
     AIChatListScrollEffect(
         listState = listState,
@@ -304,7 +307,7 @@ fun AIChatScreen(
                                 item { PlanningTypingIndicator() }
                             }
                             itemsIndexed(
-                                state.messages.reversed(),
+                                reversedMessages,
                                 key = { _, message -> message.id },
                             ) { _, message ->
                                 AIChatStandardMessageRow(
@@ -318,7 +321,11 @@ fun AIChatScreen(
                                 )
                             }
                         }
-                        val showScrollToBottom = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
+                        // derivedStateOf: letta nuda, la posizione di scroll ricomponeva l'intera
+                        // schermata a ogni frame dello scroll.
+                        val showScrollToBottom by remember(listState) {
+                            derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0 }
+                        }
                         androidx.compose.animation.AnimatedVisibility(
                             visible = showScrollToBottom,
                             modifier = Modifier

@@ -70,7 +70,11 @@ object FamilyIdsResolver {
             (if (source != null) query.get(source) else query.get()).await().documents
         }.onSuccess { docs ->
             val daiMembri = docs
+                // Stesso criterio di isMember nelle rules: non cancellato E con role.
+                // Un documento senza role è quello che un rinomina ricrea dopo una
+                // revoca: la famiglia comparirebbe in lista senza poterla leggere.
                 .filter { it.data?.get("isDeleted") as? Boolean != true }
+                .filter { (it.get("role") as? String).orEmpty().isNotBlank() }
                 .mapNotNull { it.reference.parent.parent?.id }
             val nuove = daiMembri.filter { it !in ids }
             if (nuove.isNotEmpty()) {

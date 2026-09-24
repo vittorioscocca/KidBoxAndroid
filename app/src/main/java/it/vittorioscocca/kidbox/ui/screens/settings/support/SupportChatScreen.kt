@@ -63,6 +63,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -125,7 +126,7 @@ fun SupportChatScreen(
         messageCount = state.messages.size + if (state.isLoading) 1 else 0,
         isLoading = state.isLoading,
         streamingMessageId = null,
-        streamScrollTick = 0,
+        streamScrollTick = remember { mutableIntStateOf(0) },
         reverseLayout = false,
     )
 

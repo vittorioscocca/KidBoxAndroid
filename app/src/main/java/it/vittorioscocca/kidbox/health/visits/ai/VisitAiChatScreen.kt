@@ -55,6 +55,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -286,9 +287,15 @@ fun VisitAiChatScreen(
                         }
                     }
                 }
-                val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-                val total = listState.layoutInfo.totalItemsCount
-                val showScrollToBottom = total > 0 && lastVisible < total - 1
+                // derivedStateOf: letto nudo, layoutInfo ricomponeva l'intera schermata a ogni
+                // frame dello scroll.
+                val showScrollToBottom by remember(listState) {
+                    derivedStateOf {
+                        val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+                        val total = listState.layoutInfo.totalItemsCount
+                        total > 0 && lastVisible < total - 1
+                    }
+                }
                 androidx.compose.animation.AnimatedVisibility(
                     visible = showScrollToBottom,
                     modifier = Modifier
@@ -298,7 +305,7 @@ fun VisitAiChatScreen(
                     exit = fadeOut(),
                 ) {
                     IconButton(
-                        onClick = { scope.launch { listState.animateScrollToItem((total - 1).coerceAtLeast(0)) } },
+                        onClick = { scope.launch { listState.animateScrollToItem((listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)) } },
                         modifier = Modifier
                             .size(42.dp)
                             .clip(androidx.compose.foundation.shape.CircleShape)

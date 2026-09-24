@@ -29,6 +29,9 @@ internal object LinkPreviewFetcher {
     // Sentinel for URLs that returned no useful data (avoids repeated fetches)
     private val empty = LinkPreviewData("", "", null, null, null)
 
+    /** Solo cache, senza rete: per il primo frame della bolla. */
+    fun peek(url: String): LinkPreviewData? = cache.get(url)?.takeUnless { it === empty }
+
     suspend fun fetch(url: String): LinkPreviewData? = withContext(Dispatchers.IO) {
         cache.get(url)?.let { return@withContext if (it === empty) null else it }
 

@@ -81,7 +81,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import com.google.android.gms.maps.GoogleMapOptions
@@ -263,7 +262,7 @@ internal fun ChatBubble(
                         ChatMessageType.PHOTO -> MediaContent(message, isVideo = false, onMediaTap = onMediaTap, onLongPress = { onLongPress(message) })
                         ChatMessageType.VIDEO -> MediaContent(message, isVideo = true, onMediaTap = onMediaTap, onLongPress = { onLongPress(message) })
                         ChatMessageType.MEDIA_GROUP -> MediaGroupContent(message, onMediaGroupTap = onMediaGroupTap, onLongPress = { onLongPress(message) })
-                        ChatMessageType.LOCATION -> LocationContent(message)
+                        ChatMessageType.LOCATION -> LocationContent(message, onLongPress = { onLongPress(message) })
                         else -> Unit
                     }
                     // Floating time/checks pill so the timestamp stays legible over the image
@@ -332,7 +331,7 @@ internal fun ChatBubble(
                             ChatMessageType.PHOTO -> MediaContent(message, isVideo = false, onMediaTap = onMediaTap, onLongPress = { onLongPress(message) })
                             ChatMessageType.VIDEO -> MediaContent(message, isVideo = true, onMediaTap = onMediaTap, onLongPress = { onLongPress(message) })
                             ChatMessageType.MEDIA_GROUP -> MediaGroupContent(message, onMediaGroupTap = onMediaGroupTap, onLongPress = { onLongPress(message) })
-                            ChatMessageType.LOCATION -> LocationContent(message)
+                            ChatMessageType.LOCATION -> LocationContent(message, onLongPress = { onLongPress(message) })
                             ChatMessageType.CONTACT -> ContactContent(message, textColor, subtitleColor, isOwn)
                             ChatMessageType.DOCUMENT -> DocumentContent(message, textColor, subtitleColor)
                             ChatMessageType.AUDIO -> AudioContent(
@@ -596,8 +595,10 @@ private fun LinkPreviewCard(
     textColor: Color,
 ) {
     val context = LocalContext.current
-    val preview by produceState<LinkPreviewData?>(initialValue = null, key1 = url) {
-        value = LinkPreviewFetcher.fetch(url)
+    // Partire dalla cache evita che la card compaia un frame dopo la bolla: rientrando nel
+    // viewport la bolla cresceva di ~100dp a scroll in corso e la lista scattava.
+    val preview by produceState(initialValue = LinkPreviewFetcher.peek(url), key1 = url) {
+        if (value == null) value = LinkPreviewFetcher.fetch(url)
     }
 
     // Don't show anything while loading — card appears once data is ready
@@ -727,31 +728,20 @@ private fun MediaContent(
         contentAlignment = Alignment.Center,
     ) {
         if (imageSource != null) {
-            // Stable cache key tied to the message id so Coil keeps hitting its memory
-            // / disk cache even when the source flips from local file to remote URL.
-            val cacheKey = "msg_${message.id}"
             if (isVideo) {
                 val videoSource = localFile?.absolutePath ?: (mediaUrl ?: "")
-                val bmp by produceState<android.graphics.Bitmap?>(initialValue = null, key1 = message.id) {
-                    value = VideoThumbnailLoader.load(videoSource, context, cacheKey = "vid_${message.id}")
+                val thumbKey = "vid_${message.id}"
+                // Valore iniziale dalla cache in memoria: senza, ogni bolla che rientra nel
+                // viewport mostrava un frame di placeholder prima della miniatura già nota.
+                val bmp by produceState(initialValue = VideoThumbnailLoader.peek(thumbKey), key1 = message.id) {
+                    if (value == null) value = VideoThumbnailLoader.load(videoSource, context, cacheKey = thumbKey)
                 }
-                if (bmp != null) {
+                // Niente AsyncImage di ripiego sul file video: Coil non decodifica video, ma
+                // prima di fallire scaricava l'intero file nella cache immagini, durante lo
+                // scroll. Mentre la miniatura arriva resta lo sfondo del Box.
+                bmp?.let {
                     androidx.compose.foundation.Image(
-                        bitmap = bmp!!.asImageBitmap(),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                    )
-                } else {
-                    // Fallback while thumbnail is loading
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(imageSource)
-                            .memoryCacheKey(cacheKey)
-                            .diskCacheKey(cacheKey)
-                            .memoryCachePolicy(CachePolicy.ENABLED)
-                            .diskCachePolicy(CachePolicy.ENABLED)
-                            .build(),
+                        bitmap = it.asImageBitmap(),
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
@@ -764,15 +754,14 @@ private fun MediaContent(
                     modifier = Modifier.size(42.dp),
                 )
             } else {
+                // Stable cache key tied to the message id so Coil keeps hitting its memory
+                // / disk cache even when the source flips from local file to remote URL.
+                val mediaWidthPx = chatMediaWidthPx()
+                val request = remember(imageSource, message.id, mediaWidthPx) {
+                    ChatMediaRequests.single(context, imageSource, message.id, mediaWidthPx)
+                }
                 AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(imageSource)
-                        .memoryCacheKey(cacheKey)
-                        .diskCacheKey(cacheKey)
-                        .memoryCachePolicy(CachePolicy.ENABLED)
-                        .diskCachePolicy(CachePolicy.ENABLED)
-                        .crossfade(true)
-                        .build(),
+                    model = request,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
@@ -811,6 +800,7 @@ private fun MediaGroupContent(
     //   6+ → [3,3]
     val rowLayout = mediaGridLayout(displayCount)
     val context = LocalContext.current
+    val mediaWidthPx = chatMediaWidthPx()
 
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         var tileIndex = 0
@@ -825,12 +815,12 @@ private fun MediaGroupContent(
                     val isVideo = message.mediaGroupTypes.getOrNull(idx) == "video"
                     // The last tile (index 5) gets the "+N" scrim when there are more items
                     val isOverflowTile = idx == 5 && overflowCount > 0
-                    val tileKey = "msg_${message.id}_$idx"
+                    val tileKey = ChatMediaRequests.tileKey(message.id, idx)
 
                     // Load video thumbnail asynchronously; photos are handled by Coil
                     val videoBmp by if (isVideo) {
-                        produceState<android.graphics.Bitmap?>(initialValue = null, key1 = tileKey) {
-                            value = VideoThumbnailLoader.load(url, context, cacheKey = tileKey)
+                        produceState(initialValue = VideoThumbnailLoader.peek(tileKey), key1 = tileKey) {
+                            if (value == null) value = VideoThumbnailLoader.load(url, context, cacheKey = tileKey)
                         }
                     } else {
                         produceState<android.graphics.Bitmap?>(initialValue = null) {}
@@ -852,16 +842,14 @@ private fun MediaGroupContent(
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop,
                             )
-                        } else {
+                        } else if (!isVideo) {
+                            // Un video senza miniatura resta sullo sfondo: passato a Coil
+                            // verrebbe scaricato per intero e poi rifiutato dal decoder.
+                            val request = remember(url, tileKey, mediaWidthPx) {
+                                ChatMediaRequests.tile(context, url, message.id, idx, mediaWidthPx)
+                            }
                             AsyncImage(
-                                model = ImageRequest.Builder(context)
-                                    .data(url)
-                                    .memoryCacheKey(tileKey)
-                                    .diskCacheKey(tileKey)
-                                    .memoryCachePolicy(CachePolicy.ENABLED)
-                                    .diskCachePolicy(CachePolicy.ENABLED)
-                                    .crossfade(true)
-                                    .build(),
+                                model = request,
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop,
@@ -937,6 +925,23 @@ private fun mediaGridLayout(count: Int): List<Int> = when (count) {
     else -> listOf(3, 3)   // 6 tiles shown; extras hidden behind the "+N" overlay
 }
 
+/**
+ * Apre la posizione nell'app di mappe. `geo:` lascia scegliere all'utente; se nessuna
+ * app lo gestisce (niente Google Maps, profili di lavoro, emulatori) si ripiega sul
+ * link web, che apre il browser. Prima il `geo:` era senza ripiego: un
+ * ActivityNotFoundException chiudeva l'app.
+ */
+private fun openLocationInMaps(context: android.content.Context, lat: Double, lon: Double) {
+    val label = Uri.encode(context.getString(R.string.chat_location))
+    val geo = Intent(Intent.ACTION_VIEW, Uri.parse("geo:$lat,$lon?q=$lat,$lon($label)"))
+    val web = Intent(
+        Intent.ACTION_VIEW,
+        Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lon"),
+    )
+    runCatching { context.startActivity(geo) }
+        .recoverCatching { context.startActivity(web) }
+}
+
 @Composable
 private fun LocationContent(
     message: UiChatMessage,
@@ -959,14 +964,7 @@ private fun LocationContent(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(160.dp)
-            .combinedClickable(
-                onClick = {
-                    val uri = Uri.parse("geo:$lat,$lon?q=$lat,$lon(Posizione condivisa)")
-                    context.startActivity(Intent(Intent.ACTION_VIEW, uri))
-                },
-                onLongClick = onLongPress,
-            ),
+            .height(160.dp),
     ) {
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
@@ -990,20 +988,19 @@ private fun LocationContent(
             )
         }
 
-        // Transparent overlay that consumes all touch events on the map surface,
-        // leaving only the outer combinedClickable to handle tap/long-press —
-        // identical to iOS allowsHitTesting(false).
+        // L'overlay sopra la mappa È il bersaglio del tocco. Prima consumava ogni evento
+        // nel passaggio Initial perché restasse solo il combinedClickable del Box esterno:
+        // ma Initial va dal genitore al figlio, e nel passaggio Main — dove
+        // combinedClickable decide — il genitore trovava il tocco già consumato. Risultato:
+        // toccare una posizione non apriva mai le mappe. Da fratello in cima, l'overlay
+        // vince comunque l'hit test sulla mappa (parità con iOS allowsHitTesting(false)).
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            awaitPointerEvent(pass = PointerEventPass.Initial)
-                                .changes.forEach { it.consume() }
-                        }
-                    }
-                },
+                .combinedClickable(
+                    onClick = { openLocationInMaps(context, lat, lon) },
+                    onLongClick = onLongPress,
+                ),
         )
     }
 }

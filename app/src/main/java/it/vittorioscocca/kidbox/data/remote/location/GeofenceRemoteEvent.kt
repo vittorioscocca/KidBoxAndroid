@@ -35,6 +35,10 @@ class GeofenceRemoteEvent @Inject constructor() {
             "displayName" to displayName,
             "type" to type.raw,
             "timestamp" to FieldValue.serverTimestamp(),
+            // Quando è successo DAVVERO. `timestamp` è l'ora d'arrivo al server: con il
+            // telefono offline gli eventi si accodano e arrivano insieme, anche un'ora
+            // dopo. onGeofenceEvent non avvisa per eventi più vecchi di 15 minuti.
+            "clientAt" to System.currentTimeMillis(),
         )
         runCatching {
             db.collection("families")
