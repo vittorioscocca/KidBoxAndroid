@@ -54,4 +54,7 @@ data class KBChatMessageEntity(
     val isDeletedForEveryone: Boolean,
     val syncStateRaw: Int,
     val lastSyncError: String?,
+    /** Dimensioni in pixel di foto/video come si vedono (rotazione applicata): danno il formato alla bolla. */
+    val mediaWidth: Int? = null,
+    val mediaHeight: Int? = null,
 )

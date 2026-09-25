@@ -6,6 +6,7 @@
 
 package it.vittorioscocca.kidbox.ui.screens.chat
 
+import it.vittorioscocca.kidbox.data.remote.chat.ChatUploadProgress
 import android.content.Intent
 import android.media.MediaPlayer
 import android.net.Uri
@@ -203,7 +204,16 @@ internal fun ChatBubble(
                 // Media-only bubbles use a narrower fixed width (65 % of screen, max
                 // 260 dp) so photos/videos/maps don't dominate the thread visually.
                 // Text bubbles keep the wider max so long messages still wrap nicely.
-                .let { if (isMediaOnly) it.width(maxMediaWidth) else it.widthIn(max = maxBubbleWidth) }
+                .let {
+                    when {
+                        isMediaOnly && (message.type == ChatMessageType.PHOTO || message.type == ChatMessageType.VIDEO) -> {
+                            val (w, h) = message.mediaDimensions()
+                            it.width(chatMediaBoxSize(w, h, maxMediaWidth).width)
+                        }
+                        isMediaOnly -> it.width(maxMediaWidth)
+                        else -> it.widthIn(max = maxBubbleWidth)
+                    }
+                }
                 .clip(bubbleShape)
                 .pointerInput(message.id) {
                     detectHorizontalDragGestures(
@@ -261,7 +271,9 @@ internal fun ChatBubble(
                     when (message.type) {
                         ChatMessageType.PHOTO -> MediaContent(message, isVideo = false, onMediaTap = onMediaTap, onLongPress = { onLongPress(message) })
                         ChatMessageType.VIDEO -> MediaContent(message, isVideo = true, onMediaTap = onMediaTap, onLongPress = { onLongPress(message) })
-                        ChatMessageType.MEDIA_GROUP -> MediaGroupContent(message, onMediaGroupTap = onMediaGroupTap, onLongPress = { onLongPress(message) })
+                        ChatMessageType.MEDIA_GROUP ->
+                            if (message.mediaGroupUrls.isEmpty()) PendingMediaGroupContent(message)
+                            else MediaGroupContent(message, onMediaGroupTap = onMediaGroupTap, onLongPress = { onLongPress(message) })
                         ChatMessageType.LOCATION -> LocationContent(message, onLongPress = { onLongPress(message) })
                         else -> Unit
                     }
@@ -330,7 +342,9 @@ internal fun ChatBubble(
                             ChatMessageType.TEXT -> TextContent(message, textColor, subtitleColor, isOwn, currentUid)
                             ChatMessageType.PHOTO -> MediaContent(message, isVideo = false, onMediaTap = onMediaTap, onLongPress = { onLongPress(message) })
                             ChatMessageType.VIDEO -> MediaContent(message, isVideo = true, onMediaTap = onMediaTap, onLongPress = { onLongPress(message) })
-                            ChatMessageType.MEDIA_GROUP -> MediaGroupContent(message, onMediaGroupTap = onMediaGroupTap, onLongPress = { onLongPress(message) })
+                            ChatMessageType.MEDIA_GROUP ->
+                                if (message.mediaGroupUrls.isEmpty()) PendingMediaGroupContent(message)
+                                else MediaGroupContent(message, onMediaGroupTap = onMediaGroupTap, onLongPress = { onLongPress(message) })
                             ChatMessageType.LOCATION -> LocationContent(message, onLongPress = { onLongPress(message) })
                             ChatMessageType.CONTACT -> ContactContent(message, textColor, subtitleColor, isOwn)
                             ChatMessageType.DOCUMENT -> DocumentContent(message, textColor, subtitleColor)
@@ -717,14 +731,19 @@ private fun MediaContent(
     val imageSource: Any? = localFile ?: message.mediaUrl
     val mediaUrl = message.mediaUrl   // kept for the fullscreen tap callback
     val context = LocalContext.current
+    // Formato dalla foto/video (verticale o orizzontale, come WhatsApp): la bolla
+    // media-only è già larga quanto serve, qui si fissa il rapporto.
+    val (dimW, dimH) = message.mediaDimensions()
+    val boxSize = chatMediaBoxSize(dimW, dimH, 260.dp)
+    val uploadProgress = rememberUploadProgress(message.id)
     Box(
         modifier = Modifier
-            // Fill the surrounding bubble width and use a fixed 4:3 aspect so the
-            // thumbnail looks natural across phone widths instead of being pinned
-            // to a tiny 220×160 frame.
             .fillMaxWidth()
-            .aspectRatio(4f / 3f)
-            .background(MaterialTheme.kidBoxColors.surfaceOverlay),
+            .aspectRatio(boxSize.width / boxSize.height)
+            .background(
+                if (uploadProgress != null && imageSource == null) Color.Black.copy(alpha = 0.75f)
+                else MaterialTheme.kidBoxColors.surfaceOverlay,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         if (imageSource != null) {
@@ -735,6 +754,9 @@ private fun MediaContent(
                 // viewport mostrava un frame di placeholder prima della miniatura già nota.
                 val bmp by produceState(initialValue = VideoThumbnailLoader.peek(thumbKey), key1 = message.id) {
                     if (value == null) value = VideoThumbnailLoader.load(videoSource, context, cacheKey = thumbKey)
+                }
+                LaunchedEffect(bmp) {
+                    bmp?.let { ChatMeasuredMediaSizes.record(message.id, it.width, it.height) }
                 }
                 // Niente AsyncImage di ripiego sul file video: Coil non decodifica video, ma
                 // prima di fallire scaricava l'intero file nella cache immagini, durante lo
@@ -747,12 +769,14 @@ private fun MediaContent(
                         contentScale = ContentScale.Crop,
                     )
                 }
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(42.dp),
-                )
+                if (uploadProgress == null) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(42.dp),
+                    )
+                }
             } else {
                 // Stable cache key tied to the message id so Coil keeps hitting its memory
                 // / disk cache even when the source flips from local file to remote URL.
@@ -765,6 +789,10 @@ private fun MediaContent(
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
+                    onSuccess = { state ->
+                        val d = state.result.drawable
+                        ChatMeasuredMediaSizes.record(message.id, d.intrinsicWidth, d.intrinsicHeight)
+                    },
                 )
             }
             // Transparent overlay — captures tap (fullscreen) and long press (action menu).
@@ -779,6 +807,23 @@ private fun MediaContent(
                     ),
             )
         }
+        uploadProgress?.let { ChatProgressRing(it, onCancel = { ChatUploadProgress.cancel(message.id) }) }
+    }
+}
+
+/** Gruppo di media ancora in caricamento: niente URL, solo il riquadro con l'anello. */
+@Composable
+private fun PendingMediaGroupContent(message: UiChatMessage) {
+    val progress = rememberUploadProgress(message.id)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(4f / 3f)
+            .background(Color.Black.copy(alpha = 0.75f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (progress != null) ChatProgressRing(progress, onCancel = { ChatUploadProgress.cancel(message.id) })
+        else CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
     }
 }
 
@@ -1360,12 +1405,19 @@ private fun DocumentContent(
                     color = textColor,
                 )
             } else {
-                Icon(
-                    imageVector = Icons.Default.AttachFile,
-                    contentDescription = null,
+                ChatUploadIndicator(
+                    messageId = message.id,
+                    diameter = 32.dp,
                     tint = textColor,
-                    modifier = Modifier.size(28.dp),
-                )
+                    backdrop = textColor.copy(alpha = 0.15f),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AttachFile,
+                        contentDescription = null,
+                        tint = textColor,
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
             }
             Column {
                 Text(
@@ -1501,6 +1553,13 @@ private fun AudioContent(
     }
 
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Durante l'invio l'anello prende il posto del tasto play, come su WhatsApp e iOS.
+        ChatUploadIndicator(
+            messageId = message.id,
+            diameter = 40.dp,
+            tint = textColor,
+            backdrop = textColor.copy(alpha = 0.15f),
+        ) {
         IconButton(
             onClick = {
                 if (isPlaying) {
@@ -1532,6 +1591,7 @@ private fun AudioContent(
                 contentDescription = null,
                 tint = textColor,
             )
+        }
         }
         AdaptiveRecordingWaveformView(
             samples = STATIC_AUDIO_WAVEFORM,

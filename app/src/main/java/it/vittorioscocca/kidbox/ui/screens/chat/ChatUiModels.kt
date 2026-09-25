@@ -39,6 +39,8 @@ data class UiChatMessage(
     val mediaLocalPath: String?,   // absolute on-device path when media is hydrated; null otherwise
     val mediaDurationSeconds: Int?,
     val mediaFileSize: Long?,
+    val mediaWidth: Int? = null,
+    val mediaHeight: Int? = null,
     val transcriptText: String?,
     val transcriptStatusRaw: String,
     val replyToId: String?,
@@ -105,6 +107,8 @@ internal fun KBChatMessage.toUi(formatters: ChatLabelFormatters): UiChatMessage 
         mediaLocalPath = mediaLocalPath,
         mediaDurationSeconds = mediaDurationSeconds,
         mediaFileSize = mediaFileSize,
+        mediaWidth = mediaWidth,
+        mediaHeight = mediaHeight,
         transcriptText = transcriptText,
         transcriptStatusRaw = transcriptStatusRaw,
         replyToId = replyToId,

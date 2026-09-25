@@ -81,6 +81,10 @@ class ChatRemoteStore @Inject constructor(
         local.latitude?.let { payload["latitude"] = it }
         local.longitude?.let { payload["longitude"] = it }
         local.mediaFileSize?.takeIf { it > 0 }?.let { payload["mediaFileSize"] = it }
+        if ((local.mediaWidth ?: 0) > 0 && (local.mediaHeight ?: 0) > 0) {
+            payload["mediaWidth"] = local.mediaWidth!!
+            payload["mediaHeight"] = local.mediaHeight!!
+        }
         local.mediaGroupURLsJSON?.let { payload["mediaGroupURLsJSON"] = it }
         local.mediaGroupTypesJSON?.let { payload["mediaGroupTypesJSON"] = it }
         local.contactPayloadJSON?.let { payload["contactPayloadJSON"] = it }
@@ -583,6 +587,8 @@ class ChatRemoteStore @Inject constructor(
             transcriptUpdatedAtEpochMillis = (data["transcriptUpdatedAt"] as? Timestamp)?.toDate()?.time,
             transcriptErrorMessage = data["transcriptErrorMessage"] as? String,
             mentionsJSON = parseMentionsFromFirestore(data["mentions"] as? List<*>),
+            mediaWidth = (data["mediaWidth"] as? Number)?.toInt(),
+            mediaHeight = (data["mediaHeight"] as? Number)?.toInt(),
         )
     }
 
@@ -610,6 +616,8 @@ class ChatRemoteStore @Inject constructor(
             replyToId = replyToId,
             mediaLocalPath = local?.mediaLocalPath,
             mediaFileSize = mediaFileSize,
+            mediaWidth = mediaWidth ?: local?.mediaWidth,
+            mediaHeight = mediaHeight ?: local?.mediaHeight,
             mediaGroupURLsJSON = mediaGroupURLsJSON,
             mediaGroupTypesJSON = mediaGroupTypesJSON,
             contactPayloadJSON = contactPayloadJSON,

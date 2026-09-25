@@ -37,6 +37,8 @@ class ChatStorageService @Inject constructor(
         fileName: String,
         mimeType: String,
         bytes: ByteArray,
+        onProgress: ((Float) -> Unit)? = null,
+        registerCancel: ((cancel: () -> Unit) -> Unit)? = null,
     ): ChatMediaUploadResult {
         require(auth.currentUser != null) { "Not authenticated" }
         require(bytes.isNotEmpty()) { "Empty media payload" }
@@ -54,7 +56,16 @@ class ChatStorageService @Inject constructor(
             .build()
         return try {
             prefetchAppCheckTokenForStorage()
-            ref.putBytes(bytes, metadata).await()
+            val task = ref.putBytes(bytes, metadata)
+            // Tasto stop in chat: annulla il task, await() lancia e il chiamante toglie il messaggio.
+            registerCancel?.invoke { task.cancel() }
+            task
+                .addOnProgressListener { snap ->
+                    if (snap.totalByteCount > 0) {
+                        onProgress?.invoke(snap.bytesTransferred.toFloat() / snap.totalByteCount)
+                    }
+                }
+                .await()
             val downloadUrl = ref.awaitDownloadUrlAfterWrite()
             ChatMediaUploadResult(
                 storagePath = path,

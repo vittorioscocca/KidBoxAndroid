@@ -275,6 +275,14 @@ object DatabaseModule {
      * «Urgente» sugli eventi del calendario e la scadenza senza orario sui
      * to-do: due colonne, nessuna riscrittura di tabella.
      */
+    // Chat: dimensioni di foto/video per dare alla bolla il formato verticale/orizzontale.
+    private val MIGRATION_48_49 = object : Migration(48, 49) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `kb_chat_messages` ADD COLUMN `mediaWidth` INTEGER")
+            db.execSQL("ALTER TABLE `kb_chat_messages` ADD COLUMN `mediaHeight` INTEGER")
+        }
+    }
+
     private val MIGRATION_47_48 = object : Migration(47, 48) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE `kb_calendar_events` ADD COLUMN `priorityRaw` INTEGER NOT NULL DEFAULT 0")
@@ -1424,6 +1432,7 @@ object DatabaseModule {
         MIGRATION_45_46,
         MIGRATION_46_47,
         MIGRATION_47_48,
+        MIGRATION_48_49,
     )
         .fallbackToDestructiveMigration()
         .build()

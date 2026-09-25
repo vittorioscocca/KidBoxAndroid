@@ -106,7 +106,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBShoppingTripEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTripLegEntity
 
 @Database(
-    version = 48,
+    version = 49,
     exportSchema = true,
     entities = [
         KBUserProfileEntity::class,

@@ -1,5 +1,8 @@
 package it.vittorioscocca.kidbox.data.repository
 
+import it.vittorioscocca.kidbox.data.remote.chat.ChatUploadJobs
+import dagger.hilt.android.qualifiers.ApplicationContext
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.ListenerRegistration
@@ -7,7 +10,9 @@ import it.vittorioscocca.kidbox.data.chat.model.ChatMessageType
 import it.vittorioscocca.kidbox.data.local.dao.KBChatMessageDao
 import it.vittorioscocca.kidbox.data.local.entity.KBChatMessageEntity
 import it.vittorioscocca.kidbox.data.remote.chat.ChatRemoteStore
+import it.vittorioscocca.kidbox.data.remote.chat.ChatMediaDimensions
 import it.vittorioscocca.kidbox.data.remote.chat.ChatStorageService
+import it.vittorioscocca.kidbox.data.remote.chat.ChatUploadProgress
 import it.vittorioscocca.kidbox.data.user.UserProfileRepository
 import it.vittorioscocca.kidbox.domain.model.KBChatMessage
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
@@ -31,6 +36,7 @@ import org.json.JSONArray
 
 @Singleton
 class ChatRepository @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val chatDao: KBChatMessageDao,
     private val remoteStore: ChatRemoteStore,
     private val storageService: ChatStorageService,
@@ -115,6 +121,13 @@ class ChatRepository @Inject constructor(
         listeningFamilyId = null
     }
 
+    /**
+     * Gli invii girano nello scope del repository (dell'app), non in quello di chi
+     * chiama: se l'utente esce dalla chat o manda l'app in background a metà upload,
+     * il `viewModelScope` viene cancellato ma l'invio continua. Chi chiama aspetta
+     * solo il risultato. È l'equivalente del `beginBackgroundTask` di iOS; per gli
+     * invii lunghi c'è in più [ChatUploadJobs].
+     */
     suspend fun sendMessage(
         familyId: String,
         type: ChatMessageType,
@@ -131,6 +144,30 @@ class ChatRepository @Inject constructor(
         longitude: Double? = null,
         replyToId: String? = null,
         mentionsJSON: String? = null,
+    ): String = scope.async {
+        sendMessageNow(
+            familyId, type, text, mediaBytes, fileName, mimeType, mediaDurationSeconds,
+            mediaThumbnailURL, mediaGroupURLsJSON, mediaGroupTypesJSON, contactPayloadJSON,
+            latitude, longitude, replyToId, mentionsJSON,
+        )
+    }.await()
+
+    private suspend fun sendMessageNow(
+        familyId: String,
+        type: ChatMessageType,
+        text: String?,
+        mediaBytes: ByteArray?,
+        fileName: String?,
+        mimeType: String?,
+        mediaDurationSeconds: Int?,
+        mediaThumbnailURL: String?,
+        mediaGroupURLsJSON: String?,
+        mediaGroupTypesJSON: String?,
+        contactPayloadJSON: String?,
+        latitude: Double?,
+        longitude: Double?,
+        replyToId: String?,
+        mentionsJSON: String?,
     ): String {
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
         val senderName = userProfileRepository.canonicalDisplayNameForCurrentUser().orEmpty()
@@ -174,31 +211,60 @@ class ChatRepository @Inject constructor(
             syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
             lastSyncError = null,
         )
+        val info = if (!fileName.isNullOrBlank() && !mimeType.isNullOrBlank()) {
+            fileName to mimeType
+        } else {
+            ChatStorageService.defaultFileInfo(type)
+        }
+        if (mediaBytes != null) {
+            // Il file locale si scrive PRIMA dell'upload: la bolla mostra subito
+            // l'anteprima con l'anello, e conosce già il formato (verticale/orizzontale).
+            ChatUploadProgress.begin(messageId)
+            if (type == ChatMessageType.VIDEO || mediaBytes.size > ChatUploadJobs.LONG_UPLOAD_BYTES) {
+                ChatUploadJobs.start(appContext, messageId, mediaBytes.size.toLong())
+            }
+            local = withContext(Dispatchers.IO) {
+                val localPath = runCatching {
+                    storageService.cachePlainMediaLocally(
+                        familyId = familyId,
+                        messageId = messageId,
+                        fileName = info.first,
+                        bytes = mediaBytes,
+                    )
+                }.getOrNull()
+                val dims = when (type) {
+                    ChatMessageType.PHOTO -> ChatMediaDimensions.ofImage(mediaBytes)
+                    ChatMessageType.VIDEO -> localPath?.let { ChatMediaDimensions.ofVideo(it) }
+                    else -> null
+                }
+                local.copy(
+                    mediaLocalPath = localPath,
+                    mediaWidth = dims?.first,
+                    mediaHeight = dims?.second,
+                )
+            }
+        }
         chatDao.upsert(local)
 
         return runCatching {
             if (mediaBytes != null) {
-                val info = if (!fileName.isNullOrBlank() && !mimeType.isNullOrBlank()) {
-                    fileName to mimeType
-                } else {
-                    ChatStorageService.defaultFileInfo(type)
-                }
+                ChatUploadProgress.update(messageId, 0f)
                 val upload = storageService.upload(
                     familyId = familyId,
                     messageId = messageId,
                     fileName = info.first,
                     mimeType = info.second,
                     bytes = mediaBytes,
+                    onProgress = { ChatUploadProgress.update(messageId, it) },
+                    registerCancel = { cancel -> ChatUploadProgress.setCancelHandler(messageId, cancel) },
                 )
+                if (ChatUploadProgress.isCancelled(messageId)) {
+                    discardCancelledUpload(local, listOf(upload.storagePath))
+                    return messageId
+                }
                 local = local.copy(
                     mediaStoragePath = upload.storagePath,
                     mediaURL = upload.downloadUrl,
-                    mediaLocalPath = storageService.cachePlainMediaLocally(
-                        familyId = familyId,
-                        messageId = messageId,
-                        fileName = info.first,
-                        bytes = mediaBytes,
-                    ),
                     mediaFileSize = upload.bytes,
                 )
                 chatDao.upsert(local)
@@ -212,14 +278,20 @@ class ChatRepository @Inject constructor(
             chatDao.upsert(synced)
             messageId
         }.getOrElse { err ->
+            if (ChatUploadProgress.isCancelled(messageId)) {
+                discardCancelledUpload(local, emptyList())
+                ChatUploadProgress.end(messageId)
+                return messageId
+            }
             chatDao.upsert(
                 local.copy(
                     syncStateRaw = KBSyncState.ERROR.rawValue,
                     lastSyncError = err.message,
                 ),
             )
+            ChatUploadProgress.end(messageId)
             throw err
-        }
+        }.also { ChatUploadProgress.end(messageId) }
     }
 
     /**
@@ -232,6 +304,12 @@ class ChatRepository @Inject constructor(
         familyId: String,
         items: List<Pair<ByteArray, Boolean>>,  // Boolean = isVideo
         replyToId: String? = null,
+    ): String = scope.async { sendMediaGroupMessageNow(familyId, items, replyToId) }.await()
+
+    private suspend fun sendMediaGroupMessageNow(
+        familyId: String,
+        items: List<Pair<ByteArray, Boolean>>,
+        replyToId: String?,
     ): String {
         require(items.isNotEmpty()) { "sendMediaGroupMessage requires at least one item" }
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
@@ -239,32 +317,96 @@ class ChatRepository @Inject constructor(
         val now = System.currentTimeMillis()
         val messageId = UUID.randomUUID().toString()
         val capped = items.take(10)
+        val typesJson = JSONArray(capped.map { (_, isVideo) -> if (isVideo) "video" else "photo" }).toString()
+
+        // Segnaposto subito (URL vuoti): la bolla mostra l'anello mentre i file salgono.
+        // flushPending lo salta finché l'invio è attivo, così non arriva vuoto su Firestore.
+        val placeholder = KBChatMessageEntity(
+            id = messageId,
+            familyId = familyId,
+            senderId = uid,
+            senderName = senderName,
+            typeRaw = ChatMessageType.MEDIA_GROUP.rawValue,
+            text = null, latitude = null, longitude = null,
+            mediaStoragePath = null, mediaURL = null,
+            mediaDurationSeconds = null, mediaThumbnailURL = null,
+            replyToId = replyToId, mediaLocalPath = null, mediaFileSize = null,
+            mediaGroupURLsJSON = "[]", mediaGroupTypesJSON = typesJson,
+            contactPayloadJSON = null, reactionsJSON = null,
+            readByJSON = null, deletedForJSON = null,
+            mentionsJSON = null,
+            transcriptText = null, transcriptStatusRaw = "none",
+            transcriptSourceRaw = null, transcriptLocaleIdentifier = null,
+            transcriptIsFinal = false, transcriptUpdatedAtEpochMillis = null,
+            transcriptErrorMessage = null,
+            createdAtEpochMillis = now, editedAtEpochMillis = null,
+            isDeleted = false, isDeletedForEveryone = false,
+            syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+            lastSyncError = null,
+        )
+        ChatUploadProgress.begin(messageId)
+        val groupBytes = capped.sumOf { it.first.size.toLong() }
+        if (capped.any { it.second } || groupBytes > ChatUploadJobs.LONG_UPLOAD_BYTES) {
+            ChatUploadJobs.start(appContext, messageId, groupBytes)
+        }
+        chatDao.upsert(placeholder)
 
         // Upload all files concurrently — each gets its own sub-path under the message id.
         val uploadedUrls: List<String>
-        val uploadedTypes: List<String>
-        withContext(Dispatchers.IO) {
-            val results = coroutineScope {
-                capped.mapIndexed { i, (bytes, isVideo) ->
-                    async {
-                        val type = if (isVideo) ChatMessageType.VIDEO else ChatMessageType.PHOTO
-                        val (fileName, mimeType) = ChatStorageService.defaultFileInfo(type)
-                        storageService.upload(
-                            familyId = familyId,
-                            messageId = "$messageId-$i",
-                            fileName = fileName,
-                            mimeType = mimeType,
-                            bytes = bytes,
-                        )
-                    }
-                }.awaitAll()
+        val uploadedPaths = java.util.Collections.synchronizedList(mutableListOf<String>())
+        try {
+            val totalBytes = capped.sumOf { it.first.size.toLong() }.coerceAtLeast(1L)
+            val sent = LongArray(capped.size)
+            ChatUploadProgress.update(messageId, 0f)
+            withContext(Dispatchers.IO) {
+                val results = coroutineScope {
+                    capped.mapIndexed { i, (bytes, isVideo) ->
+                        async {
+                            val type = if (isVideo) ChatMessageType.VIDEO else ChatMessageType.PHOTO
+                            val (fileName, mimeType) = ChatStorageService.defaultFileInfo(type)
+                            if (ChatUploadProgress.isCancelled(messageId)) throw kotlinx.coroutines.CancellationException("stop")
+                            storageService.upload(
+                                familyId = familyId,
+                                messageId = "$messageId-$i",
+                                fileName = fileName,
+                                mimeType = mimeType,
+                                bytes = bytes,
+                                // Upload in parallelo: lo stop li ferma tutti.
+                                registerCancel = { cancel ->
+                                    val previous = groupCancels.getOrPut(messageId) { mutableListOf() }
+                                    synchronized(previous) { previous.add(cancel) }
+                                    ChatUploadProgress.setCancelHandler(messageId) {
+                                        synchronized(previous) { previous.toList() }.forEach { it() }
+                                    }
+                                },
+                                onProgress = { p ->
+                                    synchronized(sent) {
+                                        sent[i] = (bytes.size * p).toLong()
+                                        ChatUploadProgress.update(messageId, sent.sum().toFloat() / totalBytes)
+                                    }
+                                },
+                            ).also { uploadedPaths.add(it.storagePath) }
+                        }
+                    }.awaitAll()
+                }
+                uploadedUrls = results.map { it.downloadUrl }
             }
-            uploadedUrls = results.map { it.downloadUrl }
-            uploadedTypes = capped.map { (_, isVideo) -> if (isVideo) "video" else "photo" }
+            if (ChatUploadProgress.isCancelled(messageId)) throw kotlinx.coroutines.CancellationException("stop")
+        } catch (err: Exception) {
+            groupCancels.remove(messageId)
+            if (ChatUploadProgress.isCancelled(messageId)) {
+                // Via anche i file del gruppo già saliti prima dello stop.
+                discardCancelledUpload(placeholder, uploadedPaths.toList())
+                ChatUploadProgress.end(messageId)
+                return messageId
+            }
+            ChatUploadProgress.end(messageId)
+            chatDao.upsert(placeholder.copy(syncStateRaw = KBSyncState.ERROR.rawValue, lastSyncError = err.message))
+            throw err
         }
+        groupCancels.remove(messageId)
 
         val urlsJson   = JSONArray(uploadedUrls).toString()
-        val typesJson  = JSONArray(uploadedTypes).toString()
 
         val local = KBChatMessageEntity(
             id = messageId,
@@ -297,8 +439,9 @@ class ChatRepository @Inject constructor(
             messageId
         }.getOrElse { err ->
             chatDao.upsert(local.copy(syncStateRaw = KBSyncState.ERROR.rawValue, lastSyncError = err.message))
+            ChatUploadProgress.end(messageId)
             throw err
-        }
+        }.also { ChatUploadProgress.end(messageId) }
     }
 
     suspend fun fetchOlderMessages(
@@ -554,9 +697,22 @@ class ChatRepository @Inject constructor(
         }
     }
 
+    /** Stop premuto nell'anello: il messaggio non è mai arrivato su Firestore e sparisce. */
+    private suspend fun discardCancelledUpload(local: KBChatMessageEntity, storagePaths: List<String>) {
+        withContext(Dispatchers.IO) {
+            local.mediaLocalPath?.let { runCatching { File(it).delete() } }
+            storagePaths.forEach { path -> runCatching { storageService.delete(path) } }
+            chatDao.deleteById(local.id)
+        }
+    }
+
+    private val groupCancels = java.util.concurrent.ConcurrentHashMap<String, MutableList<() -> Unit>>()
+
     fun flushPending(familyId: String) {
         scope.launch {
             chatDao.getBySyncState(familyId, KBSyncState.PENDING_UPSERT.rawValue).forEach { msg ->
+                // In invio adesso: il file non è ancora su Storage, lo spedisce sendMessage.
+                if (ChatUploadProgress.isActive(msg.id)) return@forEach
                 runCatching {
                     remoteStore.upsert(msg)
                     chatDao.upsert(
@@ -643,5 +799,7 @@ private fun KBChatMessageEntity.toDomain(): KBChatMessage {
         isDeletedForEveryone = isDeletedForEveryone,
         syncStateRaw = syncStateRaw,
         lastSyncError = lastSyncError,
+        mediaWidth = mediaWidth,
+        mediaHeight = mediaHeight,
     )
 }

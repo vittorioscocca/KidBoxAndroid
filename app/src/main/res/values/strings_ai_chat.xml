@@ -28,6 +28,8 @@
     <string name="chat_download_error">Errore download</string>
     <string name="chat_document">Documento</string>
     <string name="chat_uploading">In caricamento…</string>
+    <string name="chat_cancel_upload">Annulla invio</string>
+    <string name="chat_upload_channel">Invii in chat</string>
     <string name="chat_downloading">Download in corso…</string>
     <string name="chat_tap_to_open">Tocca per aprire</string>
     <string name="chat_auto_transcription">Trascrizione automatica</string>

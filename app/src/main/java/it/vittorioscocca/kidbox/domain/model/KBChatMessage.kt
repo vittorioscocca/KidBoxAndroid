@@ -38,4 +38,6 @@ data class KBChatMessage(
     val isDeletedForEveryone: Boolean,
     val syncStateRaw: Int,
     val lastSyncError: String?,
+    val mediaWidth: Int? = null,
+    val mediaHeight: Int? = null,
 )

@@ -2,6 +2,9 @@
 
 package it.vittorioscocca.kidbox.ui.screens.chat
 
+import androidx.compose.runtime.saveable.rememberSaveable
+import it.vittorioscocca.kidbox.util.fixBitmapOrientationFromFile
+import it.vittorioscocca.kidbox.util.decodeSampledFromFile
 import it.vittorioscocca.kidbox.notifications.AppSection
 import it.vittorioscocca.kidbox.notifications.TrackSectionPresence
 import it.vittorioscocca.kidbox.ui.permissions.LocationDisclosureDialog
@@ -406,19 +409,34 @@ fun ChatScreen(
             pendingMedia = (pendingMedia + items).take(10)
         }
     }
-    val cameraPicker = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bmp: Bitmap? ->
-        if (bmp != null) {
-            scope.launch {
-                val bytes = bitmapToJpegBytes(bmp)
-                if (bytes != null) viewModel.sendMediaAttachment(bytes, isVideo = false)
-            }
+    // Scatto su file a piena risoluzione. TakePicturePreview restituiva solo la
+    // miniatura della fotocamera (poche centinaia di pixel), e così arrivava a tutti.
+    // Il percorso è saveable: se il sistema chiude l'app mentre la fotocamera è
+    // aperta, al ritorno il file si ritrova.
+    var chatCameraPath by rememberSaveable { mutableStateOf<String?>(null) }
+    val cameraPicker = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        val file = chatCameraPath?.let { java.io.File(it) }
+        chatCameraPath = null
+        if (file == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val bytes = if (ok) cameraPhotoToJpegBytes(file) else null
+            withContext(Dispatchers.IO) { runCatching { file.delete() } }
+            if (bytes != null) viewModel.sendMediaAttachment(bytes, isVideo = false)
         }
     }
     val requestCameraCapture = rememberCameraPermissionRequester(
         onDenied = {
             Toast.makeText(context, context.getString(R.string.chat_camera_required), Toast.LENGTH_SHORT).show()
         },
-        onLaunchCamera = { cameraPicker.launch(null) },
+        onLaunchCamera = {
+            val dir = java.io.File(context.cacheDir, "chat_camera").apply { mkdirs() }
+            val file = java.io.File(dir, "${java.util.UUID.randomUUID()}.jpg")
+            chatCameraPath = file.absolutePath
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                context, "${context.packageName}.fileprovider", file,
+            )
+            cameraPicker.launch(uri)
+        },
     )
     val docPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -2147,10 +2165,24 @@ private suspend fun getLastKnownLocation(
     runCatching { client.lastLocation.await() }.getOrNull()
 }
 
-private suspend fun bitmapToJpegBytes(bitmap: Bitmap): ByteArray? = withContext(Dispatchers.IO) {
+/**
+ * Foto della fotocamera → JPEG da inviare: lato lungo max 1920 px e orientamento
+ * applicato ai pixel, come `compressPhoto` su iOS. Senza ridimensionare, uno scatto
+ * da 12-50 MP peserebbe diversi MB a messaggio.
+ */
+private suspend fun cameraPhotoToJpegBytes(file: java.io.File): ByteArray? = withContext(Dispatchers.IO) {
     runCatching {
+        val maxSide = 1920
+        val sampled = decodeSampledFromFile(file, maxSide) ?: return@runCatching null
+        val longest = maxOf(sampled.width, sampled.height)
+        val scaled = if (longest > maxSide) {
+            val f = maxSide.toFloat() / longest
+            Bitmap.createScaledBitmap(sampled, (sampled.width * f).toInt(), (sampled.height * f).toInt(), true)
+                .also { if (it !== sampled) sampled.recycle() }
+        } else sampled
+        val oriented = fixBitmapOrientationFromFile(scaled, file.absolutePath)
         ByteArrayOutputStream().use { out ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)
+            oriented.compress(Bitmap.CompressFormat.JPEG, 85, out)
             out.toByteArray()
         }
     }.getOrNull()
