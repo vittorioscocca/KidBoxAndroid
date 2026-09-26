@@ -209,6 +209,16 @@ fun ChatScreen(
     var actionTarget by remember { mutableStateOf<UiChatMessage?>(null) }
     // Unified gallery request: (urls, types, startIndex). Single-media taps produce a 1-item list.
     var galleryRequest by remember { mutableStateOf<Triple<List<String>, List<String>, Int>?>(null) }
+    // Visore con tutti i media della chat (lo stesso della galleria del dettaglio).
+    // L'elenco si congela all'apertura: un messaggio in arrivo non sposta la pagina.
+    var chatMediaViewer by remember { mutableStateOf<Pair<List<GalleryMediaItem>, Int>?>(null) }
+    // Apre il visore sul media toccato; se non è ancora fra i media della chat
+    // (upload in corso, URL locale) ripiega sulla vista del solo messaggio.
+    fun openChatMedia(url: String, fallback: Triple<List<String>, List<String>, Int>) {
+        val items = buildMediaItems(state.messages)
+        val index = items.indexOfFirst { it.url == url }
+        if (index >= 0) chatMediaViewer = items to index else galleryRequest = fallback
+    }
     var showAttachmentSheet by remember { mutableStateOf(false) }
     var showMediaSourceSheet by remember { mutableStateOf(false) }
     var showKidBoxPicker by remember { mutableStateOf(false) }
@@ -409,35 +419,31 @@ fun ChatScreen(
             pendingMedia = (pendingMedia + items).take(10)
         }
     }
-    // Scatto su file a piena risoluzione. TakePicturePreview restituiva solo la
-    // miniatura della fotocamera (poche centinaia di pixel), e così arrivava a tutti.
-    // Il percorso è saveable: se il sistema chiude l'app mentre la fotocamera è
-    // aperta, al ritorno il file si ritrova.
-    var chatCameraPath by rememberSaveable { mutableStateOf<String?>(null) }
-    val cameraPicker = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
-        val file = chatCameraPath?.let { java.io.File(it) }
-        chatCameraPath = null
-        if (file == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            val bytes = if (ok) cameraPhotoToJpegBytes(file) else null
-            withContext(Dispatchers.IO) { runCatching { file.delete() } }
-            if (bytes != null) viewModel.sendMediaAttachment(bytes, isVideo = false)
-        }
-    }
+    // Fotocamera della chat (CameraX) con il selettore Foto | Video, come iOS:
+    // Android non ha un intent di sistema «foto o video». Lo scatto arriva su file
+    // a piena risoluzione; le foto passano da cameraPhotoToJpegBytes (lato lungo e
+    // orientamento), i video dalla stessa compressione della galleria.
+    var showChatCamera by rememberSaveable { mutableStateOf(false) }
     val requestCameraCapture = rememberCameraPermissionRequester(
         onDenied = {
             Toast.makeText(context, context.getString(R.string.chat_camera_required), Toast.LENGTH_SHORT).show()
         },
-        onLaunchCamera = {
-            val dir = java.io.File(context.cacheDir, "chat_camera").apply { mkdirs() }
-            val file = java.io.File(dir, "${java.util.UUID.randomUUID()}.jpg")
-            chatCameraPath = file.absolutePath
-            val uri = androidx.core.content.FileProvider.getUriForFile(
-                context, "${context.packageName}.fileprovider", file,
-            )
-            cameraPicker.launch(uri)
-        },
+        onLaunchCamera = { showChatCamera = true },
     )
+    fun sendCameraCapture(file: java.io.File, isVideo: Boolean) {
+        scope.launch {
+            val bytes = if (isVideo) {
+                withContext(Dispatchers.IO) {
+                    runCatching { file.readBytes() }.getOrNull()
+                        ?.let { VideoCompressor.compressIfNeeded(it, context) }
+                }
+            } else {
+                cameraPhotoToJpegBytes(file)
+            }
+            withContext(Dispatchers.IO) { runCatching { file.delete() } }
+            if (bytes != null) viewModel.sendMediaAttachment(bytes, isVideo = isVideo)
+        }
+    }
     val docPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             scope.launch {
@@ -670,14 +676,18 @@ fun ChatScreen(
                                             onReactionTap = { msg, emoji -> viewModel.toggleReaction(msg, emoji) },
                                             onReplyContextTap = { msgId -> viewModel.highlightMessage(msgId) },
                                             onMediaTap = { url, isVideo ->
-                                                galleryRequest = Triple(
-                                                    listOf(url),
-                                                    listOf(if (isVideo) "video" else "photo"),
-                                                    0,
+                                                openChatMedia(
+                                                    url,
+                                                    Triple(listOf(url), listOf(if (isVideo) "video" else "photo"), 0),
                                                 )
                                             },
                                             onMediaGroupTap = { urls, types, startIndex ->
-                                                galleryRequest = Triple(urls, types, startIndex)
+                                                val tapped = urls.getOrNull(startIndex)
+                                                if (tapped != null) {
+                                                    openChatMedia(tapped, Triple(urls, types, startIndex))
+                                                } else {
+                                                    galleryRequest = Triple(urls, types, startIndex)
+                                                }
                                             },
                                             onAudioPlaybackStateChange = { active ->
                                                 proximityManager.setPlaybackActive(active)
@@ -996,6 +1006,45 @@ fun ChatScreen(
             },
         )
     }
+    if (showChatCamera) {
+        Dialog(
+            onDismissRequest = { showChatCamera = false },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
+        ) {
+            ImmersiveGalleryWindow()
+            ChatCameraCapture(
+                onCaptured = { file, isVideo ->
+                    showChatCamera = false
+                    sendCameraCapture(file, isVideo)
+                },
+                onClose = { showChatCamera = false },
+            )
+        }
+    }
+    chatMediaViewer?.let { (items, idx) ->
+        ChatMediaViewerDialog(
+            items = items,
+            startIndex = idx,
+            onDismiss = { chatMediaViewer = null },
+            onGoToMessage = { msgId ->
+                chatMediaViewer = null
+                viewModel.highlightMessage(msgId)
+            },
+            onReply = { msgId ->
+                chatMediaViewer = null
+                viewModel.startReply(msgId)
+            },
+            onDelete = { msgId, forEveryone ->
+                if (forEveryone) viewModel.deleteForEveryone(msgId) else viewModel.deleteForMe(msgId)
+            },
+            canDeleteForEveryone = { msgId ->
+                state.messages.firstOrNull { it.id == msgId }?.let(viewModel::canDeleteForEveryone) ?: false
+            },
+        )
+    }
     galleryRequest?.let { (urls, types, idx) ->
         MediaGroupGalleryDialog(
             urls = urls,
@@ -1251,13 +1300,9 @@ private fun ReplyComposerBar(
     // Il testo del composer viene raccolto qui, non in ChatScreen: così digitare ricompone
     // solo la barra di input invece dell'intera schermata.
     val inputText by inputTextFlow.collectAsStateWithLifecycle()
-    // Barra disattivata (famiglia con un solo membro): niente fascia «card»
-    // bianca staccata, si fonde con lo sfondo della pagina che porta il messaggio.
-    val composerBackground = if (state.isSoloFamily) {
-        MaterialTheme.kidBoxColors.background
-    } else {
-        MaterialTheme.kidBoxColors.card
-    }
+    // Niente fascia «card» staccata dietro la barra, in chiaro e in scuro: si
+    // fonde con lo sfondo della pagina e restano solo campo e pulsanti.
+    val composerBackground = MaterialTheme.kidBoxColors.background
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1750,6 +1795,82 @@ private fun LoadingOlderShimmer() {
     }
 }
 
+/**
+ * Finestra del Dialog per una galleria immersiva. Va chiamata DENTRO il
+ * contenuto del Dialog, così LocalView è la view del dialog stesso.
+ */
+@Composable
+private fun ImmersiveGalleryWindow() {
+    // Finestra a tutto schermo come ogni altro dialog a schermo intero
+    // (vedi ExtendDialogWindowToScreen), più quello che serve a una galleria
+    // immersiva: dimensioni MATCH_PARENT, nessun limite ai bordi dello
+    // schermo e sfondo trasparente.
+    ExtendDialogWindowToScreen()
+    val dialogView = LocalView.current
+    SideEffect {
+        (dialogView.parent as? DialogWindowProvider)?.window?.apply {
+            setLayout(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+            )
+            addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+        }
+    }
+
+    // Hide status + navigation bars while the gallery is open, restore on dismiss.
+    // Uses the activity's window (not the dialog's) so the inset change is global.
+    val activityContext = LocalContext.current
+    DisposableEffect(activityContext, dialogView) {
+        val activity = activityContext.findActivity()
+        if (activity == null) return@DisposableEffect onDispose { }
+        val controller = WindowInsetsControllerCompat(activity.window, dialogView)
+        val previousBehavior = controller.systemBarsBehavior
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        onDispose {
+            controller.show(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior = previousBehavior
+        }
+    }
+}
+
+/**
+ * Tocco su una foto o un video in chat: lo stesso visore a schermo intero di
+ * «Media, link e documenti», su tutti i media della chat e partendo da quello
+ * toccato. Come su iOS.
+ */
+@Composable
+private fun ChatMediaViewerDialog(
+    items: List<GalleryMediaItem>,
+    startIndex: Int,
+    onDismiss: () -> Unit,
+    onGoToMessage: (messageId: String) -> Unit,
+    onReply: (messageId: String) -> Unit,
+    onDelete: (messageId: String, forEveryone: Boolean) -> Unit,
+    canDeleteForEveryone: (messageId: String) -> Boolean,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
+    ) {
+        ImmersiveGalleryWindow()
+        GalleryFullscreenViewer(
+            initialItems = items,
+            startIndex = startIndex,
+            onClose = onDismiss,
+            onGoToMessage = onGoToMessage,
+            onReply = onReply,
+            onDelete = onDelete,
+            canDeleteForEveryone = canDeleteForEveryone,
+        )
+    }
+}
+
 @Composable
 private fun MediaGroupGalleryDialog(
     urls: List<String>,
@@ -1770,40 +1891,7 @@ private fun MediaGroupGalleryDialog(
             decorFitsSystemWindows = false,
         ),
     ) {
-        // Finestra a tutto schermo come ogni altro dialog a schermo intero
-        // (vedi ExtendDialogWindowToScreen), più quello che serve a una galleria
-        // immersiva: dimensioni MATCH_PARENT, nessun limite ai bordi dello
-        // schermo e sfondo trasparente. Il SideEffect deve stare DENTRO il
-        // contenuto del Dialog, così LocalView è la view del dialog stesso.
-        ExtendDialogWindowToScreen()
-        val dialogView = LocalView.current
-        SideEffect {
-            (dialogView.parent as? DialogWindowProvider)?.window?.apply {
-                setLayout(
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                )
-                addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
-                setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
-            }
-        }
-
-        // Hide status + navigation bars while the gallery is open, restore on dismiss.
-        // Uses the activity's window (not the dialog's) so the inset change is global.
-        val activityContext = LocalContext.current
-        DisposableEffect(activityContext, dialogView) {
-            val activity = activityContext.findActivity()
-            if (activity == null) return@DisposableEffect onDispose { }
-            val controller = WindowInsetsControllerCompat(activity.window, dialogView)
-            val previousBehavior = controller.systemBarsBehavior
-            controller.systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            controller.hide(WindowInsetsCompat.Type.systemBars())
-            onDispose {
-                controller.show(WindowInsetsCompat.Type.systemBars())
-                controller.systemBarsBehavior = previousBehavior
-            }
-        }
+        ImmersiveGalleryWindow()
 
         Box(
             modifier = Modifier
@@ -2380,3 +2468,4 @@ private fun ChatSoloFamilyHint(modifier: Modifier = Modifier) {
         )
     }
 }
+

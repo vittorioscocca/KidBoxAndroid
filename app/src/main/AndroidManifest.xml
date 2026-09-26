@@ -10,6 +10,12 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!--
+      Calendari del telefono in sola lettura (Google, Outlook, Exchange già
+      configurati sul dispositivo) mostrati nel calendario KidBox. Gli eventi
+      non lasciano il telefono; solo «Copia in KidBox» crea un evento di famiglia.
+    -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
@@ -42,6 +48,8 @@
         <intent>
             <action android:name="androidx.health.ACTION_HEALTH_CONNECT_SETTINGS" />
         </intent>
+        <!-- «Collega Outlook» nei calendari: sapere se l'app c'è per aprirla o proporne l'installazione. -->
+        <package android:name="com.microsoft.office.outlook" />
     </queries>
 
     <application

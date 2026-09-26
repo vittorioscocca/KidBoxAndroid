@@ -257,7 +257,8 @@ class CalendarRepository @Inject constructor(
                         local.startDateEpochMillis != dto.startDateEpochMillis ||
                         local.reminderMinutes != dto.reminderMinutes ||
                         local.priorityRaw != (dto.priority ?: 0) ||
-                        local.title != dto.title
+                        local.title != dto.title ||
+                        local.recurrenceRaw != dto.recurrenceRaw
                     if (reminderChanged && reminderScheduler.hasArmed(dto.id)) {
                         reminderScheduler.sync(
                             eventId = dto.id,
@@ -266,6 +267,7 @@ class CalendarRepository @Inject constructor(
                             startEpochMillis = dto.startDateEpochMillis,
                             reminderMinutes = dto.reminderMinutes,
                             isUrgent = (dto.priority ?: 0) == 1,
+                            recurrenceRaw = dto.recurrenceRaw,
                         )
                     }
                 }

@@ -32,8 +32,8 @@ android {
         applicationId = "it.vittorioscocca.kidbox"
         minSdk = 26
         targetSdk = 36
-        versionCode = 64
-        versionName = "2.3.8"
+        versionCode = 65
+        versionName = "2.3.9"
         manifestPlaceholders["googleMapsApiKey"] = mapsApiKey
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
         buildConfigField("Boolean", "AI_ENABLED", "true")
@@ -91,6 +91,7 @@ configurations.configureEach {
             "androidx.camera:camera-camera2:1.5.3",
             "androidx.camera:camera-lifecycle:1.5.3",
             "androidx.camera:camera-view:1.5.3",
+            "androidx.camera:camera-video:1.5.3",
         )
     }
 }
@@ -163,11 +164,12 @@ dependencies {
     implementation(libs.facebook.login)
     implementation("com.google.zxing:core:3.5.3")
 
-    // CameraX (QR scanner)
+    // CameraX (QR scanner, fotocamera della chat)
     implementation(libs.camerax.core)
     implementation(libs.camerax.camera2)
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.view)
+    implementation(libs.camerax.video) // fotocamera della chat: registrazione video
 
     // Play In-App Updates: chiede a Play se esiste un versionCode più recente
     // sul canale a cui l'utente è idoneo (rispetta i rollout graduali).

@@ -80,6 +80,7 @@ camerax-core      = { group = "androidx.camera", name = "camera-core",      vers
 camerax-camera2   = { group = "androidx.camera", name = "camera-camera2",   version.ref = "camerax" }
 camerax-lifecycle = { group = "androidx.camera", name = "camera-lifecycle",  version.ref = "camerax" }
 camerax-view      = { group = "androidx.camera", name = "camera-view",       version.ref = "camerax" }
+camerax-video     = { group = "androidx.camera", name = "camera-video",      version.ref = "camerax" }
 mlkit-barcode     = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkit-barcode" }
 security-crypto   = { group = "androidx.security", name = "security-crypto", version.ref = "security-crypto" }
 app-update-ktx = { group = "com.google.android.play", name = "app-update-ktx", version.ref = "appUpdate" }

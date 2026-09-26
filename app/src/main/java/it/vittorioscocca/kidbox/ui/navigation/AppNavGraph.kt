@@ -1674,6 +1674,16 @@ fun AppNavGraph(
                     viewModel.highlightMessage(msgId)
                     navController.popBackStack()
                 },
+                onReply = { msgId ->
+                    viewModel.startReply(msgId)
+                    navController.popBackStack()
+                },
+                onDelete = { msgId, forEveryone ->
+                    if (forEveryone) viewModel.deleteForEveryone(msgId) else viewModel.deleteForMe(msgId)
+                },
+                canDeleteForEveryone = { msgId ->
+                    state.messages.firstOrNull { it.id == msgId }?.let(viewModel::canDeleteForEveryone) ?: false
+                },
             )
         }
 
@@ -2248,6 +2258,7 @@ fun AppNavGraph(
                 onNavigateToTodo = { navController.navigate(AppDestination.Todo.route) },
                 onNavigateToHealth = { navController.navigate(AppDestination.PediatricChildSelector.createRoute(familyId)) },
                 onNavigateToUpgrade = { navController.navigate(AppDestination.AiSettings.route) },
+                onBack = { navController.popBackStack() },
             )
         }
 

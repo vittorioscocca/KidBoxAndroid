@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import it.vittorioscocca.kidbox.MainActivity
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.data.notification.CalendarEventReminderScheduler
 
 /** L'avviso di un evento del calendario non urgente: una notifica normale. */
 class CalendarEventReminderReceiver : BroadcastReceiver() {
@@ -47,6 +48,8 @@ class CalendarEventReminderReceiver : BroadcastReceiver() {
         runCatching {
             NotificationManagerCompat.from(context).notify(eventId.hashCode(), notification)
         }
+        // Una serie arma subito la ripetizione successiva.
+        CalendarEventReminderScheduler.rearmAfterFire(context, eventId)
     }
 
     private fun ensureChannel(context: Context) {

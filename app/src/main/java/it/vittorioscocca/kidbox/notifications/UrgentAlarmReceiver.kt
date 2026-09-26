@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import it.vittorioscocca.kidbox.MainActivity
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.data.notification.CalendarEventReminderScheduler
 import it.vittorioscocca.kidbox.util.KBLog
 
 /**
@@ -82,6 +83,10 @@ class UrgentAlarmReceiver : BroadcastReceiver() {
             NotificationManagerCompat.from(context).notify(entityId.hashCode(), notification)
         }.onFailure {
             KBLog.app.error("sveglia non mostrata entityId=$entityId", TAG, it)
+        }
+        // Una serie arma subito la ripetizione successiva.
+        if (kind == KIND_CALENDAR_EVENT) {
+            CalendarEventReminderScheduler.rearmAfterFire(context, entityId)
         }
     }
 

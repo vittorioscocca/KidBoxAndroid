@@ -1,5 +1,13 @@
 package it.vittorioscocca.kidbox.ui.screens.calendar
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.material.icons.filled.EditCalendar
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import androidx.compose.foundation.background
@@ -47,6 +55,7 @@ import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -86,6 +95,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.data.local.entity.KBCalendarEventEntity
+import it.vittorioscocca.kidbox.data.devicecalendar.DeviceCalendarEvent
+import it.vittorioscocca.kidbox.domain.calendar.EventRecurrence
+import it.vittorioscocca.kidbox.domain.calendar.occurrencesIn
+import it.vittorioscocca.kidbox.domain.calendar.seriesOf
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoItemEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoListEntity
 import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
@@ -111,6 +124,7 @@ import kotlinx.coroutines.delay
 import java.time.Duration
 import it.vittorioscocca.kidbox.ui.components.KBEmptyState
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.AddCircle
 import it.vittorioscocca.kidbox.ui.util.visibilityChipLabel
 import it.vittorioscocca.kidbox.ui.permissions.FullScreenAlarmNoticeDialog
@@ -147,9 +161,74 @@ fun CalendarScreen(
     TrackSectionPresence(AppSection.CALENDAR, familyId)
     var showForm by remember { mutableStateOf(false) }
     var editingEvent by remember { mutableStateOf<KBCalendarEventEntity?>(null) }
+    var pendingSeriesDelete by remember { mutableStateOf<KBCalendarEventEntity?>(null) }
+    pendingSeriesDelete?.let { series ->
+        AlertDialog(
+            onDismissRequest = { pendingSeriesDelete = null },
+            title = { Text(stringResource(R.string.calendar_delete_series_title)) },
+            text = { Text(stringResource(R.string.calendar_delete_series_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteEvent(series)
+                    pendingSeriesDelete = null
+                }) {
+                    Text(stringResource(R.string.calendar_delete_series_confirm), color = Color(0xFFD32F2F))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingSeriesDelete = null }) {
+                    Text(stringResource(R.string.calendar_delete_series_cancel))
+                }
+            },
+        )
+    }
     var editingReminder by remember { mutableStateOf<KBTodoItemEntity?>(null) }
     // Ora scelta toccando la griglia di Giorno/Settimana; null = mezzanotte.
     var newEventTime by remember { mutableStateOf<LocalTime?>(null) }
+
+    // ── Calendari del telefono (sola lettura) ─────────────────────────────
+    val deviceState by viewModel.deviceCalendarState.collectAsStateWithLifecycle()
+    val feedState by viewModel.feedState.collectAsStateWithLifecycle()
+    val feedBusy by viewModel.feedBusy.collectAsStateWithLifecycle()
+    val feedError by viewModel.feedError.collectAsStateWithLifecycle()
+    var showDeviceSettings by remember { mutableStateOf(false) }
+    var openedDeviceEvent by remember { mutableStateOf<DeviceCalendarEvent?>(null) }
+    /** «Copia in KidBox»: i campi dell'evento del telefono per il modulo nuovo evento. */
+    var copyPrefill by remember { mutableStateOf<CalendarEventPrefill?>(null) }
+    val calendarPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted -> viewModel.onDeviceCalendarPermissionResult(granted) }
+    val requestCalendarPermission = {
+        calendarPermissionLauncher.launch(Manifest.permission.READ_CALENDAR)
+    }
+    // L'accesso può essere dato o tolto dalle impostazioni mentre si è fuori.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshDeviceCalendars()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    // Quelli già copiati in KidBox non si disegnano due volte: vince la copia,
+    // che è quella che vede la famiglia. Confronto per contenuto, come su iOS.
+    // Telefono (solo se acceso) e calendari iscritti da link (sempre, sono
+    // della famiglia): stesso trattamento a schermo, sola lettura.
+    val deviceEvents = remember(deviceState, feedState, state.displayEvents) {
+        val external = (if (deviceState.isShowing) deviceState.events else emptyList()) + feedState.events
+        if (external.isEmpty()) {
+            emptyList()
+        } else {
+            val copied = state.displayEvents.map {
+                DeviceCalendarEvent.dedupKey(it.title, it.startDateEpochMillis, it.isAllDay)
+            }.toSet()
+            external.filterNot { it.dedupKey in copied }
+        }
+    }
+    val deviceById = remember(deviceEvents) { deviceEvents.associateBy { DEVICE_EVENT_ID_PREFIX + it.id } }
+    val deviceGridEvents = remember(deviceEvents) { deviceEvents.map { it.toGridEntity() } }
+    val gridEvents = remember(state.displayEvents, deviceGridEvents) { state.displayEvents + deviceGridEvents }
+    val untitledLabel = stringResource(R.string.device_calendar_untitled)
     val currentUid = remember { FirebaseAuth.getInstance().currentUser?.uid }
 
     // Un solo cancello per le due schede del foglio: evento e promemoria
@@ -270,12 +349,19 @@ fun CalendarScreen(
                         color = MaterialTheme.kidBoxColors.title,
                     )
                     HeaderCircleButton(
+                        icon = Icons.Filled.EditCalendar,
+                        contentDescription = stringResource(R.string.device_calendar_settings_title),
+                        onClick = { showDeviceSettings = true },
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    HeaderCircleButton(
                         icon = Icons.Default.Add,
                         contentDescription = stringResource(R.string.calendar_new_event_cd),
                         onClick = {
                             editingEvent = null
                             editingReminder = null
                             newEventTime = null
+                            copyPrefill = null
                             showForm = true
                         },
                     )
@@ -325,10 +411,17 @@ fun CalendarScreen(
                     ) { viewModel.setMode(CalendarMode.YEAR) }
                 }
 
+                if (deviceState.showsPrompt) {
+                    DeviceCalendarPromptCard(
+                        onConnect = requestCalendarPermission,
+                        onDismiss = viewModel::dismissDeviceCalendarPrompt,
+                    )
+                }
+
                 when (state.mode) {
                     CalendarMode.DAY, CalendarMode.WEEK -> CalendarTimeGridView(
                         selectedDate = state.selectedDate,
-                        events = state.events,
+                        events = gridEvents,
                         reminders = state.reminders,
                         onEditReminder = {
                             editingReminder = it
@@ -339,10 +432,17 @@ fun CalendarScreen(
                         isWeek = state.mode == CalendarMode.WEEK,
                         onSelectDate = viewModel::setSelectedDate,
                         onEditEvent = {
-                            editingEvent = it
-                            editingReminder = null
-                            newEventTime = null
-                            showForm = true
+                            if (it.isDeviceEvent()) {
+                                // Del telefono: scheda di sola lettura.
+                                openedDeviceEvent = deviceById[it.id]
+                            } else {
+                                // Si modifica la serie, non la ripetizione toccata.
+                                editingEvent = state.events.seriesOf(it)
+                                editingReminder = null
+                                newEventTime = null
+                                copyPrefill = null
+                                showForm = true
+                            }
                         },
                         onAddEvent = { at ->
                             viewModel.setSelectedDate(at.toLocalDate())
@@ -356,7 +456,9 @@ fun CalendarScreen(
                     CalendarMode.MONTH -> CalendarMonthView(
                         selectedDate = state.selectedDate,
                         displayedMonth = state.displayedMonth,
-                        events = state.events,
+                        events = gridEvents,
+                        deviceEventsById = deviceById,
+                        onOpenDeviceEvent = { openedDeviceEvent = it },
                         reminders = state.reminders,
                         onEditReminder = {
                             editingReminder = it
@@ -369,12 +471,28 @@ fun CalendarScreen(
                         onSelectDate = viewModel::setSelectedDate,
                         onChangeDisplayedMonth = viewModel::setDisplayedMonth,
                         onEditEvent = {
-                            editingEvent = it
-                            editingReminder = null
-                            newEventTime = null
-                            showForm = true
+                            if (it.isDeviceEvent()) {
+                                // Del telefono: scheda di sola lettura.
+                                openedDeviceEvent = deviceById[it.id]
+                            } else {
+                                // Si modifica la serie, non la ripetizione toccata.
+                                editingEvent = state.events.seriesOf(it)
+                                editingReminder = null
+                                newEventTime = null
+                                copyPrefill = null
+                                showForm = true
+                            }
                         },
-                        onDeleteEvent = viewModel::deleteEvent,
+                        onDeleteEvent = { occurrence ->
+                            val series = state.events.seriesOf(occurrence)
+                            // Non ci sono eccezioni per singola data: su una
+                            // serie si cancellano tutte, e va detto prima.
+                            if (EventRecurrence.isRecurring(series.recurrenceRaw)) {
+                                pendingSeriesDelete = series
+                            } else {
+                                viewModel.deleteEvent(series)
+                            }
+                        },
                         onAddEvent = {
                             editingEvent = null
                             editingReminder = null
@@ -385,7 +503,7 @@ fun CalendarScreen(
 
                     CalendarMode.YEAR -> CalendarYearView(
                         selectedDate = state.selectedDate,
-                        events = state.events,
+                        events = state.events + deviceGridEvents,
                         onSelectDate = {
                             viewModel.setSelectedDate(it)
                             viewModel.setMode(CalendarMode.MONTH)
@@ -415,7 +533,11 @@ fun CalendarScreen(
                 visibilityPickerForReminder = true
                 showVisibilityPicker = true
             },
-            onDismiss = { showForm = false },
+            prefill = copyPrefill,
+            onDismiss = {
+                showForm = false
+                copyPrefill = null
+            },
             // Il salvataggio passa dal cancello dei permessi: senza notifiche
             // l'avviso non arriverebbe mai e l'interruttore direbbe «attivo».
             onSaveEvent = { draft ->
@@ -434,6 +556,39 @@ fun CalendarScreen(
                     isUrgent = draft.isUrgent,
                 )
             },
+        )
+    }
+
+    if (showDeviceSettings) {
+        DeviceCalendarSettingsSheet(
+            state = deviceState,
+            onRequestPermission = requestCalendarPermission,
+            onSetEnabled = viewModel::setDeviceCalendarsEnabled,
+            onSetCalendarVisible = viewModel::setDeviceCalendarVisible,
+            feeds = feedState.feeds,
+            feedBusy = feedBusy,
+            feedError = feedError,
+            onClearFeedError = viewModel::clearFeedError,
+            onSubscribeFeed = viewModel::subscribeFeed,
+            onDeleteFeed = { viewModel.deleteFeed(it.id) },
+            onDismiss = { showDeviceSettings = false },
+        )
+    }
+
+    openedDeviceEvent?.let { event ->
+        DeviceCalendarEventSheet(
+            event = event,
+            onCopy = {
+                // Si chiude la scheda e si apre «Nuovo evento» già compilato:
+                // categoria, visibilità e promemoria sono cose di KidBox.
+                copyPrefill = event.toPrefill(untitledLabel)
+                openedDeviceEvent = null
+                editingEvent = null
+                editingReminder = null
+                newEventTime = null
+                showForm = true
+            },
+            onDismiss = { openedDeviceEvent = null },
         )
     }
 
@@ -472,6 +627,9 @@ private fun CalendarMonthView(
     selectedDate: LocalDate,
     displayedMonth: LocalDate,
     events: List<KBCalendarEventEntity>,
+    /** Gli eventi del telefono dietro le copie `device:` di `events`. */
+    deviceEventsById: Map<String, DeviceCalendarEvent>,
+    onOpenDeviceEvent: (DeviceCalendarEvent) -> Unit,
     reminders: List<KBTodoItemEntity>,
     onSelectDate: (LocalDate) -> Unit,
     onChangeDisplayedMonth: (LocalDate) -> Unit,
@@ -597,12 +755,21 @@ private fun CalendarMonthView(
         }
 
         Divider(modifier = Modifier.padding(top = 6.dp))
-        val selectedEvents = eventsByDate[selectedDate].orEmpty().sortedBy { it.startDateEpochMillis }
+        val selectedAll = eventsByDate[selectedDate].orEmpty().sortedBy { it.startDateEpochMillis }
+        // Quelli del telefono in una sezione a parte e senza «elimina»: da qui
+        // non si toccano.
+        val selectedEvents = selectedAll.filterNot { it.isDeviceEvent() }
+        val selectedExternal = selectedAll
+            .filter { it.isDeviceEvent() }
+            .sortedWith(compareBy({ !it.isAllDay }, { it.startDateEpochMillis }))
+            .mapNotNull { deviceEventsById[it.id] }
+        val selectedDeviceEvents = selectedExternal.filter { it.feedId == null }
+        val selectedFeedEvents = selectedExternal.filter { it.feedId != null }
         val selectedReminders = remindersByDate[selectedDate].orEmpty()
             // I fatti in fondo: restano visibili, ma non rubano la riga in
             // cima a quelli ancora da fare.
             .sortedWith(compareBy({ it.isDone }, { it.dueAtEpochMillis ?: Long.MAX_VALUE }))
-        if (selectedEvents.isEmpty() && selectedReminders.isEmpty()) {
+        if (selectedEvents.isEmpty() && selectedReminders.isEmpty() && selectedExternal.isEmpty()) {
             // `weight` + scroll: senza, lo spazio residuo sotto la griglia del mese può
             // essere minore dell'empty state e il pulsante finisce schiacciato/tagliato.
             Box(
@@ -626,7 +793,7 @@ private fun CalendarMonthView(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(vertical = 5.dp),
             ) {
-                if (selectedEvents.isNotEmpty() && selectedReminders.isNotEmpty()) {
+                if (selectedEvents.isNotEmpty() && (selectedReminders.isNotEmpty() || selectedExternal.isNotEmpty())) {
                     item(key = "events-header") {
                         CalendarSectionHeader(stringResource(R.string.calendar_events_section))
                     }
@@ -649,6 +816,22 @@ private fun CalendarMonthView(
                             onToggleDone = { onToggleReminder(reminder) },
                             onDelete = { onDeleteReminder(reminder) },
                         )
+                    }
+                }
+                if (selectedDeviceEvents.isNotEmpty()) {
+                    item(key = "device-header") {
+                        CalendarSectionHeader(stringResource(R.string.device_calendar_section))
+                    }
+                    items(selectedDeviceEvents, key = { "d-${it.id}" }) { event ->
+                        DeviceCalendarEventCard(event = event, onOpen = { onOpenDeviceEvent(event) })
+                    }
+                }
+                if (selectedFeedEvents.isNotEmpty()) {
+                    item(key = "feed-header") {
+                        CalendarSectionHeader(stringResource(R.string.calendar_feeds_section))
+                    }
+                    items(selectedFeedEvents, key = { "f-${it.id}" }) { event ->
+                        DeviceCalendarEventCard(event = event, onOpen = { onOpenDeviceEvent(event) })
                     }
                 }
             }
@@ -808,15 +991,16 @@ private fun CalendarTimeGridView(
                         verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
                         eventsByDate[day].orEmpty().filter { it.isAllDay }.forEach { event ->
+                            val isDevice = event.isDeviceEvent()
                             Text(
                                 event.title,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(6.dp))
-                                    .background(categoryColor(event.categoryRaw))
+                                    .background(categoryColor(event.categoryRaw).copy(alpha = if (isDevice) 0.18f else 1f))
                                     .clickable { onEditEvent(event) }
                                     .padding(horizontal = 6.dp, vertical = 3.dp),
-                                color = Color.White,
+                                color = if (isDevice) categoryColor(event.categoryRaw) else Color.White,
                                 fontSize = 11.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -961,7 +1145,9 @@ private fun RowScope.TimeGridDayColumn(
                     .width(maxOf(slot - 3.dp, 20.dp))
                     .height(height)
                     .clip(RoundedCornerShape(5.dp))
-                    .background(color.copy(alpha = 0.26f))
+                    // Quelli del telefono sono pieni solo a metà: si
+                    // distinguono senza leggere l'etichetta.
+                    .background(color.copy(alpha = if (item.event.isDeviceEvent()) 0.12f else 0.26f))
                     .clickable { onEditEvent(item.event) }
                     .padding(start = 5.dp, end = 3.dp, top = 2.dp),
             ) {
@@ -1079,16 +1265,20 @@ private fun CalendarYearView(
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = years.indexOf(currentYear).coerceAtLeast(0),
     )
-    val eventDates = remember(events) {
-        buildEventDatesSet(events)
-    }
-
+    // Le serie senza fine non si espandono tutte: ogni anno calcola le sue
+    // ripetizioni quando la sua riga compare.
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         items(years, key = { it }) { year ->
+            val eventDates = remember(events, year) {
+                val zone = ZoneId.systemDefault()
+                val from = LocalDate.of(year, 1, 1).atStartOfDay(zone).toInstant().toEpochMilli()
+                val to = LocalDate.of(year + 1, 1, 1).atStartOfDay(zone).toInstant().toEpochMilli() - 1
+                buildEventDatesSet(events.flatMap { it.occurrencesIn(from, to) })
+            }
             YearBlock(
                 year = year,
                 selectedDate = selectedDate,
@@ -1296,6 +1486,20 @@ private fun CalendarEventCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    recurrenceLabelRes(event.recurrenceRaw)?.let { res ->
+                        Icon(
+                            Icons.Filled.Repeat,
+                            contentDescription = null,
+                            tint = MaterialTheme.kidBoxColors.subtitle,
+                            modifier = Modifier.size(12.dp),
+                        )
+                        Text(
+                            stringResource(res),
+                            color = MaterialTheme.kidBoxColors.subtitle,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
             IconButton(onClick = onDelete, modifier = Modifier.size(38.dp)) {
@@ -1309,6 +1513,15 @@ private fun CalendarEventCard(
             Spacer(modifier = Modifier.width(4.dp))
         }
     }
+}
+
+/** L'etichetta della ricorrenza, o `null` per un evento singolo. */
+private fun recurrenceLabelRes(raw: String?): Int? = when (raw) {
+    "daily" -> R.string.calendar_recurrence_daily
+    "weekly" -> R.string.calendar_recurrence_weekly
+    "monthly" -> R.string.calendar_recurrence_monthly
+    "yearly" -> R.string.calendar_recurrence_yearly
+    else -> null
 }
 
 /** Titoletto «Eventi» / «Promemoria» nell'elenco del giorno. */
@@ -1413,6 +1626,8 @@ private fun CalendarReminderCard(
 @Composable
 private fun CalendarEventFormContent(
     initial: KBCalendarEventEntity?,
+    /** Solo in creazione: i campi di un evento del telefono da copiare. */
+    prefill: CalendarEventPrefill? = null,
     selectedDate: LocalDate,
     /** Ora scelta toccando la griglia oraria; null = mezzanotte. */
     initialTime: LocalTime?,
@@ -1433,20 +1648,25 @@ private fun CalendarEventFormContent(
     val kb = MaterialTheme.kidBoxColors
     val colorScheme = MaterialTheme.colorScheme
 
+    val copy = prefill.takeIf { initial == null }
     val initialStart = initial?.let {
         Instant.ofEpochMilli(it.startDateEpochMillis).atZone(ZoneId.systemDefault()).toLocalDateTime()
+    } ?: copy?.let {
+        Instant.ofEpochMilli(it.startMillis).atZone(ZoneId.systemDefault()).toLocalDateTime()
     } ?: LocalDateTime.of(selectedDate, initialTime ?: LocalTime.of(0, 0))
 
     val initialEnd = initial?.let {
         Instant.ofEpochMilli(it.endDateEpochMillis).atZone(ZoneId.systemDefault()).toLocalDateTime()
+    } ?: copy?.let {
+        Instant.ofEpochMilli(it.endMillis).atZone(ZoneId.systemDefault()).toLocalDateTime()
     } ?: initialStart.plusHours(1)
 
-    var title by remember { mutableStateOf(initial?.title.orEmpty()) }
-    var notes by remember { mutableStateOf(initial?.notes.orEmpty()) }
-    var location by remember { mutableStateOf(initial?.location.orEmpty()) }
+    var title by remember { mutableStateOf(initial?.title ?: copy?.title.orEmpty()) }
+    var notes by remember { mutableStateOf(initial?.notes ?: copy?.notes.orEmpty()) }
+    var location by remember { mutableStateOf(initial?.location ?: copy?.location.orEmpty()) }
     var category by remember { mutableStateOf(initial?.categoryRaw ?: "family") }
     var recurrence by remember { mutableStateOf(initial?.recurrenceRaw ?: "none") }
-    var isAllDay by remember { mutableStateOf(initial?.isAllDay ?: false) }
+    var isAllDay by remember { mutableStateOf(initial?.isAllDay ?: copy?.isAllDay ?: false) }
     var reminderOn by remember { mutableStateOf((initial?.reminderMinutes ?: 0) > 0) }
     var urgent by remember { mutableStateOf(initial?.priorityRaw == 1) }
     var startDate by remember { mutableStateOf(initialStart.toLocalDate()) }
@@ -1627,11 +1847,11 @@ private fun CalendarEventFormContent(
                     Text(stringResource(R.string.section_recurrence), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = MaterialTheme.kidBoxColors.subtitle)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         listOf(
-                            "none" to "Nessuna",
-                            "daily" to "Giornaliera",
-                            "weekly" to "Settimanale",
-                            "monthly" to "Mensile",
-                            "yearly" to "Annuale",
+                            "none" to stringResource(R.string.calendar_recurrence_none),
+                            "daily" to stringResource(R.string.calendar_recurrence_daily),
+                            "weekly" to stringResource(R.string.calendar_recurrence_weekly),
+                            "monthly" to stringResource(R.string.calendar_recurrence_monthly),
+                            "yearly" to stringResource(R.string.calendar_recurrence_yearly),
                         ).forEach { (raw, label) ->
                             SmallChip(
                                 label,
@@ -1801,7 +2021,11 @@ private fun CalendarEventFormContent(
                 shape = RoundedCornerShape(999.dp),
             ) {
                 Text(
-                    if (initial == null) "Aggiungi evento" else "Salva evento",
+                    if (initial == null) {
+                        stringResource(R.string.calendar_add_event_button)
+                    } else {
+                        stringResource(R.string.calendar_save_event_button)
+                    },
                     color = colorScheme.onPrimary,
                 )
             }
@@ -2040,7 +2264,7 @@ private fun categoryLabel(raw: String): String = when (raw) {
     else -> raw
 }
 
-private fun categoryColor(raw: String): Color = when (raw) {
+private fun categoryColor(raw: String): Color = deviceCategoryColor(raw) ?: when (raw) {
     "children" -> Color(0xFFF1C40F)
     "school" -> Color(0xFF3498DB)
     "health" -> Color(0xFFE74C3C)
@@ -2130,6 +2354,8 @@ fun CalendarItemSheet(
     onDismiss: () -> Unit,
     onSaveEvent: (CalendarDraftInput) -> Unit,
     onSaveReminder: (CalendarReminderDraft) -> Unit,
+    /** «Copia in KidBox» da un evento del telefono: campi già scritti. */
+    prefill: CalendarEventPrefill? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val isNew = editingEvent == null && editingReminder == null
@@ -2190,6 +2416,7 @@ fun CalendarItemSheet(
 
             else -> CalendarEventFormContent(
                 initial = editingEvent,
+                prefill = prefill,
                 selectedDate = selectedDate,
                 initialTime = initialTime,
                 currentUid = currentUid,

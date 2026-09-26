@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.home
 
+import it.vittorioscocca.kidbox.domain.calendar.occurrencesIn
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -199,11 +200,13 @@ class HomeDashboardViewModel @Inject constructor(
 
         OrganizationSlice(
             // Una tessera non deve svelare quello che la sezione nasconde.
+            // Le ricorrenze contano: un evento settimanale iniziato mesi fa è
+            // comunque «in agenda» questa settimana.
             events = events
                 .asSequence()
                 .filter { !it.isDeleted }
-                .filter { it.endDateEpochMillis >= now && it.startDateEpochMillis <= horizon }
                 .filter { visible(it.visibilityScope, it.visibilityMemberIdsJson, it.createdBy, uid) }
+                .flatMap { it.occurrencesIn(now, horizon).asSequence() }
                 .sortedBy { it.startDateEpochMillis }
                 .toList(),
             todos = todos

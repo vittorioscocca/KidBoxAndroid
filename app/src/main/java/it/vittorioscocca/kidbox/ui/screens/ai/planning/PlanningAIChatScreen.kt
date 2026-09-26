@@ -66,6 +66,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -107,6 +108,7 @@ fun PlanningAIChatScreen(
     onNavigateToTodo: () -> Unit,
     onNavigateToHealth: () -> Unit,
     onNavigateToUpgrade: () -> Unit,
+    onBack: () -> Unit,
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -188,6 +190,13 @@ fun PlanningAIChatScreen(
                             ),
                         )
                     }
+                },
+                navigationIcon = {
+                    it.vittorioscocca.kidbox.ui.components.KidBoxHeaderCircleButton(
+                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.ai_back),
+                        onClick = onBack,
+                    )
                 },
                 actions = {
                     Box {

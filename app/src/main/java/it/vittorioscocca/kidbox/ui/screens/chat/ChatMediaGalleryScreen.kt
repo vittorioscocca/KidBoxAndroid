@@ -9,6 +9,7 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.VideoView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -50,6 +51,11 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -63,11 +69,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.toMutableStateList
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -139,7 +151,7 @@ private enum class GalleryTab(@androidx.annotation.StringRes val labelRes: Int) 
 
 private val urlRegex = Regex("https?://[^\\s]+")
 
-private fun buildMediaItems(messages: List<UiChatMessage>): List<GalleryMediaItem> =
+internal fun buildMediaItems(messages: List<UiChatMessage>): List<GalleryMediaItem> =
     messages.flatMap { msg ->
         when (msg.type) {
             ChatMessageType.PHOTO -> {
@@ -234,6 +246,9 @@ internal fun ChatMediaGalleryScreen(
     messages: List<UiChatMessage>,
     onDismiss: () -> Unit,
     onGoToMessage: (messageId: String) -> Unit,
+    onReply: ((messageId: String) -> Unit)? = null,
+    onDelete: ((messageId: String, forEveryone: Boolean) -> Unit)? = null,
+    canDeleteForEveryone: (messageId: String) -> Boolean = { false },
 ) {
     val context = LocalContext.current
     // Pre-compute items once per messages snapshot
@@ -391,13 +406,21 @@ internal fun ChatMediaGalleryScreen(
             val startIdx = fullscreenStartIndex
             if (startIdx != null) {
                 GalleryFullscreenViewer(
-                    items = filteredMedia,
+                    initialItems = filteredMedia,
                     startIndex = startIdx,
                     onClose = { fullscreenStartIndex = null },
                     onGoToMessage = { msgId ->
                         fullscreenStartIndex = null
                         onGoToMessage(msgId)
                     },
+                    onReply = onReply?.let { reply ->
+                        { msgId ->
+                            fullscreenStartIndex = null
+                            reply(msgId)
+                        }
+                    },
+                    onDelete = onDelete,
+                    canDeleteForEveryone = canDeleteForEveryone,
                 )
             }
         }
@@ -722,21 +745,32 @@ private fun GalleryDocRow(
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun GalleryFullscreenViewer(
-    items: List<GalleryMediaItem>,
+internal fun GalleryFullscreenViewer(
+    initialItems: List<GalleryMediaItem>,
     startIndex: Int,
     onClose: () -> Unit,
     onGoToMessage: (messageId: String) -> Unit,
+    // Azioni come su iOS: senza callback il pulsante non compare.
+    onReply: ((messageId: String) -> Unit)? = null,
+    onDelete: ((messageId: String, forEveryone: Boolean) -> Unit)? = null,
+    canDeleteForEveryone: (messageId: String) -> Boolean = { false },
 ) {
+    // Copia locale: eliminando un media la pagina sparisce subito dal visore.
+    val items = remember(initialItems) { initialItems.toMutableStateList() }
     val pagerState = rememberPagerState(
         initialPage = startIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0)),
         pageCount = { items.size },
     )
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    var isSharing by remember { mutableStateOf(false) }
+    var deleteTarget by remember { mutableStateOf<GalleryMediaItem?>(null) }
 
     var dragAccum by remember { mutableFloatStateOf(0f) }
     val swipeDownThresholdPx = 300f
+
+    // Indietro chiude il visore, non la schermata sotto.
+    androidx.activity.compose.BackHandler(onBack = onClose)
 
     Box(
         modifier = Modifier
@@ -786,19 +820,25 @@ private fun GalleryFullscreenViewer(
                             },
                         )
                     } else {
-                        // Thumbnail while not playing
-                        AsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(item.url)
-                                .memoryCacheKey(item.url)
-                                .diskCacheKey(item.url)
-                                .memoryCachePolicy(CachePolicy.ENABLED)
-                                .diskCachePolicy(CachePolicy.ENABLED)
-                                .build(),
-                            contentDescription = null,
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                        // Miniatura dal primo fotogramma. Mai l'URL del video a Coil:
+                        // non lo decodifica, ma prima lo scarica per intero.
+                        val thumbKey = "gallery_full_${item.id}"
+                        val thumbnail by produceState(
+                            initialValue = VideoThumbnailLoader.peek(thumbKey),
+                            key1 = item.url,
+                        ) {
+                            if (value == null) {
+                                value = VideoThumbnailLoader.load(item.url, context, cacheKey = thumbKey, maxSide = Int.MAX_VALUE)
+                            }
+                        }
+                        thumbnail?.let { bmp ->
+                            androidx.compose.foundation.Image(
+                                bitmap = bmp.asImageBitmap(),
+                                contentDescription = null,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                         // Play button
                         Box(
                             modifier = Modifier
@@ -867,31 +907,293 @@ private fun GalleryFullscreenViewer(
             )
         }
 
-        // ── Bottom bar ────────────────────────────────────────────────────────
-        Row(
+        // ── Bottom bar: striscia di miniature (come su iOS) + azioni ─────────
+        Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .background(Color.Black.copy(alpha = 0.45f))
-                .navigationBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
+                .background(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
+                    ),
+                )
+                .navigationBarsPadding(),
         ) {
-            IconButton(
-                onClick = {
-                    val msgId = items.getOrNull(pagerState.currentPage)?.messageId
-                    if (msgId != null) onGoToMessage(msgId)
-                },
+            if (items.size > 1) {
+                GalleryThumbStrip(
+                    items = items,
+                    currentPage = pagerState.currentPage,
+                    onSelect = { idx -> scope.launch { pagerState.animateScrollToPage(idx) } },
+                )
+                HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
+            }
+            // Barra azioni come su iOS: Condividi · Rispondi · Messaggio · Elimina.
+            val currentItem = items.getOrNull(pagerState.currentPage)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ViewerToolbarButton(
+                    icon = Icons.Default.Share,
+                    label = stringResource(R.string.chat_share),
+                    enabled = !isSharing && currentItem != null,
+                    busy = isSharing,
                 ) {
-                    Text(stringResource(R.string.chat_go_to_message), color = Color.White, fontSize = 13.sp)
-                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    val item = currentItem ?: return@ViewerToolbarButton
+                    scope.launch {
+                        isSharing = true
+                        val ok = shareGalleryMedia(context, item)
+                        isSharing = false
+                        if (!ok) {
+                            android.widget.Toast.makeText(
+                                context,
+                                context.getString(R.string.chat_share_failed),
+                                android.widget.Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                    }
+                }
+                if (onReply != null) {
+                    ViewerToolbarButton(
+                        icon = Icons.AutoMirrored.Filled.Reply,
+                        label = stringResource(R.string.chat_reply),
+                    ) {
+                        currentItem?.let { onReply(it.messageId) }
+                    }
+                }
+                ViewerToolbarButton(
+                    icon = Icons.AutoMirrored.Filled.ArrowForward,
+                    label = stringResource(R.string.chat_message),
+                ) {
+                    currentItem?.let { onGoToMessage(it.messageId) }
+                }
+                if (onDelete != null) {
+                    ViewerToolbarButton(
+                        icon = Icons.Default.DeleteOutline,
+                        label = stringResource(R.string.chat_delete),
+                        tint = Color(0xFFFF453A),
+                    ) {
+                        deleteTarget = currentItem
+                    }
                 }
             }
+        }
+    }
+
+    val target = deleteTarget
+    if (target != null && onDelete != null) {
+        val forEveryoneAllowed = remember(target.messageId) { canDeleteForEveryone(target.messageId) }
+        // Su Android si elimina il messaggio intero: per un gruppo lo diciamo.
+        val groupSize = items.count { it.messageId == target.messageId }
+        fun confirm(forEveryone: Boolean) {
+            deleteTarget = null
+            onDelete(target.messageId, forEveryone)
+            items.removeAll { it.messageId == target.messageId }
+            if (items.isEmpty()) onClose()
+        }
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text(stringResource(R.string.chat_media_delete_q)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(
+                            if (forEveryoneAllowed) R.string.chat_media_delete_choice else R.string.chat_media_delete_me,
+                        ),
+                    )
+                    if (groupSize > 1) {
+                        Text(stringResource(R.string.chat_media_delete_group, groupSize))
+                    }
+                }
+            },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(onClick = { confirm(forEveryone = false) }) {
+                        Text(stringResource(R.string.chat_delete_for_me), color = MaterialTheme.colorScheme.error)
+                    }
+                    if (forEveryoneAllowed) {
+                        TextButton(onClick = { confirm(forEveryone = true) }) {
+                            Text(stringResource(R.string.chat_delete_for_all), color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTarget = null }) {
+                    Text(stringResource(R.string.chat_cancel))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.ViewerToolbarButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    tint: Color = Color.White,
+    enabled: Boolean = true,
+    busy: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+            if (busy) {
+                androidx.compose.material3.CircularProgressIndicator(
+                    color = tint,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(20.dp),
+                )
+            } else {
+                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
+            }
+        }
+        Text(label, color = tint.copy(alpha = 0.85f), fontSize = 11.sp, maxLines = 1)
+    }
+}
+
+/**
+ * Scarica il media in cache e apre il foglio di condivisione di sistema.
+ * `false` se il download o l'apertura non riescono.
+ */
+private suspend fun shareGalleryMedia(context: android.content.Context, item: GalleryMediaItem): Boolean {
+    val file = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        runCatching {
+            val dir = java.io.File(context.cacheDir, "chat_share").apply { mkdirs() }
+            // Via i file delle condivisioni precedenti: il foglio di sistema li ha già letti.
+            dir.listFiles()?.forEach { it.delete() }
+            val out = java.io.File(dir, "${java.util.UUID.randomUUID()}.${if (item.isVideo) "mp4" else "jpg"}")
+            java.net.URL(item.url).openStream().use { input ->
+                out.outputStream().use { input.copyTo(it) }
+            }
+            out.takeIf { it.length() > 0 }
+        }.getOrNull()
+    } ?: return false
+    return runCatching {
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            context, "${context.packageName}.fileprovider", file,
+        )
+        val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = if (item.isVideo) "video/mp4" else "image/jpeg"
+            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+            clipData = android.content.ClipData.newRawUri(null, uri)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(android.content.Intent.createChooser(send, null))
+    }.isSuccess
+}
+
+private val ThumbStripSize = 52.dp
+
+/**
+ * Striscia orizzontale di miniature sotto il visore, come su iOS: la corrente
+ * ha il bordo bianco, le altre sono attenuate; segue la pagina e un tocco ci salta.
+ */
+@Composable
+private fun GalleryThumbStrip(
+    items: List<GalleryMediaItem>,
+    currentPage: Int,
+    onSelect: (Int) -> Unit,
+) {
+    val stripState = androidx.compose.foundation.lazy.rememberLazyListState(
+        initialFirstVisibleItemIndex = (currentPage - 3).coerceAtLeast(0),
+    )
+    // Tiene la miniatura corrente AL CENTRO della striscia (salvo ai bordi della
+    // lista, dove non c'è spazio per centrarla). Si misura la posizione vera
+    // dell'elemento: stimare dal numero di visibili lo lasciava scivolare fuori.
+    LaunchedEffect(currentPage) {
+        if (stripState.layoutInfo.visibleItemsInfo.none { it.index == currentPage }) {
+            // Fuori vista (apertura su un media lontano, salto lungo): prima ci si porta
+            // lì senza animazione, poi al prossimo frame la misura è aggiornata.
+            stripState.scrollToItem(currentPage)
+            withFrameNanos { }
+        }
+        val info = stripState.layoutInfo
+        val target = info.visibleItemsInfo.firstOrNull { it.index == currentPage } ?: return@LaunchedEffect
+        val viewportCenter = (info.viewportStartOffset + info.viewportEndOffset) / 2
+        val delta = target.offset + target.size / 2 - viewportCenter
+        if (delta != 0) stripState.animateScrollBy(delta.toFloat())
+    }
+    androidx.compose.foundation.lazy.LazyRow(
+        state = stripState,
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        items(items.size, key = { items[it].id }) { idx ->
+            GalleryThumbCell(
+                item = items[idx],
+                isSelected = idx == currentPage,
+                onClick = { onSelect(idx) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun GalleryThumbCell(
+    item: GalleryMediaItem,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+) {
+    val context = LocalContext.current
+    val shape = RoundedCornerShape(6.dp)
+    Box(
+        modifier = Modifier
+            .size(ThumbStripSize)
+            .alpha(if (isSelected) 1f else 0.55f)
+            .clip(shape)
+            .background(Color.White.copy(alpha = 0.08f))
+            .border(2.dp, if (isSelected) Color.White else Color.Transparent, shape)
+            .clickable(onClick = onClick),
+    ) {
+        if (item.isVideo) {
+            // Mai l'URL del video a Coil: miniatura dal primo fotogramma, piccola.
+            val key = "strip_${item.id}"
+            val thumb by produceState(initialValue = VideoThumbnailLoader.peek(key), key1 = item.url) {
+                if (value == null) value = VideoThumbnailLoader.load(item.url, context, cacheKey = key, maxSide = 200)
+            }
+            thumb?.let { bmp ->
+                androidx.compose.foundation.Image(
+                    bitmap = bmp.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            Icon(
+                Icons.Default.PlayArrow,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(3.dp)
+                    .size(14.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    .padding(2.dp),
+            )
+        } else {
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(item.url)
+                    .size(200)
+                    .memoryCacheKey("strip_${item.id}")
+                    .diskCacheKey(item.url)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }
