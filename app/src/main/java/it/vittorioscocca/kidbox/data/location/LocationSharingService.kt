@@ -88,10 +88,20 @@ class LocationSharingService : Service() {
         familyId = newFamilyId
         if (newDisplayName.isNotBlank()) displayName = newDisplayName
 
-        startForegroundCompat()
-
+        // Prima il permesso, poi il foreground: su Android 14+ un servizio di
+        // tipo «location» avviato senza il permesso posizione non si ferma da
+        // solo, lancia SecurityException e uccide l'app.
         if (!hasLocationPermission()) {
             KBLog.app.warning("LocationSharingService: permesso posizione mancante, stop", TAG)
+            stopSelfSafely()
+            return START_NOT_STICKY
+        }
+
+        if (!startForegroundCompat()) {
+            // Avvio negato perché siamo in background (riavvio del sistema con
+            // START_REDELIVER_INTENT, watchdog, boot). Lo stato resta «attivo»:
+            // la condivisione riprende da MainActivity.onResume appena l'utente
+            // riapre l'app, che è il momento in cui Android lo permette.
             stopSelfSafely()
             return START_NOT_STICKY
         }
@@ -149,7 +159,18 @@ class LocationSharingService : Service() {
         lastWrittenLocation = null
     }
 
-    private fun startForegroundCompat() {
+    /**
+     * Porta il servizio in primo piano. `false` se Android lo ha negato.
+     *
+     * Da Android 12 un servizio in primo piano non può partire mentre l'app è
+     * in background (ForegroundServiceStartNotAllowedException), e da Android
+     * 14 un servizio di tipo «location» richiede che il permesso posizione sia
+     * utilizzabile in quel momento (SecurityException, tipico con il permesso
+     * «solo mentre usi l'app» e l'app chiusa). Entrambe arrivano qui dentro, in
+     * onStartCommand, dove nessuno le catturava: settembre 2026, 19 crash su 30
+     * in due settimane, su Samsung, Honor e Oppo con Android 15 e 16.
+     */
+    private fun startForegroundCompat(): Boolean {
         val stopIntent = Intent(this, LocationSharingService::class.java).apply { action = ACTION_STOP }
         val stopPending = PendingIntent.getService(
             this,
@@ -179,14 +200,25 @@ class LocationSharingService : Service() {
             .addAction(0, "Interrompi", stopPending)
             .build()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+            true
+        } catch (e: SecurityException) {
+            KBLog.app.warning("LocationSharingService: foreground negato (permesso): ${e.message}", TAG)
+            false
+        } catch (e: IllegalStateException) {
+            // ForegroundServiceStartNotAllowedException estende IllegalStateException
+            // ed esiste solo da API 31: si cattura la superclasse.
+            KBLog.app.warning("LocationSharingService: foreground negato (app in background): ${e.message}", TAG)
+            false
         }
     }
 

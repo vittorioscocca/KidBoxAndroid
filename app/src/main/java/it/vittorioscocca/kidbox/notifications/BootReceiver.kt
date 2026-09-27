@@ -47,8 +47,11 @@ class BootReceiver : BroadcastReceiver() {
                     return@launch
                 }
                 // Il foreground service muore al reboot: se la condivisione posizione
-                // era attiva, riavviala (BOOT_COMPLETED è esente dalle restrizioni di
-                // avvio FGS da background) e ri-arma il watchdog.
+                // era attiva, prova a riavviarla e ri-arma il watchdog. Tentativo e non
+                // garanzia: da Android 14 un servizio di tipo «location» dal boot
+                // richiede il permesso posizione in background, e senza quello Android
+                // lo nega. Il servizio ora lo gestisce senza crash e la condivisione
+                // riprende all'apertura dell'app (MainActivity.onResume).
                 runCatching {
                     if (LocationSharingStateStore.shouldBeActive(appCtx)) {
                         LocationSharingService.start(

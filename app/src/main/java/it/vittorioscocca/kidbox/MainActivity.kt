@@ -44,6 +44,8 @@ import it.vittorioscocca.kidbox.ui.theme.KidBoxTheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import it.vittorioscocca.kidbox.util.CrashAnalyzer
 import it.vittorioscocca.kidbox.util.KBLog
+import it.vittorioscocca.kidbox.data.location.LocationSharingService
+import it.vittorioscocca.kidbox.data.location.LocationSharingStateStore
 import it.vittorioscocca.kidbox.data.remote.family.InviteReferrerPickup
 import it.vittorioscocca.kidbox.data.remote.family.PendingFamilyInvite
 import javax.inject.Inject
@@ -225,6 +227,25 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         NotificationDeepLinkRouter.claimOwnership(deepLinkOwnerToken)
+        resumeLocationSharingIfNeeded()
+    }
+
+    /**
+     * Se la condivisione posizione dovrebbe essere attiva ma il servizio non
+     * gira, la riprende adesso. È l'unico momento affidabile: da background
+     * (riavvio del sistema, watchdog, boot) Android 12+ nega l'avvio del
+     * servizio in primo piano, e prima di questo punto la condivisione restava
+     * spenta finché l'utente non apriva la schermata Posizione. `start` è
+     * idempotente: se il servizio gira già non cambia niente.
+     */
+    private fun resumeLocationSharingIfNeeded() {
+        runCatching {
+            if (!LocationSharingStateStore.shouldBeActive(this)) return@runCatching
+            val familyId = getSharedPreferences("kidbox_prefs", MODE_PRIVATE)
+                .getString("active_family_id", null)?.trim().orEmpty()
+            if (familyId.isEmpty()) return@runCatching
+            LocationSharingService.start(this, familyId, LocationSharingStateStore.displayName(this))
+        }.onFailure { KBLog.app.warning("Ripresa condivisione posizione fallita: ${it.message}", "MainActivity") }
     }
 
     override fun onNewIntent(intent: Intent) {
