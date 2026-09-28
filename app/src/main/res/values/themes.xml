@@ -31,10 +31,17 @@
         <item name="android:forceDarkAllowed">false</item>
     </style>
 
-    <style name="Theme.Translucent" parent="@android:style/Theme.Translucent.NoTitleBar">
+    <!-- Usato da ShareReceiverActivity, che è una AppCompatActivity: il parent
+         DEVE essere un tema AppCompat, altrimenti onCreate lancia
+         «You need to use a Theme.AppCompat theme» e ogni condivisione verso
+         KidBox crasha (successo dal 22/07 al 28/09 col parent di sistema). -->
+    <style name="Theme.Translucent" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowNoTitle">true</item>
+        <item name="windowNoTitle">true</item>
+        <item name="windowActionBar">false</item>
+        <item name="android:windowContentOverlay">@null</item>
         <item name="android:backgroundDimEnabled">true</item>
     </style>
 </resources>
