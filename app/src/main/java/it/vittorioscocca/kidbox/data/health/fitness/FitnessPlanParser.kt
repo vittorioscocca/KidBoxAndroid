@@ -48,7 +48,8 @@ object FitnessPlanParser {
             )
         }
 
-        if (weeks.isEmpty()) {
+        val uniqueWeeks = oneSessionPerDay(weeks)
+        if (uniqueWeeks.isEmpty()) {
             KBLog.ai.error("JSON senza settimane utilizzabili", TAG)
             throw FitnessPlanError.InvalidPlanFormat
         }
@@ -59,10 +60,32 @@ object FitnessPlanParser {
             startDateEpochMillis = FitnessPlanDates.startOfDay(startDateEpochMillis),
             summary = summary,
             safetyNotes = safetyNotes,
-            weeks = weeks.sortedBy { it.index },
+            weeks = uniqueWeeks.sortedBy { it.index },
             generatedAtEpochMillis = System.currentTimeMillis(),
             messageUnitsConsumed = messageUnitsConsumed,
         )
+    }
+
+    /**
+     * Una seduta per giorno, anche quando l'AI ne mette due sullo stesso
+     * `dayOffset` (è successo nel settembre 2026: lunedì e mercoledì doppi
+     * nella settimana 4, mai chiesti). Il doppione non si vede sul calendario
+     * ma pesa nel report: resta la seduta più lunga, che è quella principale.
+     * Parity con `oneSessionPerDay` su iOS.
+     */
+    fun oneSessionPerDay(weeks: List<FitnessWeek>): List<FitnessWeek> {
+        val keptByDay = mutableMapOf<Long, FitnessSession>()
+        weeks.flatMap { it.sessions }.forEach { session ->
+            val day = FitnessPlanDates.startOfDay(session.dateEpochMillis)
+            val kept = keptByDay[day]
+            if (kept == null || session.durationMinutes > kept.durationMinutes) keptByDay[day] = session
+        }
+        val keep = keptByDay.values.map { it.id }.toSet()
+        val dropped = weeks.sumOf { it.sessions.size } - keep.size
+        if (dropped > 0) KBLog.ai.error("scartate $dropped sedute doppie sullo stesso giorno", TAG)
+        return weeks
+            .map { week -> week.copy(sessions = week.sessions.filter { it.id in keep }) }
+            .filter { it.sessions.isNotEmpty() }
     }
 
     /** Aggiornamento parziale: spostamento di una seduta o adeguamento settimanale. */

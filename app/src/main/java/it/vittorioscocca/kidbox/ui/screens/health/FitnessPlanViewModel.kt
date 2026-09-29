@@ -24,6 +24,7 @@ import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanRemoteStore
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanStore
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessSession
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessSessionStatus
+import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanRecap
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessWeeklyReport
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessWeeklyReportBuilder
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
@@ -67,6 +68,8 @@ data class FitnessPlanUiState(
     val isAdjusting: Boolean = false,
     val generatingMessageRes: Int = R.string.fitness_generating,
     val weeklyReport: FitnessWeeklyReport? = null,
+    /** Consuntivo del mese, presente solo quando il piano è finito. */
+    val planRecap: FitnessPlanRecap? = null,
     val adjustmentProposal: FitnessAdjustmentProposal? = null,
     val lastHealthSyncEpochMillis: Long? = null,
     val healthConnectAvailable: Boolean = false,
@@ -95,6 +98,13 @@ data class FitnessPlanUiState(
 
     val sessionsOfSelectedDay: List<FitnessSession>
         get() = plan?.sessionsOn(selectedDayEpochMillis).orEmpty()
+
+    /**
+     * Piano concluso da cui far nascere il prossimo: la generazione se ne porta
+     * dietro il consuntivo. Un piano ancora in corso non conta come storia.
+     */
+    val finishedPlan: FitnessPlanDocument?
+        get() = plan?.takeIf { it.isFinished() }
 
     /** Il giorno selezionato ricade nelle quattro settimane del piano? */
     val selectedDayInPlan: Boolean
@@ -186,6 +196,7 @@ class FitnessPlanViewModel @Inject constructor(
             val subjectName = _uiState.value.subjectName.ifBlank {
                 context.getString(R.string.health_profile)
             }
+            val finishedPlan = _uiState.value.finishedPlan
             runCatching {
                 withContext(Dispatchers.IO) {
                     val inputs = loadInputs()
@@ -198,6 +209,10 @@ class FitnessPlanViewModel @Inject constructor(
                         treatments = inputs.activeTreatments,
                         visits = inputs.visits,
                         exams = inputs.exams,
+                        // Qualunque strada porti a rigenerare un piano finito (il
+                        // pulsante del consuntivo o le impostazioni), il mese
+                        // concluso diventa storia.
+                        previousPlan = finishedPlan,
                     )
                     FitnessPlanGenerator.generate(
                         aiRepository = aiRepository,
@@ -209,6 +224,7 @@ class FitnessPlanViewModel @Inject constructor(
                     )
                 }
             }.onSuccess { result ->
+                withContext(Dispatchers.IO) { planStore.resetReviewedWeeks(childId) }
                 persist(result.document)
                 // Se subito dopo si apre la richiesta dei permessi Health Connect,
                 // `ReviewPrompter` vede l'Activity senza focus e rinuncia.
@@ -367,6 +383,12 @@ class FitnessPlanViewModel @Inject constructor(
         viewModelScope.launch { persist(updated) }
     }
 
+    /** Toglie una seduta dal piano: esce da calendario, promemoria e report. */
+    fun deleteSession(sessionId: String) {
+        val plan = _uiState.value.plan ?: return
+        viewModelScope.launch { persist(plan.removeSession(sessionId)) }
+    }
+
     // ── Health Connect ─────────────────────────────────────────────────────
 
     fun syncHealthNow() {
@@ -485,6 +507,7 @@ class FitnessPlanViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 plan = null,
                 weeklyReport = null,
+                planRecap = null,
                 adjustmentProposal = null,
                 lastUsage = null,
             )
@@ -508,6 +531,7 @@ class FitnessPlanViewModel @Inject constructor(
                         treatments = inputs.activeTreatments,
                         visits = inputs.visits,
                         exams = inputs.exams,
+                        previousPlan = cached?.takeIf { it.isFinished() },
                     )
                     inputs to FitnessPlanGenerator.estimate(payload).messageUnits
                 }
@@ -557,7 +581,7 @@ class FitnessPlanViewModel @Inject constructor(
                         planStore.clear(id)
                         reminderScheduler.cancelAll(id)
                     }
-                    _uiState.value = _uiState.value.copy(plan = null, weeklyReport = null)
+                    _uiState.value = _uiState.value.copy(plan = null, weeklyReport = null, planRecap = null)
                 }
 
             is FitnessPlanRemoteStore.Remote.Plan -> {
@@ -571,7 +595,14 @@ class FitnessPlanViewModel @Inject constructor(
                 ) {
                     return
                 }
-                withContext(Dispatchers.IO) { planStore.save(id, document) }
+                withContext(Dispatchers.IO) {
+                    // Piano rigenerato su un altro device: i report già visti
+                    // erano quelli del piano vecchio.
+                    if (local != null && document.generatedAtEpochMillis > localGenerated) {
+                        planStore.resetReviewedWeeks(id)
+                    }
+                    planStore.save(id, document)
+                }
                 _uiState.value = _uiState.value.copy(plan = document, input = document.input)
                 refreshWeeklyReport()
             }
@@ -614,13 +645,26 @@ class FitnessPlanViewModel @Inject constructor(
     private fun refreshWeeklyReport() {
         val plan = _uiState.value.plan
         if (plan == null) {
-            _uiState.value = _uiState.value.copy(weeklyReport = null)
+            _uiState.value = _uiState.value.copy(weeklyReport = null, planRecap = null)
+            return
+        }
+        // A piano finito il report dell'ultima settimana cede il posto al
+        // consuntivo del mese: il suo «adeguamento» riguarderebbe una
+        // settimana che non c'è.
+        if (plan.isFinished()) {
+            _uiState.value = _uiState.value.copy(
+                weeklyReport = null,
+                planRecap = FitnessWeeklyReportBuilder.recap(plan),
+            )
             return
         }
         val weekIndex = FitnessWeeklyReportBuilder.lastCompletedWeekIndex(plan)
         val report = weekIndex?.let { FitnessWeeklyReportBuilder.report(it, plan) }
         val alreadyReviewed = report != null && report.weekIndex in planStore.reviewedWeeks(childId)
-        _uiState.value = _uiState.value.copy(weeklyReport = if (alreadyReviewed) null else report)
+        _uiState.value = _uiState.value.copy(
+            weeklyReport = if (alreadyReviewed) null else report,
+            planRecap = null,
+        )
     }
 
     private suspend fun persist(document: FitnessPlanDocument) {

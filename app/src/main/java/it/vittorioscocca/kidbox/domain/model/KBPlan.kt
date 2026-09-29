@@ -42,6 +42,16 @@ enum class KBPlan(val rawValue: String) {
 
     val productId: String? get() = spec.productId
 
+    /**
+     * Abbonamento annuale su Play. Ricavato dal mensile invece che dal catalogo:
+     * `config/plans` può non avere ancora il campo, e i due id restano accoppiati
+     * comunque (vedi functions/purchases.js).
+     */
+    val productIdYearly: String? get() = productId?.replace(".monthly", ".yearly")
+
+    /** Tutti i product id del piano, mensile e annuale. */
+    val allProductIds: List<String> get() = listOfNotNull(productId, productIdYearly)
+
     val badge: String get() = spec.localizedBadge
 
     /** Elenco feature del piano, nella lingua del device e con quote già risolte. */
@@ -59,5 +69,9 @@ enum class KBPlan(val rawValue: String) {
 
         // Backward-compatible helper for existing Android call sites.
         fun from(raw: String?): KBPlan = fromRawValue(raw)
+
+        /** Piano di un product id dello store, mensile o annuale. */
+        fun fromProductId(productId: String?): KBPlan? =
+            productId?.let { id -> entries.firstOrNull { id in it.allProductIds } }
     }
 }

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Prova Pro e piano annuale (functions/proTrial.js). Stesse chiavi in values/-en/-fr/-es. -->
+<resources>
+    <string name="trial_ai_title">Mensajes de IA de la prueba Pro</string>
+    <string name="trial_ai_messages_used">%1$d de %2$d mensajes de la prueba usados</string>
+    <string name="trial_health_ai_usage_summary">%1$d mensajes de IA · %2$d/%3$d de la prueba Pro</string>
+    <string name="trial_plans_notice_days">Te quedan %1$d días de prueba Pro. Suscríbete para conservar el espacio extra, los planificadores y el asistente de IA cuando termine.</string>
+    <string name="trial_plans_notice_last_day">Es el último día de tu prueba Pro. Suscríbete para conservar el espacio extra, los planificadores y el asistente de IA.</string>
+    <string name="trial_plans_notice_ended">Tu prueba Pro ha terminado. Todos tus datos se conservan: con Pro vuelven el espacio extra, los planificadores y el asistente de IA.</string>
+    <string name="trial_status_chip">En prueba</string>
+    <string name="plans_billing_monthly">Mensual</string>
+    <string name="plans_billing_yearly">Anual</string>
+    <string name="plans_billing_yearly_saving">Anual · −%1$d %%</string>
+    <string name="plans_price_per_year">%1$s/año</string>
+    <string name="plans_price_per_month">%1$s/mes</string>
+    <string name="trial_home_title_days">Pro incluido: quedan %1$d días</string>
+    <string name="trial_home_title_last">Pro incluido: último día</string>
+    <string name="trial_home_body">Espacio extra, planificadores y asistente de IA desbloqueados. Sin tarjeta.</string>
+    <string name="trial_profile_plan_until">%1$s · en prueba hasta el %2$s</string>
+</resources>

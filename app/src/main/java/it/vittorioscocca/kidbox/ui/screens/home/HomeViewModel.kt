@@ -107,6 +107,8 @@ data class HomeUiState(
     val badgePasswords: Int = 0,
     /** Piano abbonamento famiglia (Firestore); aggiorna card Assistente e paywall come iOS. */
     val familyPlan: KBPlan = KBPlan.FREE,
+    /** Giorni rimasti di prova Pro, solo per chi può abbonarsi (banner in Home). */
+    val trialDaysLeft: Int? = null,
     /** Conteggio utilizzi per feature-id (tutte le categorie Home), per le Scorciatoie. */
     val featureUsage: Map<String, Int> = emptyMap(),
 )
@@ -436,6 +438,17 @@ class HomeViewModel @Inject constructor(
                 }
                 subscriptionRepository.planFlow(familyId, uid).collectLatest { plan ->
                     _uiState.value = _uiState.value.copy(familyPlan = plan)
+                    // Prova Pro: senza il banner la famiglia si ritrova tutto sbloccato
+                    // senza saperlo. Solo al proprietario, che è chi può abbonarsi.
+                    val canSubscribe = it.vittorioscocca.kidbox.domain.family.isFamilySubscriptionManager(
+                        familyDao, familyMemberDao, familyId, uid,
+                    )
+                    val trialDays = if (canSubscribe && plan != KBPlan.FREE) {
+                        subscriptionRepository.loadTrialState(familyId).daysLeft()
+                    } else {
+                        null
+                    }
+                    _uiState.value = _uiState.value.copy(trialDaysLeft = trialDays)
                     it.vittorioscocca.kidbox.ai.CurrentPlanStore.update(plan)
                     // Equivalente Android di refreshAIQuotaStatus() su iOS: al caricamento
                     // del piano, aggiorna subito lo stato AI (bonus Free esaurito o no).

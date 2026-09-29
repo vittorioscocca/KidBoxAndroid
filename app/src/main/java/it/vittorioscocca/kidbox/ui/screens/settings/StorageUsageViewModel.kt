@@ -10,6 +10,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
+import it.vittorioscocca.kidbox.data.repository.KBTrialState
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.billing.KBBillingManager
 import it.vittorioscocca.kidbox.domain.family.isFamilySubscriptionManager
@@ -21,6 +22,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -47,6 +49,10 @@ data class StorageUsageUiState(
     val restoreDialogError: String? = null,
     /** Errore flusso acquisto da questa schermata (righe piano). */
     val billingPurchaseError: String? = null,
+    /** Prova Pro della famiglia: il Pro «attuale» in prova resta acquistabile. */
+    val trial: KBTrialState = KBTrialState(),
+    /** Play ha gli annuali: solo allora si propone la scelta Mensile/Annuale. */
+    val hasYearly: Boolean = false,
 )
 
 @HiltViewModel
@@ -76,6 +82,13 @@ class StorageUsageViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            billingManager.trialState.combine(billingManager.products) { trial, products ->
+                trial to products.any { it.productId == KBPlan.PRO.productIdYearly }
+            }.collect { (trial, hasYearly) ->
+                _uiState.update { it.copy(trial = trial, hasYearly = hasYearly) }
+            }
+        }
+        viewModelScope.launch {
             billingManager.purchaseError.collect { err ->
                 _uiState.update { it.copy(billingPurchaseError = err) }
             }
@@ -87,10 +100,23 @@ class StorageUsageViewModel @Inject constructor(
     }
 
     /** Avvio acquisto come dal pulsante "Abbonati" in Piani. */
-    fun purchase(plan: KBPlan, activity: Activity) {
+    fun purchase(plan: KBPlan, activity: Activity, triggerFeature: String, yearly: Boolean) {
         billingManager.clearError()
         billingManager.start()
-        billingManager.purchase(plan, activity)
+        billingManager.purchase(plan, activity, triggerFeature = triggerFeature, yearly = yearly)
+    }
+
+    /** Prezzo dello store per il piano, mensile o annuale (null se Play non lo ha). */
+    fun priceLabel(plan: KBPlan, yearly: Boolean): String? =
+        billingManager.basePriceLabel(if (yearly) plan.productIdYearly else plan.productId)
+
+    /** Risparmio percentuale dell'annuale sul mensile ×12, dai prezzi di Play. */
+    fun yearlySavingPercent(plan: KBPlan): Int? {
+        val monthly = billingManager.basePriceMicros(plan.productId) ?: return null
+        val yearly = billingManager.basePriceMicros(plan.productIdYearly) ?: return null
+        if (monthly <= 0) return null
+        val pct = Math.round((1.0 - yearly.toDouble() / (monthly * 12.0)) * 100).toInt()
+        return pct.takeIf { it > 0 }
     }
 
     fun clearBillingPurchaseError() {

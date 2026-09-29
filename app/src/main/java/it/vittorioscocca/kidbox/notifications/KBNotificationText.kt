@@ -49,6 +49,8 @@ object KBNotificationText {
         "exam_reminder_body_format_urgent" to R.string.exam_reminder_body_format_urgent,
         "vaccine_reminder_notification_title" to R.string.vaccine_reminder_notification_title,
         "fitness_reminder_title" to R.string.fitness_reminder_title,
+        "fitness_plan_end_title" to R.string.fitness_plan_end_title,
+        "fitness_plan_end_body" to R.string.fitness_plan_end_body,
         "vaccine_reminder_body_fallback" to R.string.vaccine_reminder_body_fallback,
         "vaccine_reminder_body_format" to R.string.vaccine_reminder_body_format,
         "treatment_reminder_notification_title" to R.string.treatment_reminder_notification_title,

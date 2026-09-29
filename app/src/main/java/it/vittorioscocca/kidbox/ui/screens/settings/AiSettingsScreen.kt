@@ -204,6 +204,7 @@ fun AiSettingsScreen(
                 plan = state.plan,
                 usageToday = state.aiUsageToday,
                 period = state.aiQuotaPeriod,
+                quotaLimit = state.aiQuotaLimit,
                 aiAccessBlocked = state.aiAccessBlocked,
                 onUpgrade = onPlansTap,
             )
@@ -226,7 +227,12 @@ fun AiSettingsScreen(
 
                 AIUsageCard(
                     usageToday = state.aiUsageToday,
-                    dailyLimit = state.plan.aiMessageLimit,
+                    // Nella prova Pro il tetto è quello del server, non il Pro del listino.
+                    dailyLimit = if (state.aiQuotaPeriod == it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod.TRIAL) {
+                        state.aiQuotaLimit
+                    } else {
+                        state.plan.aiMessageLimit
+                    },
                     period = state.aiQuotaPeriod,
                 )
 
@@ -267,6 +273,7 @@ private fun CurrentPlanCard(
     plan: KBPlan,
     usageToday: Int,
     period: it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod,
+    quotaLimit: Int = 0,
     aiAccessBlocked: Boolean,
     onUpgrade: () -> Unit,
 ) {
@@ -328,6 +335,8 @@ private fun CurrentPlanCard(
                             stringResource(R.string.settings_ai_unlimited)
                         } else if (isLifetime) {
                             stringResource(R.string.settings_ai_free_messages_used, usageToday, plan.aiMessageLimit)
+                        } else if (period == it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod.TRIAL) {
+                            stringResource(R.string.trial_ai_messages_used, usageToday, quotaLimit)
                         } else {
                             stringResource(R.string.settings_plan_ai_messages_per_day, plan.aiMessageLimit)
                         },
@@ -470,6 +479,7 @@ private fun AIUsageCard(
 ) {
     val kb = MaterialTheme.kidBoxColors
     val isLifetime = period == it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod.LIFETIME
+    val isTrial = period == it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod.TRIAL
     val isUnlimited = dailyLimit == Int.MAX_VALUE
     val availableToday = if (isUnlimited) Int.MAX_VALUE else (dailyLimit - usageToday).coerceAtLeast(0)
     val progress = if (isUnlimited) 0f else usageToday.toFloat() / dailyLimit.coerceAtLeast(1)
@@ -485,7 +495,11 @@ private fun AIUsageCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.BarChart, contentDescription = null, tint = progressColor, modifier = Modifier.size(18.dp))
                 Text(
-                    if (isLifetime) stringResource(R.string.settings_ai_bonus_free_title) else stringResource(R.string.settings_ai_messages_today),
+                    when {
+                        isTrial -> stringResource(R.string.trial_ai_title)
+                        isLifetime -> stringResource(R.string.settings_ai_bonus_free_title)
+                        else -> stringResource(R.string.settings_ai_messages_today)
+                    },
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
                     color = kb.title,
@@ -505,9 +519,13 @@ private fun AIUsageCard(
                     fontSize = 14.sp,
                     color = kb.subtitle,
                 )
-            } else if (isLifetime) {
+            } else if (isLifetime || isTrial) {
                 Text(
-                    stringResource(R.string.settings_ai_free_messages_used, usageToday, dailyLimit),
+                    if (isTrial) {
+                        stringResource(R.string.trial_ai_messages_used, usageToday, dailyLimit)
+                    } else {
+                        stringResource(R.string.settings_ai_free_messages_used, usageToday, dailyLimit)
+                    },
                     fontSize = 14.sp,
                     color = kb.title,
                     fontWeight = FontWeight.SemiBold,

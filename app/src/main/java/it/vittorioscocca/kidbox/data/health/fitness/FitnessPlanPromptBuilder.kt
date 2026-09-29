@@ -54,6 +54,9 @@ object FitnessPlanPromptBuilder {
         cresce e una settimana di scarico se il volume è alto).
         Allena SOLO nei giorni indicati come disponibili: ogni sessione deve avere un "dayOffset"
         compreso nell'elenco di offset ammessi fornito nel messaggio utente. Non inventare altri giorni.
+        UNA SOLA seduta per giorno: ogni "dayOffset" compare al massimo una volta in tutto il piano.
+        Il lavoro complementare (forza, mobilità, riscaldamento) va dentro la seduta di quel giorno,
+        mai in una seduta separata sullo stesso giorno.
         Ogni sessione deve avere esercizi o attività concrete e obiettivi MISURABILI (minuti, distanza,
         calorie, serie × ripetizioni, ritmo). Niente obiettivi generici tipo "allenati bene".
         Rispetta la durata indicata per sessione, con una tolleranza di ±10 minuti.
@@ -107,8 +110,16 @@ object FitnessPlanPromptBuilder {
         allowedDayOffsets: List<Int>,
         profileSummary: List<String>,
         healthContext: String,
+        previousPlan: FitnessPlanDocument? = null,
     ): String = buildString {
-        appendLine("Crea il piano di allenamento mensile per $subjectName.")
+        if (previousPlan != null) {
+            appendLine(
+                "Crea il piano di allenamento del mese ${previousPlan.cycleNumber + 1} per $subjectName: " +
+                    "è la continuazione del piano appena concluso, descritto più sotto.",
+            )
+        } else {
+            appendLine("Crea il piano di allenamento mensile per $subjectName.")
+        }
         appendLine()
         appendLine("--- OBIETTIVO E DISPONIBILITÀ ---")
         appendLine("Obiettivo principale: ${input.goal.promptLabel}")
@@ -134,7 +145,14 @@ object FitnessPlanPromptBuilder {
             input.raceDetail.trim().takeIf { it.isNotBlank() }?.let { race.append(" — ").append(it) }
             appendLine(race.toString())
             val raceDate = input.raceDateEpochMillis
-            if (raceDate != null) {
+            if (raceDate != null && raceDate < FitnessPlanDates.today()) {
+                // Succede proprio al mese successivo: la gara era il traguardo
+                // del piano concluso e le impostazioni sono rimaste quelle.
+                appendLine(
+                    "Data della gara: ${formatDate(raceDate)}, già passata. Imposta il mese come " +
+                        "recupero attivo e poi ripresa, salvo indicazioni diverse nelle note.",
+                )
+            } else if (raceDate != null) {
                 val weeks = (FitnessPlanDates.daysBetween(System.currentTimeMillis(), raceDate) / 7)
                     .coerceAtLeast(0)
                 appendLine("Data della gara: ${formatDate(raceDate)} (tra circa $weeks settimane)")
@@ -157,6 +175,11 @@ object FitnessPlanPromptBuilder {
             appendLine("Note dell'utente (infortuni, limiti, preferenze): $it")
         }
 
+        if (previousPlan != null) {
+            appendLine()
+            previousPlanLines(previousPlan).forEach { appendLine(it) }
+        }
+
         appendLine()
         appendLine("--- DATI ANTROPOMETRICI E ALLENAMENTI (Health Connect) ---")
         if (profileSummary.isEmpty()) {
@@ -168,6 +191,111 @@ object FitnessPlanPromptBuilder {
         appendLine()
         appendLine("--- DATI CLINICI (visite, cure, analisi, referti) ---")
         appendLine(healthContext)
+    }
+
+    /**
+     * Il piano concluso raccontato all'AI: i numeri del consuntivo, l'ultima
+     * settimana seduta per seduta (è il livello da cui ripartire) e i mesi
+     * ancora prima in una riga ciascuno. Parity con iOS `previousPlanLines`.
+     */
+    fun previousPlanLines(plan: FitnessPlanDocument): List<String> = buildList {
+        val recap = FitnessWeeklyReportBuilder.recap(plan)
+        add(
+            "--- MESE PRECEDENTE (mese ${plan.cycleNumber}, dal ${formatDate(recap.startDateEpochMillis)} " +
+                "al ${formatDate(recap.endDateEpochMillis)}) ---",
+        )
+        add("Obiettivo di quel mese: ${recap.goal.promptLabel}")
+        add(
+            "Sedute completate: ${recap.completedSessions} su ${recap.plannedSessions} " +
+                "(${recap.completionPercent}%), saltate ${recap.skippedSessions}, " +
+                "fatte con un'attività diversa da quella prevista ${recap.substitutedSessions}",
+        )
+        add("Completamento per settimana: " + recap.weeklyCompletionPercents.joinToString(", ") { "$it%" })
+        val volume = StringBuilder("Volume svolto: ${recap.totalMinutes} minuti")
+        if (recap.totalDistanceMeters >= 10) {
+            volume.append(String.format(Locale.US, ", %.1f km", recap.totalDistanceMeters / 1000))
+        }
+        if (recap.totalKcal > 0) volume.append(", ${recap.totalKcal} kcal")
+        add(volume.toString())
+        if (recap.chronicallySkippedWeekdays.isNotEmpty()) {
+            add("Giorni saltati più volte: ${weekdayNames(recap.chronicallySkippedWeekdays)}")
+        }
+        if (recap.extraWorkouts > 0) {
+            val titles = plan.loggedWorkouts
+                .groupingBy { it.title }
+                .eachCount()
+                .entries
+                .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+                .take(4)
+                .joinToString(", ") { "${it.key} ×${it.value}" }
+            add("Attività registrate fuori programma: ${recap.extraWorkouts} ($titles)")
+        }
+
+        plan.weeks.maxByOrNull { it.index }?.let { lastWeek ->
+            add("Sedute dell'ultima settimana (il livello da cui ripartire):")
+            lastWeek.sessions.sortedBy { it.dateEpochMillis }.filterNot { it.isRest }.forEach { session ->
+                add("- " + sessionOutcomeLine(session))
+            }
+        }
+
+        // I mesi più vecchi restano nel documento ma al prompt ne bastano gli
+        // ultimi, per la tendenza.
+        val older = plan.previousCycles
+        val shown = older.takeLast(5)
+        if (shown.isNotEmpty()) {
+            add("Mesi ancora precedenti:")
+            shown.forEachIndexed { offset, cycle ->
+                val number = older.size - shown.size + offset + 1
+                add(
+                    "- mese $number (${cycle.goal.promptLabel}): ${cycle.completionPercent}% " +
+                        "delle sedute, ${cycle.totalMinutes} minuti",
+                )
+            }
+        }
+
+        add("")
+        add("REGOLE PER LA CONTINUAZIONE:")
+        add(
+            "- Riparti dal livello raggiunto nell'ultima settimana, non da zero: niente settimana " +
+                "introduttiva se la persona si è allenata con continuità.",
+        )
+        add(
+            "- Completamento del mese dal 70% in su: progressione moderata (circa +10% di volume o " +
+                "una seduta più impegnativa). Dal 40% al 69%: stesso volume, consolida. Sotto il 40%: " +
+                "riduci durata o numero di sedute e rendile più facili da incastrare.",
+        )
+        add(
+            "- Nei giorni saltati più volte metti le sedute più brevi o leggere, se restano fra " +
+                "quelli disponibili.",
+        )
+        add(
+            "- Le attività fatte al posto di quelle previste e quelle fuori programma dicono cosa la " +
+                "persona fa volentieri: dagli spazio nel nuovo mese.",
+        )
+        add("- Mantieni le discipline ma varia esercizi e stimoli rispetto al mese precedente.")
+        add(
+            "- Il campo \"summary\" si apre con 1-2 frasi di bilancio del mese concluso, con i numeri, " +
+                "e spiega come il nuovo mese ne tiene conto.",
+        )
+    }
+
+    /** Una seduta dell'ultima settimana come la legge l'AI: prevista e svolta. */
+    private fun sessionOutcomeLine(session: FitnessSession): String {
+        val planned = "${session.title} (${session.activityType}, ${session.durationMinutes} min, " +
+            "intensità ${session.intensity}): "
+        val outcome = when (session.status) {
+            FitnessSessionStatus.DONE -> buildList {
+                add("completata")
+                session.actualMinutes?.let { add("$it min") }
+                session.actualDistanceMeters?.takeIf { it >= 10 }?.let {
+                    add(String.format(Locale.US, "%.1f km", it / 1000))
+                }
+                if (session.wasSubstituted) session.actualActivityTitle?.let { add("svolta come $it") }
+            }.joinToString(", ")
+            FitnessSessionStatus.SKIPPED -> "saltata"
+            else -> "non registrata"
+        }
+        return planned + outcome
     }
 
     /**

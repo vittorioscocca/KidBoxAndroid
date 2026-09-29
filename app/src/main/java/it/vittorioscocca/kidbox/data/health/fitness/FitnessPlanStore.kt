@@ -61,6 +61,14 @@ class FitnessPlanStore @Inject constructor(
             .apply()
     }
 
+    /**
+     * Un piano nuovo riparte dalla settimana 1: senza azzerare, i report del
+     * mese successivo nascerebbero già «visti» e non comparirebbero mai.
+     */
+    fun resetReviewedWeeks(childId: String) {
+        prefs.edit().remove(reviewedKey(childId)).apply()
+    }
+
     fun lastHealthSync(childId: String): Long? =
         prefs.getLong(lastSyncKey(childId), 0L).takeIf { it > 0L }
 

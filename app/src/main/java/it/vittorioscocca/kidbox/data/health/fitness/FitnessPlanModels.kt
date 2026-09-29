@@ -345,7 +345,37 @@ data class FitnessPlanDocument(
     val messageUnitsConsumed: Int,
     /** Attività svolte che non corrispondono a nessuna seduta programmata. */
     val loggedWorkouts: List<FitnessLoggedWorkout> = emptyList(),
+    /**
+     * Consuntivi dei mesi già conclusi, dal più vecchio: un piano nuovo nasce
+     * dal precedente e se ne porta dietro la storia, perché il documento su
+     * Firestore è uno solo per profilo e la rigenerazione lo sovrascrive.
+     * Parity con `previousCycles` su iOS.
+     */
+    val previousCycles: List<FitnessPlanRecap> = emptyList(),
 ) {
+    /** Numero del mese nel percorso: 1 per il primo piano generato. */
+    val cycleNumber: Int get() = previousCycles.size + 1
+
+    /** Ultimo giorno del piano (mezzanotte locale), cioè la fine dell'ultima settimana. */
+    val lastDayEpochMillis: Long
+        get() {
+            val weekCount = weeks.maxOfOrNull { it.index } ?: FitnessPlanPromptBuilder.PLAN_WEEKS
+            return FitnessPlanDates.plusDays(startDateEpochMillis, weekCount * 7 - 1)
+        }
+
+    /**
+     * Il piano è finito: l'ultima settimana è passata e non resta nessuna
+     * seduta da fare spostata oltre la fine. Da qui in poi la dashboard propone
+     * il consuntivo del mese invece del report settimanale.
+     */
+    fun isFinished(todayEpochMillis: Long = FitnessPlanDates.today()): Boolean {
+        if (lastDayEpochMillis >= todayEpochMillis) return false
+        return allSessions.none { session ->
+            session.status == FitnessSessionStatus.PLANNED && !session.isRest &&
+                FitnessPlanDates.startOfDay(session.dateEpochMillis) >= todayEpochMillis
+        }
+    }
+
     /** Attività registrate in una giornata, dalla più recente. */
     fun loggedWorkoutsOn(dayEpochMillis: Long): List<FitnessLoggedWorkout> {
         val day = FitnessPlanDates.startOfDay(dayEpochMillis)
@@ -426,6 +456,48 @@ data class FitnessWeeklyReport(
             in 70..99 -> R.string.fitness_report_headline_good
             in 40..69 -> R.string.fitness_report_headline_mid
             else -> R.string.fitness_report_headline_low
+        }
+}
+
+/**
+ * Consuntivo di un piano concluso: è il report di fine mese e, salvato nel
+ * piano successivo, la memoria da cui l'AI riparte. Calcolato in locale come il
+ * report settimanale: non costa messaggi AI. Parity con `FitnessPlanRecap` iOS.
+ */
+data class FitnessPlanRecap(
+    val startDateEpochMillis: Long,
+    /** Ultimo giorno del piano, incluso. */
+    val endDateEpochMillis: Long,
+    val goal: FitnessGoal,
+    val plannedSessions: Int,
+    val completedSessions: Int,
+    val skippedSessions: Int,
+    val substitutedSessions: Int,
+    val totalMinutes: Int,
+    val totalKcal: Int,
+    val totalDistanceMeters: Double,
+    /** Completamento settimana per settimana, in ordine, in percentuale. */
+    val weeklyCompletionPercents: List<Int>,
+    /** Giorni della settimana (convenzione [Calendar]) saltati almeno due volte. */
+    val chronicallySkippedWeekdays: List<Int>,
+    /** Attività registrate fuori programma e mai attribuite a una seduta. */
+    val extraWorkouts: Int,
+) {
+    val completionRate: Float
+        get() = if (plannedSessions <= 0) 0f else completedSessions.toFloat() / plannedSessions
+
+    val completionPercent: Int get() = Math.round(completionRate * 100)
+
+    /**
+     * Frase di sintesi, scelta localmente. Le soglie sono le stesse che il
+     * prompt del mese successivo usa per decidere il carico.
+     */
+    val headlineRes: Int
+        get() = when {
+            completionPercent >= 100 -> R.string.fitness_recap_headline_perfect
+            completionPercent >= 70 -> R.string.fitness_recap_headline_good
+            completionPercent >= 40 -> R.string.fitness_recap_headline_mid
+            else -> R.string.fitness_recap_headline_low
         }
 }
 

@@ -135,6 +135,97 @@ class FitnessPlanJsonTest {
     }
 
     @Test
+    fun `il consuntivo dei mesi precedenti sopravvive al round-trip`() {
+        // È la memoria da cui riparte il mese successivo: se un salvataggio da
+        // Android la perdesse, il piano dopo ripartirebbe senza storia.
+        val base = requireNotNull(FitnessPlanJson.decode(payload()))
+        val recap = FitnessWeeklyReportBuilder.recap(base)
+        val next = base.copy(previousCycles = listOf(recap))
+
+        val roundTrip = requireNotNull(FitnessPlanJson.decode(FitnessPlanJson.encode(next)))
+        assertEquals(listOf(recap), roundTrip.previousCycles)
+        assertEquals(2, roundTrip.cycleNumber)
+    }
+
+    @Test
+    fun `legge il consuntivo scritto da iOS`() {
+        // Forma di `FitnessPlanRecap` con JSONEncoder e strategia .iso8601.
+        val json = org.json.JSONObject(payload()).apply {
+            put(
+                "previousCycles",
+                org.json.JSONArray().put(
+                    org.json.JSONObject(
+                        """
+                        {"startDate":"2026-08-02T22:00:00Z","endDate":"2026-08-29T22:00:00Z",
+                         "goal":"weightLoss","plannedSessions":12,"completedSessions":9,
+                         "skippedSessions":2,"substitutedSessions":1,"totalMinutes":410,
+                         "totalKcal":2300,"totalDistanceMeters":31500.5,
+                         "weeklyCompletionPercents":[100,75,67,58],
+                         "chronicallySkippedWeekdays":[3],"extraWorkouts":2}
+                        """.trimIndent(),
+                    ),
+                ),
+            )
+        }
+        val plan = requireNotNull(FitnessPlanJson.decode(json.toString()))
+        val recap = plan.previousCycles.single()
+        assertEquals(FitnessGoal.WEIGHT_LOSS, recap.goal)
+        assertEquals(75, recap.completionPercent)
+        assertEquals(listOf(100, 75, 67, 58), recap.weeklyCompletionPercents)
+        assertEquals(31500.5, recap.totalDistanceMeters, 0.001)
+        assertTrue(recap.endDateEpochMillis > recap.startDateEpochMillis)
+    }
+
+    @Test
+    fun `il piano finisce solo dopo l'ultima settimana`() {
+        val base = requireNotNull(FitnessPlanJson.decode(payload()))
+        val start = FitnessPlanDates.today()
+        val running = base.copy(startDateEpochMillis = start)
+        assertFalse(running.isFinished())
+
+        // Iniziato cinque settimane fa, con tutte le sedute alla loro data
+        // originale: l'ultima settimana è passata.
+        val shift = FitnessPlanDates.plusDays(start, -35) - base.startDateEpochMillis
+        val ended = base.copy(
+            startDateEpochMillis = base.startDateEpochMillis + shift,
+            weeks = base.weeks.map { week ->
+                week.copy(sessions = week.sessions.map { it.copy(dateEpochMillis = it.dateEpochMillis + shift) })
+            },
+        )
+        assertTrue(ended.isFinished())
+
+        // Una seduta ancora da fare spostata a domani tiene il piano aperto.
+        val movedId = ended.allSessions.first { !it.isRest }.id
+        val stillOpen = ended.updateSession(movedId) {
+            it.copy(status = FitnessSessionStatus.PLANNED, dateEpochMillis = FitnessPlanDates.plusDays(start, 1))
+        }
+        assertFalse(stillOpen.isFinished())
+    }
+
+    @Test
+    fun `due sedute sullo stesso giorno diventano una sola`() {
+        // Settembre 2026: l'AI aveva messo lunedì e mercoledì doppi nella
+        // settimana 4. Il doppione non si vedeva ma abbassava il report.
+        val raw = """
+            {"summary":"s","safetyNotes":[],"weeks":[
+              {"index":1,"focus":"f","sessions":[
+                {"dayOffset":0,"title":"Bici","activityType":"bici","durationMinutes":90},
+                {"dayOffset":0,"title":"Mobilità","activityType":"mobilità","durationMinutes":20},
+                {"dayOffset":2,"title":"Corsa","activityType":"corsa","durationMinutes":40}
+              ]}
+            ]}
+        """.trimIndent()
+        val plan = FitnessPlanParser.parsePlan(
+            raw = raw,
+            subjectName = "X",
+            input = FitnessPlanInput(),
+            startDateEpochMillis = FitnessPlanDates.today(),
+            messageUnitsConsumed = 15,
+        )
+        assertEquals(listOf("Bici", "Corsa"), plan.allSessions.map { it.title })
+    }
+
+    @Test
     fun `un documento senza data d'inizio viene scartato`() {
         // Scartarlo è la difesa che impedisce di sovrascrivere un piano locale
         // valido con uno illeggibile.

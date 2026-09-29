@@ -29,6 +29,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,6 +39,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,12 +69,17 @@ fun PlansScreen(
     val activity = context as? Activity
     val uriHandler = LocalUriHandler.current
     val contextualMessage = remember { UpgradeMessageStore.consume() }
+    // Letto una volta sola e tenuto per tutta la vita della schermata: serve
+    // anche all'acquisto, che arriva dopo il paywall_shown.
+    val triggerFeature = rememberSaveable { UpgradeMessageStore.consumeTrigger() }
+    // Annuale di default quando Play lo offre: è il piano che conviene di più.
+    var yearly by rememberSaveable { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
         viewModel.loadPlan()
         AppAnalytics.paywallShown(
             context,
-            triggerFeature = UpgradeMessageStore.consumeTrigger(),
+            triggerFeature = triggerFeature,
             planShown = "both",
         )
     }
@@ -156,6 +163,70 @@ fun PlansScreen(
                 }
             }
         }
+        val trialDaysLeft = state.trial.daysLeft()
+        val inTrial = trialDaysLeft != null && state.currentPlan == KBPlan.PRO
+        val trialNotice = when {
+            trialDaysLeft == 1 -> stringResource(R.string.trial_plans_notice_last_day)
+            trialDaysLeft != null -> stringResource(R.string.trial_plans_notice_days, trialDaysLeft)
+            state.trial.ended && state.currentPlan == KBPlan.FREE -> stringResource(R.string.trial_plans_notice_ended)
+            else -> null
+        }
+        if (trialNotice != null) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF2563EB).copy(alpha = 0.10f)),
+            ) {
+                Text(
+                    trialNotice,
+                    color = kb.title,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                )
+            }
+        }
+
+        // L'annuale si propone solo se Play lo ha davvero (prodotto pubblicato).
+        val hasYearly = state.availableProducts.any { it.productId == KBPlan.PRO.productIdYearly }
+        val showYearly = yearly && hasYearly
+        if (hasYearly) {
+            Spacer(modifier = Modifier.height(12.dp))
+            val saving = viewModel.yearlySavingPercent(KBPlan.PRO)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = !showYearly,
+                    onClick = { yearly = false },
+                    label = { Text(stringResource(R.string.plans_billing_monthly)) },
+                )
+                FilterChip(
+                    selected = showYearly,
+                    onClick = { yearly = true },
+                    label = {
+                        Text(
+                            if (saving != null) {
+                                stringResource(R.string.plans_billing_yearly_saving, saving)
+                            } else {
+                                stringResource(R.string.plans_billing_yearly)
+                            },
+                        )
+                    },
+                )
+            }
+        }
+        // Prezzo dallo store quando c'è (quello che l'utente paga davvero), se no il listino.
+        @Composable
+        fun priceFor(plan: KBPlan): String {
+            val store = viewModel.priceLabel(plan, showYearly)
+            return when {
+                store == null -> plan.monthlyPrice
+                showYearly -> stringResource(R.string.plans_price_per_year, store)
+                else -> stringResource(R.string.plans_price_per_month, store)
+            }
+        }
+        fun label(plan: KBPlan) = if (showYearly) "${plan.rawValue}_yearly" else plan.rawValue
+
         Spacer(modifier = Modifier.height(16.dp))
 
         PlanCard(
@@ -174,12 +245,16 @@ fun PlansScreen(
             // Il pulsante c'è anche per chi non ha creato la famiglia: nasconderlo
             // lasciava senza risposta la domanda "perché non posso abbonarmi?".
             // Al tocco arriva il motivo, non un acquisto che fallirebbe.
-            buttonLabel = if (state.currentPlan != KBPlan.PRO) stringResource(R.string.subscription_subscribe) else null,
+            // In prova il Pro è «attuale» ma nessuno lo paga: il pulsante resta.
+            buttonLabel = if (state.currentPlan != KBPlan.PRO || inTrial) stringResource(R.string.subscription_subscribe) else null,
+            priceLabel = priceFor(KBPlan.PRO),
+            statusLabel = if (inTrial) stringResource(R.string.trial_status_chip) else null,
             onButtonClick = {
                 if (!state.isFamilyOwner) {
+                    AppAnalytics.purchaseFailed(context, label(KBPlan.PRO), triggerFeature, reason = "not_owner")
                     mostraAvvisoCreatore = true
                 } else if (activity != null) {
-                    viewModel.purchase(KBPlan.PRO, activity)
+                    viewModel.purchase(KBPlan.PRO, activity, triggerFeature, yearly = showYearly)
                 }
             },
         )
@@ -190,11 +265,13 @@ fun PlansScreen(
             isCurrent = state.currentPlan == KBPlan.MAX,
             badgeColor = Color(0xFF7C3AED),
             buttonLabel = if (state.currentPlan != KBPlan.MAX) stringResource(R.string.subscription_subscribe) else null,
+            priceLabel = priceFor(KBPlan.MAX),
             onButtonClick = {
                 if (!state.isFamilyOwner) {
+                    AppAnalytics.purchaseFailed(context, label(KBPlan.MAX), triggerFeature, reason = "not_owner")
                     mostraAvvisoCreatore = true
                 } else if (activity != null) {
-                    viewModel.purchase(KBPlan.MAX, activity)
+                    viewModel.purchase(KBPlan.MAX, activity, triggerFeature, yearly = showYearly)
                 }
             },
         )
@@ -250,6 +327,9 @@ private fun PlanCard(
     badgeColor: Color,
     buttonLabel: String?,
     onButtonClick: (() -> Unit)?,
+    priceLabel: String = plan.monthlyPrice,
+    /** Etichetta di stato al posto della spunta, es. «In prova». */
+    statusLabel: String? = null,
 ) {
     val kb = MaterialTheme.kidBoxColors
     Card(
@@ -283,12 +363,20 @@ private fun PlanCard(
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                if (isCurrent) {
+                if (statusLabel != null) {
+                    Box(
+                        modifier = Modifier
+                            .background(badgeColor.copy(alpha = 0.18f), RoundedCornerShape(999.dp))
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    ) {
+                        Text(statusLabel, color = badgeColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                } else if (isCurrent) {
                     Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF22C55E))
                 }
             }
             Text(plan.displayName, color = kb.title, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
-            Text(plan.monthlyPrice, color = kb.subtitle, fontSize = 16.sp)
+            Text(priceLabel, color = kb.subtitle, fontSize = 16.sp)
             if (plan.tagline.isNotBlank()) {
                 Text(plan.tagline, color = kb.subtitle, fontSize = 12.sp)
             }

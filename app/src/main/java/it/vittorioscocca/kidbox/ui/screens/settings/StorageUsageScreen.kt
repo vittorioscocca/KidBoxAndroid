@@ -43,6 +43,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -57,6 +58,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -79,11 +81,14 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.components.KBBackButton
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 
 @Composable
 fun StorageUsageScreen(
     onBack: () -> Unit,
     onOpenPlans: () -> Unit = {},
+    /** Origine nel funnel: la schermata si apre da Impostazioni e dal Profilo. */
+    triggerFeature: String = "storage_settings",
     viewModel: StorageUsageViewModel = hiltViewModel(),
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -92,9 +97,17 @@ fun StorageUsageScreen(
     val activity = context as? Activity
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // Annuale di default quando Play lo offre, come nella schermata Piani.
+    var yearly by rememberSaveable { mutableStateOf(true) }
+    val showYearly = yearly && state.hasYearly
+    fun label(plan: KBPlan) = if (showYearly) "${plan.rawValue}_yearly" else plan.rawValue
+
     LaunchedEffect(Unit) {
         viewModel.load()
         viewModel.warmBilling()
+        // Il carosello dei piani È un paywall: senza questo evento chi arrivava
+        // qui non entrava nel funnel d'acquisto.
+        AppAnalytics.paywallShown(context, triggerFeature = triggerFeature, planShown = "carousel")
     }
 
     state.restoreDialogError?.let { err ->
@@ -219,6 +232,32 @@ fun StorageUsageScreen(
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
         )
+        if (state.hasYearly) {
+            val saving = viewModel.yearlySavingPercent(KBPlan.PRO)
+            Row(
+                modifier = Modifier.padding(bottom = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilterChip(
+                    selected = !showYearly,
+                    onClick = { yearly = false },
+                    label = { Text(stringResource(R.string.plans_billing_monthly)) },
+                )
+                FilterChip(
+                    selected = showYearly,
+                    onClick = { yearly = true },
+                    label = {
+                        Text(
+                            if (saving != null) {
+                                stringResource(R.string.plans_billing_yearly_saving, saving)
+                            } else {
+                                stringResource(R.string.plans_billing_yearly)
+                            },
+                        )
+                    },
+                )
+            }
+        }
         // Carosello: le card di listino sono alte (fino a nove voci su Pro) e
         // affiancate si confrontano a colpo d'occhio, invece di allungare la
         // pagina per tre schermate.
@@ -233,14 +272,22 @@ fun StorageUsageScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             KBPlan.entries.sortedBy { it.spec.order }.forEach { plan ->
+                val store = viewModel.priceLabel(plan, showYearly)
                 PlanCard(
                     plan = plan,
                     current = state.plan,
+                    isTrial = plan == state.plan && state.trial.daysLeft() != null,
+                    priceLabel = when {
+                        plan == KBPlan.FREE || store == null -> null
+                        showYearly -> stringResource(R.string.plans_price_per_year, store)
+                        else -> stringResource(R.string.plans_price_per_month, store)
+                    },
                     onPurchasePlan = {
                         if (!state.isFamilyOwner) {
+                            AppAnalytics.purchaseFailed(context, label(plan), triggerFeature, reason = "not_owner")
                             mostraAvvisoCreatore = true
                         } else if (activity != null) {
-                            viewModel.purchase(plan, activity)
+                            viewModel.purchase(plan, activity, triggerFeature, yearly = showYearly)
                         }
                     },
                 )
@@ -463,10 +510,14 @@ private fun PlanCard(
     plan: KBPlan,
     current: KBPlan,
     onPurchasePlan: () -> Unit,
+    /** Il piano attuale è in prova: resta acquistabile. */
+    isTrial: Boolean = false,
+    /** Prezzo dello store (mensile o annuale); null = prezzo di listino. */
+    priceLabel: String? = null,
 ) {
     val kb = MaterialTheme.kidBoxColors
     val isCurrent = plan == current
-    val canPurchase = plan != KBPlan.FREE && !isCurrent
+    val canPurchase = plan != KBPlan.FREE && (!isCurrent || isTrial)
     val accento = when (plan) {
         KBPlan.FREE -> kb.subtitle
         KBPlan.PRO -> Color(0xFF4F8FDB)
@@ -489,7 +540,11 @@ private fun PlanCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(plan.displayName, color = kb.title, fontWeight = FontWeight.Bold, fontSize = 22.sp)
                 Spacer(Modifier.size(8.dp))
-                val etichetta = if (isCurrent) stringResource(R.string.settings_storage_current_plan) else plan.badge
+                val etichetta = when {
+                    isTrial -> stringResource(R.string.trial_status_chip)
+                    isCurrent -> stringResource(R.string.settings_storage_current_plan)
+                    else -> plan.badge
+                }
                 if (etichetta.isNotBlank()) {
                     Box(
                         modifier = Modifier
@@ -506,7 +561,7 @@ private fun PlanCard(
             Text(
                 // Prezzo dal catalogo `config/plans`, non da una stringa a mano:
                 // vedi KBPlanCatalog e internal/plans-source-of-truth.md.
-                if (plan == KBPlan.FREE) stringResource(R.string.settings_storage_free) else plan.monthlyPrice,
+                if (plan == KBPlan.FREE) stringResource(R.string.settings_storage_free) else priceLabel ?: plan.monthlyPrice,
                 color = if (plan == KBPlan.FREE) kb.subtitle else accento,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,

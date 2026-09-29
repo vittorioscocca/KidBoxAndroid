@@ -208,10 +208,53 @@ object AppAnalytics {
         }
     }
 
-    fun subscriptionStarted(context: Context, plan: String, trial: Boolean) {
+    // Funnel d'acquisto: paywall_shown → purchase_started → subscription_started,
+    // con le due uscite purchase_cancelled / purchase_failed. Tutti portano
+    // `trigger_feature`, così ogni passo si lega alla schermata che ha aperto
+    // il paywall. Stessi nomi e valori su iOS.
+
+    fun subscriptionStarted(context: Context, plan: String, trial: Boolean, triggerFeature: String) {
         log(context, "subscription_started") {
             putString("plan", plan)
             putBoolean("trial", trial)
+            putString("trigger_feature", triggerFeature)
+        }
+    }
+
+    /** Tocco su «Abbonati» da chi può abbonarsi: parte il foglio di Play. */
+    fun purchaseStarted(context: Context, plan: String, triggerFeature: String) {
+        log(context, "purchase_started") {
+            putString("plan", plan)
+            putString("trigger_feature", triggerFeature)
+        }
+    }
+
+    /** Foglio di Play chiuso senza pagare. */
+    fun purchaseCancelled(context: Context, plan: String, triggerFeature: String) {
+        log(context, "purchase_cancelled") {
+            putString("plan", plan)
+            putString("trigger_feature", triggerFeature)
+        }
+    }
+
+    /**
+     * Acquisto non concluso per un motivo diverso dalla rinuncia. `reason`:
+     * not_owner, product_unavailable, no_offer, launch_error, billing_error,
+     * pending, server_error. Per billing_error/launch_error `responseCode` è
+     * il codice di Play.
+     */
+    fun purchaseFailed(
+        context: Context,
+        plan: String,
+        triggerFeature: String,
+        reason: String,
+        responseCode: Int? = null,
+    ) {
+        log(context, "purchase_failed") {
+            putString("plan", plan)
+            putString("trigger_feature", triggerFeature)
+            putString("reason", reason)
+            responseCode?.let { putInt("response_code", it) }
         }
     }
 

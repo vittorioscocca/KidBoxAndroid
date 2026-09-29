@@ -26,6 +26,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.domain.family.isFamilySubscriptionManager
 import it.vittorioscocca.kidbox.domain.family.resolveActiveFamilyId
+import it.vittorioscocca.kidbox.data.repository.KBTrialState
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import javax.inject.Inject
@@ -79,6 +80,10 @@ class KBBillingManager @Inject constructor(
     private val _isFamilyOwner = MutableStateFlow(false)
     val isFamilyOwner: StateFlow<Boolean> = _isFamilyOwner.asStateFlow()
 
+    /** Prova Pro della famiglia attiva (concessa dal server, vedi functions/proTrial.js). */
+    private val _trialState = MutableStateFlow(KBTrialState())
+    val trialState: StateFlow<KBTrialState> = _trialState.asStateFlow()
+
     private val _products = MutableStateFlow<List<ProductDetails>>(emptyList())
     val products: StateFlow<List<ProductDetails>> = _products.asStateFlow()
 
@@ -86,6 +91,44 @@ class KBBillingManager @Inject constructor(
     private var currentUid: String = ""
     private var retryCount = 0
     private val trialOfferByProductId = mutableMapOf<String, Boolean>()
+
+    /**
+     * Acquisto avviato e non ancora concluso: l'esito arriva più tardi in
+     * [handlePurchasesUpdated], e senza questo non sapremmo più per quale piano
+     * né da quale schermata era partito (funnel d'acquisto in GA4).
+     */
+    @Volatile private var pendingPurchase: PendingPurchase? = null
+
+    private data class PendingPurchase(val plan: KBPlan, val label: String, val trigger: String)
+
+    /**
+     * Offerta da comprare: quella con la prova gratuita se Play la propone
+     * (Play elenca solo le offerte a cui l'utente ha diritto), altrimenti il
+     * piano base. Prima si prendeva la prima della lista, che con più offerte
+     * sullo stesso prodotto era una scelta a caso.
+     */
+    private fun preferredOffer(product: ProductDetails): ProductDetails.SubscriptionOfferDetails? {
+        val offers = product.subscriptionOfferDetails.orEmpty()
+        return offers.firstOrNull { o -> o.pricingPhases.pricingPhaseList.any { it.priceAmountMicros == 0L } }
+            ?: offers.firstOrNull { it.offerId == null }
+            ?: offers.firstOrNull()
+    }
+
+    /** Prezzo di listino dello store (es. «39,99 €»), dal piano base del prodotto. */
+    fun basePriceLabel(productId: String?): String? {
+        val product = _products.value.firstOrNull { it.productId == productId } ?: return null
+        val base = product.subscriptionOfferDetails.orEmpty().firstOrNull { it.offerId == null }
+            ?: product.subscriptionOfferDetails?.firstOrNull()
+        return base?.pricingPhases?.pricingPhaseList?.lastOrNull()?.formattedPrice
+    }
+
+    /** Micro-unità del prezzo base, per calcolare il risparmio dell'annuale. */
+    fun basePriceMicros(productId: String?): Long? {
+        val product = _products.value.firstOrNull { it.productId == productId } ?: return null
+        val base = product.subscriptionOfferDetails.orEmpty().firstOrNull { it.offerId == null }
+            ?: product.subscriptionOfferDetails?.firstOrNull()
+        return base?.pricingPhases?.pricingPhaseList?.lastOrNull()?.priceAmountMicros
+    }
 
     /** Completamento opzionale per schermate che devono attendere [onQueryPurchasesResponse]. */
     private val restoreAwaitLock = Any()
@@ -128,27 +171,37 @@ class KBBillingManager @Inject constructor(
                 currentUid,
             )
             _currentPlan.value = subscriptionRepository.loadPlan(currentFamilyId, currentUid)
+            _trialState.value = subscriptionRepository.loadTrialState(currentFamilyId)
             connectBillingClient()
             _isLoading.value = false
         }
     }
 
-    fun purchase(plan: KBPlan, activity: Activity) {
-        val productId = plan.productId ?: return
+    /**
+     * @param triggerFeature la schermata che ha aperto il paywall (funnel d'acquisto).
+     * @param yearly abbonamento annuale invece del mensile.
+     */
+    fun purchase(plan: KBPlan, activity: Activity, triggerFeature: String = "unknown", yearly: Boolean = false) {
+        val productId = (if (yearly) plan.productIdYearly else plan.productId) ?: return
+        // Nel funnel l'annuale si distingue dal mensile: "pro" / "pro_yearly".
+        val planLabel = if (yearly) "${plan.rawValue}_yearly" else plan.rawValue
+        if (!_isFamilyOwner.value) {
+            _purchaseError.value = "Solo il proprietario famiglia può gestire l'abbonamento."
+            AppAnalytics.purchaseFailed(context, planLabel, triggerFeature, reason = "not_owner")
+            return
+        }
+        AppAnalytics.purchaseStarted(context, planLabel, triggerFeature)
         val product = _products.value.firstOrNull { it.productId == productId }
         if (product == null) {
             _purchaseError.value = "Prodotto non disponibile sullo store."
+            AppAnalytics.purchaseFailed(context, planLabel, triggerFeature, reason = "product_unavailable")
             return
         }
-        if (!_isFamilyOwner.value) {
-            _purchaseError.value = "Solo il proprietario famiglia può gestire l'abbonamento."
-            return
-        }
-        val offers: List<ProductDetails.SubscriptionOfferDetails>? = product.subscriptionOfferDetails
-        val firstOffer: ProductDetails.SubscriptionOfferDetails? = offers?.firstOrNull()
+        val firstOffer: ProductDetails.SubscriptionOfferDetails? = preferredOffer(product)
         val offerToken: String? = firstOffer?.offerToken
-        if (offerToken.isNullOrBlank()) {
+        if (firstOffer == null || offerToken.isNullOrBlank()) {
             _purchaseError.value = "Offerta non disponibile per questo piano."
+            AppAnalytics.purchaseFailed(context, planLabel, triggerFeature, reason = "no_offer")
             return
         }
         val hasTrial = firstOffer.pricingPhases.pricingPhaseList.any { it.priceAmountMicros == 0L }
@@ -160,9 +213,15 @@ class KBBillingManager @Inject constructor(
         val flowParams: BillingFlowParams = BillingFlowParams.newBuilder()
             .setProductDetailsParamsList(listOf(params))
             .build()
+        pendingPurchase = PendingPurchase(plan, planLabel, triggerFeature)
         val result: BillingResult = billingClient.launchBillingFlow(activity, flowParams)
         if (result.responseCode != BillingClient.BillingResponseCode.OK) {
+            pendingPurchase = null
             _purchaseError.value = result.debugMessage.ifBlank { "Impossibile avviare acquisto." }
+            AppAnalytics.purchaseFailed(
+                context, planLabel, triggerFeature,
+                reason = "launch_error", responseCode = result.responseCode,
+            )
         }
     }
 
@@ -257,20 +316,16 @@ class KBBillingManager @Inject constructor(
     }
 
     private fun queryProducts() {
-        val proId: String = KBPlan.PRO.productId ?: return
-        val maxId: String = KBPlan.MAX.productId ?: return
-
-        val proProduct: QueryProductDetailsParams.Product =
-            QueryProductDetailsParams.Product.newBuilder()
-                .setProductId(proId)
-                .setProductType(BillingClient.ProductType.SUBS)
-                .build()
-        val maxProduct: QueryProductDetailsParams.Product =
-            QueryProductDetailsParams.Product.newBuilder()
-                .setProductId(maxId)
-                .setProductType(BillingClient.ProductType.SUBS)
-                .build()
-        val productsQuery: List<QueryProductDetailsParams.Product> = listOf(proProduct, maxProduct)
+        // Mensili e annuali: un annuale non ancora creato su Play finisce in
+        // `unfetchedProductList` e il paywall non propone la scelta.
+        val productsQuery: List<QueryProductDetailsParams.Product> =
+            listOf(KBPlan.PRO, KBPlan.MAX).flatMap { it.allProductIds }.map { id ->
+                QueryProductDetailsParams.Product.newBuilder()
+                    .setProductId(id)
+                    .setProductType(BillingClient.ProductType.SUBS)
+                    .build()
+            }
+        if (productsQuery.isEmpty()) return
         val params: QueryProductDetailsParams =
             QueryProductDetailsParams.newBuilder()
                 .setProductList(productsQuery)
@@ -309,19 +364,40 @@ class KBBillingManager @Inject constructor(
     }
 
     private fun handlePurchasesUpdated(result: BillingResult, purchases: List<Purchase>?) {
+        // Gli aggiornamenti arrivano anche senza un acquisto avviato da qui
+        // (rinnovi, acquisti in sospeso che si sbloccano): allora niente funnel.
+        val started = pendingPurchase
+        pendingPurchase = null
         if (result.responseCode == BillingClient.BillingResponseCode.USER_CANCELED) {
             _isLoading.value = false
+            started?.let { AppAnalytics.purchaseCancelled(context, it.label, it.trigger) }
             return
         }
         if (result.responseCode != BillingClient.BillingResponseCode.OK || purchases.isNullOrEmpty()) {
             _isLoading.value = false
             _purchaseError.value = result.debugMessage.ifBlank { "Acquisto non riuscito." }
+            started?.let {
+                AppAnalytics.purchaseFailed(
+                    context, it.label, it.trigger,
+                    reason = "billing_error", responseCode = result.responseCode,
+                )
+            }
             return
+        }
+        started?.let {
+            if (purchases.any { p -> p.purchaseState == Purchase.PurchaseState.PENDING }) {
+                AppAnalytics.purchaseFailed(context, it.label, it.trigger, reason = "pending")
+            }
         }
         scope.launch {
             _isLoading.value = true
             for (purchase: Purchase in purchases) {
-                processPurchase(purchase, isNewPurchase = true)
+                processPurchase(
+                    purchase,
+                    isNewPurchase = true,
+                    triggerFeature = started?.trigger ?: "unknown",
+                    planLabel = started?.label,
+                )
             }
             _isLoading.value = false
         }
@@ -343,7 +419,12 @@ class KBBillingManager @Inject constructor(
         }
     }
 
-    private suspend fun processPurchase(purchase: Purchase, isNewPurchase: Boolean) {
+    private suspend fun processPurchase(
+        purchase: Purchase,
+        isNewPurchase: Boolean,
+        triggerFeature: String = "unknown",
+        planLabel: String? = null,
+    ) {
         if (purchase.purchaseState != Purchase.PurchaseState.PURCHASED) return
         val detectedPlan = mapPurchaseToPlan(purchase) ?: return
         val token = purchase.purchaseToken
@@ -356,11 +437,19 @@ class KBBillingManager @Inject constructor(
         )
         if (updateResult.isFailure) {
             _purchaseError.value = updateResult.exceptionOrNull()?.localizedMessage ?: "Errore aggiornamento piano."
+            if (isNewPurchase) {
+                AppAnalytics.purchaseFailed(context, planLabel ?: detectedPlan.rawValue, triggerFeature, reason = "server_error")
+            }
             return
         }
         if (isNewPurchase && !purchase.isAcknowledged) {
             val hasTrialOffer = purchase.products.firstOrNull()?.let { trialOfferByProductId[it] } ?: false
-            AppAnalytics.subscriptionStarted(context, plan = detectedPlan.rawValue, trial = hasTrialOffer)
+            AppAnalytics.subscriptionStarted(
+                context,
+                plan = planLabel ?: detectedPlan.rawValue,
+                trial = hasTrialOffer,
+                triggerFeature = triggerFeature,
+            )
         }
         if (!purchase.isAcknowledged) {
             val ackParams: AcknowledgePurchaseParams = AcknowledgePurchaseParams.newBuilder()
@@ -378,15 +467,13 @@ class KBBillingManager @Inject constructor(
             )
         }
         _currentPlan.value = subscriptionRepository.loadPlan(currentFamilyId, currentUid)
+        // Un acquisto durante la prova la chiude: il banner e il riquadro spariscono.
+        _trialState.value = subscriptionRepository.loadTrialState(currentFamilyId)
     }
 
     private fun mapPurchaseToPlan(purchase: Purchase): KBPlan? {
-        val productId = purchase.products.firstOrNull() ?: return null
-        return when (productId) {
-            KBPlan.PRO.productId -> KBPlan.PRO
-            KBPlan.MAX.productId -> KBPlan.MAX
-            else -> null
-        }
+        // Mensile o annuale: stesso piano.
+        return KBPlan.fromProductId(purchase.products.firstOrNull())
     }
 
 }

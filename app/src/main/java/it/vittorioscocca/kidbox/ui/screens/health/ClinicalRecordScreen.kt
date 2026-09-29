@@ -320,10 +320,14 @@ private fun AiUsageBanner(usage: ClinicalRecordAIUsageInfo, kb: KidBoxColorSchem
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = CLINICAL_TINT, modifier = Modifier.size(18.dp))
                 // Sul Free il contatore è il bonus a vita, non si azzera: «oggi» sarebbe falso.
-                val summary = if (usage.period == AIQuotaPeriod.LIFETIME) {
-                    stringResource(R.string.health_ai_usage_summary_lifetime, usage.messageUnitsConsumed, usage.usageToday, usage.dailyLimit)
-                } else {
-                    stringResource(R.string.health_ai_usage_summary, usage.messageUnitsConsumed, usage.usageToday, usage.dailyLimit)
+                val summary = when (usage.period) {
+                    AIQuotaPeriod.LIFETIME ->
+                        stringResource(R.string.health_ai_usage_summary_lifetime, usage.messageUnitsConsumed, usage.usageToday, usage.dailyLimit)
+                    // Anche la prova è un totale, non un contatore di giornata.
+                    AIQuotaPeriod.TRIAL ->
+                        stringResource(R.string.trial_health_ai_usage_summary, usage.messageUnitsConsumed, usage.usageToday, usage.dailyLimit)
+                    AIQuotaPeriod.DAILY ->
+                        stringResource(R.string.health_ai_usage_summary, usage.messageUnitsConsumed, usage.usageToday, usage.dailyLimit)
                 }
                 Text(summary, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = kb.title)
             }

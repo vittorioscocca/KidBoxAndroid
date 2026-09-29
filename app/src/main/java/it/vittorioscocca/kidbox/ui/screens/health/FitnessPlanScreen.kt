@@ -91,6 +91,14 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import java.text.DateFormatSymbols
 import java.util.Calendar
 import java.util.Locale
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Contrast
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
+import java.text.DateFormat
+import java.util.Date
+import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanRecap
+import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanPromptBuilder
 
 /** Tinta del modulo Piano Fitness (stessa della card in Salute). */
 internal val FITNESS_TINT = Color(0xFF5A9EE0)
@@ -227,8 +235,16 @@ fun FitnessPlanScreen(
                         DataSourcesCard(state)
                         LockedCard(onUpgrade)
                     } else if (plan != null) {
-                        state.weeklyReport?.let { report ->
-                            WeeklyReportCard(state, report, viewModel)
+                        val recap = state.planRecap
+                        if (recap != null) {
+                            PlanRecapCard(plan, recap, state.estimatedUnits, enabled = !state.isGenerating) {
+                                setupMode = FitnessSetupMode.CONTINUATION
+                                showSetup = true
+                            }
+                        } else {
+                            state.weeklyReport?.let { report ->
+                                WeeklyReportCard(state, report, viewModel)
+                            }
                         }
                         CalendarCard(state, viewModel) { showSessions = true }
                         DayDetailCard(state, viewModel) { sessionToMove = it }
@@ -538,7 +554,7 @@ private fun CalendarCard(
         MonthGrid(state, viewModel)
 
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             listOf(
                 FitnessSessionStatus.DONE,
                 FitnessSessionStatus.PLANNED,
@@ -554,6 +570,17 @@ private fun CalendarCard(
                     Spacer(Modifier.width(4.dp))
                     Text(stringResource(status.labelRes), fontSize = 12.sp, color = kb.subtitle)
                 }
+            }
+            // Giorni con più sedute in stati diversi (vedi DayCell).
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Contrast,
+                    contentDescription = null,
+                    tint = statusColor(FitnessSessionStatus.MOVED, kb.subtitle),
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(stringResource(R.string.fitness_status_partial), fontSize = 12.sp, color = kb.subtitle)
             }
         }
 
@@ -671,7 +698,12 @@ private fun DayCell(
         FitnessPlanDates.startOfDay(state.selectedDayEpochMillis)
     val isToday = FitnessPlanDates.startOfDay(dayEpochMillis) == FitnessPlanDates.today()
     val inPlan = plan.weekIndexFor(dayEpochMillis) != null
-    val status = sessions.firstOrNull()?.status
+    // Stato calcolato su tutte le sedute del giorno: con la sola prima, un
+    // doppione ancora da fare restava nascosto dietro una spunta verde mentre
+    // il report lo contava come mancato. Parity con `dayMarker` su iOS.
+    val statuses = (sessions.filterNot { it.isRest }.ifEmpty { sessions }).map { it.status }.toSet()
+    val status = statuses.singleOrNull()
+    val isMixed = statuses.size > 1
     val dayNumber = Calendar.getInstance().apply { timeInMillis = dayEpochMillis }
         .get(Calendar.DAY_OF_MONTH)
 
@@ -706,7 +738,14 @@ private fun DayCell(
             },
         )
         Spacer(Modifier.height(2.dp))
-        if (status != null) {
+        if (isMixed) {
+            Icon(
+                Icons.Default.Contrast,
+                contentDescription = null,
+                tint = if (isSelected) Color.White else statusColor(FitnessSessionStatus.MOVED, kb.subtitle),
+                modifier = Modifier.size(14.dp),
+            )
+        } else if (status != null) {
             Icon(
                 statusIcon(status),
                 contentDescription = null,
@@ -874,6 +913,10 @@ private fun SessionCard(
             onSave = { status, title, minutes, kcal ->
                 showEditor = false
                 viewModel.applyManualEdit(session.id, status, title, minutes, kcal)
+            },
+            onDelete = {
+                showEditor = false
+                viewModel.deleteSession(session.id)
             },
         )
     }
@@ -1093,8 +1136,29 @@ private fun SessionEditDialog(
     session: FitnessSession,
     onDismiss: () -> Unit,
     onSave: (FitnessSessionStatus, String?, Int?, Int?) -> Unit,
+    onDelete: () -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
+    var confirmDelete by remember { mutableStateOf(false) }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(stringResource(R.string.fitness_delete_session_confirm_title)) },
+            text = { Text(stringResource(R.string.fitness_delete_session_hint)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    onDelete()
+                }) { Text(stringResource(R.string.fitness_delete_session), color = Color(0xFFD32F2F)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) {
+                    Text(stringResource(R.string.meal_plan_delete_cancel))
+                }
+            },
+        )
+        return
+    }
     var status by remember { mutableStateOf(session.status) }
     var activityTitle by remember { mutableStateOf(session.actualActivityTitle.orEmpty()) }
     var minutes by remember { mutableStateOf(session.actualMinutes?.toString().orEmpty()) }
@@ -1157,6 +1221,16 @@ private fun SessionEditDialog(
                         fontSize = 12.sp,
                         color = kb.subtitle,
                     )
+                }
+                // Prima l'unico modo di togliere una seduta era chiederlo al
+                // copilota: un doppione messo dall'AI restava nel calendario e
+                // abbassava la percentuale della settimana senza rimedio.
+                Spacer(Modifier.height(12.dp))
+                TextButton(
+                    onClick = { confirmDelete = true },
+                    contentPadding = PaddingValues(0.dp),
+                ) {
+                    Text(stringResource(R.string.fitness_delete_session), color = Color(0xFFD32F2F))
                 }
             }
         },
@@ -1336,6 +1410,165 @@ private fun WeeklyReportCard(
             }
             Spacer(Modifier.height(6.dp))
             Text(stringResource(R.string.fitness_adjust_cost), fontSize = 12.sp, color = kb.subtitle)
+        }
+    }
+}
+
+// ── Consuntivo del piano ───────────────────────────────────────────────────
+
+/**
+ * Report di fine piano: prende il posto del report dell'ultima settimana, che
+ * proponeva un «adeguamento» per una settimana che non esiste, e accompagna
+ * al mese successivo. Parity con `planRecapCard` su iOS.
+ */
+@Composable
+private fun PlanRecapCard(
+    plan: FitnessPlanDocument,
+    recap: FitnessPlanRecap,
+    estimatedUnits: Int,
+    enabled: Boolean,
+    onContinue: () -> Unit,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    val dateFormat = remember { DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.getDefault()) }
+    FitnessCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Flag, contentDescription = null, tint = FITNESS_TINT)
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.fitness_recap_title, plan.cycleNumber),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = kb.title,
+                )
+                Text(
+                    stringResource(
+                        R.string.fitness_recap_range,
+                        dateFormat.format(Date(recap.startDateEpochMillis)),
+                        dateFormat.format(Date(recap.endDateEpochMillis)),
+                    ),
+                    fontSize = 12.sp,
+                    color = kb.subtitle,
+                )
+            }
+            Text(
+                "${recap.completionPercent}%",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = FITNESS_TINT,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        LinearProgressIndicator(
+            progress = { recap.completionRate },
+            color = FITNESS_TINT,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            stringResource(recap.headlineRes, recap.completionPercent),
+            fontSize = 15.sp,
+            color = kb.title,
+        )
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            ReportMetric(
+                stringResource(R.string.fitness_report_completed),
+                "${recap.completedSessions}/${recap.plannedSessions}",
+            )
+            ReportMetric(stringResource(R.string.fitness_report_minutes), "${recap.totalMinutes}")
+            // Zero è un risultato, non un motivo per nascondere la metrica.
+            ReportMetric(
+                stringResource(R.string.fitness_sessions_distance),
+                FitnessDistanceFormatter.kilometers(recap.totalDistanceMeters) ?: "—",
+            )
+            ReportMetric(stringResource(R.string.fitness_report_kcal), "${recap.totalKcal}")
+        }
+
+        if (recap.weeklyCompletionPercents.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            WeeklyTrend(recap.weeklyCompletionPercents)
+        }
+
+        val notes = buildList {
+            if (recap.substitutedSessions > 0) {
+                add(stringResource(R.string.fitness_recap_substituted, recap.substitutedSessions))
+            }
+            if (recap.extraWorkouts > 0) {
+                add(stringResource(R.string.fitness_recap_extra, recap.extraWorkouts))
+            }
+            if (recap.chronicallySkippedWeekdays.isNotEmpty()) {
+                add(
+                    stringResource(
+                        R.string.fitness_recap_skipped_days,
+                        FitnessPlanPromptBuilder.weekdayNames(recap.chronicallySkippedWeekdays),
+                    ),
+                )
+            }
+        }
+        if (notes.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            notes.forEach { Text("• $it", fontSize = 13.sp, color = kb.subtitle) }
+        }
+
+        Spacer(Modifier.height(12.dp))
+        HorizontalDivider(color = kb.subtitle.copy(alpha = 0.15f))
+        Spacer(Modifier.height(10.dp))
+        Text(stringResource(R.string.fitness_recap_next_hint), fontSize = 13.sp, color = kb.subtitle)
+        Spacer(Modifier.height(10.dp))
+        Button(
+            onClick = onContinue,
+            enabled = enabled,
+            colors = ButtonDefaults.buttonColors(containerColor = FITNESS_TINT),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.fitness_recap_next_cta))
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(stringResource(R.string.fitness_cost, estimatedUnits), fontSize = 12.sp, color = kb.subtitle)
+    }
+}
+
+/**
+ * Completamento settimana per settimana: dice se il mese è calato alla fine o
+ * è partito piano, cosa che la percentuale totale nasconde.
+ */
+@Composable
+private fun WeeklyTrend(percents: List<Int>) {
+    val kb = MaterialTheme.kidBoxColors
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        percents.forEachIndexed { index, percent ->
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("$percent%", fontSize = 11.sp, color = kb.subtitle)
+                Spacer(Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(FITNESS_TINT.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight(percent.coerceIn(0, 100) / 100f)
+                            .background(FITNESS_TINT),
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(stringResource(R.string.fitness_recap_week_short, index + 1), fontSize = 11.sp, color = kb.subtitle)
+            }
         }
     }
 }

@@ -82,10 +82,51 @@ class FitnessPlanReminderScheduler @Inject constructor(
             )
         }
 
+        val planEndArmed = armPlanEnd(childId, familyId, plan, now)
+
+        val entries = scheduled.map { it.first.id }.toMutableSet()
+        if (planEndArmed) entries += HealthReminderReceiver.FITNESS_PLAN_END_ID
         prefs.edit()
-            .putStringSet(entriesKey(childId), scheduled.map { it.first.id }.toSet())
+            .putStringSet(entriesKey(childId), entries)
             .apply()
-        KBLog.app.info("armati ${scheduled.size} promemoria childId=$childId", TAG)
+        KBLog.app.info("armati ${scheduled.size} promemoria childId=$childId fine=$planEndArmed", TAG)
+    }
+
+    /**
+     * Il giorno dopo la fine del piano, all'ora dei promemoria: senza, il piano
+     * finiva in silenzio e l'ultima cosa vista era il report di una settimana.
+     * Viaggia come una seduta con id fittizio, così il ripristino al reboot e
+     * il deep link alla dashboard sono quelli di sempre. Parity con iOS.
+     */
+    private fun armPlanEnd(childId: String, familyId: String, plan: FitnessPlanDocument, now: Long): Boolean {
+        val endId = HealthReminderReceiver.FITNESS_PLAN_END_ID
+        val fireAt = fireTime(
+            FitnessPlanDates.plusDays(plan.lastDayEpochMillis, 1),
+            plan.input.reminderHour,
+            plan.input.reminderMinute,
+        )
+        if (fireAt <= now) return false
+        alarmRegistry.arm(
+            ReminderAlarmRegistry.AlarmSpec(
+                key = ReminderAlarmRegistry.fitnessSessionKey(childId, endId),
+                target = ReminderAlarmRegistry.Target.HEALTH,
+                requestCode = requestCode(childId, endId),
+                fireAtMillis = fireAt,
+                action = action(childId, endId),
+                stringExtras = buildMap<String, String> {
+                    put(HealthReminderReceiver.EXTRA_TYPE, HealthReminderReceiver.TYPE_FITNESS_SESSION)
+                    put(HealthReminderReceiver.EXTRA_CHILD_ID, childId)
+                    put(HealthReminderReceiver.EXTRA_FAMILY_ID, familyId)
+                    put(HealthReminderReceiver.EXTRA_FITNESS_SESSION_ID, endId)
+                    KBNotificationText.put(
+                        this,
+                        titleKey = "fitness_plan_end_title",
+                        bodyKey = "fitness_plan_end_body",
+                    )
+                },
+            ),
+        )
+        return true
     }
 
     fun cancelAll(childId: String) {

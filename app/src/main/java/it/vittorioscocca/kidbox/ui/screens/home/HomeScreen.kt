@@ -52,6 +52,7 @@ import androidx.compose.material.icons.filled.LocalGroceryStore
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Lock
 import it.vittorioscocca.kidbox.ai.AskAiButton
+import it.vittorioscocca.kidbox.ai.UpgradeMessageStore
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Place
@@ -334,6 +335,14 @@ fun HomeScreen(
                 }
 
                 Spacer(modifier = Modifier.size(16.dp))
+
+                state.trialDaysLeft?.let { days ->
+                    ProTrialBanner(daysLeft = days) {
+                        UpgradeMessageStore.set(null, triggerFeature = "trial_banner")
+                        onNavigate(AppDestination.Plans.route)
+                    }
+                    Spacer(modifier = Modifier.size(16.dp))
+                }
 
                 // Sopra le sezioni, non in fondo: il senso della checklist è farsi
                 // vedere da chi apre la Home e non sa da dove partire.

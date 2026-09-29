@@ -40,6 +40,11 @@ object FitnessPlanGenerator {
         val startDateEpochMillis: Long,
         val hasWeight: Boolean,
         val hasHeight: Boolean,
+        /**
+         * Storia da portare nel piano nuovo: i consuntivi dei mesi già chiusi
+         * più quello del piano appena concluso. Vuota per un primo piano.
+         */
+        val previousCycles: List<FitnessPlanRecap> = emptyList(),
     )
 
     fun buildPayload(
@@ -51,6 +56,7 @@ object FitnessPlanGenerator {
         treatments: List<KBTreatmentEntity>,
         visits: List<KBMedicalVisitEntity>,
         exams: List<KBMedicalExamEntity>,
+        previousPlan: FitnessPlanDocument? = null,
         startDateEpochMillis: Long = FitnessPlanPromptBuilder.planStartDate(),
     ): Payload {
         val healthContext = ClinicalRecordHealthContextBuilder.buildClinicalPrompt(
@@ -83,12 +89,16 @@ object FitnessPlanGenerator {
                 ),
                 profileSummary = profileSummary,
                 healthContext = healthContext,
+                previousPlan = previousPlan,
             ),
             profileSummary = profileSummary,
             healthContext = healthContext,
             startDateEpochMillis = startDateEpochMillis,
             hasWeight = snapshot?.weightKg != null || input.manualWeightValue != null,
             hasHeight = snapshot?.heightCm != null || input.manualHeightValue != null,
+            previousCycles = previousPlan
+                ?.let { it.previousCycles + FitnessWeeklyReportBuilder.recap(it) }
+                .orEmpty(),
         )
     }
 
@@ -140,7 +150,7 @@ object FitnessPlanGenerator {
             input = input,
             startDateEpochMillis = payload.startDateEpochMillis,
             messageUnitsConsumed = reply.messageUnitsConsumed,
-        )
+        ).copy(previousCycles = payload.previousCycles)
         KBLog.ai.info(
             "done weeks=${document.weeks.size} sessions=${document.allSessions.size}",
             TAG,

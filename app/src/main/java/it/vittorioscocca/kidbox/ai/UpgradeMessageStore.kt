@@ -9,6 +9,15 @@ object UpgradeMessageStore {
         this.triggerFeature = triggerFeature
     }
 
+    /**
+     * Imposta l'origine solo se nessuno l'ha già fatto: la Home manda al paywall
+     * sia dal suggerimento generico («home_upsell») sia dal banner della prova,
+     * e il secondo va distinto nel funnel.
+     */
+    fun setTriggerIfUnset(triggerFeature: String) {
+        if (this.triggerFeature == null) this.triggerFeature = triggerFeature
+    }
+
     fun consume(): String? = message.also { message = null }
     fun consumeTrigger(): String = (triggerFeature ?: "unknown").also { triggerFeature = null }
 }

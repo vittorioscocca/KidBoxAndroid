@@ -69,6 +69,12 @@ class SubscriptionRepositoryImpl @Inject constructor(
                 } else {
                     KBPlan.fromRawValue(data["plan"] as? String)
                 }
+                // Prova scaduta ma non ancora riportata al Free dal job orario del
+                // server: per le quote il server la considera già finita, e così qui.
+                if (data["planSource"] == "trial") {
+                    val end = (data["planExpiresAt"] as? com.google.firebase.Timestamp)?.toDate()?.time
+                    if (end != null && end <= System.currentTimeMillis()) plan = KBPlan.FREE
+                }
             }
 
             if (plan == KBPlan.FREE) {
@@ -81,6 +87,25 @@ class SubscriptionRepositoryImpl @Inject constructor(
 
             plan
         }.getOrDefault(KBPlan.FREE)
+    }
+
+    override suspend fun loadTrialState(familyId: String): KBTrialState {
+        if (familyId.isBlank()) return KBTrialState()
+        return runCatching {
+            val data = firestore.collection("families").document(familyId).get().await().data.orEmpty()
+            val override = (data["planOverride"] as? String)?.trim()?.lowercase()
+            if (override == KBPlan.PRO.rawValue || override == KBPlan.MAX.rawValue) return@runCatching KBTrialState()
+            val end = (data["planExpiresAt"] as? com.google.firebase.Timestamp)?.toDate()?.time
+            when (data["planSource"]) {
+                "trial" -> if (end != null && end > System.currentTimeMillis()) {
+                    KBTrialState(endsAtMillis = end)
+                } else {
+                    KBTrialState(ended = true)
+                }
+                "trial_ended" -> KBTrialState(ended = true)
+                else -> KBTrialState()
+            }
+        }.getOrDefault(KBTrialState())
     }
 
     override suspend fun updatePlanAfterPurchase(

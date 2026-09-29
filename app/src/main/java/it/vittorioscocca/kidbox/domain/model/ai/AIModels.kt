@@ -17,6 +17,8 @@ enum class AIMessageRole(val value: String) {
 enum class AIQuotaPeriod(val raw: String) {
     DAILY("daily"),
     LIFETIME("lifetime"),
+    /** Prova Pro: un totale per tutta la prova, non si resetta (functions/proTrial.js). */
+    TRIAL("trial"),
     ;
 
     companion object {

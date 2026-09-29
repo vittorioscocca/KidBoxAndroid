@@ -97,9 +97,11 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 if (childId.isBlank() || sessionId.isBlank()) return
                 val title = KBNotificationText.title(context, intent)
                     ?: context.getString(R.string.fitness_reminder_title)
-                val body = intent.getStringExtra(EXTRA_BODY)
+                val body = KBNotificationText.body(context, intent)
+                    ?: intent.getStringExtra(EXTRA_BODY)
                     ?: context.getString(R.string.fitness_reminder_body_fallback)
                 val notifId = "fitness:$childId:$sessionId".hashCode()
+                val isPlanEnd = sessionId == FITNESS_PLAN_END_ID
 
                 val deepLink = Intent(context, MainActivity::class.java).apply {
                     // NEW_TASK necessario: parte da un BroadcastReceiver (AlarmManager),
@@ -132,7 +134,7 @@ class HealthReminderReceiver : BroadcastReceiver() {
                     )
                 }
 
-                val notification = NotificationCompat.Builder(context, CHANNEL_ID_HEALTH_REMINDERS)
+                val builder = NotificationCompat.Builder(context, CHANNEL_ID_HEALTH_REMINDERS)
                     .setSmallIcon(R.mipmap.ic_launcher)
                     .setContentTitle(title)
                     .setContentText(body)
@@ -140,6 +142,13 @@ class HealthReminderReceiver : BroadcastReceiver() {
                     .setAutoCancel(true)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setContentIntent(contentIntent)
+                // Fine del piano: «Fatto» e «Sposta» non hanno una seduta a cui
+                // applicarsi, il tap apre la dashboard col consuntivo.
+                if (isPlanEnd) {
+                    runCatching { NotificationManagerCompat.from(context).notify(notifId, builder.build()) }
+                    return
+                }
+                val notification = builder
                     .addAction(
                         0,
                         context.getString(R.string.fitness_action_done),
@@ -537,6 +546,8 @@ class HealthReminderReceiver : BroadcastReceiver() {
         const val TYPE_WALLET_REMINDER = "wallet_reminder"
         const val TYPE_FITNESS_SESSION = "fitness_session_reminder"
         const val EXTRA_FITNESS_SESSION_ID = "extra_fitness_session_id"
+        /** Id fittizio della notifica di fine piano: viaggia come una seduta. */
+        const val FITNESS_PLAN_END_ID = "planEnd"
         const val EXTRA_WALLET_TICKET_ID = "extra_wallet_ticket_id"
         const val TYPE_WALLET_DOCUMENT_REMINDER = "wallet_document_reminder"
         const val EXTRA_WALLET_DOCUMENT_ID = "extra_wallet_document_id"

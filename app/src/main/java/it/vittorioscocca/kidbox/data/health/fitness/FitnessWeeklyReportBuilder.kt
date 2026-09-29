@@ -44,6 +44,30 @@ object FitnessWeeklyReportBuilder {
     }
 
     /**
+     * Consuntivo dell'intero piano: le settimane sommate, più quello che solo
+     * il mese intero mostra (andamento per settimana, attività fuori programma).
+     */
+    fun recap(plan: FitnessPlanDocument): FitnessPlanRecap {
+        val weekly = plan.weeks.map { it.index }.sorted().mapNotNull { report(it, plan) }
+        val lastWeek = weekly.lastOrNull()?.weekIndex ?: FitnessPlanPromptBuilder.PLAN_WEEKS
+        return FitnessPlanRecap(
+            startDateEpochMillis = FitnessPlanDates.startOfDay(plan.startDateEpochMillis),
+            endDateEpochMillis = plan.lastDayEpochMillis,
+            goal = plan.input.goal,
+            plannedSessions = weekly.sumOf { it.plannedSessions },
+            completedSessions = weekly.sumOf { it.completedSessions },
+            skippedSessions = weekly.sumOf { it.skippedSessions },
+            substitutedSessions = weekly.sumOf { it.substitutedSessions },
+            totalMinutes = weekly.sumOf { it.totalMinutes },
+            totalKcal = weekly.sumOf { it.totalKcal },
+            totalDistanceMeters = weekly.sumOf { it.totalDistanceMeters },
+            weeklyCompletionPercents = weekly.map { it.completionPercent },
+            chronicallySkippedWeekdays = chronicallySkippedWeekdays(plan, lastWeek),
+            extraWorkouts = plan.loggedWorkouts.size,
+        )
+    }
+
+    /**
      * Giorni della settimana saltati almeno due volte: sono il segnale che l'AI
      * usa per proporre di spostare quella seduta.
      */

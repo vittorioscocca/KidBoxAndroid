@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox.notifications
 
 import android.content.Context
 import android.content.Intent
+import it.vittorioscocca.kidbox.ai.UpgradeMessageStore
 import it.vittorioscocca.kidbox.notifications.nudge.NudgeDestination
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.DailyBriefingDraftStore
@@ -392,6 +393,14 @@ object NotificationDeepLinkRouter {
             "password_security_summary" -> {
                 queueFamilyAwareRoute(resolvedType, familyId) { fid ->
                     AppDestination.PasswordsSecurity.createRoute(fid)
+                }
+            }
+            "pro_trial" -> {
+                // Promemoria e fine della prova Pro (functions/proTrial.js): si
+                // aprono i Piani, con un'origine propria nel funnel d'acquisto.
+                queueFamilyAwareRoute(resolvedType, familyId) { _ ->
+                    UpgradeMessageStore.set(null, triggerFeature = "trial_push")
+                    AppDestination.Plans.route
                 }
             }
             "broadcast" -> {

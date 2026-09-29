@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Prova Pro e piano annuale (functions/proTrial.js). Stesse chiavi in values/-en/-fr/-es. -->
+<resources>
+    <string name="trial_ai_title">Pro trial AI messages</string>
+    <string name="trial_ai_messages_used">%1$d of %2$d trial messages used</string>
+    <string name="trial_health_ai_usage_summary">%1$d AI messages · %2$d/%3$d of the Pro trial</string>
+    <string name="trial_plans_notice_days">You have Pro on trial for %1$d more days. Subscribe to keep extra storage, planners and the AI assistant when it ends.</string>
+    <string name="trial_plans_notice_last_day">It\'s the last day of your Pro trial. Subscribe to keep extra storage, planners and the AI assistant.</string>
+    <string name="trial_plans_notice_ended">Your Pro trial has ended. All your data stays: Pro brings back extra storage, planners and the AI assistant.</string>
+    <string name="trial_status_chip">On trial</string>
+    <string name="plans_billing_monthly">Monthly</string>
+    <string name="plans_billing_yearly">Yearly</string>
+    <string name="plans_billing_yearly_saving">Yearly · −%1$d%%</string>
+    <string name="plans_price_per_year">%1$s/year</string>
+    <string name="plans_price_per_month">%1$s/month</string>
+    <string name="trial_home_title_days">Pro included: %1$d days left</string>
+    <string name="trial_home_title_last">Pro included: last day</string>
+    <string name="trial_home_body">Extra storage, planners and the AI assistant are unlocked. No card required.</string>
+    <string name="trial_profile_plan_until">%1$s · on trial until %2$s</string>
+</resources>

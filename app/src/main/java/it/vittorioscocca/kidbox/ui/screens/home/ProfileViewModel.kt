@@ -175,6 +175,15 @@ class ProfileViewModel @Inject constructor(
         }
 
         val plan = subscriptionRepository.getPlan(familyId)
+        // In prova il piano «Pro» non è pagato da nessuno: la riga lo dice, con
+        // la data di fine, come su iOS.
+        val app = getApplication<Application>()
+        val baseLabel = app.getString(R.string.home_profile_vm_plan_label, plan.displayName)
+        val trialEnd = if (plan != KBPlan.FREE) subscriptionRepository.loadTrialState(familyId).endsAtMillis else null
+        val planLabelText = trialEnd?.let {
+            val date = java.text.DateFormat.getDateInstance(java.text.DateFormat.LONG).format(java.util.Date(it))
+            app.getString(R.string.trial_profile_plan_until, baseLabel, date)
+        } ?: baseLabel
         val isOwner = isFamilySubscriptionManager(
             familyDao,
             familyMemberDao,
@@ -193,7 +202,7 @@ class ProfileViewModel @Inject constructor(
             val usedBytes = (payload.orEmpty()["usedBytes"] as? Number)?.toLong() ?: 0L
             _uiState.update {
                 it.copy(
-                    planLabel = getApplication<Application>().getString(R.string.home_profile_vm_plan_label, plan.displayName),
+                    planLabel = planLabelText,
                     plan = plan,
                     isFamilyOwner = isOwner,
                     storageUsedBytes = usedBytes.coerceAtLeast(0L),
@@ -204,7 +213,7 @@ class ProfileViewModel @Inject constructor(
             // Keep quota from current plan even if usage fetch fails.
             _uiState.update {
                 it.copy(
-                    planLabel = getApplication<Application>().getString(R.string.home_profile_vm_plan_label, plan.displayName),
+                    planLabel = planLabelText,
                     plan = plan,
                     isFamilyOwner = isOwner,
                     storageTotalBytes = plan.storageQuota,

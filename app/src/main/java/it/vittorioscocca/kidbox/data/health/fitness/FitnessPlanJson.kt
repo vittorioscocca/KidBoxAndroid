@@ -62,6 +62,9 @@ object FitnessPlanJson {
                 },
             )
         }
+        if (document.previousCycles.isNotEmpty()) {
+            put("previousCycles", JSONArray().apply { document.previousCycles.forEach { put(encodeRecap(it)) } })
+        }
         put(
             "weeks",
             JSONArray().apply {
@@ -116,8 +119,57 @@ object FitnessPlanJson {
                 ?: System.currentTimeMillis(),
             messageUnitsConsumed = json.optInt("messageUnitsConsumed", 0),
             loggedWorkouts = decodeLoggedWorkouts(json.optJSONArray("loggedWorkouts")),
+            previousCycles = decodeRecaps(json.optJSONArray("previousCycles")),
         )
     }.getOrNull()
+
+    // ── Consuntivi dei mesi precedenti ─────────────────────────────────────
+
+    /** Tutte le chiavi sempre presenti: vedi il vincolo 2 in testa al file. */
+    private fun encodeRecap(recap: FitnessPlanRecap) = JSONObject().apply {
+        put("startDate", isoDate(recap.startDateEpochMillis))
+        put("endDate", isoDate(recap.endDateEpochMillis))
+        put("goal", recap.goal.wire())
+        put("plannedSessions", recap.plannedSessions)
+        put("completedSessions", recap.completedSessions)
+        put("skippedSessions", recap.skippedSessions)
+        put("substitutedSessions", recap.substitutedSessions)
+        put("totalMinutes", recap.totalMinutes)
+        put("totalKcal", recap.totalKcal)
+        put("totalDistanceMeters", recap.totalDistanceMeters)
+        put("weeklyCompletionPercents", JSONArray(recap.weeklyCompletionPercents))
+        put("chronicallySkippedWeekdays", JSONArray(recap.chronicallySkippedWeekdays))
+        put("extraWorkouts", recap.extraWorkouts)
+    }
+
+    /** Tollerante: un consuntivo illeggibile si scarta, il piano no. */
+    private fun decodeRecaps(array: JSONArray?): List<FitnessPlanRecap> {
+        if (array == null) return emptyList()
+        return (0 until array.length()).mapNotNull { index ->
+            val item = array.optJSONObject(index) ?: return@mapNotNull null
+            val start = item.dateOrNull("startDate", "startDateEpochMillis") ?: return@mapNotNull null
+            FitnessPlanRecap(
+                startDateEpochMillis = start,
+                endDateEpochMillis = item.dateOrNull("endDate", "endDateEpochMillis") ?: start,
+                goal = enumFromWire(item.optString("goal"), FitnessGoal.entries, FitnessGoal.TONING),
+                plannedSessions = item.optInt("plannedSessions"),
+                completedSessions = item.optInt("completedSessions"),
+                skippedSessions = item.optInt("skippedSessions"),
+                substitutedSessions = item.optInt("substitutedSessions"),
+                totalMinutes = item.optInt("totalMinutes"),
+                totalKcal = item.optInt("totalKcal"),
+                totalDistanceMeters = item.optDouble("totalDistanceMeters", 0.0).takeUnless { it.isNaN() } ?: 0.0,
+                weeklyCompletionPercents = item.optJSONArray("weeklyCompletionPercents").toIntList(),
+                chronicallySkippedWeekdays = item.optJSONArray("chronicallySkippedWeekdays").toIntList(),
+                extraWorkouts = item.optInt("extraWorkouts"),
+            )
+        }
+    }
+
+    private fun JSONArray?.toIntList(): List<Int> {
+        if (this == null) return emptyList()
+        return (0 until length()).map { optInt(it) }
+    }
 
     private fun decodeLoggedWorkouts(array: JSONArray?): List<FitnessLoggedWorkout> {
         if (array == null) return emptyList()

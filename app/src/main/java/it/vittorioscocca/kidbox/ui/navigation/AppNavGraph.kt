@@ -462,7 +462,7 @@ fun AppNavGraph(
             HomeScreen(
                 onNavigate = { route ->
                     if (route == AppDestination.Plans.route) {
-                        UpgradeMessageStore.set(null, triggerFeature = "home_upsell")
+                        UpgradeMessageStore.setTriggerIfUnset("home_upsell")
                     }
                     navController.navigate(route) {
                         when (route) {
@@ -490,7 +490,7 @@ fun AppNavGraph(
                         popUpTo(navController.graph.id) { inclusive = true }
                     }
                 },
-                onStorageUsage = { navController.navigate(AppDestination.StorageUsage.route) },
+                onStorageUsage = { navController.navigate(AppDestination.StorageUsage.route + "?from=profile") },
                 onOpenPlans = {
                     UpgradeMessageStore.set(null, triggerFeature = "settings_upsell")
                     navController.navigate(AppDestination.Plans.route) {
@@ -558,8 +558,14 @@ fun AppNavGraph(
             )
         }
 
-        composable(AppDestination.StorageUsage.route) {
+        // `?from=profile` distingue nel funnel d'acquisto l'ingresso dal Profilo;
+        // senza parametro (Impostazioni) vale il default.
+        composable(
+            route = AppDestination.StorageUsage.route + "?from={from}",
+            arguments = listOf(navArgument("from") { type = NavType.StringType; defaultValue = "settings" }),
+        ) { entry ->
             StorageUsageScreen(
+                triggerFeature = if (entry.arguments?.getString("from") == "profile") "profile_storage" else "storage_settings",
                 onBack = { navController.popBackStack() },
                 onOpenPlans = {
                     UpgradeMessageStore.set(null, triggerFeature = "storage_lock")
@@ -1038,7 +1044,7 @@ fun AppNavGraph(
                 subjectName = "",
                 onBack = { navController.popBackStack() },
                 onUpgrade = {
-                    UpgradeMessageStore.set(null, triggerFeature = "meal_plan")
+                    UpgradeMessageStore.set(null, triggerFeature = "meal_plan_lock")
                     navController.navigate(AppDestination.Plans.route) { launchSingleTop = true }
                 },
             )
@@ -1059,7 +1065,7 @@ fun AppNavGraph(
                 subjectName = "",
                 onBack = { navController.popBackStack() },
                 onUpgrade = {
-                    UpgradeMessageStore.set(null, triggerFeature = "fitness_plan")
+                    UpgradeMessageStore.set(null, triggerFeature = "fitness_plan_lock")
                     navController.navigate(AppDestination.Plans.route) { launchSingleTop = true }
                 },
                 onOpenCopilot = {
@@ -1862,7 +1868,10 @@ fun AppNavGraph(
                 familyId = familyId,
                 documentId = documentId,
                 onBack = { navController.popBackStack() },
-                onUpgrade = { navController.navigate(AppDestination.Plans.route) },
+                onUpgrade = {
+                    UpgradeMessageStore.set(null, triggerFeature = "wallet")
+                    navController.navigate(AppDestination.Plans.route)
+                },
             )
         }
 
@@ -2041,6 +2050,7 @@ fun AppNavGraph(
                     navController.navigate(AppDestination.TravelAllTrips.createRoute(familyId))
                 },
                 onUpgrade = {
+                    UpgradeMessageStore.set(null, triggerFeature = "travel_lock")
                     navController.navigate(AppDestination.Plans.route) { launchSingleTop = true }
                 },
             )
@@ -2125,7 +2135,10 @@ fun AppNavGraph(
                 prefillDestinationName = prefill,
                 navController = navController,
                 onNavigateBack = { navController.popBackStack() },
-                onOpenPlans = { navController.navigate(AppDestination.Plans.route) },
+                onOpenPlans = {
+                    UpgradeMessageStore.set(null, triggerFeature = "travel_lock")
+                    navController.navigate(AppDestination.Plans.route)
+                },
             )
         }
 
@@ -2138,7 +2151,10 @@ fun AppNavGraph(
                 familyId = familyId,
                 navController = navController,
                 backStackEntry = backStackEntry,
-                onOpenPlans = { navController.navigate(AppDestination.Plans.route) },
+                onOpenPlans = {
+                    UpgradeMessageStore.set(null, triggerFeature = "travel_lock")
+                    navController.navigate(AppDestination.Plans.route)
+                },
             )
         }
 

@@ -79,7 +79,17 @@ import java.util.Locale
  * Non genera nulla da sé: restituisce l'input al chiamante, che è l'unico a
  * parlare con l'AI e a mostrare il costo in messaggi.
  */
-enum class FitnessSetupMode { ONBOARDING, SETTINGS }
+enum class FitnessSetupMode {
+    ONBOARDING,
+    SETTINGS,
+
+    /**
+     * Mese successivo a un piano concluso: lo stesso modulo delle impostazioni,
+     * già compilato con le scelte del mese finito, e nessun ricalcolo
+     * «distruttivo» da confermare — il piano vecchio è finito, non si perde niente.
+     */
+    CONTINUATION,
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -132,10 +142,10 @@ fun FitnessPlanSetupScreen(
             Spacer(Modifier.weight(1f))
             Text(
                 stringResource(
-                    if (mode == FitnessSetupMode.ONBOARDING) {
-                        R.string.fitness_setup_title
-                    } else {
-                        R.string.fitness_settings_title
+                    when (mode) {
+                        FitnessSetupMode.ONBOARDING -> R.string.fitness_setup_title
+                        FitnessSetupMode.SETTINGS -> R.string.fitness_settings_title
+                        FitnessSetupMode.CONTINUATION -> R.string.fitness_continuation_title
                     },
                 ),
                 fontWeight = FontWeight.Bold,
@@ -164,7 +174,11 @@ fun FitnessPlanSetupScreen(
                 GoalSection(input) { input = it }
                 ScheduleSection(input) { input = it }
                 DetailsSection(input, needsManualMetrics) { input = it }
-                RecalcSection(estimatedUnits, input.isComplete) { showRecalcConfirm = true }
+                if (mode == FitnessSetupMode.CONTINUATION) {
+                    ContinuationSection(estimatedUnits, input.isComplete) { onConfirm(input) }
+                } else {
+                    RecalcSection(estimatedUnits, input.isComplete) { showRecalcConfirm = true }
+                }
                 plan?.let { current ->
                     if (current.safetyNotes.isNotEmpty()) SafetyNotesSection(current)
                     PlanInfoSection(current, usageSummary) { showDeleteConfirm = true }
@@ -628,6 +642,28 @@ private fun DetailsSection(
             fontSize = 13.sp,
             color = kb.subtitle,
         )
+    }
+}
+
+@Composable
+private fun ContinuationSection(estimatedUnits: Int, enabled: Boolean, onGenerate: () -> Unit) {
+    val kb = MaterialTheme.kidBoxColors
+    FitnessCard {
+        Text(
+            stringResource(R.string.fitness_cost, estimatedUnits),
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp,
+            color = kb.title,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(stringResource(R.string.fitness_continuation_hint), fontSize = 13.sp, color = kb.subtitle)
+        Spacer(Modifier.height(12.dp))
+        Button(
+            onClick = onGenerate,
+            enabled = enabled,
+            colors = ButtonDefaults.buttonColors(containerColor = FITNESS_TINT),
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text(stringResource(R.string.fitness_continuation_cta)) }
     }
 }
 
