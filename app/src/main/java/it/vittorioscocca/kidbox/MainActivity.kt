@@ -239,13 +239,9 @@ class MainActivity : AppCompatActivity() {
      * idempotente: se il servizio gira già non cambia niente.
      */
     private fun resumeLocationSharingIfNeeded() {
-        runCatching {
-            if (!LocationSharingStateStore.shouldBeActive(this)) return@runCatching
-            val familyId = getSharedPreferences("kidbox_prefs", MODE_PRIVATE)
-                .getString("active_family_id", null)?.trim().orEmpty()
-            if (familyId.isEmpty()) return@runCatching
-            LocationSharingService.start(this, familyId, LocationSharingStateStore.displayName(this))
-        }.onFailure { KBLog.app.warning("Ripresa condivisione posizione fallita: ${it.message}", "MainActivity") }
+        // La famiglia è quella in cui si condivide, non quella attiva nell'app:
+        // cambiando famiglia la condivisione ripartiva nella famiglia sbagliata.
+        LocationSharingService.resumeIfNeeded(this, "apertura dell'app")
     }
 
     override fun onNewIntent(intent: Intent) {

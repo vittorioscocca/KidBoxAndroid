@@ -13,6 +13,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.AndroidEntryPoint
+import it.vittorioscocca.kidbox.data.location.LocationSharingService
 import it.vittorioscocca.kidbox.data.notification.PushNotificationManager
 import javax.inject.Inject
 import it.vittorioscocca.kidbox.MainActivity
@@ -49,6 +50,17 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
             ?: remoteMessage.data["deep_link"]
             ?: remoteMessage.data["route"]
             ?: ""
+        // Push silenziosa del server (`resumeStaleLocationSharing`) quando la
+        // condivisione di questo telefono risulta ferma: una push ad alta
+        // priorità è uno dei pochi momenti in cui Android permette di avviare
+        // il servizio in primo piano con l'app in background. Niente notifica:
+        // se il servizio riparte, la sua notifica fissa è già quella visibile.
+        // Arriva solo ai token con `locationResume` (vedi PushNotificationManager):
+        // le build precedenti la mostrerebbero come «Nuova notifica».
+        if (type == LOCATION_RESUME_TYPE) {
+            LocationSharingService.resumeIfNeeded(applicationContext, "push di ripresa")
+            return
+        }
         // L'utente è già dentro la sezione in cui è appena stato creato il
         // contenuto: niente notifica e niente badge, lo vede comparire da solo.
         // Qui si arriva solo con l'app in foreground — in background/killed la
@@ -204,6 +216,8 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
     companion object {
         const val CHANNEL_ID_FAMILY_UPDATES = "family_updates_v2"
         private const val CHANNEL_ID_LEGACY = "family_updates"
+        /** Stesso valore di `LOCATION_RESUME_TYPE` in functions/index.js. */
+        private const val LOCATION_RESUME_TYPE = "location_resume"
 
         fun createNotificationChannels(context: Context) {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return

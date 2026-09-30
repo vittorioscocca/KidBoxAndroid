@@ -36,8 +36,8 @@ class LocationSharingWatchdogWorker(
             return Result.success()
         }
 
-        val familyId = ctx.getSharedPreferences("kidbox_prefs", Context.MODE_PRIVATE)
-            .getString("active_family_id", null)?.trim().orEmpty()
+        // La famiglia in cui si condivide, non quella attiva nell'app.
+        val familyId = LocationSharingStateStore.familyId(ctx).orEmpty()
         if (familyId.isNotBlank()) {
             runCatching {
                 LocationSharingService.start(ctx, familyId, LocationSharingStateStore.displayName(ctx))

@@ -103,6 +103,13 @@ class PushNotificationManager @Inject constructor(
         ).await()
     }
 
+    private fun hasBackgroundLocationPermission(): Boolean =
+        android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q ||
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                appContext,
+                android.Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
     suspend fun registerCurrentFcmToken() {
         val token = FirebaseMessaging.getInstance().token.await()
         persistFcmToken(token)
@@ -124,6 +131,17 @@ class PushNotificationManager @Inject constructor(
                     "token" to token,
                     "platform" to "android",
                     "enabled" to isPushEnabledOnThisDevice(),
+                    // Questa build sa gestire la push silenziosa che riavvia la
+                    // condivisione posizione: il server la manda solo ai token
+                    // con questo campo a true, perché le build precedenti
+                    // mostrerebbero ogni push dati sconosciuta come «Nuova
+                    // notifica». Serve anche il permesso posizione «sempre»:
+                    // senza, Android non lascia ripartire il servizio da
+                    // background, e push ad alta priorità che non producono
+                    // niente di visibile possono far declassare le altre.
+                    // Il token si riscrive a ogni avvio, quindi il campo segue
+                    // il permesso.
+                    "locationResume" to hasBackgroundLocationPermission(),
                     "updatedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
                 ),
                 com.google.firebase.firestore.SetOptions.merge(),

@@ -97,6 +97,18 @@ class FamilyLocationRepository @Inject constructor(
         remoteStore.stopSharing(familyId, uid)
     }
 
+    fun currentUid(): String? = auth.currentUser?.uid
+
+    /** Vedi [LocationRemoteStore.listenOwnStatus]; `null` senza utente autenticato. */
+    fun listenMySharingStatus(
+        familyId: String,
+        onServerStatus: (Boolean) -> Unit,
+        onError: (Exception) -> Unit,
+    ): ListenerRegistration? {
+        val uid = auth.currentUser?.uid ?: return null
+        return remoteStore.listenOwnStatus(familyId, uid, onServerStatus, onError)
+    }
+
     suspend fun updateMyLocation(
         familyId: String,
         latitude: Double,

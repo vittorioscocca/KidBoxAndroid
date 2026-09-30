@@ -183,6 +183,34 @@ class LocationRemoteStore @Inject constructor(
         }
     }
 
+    /**
+     * Ascolta il proprio documento di stato e riporta **solo** quello che dice
+     * il server: una cache vuota (primo avvio, persistenza azzerata) o una
+     * nostra scrittura non ancora confermata non dicono niente, e leggerle
+     * come «spenta» fermerebbe una condivisione ancora attiva.
+     * [onServerStatus] riceve `isSharing` (false anche se il documento non c'è).
+     */
+    fun listenOwnStatus(
+        familyId: String,
+        uid: String,
+        onServerStatus: (Boolean) -> Unit,
+        onError: (Exception) -> Unit,
+    ): ListenerRegistration =
+        firestore.collection("families")
+            .document(familyId)
+            .collection("locations")
+            .document(uid)
+            .addSnapshotListener { snap, err ->
+                if (err != null) {
+                    onError(err)
+                    return@addSnapshotListener
+                }
+                if (snap == null || snap.metadata.isFromCache || snap.metadata.hasPendingWrites()) {
+                    return@addSnapshotListener
+                }
+                onServerStatus(snap.getBoolean("isSharing") == true)
+            }
+
     suspend fun startSharing(
         familyId: String,
         uid: String,

@@ -36,7 +36,7 @@ import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -78,14 +78,23 @@ class FamilyLocationViewModel @Inject constructor(
 
     private val fusedClient by lazy { LocationServices.getFusedLocationProviderClient(context) }
     private var locationCallback: LocationCallback? = null
-    private var expiryJob: Job? = null
     private var observeJob: Job? = null
     private var geofenceObserveJob: Job? = null
     private var cachedGeofences: List<it.vittorioscocca.kidbox.data.local.entity.KBGeofenceEntity> = emptyList()
     private var hasLocationPermission: Boolean = false
     private var currentDisplayName: String = "Utente"
-    private var sharingRequestedLocal: Boolean = false
     private var activeFamilyObserverStarted = false
+
+    init {
+        // Lo stato della PROPRIA condivisione viene dal telefono
+        // (LocationSharingStateStore), non dal documento su Firestore: prima la
+        // schermata, trovandolo ancora «in condivisione», riavviava il servizio,
+        // e così annullava lo stop dato dalla notifica o la condivisione
+        // avviata su un altro dispositivo dello stesso utente.
+        viewModelScope.launch {
+            LocationSharingStateStore.observe(context).collect { applySharingState() }
+        }
+    }
 
     fun startObservingActiveFamily(routeFamilyId: String = "") {
         if (activeFamilyObserverStarted) return
@@ -116,6 +125,7 @@ class FamilyLocationViewModel @Inject constructor(
         repository.stopRealtime()
         geofenceRepository.stopRealtime()
         _uiState.value = _uiState.value.copy(familyId = familyId, isLoading = true, errorMessage = null)
+        applySharingState()
         viewModelScope.launch { refreshDisplayName() }
         repository.startRealtime(
             familyId = familyId,
@@ -156,87 +166,96 @@ class FamilyLocationViewModel @Inject constructor(
         }
     }
 
-    fun startRealtime() {
+    fun startRealtime() = startSharing(
+        mode = LocationShareMode.REALTIME,
+        expiresAtEpochMillis = null,
+        errorFallback = "Errore avvio condivisione",
+    )
+
+    fun startTemporary(hours: Int) = startSharing(
+        mode = LocationShareMode.TEMPORARY,
+        expiresAtEpochMillis = System.currentTimeMillis() + hours * 3_600_000L,
+        errorFallback = "Errore condivisione temporanea",
+    )
+
+    /**
+     * Scrive lo stato su Firestore e solo DOPO segna il telefono come attivo:
+     * il servizio, appena parte, ascolta quel documento e si ferma se il
+     * server dice «spenta». Tutto in `NonCancellable`: uscendo dalla schermata
+     * a metà, prima si restava «in condivisione» per gli altri con il telefono
+     * che non inviava niente.
+     */
+    private fun startSharing(
+        mode: LocationShareMode,
+        expiresAtEpochMillis: Long?,
+        errorFallback: String,
+    ) {
         val familyId = _uiState.value.familyId
         if (familyId.isBlank()) return
         viewModelScope.launch {
             refreshDisplayName()
-            sharingRequestedLocal = true
+            // Ottimistico: lo stato vero arriva da LocationSharingStateStore.
             _uiState.value = _uiState.value.copy(
                 isSharing = true,
-                myMode = LocationShareMode.REALTIME,
-                myExpiresAtEpochMillis = null,
+                myMode = mode,
+                myExpiresAtEpochMillis = expiresAtEpochMillis,
                 errorMessage = null,
             )
-            runCatching {
-                repository.startSharing(
-                    familyId = familyId,
-                    displayName = currentDisplayName,
-                    mode = LocationShareMode.REALTIME,
-                )
-            }.onSuccess {
-                LocationSharingStateStore.markActive(context, currentDisplayName, expiresAtEpochMillis = 0L)
-                LocationSharingWatchdogWorker.enqueue(context)
-                if (hasLocationPermission) startLocationUpdatesIfNeeded()
-                syncGeofenceMonitor()
-            }.onFailure { err ->
-                sharingRequestedLocal = false
-                _uiState.value = _uiState.value.copy(
-                    isSharing = false,
-                    myMode = null,
-                    myExpiresAtEpochMillis = null,
-                )
-                _uiState.value = _uiState.value.copy(errorMessage = err.localizedMessage ?: "Errore avvio condivisione")
-                syncGeofenceMonitor()
+            withContext(NonCancellable) {
+                runCatching {
+                    repository.startSharing(
+                        familyId = familyId,
+                        displayName = currentDisplayName,
+                        mode = mode,
+                        expiresAtEpochMillis = expiresAtEpochMillis,
+                    )
+                }.onSuccess {
+                    val uid = auth.currentUser?.uid.orEmpty()
+                    LocationSharingStateStore.markActive(
+                        context,
+                        familyId = familyId,
+                        uid = uid,
+                        displayName = currentDisplayName,
+                        expiresAtEpochMillis = expiresAtEpochMillis ?: 0L,
+                    )
+                    LocationSharingWatchdogWorker.enqueue(context)
+                    // Servizio e stream della mappa li avvia applySharingState().
+                }.onFailure { err ->
+                    applySharingState()
+                    _uiState.value = _uiState.value.copy(errorMessage = err.localizedMessage ?: errorFallback)
+                }
             }
+            syncGeofenceMonitor()
         }
     }
 
-    fun startTemporary(hours: Int) {
+    /** Riflette nella UI lo stato di [LocationSharingStateStore] per la famiglia mostrata. */
+    private fun applySharingState() {
+        val state = LocationSharingStateStore.observe(context).value
         val familyId = _uiState.value.familyId
-        if (familyId.isBlank()) return
-        val expiresAt = System.currentTimeMillis() + hours * 3_600_000L
-        viewModelScope.launch {
-            refreshDisplayName()
-            sharingRequestedLocal = true
-            _uiState.value = _uiState.value.copy(
-                isSharing = true,
-                myMode = LocationShareMode.TEMPORARY,
-                myExpiresAtEpochMillis = expiresAt,
-                errorMessage = null,
-            )
-            scheduleLocalExpiryStop(expiresAt)
-            runCatching {
-                repository.startSharing(
-                    familyId = familyId,
-                    displayName = currentDisplayName,
-                    mode = LocationShareMode.TEMPORARY,
-                    expiresAtEpochMillis = expiresAt,
-                )
-            }.onSuccess {
-                LocationSharingStateStore.markActive(context, currentDisplayName, expiresAtEpochMillis = expiresAt)
-                LocationSharingWatchdogWorker.enqueue(context)
-                if (hasLocationPermission) startLocationUpdatesIfNeeded()
-                syncGeofenceMonitor()
-            }.onFailure { err ->
-                sharingRequestedLocal = false
-                expiryJob?.cancel()
-                _uiState.value = _uiState.value.copy(
-                    isSharing = false,
-                    myMode = null,
-                    myExpiresAtEpochMillis = null,
-                )
-                _uiState.value = _uiState.value.copy(errorMessage = err.localizedMessage ?: "Errore condivisione temporanea")
-                syncGeofenceMonitor()
-            }
+        val here = state.active && familyId.isNotBlank() && state.familyId == familyId
+        _uiState.value = _uiState.value.copy(
+            isSharing = here,
+            myMode = when {
+                !here -> null
+                state.expiresAtEpochMillis == 0L -> LocationShareMode.REALTIME
+                else -> LocationShareMode.TEMPORARY
+            },
+            myExpiresAtEpochMillis = state.expiresAtEpochMillis.takeIf { here && it != 0L },
+            myCurrentAddress = if (here) _uiState.value.myCurrentAddress else null,
+        )
+        if (here) {
+            // Con l'app in primo piano l'avvio del servizio è sempre permesso:
+            // se era morto, riparte da qui. È idempotente.
+            if (hasLocationPermission) startLocationUpdatesIfNeeded()
+        } else {
+            stopLocationUpdates()
         }
     }
 
     fun stopSharing() {
         val familyId = _uiState.value.familyId
         if (familyId.isBlank()) return
-        sharingRequestedLocal = false
-        expiryJob?.cancel()
         _uiState.value = _uiState.value.copy(
             isSharing = false,
             myMode = null,
@@ -269,46 +288,19 @@ class FamilyLocationViewModel @Inject constructor(
 
     private fun applyUsers(users: List<KBSharedLocationEntity>) {
         val now = System.currentTimeMillis()
-        val myUid = auth.currentUser?.uid
         val filtered = users.filter { user ->
             if (user.modeRaw != LocationShareMode.TEMPORARY.raw) return@filter true
             val expires = user.expiresAtEpochMillis ?: return@filter true
             expires > now
         }
-        val me = myUid?.let { uid -> filtered.firstOrNull { it.id == uid } }
-        val mode = when (me?.modeRaw) {
-            LocationShareMode.REALTIME.raw -> LocationShareMode.REALTIME
-            LocationShareMode.TEMPORARY.raw -> LocationShareMode.TEMPORARY
-            else -> null
-        }
-        // Se `me` non è ancora in DB (es. Firestore ha scritto isSharing=true ma il primo
-        // fix GPS non è ancora arrivato), rispettiamo `sharingRequestedLocal` per non
-        // resettare l'UI a "non condivido" prima ancora che il GPS risponda.
-        val effectiveSharing = me != null || sharingRequestedLocal
+        // Solo la mappa: lo stato della propria condivisione non si deduce da
+        // qui (vedi applySharingState), e nemmeno il servizio si avvia o si
+        // ferma da qui. Se la condivisione viene spenta sul server, il servizio
+        // lo vede da sé ascoltando il proprio documento.
         _uiState.value = _uiState.value.copy(
             sharedUsers = filtered,
             isLoading = false,
-            isSharing = effectiveSharing,
-            myMode = if (me != null) mode else _uiState.value.myMode,
-            myExpiresAtEpochMillis = if (me != null) me.expiresAtEpochMillis else _uiState.value.myExpiresAtEpochMillis,
         )
-        if (me != null) {
-            sharingRequestedLocal = true
-            if (hasLocationPermission) startLocationUpdatesIfNeeded()
-            scheduleTemporaryExpiryStop(me)
-        } else {
-            if (sharingRequestedLocal) {
-                // Stiamo aspettando il primo fix GPS: avvia comunque gli aggiornamenti
-                // in modo che possano produrre le prime coordinate.
-                if (hasLocationPermission) startLocationUpdatesIfNeeded()
-                syncGeofenceMonitor()
-                return
-            }
-            expiryJob?.cancel()
-            stopLocationUpdates()
-            stopSharingService()
-            _uiState.value = _uiState.value.copy(myCurrentAddress = null)
-        }
         syncGeofenceMonitor()
     }
 
@@ -326,34 +318,6 @@ class FamilyLocationViewModel @Inject constructor(
             displayName = currentDisplayName,
             geofences = cachedGeofences,
         )
-    }
-
-    private fun scheduleTemporaryExpiryStop(me: KBSharedLocationEntity) {
-        expiryJob?.cancel()
-        if (me.modeRaw != LocationShareMode.TEMPORARY.raw) return
-        val expiresAt = me.expiresAtEpochMillis ?: return
-        val delayMs = expiresAt - System.currentTimeMillis()
-        if (delayMs <= 0L) {
-            stopSharing()
-            return
-        }
-        expiryJob = viewModelScope.launch {
-            delay(delayMs)
-            stopSharing()
-        }
-    }
-
-    private fun scheduleLocalExpiryStop(expiresAtEpochMillis: Long) {
-        expiryJob?.cancel()
-        val delayMs = expiresAtEpochMillis - System.currentTimeMillis()
-        if (delayMs <= 0L) {
-            stopSharing()
-            return
-        }
-        expiryJob = viewModelScope.launch {
-            delay(delayMs)
-            stopSharing()
-        }
     }
 
     private suspend fun refreshDisplayName() {
@@ -482,7 +446,6 @@ class FamilyLocationViewModel @Inject constructor(
 
     override fun onCleared() {
         stopLocationUpdates()
-        expiryJob?.cancel()
         observeJob?.cancel()
         geofenceObserveJob?.cancel()
         repository.stopRealtime()

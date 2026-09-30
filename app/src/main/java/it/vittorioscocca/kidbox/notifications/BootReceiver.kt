@@ -54,11 +54,8 @@ class BootReceiver : BroadcastReceiver() {
                 // riprende all'apertura dell'app (MainActivity.onResume).
                 runCatching {
                     if (LocationSharingStateStore.shouldBeActive(appCtx)) {
-                        LocationSharingService.start(
-                            appCtx,
-                            familyId,
-                            LocationSharingStateStore.displayName(appCtx),
-                        )
+                        // Famiglia della condivisione, non quella attiva nell'app.
+                        LocationSharingService.resumeIfNeeded(appCtx, "riavvio del telefono")
                         LocationSharingWatchdogWorker.enqueue(appCtx)
                     }
                 }

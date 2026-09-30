@@ -36,6 +36,12 @@ class GeofenceTransitionReceiver : BroadcastReceiver() {
         }
         if (event.geofenceTransition == Geofence.GEOFENCE_TRANSITION_DWELL) return
 
+        // Un evento di zona è uno dei momenti in cui Android permette di avviare
+        // il servizio in primo piano con l'app in background: se la condivisione
+        // era morta, riparte da qui. Il 30/09/2026 un telefono mandava arrivi e
+        // uscite da una zona mentre la sua condivisione era ferma da 10 giorni.
+        LocationSharingService.resumeIfNeeded(context.applicationContext, "evento di zona")
+
         val familyId = GeofenceMonitorState.familyId(context) ?: return
         val uid = GeofenceMonitorState.uid(context) ?: return
         val displayName = GeofenceMonitorState.displayName(context)
