@@ -2,6 +2,7 @@ package it.vittorioscocca.kidbox.data.remote.location
 
 import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -129,7 +130,10 @@ class LocationRemoteStore @Inject constructor(
             toAdd.forEach { uid ->
                 val reg = liveLocationRef(familyId, uid)
                     .addSnapshotListener { snap, _ ->
-                        val data = snap?.data
+                        // ESTIMATE: sulla propria scrittura non ancora confermata
+                        // `lastUpdateAt` (serverTimestamp) sarebbe null, e il proprio
+                        // pin risulterebbe «non aggiornato» proprio mentre si aggiorna.
+                        val data = snap?.getData(DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
                         val lat = data?.numberOrNull("lat")?.toDouble()
                         val lon = data?.numberOrNull("lon")?.toDouble()
                         if (lat == null || lon == null) {

@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.filled.Battery1Bar
 import androidx.compose.material.icons.filled.Battery3Bar
@@ -55,6 +56,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -91,6 +93,7 @@ import it.vittorioscocca.kidbox.data.repository.LocationShareMode
 import it.vittorioscocca.kidbox.ui.permissions.RuntimePermissions
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -126,6 +129,8 @@ fun FamilyLocationScreen(
         }
     }
     val myUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+    // «X minuti fa» e il segnaposto sbiadito devono invecchiare anche senza dati nuovi.
+    val now = rememberNowMillis()
     val scope = rememberCoroutineScope()
 
     // Mappa a tutto schermo, sotto le barre di sistema.
@@ -268,11 +273,14 @@ fun FamilyLocationScreen(
         ) {
             state.sharedUsers.forEach { user ->
                 val avatarDescriptor = rememberAvatarMarkerDescriptor(user.avatarUrl)
+                val freshness = freshnessLabel(user.lastUpdateAtEpochMillis, now)
                 Marker(
                     state = MarkerState(position = LatLng(user.latitude, user.longitude)),
                     title = user.name,
-                    snippet = user.statusSnippet(),
+                    snippet = listOfNotNull(user.statusSnippet(), freshness).joinToString(" · "),
                     icon = avatarDescriptor,
+                    // Una posizione vecchia dice «era qui», non «è qui».
+                    alpha = if (isStale(user.lastUpdateAtEpochMillis, now)) 0.5f else 1f,
                     anchor = if (avatarDescriptor != null) androidx.compose.ui.geometry.Offset(0.5f, 0.5f) else androidx.compose.ui.geometry.Offset(0.5f, 1.0f),
                     onClick = {
                         followingUserId = user.id
@@ -428,6 +436,7 @@ fun FamilyLocationScreen(
                         FollowUserPill(
                             user = user,
                             isActive = followingUserId == user.id,
+                            now = now,
                             onClick = { followingUserId = user.id },
                         )
                     }
@@ -593,8 +602,11 @@ private fun circularAvatarBitmap(source: android.graphics.Bitmap, sizePx: Int): 
 private fun FollowUserPill(
     user: KBSharedLocationEntity,
     isActive: Boolean,
+    now: Long,
     onClick: () -> Unit,
 ) {
+    val stale = isStale(user.lastUpdateAtEpochMillis, now)
+    val avatarAlpha = if (stale) 0.55f else 1f
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(999.dp),
@@ -612,12 +624,14 @@ private fun FollowUserPill(
                     contentDescription = null,
                     modifier = Modifier
                         .size(24.dp)
+                        .alpha(avatarAlpha)
                         .clip(CircleShape),
                 )
             } else {
                 Box(
                     modifier = Modifier
                         .size(24.dp)
+                        .alpha(avatarAlpha)
                         .background(Color(0xFFE8EDF5), CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -638,8 +652,56 @@ private fun FollowUserPill(
             user.batteryLevel?.let { level ->
                 BatteryBadge(level = level, isCharging = user.isCharging, onOrange = isActive)
             }
+            freshnessLabel(user.lastUpdateAtEpochMillis, now)?.let { label ->
+                Text(
+                    text = label,
+                    color = when {
+                        isActive -> Color.White
+                        // Arancione scuro: il pill ha fondo bianco anche in tema scuro.
+                        stale -> Color(0xFFD35400)
+                        else -> Color(0xFF6B7280)
+                    },
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
+            }
         }
     }
+}
+
+/** Oltre mezz'ora senza aggiornamenti (due battiti da 15 min persi) quel telefono ha smesso di inviare. */
+private const val LOCATION_STALE_AFTER_MS = 30 * 60 * 1000L
+
+private fun isStale(lastUpdateAt: Long?, now: Long): Boolean =
+    lastUpdateAt != null && now - lastUpdateAt > LOCATION_STALE_AFTER_MS
+
+/**
+ * «adesso» · «12 minuti fa» · «3 ore fa» · «2 giorni fa», come su iOS. Sotto le
+ * due ore si resta sui minuti, così minuti, ore e giorni sono sempre plurali.
+ * `null` se la posizione non ha data (scritta da build molto vecchie).
+ */
+@Composable
+private fun freshnessLabel(lastUpdateAt: Long?, now: Long): String? {
+    if (lastUpdateAt == null) return null
+    val minutes = ((now - lastUpdateAt) / 60_000L).coerceAtLeast(0L).toInt()
+    return when {
+        minutes < 2 -> stringResource(R.string.location_updated_now)
+        minutes < 120 -> stringResource(R.string.location_updated_minutes_ago, minutes)
+        minutes < 48 * 60 -> stringResource(R.string.location_updated_hours_ago, minutes / 60)
+        else -> stringResource(R.string.location_updated_days_ago, minutes / (24 * 60))
+    }
+}
+
+@Composable
+private fun rememberNowMillis(periodMs: Long = 30_000L): Long {
+    val now by produceState(System.currentTimeMillis()) {
+        while (true) {
+            delay(periodMs)
+            value = System.currentTimeMillis()
+        }
+    }
+    return now
 }
 
 /**
