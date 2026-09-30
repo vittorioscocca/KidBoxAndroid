@@ -236,8 +236,11 @@ class LocationSharingService : Service() {
             return
         }
 
+        // Uno spostamento più piccolo dell'imprecisione del fix è rumore, non
+        // movimento: vale per capire se si è fermi e per decidere se scrivere.
+        val noise = maxOf(MOVEMENT_RADIUS_METERS, fix.accuracy)
         val anchor = movementAnchor
-        if (anchor == null || fix.distanceTo(anchor) >= MOVEMENT_RADIUS_METERS) {
+        if (anchor == null || fix.distanceTo(anchor) >= noise) {
             movementAnchor = fix
             lastMovementAtMillis = now
         } else if (now - lastMovementAtMillis >= STATIONARY_AFTER_MS) {
@@ -258,7 +261,11 @@ class LocationSharingService : Service() {
         // distinguere «fermo» da «servizio morto». Il 30/09/2026 un telefono
         // aveva la condivisione ferma da 10 giorni e nessuno poteva saperlo.
         val heartbeatDue = now - lastWriteAtMillis >= HEARTBEAT_MS
-        if (previous != null && fix.distanceTo(previous) < MIN_DISTANCE_METERS && !heartbeatDue) {
+        // Oltre i 10 m e anche oltre l'imprecisione del fix: al chiuso un
+        // telefono fermo con fix da ±20 m scriveva ogni pochi minuti (prova del
+        // 30/09). In movimento vero lo spostamento la supera, e il fix si scrive
+        // anche se grossolano: in macchina il pin non si ferma.
+        if (previous != null && fix.distanceTo(previous) < maxOf(MIN_DISTANCE_METERS, fix.accuracy) && !heartbeatDue) {
             return
         }
         write(fix, now)
