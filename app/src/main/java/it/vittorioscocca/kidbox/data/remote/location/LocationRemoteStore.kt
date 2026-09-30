@@ -6,6 +6,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.SetOptions
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.location.DeviceBattery
@@ -204,7 +205,12 @@ class LocationRemoteStore @Inject constructor(
             .document(familyId)
             .collection("locations")
             .document(uid)
-            .addSnapshotListener { snap, err ->
+            // MetadataChanges.INCLUDE è indispensabile: se il documento in cache
+            // è identico a quello del server, senza di esso Firestore non manda
+            // l'aggiornamento «ora viene dal server» e la conferma non arriva
+            // mai. Dopo ogni ripresa il telefono non avrebbe scritto niente
+            // (prova dal vivo del 30/09/2026 su iOS, stesso schema qui).
+            .addSnapshotListener(MetadataChanges.INCLUDE) { snap, err ->
                 if (err != null) {
                     onError(err)
                     return@addSnapshotListener
