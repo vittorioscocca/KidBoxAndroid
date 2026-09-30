@@ -25,6 +25,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.filled.Battery1Bar
@@ -131,6 +141,10 @@ fun FamilyLocationScreen(
     val myUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
     // «X minuti fa» e il segnaposto sbiadito devono invecchiare anche senza dati nuovi.
     val now = rememberNowMillis()
+    // Scheda in basso abbassata a una riga: si ricorda fra un'apertura e
+    // l'altra, come il foglio di Mappe (e come su iOS).
+    val cardPrefs = remember { context.getSharedPreferences("kidbox_prefs", android.content.Context.MODE_PRIVATE) }
+    var cardCollapsed by remember { mutableStateOf(cardPrefs.getBoolean(CARD_COLLAPSED_KEY, false)) }
     val scope = rememberCoroutineScope()
 
     // Mappa a tutto schermo, sotto le barre di sistema.
@@ -479,6 +493,11 @@ fun FamilyLocationScreen(
                     )
                 }
             },
+            collapsed = cardCollapsed,
+            onCollapsedChange = { value ->
+                cardCollapsed = value
+                cardPrefs.edit().putBoolean(CARD_COLLAPSED_KEY, value).apply()
+            },
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             )
         }
@@ -670,6 +689,8 @@ private fun FollowUserPill(
     }
 }
 
+private const val CARD_COLLAPSED_KEY = "location_card_collapsed"
+
 /** Oltre mezz'ora senza aggiornamenti (due battiti da 15 min persi) quel telefono ha smesso di inviare. */
 private const val LOCATION_STALE_AFTER_MS = 30 * 60 * 1000L
 
@@ -755,6 +776,8 @@ private fun LocationBottomCard(
     myUid: String,
     onToggle: (Boolean) -> Unit,
     onMyLocationTap: () -> Unit = {},
+    collapsed: Boolean = false,
+    onCollapsedChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val containerColor = if (isDarkTheme) Color(0xD11C2733) else Color(0xE6EFF6E5)
@@ -798,9 +821,32 @@ private fun LocationBottomCard(
             " • " + stringResource(R.string.location_other_sharing_more, otherParts.size - 2)
     }
 
+    // Trascinamento della scheda, come il foglio di Mappe: da aperta segue il
+    // dito verso il basso, da chiusa accenna la salita; al rilascio scatta.
+    val density = LocalDensity.current
+    val snapPx = with(density) { 60.dp.toPx() }
+    var dragPx by remember { mutableFloatStateOf(0f) }
+    val visualOffset = if (collapsed) (dragPx.coerceAtMost(0f) * 0.25f) else dragPx.coerceAtLeast(0f)
+
     Box(modifier = modifier.fillMaxWidth()) {
         Surface(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset { IntOffset(0, visualOffset.roundToInt()) }
+                .pointerInput(collapsed) {
+                    detectVerticalDragGestures(
+                        onDragEnd = {
+                            if (dragPx > snapPx) onCollapsedChange(true)
+                            else if (dragPx < -snapPx) onCollapsedChange(false)
+                            dragPx = 0f
+                        },
+                        onDragCancel = { dragPx = 0f },
+                        onVerticalDrag = { change, amount ->
+                            change.consume()
+                            dragPx += amount
+                        },
+                    )
+                },
             shape = RoundedCornerShape(24.dp),
             color = containerColor,
             tonalElevation = 2.dp,
@@ -808,125 +854,205 @@ private fun LocationBottomCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                    .animateContentSize()
+                    .padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    text = stringResource(R.string.location_my_section_title),
-                    fontSize = 34.sp,
-                    lineHeight = 34.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.kidBoxColors.title,
+                // La maniglia: si trascina, e un tocco apre o chiude.
+                val grabberLabel = stringResource(
+                    if (collapsed) R.string.location_card_expand else R.string.location_card_collapse,
                 )
-                if (!state.isSharing) {
-                    Text(
-                        text = stringResource(R.string.location_no_location_shared),
-                        color = dangerColor,
-                        fontSize = 22.sp,
-                        lineHeight = 24.sp,
-                        fontWeight = FontWeight.Bold,
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(14.dp)
+                        .clickable(onClickLabel = grabberLabel) { onCollapsedChange(!collapsed) }
+                        .semantics { contentDescription = grabberLabel },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(width = 36.dp, height = 5.dp)
+                            .background(secondaryTextColor.copy(alpha = 0.55f), RoundedCornerShape(50)),
                     )
-                } else {
-                    state.myCurrentAddress?.let {
-                        Text(
-                            text = it,
-                            color = MaterialTheme.kidBoxColors.title,
-                            fontSize = 14.sp,
-                        )
-                    }
                 }
 
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = innerCardColor,
-                ) {
-                    Column(
+                if (collapsed) {
+                    // Scheda abbassata: chi sono, lo stato in una riga, e l'interruttore.
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                            .clickable { onCollapsedChange(false) },
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Row(
+                        Surface(
+                            shape = CircleShape,
+                            color = locationChipColor,
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    tint = if (state.isSharing) Color(0xFF2E86FF) else chevronColor,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.location_my_section_title),
+                                color = MaterialTheme.kidBoxColors.title,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                            )
+                            val line = if (!state.isSharing) {
+                                stringResource(R.string.location_no_location_shared)
+                            } else {
+                                state.myCurrentAddress ?: myStatusText
+                            }
+                            line?.let {
+                                Text(
+                                    text = it,
+                                    color = if (state.isSharing) secondaryTextColor else dangerColor,
+                                    fontSize = 13.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = state.isSharing,
+                            onCheckedChange = onToggle,
+                            thumbContent = null,
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFF30C659),
+                                uncheckedThumbColor = Color.White,
+                                uncheckedTrackColor = if (isDarkTheme) Color(0xFF616872) else Color(0xFFD0D3D7),
+                            ),
+                        )
+                    }
+                } else {
+                    Text(
+                        text = stringResource(R.string.location_my_section_title),
+                        fontSize = 34.sp,
+                        lineHeight = 34.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.kidBoxColors.title,
+                    )
+                    if (!state.isSharing) {
+                        Text(
+                            text = stringResource(R.string.location_no_location_shared),
+                            color = dangerColor,
+                            fontSize = 22.sp,
+                            lineHeight = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    } else {
+                        state.myCurrentAddress?.let {
+                            Text(
+                                text = it,
+                                color = MaterialTheme.kidBoxColors.title,
+                                fontSize = 14.sp,
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = innerCardColor,
+                    ) {
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable(
-                                    enabled = state.deviceLatitude != null,
-                                    onClick = onMyLocationTap,
-                                ),
-                            verticalAlignment = Alignment.CenterVertically,
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = locationChipColor,
-                                modifier = Modifier.size(24.dp),
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(
+                                        enabled = state.deviceLatitude != null,
+                                        onClick = onMyLocationTap,
+                                    ),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        Icons.Default.LocationOn,
-                                        contentDescription = null,
-                                        tint = if (state.isSharing) Color(0xFF2E86FF) else chevronColor,
-                                        modifier = Modifier.size(15.dp),
-                                    )
+                                Surface(
+                                    shape = CircleShape,
+                                    color = locationChipColor,
+                                    modifier = Modifier.size(24.dp),
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Default.LocationOn,
+                                            contentDescription = null,
+                                            tint = if (state.isSharing) Color(0xFF2E86FF) else chevronColor,
+                                            modifier = Modifier.size(15.dp),
+                                        )
+                                    }
                                 }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = stringResource(R.string.location_my_location_label),
+                                    color = MaterialTheme.kidBoxColors.title,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 19.sp,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = if (state.deviceLatitude != null) Color(0xFF2E86FF) else chevronColor,
+                                    modifier = Modifier.size(20.dp),
+                                )
                             }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = stringResource(R.string.location_my_location_label),
-                                color = MaterialTheme.kidBoxColors.title,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 19.sp,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowRight,
-                                contentDescription = null,
-                                tint = if (state.deviceLatitude != null) Color(0xFF2E86FF) else chevronColor,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = stringResource(R.string.location_share_my_location_label),
-                                color = MaterialTheme.kidBoxColors.title,
-                                fontSize = 18.sp,
-                                lineHeight = 20.sp,
-                            )
-                            Spacer(modifier = Modifier.weight(1f))
-                            Switch(
-                                checked = state.isSharing,
-                                onCheckedChange = onToggle,
-                                thumbContent = null,
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = Color(0xFF30C659),
-                                    uncheckedThumbColor = Color.White,
-                                    uncheckedTrackColor = if (isDarkTheme) Color(0xFF616872) else Color(0xFFD0D3D7),
-                                ),
-                            )
-                        }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.location_share_my_location_label),
+                                    color = MaterialTheme.kidBoxColors.title,
+                                    fontSize = 18.sp,
+                                    lineHeight = 20.sp,
+                                )
+                                Spacer(modifier = Modifier.weight(1f))
+                                Switch(
+                                    checked = state.isSharing,
+                                    onCheckedChange = onToggle,
+                                    thumbContent = null,
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = Color(0xFF30C659),
+                                        uncheckedThumbColor = Color.White,
+                                        uncheckedTrackColor = if (isDarkTheme) Color(0xFF616872) else Color(0xFFD0D3D7),
+                                    ),
+                                )
+                            }
 
-                        myStatusText?.let { status ->
-                            Text(
-                                text = status,
-                                color = secondaryTextColor,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                            )
-                        }
+                            myStatusText?.let { status ->
+                                Text(
+                                    text = status,
+                                    color = secondaryTextColor,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                            }
 
-                        othersStatusText?.let { line ->
-                            Text(
-                                text = line,
-                                color = secondaryTextColor,
-                                fontSize = 12.sp,
-                                lineHeight = 16.sp,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                            othersStatusText?.let { line ->
+                                Text(
+                                    text = line,
+                                    color = secondaryTextColor,
+                                    fontSize = 12.sp,
+                                    lineHeight = 16.sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     }
                 }
