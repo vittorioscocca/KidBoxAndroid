@@ -561,6 +561,9 @@
     <string name="security_breach_notification_title">KidBox · Contraseñas en riesgo</string>
     <string name="security_breach_notification_body">%1$s nuevas contraseñas encontradas en una filtración de datos.</string>
     <string name="location_sharing_notification_text">Compartir ubicación activo</string>
+    <string name="location_sharing_stop_action">Detener</string>
+    <string name="location_sharing_channel_name">Compartir ubicación</string>
+    <string name="location_sharing_channel_description">Notificación permanente mientras compartes tu ubicación con la familia</string>
     <string name="house_payment_reminder_title">Vencimiento próximo</string>
     <string name="house_payment_reminder_body">%1$s — en 3 días.</string>
     <string name="house_payment_reminder_body_fallback">En 3 días — abre Casa.</string>

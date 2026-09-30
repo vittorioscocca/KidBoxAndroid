@@ -561,6 +561,9 @@
     <string name="security_breach_notification_title">KidBox · Mots de passe à risque</string>
     <string name="security_breach_notification_body">%1$s nouveaux mots de passe trouvés dans une fuite de données.</string>
     <string name="location_sharing_notification_text">Partage de position actif</string>
+    <string name="location_sharing_stop_action">Arrêter</string>
+    <string name="location_sharing_channel_name">Partage de position</string>
+    <string name="location_sharing_channel_description">Notification permanente pendant que vous partagez votre position avec la famille</string>
     <string name="house_payment_reminder_title">Échéance à venir</string>
     <string name="house_payment_reminder_body">%1$s — dans 3 jours.</string>
     <string name="house_payment_reminder_body_fallback">Dans 3 jours — ouvrez Maison.</string>

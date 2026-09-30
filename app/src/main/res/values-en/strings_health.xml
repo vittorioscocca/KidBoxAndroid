@@ -561,6 +561,9 @@
     <string name="security_breach_notification_title">KidBox · Passwords at risk</string>
     <string name="security_breach_notification_body">%1$s new passwords found in a data breach.</string>
     <string name="location_sharing_notification_text">Location sharing active</string>
+    <string name="location_sharing_stop_action">Stop</string>
+    <string name="location_sharing_channel_name">Location sharing</string>
+    <string name="location_sharing_channel_description">Ongoing notification while you share your location with your family</string>
     <string name="house_payment_reminder_title">Upcoming deadline</string>
     <string name="house_payment_reminder_body">%1$s — in 3 days.</string>
     <string name="house_payment_reminder_body_fallback">In 3 days — open Home.</string>

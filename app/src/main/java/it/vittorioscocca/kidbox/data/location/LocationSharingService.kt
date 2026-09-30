@@ -486,7 +486,7 @@ class LocationSharingService : Service() {
             .setOngoing(true)
             .setContentIntent(contentIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .addAction(0, "Interrompi", stopPending)
+            .addAction(0, getString(R.string.location_sharing_stop_action), stopPending)
             .build()
 
         return try {
@@ -605,10 +605,10 @@ class LocationSharingService : Service() {
             manager.createNotificationChannel(
                 NotificationChannel(
                     CHANNEL_ID,
-                    "Condivisione posizione",
+                    context.getString(R.string.location_sharing_channel_name),
                     NotificationManager.IMPORTANCE_LOW,
                 ).apply {
-                    description = "Notifica persistente mentre condividi la tua posizione con la famiglia"
+                    description = context.getString(R.string.location_sharing_channel_description)
                     setShowBadge(false)
                 },
             )
