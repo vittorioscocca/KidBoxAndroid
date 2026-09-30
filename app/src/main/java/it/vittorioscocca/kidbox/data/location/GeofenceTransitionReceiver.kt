@@ -58,10 +58,9 @@ class GeofenceTransitionReceiver : BroadcastReceiver() {
                 for (triggering in event.triggeringGeofences.orEmpty()) {
                     val geofenceId = triggering.requestId
                     val entity = geofenceDao.getById(geofenceId) ?: continue
-                    when (type) {
-                        GeofenceTransitionType.ARRIVE -> if (!entity.notifyOnArrive) continue
-                        GeofenceTransitionType.LEAVE -> if (!entity.notifyOnLeave) continue
-                    }
+                    // Anche il passaggio che non si avvisa va al server: gli
+                    // serve per tenere lo stato della zona (vedi toAndroidGeofence).
+                    if (!entity.notifyOnArrive && !entity.notifyOnLeave) continue
                     KBLog.app.info(
                         "GeofenceTransitionReceiver: ${type.raw} id=$geofenceId familyId=$familyId",
                         TAG,

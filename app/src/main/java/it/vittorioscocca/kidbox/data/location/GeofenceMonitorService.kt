@@ -139,10 +139,13 @@ class GeofenceMonitorService @Inject constructor(
             (if (entity.radius > 0) entity.radius else 200.0).toFloat(),
             MAX_RADIUS_METERS,
         )
-        var transitions = 0
-        if (entity.notifyOnArrive) transitions = transitions or Geofence.GEOFENCE_TRANSITION_ENTER
-        if (entity.notifyOnLeave) transitions = transitions or Geofence.GEOFENCE_TRANSITION_EXIT
-        if (transitions == 0) return null
+        // Sempre ENTRATA e USCITA, anche quando se ne avvisa una sola: cosa
+        // avvisare lo decide il server (onGeofenceEvent), che per riconoscere un
+        // doppione o un'uscita lampo deve vedere tutti e due i passaggi. Prima
+        // si mandava solo quello da avvisare, e in una zona «solo arrivo» (il
+        // default) dopo il primo avviso ogni arrivo sembrava un doppione.
+        if (!entity.notifyOnArrive && !entity.notifyOnLeave) return null
+        val transitions = Geofence.GEOFENCE_TRANSITION_ENTER or Geofence.GEOFENCE_TRANSITION_EXIT
         return Geofence.Builder()
             .setRequestId(entity.id)
             .setCircularRegion(entity.latitude, entity.longitude, radiusMeters)
