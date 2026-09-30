@@ -82,6 +82,13 @@ class LocationSharingService : Service() {
     /** Ora della prima pubblicazione della notifica fissa: resta quella a ogni ripubblicazione. */
     private var foregroundSinceMillis = 0L
 
+    // Risparmio batteria: vedi requestUpdates.
+    private enum class PowerMode { MOVING, STATIONARY }
+    private var powerMode = PowerMode.MOVING
+    /** Ultimo punto in cui ci si è mossi davvero, e quando. */
+    private var movementAnchor: Location? = null
+    private var lastMovementAtMillis = 0L
+
     override fun onCreate() {
         super.onCreate()
         fusedClient = LocationServices.getFusedLocationProviderClient(this)
@@ -160,14 +167,34 @@ class LocationSharingService : Service() {
 
     private fun startLocationUpdates() {
         if (locationCallback != null) return
+        requestUpdates(PowerMode.MOVING)
+    }
+
+    /**
+     * In movimento il GPS; da fermi la posizione da Wi-Fi e celle
+     * (BALANCED_POWER_ACCURACY), che costa una frazione. Prima il GPS restava
+     * a HIGH_ACCURACY anche col telefono sul tavolo, per una scrittura ogni
+     * 45 secondi al più.
+     */
+    private fun requestUpdates(mode: PowerMode) {
+        locationCallback?.let { runCatching { fusedClient.removeLocationUpdates(it) } }
+        powerMode = mode
         val callback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 result.lastLocation?.let { handleFix(it) }
             }
         }
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 45_000L)
-            .setMinUpdateIntervalMillis(45_000L)
-            .build()
+        val request = when (mode) {
+            PowerMode.MOVING -> LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 45_000L)
+                .setMinUpdateIntervalMillis(45_000L)
+                .build()
+            // Un fix al minuto: basta per accorgersi di essere ripartiti, e per
+            // far girare il battito (che da fermi riscrive l'ultima posizione
+            // precisa, non questi fix grossolani).
+            PowerMode.STATIONARY -> LocationRequest.Builder(Priority.PRIORITY_BALANCED_POWER_ACCURACY, 60_000L)
+                .setMinUpdateIntervalMillis(60_000L)
+                .build()
+        }
         locationCallback = callback
         runCatching {
             @Suppress("MissingPermission")
@@ -186,13 +213,45 @@ class LocationSharingService : Service() {
             return
         }
         if (!isReliable(fix)) return
+        val now = System.currentTimeMillis()
+
+        if (powerMode == PowerMode.STATIONARY) {
+            // Da fermi i fix vengono da Wi-Fi e celle: dicono solo se ci si è
+            // mossi. Scritti, farebbero saltare il pin. Se ci si è allontanati
+            // davvero (oltre l'imprecisione del fix) si riaccende il GPS e si
+            // scrive il prossimo fix preciso; altrimenti solo il battito, con
+            // l'ultima posizione precisa.
+            val anchor = movementAnchor
+            if (anchor != null && fix.distanceTo(anchor) > WAKE_UP_DISTANCE_METERS + fix.accuracy) {
+                KBLog.app.info("LocationSharingService: di nuovo in movimento → GPS", TAG)
+                movementAnchor = null
+                lastMovementAtMillis = now
+                requestUpdates(PowerMode.MOVING)
+                return
+            }
+            val lastPrecise = lastWrittenLocation
+            if (remoteConfirmed && lastPrecise != null && now - lastWriteAtMillis >= HEARTBEAT_MS) {
+                write(lastPrecise, now)
+            }
+            return
+        }
+
+        val anchor = movementAnchor
+        if (anchor == null || fix.distanceTo(anchor) >= MOVEMENT_RADIUS_METERS) {
+            movementAnchor = fix
+            lastMovementAtMillis = now
+        } else if (now - lastMovementAtMillis >= STATIONARY_AFTER_MS) {
+            // Fermi da 5 minuti: si spegne il GPS. Il fix di adesso si valuta
+            // comunque qui sotto (può essere il battito).
+            KBLog.app.info("LocationSharingService: fermi da 5 minuti → GPS spento, Wi-Fi e celle", TAG)
+            requestUpdates(PowerMode.STATIONARY)
+        }
 
         if (!remoteConfirmed) {
             pendingFix = fix
             return
         }
 
-        val now = System.currentTimeMillis()
         val previous = lastWrittenLocation
         // Il battito: anche da fermi una scrittura ogni HEARTBEAT_MS, così chi
         // guarda (e il server, che decide se mandare la push di ripresa) può
@@ -232,9 +291,16 @@ class LocationSharingService : Service() {
      * salterebbe di centinaia di metri). Stessi criteri di iOS.
      */
     private fun isReliable(fix: Location): Boolean {
-        if (fix.hasAccuracy() && fix.accuracy > MAX_ACCURACY_METERS) return false
         val ageMs = (SystemClock.elapsedRealtimeNanos() - fix.elapsedRealtimeNanos) / 1_000_000
         if (ageMs > MAX_FIX_AGE_MS) return false
+        // Con la sola posizione «approssimativa» ogni fix è da chilometri per
+        // scelta dell'utente: i due filtri sulla precisione lo scarterebbero
+        // sempre, e quel telefono non scriverebbe più niente.
+        val approximateOnly = ContextCompat.checkSelfPermission(
+            this, android.Manifest.permission.ACCESS_FINE_LOCATION,
+        ) != PackageManager.PERMISSION_GRANTED
+        if (approximateOnly) return true
+        if (fix.hasAccuracy() && fix.accuracy > MAX_ACCURACY_METERS) return false
         val previous = lastWrittenLocation
         if (fix.hasAccuracy() && fix.accuracy > COARSE_ACCURACY_METERS &&
             previous != null && previous.hasAccuracy() && previous.accuracy <= COARSE_ACCURACY_METERS &&
@@ -363,6 +429,8 @@ class LocationSharingService : Service() {
         pendingFix = null
         lastWrittenLocation = null
         lastWriteAtMillis = 0L
+        movementAnchor = null
+        lastMovementAtMillis = 0L
     }
 
     /**
@@ -473,6 +541,12 @@ class LocationSharingService : Service() {
         private const val COARSE_ACCURACY_METERS = 200f
         private const val PRECISE_FIX_VALIDITY_MS = 5 * 60 * 1000L
         private const val MAX_FIX_AGE_MS = 2 * 60 * 1000L
+        /** Sotto questo raggio un fix nuovo è ancora «lì»: il jitter da fermi. */
+        private const val MOVEMENT_RADIUS_METERS = 30f
+        /** Da fermi da così tanto si spegne il GPS. */
+        private const val STATIONARY_AFTER_MS = 5 * 60 * 1000L
+        /** Da fermi, quanto deve spostarsi un fix grossolano (oltre la sua imprecisione) per riaccendere il GPS. */
+        private const val WAKE_UP_DISTANCE_METERS = 100f
         private const val STATUS_RETRY_MIN_MS = 60_000L
         private const val STATUS_RETRY_MAX_MS = 15 * 60_000L
         const val ACTION_STOP = "it.vittorioscocca.kidbox.action.STOP_LOCATION_SHARING"
