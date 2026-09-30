@@ -79,6 +79,8 @@ class LocationSharingService : Service() {
     private var statusRetryDelayMs = STATUS_RETRY_MIN_MS
     private var statusRetryJob: Job? = null
     private var expiryJob: Job? = null
+    /** Ora della prima pubblicazione della notifica fissa: resta quella a ogni ripubblicazione. */
+    private var foregroundSinceMillis = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -394,10 +396,18 @@ class LocationSharingService : Service() {
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        // Ogni avvio (push di ripresa, evento di zona, apertura dell'app, watchdog)
+        // ripubblica questa notifica anche a servizio già attivo: senza queste tre
+        // righe si riportava in cima con l'ora nuova, e sembrava un avviso appena
+        // arrivato (prova dal vivo del 30/09/2026 con la push di ripresa).
+        if (foregroundSinceMillis == 0L) foregroundSinceMillis = System.currentTimeMillis()
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(getString(R.string.app_name))
             .setContentText(getString(R.string.location_sharing_notification_text))
+            .setWhen(foregroundSinceMillis)
+            .setShowWhen(false)
+            .setOnlyAlertOnce(true)
             .setOngoing(true)
             .setContentIntent(contentIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
