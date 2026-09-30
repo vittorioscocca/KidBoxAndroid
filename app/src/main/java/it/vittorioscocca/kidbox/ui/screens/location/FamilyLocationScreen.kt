@@ -285,7 +285,12 @@ fun FamilyLocationScreen(
                 followingUserId = null
             },
         ) {
-            state.sharedUsers.forEach { user ->
+            // Sé stessi sono il pallino blu (dal vivo, isMyLocationEnabled): il
+            // proprio segnaposto starebbe sull'ultima posizione SCRITTA, qualche
+            // metro o minuto indietro, e i due punti non coinciderebbero. Come su
+            // iOS, la propria foto la vedono solo gli altri.
+            val showMe = !viewModel.hasLocationPermissionNow()
+            state.sharedUsers.filter { showMe || it.id != myUid }.forEach { user ->
                 val avatarDescriptor = rememberAvatarMarkerDescriptor(user.avatarUrl)
                 val freshness = freshnessLabel(user.lastUpdateAtEpochMillis, now)
                 Marker(
