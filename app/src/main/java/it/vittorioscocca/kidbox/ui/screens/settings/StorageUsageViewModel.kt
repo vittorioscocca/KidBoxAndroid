@@ -10,6 +10,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
+import it.vittorioscocca.kidbox.data.repository.KBTrialOfferUi
 import it.vittorioscocca.kidbox.data.repository.KBTrialState
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.billing.KBBillingManager
@@ -53,6 +54,8 @@ data class StorageUsageUiState(
     val trial: KBTrialState = KBTrialState(),
     /** Play ha gli annuali: solo allora si propone la scelta Mensile/Annuale. */
     val hasYearly: Boolean = false,
+    /** Card della prova Pro (pulsante o richiesta al proprietario). */
+    val trialOffer: KBTrialOfferUi = KBTrialOfferUi(),
 )
 
 @HiltViewModel
@@ -89,6 +92,11 @@ class StorageUsageViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            billingManager.trialOffer.collect { offer ->
+                _uiState.update { it.copy(trialOffer = offer) }
+            }
+        }
+        viewModelScope.launch {
             billingManager.purchaseError.collect { err ->
                 _uiState.update { it.copy(billingPurchaseError = err) }
             }
@@ -98,6 +106,14 @@ class StorageUsageViewModel @Inject constructor(
     fun warmBilling() {
         billingManager.start()
     }
+
+    fun startTrial(triggerFeature: String) = billingManager.startTrial(triggerFeature)
+
+    fun clearTrialStartFailed() = billingManager.clearTrialStartFailed()
+
+    fun askOwnerForTrial() = billingManager.askOwnerForTrial()
+
+    fun clearTrialAskResult() = billingManager.clearTrialAskResult()
 
     /** Avvio acquisto come dal pulsante "Abbonati" in Piani. */
     fun purchase(plan: KBPlan, activity: Activity, triggerFeature: String, yearly: Boolean) {

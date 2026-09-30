@@ -80,6 +80,7 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.screens.home.ProTrialOfferCard
 import it.vittorioscocca.kidbox.ui.components.KBBackButton
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 
@@ -175,7 +176,9 @@ fun StorageUsageScreen(
             sectionRows = state.sections,
         )
 
-        if (state.plan == KBPlan.FREE || state.plan == KBPlan.PRO) {
+        // Con la prova disponibile «Upgrade · Passa a Pro» sarebbe un secondo
+        // invito accanto a «Prova Pro»: la card della prova, più sotto, basta.
+        if (!state.trialOffer.isVisible && (state.plan == KBPlan.FREE || state.plan == KBPlan.PRO)) {
             Spacer(Modifier.height(10.dp))
             Card(
                 modifier = Modifier
@@ -222,6 +225,18 @@ fun StorageUsageScreen(
                     }
                 }
             }
+        }
+
+        if (state.trialOffer.isVisible) {
+            Spacer(Modifier.height(14.dp))
+            ProTrialOfferCard(
+                offer = state.trialOffer,
+                triggerFeature = triggerFeature,
+                onStart = { viewModel.startTrial(triggerFeature) },
+                onAskOwner = viewModel::askOwnerForTrial,
+                onDismissFailure = viewModel::clearTrialStartFailed,
+                onDismissAskResult = viewModel::clearTrialAskResult,
+            )
         }
 
         Spacer(Modifier.height(14.dp))

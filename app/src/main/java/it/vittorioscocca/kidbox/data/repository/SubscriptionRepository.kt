@@ -23,6 +23,37 @@ data class KBTrialState(val endsAtMillis: Long? = null, val ended: Boolean = fal
     }
 }
 
+/**
+ * Risposta di `getProTrialStatus`: se la prova spetta a chi chiama
+ * ([eligible]) o, a un membro non proprietario, se il proprietario può ancora
+ * attivarla ([ownerCanStart]) e se gliel'ha già chiesto da poco ([askedOwner]).
+ */
+data class KBTrialOfferStatus(
+    val eligible: Boolean,
+    val days: Int,
+    val aiLimit: Int,
+    val ownerCanStart: Boolean,
+    val askedOwner: Boolean,
+)
+
+/** Stato della card della prova Pro in Spazio e Piani (vedi ProTrialOfferCard). */
+data class KBTrialOfferUi(
+    /** Giorni attivabili dal proprietario col pulsante (null = non spetta). */
+    val ownerDays: Int? = null,
+    /** Giorni che il proprietario può attivare, visti da un altro membro. */
+    val askOwnerDays: Int? = null,
+    val ownerAsked: Boolean = false,
+    val aiLimit: Int = 50,
+    val isStarting: Boolean = false,
+    val startFailed: Boolean = false,
+    val isAsking: Boolean = false,
+    val askResult: KBTrialAskResult? = null,
+) {
+    val isVisible: Boolean get() = ownerDays != null || askOwnerDays != null
+}
+
+enum class KBTrialAskResult { SENT, NOT_DELIVERED, FAILED }
+
 interface SubscriptionRepository {
     fun planFlow(familyId: String, uid: String): Flow<KBPlan>
 
@@ -30,6 +61,18 @@ interface SubscriptionRepository {
     suspend fun loadTrialState(familyId: String): KBTrialState
 
     suspend fun loadPlan(familyId: String, uid: String): KBPlan
+
+    /**
+     * Se la prova Pro spetta, a chi chiama o al proprietario (null = errore).
+     * Decide il server (`getProTrialStatus`): `trials/{uid}` non è leggibile.
+     */
+    suspend fun loadTrialOffer(familyId: String): KBTrialOfferStatus?
+
+    /** «Chiedi di attivarla»: push al proprietario. true = consegnata. */
+    suspend fun askOwnerForTrial(familyId: String): Result<Boolean>
+
+    /** Attiva la prova Pro sulla famiglia (`startProTrial`). */
+    suspend fun startTrial(familyId: String): Result<Unit>
 
     suspend fun updatePlanAfterPurchase(
         plan: KBPlan,

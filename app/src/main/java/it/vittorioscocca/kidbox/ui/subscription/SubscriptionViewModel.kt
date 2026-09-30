@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.android.billingclient.api.ProductDetails
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.billing.KBBillingManager
+import it.vittorioscocca.kidbox.data.repository.KBTrialOfferUi
 import it.vittorioscocca.kidbox.data.repository.KBTrialState
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import javax.inject.Inject
@@ -23,6 +24,8 @@ data class SubscriptionUiState(
     val availableProducts: List<ProductDetails> = emptyList(),
     val subscriptionExpirationDate: Long? = null,
     val trial: KBTrialState = KBTrialState(),
+    /** Card della prova Pro (pulsante o richiesta al proprietario). */
+    val trialOffer: KBTrialOfferUi = KBTrialOfferUi(),
 )
 
 @HiltViewModel
@@ -52,6 +55,8 @@ class SubscriptionViewModel @Inject constructor(
                 )
             }.combine(billingManager.trialState) { state, trial ->
                 state.copy(trial = trial)
+            }.combine(billingManager.trialOffer) { state, offer ->
+                state.copy(trialOffer = offer)
             }.collect { _uiState.value = it }
         }
     }
@@ -72,6 +77,14 @@ class SubscriptionViewModel @Inject constructor(
     fun loadPlan() {
         billingManager.start()
     }
+
+    fun startTrial(triggerFeature: String) = billingManager.startTrial(triggerFeature)
+
+    fun clearTrialStartFailed() = billingManager.clearTrialStartFailed()
+
+    fun askOwnerForTrial() = billingManager.askOwnerForTrial()
+
+    fun clearTrialAskResult() = billingManager.clearTrialAskResult()
 
     fun purchase(plan: KBPlan, activity: Activity, triggerFeature: String, yearly: Boolean = false) {
         billingManager.purchase(plan, activity, triggerFeature, yearly)

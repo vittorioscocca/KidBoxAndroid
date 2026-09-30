@@ -17,4 +17,21 @@
     <string name="trial_home_title_last">Pro included: last day</string>
     <string name="trial_home_body">Extra storage, planners and the AI assistant are unlocked. No card required.</string>
     <string name="trial_profile_plan_until">%1$s · on trial until %2$s</string>
+    <string name="trial_offer_title">Try Pro free for %1$d days</string>
+    <string name="trial_offer_body">Extra storage, planners and the AI assistant for the whole family. No card and no renewal: after %1$d days you go back to Free and your data stays.</string>
+    <string name="trial_offer_button">Try Pro for %1$d days</string>
+    <string name="trial_offer_error_title">Pro trial</string>
+    <string name="trial_offer_error_body">Couldn\'t start the trial. Please try again shortly.</string>
+    <string name="trial_offer_title_ai">You\'ve used your free AI messages</string>
+    <string name="trial_offer_title_meal">The meal plan is included in the Pro trial</string>
+    <string name="trial_offer_title_fitness">The fitness plan is included in the Pro trial</string>
+    <string name="trial_offer_title_travel">Travel itineraries are included in the Pro trial</string>
+    <string name="trial_offer_body_ai">Start the Pro trial: %1$d more messages and all of Pro for %2$d days, no card and no renewal.</string>
+    <string name="trial_offer_body_planner">Start it now: %1$d days of Pro for the whole family, no card and no renewal. Afterwards you go back to Free and your data stays.</string>
+    <string name="trial_offer_body_member">The free trial is started by whoever created the family: %1$d days of Pro for everyone, no card. You can ask with one tap and they\'ll get a notification.</string>
+    <string name="trial_offer_ask_button">Ask to start it</string>
+    <string name="trial_offer_asked">Request sent</string>
+    <string name="trial_offer_ask_sent">Request sent: whoever created the family will get a notification to start the trial.</string>
+    <string name="trial_offer_ask_not_delivered">We couldn\'t notify whoever created the family: their notifications may be off. Ask them in person.</string>
+    <string name="trial_offer_ask_error">Couldn\'t send the request. Please try again shortly.</string>
 </resources>

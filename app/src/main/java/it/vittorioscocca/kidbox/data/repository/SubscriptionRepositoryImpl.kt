@@ -134,6 +134,39 @@ class SubscriptionRepositoryImpl @Inject constructor(
         Unit
     }
 
+    override suspend fun loadTrialOffer(familyId: String): KBTrialOfferStatus? {
+        if (familyId.isBlank()) return null
+        return runCatching {
+            val result = functions.getHttpsCallable("getProTrialStatus")
+                .call(hashMapOf("familyId" to familyId))
+                .await()
+            val data = result.getData() as? Map<*, *> ?: error("Risposta non valida")
+            KBTrialOfferStatus(
+                eligible = data["eligible"] == true,
+                days = (data["days"] as? Number)?.toInt() ?: 14,
+                aiLimit = (data["aiLimit"] as? Number)?.toInt() ?: 50,
+                ownerCanStart = data["ownerCanStart"] == true,
+                askedOwner = data["askedOwner"] == true,
+            )
+        }.getOrNull()
+    }
+
+    override suspend fun askOwnerForTrial(familyId: String): Result<Boolean> = runCatching {
+        if (familyId.isBlank()) error("Famiglia non disponibile")
+        val result = functions.getHttpsCallable("askOwnerForProTrial")
+            .call(hashMapOf("familyId" to familyId))
+            .await()
+        (result.getData() as? Map<*, *>)?.get("sent") == true
+    }
+
+    override suspend fun startTrial(familyId: String): Result<Unit> = runCatching {
+        if (familyId.isBlank()) error("Famiglia non disponibile")
+        functions.getHttpsCallable("startProTrial")
+            .call(hashMapOf("familyId" to familyId))
+            .await()
+        Unit
+    }
+
     override suspend fun getPlan(familyId: String): KBPlan {
         val uid = auth.currentUser?.uid.orEmpty()
         return loadPlan(familyId, uid)

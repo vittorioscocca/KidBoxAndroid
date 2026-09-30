@@ -17,4 +17,21 @@
     <string name="trial_home_title_last">Pro inclus : dernier jour</string>
     <string name="trial_home_body">Espace supplémentaire, planificateurs et assistant IA débloqués. Aucune carte requise.</string>
     <string name="trial_profile_plan_until">%1$s · en essai jusqu’au %2$s</string>
+    <string name="trial_offer_title">Essayez Pro gratuitement pendant %1$d jours</string>
+    <string name="trial_offer_body">Espace supplémentaire, planificateurs et assistant IA pour toute la famille. Sans carte ni renouvellement : après %1$d jours, vous revenez à Free et vos données restent.</string>
+    <string name="trial_offer_button">Essayer Pro pendant %1$d jours</string>
+    <string name="trial_offer_error_title">Essai Pro</string>
+    <string name="trial_offer_error_body">Impossible d’activer l’essai. Réessayez dans quelques instants.</string>
+    <string name="trial_offer_title_ai">Vous avez utilisé vos messages IA gratuits</string>
+    <string name="trial_offer_title_meal">Le plan alimentaire est inclus dans l’essai Pro</string>
+    <string name="trial_offer_title_fitness">Le plan fitness est inclus dans l’essai Pro</string>
+    <string name="trial_offer_title_travel">Les itinéraires de voyage sont inclus dans l’essai Pro</string>
+    <string name="trial_offer_body_ai">Activez l’essai Pro : %1$d messages de plus et tout Pro pendant %2$d jours, sans carte ni renouvellement.</string>
+    <string name="trial_offer_body_planner">Activez-le maintenant : %1$d jours de Pro pour toute la famille, sans carte ni renouvellement. Ensuite, vous revenez à Free et vos données restent.</string>
+    <string name="trial_offer_body_member">L’essai gratuit est activé par la personne qui a créé la famille : %1$d jours de Pro pour tous, sans carte. Demandez-le en un geste, elle recevra une notification.</string>
+    <string name="trial_offer_ask_button">Demander de l’activer</string>
+    <string name="trial_offer_asked">Demande envoyée</string>
+    <string name="trial_offer_ask_sent">Demande envoyée : la personne qui a créé la famille recevra une notification pour activer l’essai.</string>
+    <string name="trial_offer_ask_not_delivered">Impossible de prévenir la personne qui a créé la famille : ses notifications sont peut-être désactivées. Demandez-le-lui de vive voix.</string>
+    <string name="trial_offer_ask_error">Impossible d’envoyer la demande. Réessayez dans quelques instants.</string>
 </resources>

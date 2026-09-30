@@ -17,4 +17,21 @@
     <string name="trial_home_title_last">Pro incluido: último día</string>
     <string name="trial_home_body">Espacio extra, planificadores y asistente de IA desbloqueados. Sin tarjeta.</string>
     <string name="trial_profile_plan_until">%1$s · en prueba hasta el %2$s</string>
+    <string name="trial_offer_title">Prueba Pro gratis durante %1$d días</string>
+    <string name="trial_offer_body">Espacio extra, planificadores y asistente de IA para toda la familia. Sin tarjeta y sin renovación: después de %1$d días vuelves a Free y tus datos se conservan.</string>
+    <string name="trial_offer_button">Probar Pro %1$d días</string>
+    <string name="trial_offer_error_title">Prueba Pro</string>
+    <string name="trial_offer_error_body">No se ha podido activar la prueba. Inténtalo de nuevo en unos minutos.</string>
+    <string name="trial_offer_title_ai">Has usado los mensajes de IA gratuitos</string>
+    <string name="trial_offer_title_meal">El plan de alimentación está incluido en la prueba Pro</string>
+    <string name="trial_offer_title_fitness">El plan de fitness está incluido en la prueba Pro</string>
+    <string name="trial_offer_title_travel">Los itinerarios de viaje están incluidos en la prueba Pro</string>
+    <string name="trial_offer_body_ai">Activa la prueba Pro: %1$d mensajes más y todo Pro durante %2$d días, sin tarjeta y sin renovación.</string>
+    <string name="trial_offer_body_planner">Actívala ahora: %1$d días de Pro para toda la familia, sin tarjeta y sin renovación. Después vuelves a Free y tus datos se conservan.</string>
+    <string name="trial_offer_body_member">La prueba gratuita la activa quien creó la familia: %1$d días de Pro para todos, sin tarjeta. Puedes pedirlo con un toque y recibirá una notificación.</string>
+    <string name="trial_offer_ask_button">Pedir que la active</string>
+    <string name="trial_offer_asked">Solicitud enviada</string>
+    <string name="trial_offer_ask_sent">Solicitud enviada: quien creó la familia recibirá una notificación para activar la prueba.</string>
+    <string name="trial_offer_ask_not_delivered">No se ha podido avisar a quien creó la familia: quizá no tiene las notificaciones activadas. Pídeselo en persona.</string>
+    <string name="trial_offer_ask_error">No se ha podido enviar la solicitud. Inténtalo de nuevo en unos minutos.</string>
 </resources>

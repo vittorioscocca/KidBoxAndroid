@@ -26,6 +26,8 @@ import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.domain.family.isFamilySubscriptionManager
 import it.vittorioscocca.kidbox.domain.family.resolveActiveFamilyId
+import it.vittorioscocca.kidbox.data.repository.KBTrialAskResult
+import it.vittorioscocca.kidbox.data.repository.KBTrialOfferUi
 import it.vittorioscocca.kidbox.data.repository.KBTrialState
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
@@ -39,6 +41,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 
@@ -83,6 +86,14 @@ class KBBillingManager @Inject constructor(
     /** Prova Pro della famiglia attiva (concessa dal server, vedi functions/proTrial.js). */
     private val _trialState = MutableStateFlow(KBTrialState())
     val trialState: StateFlow<KBTrialState> = _trialState.asStateFlow()
+
+    /**
+     * Card della prova Pro in Spazio e Piani. La prova non parte più da sola:
+     * la attiva il proprietario col pulsante, e gli altri membri possono
+     * chiedergliela («Chiedi di attivarla», push al proprietario).
+     */
+    private val _trialOffer = MutableStateFlow(KBTrialOfferUi())
+    val trialOffer: StateFlow<KBTrialOfferUi> = _trialOffer.asStateFlow()
 
     private val _products = MutableStateFlow<List<ProductDetails>>(emptyList())
     val products: StateFlow<List<ProductDetails>> = _products.asStateFlow()
@@ -172,9 +183,77 @@ class KBBillingManager @Inject constructor(
             )
             _currentPlan.value = subscriptionRepository.loadPlan(currentFamilyId, currentUid)
             _trialState.value = subscriptionRepository.loadTrialState(currentFamilyId)
+            refreshTrialOffer()
             connectBillingClient()
             _isLoading.value = false
         }
+    }
+
+    /** Solo su Free: con un piano o una prova in corso la card non serve. */
+    private suspend fun refreshTrialOffer() {
+        val freeHere = _currentPlan.value == KBPlan.FREE &&
+            !_trialState.value.ended &&
+            currentFamilyId.isNotBlank()
+        val status = if (freeHere) subscriptionRepository.loadTrialOffer(currentFamilyId) else null
+        _trialOffer.update {
+            it.copy(
+                ownerDays = status?.takeIf { s -> s.eligible }?.days,
+                askOwnerDays = status?.takeIf { s -> !s.eligible && s.ownerCanStart }?.days,
+                ownerAsked = status?.askedOwner ?: false,
+                aiLimit = status?.aiLimit ?: it.aiLimit,
+            )
+        }
+    }
+
+    /** Pulsante «Prova Pro per 14 giorni»: attiva la prova e ricarica piano e stato. */
+    fun startTrial(triggerFeature: String) {
+        if (_trialOffer.value.isStarting) return
+        scope.launch {
+            _trialOffer.update { it.copy(isStarting = true, startFailed = false) }
+            val familyId = currentFamilyId.ifBlank { resolveActiveFamilyId(familySessionPreferences, familyDao) }
+            subscriptionRepository.startTrial(familyId)
+                .onSuccess {
+                    AppAnalytics.proTrialStarted(context, triggerFeature)
+                    _trialOffer.update { it.copy(ownerDays = null) }
+                    _currentPlan.value = subscriptionRepository.loadPlan(familyId, currentUid)
+                    _trialState.value = subscriptionRepository.loadTrialState(familyId)
+                }
+                .onFailure { _trialOffer.update { it.copy(startFailed = true) } }
+            _trialOffer.update { it.copy(isStarting = false) }
+        }
+    }
+
+    /** Chiusura dell'avviso: il rifiuto può voler dire che la prova non spetta più. */
+    fun clearTrialStartFailed() {
+        _trialOffer.update { it.copy(startFailed = false) }
+        scope.launch { refreshTrialOffer() }
+    }
+
+    /** «Chiedi di attivarla»: push al proprietario (al massimo una al giorno). */
+    fun askOwnerForTrial() {
+        if (_trialOffer.value.isAsking) return
+        scope.launch {
+            _trialOffer.update { it.copy(isAsking = true) }
+            val familyId = currentFamilyId.ifBlank { resolveActiveFamilyId(familySessionPreferences, familyDao) }
+            val esito = subscriptionRepository.askOwnerForTrial(familyId)
+            val sent = esito.getOrNull() == true
+            if (sent) AppAnalytics.proTrialOwnerAsked(context)
+            _trialOffer.update {
+                it.copy(
+                    isAsking = false,
+                    ownerAsked = it.ownerAsked || sent,
+                    askResult = when {
+                        esito.isFailure -> KBTrialAskResult.FAILED
+                        sent -> KBTrialAskResult.SENT
+                        else -> KBTrialAskResult.NOT_DELIVERED
+                    },
+                )
+            }
+        }
+    }
+
+    fun clearTrialAskResult() {
+        _trialOffer.update { it.copy(askResult = null) }
     }
 
     /**

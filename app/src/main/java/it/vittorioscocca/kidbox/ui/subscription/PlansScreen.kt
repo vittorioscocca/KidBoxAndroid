@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.screens.home.ProTrialOfferCard
 import it.vittorioscocca.kidbox.ai.UpgradeMessageStore
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
@@ -136,7 +137,20 @@ fun PlansScreen(
             fontSize = 14.sp,
             modifier = Modifier.padding(top = 2.dp),
         )
-        if (contextualMessage != null) {
+        // La prova è l'invito principale: in cima, e con lei il messaggio
+        // contestuale si toglie, perché il titolo della card dice già il motivo.
+        if (state.trialOffer.isVisible) {
+            Spacer(modifier = Modifier.height(12.dp))
+            ProTrialOfferCard(
+                offer = state.trialOffer,
+                triggerFeature = triggerFeature,
+                onStart = { viewModel.startTrial(triggerFeature) },
+                onAskOwner = viewModel::askOwnerForTrial,
+                onDismissFailure = viewModel::clearTrialStartFailed,
+                onDismissAskResult = viewModel::clearTrialAskResult,
+            )
+        }
+        if (contextualMessage != null && !state.trialOffer.isVisible) {
             Spacer(modifier = Modifier.height(12.dp))
             Card(
                 modifier = Modifier.fillMaxWidth(),
