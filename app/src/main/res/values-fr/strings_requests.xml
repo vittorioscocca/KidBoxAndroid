@@ -69,4 +69,9 @@
     <string name="requests_calendar_around">Au calendrier, vers %1$s</string>
     <string name="requests_already_has">A déjà « %1$s » à %2$s</string>
     <string name="requests_all_day">Toute la journée</string>
+    <string name="requests_ai_sent">Demande envoyée à %1$s : « %2$s ».</string>
+    <string name="requests_ai_unknown">Introuvable dans la famille : %1$s.</string>
+    <string name="requests_ai_link">Lien à envoyer à ceux qui n\'ont pas l\'app : %1$s</string>
+    <string name="requests_ai_not_sent">Demande non envoyée : %1$s</string>
+    <string name="requests_ai_not_sent_unknown">Demande non envoyée : %1$s introuvable dans la famille.</string>
 </resources>

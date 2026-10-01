@@ -69,4 +69,9 @@
     <string name="requests_calendar_around">On the calendar, around %1$s</string>
     <string name="requests_already_has">Already has “%1$s” at %2$s</string>
     <string name="requests_all_day">All day</string>
+    <string name="requests_ai_sent">Request sent to %1$s: “%2$s”.</string>
+    <string name="requests_ai_unknown">Not found in the family: %1$s.</string>
+    <string name="requests_ai_link">Link to send to people without the app: %1$s</string>
+    <string name="requests_ai_not_sent">Request not sent: %1$s</string>
+    <string name="requests_ai_not_sent_unknown">Request not sent: I can\'t find %1$s in the family.</string>
 </resources>

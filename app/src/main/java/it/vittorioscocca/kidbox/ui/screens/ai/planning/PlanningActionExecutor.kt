@@ -1,6 +1,13 @@
 package it.vittorioscocca.kidbox.ui.screens.ai.planning
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
+import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
+import it.vittorioscocca.kidbox.data.remote.requests.FamilyRequestRemoteStore
+import it.vittorioscocca.kidbox.data.user.UserProfileRepository
 import it.vittorioscocca.kidbox.data.local.dao.KBCalendarEventDao
 import it.vittorioscocca.kidbox.data.local.dao.KBGroceryItemDao
 import it.vittorioscocca.kidbox.data.local.dao.KBNoteDao
@@ -29,6 +36,10 @@ class PlanningActionExecutor @Inject constructor(
     private val childDao: KBChildDao,
     private val auth: FirebaseAuth,
     private val reminderService: PlanningReminderService,
+    @ApplicationContext private val appContext: Context,
+    private val memberDao: KBFamilyMemberDao,
+    private val familyDao: KBFamilyDao,
+    private val userProfileRepository: UserProfileRepository,
 ) {
     private companion object {
         const val SYNC_PENDING_UPSERT = 1
@@ -74,6 +85,7 @@ class PlanningActionExecutor @Inject constructor(
                         lines += "Nota creata: \"$title\"."
                     }
                 }
+                "request_add" -> addRequest(familyId, uid, action, children)?.let { lines += it }
                 "health_reminder" -> {
                     val title = action.title?.trim().orEmpty()
                     if (title.isNotEmpty()) {
@@ -241,6 +253,86 @@ class PlanningActionExecutor @Inject constructor(
         return true
     }
 
+    /**
+     * Crea una richiesta («Chi prende Marco giovedì?») con lo stesso servizio
+     * del dialog «Chiedi a…». I nomi detti dall'utente diventano account della
+     * famiglia; un nome che non si trova si dice nel riepilogo, e senza
+     * nessuno a cui chiedere la richiesta non parte. Gemello di
+     * `addRequest` in `PlanningAIActionBlock.swift`.
+     */
+    private suspend fun addRequest(
+        familyId: String,
+        uid: String,
+        action: PlanningExecutableActionDto,
+        children: List<it.vittorioscocca.kidbox.data.local.entity.KBChildEntity>,
+    ): String? {
+        val title = action.title?.trim().orEmpty().ifEmpty { return null }
+        val members = memberDao.getAllByFamilyId(familyId)
+            .filter { !it.isDeleted && it.userId != uid }
+        val wanted = action.askMembers.orEmpty().map { it.trim() }.filter { it.isNotEmpty() }
+        val recipients = mutableListOf<it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity>()
+        val unknown = mutableListOf<String>()
+        if (wanted.isEmpty()) {
+            recipients += members
+        } else {
+            for (name in wanted) {
+                val key = name.lowercase()
+                val match = members.firstOrNull { m ->
+                    val full = m.displayName?.trim()?.lowercase().orEmpty()
+                    full == key || full.split(" ").firstOrNull() == key
+                }
+                if (match != null) recipients += match else unknown += name
+            }
+        }
+        val askOutside = action.askOutside == true
+        if (recipients.isEmpty() && !askOutside) {
+            return appContext.getString(R.string.requests_ai_not_sent_unknown, unknown.joinToString(", "))
+        }
+
+        // Una lista vera: il to-do nascerà lì alla prima risposta «Ci penso io».
+        // Se la famiglia non ne ha nessuna, il server ne crea una al momento.
+        val target = resolveTodoTarget(familyId, action.childId, action.listId, children)
+        val listId = target.listId ?: UUID.randomUUID().toString().uppercase()
+        val draft = FamilyRequestRemoteStore.Draft(
+            recipients = recipients.map { it.userId },
+            askOutside = askOutside,
+            outsideLabel = action.outsideLabel?.trim().orEmpty(),
+            includeInvite = action.includeInvite ?: true,
+        )
+        val profileName = runCatching { userProfileRepository.getByUid(uid) }.getOrNull()
+            ?.displayName?.trim().orEmpty()
+        val inviterName = profileName.takeIf { it.isNotEmpty() && it != "Utente" }
+            ?: auth.currentUser?.displayName?.trim().orEmpty()
+
+        return try {
+            val created = FamilyRequestRemoteStore.create(
+                context = appContext,
+                familyId = familyId,
+                childId = target.childId,
+                listId = listId,
+                title = title,
+                notes = action.notes?.trim()?.takeIf { it.isNotEmpty() },
+                isUrgent = false,
+                dueAtMillis = parseEpoch(action.dueAt),
+                dueHasTime = true,
+                draft = draft,
+                familyName = familyDao.getById(familyId)?.name.orEmpty(),
+                inviterName = inviterName,
+            )
+            val who = recipients.mapNotNull { it.displayName?.trim()?.split(" ")?.firstOrNull()?.takeIf(String::isNotEmpty) } +
+                if (askOutside) listOf(draft.outsideLabel.ifEmpty { appContext.getString(R.string.requests_outside_lower) }) else emptyList()
+            buildList {
+                add(appContext.getString(R.string.requests_ai_sent, who.joinToString(", "), title))
+                if (unknown.isNotEmpty()) add(appContext.getString(R.string.requests_ai_unknown, unknown.joinToString(", ")))
+                created.shareLink?.let { add(appContext.getString(R.string.requests_ai_link, it)) }
+            }.joinToString("\n")
+        } catch (e: FamilyRequestRemoteStore.DueInPastException) {
+            appContext.getString(R.string.requests_ai_not_sent, appContext.getString(R.string.requests_due_in_past))
+        } catch (e: Exception) {
+            appContext.getString(R.string.requests_ai_not_sent, e.localizedMessage ?: "")
+        }
+    }
+
     private data class TodoTarget(val childId: String, val listId: String?)
 
     private suspend fun resolveTodoTarget(
@@ -255,8 +347,10 @@ class PlanningActionExecutor @Inject constructor(
         return TodoTarget(resolvedChild, lists.firstOrNull()?.id)
     }
 
+    /** ISO8601 con «Z» o con offset («+02:00»), come chiede il prompt. */
     private fun parseEpoch(raw: String?): Long? {
         if (raw.isNullOrBlank()) return null
-        return runCatching { Instant.parse(raw).toEpochMilli() }.getOrNull()
+        return runCatching { java.time.OffsetDateTime.parse(raw).toInstant().toEpochMilli() }.getOrNull()
+            ?: runCatching { Instant.parse(raw).toEpochMilli() }.getOrNull()
     }
 }

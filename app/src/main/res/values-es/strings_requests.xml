@@ -69,4 +69,9 @@
     <string name="requests_calendar_around">En el calendario, hacia las %1$s</string>
     <string name="requests_already_has">Ya tiene «%1$s» a las %2$s</string>
     <string name="requests_all_day">Todo el día</string>
+    <string name="requests_ai_sent">Solicitud enviada a %1$s: «%2$s».</string>
+    <string name="requests_ai_unknown">No encuentro en la familia: %1$s.</string>
+    <string name="requests_ai_link">Enlace para enviar a quien no tiene la app: %1$s</string>
+    <string name="requests_ai_not_sent">Solicitud no enviada: %1$s</string>
+    <string name="requests_ai_not_sent_unknown">Solicitud no enviada: no encuentro a %1$s en la familia.</string>
 </resources>
