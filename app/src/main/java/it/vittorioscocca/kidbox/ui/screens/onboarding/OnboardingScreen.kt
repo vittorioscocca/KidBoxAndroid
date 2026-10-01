@@ -67,6 +67,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
@@ -90,6 +91,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.EdgeToEdgeController
 import it.vittorioscocca.kidbox.ui.screens.settings.CornerBrackets
@@ -955,6 +959,30 @@ private fun InvitePartnerPageContent(
     val shareLink by viewModel.shareLink.collectAsStateWithLifecycle()
     var didCopy by remember { mutableStateOf(false) }
     var showQr by remember { mutableStateOf(false) }
+    // Chi condivide su Android finisce in WhatsApp a tutto schermo e spesso non
+    // torna a premere «Ho inviato il link» (19-30/09: 2 su 9). Al rientro dall'app
+    // scelta nel foglio di condivisione il wizard si chiude da solo. Il foglio
+    // chiuso senza scegliere non ferma l'activity (ON_STOP non arriva): si resta qui.
+    var shareLaunched by rememberSaveable { mutableStateOf(false) }
+    var leftForShare by rememberSaveable { mutableStateOf(false) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> if (shareLaunched) leftForShare = true
+                Lifecycle.Event.ON_RESUME -> {
+                    // Senza ON_STOP prima, era il foglio chiuso a vuoto: si azzera,
+                    // così un'uscita successiva per altri motivi non conta come invio.
+                    if (leftForShare) onFinish()
+                    shareLaunched = false
+                    leftForShare = false
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     LaunchedEffect(Unit) {
         AppAnalytics.onboardingInviteStepShown(context)
@@ -1039,6 +1067,7 @@ private fun InvitePartnerPageContent(
                             // il wizard Android era cieco su chi condivide davvero
                             // (20/09: 16 inviti generati, 0 invite_shared).
                             AppAnalytics.inviteShared(context, "system_share_sheet")
+                            shareLaunched = true
                             context.startActivity(Intent.createChooser(send, context.getString(R.string.onboarding_share_link)))
                         }
                         .padding(vertical = 16.dp),
