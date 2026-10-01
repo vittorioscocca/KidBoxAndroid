@@ -15,6 +15,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.data.local.entity.KBChildEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBFamilyEntity
+import it.vittorioscocca.kidbox.data.remote.ActiveFamilyRemoteStore
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
@@ -91,6 +92,10 @@ class FamilyFirestoreCreationRepository @Inject constructor(
         )
         batch1.commit().await()
         AppAnalytics.familyCreated(appContext)
+        // Famiglia attiva sull'account subito, come iOS: prima si scriveva solo
+        // all'apertura della Home, e chi chiudeva l'app sulla pagina invito
+        // restava senza (13 famiglie Android su 58 dal 15/09).
+        ActiveFamilyRemoteStore.save(familyId)
 
         val now = System.currentTimeMillis()
         familyDao.upsert(
