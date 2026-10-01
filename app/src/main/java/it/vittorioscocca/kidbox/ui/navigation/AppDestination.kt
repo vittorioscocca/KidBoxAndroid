@@ -71,6 +71,16 @@ sealed class AppDestination(val route: String) {
         }
     }
     data object Todo : AppDestination("todo")
+    /**
+     * Richiesta di famiglia («Chi prende Marco?»). `answer=yes` arriva
+     * dall'azione «Ci penso io» della notifica: la schermata risponde da sola.
+     */
+    data object FamilyRequest : AppDestination("family_request/{familyId}/{requestId}?answer={answer}") {
+        fun createRoute(familyId: String, requestId: String, answer: String? = null): String {
+            val base = "family_request/$familyId/$requestId"
+            return if (answer.isNullOrBlank()) base else "$base?answer=$answer"
+        }
+    }
     data object TodoList : AppDestination("todo_list/{familyId}/{childId}/{listId}?highlightTodoId={highlightTodoId}") {
         fun createRoute(
             familyId: String,

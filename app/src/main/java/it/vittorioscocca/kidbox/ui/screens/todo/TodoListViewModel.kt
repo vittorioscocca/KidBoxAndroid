@@ -1,10 +1,16 @@
 package it.vittorioscocca.kidbox.ui.screens.todo
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
+import it.vittorioscocca.kidbox.data.remote.requests.FamilyRequestRemoteStore
+import it.vittorioscocca.kidbox.data.user.UserProfileRepository
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoItemEntity
 import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
@@ -37,12 +43,23 @@ data class TodoListUiState(
     val errorMessage: String? = null,
 )
 
+/** Invio di una richiesta («Chiedi a…») dall'editor del to-do. */
+sealed interface TodoRequestSendState {
+    data object Idle : TodoRequestSendState
+    data object Sending : TodoRequestSendState
+    data class Sent(val created: FamilyRequestRemoteStore.Created) : TodoRequestSendState
+    data class Failed(val message: String) : TodoRequestSendState
+}
+
 @HiltViewModel
 class TodoListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val todoRepository: TodoRepository,
     private val memberDao: KBFamilyMemberDao,
     private val auth: FirebaseAuth,
+    @ApplicationContext private val appContext: Context,
+    private val familyDao: KBFamilyDao,
+    private val userProfileRepository: UserProfileRepository,
 ) : ViewModel() {
     private val familyId = savedStateHandle.get<String>("familyId").orEmpty()
     private val childId = savedStateHandle.get<String>("childId").orEmpty()
@@ -203,6 +220,62 @@ class TodoListViewModel @Inject constructor(
                 )
             }.onFailure { error.value = it.message ?: "Errore durante aggiornamento To-Do" }
         }
+    }
+
+    private val _requestSend = MutableStateFlow<TodoRequestSendState>(TodoRequestSendState.Idle)
+    val requestSend: StateFlow<TodoRequestSendState> = _requestSend
+
+    /**
+     * «Chiedi a…»: invece del to-do si crea una richiesta. Il to-do lo crea il
+     * server alla prima risposta «Ci penso io», in questa lista. Su Android la
+     * scadenza ha sempre l'orario.
+     */
+    fun createRequest(
+        title: String,
+        notes: String?,
+        dueAtEpochMillis: Long?,
+        urgent: Boolean,
+        draft: FamilyRequestRemoteStore.Draft,
+    ) {
+        if (familyId.isBlank() || listId.isBlank()) return
+        if (_requestSend.value == TodoRequestSendState.Sending) return
+        _requestSend.value = TodoRequestSendState.Sending
+        viewModelScope.launch {
+            _requestSend.value = try {
+                val created = FamilyRequestRemoteStore.create(
+                    context = appContext,
+                    familyId = familyId,
+                    childId = childId,
+                    listId = listId,
+                    title = title.trim(),
+                    notes = notes?.trim()?.takeIf { it.isNotEmpty() },
+                    isUrgent = urgent,
+                    dueAtMillis = dueAtEpochMillis,
+                    dueHasTime = true,
+                    draft = draft,
+                    familyName = familyDao.getById(familyId)?.name.orEmpty(),
+                    inviterName = inviterName(),
+                )
+                TodoRequestSendState.Sent(created)
+            } catch (e: FamilyRequestRemoteStore.DueInPastException) {
+                TodoRequestSendState.Failed(appContext.getString(R.string.requests_due_in_past))
+            } catch (e: Exception) {
+                TodoRequestSendState.Failed(e.localizedMessage ?: appContext.getString(R.string.requests_send_failed))
+            }
+        }
+    }
+
+    fun clearRequestSend() {
+        _requestSend.value = TodoRequestSendState.Idle
+    }
+
+    /** Nome di chi invita, come in `InviteCodeViewModel`. */
+    private suspend fun inviterName(): String {
+        val uid = auth.currentUser?.uid ?: return ""
+        val local = runCatching { userProfileRepository.getByUid(uid) }.getOrNull()
+        val name = local?.displayName?.trim().orEmpty()
+        if (name.isNotEmpty() && name != "Utente") return name
+        return auth.currentUser?.displayName?.trim().orEmpty()
     }
 
     fun toggleDone(todoId: String) {

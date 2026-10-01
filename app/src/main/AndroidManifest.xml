@@ -247,6 +247,11 @@
             android:name=".notifications.FitnessSessionActionReceiver"
             android:exported="false" />
 
+        <!-- «Non posso» sulla notifica di una richiesta di famiglia. -->
+        <receiver
+            android:name=".notifications.FamilyRequestActionReceiver"
+            android:exported="false" />
+
         <receiver
             android:name=".notifications.nudge.NudgeReceiver"
             android:exported="false" />

@@ -92,6 +92,11 @@ import androidx.compose.material.icons.filled.Flag
 import it.vittorioscocca.kidbox.ui.components.KidBoxFormPage
 import it.vittorioscocca.kidbox.ui.components.FormSectionTitle
 import it.vittorioscocca.kidbox.ui.components.FormSectionHeader
+import it.vittorioscocca.kidbox.data.remote.requests.FamilyRequestRemoteStore
+import it.vittorioscocca.kidbox.ui.screens.requests.FamilyRequestAskDialog
+import it.vittorioscocca.kidbox.ui.screens.requests.FamilyRequestAskMember
+import it.vittorioscocca.kidbox.ui.screens.requests.FamilyRequestAskRow
+import it.vittorioscocca.kidbox.ui.screens.requests.FamilyRequestSentDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,6 +111,7 @@ fun TodoListScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showEditor by remember { mutableStateOf(false) }
     var editingTodo by remember { mutableStateOf<KBTodoItemEntity?>(null) }
+    val requestSend by viewModel.requestSend.collectAsStateWithLifecycle()
 
     // Niente notifica per un to-do creato nella lista che è già a schermo.
     // Lo scope è il `listId`: essere in una lista non deve zittire gli avvisi
@@ -211,8 +217,22 @@ fun TodoListScreen(
             initial = editingTodo,
             members = state.members,
             currentUid = state.currentUid,
+            // Si chiede solo da una lista vera: il to-do nascerà lì.
+            canAsk = state.smartKind == null && state.listId.isNotBlank(),
+            sending = requestSend == TodoRequestSendState.Sending,
             onDismiss = { showEditor = false },
             onSave = { form ->
+                val draft = form.askDraft
+                if (draft != null && editingTodo == null) {
+                    viewModel.createRequest(
+                        title = form.title,
+                        notes = form.notes,
+                        dueAtEpochMillis = form.dueAt,
+                        urgent = form.urgent,
+                        draft = draft,
+                    )
+                    return@TodoEditScreen
+                }
                 val mustAskPermission = form.reminderEnabled &&
                     !RuntimePermissions.hasNotificationPermission(context)
                 if (mustAskPermission) {
@@ -256,6 +276,33 @@ fun TodoListScreen(
                 }
             },
         )
+        when (val send = requestSend) {
+            is TodoRequestSendState.Sent -> {
+                if (send.created.shareLink != null) {
+                    FamilyRequestSentDialog(
+                        created = send.created,
+                        onDone = {
+                            viewModel.clearRequestSend()
+                            showEditor = false
+                        },
+                    )
+                } else {
+                    LaunchedEffect(send) {
+                        viewModel.clearRequestSend()
+                        showEditor = false
+                        pendingSnackbarMessage = context.getString(R.string.requests_sent_title)
+                    }
+                }
+            }
+            is TodoRequestSendState.Failed -> AlertDialog(
+                onDismissRequest = { viewModel.clearRequestSend() },
+                text = { Text(send.message) },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.clearRequestSend() }) { Text("OK") }
+                },
+            )
+            else -> Unit
+        }
         return
     }
 
@@ -479,6 +526,8 @@ private data class TodoEditForm(
     val reminderEnabled: Boolean,
     val visibilityScope: String,
     val visibilityMemberIds: List<String>,
+    /** «Chiedi a…»: se c'è, si crea una richiesta invece del to-do. */
+    val askDraft: FamilyRequestRemoteStore.Draft? = null,
 )
 
 @Composable
@@ -486,6 +535,8 @@ private fun TodoEditScreen(
     initial: KBTodoItemEntity?,
     members: List<TodoMemberUi>,
     currentUid: String,
+    canAsk: Boolean,
+    sending: Boolean,
     onDismiss: () -> Unit,
     onSave: (TodoEditForm) -> Unit,
 ) {
@@ -527,6 +578,15 @@ private fun TodoEditScreen(
     val displayVisScope = KBVisibilityScope.normalized(visScope)
     // Un to-do «Solo io» non lo vede nessun altro: l'unico assegnatario sensato è chi lo crea.
     val isPrivateScope = displayVisScope == KBVisibilityScope.ONLY_CREATOR
+    // «Chiedi a…» solo per un to-do nuovo visibile a tutta la famiglia: la
+    // richiesta la vedono tutti i membri, e il to-do che ne nasce pure.
+    val canAskNow = canAsk && initial == null && displayVisScope == KBVisibilityScope.FAMILY
+    var askDraft by remember { mutableStateOf<FamilyRequestRemoteStore.Draft?>(null) }
+    var showAskDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(canAskNow) { if (!canAskNow) askDraft = null }
+    val askMembers = remember(members, currentUid) {
+        members.filter { it.uid != currentUid }.map { FamilyRequestAskMember(it.uid, it.displayName) }
+    }
 
     fun pickDate() {
         val cal = Calendar.getInstance().apply { timeInMillis = dueAt }
@@ -568,7 +628,7 @@ private fun TodoEditScreen(
         title = if (initial == null) stringResource(R.string.todo_new) else stringResource(R.string.todo_edit),
         onDismiss = onDismiss,
         saveLabel = stringResource(R.string.life_save),
-        saveEnabled = title.isNotBlank(),
+        saveEnabled = title.isNotBlank() && !sending,
         accent = accent,
         onSave = {
             val cleanTitle = title.trim()
@@ -587,6 +647,7 @@ private fun TodoEditScreen(
                         } else {
                             emptyList()
                         },
+                        askDraft = askDraft.takeIf { canAskNow },
                     ),
                 )
             }
@@ -699,7 +760,10 @@ private fun TodoEditScreen(
                 ) {
                     Text(stringResource(R.string.vehicles_reminder), color = kb.title)
                     Switch(
-                        checked = reminderEnabled,
+                        // Chiedendo, il promemoria locale suonerebbe solo su
+                        // questo telefono, non a chi se lo prende.
+                        enabled = askDraft == null,
+                        checked = reminderEnabled && askDraft == null,
                         onCheckedChange = { enabled ->
                             if (!dueEnabled) {
                                 reminderEnabled = false
@@ -731,7 +795,7 @@ private fun TodoEditScreen(
                     Text(stringResource(R.string.todo_urgent), color = kb.title)
                     Switch(checked = urgent, onCheckedChange = { urgent = it })
                 }
-                if (!isPrivateScope) {
+                if (!isPrivateScope && askDraft == null) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -749,9 +813,29 @@ private fun TodoEditScreen(
                         )
                     }
                 }
+                if (canAskNow) {
+                    FamilyRequestAskRow(
+                        draft = askDraft,
+                        members = askMembers,
+                        onEdit = { showAskDialog = true },
+                        onClear = { askDraft = null },
+                    )
+                }
             }
         }
         Spacer(Modifier.height(8.dp))
+    }
+
+    if (showAskDialog) {
+        FamilyRequestAskDialog(
+            members = askMembers,
+            initial = askDraft,
+            onDismiss = { showAskDialog = false },
+            onConfirm = {
+                askDraft = it
+                showAskDialog = false
+            },
+        )
     }
 
     if (showReminderConfirm) {

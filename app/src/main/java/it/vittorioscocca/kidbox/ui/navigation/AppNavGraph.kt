@@ -101,6 +101,7 @@ import it.vittorioscocca.kidbox.ui.screens.chat.ChatScreen
 import it.vittorioscocca.kidbox.ui.screens.chat.ChatViewModel
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoDeepLinkResolverViewModel
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoHomeScreen
+import it.vittorioscocca.kidbox.ui.screens.requests.FamilyRequestDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.todo.TodoListScreen
 import it.vittorioscocca.kidbox.ui.screens.health.HealthSubjectSelectorScreen
 import it.vittorioscocca.kidbox.ui.screens.health.HealthHomeScreen
@@ -732,6 +733,24 @@ fun AppNavGraph(
                 noteId = noteId,
                 isNewNote = isNewNote,
                 onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.FamilyRequest.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("requestId") { type = NavType.StringType },
+                navArgument("answer") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) {
+            FamilyRequestDetailScreen(
+                onBack = { navController.popBackStack() },
+                onNavigate = { route -> navController.navigate(route) },
             )
         }
 

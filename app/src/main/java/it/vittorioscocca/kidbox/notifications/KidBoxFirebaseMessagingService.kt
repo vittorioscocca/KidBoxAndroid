@@ -138,6 +138,7 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
     ) {
         ensureChannel()
         val unreadCount = NotificationBadgeStore.increment(this)
+        val notificationId = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
         val deepLinkIntent = Intent(this, MainActivity::class.java).apply {
             // NEW_TASK è necessario perché il tap parte dal system tray, un contesto
             // non-Activity: senza, con l'app in background Android a volte apre un
@@ -177,6 +178,7 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
             putExtra("cardId", data["cardId"])
             putExtra("push_deep_link", data["deep_link"] ?: data["route"])
             putExtra("push_message_id", data["messageId"])
+            putExtra("push_request_id", data["requestId"])
             // Annunci dalla console admin: il testo integrale sta in `data`,
             // perché quello mostrato nella tendina è già troncato dal sistema.
             putExtra("push_broadcast_id", data["broadcastId"])
@@ -194,7 +196,7 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
             .setContentTitle(title)
             .setContentText(body)
             .build()
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID_FAMILY_UPDATES)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID_FAMILY_UPDATES)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(body)
@@ -207,8 +209,35 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
             .setPublicVersion(publicVersion)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
-            .build()
-        NotificationManagerCompat.from(this).notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), notification)
+        // Richiesta di famiglia: «Ci penso io» / «Non posso» sotto la notifica.
+        // Solo qui, cioè con l'app aperta: ad app chiusa la notifica la disegna
+        // il sistema dal blocco `notification` e i bottoni non ci sono (il
+        // payload resta ibrido apposta, vedi `buildDataOnlyMessage`).
+        // «Ci penso io» apre l'app direttamente: da Android 12 un receiver non
+        // può aprire un'Activity partendo da una notifica (trampolino).
+        if (type == FamilyRequestActionReceiver.TYPE_NEW) {
+            val familyId = data["familyId"].orEmpty()
+            val requestId = data["requestId"].orEmpty()
+            if (familyId.isNotBlank() && requestId.isNotBlank()) {
+                val yesIntent = Intent(deepLinkIntent).apply {
+                    putExtra("push_request_answer", "yes")
+                    putExtra(NotificationDeepLinkRouter.EXTRA_NOTIFICATION_ID, notificationId)
+                }
+                val yesPending = PendingIntent.getActivity(
+                    this,
+                    notificationId xor 0x5245,
+                    yesIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+                builder.addAction(0, getString(R.string.requests_notification_yes), yesPending)
+                builder.addAction(
+                    0,
+                    getString(R.string.requests_no),
+                    FamilyRequestActionReceiver.declineIntent(this, familyId, requestId, notificationId, body),
+                )
+            }
+        }
+        NotificationManagerCompat.from(this).notify(notificationId, builder.build())
     }
 
     private fun ensureChannel() = createNotificationChannels(this)

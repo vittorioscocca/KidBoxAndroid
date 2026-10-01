@@ -52,6 +52,8 @@ object NotificationDeepLinkRouter {
     private const val KEY_ACTIVE_FAMILY_ID = "active_family_id"
     private const val KEY_LAST_BRIEFING = "kb_dailyBriefing_lastText"
     private const val TAG = "NotificationDeepLink"
+    /** Id della notifica da togliere quando il tap arriva da un'azione. */
+    const val EXTRA_NOTIFICATION_ID = "push_notification_id"
 
     /**
      * Istanza di `MainActivity` che ha diritto a consumare la coda.
@@ -235,6 +237,26 @@ object NotificationDeepLinkRouter {
                         childId = childId.orEmpty(),
                         listId = listId,
                     )
+                }
+            }
+            // Richiesta di famiglia («Chi prende Marco?»): nuova, o con l'esito
+            // per chi l'ha fatta. `push_request_answer=yes` arriva dall'azione
+            // «Ci penso io» della notifica (solo con l'app aperta: ad app chiusa
+            // la notifica la disegna il sistema, senza bottoni).
+            "family_request",
+            "family_request_resolved" -> {
+                val requestId = intent.getStringExtra("push_request_id") ?: intent.getStringExtra("requestId")
+                if (requestId.isNullOrBlank()) {
+                    KBLog.app.warning("NotificationDeepLink: requestId mancante", TAG)
+                    return
+                }
+                val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, 0)
+                if (notificationId != 0) {
+                    runCatching { androidx.core.app.NotificationManagerCompat.from(context).cancel(notificationId) }
+                }
+                val answer = intent.getStringExtra("push_request_answer")
+                queueFamilyAwareRoute(resolvedType, familyId) { fid ->
+                    AppDestination.FamilyRequest.createRoute(fid, requestId, answer)
                 }
             }
             "new_grocery_item" -> {

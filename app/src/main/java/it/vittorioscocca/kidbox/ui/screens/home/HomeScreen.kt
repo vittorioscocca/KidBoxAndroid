@@ -87,6 +87,8 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -132,6 +134,7 @@ import it.vittorioscocca.kidbox.ui.family.FamilySwitcherBottomSheet
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.permissions.rememberNotificationPermissionRequester
 import it.vittorioscocca.kidbox.ui.screens.home.onboarding.OnboardingChecklistCard
+import it.vittorioscocca.kidbox.ui.screens.requests.FamilyRequestsHomeSection
 import it.vittorioscocca.kidbox.ui.screens.home.onboarding.OnboardingStep
 import it.vittorioscocca.kidbox.ui.theme.KidBoxDarkColorScheme
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
@@ -153,6 +156,7 @@ fun HomeScreen(
     var showQuickInvite by remember { mutableStateOf(false) }
     val familySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val snackbarHostState = remember { SnackbarHostState() }
+    val requestsScope = rememberCoroutineScope()
     val pendingUri by viewModel.pendingHeroUri.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -335,6 +339,17 @@ fun HomeScreen(
                 }
 
                 Spacer(modifier = Modifier.size(16.dp))
+
+                // Richieste aperte («Chi prende Marco?»): sopra a tutto, perché
+                // aspettano una risposta. Senza richieste non disegna niente.
+                // L'esito va nello snackbar: dopo un «Io» la card sparisce.
+                if (state.familyId.isNotBlank()) {
+                    FamilyRequestsHomeSection(
+                        familyId = state.familyId,
+                        onNavigate = onNavigate,
+                        onMessage = { msg -> requestsScope.launch { snackbarHostState.showSnackbar(msg) } },
+                    )
+                }
 
                 state.trialDaysLeft?.let { days ->
                     ProTrialBanner(daysLeft = days) {
