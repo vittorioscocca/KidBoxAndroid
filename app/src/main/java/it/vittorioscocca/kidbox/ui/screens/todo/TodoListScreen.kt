@@ -401,7 +401,8 @@ fun TodoListScreen(
                         items(state.filteredTodos, key = { it.id }) { todo ->
                             TodoRow(
                                 todo = todo,
-                                assigneeName = state.members.firstOrNull { it.uid == todo.assignedTo }?.displayName,
+                                assigneeName = state.members.firstOrNull { it.uid == todo.assignedTo }?.displayName
+                                    ?: externalAssignee(todo)?.let { stringResource(R.string.todo_external_assignee, it) },
                                 highlighted = flashingTodoId == todo.id,
                                 onToggle = { viewModel.toggleDone(todo.id) },
                                 onEdit = {
@@ -807,6 +808,9 @@ private fun TodoEditScreen(
                         Text(stringResource(R.string.todo_assigned_to), fontSize = 13.sp, color = kb.subtitle)
                         Text(
                             members.firstOrNull { it.uid == assignedTo }?.displayName
+                                ?: initial?.takeIf { assignedTo == it.assignedTo }
+                                    ?.let(::externalAssignee)
+                                    ?.let { stringResource(R.string.todo_external_assignee, it) }
                                 ?: stringResource(R.string.todo_nobody),
                             fontSize = 15.sp,
                             color = kb.title,
@@ -921,6 +925,13 @@ private fun TodoEditScreen(
         )
     }
 }
+
+/**
+ * Chi ha preso il to-do da fuori dall'app (richiesta di famiglia): solo se
+ * nessun membro è assegnato, così una riassegnazione successiva vince.
+ */
+private fun externalAssignee(todo: KBTodoItemEntity): String? =
+    todo.assignedExternalName?.trim()?.takeIf { it.isNotEmpty() && todo.assignedTo.isNullOrEmpty() }
 
 private fun formatDate(epochMillis: Long): String {
     val formatter = DateTimeFormatter.ofPattern("d MMM, HH:mm", KBLocale.current())

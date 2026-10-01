@@ -584,6 +584,7 @@ class TodoRepository @Inject constructor(
                             priorityRaw = dto.priorityRaw ?: 0,
                             visibilityScope = remoteScope,
                             visibilityMemberIdsJson = encodeStringList(remoteMemberIds),
+                            assignedExternalName = dto.assignedExternalName,
                         ),
                     )
                     if (reminderMoved && remoteDueAt != null) {

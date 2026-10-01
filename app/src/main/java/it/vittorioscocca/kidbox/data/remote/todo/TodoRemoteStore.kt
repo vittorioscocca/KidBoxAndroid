@@ -47,6 +47,8 @@ data class TodoItemRemoteDto(
     val priorityRaw: Int?,
     val visibilityScope: String?,
     val visibilityMemberIds: List<String>,
+    /** Chi l'ha preso da fuori dall'app (richiesta di famiglia). Solo lettura. */
+    val assignedExternalName: String? = null,
 )
 
 @Suppress("UNCHECKED_CAST")
@@ -185,6 +187,7 @@ class TodoRemoteStore @Inject constructor(
                                         priorityRaw = (d["priority"] as? Number)?.toInt(),
                                         visibilityScope = d["visibilityScope"] as? String,
                                         visibilityMemberIds = readFirestoreTodoStringIds(d, "visibilityMemberIds"),
+                                        assignedExternalName = d["assignedExternalName"] as? String,
                                     ),
                                 )
                             }

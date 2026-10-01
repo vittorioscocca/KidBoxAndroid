@@ -60,4 +60,10 @@ data class KBTodoItemEntity(
     val priorityRaw: Int?,
     val visibilityScope: String,
     val visibilityMemberIdsJson: String,
+    /**
+     * Nome di chi l'ha preso da fuori dall'app, con una richiesta di famiglia
+     * («Ci penso io» dal link): lì `assignedTo` è vuoto. Lo scrive solo il
+     * server (functions/familyRequests.js), qui si legge e basta.
+     */
+    val assignedExternalName: String? = null,
 )

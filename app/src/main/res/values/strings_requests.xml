@@ -65,4 +65,5 @@
     <string name="requests_retry_body">Tocca per riprovare: %1$s</string>
     <string name="requests_retry_body_short">Tocca per riprovare.</string>
     <string name="requests_notification_yes">🙋 Ci penso io</string>
+    <string name="todo_external_assignee">%1$s (fuori dall\'app)</string>
 </resources>

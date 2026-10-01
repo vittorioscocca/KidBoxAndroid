@@ -276,6 +276,13 @@ object DatabaseModule {
      * to-do: due colonne, nessuna riscrittura di tabella.
      */
     // Chat: dimensioni di foto/video per dare alla bolla il formato verticale/orizzontale.
+    /** Chi ha preso un to-do da fuori dall'app (richieste di famiglia). */
+    private val MIGRATION_49_50 = object : Migration(49, 50) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `kb_todo_items` ADD COLUMN `assignedExternalName` TEXT")
+        }
+    }
+
     private val MIGRATION_48_49 = object : Migration(48, 49) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE `kb_chat_messages` ADD COLUMN `mediaWidth` INTEGER")
@@ -1433,6 +1440,7 @@ object DatabaseModule {
         MIGRATION_46_47,
         MIGRATION_47_48,
         MIGRATION_48_49,
+        MIGRATION_49_50,
     )
         .fallbackToDestructiveMigration()
         .build()
