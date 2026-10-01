@@ -997,186 +997,196 @@ private fun InvitePartnerPageContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // ── Header ──
-        Box(
+        // Contenuto che scorre; i bottoni di chiusura stanno sotto, fissi: in
+        // fondo alla pagina che scorreva non li vedeva quasi nessuno
+        // (19-30/09 Android: circa 20 su 46 uscivano senza toccarli).
+        Column(
             modifier = Modifier
-                .size(72.dp)
-                .clip(CircleShape)
-                .background(OrangeAccent.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center,
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(Icons.Filled.People, contentDescription = null, tint = OrangeAccent, modifier = Modifier.size(32.dp))
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            stringResource(R.string.onboarding_invite_title),
-            fontSize = 26.sp, fontWeight = FontWeight.Bold, color = BlackText, textAlign = TextAlign.Center,
-        )
-        Text(
-            stringResource(R.string.onboarding_invite_subtitle),
-            fontSize = 16.sp, color = GraySubtitle, textAlign = TextAlign.Center, lineHeight = 23.sp,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
-        )
-        Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
-        // ── Pulsante condividi (primario) ──
-        when {
-            isBusy -> {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(GrayCaption.copy(alpha = 0.08f))
-                        .padding(vertical = 16.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = OrangeAccent)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(stringResource(R.string.onboarding_generating_qr), fontSize = 14.sp, color = GraySubtitle)
-                }
-            }
-            !shareLink.isNullOrBlank() -> {
-                // Si condivide il link, non più il codice: il link porta anche la
-                // chiave di cifratura (nel frammento) e apre l'app da solo.
-                // Stesse stringhe delle impostazioni e di iOS: l'invito deve
-                // arrivare identico da qualunque punto lo si mandi.
-                val shareText = stringResource(R.string.settings_invite_share_text, shareLink.orEmpty())
-                val shareSubject = stringResource(R.string.settings_invite_share_subject)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(16.dp), spotColor = OrangeAccent.copy(alpha = 0.35f))
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Brush.horizontalGradient(listOf(Color(0xFFFFBF40), OrangeAccent)))
-                        .clickable {
-                            val send = Intent(Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                // Oggetto per i client di posta; le app di
-                                // messaggistica lo ignorano.
-                                putExtra(Intent.EXTRA_SUBJECT, shareSubject)
-                                putExtra(Intent.EXTRA_TEXT, shareText)
-                            }
-                            // Stesso evento di InviteCodeScreen e QuickInviteSheet: senza,
-                            // il wizard Android era cieco su chi condivide davvero
-                            // (20/09: 16 inviti generati, 0 invite_shared).
-                            AppAnalytics.inviteShared(context, "system_share_sheet")
-                            shareLaunched = true
-                            context.startActivity(Intent.createChooser(send, context.getString(R.string.onboarding_share_link)))
-                        }
-                        .padding(vertical = 16.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Icon(Icons.Filled.Share, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
-                        Text(stringResource(R.string.onboarding_share_link), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-                    }
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-                OutlinedSoftButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    containerColor = GraySubtitle.copy(alpha = 0.08f),
-                    contentColor = if (didCopy) SuccessGreen else GraySubtitle,
-                    icon = if (didCopy) Icons.Filled.CheckCircle else Icons.Filled.ContentCopy,
-                    label = if (didCopy) stringResource(R.string.onboarding_copied) else stringResource(R.string.settings_invite_copy_link),
-                    onClick = {
-                        val value = shareLink.orEmpty()
-                        if (value.isNotBlank()) {
-                            runCatching {
-                                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                cm.setPrimaryClip(ClipData.newPlainText("kidbox_invite_link", value))
-                            }.onSuccess {
-                                didCopy = true
-                                AppAnalytics.inviteShared(context, "copy")
-                            }
-                        }
-                    },
-                )
-                LaunchedEffect(didCopy) {
-                    if (didCopy) { kotlinx.coroutines.delay(2000); didCopy = false }
-                }
-                // Il segreto viaggia dentro il link: chi lo riceve entra.
-                Text(
-                    stringResource(R.string.invite_link_caution),
-                    fontSize = 11.sp,
-                    color = GrayCaption,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 8.dp, start = 8.dp, end = 8.dp),
-                )
-            }
-            errorMessage != null -> {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(Icons.Filled.Warning, contentDescription = null, tint = Color(0xFFFF9800), modifier = Modifier.size(28.dp))
-                    Text(errorMessage.orEmpty(), color = GraySubtitle, fontSize = 14.sp, textAlign = TextAlign.Center)
-                    TextButton(onClick = viewModel::generateInviteCode) {
-                        Text(stringResource(R.string.onboarding_retry), color = OrangeAccent)
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // ── QR collassabile (secondario) ──
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
+            // ── Header ──
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showQr = !showQr }
-                    .padding(vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(OrangeAccent.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    stringResource(R.string.onboarding_show_qr),
-                    fontSize = 14.sp, color = GraySubtitle,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    stringResource(R.string.invite_qr_safer_badge),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = SuccessGreen,
-                    modifier = Modifier.padding(end = 8.dp),
-                )
-                Icon(
-                    if (showQr) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                    contentDescription = null, tint = GrayCaption, modifier = Modifier.size(20.dp),
-                )
+                Icon(Icons.Filled.People, contentDescription = null, tint = OrangeAccent, modifier = Modifier.size(32.dp))
             }
-            if (showQr && qrPayload != null) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.White)
-                        .padding(vertical = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    QRCodeView(payload = qrPayload.orEmpty(), modifier = Modifier.size(140.dp))
-                    Text(stringResource(R.string.onboarding_valid_7d), fontSize = 12.sp, color = GrayCaption)
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                stringResource(R.string.onboarding_invite_title),
+                fontSize = 26.sp, fontWeight = FontWeight.Bold, color = BlackText, textAlign = TextAlign.Center,
+            )
+            Text(
+                stringResource(R.string.onboarding_invite_subtitle),
+                fontSize = 16.sp, color = GraySubtitle, textAlign = TextAlign.Center, lineHeight = 23.sp,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ── Pulsante condividi (primario) ──
+            when {
+                isBusy -> {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(GrayCaption.copy(alpha = 0.08f))
+                            .padding(vertical = 16.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = OrangeAccent)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(stringResource(R.string.onboarding_generating_qr), fontSize = 14.sp, color = GraySubtitle)
+                    }
+                }
+                !shareLink.isNullOrBlank() -> {
+                    // Si condivide il link, non più il codice: il link porta anche la
+                    // chiave di cifratura (nel frammento) e apre l'app da solo.
+                    // Stesse stringhe delle impostazioni e di iOS: l'invito deve
+                    // arrivare identico da qualunque punto lo si mandi.
+                    val shareText = stringResource(R.string.settings_invite_share_text, shareLink.orEmpty())
+                    val shareSubject = stringResource(R.string.settings_invite_share_subject)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .shadow(elevation = 8.dp, shape = RoundedCornerShape(16.dp), spotColor = OrangeAccent.copy(alpha = 0.35f))
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Brush.horizontalGradient(listOf(Color(0xFFFFBF40), OrangeAccent)))
+                            .clickable {
+                                val send = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    // Oggetto per i client di posta; le app di
+                                    // messaggistica lo ignorano.
+                                    putExtra(Intent.EXTRA_SUBJECT, shareSubject)
+                                    putExtra(Intent.EXTRA_TEXT, shareText)
+                                }
+                                // Stesso evento di InviteCodeScreen e QuickInviteSheet: senza,
+                                // il wizard Android era cieco su chi condivide davvero
+                                // (20/09: 16 inviti generati, 0 invite_shared).
+                                AppAnalytics.inviteShared(context, "system_share_sheet")
+                                shareLaunched = true
+                                context.startActivity(Intent.createChooser(send, context.getString(R.string.onboarding_share_link)))
+                            }
+                            .padding(vertical = 16.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(Icons.Filled.Share, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                            Text(stringResource(R.string.onboarding_share_link), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedSoftButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        containerColor = GraySubtitle.copy(alpha = 0.08f),
+                        contentColor = if (didCopy) SuccessGreen else GraySubtitle,
+                        icon = if (didCopy) Icons.Filled.CheckCircle else Icons.Filled.ContentCopy,
+                        label = if (didCopy) stringResource(R.string.onboarding_copied) else stringResource(R.string.settings_invite_copy_link),
+                        onClick = {
+                            val value = shareLink.orEmpty()
+                            if (value.isNotBlank()) {
+                                runCatching {
+                                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    cm.setPrimaryClip(ClipData.newPlainText("kidbox_invite_link", value))
+                                }.onSuccess {
+                                    didCopy = true
+                                    AppAnalytics.inviteShared(context, "copy")
+                                }
+                            }
+                        },
+                    )
+                    LaunchedEffect(didCopy) {
+                        if (didCopy) { kotlinx.coroutines.delay(2000); didCopy = false }
+                    }
+                    // Il segreto viaggia dentro il link: chi lo riceve entra.
                     Text(
-                        stringResource(R.string.invite_qr_safer),
+                        stringResource(R.string.invite_link_caution),
                         fontSize = 11.sp,
                         color = GrayCaption,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 16.dp),
+                        modifier = Modifier.padding(top = 8.dp, start = 8.dp, end = 8.dp),
                     )
                 }
+                errorMessage != null -> {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(Icons.Filled.Warning, contentDescription = null, tint = Color(0xFFFF9800), modifier = Modifier.size(28.dp))
+                        Text(errorMessage.orEmpty(), color = GraySubtitle, fontSize = 14.sp, textAlign = TextAlign.Center)
+                        TextButton(onClick = viewModel::generateInviteCode) {
+                            Text(stringResource(R.string.onboarding_retry), color = OrangeAccent)
+                        }
+                    }
+                }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ── QR collassabile (secondario) ──
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showQr = !showQr }
+                        .padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        stringResource(R.string.onboarding_show_qr),
+                        fontSize = 14.sp, color = GraySubtitle,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        stringResource(R.string.invite_qr_safer_badge),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = SuccessGreen,
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+                    Icon(
+                        if (showQr) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                        contentDescription = null, tint = GrayCaption, modifier = Modifier.size(20.dp),
+                    )
+                }
+                if (showQr && qrPayload != null) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color.White)
+                            .padding(vertical = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        QRCodeView(payload = qrPayload.orEmpty(), modifier = Modifier.size(140.dp))
+                        Text(stringResource(R.string.onboarding_valid_7d), fontSize = 12.sp, color = GrayCaption)
+                        Text(
+                            stringResource(R.string.invite_qr_safer),
+                            fontSize = 11.sp,
+                            color = GrayCaption,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
         androidx.compose.material3.HorizontalDivider(color = GrayFieldBorder)
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -1205,7 +1215,8 @@ private fun InvitePartnerPageContent(
         ) {
             Text(stringResource(R.string.onboarding_skip_invite), fontSize = 15.sp, color = GrayCaption)
         }
-        Spacer(modifier = Modifier.height(24.dp))
+        // Sotto ci sono già indicatori e spazio della CTA del wizard.
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 
