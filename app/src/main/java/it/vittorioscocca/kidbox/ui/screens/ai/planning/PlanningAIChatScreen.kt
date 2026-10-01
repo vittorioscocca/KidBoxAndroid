@@ -33,8 +33,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowForward
@@ -80,7 +78,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
@@ -261,8 +258,6 @@ fun PlanningAIChatScreen(
                             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                         ),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                        keyboardActions = KeyboardActions(onSend = { if (state.inputText.isNotBlank() && !state.isLoading) viewModel.send(contextInput) }),
                     )
                     IconButton(
                         onClick = { viewModel.send(contextInput) },
