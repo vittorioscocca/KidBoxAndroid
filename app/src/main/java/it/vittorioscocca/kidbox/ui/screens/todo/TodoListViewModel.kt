@@ -8,7 +8,9 @@ import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.data.local.dao.KBCalendarEventDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
+import it.vittorioscocca.kidbox.ui.screens.requests.FamilyRequestAvailability
 import it.vittorioscocca.kidbox.data.remote.requests.FamilyRequestRemoteStore
 import it.vittorioscocca.kidbox.data.user.UserProfileRepository
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
@@ -60,6 +62,7 @@ class TodoListViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val familyDao: KBFamilyDao,
     private val userProfileRepository: UserProfileRepository,
+    calendarEventDao: KBCalendarEventDao,
 ) : ViewModel() {
     private val familyId = savedStateHandle.get<String>("familyId").orEmpty()
     private val childId = savedStateHandle.get<String>("childId").orEmpty()
@@ -220,6 +223,21 @@ class TodoListViewModel @Inject constructor(
                 )
             }.onFailure { error.value = it.message ?: "Errore durante aggiornamento To-Do" }
         }
+    }
+
+    /**
+     * To-do ed eventi della famiglia, per «chi è libero» nel dialog «Chiedi
+     * a…». Il calcolo si fa all'apertura del dialog, con la scadenza scelta.
+     */
+    val availabilitySources: StateFlow<Pair<List<KBTodoItemEntity>, List<it.vittorioscocca.kidbox.data.local.entity.KBCalendarEventEntity>>> = combine(
+        todoRepository.observeTodos(familyId, childId),
+        calendarEventDao.observeByFamilyId(familyId),
+    ) { todos, events -> todos to events }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList<KBTodoItemEntity>() to emptyList())
+
+    fun availabilityAround(dueAtEpochMillis: Long?): FamilyRequestAvailability? {
+        val (todos, events) = availabilitySources.value
+        return FamilyRequestAvailability.compute(dueAtEpochMillis, todos, events, auth.currentUser?.uid)
     }
 
     private val _requestSend = MutableStateFlow<TodoRequestSendState>(TodoRequestSendState.Idle)

@@ -94,6 +94,7 @@ import it.vittorioscocca.kidbox.ui.components.FormSectionTitle
 import it.vittorioscocca.kidbox.ui.components.FormSectionHeader
 import it.vittorioscocca.kidbox.data.remote.requests.FamilyRequestRemoteStore
 import it.vittorioscocca.kidbox.ui.screens.requests.FamilyRequestAskDialog
+import it.vittorioscocca.kidbox.ui.screens.requests.FamilyRequestAvailability
 import it.vittorioscocca.kidbox.ui.screens.requests.FamilyRequestAskMember
 import it.vittorioscocca.kidbox.ui.screens.requests.FamilyRequestAskRow
 import it.vittorioscocca.kidbox.ui.screens.requests.FamilyRequestSentDialog
@@ -112,6 +113,8 @@ fun TodoListScreen(
     var showEditor by remember { mutableStateOf(false) }
     var editingTodo by remember { mutableStateOf<KBTodoItemEntity?>(null) }
     val requestSend by viewModel.requestSend.collectAsStateWithLifecycle()
+    // Tiene vivo l'ascolto di to-do ed eventi per «chi è libero».
+    viewModel.availabilitySources.collectAsStateWithLifecycle()
 
     // Niente notifica per un to-do creato nella lista che è già a schermo.
     // Lo scope è il `listId`: essere in una lista non deve zittire gli avvisi
@@ -220,6 +223,7 @@ fun TodoListScreen(
             // Si chiede solo da una lista vera: il to-do nascerà lì.
             canAsk = state.smartKind == null && state.listId.isNotBlank(),
             sending = requestSend == TodoRequestSendState.Sending,
+            availabilityAround = viewModel::availabilityAround,
             onDismiss = { showEditor = false },
             onSave = { form ->
                 val draft = form.askDraft
@@ -538,6 +542,7 @@ private fun TodoEditScreen(
     currentUid: String,
     canAsk: Boolean,
     sending: Boolean,
+    availabilityAround: (Long?) -> FamilyRequestAvailability?,
     onDismiss: () -> Unit,
     onSave: (TodoEditForm) -> Unit,
 ) {
@@ -834,6 +839,8 @@ private fun TodoEditScreen(
         FamilyRequestAskDialog(
             members = askMembers,
             initial = askDraft,
+            // Su Android la scadenza ha sempre l'orario.
+            availability = remember(dueEnabled, dueAt) { availabilityAround(if (dueEnabled) dueAt else null) },
             onDismiss = { showAskDialog = false },
             onConfirm = {
                 askDraft = it

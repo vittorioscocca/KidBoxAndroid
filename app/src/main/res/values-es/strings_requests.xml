@@ -66,4 +66,7 @@
     <string name="requests_retry_body_short">Toca para intentarlo de nuevo.</string>
     <string name="requests_notification_yes">🙋 Me encargo yo</string>
     <string name="todo_external_assignee">%1$s (fuera de la app)</string>
+    <string name="requests_calendar_around">En el calendario, hacia las %1$s</string>
+    <string name="requests_already_has">Ya tiene «%1$s» a las %2$s</string>
+    <string name="requests_all_day">Todo el día</string>
 </resources>

@@ -76,6 +76,10 @@ fun shareRequestText(context: Context, text: String) {
     runCatching { context.startActivity(Intent.createChooser(send, null)) }
 }
 
+private fun timeText(millis: Long): String =
+    java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+        .format(java.time.Instant.ofEpochMilli(millis).atZone(java.time.ZoneId.systemDefault()))
+
 private fun copyToClipboard(context: Context, text: String) {
     val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
     cm.setPrimaryClip(ClipData.newPlainText("KidBox", text))
@@ -431,6 +435,7 @@ data class FamilyRequestAskMember(val uid: String, val displayName: String)
 fun FamilyRequestAskDialog(
     members: List<FamilyRequestAskMember>,
     initial: FamilyRequestRemoteStore.Draft?,
+    availability: FamilyRequestAvailability? = null,
     onDismiss: () -> Unit,
     onConfirm: (FamilyRequestRemoteStore.Draft) -> Unit,
 ) {
@@ -445,6 +450,26 @@ fun FamilyRequestAskDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
+                // Contesto, non attribuito a nessuno: gli eventi non dicono chi
+                // partecipa. Vedi `FamilyRequestAvailability`.
+                if (availability != null && availability.events.isNotEmpty()) {
+                    Text(
+                        stringResource(R.string.requests_calendar_around, timeText(availability.around)),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    availability.events.forEach { item ->
+                        Row(verticalAlignment = Alignment.Top) {
+                            Text(
+                                if (item.isAllDay) stringResource(R.string.requests_all_day)
+                                else "${timeText(item.start)}–${timeText(item.end)}",
+                                fontSize = 12.sp,
+                                modifier = Modifier.width(96.dp),
+                            )
+                            Text(item.title, fontSize = 14.sp)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
                 if (members.isEmpty()) {
                     Text(stringResource(R.string.requests_only_you), fontSize = 14.sp)
                 } else {
@@ -463,7 +488,16 @@ fun FamilyRequestAskDialog(
                         ) {
                             Checkbox(checked = checked, onCheckedChange = null)
                             Spacer(Modifier.width(8.dp))
-                            Text(m.displayName)
+                            Column {
+                                Text(m.displayName)
+                                availability?.busy?.get(m.uid)?.firstOrNull()?.let { busy ->
+                                    Text(
+                                        stringResource(R.string.requests_already_has, busy.title, timeText(busy.start)),
+                                        fontSize = 12.sp,
+                                        color = Color(0xFFD9822B),
+                                    )
+                                }
+                            }
                         }
                     }
                     Text(stringResource(R.string.requests_in_family_hint), fontSize = 12.sp)
