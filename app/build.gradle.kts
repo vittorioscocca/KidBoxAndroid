@@ -32,8 +32,8 @@ android {
         applicationId = "it.vittorioscocca.kidbox"
         minSdk = 26
         targetSdk = 36
-        versionCode = 70
-        versionName = "2.4.4"
+        versionCode = 71
+        versionName = "2.4.5"
         manifestPlaceholders["googleMapsApiKey"] = mapsApiKey
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
         buildConfigField("Boolean", "AI_ENABLED", "true")
