@@ -136,10 +136,10 @@
     <string name="settings_ai_messages_today">Mensajes de IA hoy</string>
     <string name="settings_ai_available_unlimited">Disponibles: ilimitados</string>
     <string name="settings_ai_privacy_title">Privacidad y seguridad</string>
-    <string name="settings_ai_privacy1">Los datos de salud se cifran antes de enviarse.</string>
-    <string name="settings_ai_privacy2">Las respuestas de la IA no se guardan en los servidores de KidBox.</string>
+    <string name="settings_ai_privacy1">Los datos viajan por una conexión cifrada y pasan por los servidores de KidBox: ninguna clave en el teléfono.</string>
+    <string name="settings_ai_privacy2">Las conversaciones quedan guardadas para encontrarlas; puedes borrarlas desde el asistente.</string>
     <string name="settings_ai_privacy3">Puedes revocar el consentimiento cuando quieras.</string>
-    <string name="settings_ai_privacy4">Anthropic trata los datos según su Política de Privacidad.</string>
+    <string name="settings_ai_privacy4">Anthropic trata los datos según su política de privacidad y no los usa para entrenar sus modelos.</string>
     <string name="settings_ai_weekly">Resumen semanal de IA</string>
     <string name="settings_ai_weekly_sub">Recibe un resumen de IA cada semana</string>
     <string name="settings_ai_daily">Resumen diario de IA</string>
