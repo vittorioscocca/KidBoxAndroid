@@ -19,6 +19,8 @@ import it.vittorioscocca.kidbox.data.sync.FamilySyncCenter
 import it.vittorioscocca.kidbox.data.user.UserProfileRepository
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -90,76 +92,103 @@ class JoinFamilyViewModel @Inject constructor(
      * l'invito come usato; se fallisce (scaduto, già usato, segreto errato) non
      * si deve entrare affatto, altrimenti si ricadrebbe nello stato "membro
      * senza chiave" che questo lavoro serve a eliminare.
+     *
+     * Il join gira in `NonCancellable`, quindi non muore con la schermata.
+     * L'onboarding va in Home appena vede `didJoin`, e con la sua schermata se ne
+     * va anche questo ViewModel. Fino alla 2.4.5 il resto del lavoro veniva
+     * annullato a metà: l'annullamento finiva nel catch come `family_join_failed`
+     * «unknown», senza `family_joined`, con il membro già scritto (27/09 e
+     * 01/10/2026). In più, un'uscita fra la chiave e la membership bruciava
+     * l'invito senza far entrare nessuno. [onJoined] invece parte solo se chi
+     * l'ha chiesto è ancora lì.
      */
     fun joinFromInvite(invite: PendingFamilyInvite, onJoined: () -> Unit) {
         viewModelScope.launch {
             _uiState.value = JoinFamilyUiState(isBusy = true)
             AppAnalytics.familyJoinAttempted(getApplication())
-            try {
-                joinWrapService.join(getApplication(), invite.qrEquivalentPayload)
-                KBLog.ui.info("invito: master key sbloccata familyId=${invite.familyId}", TAG)
-
-                inviteRemote.addMember(invite.familyId, inviteId = invite.inviteId)
-                KBLog.ui.info("invito: membership creata familyId=${invite.familyId}", TAG)
-
-                // `addMember` crea il membro senza `displayName`: senza questa
-                // riga chi entra resta anonimo per gli altri. Sta qui e non nei
-                // chiamanti perché questo è l'unico punto attraversato da tutte
-                // le strade di join (QR, link nel wizard, link ad app avviata).
-                runCatching { userProfileRepository.propagateDisplayNameToMember(invite.familyId) }
-                    .onFailure { KBLog.ui.error("propagazione nome fallita: ${it.message}", TAG, it) }
-
-                pendingFamilyId = invite.familyId
-                _uiState.value = JoinFamilyUiState(
-                    didJoin = true,
-                    joinedFamilyId = invite.familyId,
-                )
-
-                familySyncCenter.stopSync()
-                familySyncCenter.startSync(invite.familyId)
-
-                withTimeoutOrNull(30_000) {
-                    familySyncCenter.initialSyncDone.first { it }
-                } ?: KBLog.ui.warning("initialSyncDone timeout familyId=${invite.familyId}", TAG)
-
-                val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-                if (uid.isNotBlank()) {
-                    withContext(Dispatchers.IO) {
-                        runCatching { passwordsRepository.hydratePasswordRoomFromServer(invite.familyId) }
-                            .onFailure { e ->
-                                KBLog.ui.error("hydratePasswordRoomFromServer failed: ${e.message}", TAG, e)
-                            }
-                    }
-                    withContext(Dispatchers.IO) {
-                        passwordsRepository.awaitForceRestartRealtime(invite.familyId)
-                    }
-                }
-
-                val vaultKeyAvailable = FamilyKeyStore.hasFamilyKey(getApplication(), invite.familyId, uid)
-                AppAnalytics.familyJoined(getApplication(), vaultKeyAvailable)
-
-                // La famiglia creata solo per superare l'onboarding, se è rimasta
-                // vuota, va tolta di mezzo: occupa uno slot dei due per account e
-                // rende ambigua la scelta della famiglia "corrente".
-                withContext(Dispatchers.IO) {
-                    runCatching { leftoverFamilyCleaner.deleteEmptyOwnedFamilies(invite.familyId) }
-                        .onFailure { KBLog.ui.warning("pulizia famiglia residua fallita: ${it.message}", TAG) }
-                }
-
-                onJoined()
-            } catch (e: Exception) {
-                KBLog.ui.error("invito fallito: ${e.message}", TAG, e)
-                val reason = when (e) {
-                    is JoinInviteError.InvalidPayload -> "invalid_payload"
-                    is JoinInviteError.Expired -> "expired"
-                    is JoinInviteError.InvalidSecret -> "invalid_secret"
-                    is JoinInviteError.AlreadyUsed -> "already_used"
-                    else -> "unknown"
-                }
-                AppAnalytics.familyJoinFailed(getApplication(), reason)
-                _uiState.value = JoinFamilyUiState(error = e.localizedMessage ?: "Errore invito")
-            }
+            val joined = withContext(NonCancellable) { performJoin(invite) }
+            ensureActive()
+            if (joined) onJoined()
         }
+    }
+
+    /** `true` se la membership è stata creata. */
+    private suspend fun performJoin(invite: PendingFamilyInvite): Boolean {
+        try {
+            joinWrapService.join(getApplication(), invite.qrEquivalentPayload)
+            KBLog.ui.info("invito: master key sbloccata familyId=${invite.familyId}", TAG)
+
+            inviteRemote.addMember(invite.familyId, inviteId = invite.inviteId)
+            KBLog.ui.info("invito: membership creata familyId=${invite.familyId}", TAG)
+        } catch (e: Exception) {
+            KBLog.ui.error("invito fallito: ${e.message}", TAG, e)
+            val reason = when (e) {
+                is JoinInviteError.InvalidPayload -> "invalid_payload"
+                is JoinInviteError.Expired -> "expired"
+                is JoinInviteError.InvalidSecret -> "invalid_secret"
+                is JoinInviteError.AlreadyUsed -> "already_used"
+                else -> "unknown"
+            }
+            AppAnalytics.familyJoinFailed(getApplication(), reason)
+            _uiState.value = JoinFamilyUiState(error = e.localizedMessage ?: "Errore invito")
+            return false
+        }
+
+        // Da qui il membro esiste e il join è riuscito: il resto serve a
+        // sistemare. Se qualcosa va storto si annota nel log, ma non diventa un
+        // join fallito.
+
+        // `addMember` crea il membro senza `displayName`: senza questa
+        // riga chi entra resta anonimo per gli altri. Sta qui e non nei
+        // chiamanti perché questo è l'unico punto attraversato da tutte
+        // le strade di join (QR, link nel wizard, link ad app avviata).
+        runCatching { userProfileRepository.propagateDisplayNameToMember(invite.familyId) }
+            .onFailure { KBLog.ui.error("propagazione nome fallita: ${it.message}", TAG, it) }
+
+        // Come su iOS: si registra appena la membership esiste, non in fondo.
+        val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        AppAnalytics.familyJoined(
+            getApplication(),
+            vaultKeyAvailable = FamilyKeyStore.hasFamilyKey(getApplication(), invite.familyId, uid),
+        )
+
+        pendingFamilyId = invite.familyId
+        _uiState.value = JoinFamilyUiState(
+            didJoin = true,
+            joinedFamilyId = invite.familyId,
+        )
+
+        try {
+            familySyncCenter.stopSync()
+            familySyncCenter.startSync(invite.familyId)
+
+            withTimeoutOrNull(30_000) {
+                familySyncCenter.initialSyncDone.first { it }
+            } ?: KBLog.ui.warning("initialSyncDone timeout familyId=${invite.familyId}", TAG)
+
+            if (uid.isNotBlank()) {
+                withContext(Dispatchers.IO) {
+                    runCatching { passwordsRepository.hydratePasswordRoomFromServer(invite.familyId) }
+                        .onFailure { e ->
+                            KBLog.ui.error("hydratePasswordRoomFromServer failed: ${e.message}", TAG, e)
+                        }
+                }
+                withContext(Dispatchers.IO) {
+                    passwordsRepository.awaitForceRestartRealtime(invite.familyId)
+                }
+            }
+
+            // La famiglia creata solo per superare l'onboarding, se è rimasta
+            // vuota, va tolta di mezzo: occupa uno slot dei due per account e
+            // rende ambigua la scelta della famiglia "corrente".
+            withContext(Dispatchers.IO) {
+                runCatching { leftoverFamilyCleaner.deleteEmptyOwnedFamilies(invite.familyId) }
+                    .onFailure { KBLog.ui.warning("pulizia famiglia residua fallita: ${it.message}", TAG) }
+            }
+        } catch (e: Exception) {
+            KBLog.ui.error("sistemazione dopo il join fallita familyId=${invite.familyId}: ${e.message}", TAG, e)
+        }
+        return true
     }
 
     fun clearError() {
