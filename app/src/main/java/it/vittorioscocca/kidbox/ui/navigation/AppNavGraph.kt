@@ -64,6 +64,7 @@ import it.vittorioscocca.kidbox.ui.screens.settings.MessageSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.DevicesScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.NotificationSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.AIChatScreen
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.AgentFocus
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.PlanningAIChatScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.AiSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.PrivacySettingsScreen
@@ -1144,14 +1145,12 @@ fun AppNavGraph(
                 onOpen = { visitId ->
                     navController.navigate(AppDestination.MedicalVisitDetail.route(familyId, childId, visitId))
                 },
-                onOpenVisitsListAiChat = { subjectName, visitIdsJson ->
+                onOpenVisitsListAiChat = { subjectName, _ ->
+                    // L'assistente unico, centrato sulle visite di questa persona.
                     navController.navigate(
-                        AppDestination.VisitsListAiChat.route(
-                            familyId = familyId,
-                            childId = childId,
-                            subjectName = subjectName,
-                            visitIdsJson = visitIdsJson,
-                            isListMode = true,
+                        AppDestination.AiChat.createRoute(
+                            familyId,
+                            AgentFocus(personId = childId, personName = subjectName, scope = AgentFocus.Scope.VISITS),
                         ),
                     )
                 },
@@ -1261,6 +1260,7 @@ fun AppNavGraph(
             val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
             val childId = backStackEntry.arguments?.getString("childId").orEmpty()
             val visitId = backStackEntry.arguments?.getString("visitId").orEmpty()
+            val context = LocalContext.current
             MedicalVisitDetailScreen(
                 familyId = familyId,
                 childId = childId,
@@ -1277,17 +1277,21 @@ fun AppNavGraph(
                 onOpenExam = { examId ->
                     navController.navigate(AppDestination.MedicalExamDetail.route(familyId, childId, examId))
                 },
-                onOpenVisitAiChat = { subjectName, visitTitle, visitDate, diagnosis, notes ->
+                onOpenVisitAiChat = { subjectName, visitTitle, visitDate, _, _ ->
+                    // L'assistente unico, centrato su questa visita.
+                    val detail = visitDate.takeIf { it.isNotBlank() }
+                        ?.let { context.getString(R.string.agent_focus_visit_of_date, it) }
+                        ?: visitTitle
                     navController.navigate(
-                        AppDestination.VisitAiChat.route(
-                            familyId = familyId,
-                            childId = childId,
-                            visitId = visitId,
-                            subjectName = subjectName,
-                            visitTitle = visitTitle,
-                            visitDate = visitDate,
-                            diagnosis = diagnosis,
-                            notes = notes,
+                        AppDestination.AiChat.createRoute(
+                            familyId,
+                            AgentFocus(
+                                personId = childId,
+                                personName = subjectName,
+                                scope = AgentFocus.Scope.VISIT,
+                                itemId = visitId,
+                                detail = detail,
+                            ),
                         ),
                     )
                 },
@@ -1359,14 +1363,12 @@ fun AppNavGraph(
                 onOpen = { examId ->
                     navController.navigate(AppDestination.MedicalExamDetail.route(familyId, childId, examId))
                 },
-                onOpenExamsListAiChat = { subjectName, examIdsJson ->
+                onOpenExamsListAiChat = { subjectName, _ ->
+                    // L'assistente unico, centrato sugli esami di questa persona.
                     navController.navigate(
-                        AppDestination.ExamsListAiChat.route(
-                            familyId = familyId,
-                            childId = childId,
-                            subjectName = subjectName,
-                            examIdsJson = examIdsJson,
-                            isListMode = true,
+                        AppDestination.AiChat.createRoute(
+                            familyId,
+                            AgentFocus(personId = childId, personName = subjectName, scope = AgentFocus.Scope.EXAMS),
                         ),
                     )
                 },
@@ -1498,20 +1500,18 @@ fun AppNavGraph(
                 onOpenVisit = { visitId ->
                     navController.navigate(AppDestination.MedicalVisitDetail.route(familyId, childId, visitId))
                 },
-                onOpenExamAiChat = { subjectName, examName, examStatus, deadline, preparation, resultText, notes, attachmentsSummary ->
+                onOpenExamAiChat = { subjectName, examName, _, _, _, _, _, _ ->
+                    // L'assistente unico, centrato su questo esame.
                     navController.navigate(
-                        AppDestination.ExamAiChat.route(
-                            familyId = familyId,
-                            childId = childId,
-                            examId = examId,
-                            subjectName = subjectName,
-                            examName = examName,
-                            examStatus = examStatus,
-                            deadline = deadline,
-                            preparation = preparation,
-                            resultText = resultText,
-                            notes = notes,
-                            attachmentsSummary = attachmentsSummary,
+                        AppDestination.AiChat.createRoute(
+                            familyId,
+                            AgentFocus(
+                                personId = childId,
+                                personName = subjectName,
+                                scope = AgentFocus.Scope.EXAM,
+                                itemId = examId,
+                                detail = examName.trim(),
+                            ),
                         ),
                     )
                 },
@@ -2284,8 +2284,14 @@ fun AppNavGraph(
 
         composable(
             route = AppDestination.AiChat.route,
-
-            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("focusPersonId") { type = NavType.StringType; defaultValue = "" },
+                navArgument("focusName") { type = NavType.StringType; defaultValue = "" },
+                navArgument("focusScope") { type = NavType.StringType; defaultValue = "" },
+                navArgument("focusItemId") { type = NavType.StringType; defaultValue = "" },
+                navArgument("focusDetail") { type = NavType.StringType; defaultValue = "" },
+            ),
         ) { backStackEntry ->
             val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
             PlanningAIChatScreen(

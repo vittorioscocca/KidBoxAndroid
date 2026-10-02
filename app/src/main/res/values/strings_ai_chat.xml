@@ -208,4 +208,28 @@
     <string name="chat_back">Indietro</string>
     <string name="ai_cancel">Annulla</string>
     <string name="ai_back">Indietro</string>
+
+    <!-- Assistente unico: focus da Salute e scelta del contesto (internal/assistente-unico.md) -->
+    <string name="agent_focus_health_of">Salute di %1$s</string>
+    <string name="agent_focus_visits_of">Visite di %1$s</string>
+    <string name="agent_focus_exams_of">Esami di %1$s</string>
+    <string name="agent_focus_visit_of_date">Visita del %1$s</string>
+    <string name="agent_focus_clear">Chiedi di tutta la famiglia</string>
+    <string name="agent_q_person_summary">Riassumimi la salute di %1$s</string>
+    <string name="agent_q_person_todo">Ci sono esami, vaccini o visite da fare?</string>
+    <string name="agent_q_person_last_report">Spiegami l\'ultimo referto</string>
+    <string name="agent_q_visits_summary">Riassumimi le ultime visite di %1$s</string>
+    <string name="agent_q_visits_followup">Ci sono controlli da prenotare?</string>
+    <string name="agent_q_visit_explain">Spiegami questa visita</string>
+    <string name="agent_q_visit_report">Cosa dice il referto?</string>
+    <string name="agent_q_visit_next">Cosa devo fare adesso?</string>
+    <string name="agent_q_exams_out_of_range">Ci sono valori fuori norma negli esami di %1$s?</string>
+    <string name="agent_q_exams_pending">Quali esami sono ancora da fare?</string>
+    <string name="agent_q_exam_values">Cosa significano questi valori?</string>
+    <string name="agent_q_exam_normal">È tutto nella norma?</string>
+    <string name="agent_wide_context_title">Memoria molto ampia</string>
+    <string name="agent_wide_context_message">Con tutti i documenti per intero questa domanda supera un messaggio. Con il contesto ridotto restano interi i documenti che c\'entrano con la domanda e gli altri vengono accorciati. La scelta resta come preferenza: puoi cambiarla in Impostazioni AI.</string>
+    <string name="agent_full_accuracy_units">Massima accuratezza (%1$d messaggi)</string>
+    <string name="agent_reduced_one_unit">Contesto ridotto (1 messaggio)</string>
+    <string name="agent_reduced_units">Contesto ridotto (%1$d messaggi)</string>
 </resources>

@@ -96,6 +96,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.data.health.ai.HealthContextSendMode
 import androidx.compose.ui.platform.LocalContext
 
 @Composable
@@ -127,35 +128,7 @@ fun PlanningAIChatScreen(
         viewModel.clearActionExecutionSummary()
     }
 
-    val contextInput = remember {
-        PlanningContextInput(
-            familyName = "",
-            memberNames = emptyList(),
-            calendarEvents = emptyList(),
-            openTodos = emptyList(),
-            activeRoutines = emptyList(),
-            todayChecks = emptyList(),
-            childNames = emptyList(),
-            activeTreatments = emptyList(),
-            visitsWithNextDate = emptyList(),
-            visitsWithPendingExams = emptyList(),
-            upcomingVaccines = emptyList(),
-            recentNotes = emptyList(),
-            recentExpenses = emptyList(),
-            expenseCategoryNames = emptyList(),
-            pendingGroceryItems = emptyList(),
-            recentChatMessages = emptyList(),
-            recentDocuments = emptyList(),
-            recentWalletTickets = emptyList(),
-            children = emptyList(),
-            pediatricProfiles = emptyList(),
-            allVisits = emptyList(),
-            allExams = emptyList(),
-            allVaccines = emptyList(),
-        )
-    }
-
-    LaunchedEffect(Unit) { viewModel.loadOrCreateConversation(contextInput) }
+    LaunchedEffect(Unit) { viewModel.loadOrCreateConversation() }
     LaunchedEffect(state.conversationReady, recapTick) {
         if (state.conversationReady && recapTick > 0) {
             viewModel.injectPendingRecapFromStores()
@@ -233,7 +206,8 @@ fun PlanningAIChatScreen(
                     .navigationBarsPadding()
                     .padding(10.dp),
             ) {
-                val quick = listOf(
+                // Aperto da Salute: domande a tema; dalla Home: quelle di sempre.
+                val quick = state.focus?.suggestions(context) ?: listOf(
                     stringResource(R.string.ai_q_this_week),
                     stringResource(R.string.ai_q_create_event),
                     stringResource(R.string.ai_q_add_todo),
@@ -260,7 +234,7 @@ fun PlanningAIChatScreen(
                         ),
                     )
                     IconButton(
-                        onClick = { viewModel.send(contextInput) },
+                        onClick = { viewModel.send() },
                         enabled = state.inputText.isNotBlank() && !state.isLoading,
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.chat_send), tint = Color(0xFF598FDB))
@@ -272,6 +246,14 @@ fun PlanningAIChatScreen(
     ) { innerPadding ->
         Box(Modifier.fillMaxSize().padding(innerPadding)) {
             Column(Modifier.fillMaxSize()) {
+                // Focus da Salute: si può togliere e chiedere di tutta la famiglia.
+                state.focus?.let { focus ->
+                    AgentFocusChip(
+                        label = focus.label(context),
+                        onClear = viewModel::clearFocus,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    )
+                }
                 if (state.conversationReady) {
                     LazyRow(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
@@ -415,6 +397,31 @@ fun PlanningAIChatScreen(
         }
     }
 
+    if (state.showContextModeDialog) {
+        // Quaderno più grande di un messaggio: la stessa scelta della chat Salute.
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelPendingSend() },
+            title = { Text(stringResource(R.string.agent_wide_context_title)) },
+            text = { Text(stringResource(R.string.agent_wide_context_message)) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.confirmSend(HealthContextSendMode.FULL_ACCURACY) }) {
+                    Text(stringResource(R.string.agent_full_accuracy_units, state.choiceFullUnits))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.confirmSend(HealthContextSendMode.COMPACT_SUMMARY) }) {
+                    Text(
+                        if (state.choiceReducedUnits == 1) {
+                            stringResource(R.string.agent_reduced_one_unit)
+                        } else {
+                            stringResource(R.string.agent_reduced_units, state.choiceReducedUnits)
+                        },
+                    )
+                }
+            },
+        )
+    }
+
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
@@ -436,6 +443,32 @@ fun PlanningAIChatScreen(
                 }
             },
         )
+    }
+}
+
+/** Etichetta del focus (es. «Salute di Marco») con la crocetta per toglierlo. */
+@Composable
+private fun AgentFocusChip(label: String, onClear: () -> Unit, modifier: Modifier = Modifier) {
+    val kb = MaterialTheme.kidBoxColors
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(50),
+        color = Color(0xFF598FDB).copy(alpha = 0.12f),
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 12.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(label, fontSize = 13.sp, color = kb.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = stringResource(R.string.agent_focus_clear),
+                    tint = kb.subtitle,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        }
     }
 }
 

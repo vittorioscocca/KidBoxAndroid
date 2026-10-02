@@ -21,6 +21,7 @@ import it.vittorioscocca.kidbox.data.pets.PetEventAttachmentTag
 import it.vittorioscocca.kidbox.data.vehicles.VehicleAttachmentTag
 import it.vittorioscocca.kidbox.data.vehicles.VehicleEventAttachmentTag
 import it.vittorioscocca.kidbox.domain.model.KBTextExtractionStatus
+import it.vittorioscocca.kidbox.domain.model.WalletDocumentMetadata
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
 import java.io.File
@@ -52,6 +53,7 @@ class HealthAttachmentService @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val backfillInFlightByFamily = ConcurrentHashMap<String, Boolean>()
+    private val generalInFlightByFamily = ConcurrentHashMap<String, Boolean>()
 
 
     suspend fun uploadVisitAttachment(
@@ -287,6 +289,41 @@ class HealthAttachmentService @Inject constructor(
                 backfillHealthExtractionInternal(familyId)
             } finally {
                 backfillInFlightByFamily.remove(familyId)
+            }
+        }
+    }
+
+    /**
+     * Assistente unico: legge (OCR) qualche documento mai letto, i più recenti
+     * per primi, così il suo testo entra nella memoria dell'assistente. Mai i
+     * documenti d'identità del Wallet (il testo conterrebbe numeri e codici) e
+     * mai quelli già falliti, che si riproverebbero a ogni apertura. Parity iOS
+     * `PlanningAIChatViewModel.enqueuePendingExtractions`.
+     */
+    fun enqueueGeneralDocumentsExtraction(familyId: String, maxDocs: Int) {
+        if (familyId.isBlank() || maxDocs <= 0) return
+        if (generalInFlightByFamily.putIfAbsent(familyId, true) != null) return
+        scope.launch {
+            try {
+                val uid = auth.currentUser?.uid ?: "local"
+                val candidates = documentDao.getAllByFamilyId(familyId)
+                    .asSequence()
+                    .filter { !it.isDeleted && it.extractedText.isNullOrBlank() }
+                    .filter { it.extractionStatusRaw == KBTextExtractionStatus.NONE.rawValue }
+                    .filter { it.notes?.startsWith(WalletDocumentMetadata.NOTES_PREFIX) != true }
+                    .filter { it.mimeType.contains("pdf", ignoreCase = true) || it.mimeType.startsWith("image/") }
+                    .sortedByDescending { it.updatedAtEpochMillis }
+                    .take(maxDocs)
+                    .toList()
+                if (candidates.isEmpty()) return@launch
+                KBLog.data.info("General extraction start familyId=$familyId count=${candidates.size}", TAG)
+                for (doc in candidates) {
+                    extractAndPersistText(doc, uid)
+                }
+                runCatching { documentRepository.flushPending(familyId) }
+                    .onFailure { KBLog.data.error("General extraction flushPending failed familyId=$familyId", TAG, it) }
+            } finally {
+                generalInFlightByFamily.remove(familyId)
             }
         }
     }

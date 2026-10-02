@@ -195,4 +195,28 @@
     <string name="chat_back">Retour</string>
     <string name="ai_cancel">Annuler</string>
     <string name="ai_back">Retour</string>
+
+    <!-- Assistente unico: focus da Salute e scelta del contesto (internal/assistente-unico.md) -->
+    <string name="agent_focus_health_of">Santé de %1$s</string>
+    <string name="agent_focus_visits_of">Consultations de %1$s</string>
+    <string name="agent_focus_exams_of">Examens de %1$s</string>
+    <string name="agent_focus_visit_of_date">Consultation du %1$s</string>
+    <string name="agent_focus_clear">Poser une question sur toute la famille</string>
+    <string name="agent_q_person_summary">Résume-moi la santé de %1$s</string>
+    <string name="agent_q_person_todo">Y a-t-il des examens, des vaccins ou des consultations à faire ?</string>
+    <string name="agent_q_person_last_report">Explique-moi le dernier compte rendu</string>
+    <string name="agent_q_visits_summary">Résume-moi les dernières consultations de %1$s</string>
+    <string name="agent_q_visits_followup">Y a-t-il des contrôles à réserver ?</string>
+    <string name="agent_q_visit_explain">Explique-moi cette consultation</string>
+    <string name="agent_q_visit_report">Que dit le compte rendu ?</string>
+    <string name="agent_q_visit_next">Que dois-je faire maintenant ?</string>
+    <string name="agent_q_exams_out_of_range">Y a-t-il des valeurs anormales dans les examens de %1$s ?</string>
+    <string name="agent_q_exams_pending">Quels examens restent à faire ?</string>
+    <string name="agent_q_exam_values">Que signifient ces valeurs ?</string>
+    <string name="agent_q_exam_normal">Est-ce que tout est normal ?</string>
+    <string name="agent_wide_context_title">Mémoire très volumineuse</string>
+    <string name="agent_wide_context_message">Avec tous les documents en entier, cette question dépasse un message. Avec le contexte réduit, les documents liés à la question restent complets et les autres sont raccourcis. Ce choix est enregistré comme préférence : vous pouvez le modifier dans Réglages IA.</string>
+    <string name="agent_full_accuracy_units">Précision maximale (%1$d messages)</string>
+    <string name="agent_reduced_one_unit">Contexte réduit (1 message)</string>
+    <string name="agent_reduced_units">Contexte réduit (%1$d messages)</string>
 </resources>

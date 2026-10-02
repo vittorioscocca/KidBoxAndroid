@@ -1,85 +1,40 @@
 package it.vittorioscocca.kidbox.ui.screens.ai.planning
 
 import android.content.Context
-import it.vittorioscocca.kidbox.util.KBLog
-import com.google.firebase.auth.FirebaseAuth
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import it.vittorioscocca.kidbox.data.local.dao.KBCalendarEventDao
-import it.vittorioscocca.kidbox.data.local.dao.KBChatMessageDao
-import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
-import it.vittorioscocca.kidbox.data.local.dao.KBDocumentDao
-import it.vittorioscocca.kidbox.data.local.dao.KBExpenseCategoryDao
-import it.vittorioscocca.kidbox.data.local.dao.KBExpenseDao
+import it.vittorioscocca.kidbox.ai.CurrentPlanStore
+import it.vittorioscocca.kidbox.data.ai.AISettingsStore
+import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
+import it.vittorioscocca.kidbox.data.health.ai.HealthContextSendMode
+import it.vittorioscocca.kidbox.data.health.ai.HealthContextSendPreference
 import it.vittorioscocca.kidbox.data.local.ActiveFamilyResolver
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
-import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.dao.KBGroceryItemDao
-import it.vittorioscocca.kidbox.data.local.dao.HomeItemDao
-import it.vittorioscocca.kidbox.data.local.dao.HousePaymentDao
-import it.vittorioscocca.kidbox.data.local.dao.KBNoteDao
-import it.vittorioscocca.kidbox.data.local.dao.PetDao
-import it.vittorioscocca.kidbox.data.local.dao.PetEventDao
-import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
-import it.vittorioscocca.kidbox.data.local.dao.KBPediatricProfileDao
-import it.vittorioscocca.kidbox.data.local.dao.KBRoutineCheckDao
-import it.vittorioscocca.kidbox.data.local.dao.KBRoutineDao
-import it.vittorioscocca.kidbox.data.local.dao.KBTodoItemDao
-import it.vittorioscocca.kidbox.data.local.dao.VehicleDao
-import it.vittorioscocca.kidbox.data.local.dao.VehicleEventDao
-import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
-import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
-import it.vittorioscocca.kidbox.data.home.HomeItemAttachmentTag
-import it.vittorioscocca.kidbox.data.home.HousePaymentAttachmentTag
-import it.vittorioscocca.kidbox.data.pets.PetEventAttachmentTag
-import it.vittorioscocca.kidbox.data.vehicles.VehicleAttachmentTag
-import it.vittorioscocca.kidbox.data.vehicles.VehicleEventAttachmentTag
-import it.vittorioscocca.kidbox.data.local.entity.KBCalendarEventEntity
-import it.vittorioscocca.kidbox.data.local.entity.KBChatMessageEntity
-import it.vittorioscocca.kidbox.data.local.entity.KBChildEntity
-import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
-import it.vittorioscocca.kidbox.data.local.entity.KBExpenseEntity
-import it.vittorioscocca.kidbox.data.local.entity.KBGroceryItemEntity
-import it.vittorioscocca.kidbox.data.local.entity.KBNoteEntity
-import it.vittorioscocca.kidbox.data.local.entity.KBPediatricProfileEntity
-import it.vittorioscocca.kidbox.data.local.entity.KBRoutineCheckEntity
-import it.vittorioscocca.kidbox.data.local.entity.KBRoutineEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoItemEntity
 import it.vittorioscocca.kidbox.data.local.mapper.scheduleTimesList
+import it.vittorioscocca.kidbox.data.remote.ai.AIAskAIPayload
+import it.vittorioscocca.kidbox.data.remote.ai.AIRemotePreferences
 import it.vittorioscocca.kidbox.data.remote.ai.AIService
 import it.vittorioscocca.kidbox.data.remote.ai.AIServiceException
 import it.vittorioscocca.kidbox.data.repository.KBAIRepository
-import it.vittorioscocca.kidbox.data.repository.MedicalExamRepository
-import it.vittorioscocca.kidbox.data.repository.MedicalVisitRepository
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
-import it.vittorioscocca.kidbox.data.repository.TreatmentRepository
-import it.vittorioscocca.kidbox.data.repository.VaccineRepository
+import it.vittorioscocca.kidbox.domain.calendar.occurrencesIn
 import it.vittorioscocca.kidbox.domain.model.KBAIConversation
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
-import it.vittorioscocca.kidbox.domain.model.KBCalendarEvent
-import it.vittorioscocca.kidbox.domain.model.KBChatMessage
-import it.vittorioscocca.kidbox.domain.model.KBChild
-import it.vittorioscocca.kidbox.domain.model.KBDocument
-import it.vittorioscocca.kidbox.domain.model.KBExpense
-import it.vittorioscocca.kidbox.domain.model.KBGroceryItem
 import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
-import it.vittorioscocca.kidbox.domain.model.KBNote
-import it.vittorioscocca.kidbox.domain.model.KBTextExtractionStatus
-import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
-import it.vittorioscocca.kidbox.domain.model.KBPediatricProfile
-import it.vittorioscocca.kidbox.domain.model.KBRoutine
-import it.vittorioscocca.kidbox.domain.model.KBRoutineCheck
-import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import it.vittorioscocca.kidbox.domain.model.KBTodoItem
-import it.vittorioscocca.kidbox.ai.CurrentPlanStore
-import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
+import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import it.vittorioscocca.kidbox.domain.model.ai.AIMessageRole
 import it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod
 import it.vittorioscocca.kidbox.domain.model.ai.AIServiceError
+import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatStreamingDelivery
+import it.vittorioscocca.kidbox.util.KBLog
+import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -88,7 +43,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
-import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatStreamingDelivery
 import kotlinx.coroutines.launch
 
 data class PlanningChatUiState(
@@ -115,11 +69,30 @@ data class PlanningChatUiState(
     val parserFamilyId: String = "",
     val actionExecutionSummary: String? = null,
     val autoExecutedMessageIds: Set<String> = emptySet(),
+    /** Da dove si è aperto l'assistente (pulsanti di Salute); null = dalla Home. */
+    val focus: AgentFocus? = null,
+    /** Quaderno più grande di un messaggio: la stessa scelta della chat Salute. */
+    val showContextModeDialog: Boolean = false,
+    val pendingSendText: String = "",
+    val choiceFullUnits: Int = 1,
+    val choiceReducedUnits: Int = 1,
 ) {
     val canSend: Boolean get() = inputText.isNotBlank() && !isLoading && !isLoadingContext
     val isNearLimit: Boolean get() = dailyLimit > 0 && usageToday >= (dailyLimit * 0.8).toInt()
 }
 
+/**
+ * L'assistente unico di KidBox: si apre dalla Home e, con un focus, dai pulsanti
+ * di Salute (persona, visite, singola visita, esami).
+ *
+ * - Il contesto è il quaderno di schede ([AgentMemoryBook]), ricostruito dai dati
+ *   di Room a ogni domanda.
+ * - Una sola conversazione per famiglia (`planning-agent-{familyId}`).
+ * - Quaderno più grande di un messaggio: stessa scelta della chat Salute
+ *   (`HealthContextSendPreference`); la versione ridotta non costa un riassunto.
+ *
+ * Disegno in `internal/assistente-unico.md`.
+ */
 @HiltViewModel
 class PlanningAIChatViewModel @Inject constructor(
     private val kbAIRepository: KBAIRepository,
@@ -128,33 +101,12 @@ class PlanningAIChatViewModel @Inject constructor(
     private val subscriptionRepository: SubscriptionRepository,
     private val familyDao: KBFamilyDao,
     private val familySessionPreferences: FamilySessionPreferences,
-    private val familyMemberDao: KBFamilyMemberDao,
-    private val childDao: KBChildDao,
-    private val calendarEventDao: KBCalendarEventDao,
-    private val todoItemDao: KBTodoItemDao,
-    private val routineDao: KBRoutineDao,
-    private val routineCheckDao: KBRoutineCheckDao,
-    private val treatmentRepository: TreatmentRepository,
-    private val medicalVisitRepository: MedicalVisitRepository,
-    private val medicalExamRepository: MedicalExamRepository,
-    private val vaccineRepository: VaccineRepository,
-    private val noteDao: KBNoteDao,
-    private val expenseDao: KBExpenseDao,
-    private val expenseCategoryDao: KBExpenseCategoryDao,
     private val groceryItemDao: KBGroceryItemDao,
-    private val chatMessageDao: KBChatMessageDao,
-    private val documentDao: KBDocumentDao,
-    private val walletTicketDao: WalletTicketDao,
-    private val pediatricProfileDao: KBPediatricProfileDao,
-    private val petDao: PetDao,
-    private val petEventDao: PetEventDao,
-    private val homeItemDao: HomeItemDao,
-    private val housePaymentDao: HousePaymentDao,
-    private val vehicleDao: VehicleDao,
-    private val vehicleEventDao: VehicleEventDao,
+    private val agentMemoryRepository: AgentMemoryRepository,
     private val healthAttachmentService: HealthAttachmentService,
     private val familyMemoryService: FamilyMemoryService,
-    private val auth: FirebaseAuth,
+    private val aiSettingsStore: AISettingsStore,
+    private val aiRemotePrefs: AIRemotePreferences,
     @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
@@ -163,16 +115,14 @@ class PlanningAIChatViewModel @Inject constructor(
         familySessionPreferences.getActiveFamilyId().orEmpty()
     }
     private var scopeId: String = "planning-agent-$effectiveFamilyId"
-    private val familyName: String = savedStateHandle["familyName"] ?: ""
-    private val memberNames: List<String> = savedStateHandle.get<ArrayList<String>>("memberNames")?.toList().orEmpty()
-    private val horizonDays: Int = savedStateHandle["horizonDays"] ?: 14
+    private val routeFamilyName: String = savedStateHandle["familyName"] ?: ""
 
-    private val _uiState = MutableStateFlow(PlanningChatUiState())
+    private val _uiState = MutableStateFlow(PlanningChatUiState(focus = focusFrom(savedStateHandle)))
     val uiState: StateFlow<PlanningChatUiState> = _uiState.asStateFlow()
     private var observeJob: Job? = null
     private var conversation: KBAIConversation? = null
-    private var systemPrompt: String = ""
-    private var lastInput: PlanningContextInput? = null
+    private var snapshot: AgentMemorySnapshot? = null
+    private var pendingPlan: ContextPlan? = null
 
     private val COMPACTION_THRESHOLD = 0.60
     private var lastCompactionStep = 0
@@ -195,17 +145,17 @@ class PlanningAIChatViewModel @Inject constructor(
     private fun rebindActiveFamily(familyId: String) {
         observeJob?.cancel()
         conversation = null
+        snapshot = null
         effectiveFamilyId = familyId
         scopeId = "planning-agent-$familyId"
-        _uiState.value = PlanningChatUiState()
-        loadOrCreateConversation(lastInput ?: emptyPlanningContext())
+        _uiState.value = PlanningChatUiState(focus = _uiState.value.focus)
+        loadOrCreateConversation()
     }
 
-    fun loadOrCreateConversation(input: PlanningContextInput) {
+    fun loadOrCreateConversation() {
         if (_uiState.value.isLoadingContext || _uiState.value.conversationReady) return
-        lastInput = input
         viewModelScope.launch {
-            KBLog.ai.debug("init", "PlanningAIChatVM")
+            KBLog.ai.debug("init focus=${_uiState.value.focus?.scope}", TAG)
             _uiState.update { it.copy(isLoadingContext = true, errorMessage = null) }
             val plan = if (effectiveFamilyId.isBlank()) {
                 null
@@ -224,48 +174,19 @@ class PlanningAIChatViewModel @Inject constructor(
             }
             dailyLimit = _uiState.value.dailyLimit
             runCatching {
-                val enrichedInput = buildContextInput(input)
-                lastInput = enrichedInput
                 conversation = kbAIRepository.getOrCreateConversation(scopeId, effectiveFamilyId)
-                val memoryFacts = familyMemoryService.fetchFactTexts(effectiveFamilyId)
-                systemPrompt = PlanningContextBuilder.build(
-                    enrichedInput.copy(familyMemoryFacts = memoryFacts),
-                )
+                val snap = loadSnapshot()
                 observeJob?.cancel()
                 observeJob = viewModelScope.launch {
                     kbAIRepository.observeMessages(conversation!!.id).collectLatest { msgs ->
                         _uiState.update { it.copy(messages = msgs) }
                     }
                 }
-                injectPendingRecapFromStores()
-                _uiState.update {
-                    it.copy(
-                        isLoadingContext = false,
-                        conversationReady = true,
-                        familyName = enrichedInput.familyName,
-                        upcomingEventsCount = enrichedInput.calendarEvents.size,
-                        pendingGroceryCount = enrichedInput.pendingGroceryItems.size,
-                        todayEventsCount = enrichedInput.calendarEvents.count { event ->
-                            val c = java.util.Calendar.getInstance()
-                            c.timeInMillis = event.startDateEpochMillis
-                            val d = java.util.Calendar.getInstance()
-                            c.get(java.util.Calendar.YEAR) == d.get(java.util.Calendar.YEAR) &&
-                                c.get(java.util.Calendar.DAY_OF_YEAR) == d.get(java.util.Calendar.DAY_OF_YEAR)
-                        },
-                        urgentTodosCount = enrichedInput.openTodos.count { todo ->
-                            val isHighPriority = (todo.priorityRaw ?: 0) == 1
-                            val isOverdue = (todo.dueAtEpochMillis ?: Long.MAX_VALUE) < System.currentTimeMillis()
-                            isHighPriority || isOverdue
-                        },
-                        todayDosesCount = enrichedInput.activeTreatments.sumOf { treatment ->
-                            treatment.scheduleTimesList().size
-                        },
-                        parserOpenTodos = enrichedInput.openTodos,
-                        parserVisits = enrichedInput.visitsWithNextDate,
-                        parserTreatments = enrichedInput.activeTreatments,
-                        parserFamilyId = effectiveFamilyId,
-                    )
-                }
+                // Il briefing e gli insight sono della Home: aperto da Salute
+                // l'assistente non li mette davanti alla domanda sulla persona.
+                if (_uiState.value.focus == null) injectPendingRecapFromStores()
+                enqueuePendingExtractions()
+                _uiState.update { it.copy(isLoadingContext = false, conversationReady = true).withSnapshot(snap) }
             }.onFailure { err ->
                 _uiState.update { it.copy(isLoadingContext = false, errorMessage = err.message ?: "Errore contesto") }
             }
@@ -289,68 +210,243 @@ class PlanningAIChatViewModel @Inject constructor(
         }
     }
 
-    fun send(input: PlanningContextInput) {
-        lastInput = input
+    fun send() {
         val text = _uiState.value.inputText.trim()
-        val conv = conversation ?: return
-        if (text.isBlank()) return
+        if (text.isBlank() || _uiState.value.isLoading || conversation == null) return
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null, inputText = "") }
-            runCatching {
-                val enrichedInput = buildContextInput(input)
-                lastInput = enrichedInput
-                kbAIRepository.addMessage(conv.id, AIMessageRole.USER, text)
-                val memoryFacts = familyMemoryService.fetchFactTexts(effectiveFamilyId)
-                systemPrompt = PlanningContextBuilder.build(
-                    enrichedInput.copy(familyMemoryFacts = memoryFacts),
-                )
-                val payload = buildApiMessages(conversation = conv, latestUserText = text)
-                val reply = aiService.sendMessage(payload, systemPrompt, effectiveFamilyId).getOrThrow()
-                val outcome = actionPipeline.processReply(
-                    reply = reply.reply,
-                    familyId = effectiveFamilyId,
-                    defaultChildId = childDao.getChildrenByFamilyId(effectiveFamilyId).firstOrNull()?.id,
-                )
-                val assistantMsg = kbAIRepository.addMessage(conv.id, AIMessageRole.ASSISTANT, outcome.displayText)
-                val executionSummary = outcome.executionSummary
-                val autoExecutedIds = if (outcome.didAutoExecute) {
-                    _uiState.value.autoExecutedMessageIds + assistantMsg.id
-                } else {
-                    _uiState.value.autoExecutedMessageIds
+            _uiState.update { it.copy(inputText = "", errorMessage = null, isLoading = true) }
+            val plan = runCatching { prepareContext(text) }.getOrElse { err ->
+                _uiState.update { it.copy(isLoading = false, errorMessage = err.message ?: "Errore contesto") }
+                return@launch
+            }
+            val reduced = plan.reducedPrompt
+            if (reduced == null || plan.fullUnits <= 1) {
+                performSend(text, plan.fullPrompt, "full")
+                return@launch
+            }
+            when (aiSettingsStore.getHealthContextSendPreference()) {
+                HealthContextSendPreference.ASK_EACH_TIME -> {
+                    pendingPlan = plan
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            showContextModeDialog = true,
+                            pendingSendText = text,
+                            choiceFullUnits = plan.fullUnits,
+                            choiceReducedUnits = plan.reducedUnits,
+                        )
+                    }
                 }
-                AppAnalytics.aiMessageSent(context, "assistente", CurrentPlanStore.plan.value.rawValue)
-                messagesInSession = reply.usageToday
-                dailyLimit = reply.dailyLimit
-                maybeCompactIfNeeded(conv.id, reply.usageToday, reply.dailyLimit)
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        streamingMessageId = AIChatStreamingDelivery.beginAssistantReveal(assistantMsg.id),
-                        usageToday = reply.usageToday,
-                        dailyLimit = reply.dailyLimit,
-                        quotaPeriod = reply.period,
-                        // Il bonus Free può esaurirsi proprio con questo messaggio: rifletti
-                        // subito lo stato aggiornato di CurrentPlanStore (già propagato da
-                        // AIService/AIUsageTracker prima di questo update).
-                        isSubscribed = !CurrentPlanStore.aiAccessBlocked.value,
-                        actionExecutionSummary = executionSummary,
-                        autoExecutedMessageIds = autoExecutedIds,
-                        pendingGroceryCount = groceryItemDao.observeByFamilyId(effectiveFamilyId).first()
-                            .count { !it.isPurchased && !it.isDeleted },
-                    )
-                }
-            }.onFailure { err ->
-                _uiState.update { it.copy(isLoading = false, errorMessage = localizeError(err)) }
+                HealthContextSendPreference.FULL_ACCURACY -> performSend(text, plan.fullPrompt, "full")
+                HealthContextSendPreference.COMPACT_SUMMARY -> performSend(text, reduced, "reduced")
             }
         }
     }
 
+    /** Scelta dal dialogo: diventa la preferenza, come nella chat Salute. */
+    fun confirmSend(mode: HealthContextSendMode) {
+        val plan = pendingPlan ?: return
+        val text = _uiState.value.pendingSendText
+        pendingPlan = null
+        _uiState.update { it.copy(showContextModeDialog = false, pendingSendText = "", isLoading = true) }
+        if (text.isBlank()) {
+            _uiState.update { it.copy(isLoading = false) }
+            return
+        }
+        val preference = HealthContextSendPreference.fromSendMode(mode)
+        aiSettingsStore.setHealthContextSendPreference(preference)
+        viewModelScope.launch {
+            runCatching { aiRemotePrefs.setHealthContextSendPreference(preference) }
+            when (mode) {
+                HealthContextSendMode.FULL_ACCURACY -> performSend(text, plan.fullPrompt, "full")
+                HealthContextSendMode.COMPACT_SUMMARY -> performSend(text, plan.reducedPrompt ?: plan.fullPrompt, "reduced")
+            }
+        }
+    }
+
+    /** Annullato: la domanda torna nel campo, non si perde. */
+    fun cancelPendingSend() {
+        val text = _uiState.value.pendingSendText
+        pendingPlan = null
+        _uiState.update {
+            it.copy(
+                showContextModeDialog = false,
+                pendingSendText = "",
+                inputText = if (it.inputText.isBlank()) text else it.inputText,
+            )
+        }
+    }
+
+    private suspend fun performSend(text: String, systemPrompt: String, mode: String) {
+        val conv = conversation ?: return
+        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+        runCatching {
+            KBLog.ai.debug("send mode=$mode promptChars=${systemPrompt.length}", TAG)
+            val userMessage = kbAIRepository.addMessage(conv.id, AIMessageRole.USER, text)
+            // La domanda entra esplicitamente: lo stato osservato da Room potrebbe
+            // non averla ancora, e uno storico che finisce con l'assistente perde la domanda.
+            val payload = buildApiMessages(conversation = conv, pendingUser = userMessage)
+            val reply = aiService.sendMessage(payload, systemPrompt, effectiveFamilyId, purpose = AGENT_PURPOSE).getOrThrow()
+            val outcome = actionPipeline.processReply(
+                reply = reply.reply,
+                familyId = effectiveFamilyId,
+                defaultChildId = defaultChildId(),
+            )
+            val assistantMsg = kbAIRepository.addMessage(conv.id, AIMessageRole.ASSISTANT, outcome.displayText)
+            val autoExecutedIds = if (outcome.didAutoExecute) {
+                _uiState.value.autoExecutedMessageIds + assistantMsg.id
+            } else {
+                _uiState.value.autoExecutedMessageIds
+            }
+            // Con il focus di Salute vale come la vecchia chat Salute: la serie
+            // dell'evento resta confrontabile con quella di prima.
+            AppAnalytics.aiMessageSent(
+                context,
+                if (_uiState.value.focus == null) "assistente" else "salute",
+                CurrentPlanStore.plan.value.rawValue,
+            )
+            messagesInSession = reply.usageToday
+            dailyLimit = reply.dailyLimit
+            maybeCompactIfNeeded(conv.id, reply.usageToday, reply.dailyLimit)
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    streamingMessageId = AIChatStreamingDelivery.beginAssistantReveal(assistantMsg.id),
+                    usageToday = reply.usageToday,
+                    dailyLimit = reply.dailyLimit,
+                    quotaPeriod = reply.period,
+                    // Il bonus Free può esaurirsi proprio con questo messaggio: rifletti
+                    // subito lo stato aggiornato di CurrentPlanStore.
+                    isSubscribed = !CurrentPlanStore.aiAccessBlocked.value,
+                    actionExecutionSummary = outcome.executionSummary,
+                    autoExecutedMessageIds = autoExecutedIds,
+                    pendingGroceryCount = groceryItemDao.observeByFamilyId(effectiveFamilyId).first()
+                        .count { g -> !g.isPurchased && !g.isDeleted },
+                )
+            }
+        }.onFailure { err ->
+            _uiState.update { it.copy(isLoading = false, errorMessage = localizeError(err)) }
+        }
+    }
+
+    /** Il figlio a cui attribuire un to-do creato dall'assistente: quello del focus, se è un figlio. */
+    private fun defaultChildId(): String? {
+        val children = snapshot?.children.orEmpty()
+        val focusId = _uiState.value.focus?.personId
+        return children.firstOrNull { it.id == focusId }?.id ?: children.firstOrNull()?.id
+    }
+
+    // ── Contesto ─────────────────────────────────────────────────────────────
+
+    private data class ContextPlan(
+        val fullPrompt: String,
+        val fullUnits: Int,
+        /** null se la versione completa sta già in un messaggio. */
+        val reducedPrompt: String?,
+        val reducedUnits: Int,
+    )
+
+    /** Quaderno completo e, se non sta in un messaggio, quello ridotto per questa domanda. */
+    private suspend fun prepareContext(question: String): ContextPlan {
+        val snap = loadSnapshot()
+        val familyName = snap.familyName
+        val focus = _uiState.value.focus
+        val builder = AgentMemoryBookBuilder(snap)
+        val history = conversation?.let { buildApiMessages(it, pendingUser = null) }.orEmpty()
+
+        val fullPrompt = AgentPrompt.systemPrompt(familyName, builder.build(docAllowance = null), focus)
+        val fullChars = AIAskAIPayload.totalChars(fullPrompt, history, question)
+        val fullUnits = AIAskAIPayload.messageUnits(fullChars)
+        if (fullUnits <= 1) {
+            KBLog.ai.debug("context full chars=$fullChars units=1", TAG)
+            return ContextPlan(fullPrompt, 1, null, 1)
+        }
+
+        // Ridotto: si misura lo scheletro (tutti i testi a zero) e si divide il resto
+        // del messaggio fra i documenti, i più utili per primi.
+        val textDocs = builder.textDocuments()
+        val zero = textDocs.associate { it.doc.id to 0 }
+        val skeleton = AgentPrompt.systemPrompt(familyName, builder.build(docAllowance = zero), focus)
+        val skeletonChars = AIAskAIPayload.totalChars(skeleton, history, question)
+        // Di solito lo scheletro sta in un messaggio e il ridotto costa 1. Se già lo
+        // scheletro non ci sta (02/10/2026: una famiglia con 30 esami e 88 documenti,
+        // 50.449 caratteri senza un rigo di testo letto), il ridotto paga i messaggi
+        // che servono allo scheletro e li riempie di testi.
+        val target = AIAskAIPayload.messageUnits(skeletonChars + UNIT_SAFETY_MARGIN) * AIAskAIPayload.STANDARD_CHARS -
+            UNIT_SAFETY_MARGIN
+        val personNames = snap.children.associate { it.id to it.name } +
+            snap.members.mapNotNull { m -> m.displayName?.takeIf { it.isNotBlank() }?.let { m.userId to it } }
+        var available = (target - skeletonChars).coerceAtLeast(0)
+        var reducedPrompt = skeleton
+        var reducedChars = skeletonChars
+        // Il contorno stimato per documento non basta quando un allegato ha molte
+        // righe (ognuna indentata): se sfora, lo sforamento esce dal budget e si
+        // ridistribuisce. Stesso giro su iOS e web.
+        for (attempt in 0 until 3) {
+            val allowance = AgentContextFitter.allowances(textDocs, question, focus, personNames, available)
+            reducedPrompt = AgentPrompt.systemPrompt(familyName, builder.build(docAllowance = allowance), focus)
+            reducedChars = AIAskAIPayload.totalChars(reducedPrompt, history, question)
+            if (reducedChars <= target || available == 0) break
+            available = (available - (reducedChars - target)).coerceAtLeast(0)
+        }
+        val reducedUnits = AIAskAIPayload.messageUnits(reducedChars)
+        KBLog.ai.debug(
+            "context full chars=$fullChars units=$fullUnits reduced units=$reducedUnits docs=${textDocs.size}",
+            TAG,
+        )
+        // Un ridotto che costa quanto il completo non è una scelta: si manda il completo.
+        if (reducedUnits >= fullUnits) return ContextPlan(fullPrompt, fullUnits, null, fullUnits)
+        return ContextPlan(fullPrompt, fullUnits, reducedPrompt, reducedUnits)
+    }
+
+    private suspend fun loadSnapshot(): AgentMemorySnapshot {
+        val familyName = routeFamilyName.ifBlank {
+            if (effectiveFamilyId.isNotBlank()) familyDao.getById(effectiveFamilyId)?.name.orEmpty() else ""
+        }.ifBlank { "Famiglia" }
+        val snap = agentMemoryRepository.load(effectiveFamilyId, familyName)
+        snapshot = snap
+        _uiState.update { it.withSnapshot(snap) }
+        return snap
+    }
+
+    private fun PlanningChatUiState.withSnapshot(snap: AgentMemorySnapshot): PlanningChatUiState {
+        val now = System.currentTimeMillis()
+        val startOfDay = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val endOfDay = startOfDay + 24L * 60 * 60 * 1000
+        return copy(
+            familyName = snap.familyName,
+            upcomingEventsCount = snap.events.count { it.startDateEpochMillis >= now },
+            pendingGroceryCount = snap.pendingGrocery.size,
+            todayEventsCount = snap.events.sumOf { e -> e.occurrencesIn(startOfDay, endOfDay).size },
+            urgentTodosCount = snap.openTodos.count { t ->
+                (t.priorityRaw ?: 0) == 1 || (t.dueAtEpochMillis ?: Long.MAX_VALUE) < now
+            },
+            todayDosesCount = snap.activeTreatments.sumOf { t -> t.scheduleTimesList().size },
+            parserOpenTodos = snap.openTodos.map { it.toDomain() },
+            parserVisits = snap.allVisits.filter { (it.nextVisitDateEpochMillis ?: 0L) > now },
+            parserTreatments = snap.activeTreatments,
+            parserFamilyId = snap.familyId,
+        )
+    }
+
+    /**
+     * Fa leggere (OCR) i documenti ancora senza testo: salute e allegati di casa,
+     * auto e animali col recupero di sempre, più pochi documenti generici alla
+     * volta. I documenti d'identità del Wallet mai.
+     */
+    private fun enqueuePendingExtractions() {
+        if (effectiveFamilyId.isBlank()) return
+        healthAttachmentService.enqueueBackfillHealthExtraction(effectiveFamilyId)
+        healthAttachmentService.enqueueGeneralDocumentsExtraction(effectiveFamilyId, maxDocs = EXTRACTION_BATCH_SIZE)
+    }
+
+    fun clearFocus() = _uiState.update { it.copy(focus = null) }
+
     fun executeCardAction(action: PlanningAction) {
         viewModelScope.launch {
-            val pending = groceryItemDao.observeByFamilyId(effectiveFamilyId).first()
-                .filter { !it.isPurchased && !it.isDeleted }
-                .map { it.name.lowercase() }
-                .toSet()
             val dto = when (action.kind) {
                 PlanningActionKind.CREATE_GROCERY -> PlanningExecutableActionDto(
                     type = "grocery_add",
@@ -375,7 +471,7 @@ class PlanningAIChatViewModel @Inject constructor(
             val summary = actionPipeline.executeActions(
                 familyId = effectiveFamilyId,
                 actions = listOf(dto),
-                defaultChildId = childDao.getChildrenByFamilyId(effectiveFamilyId).firstOrNull()?.id,
+                defaultChildId = defaultChildId(),
             )
             _uiState.update { it.copy(actionExecutionSummary = summary) }
         }
@@ -397,13 +493,10 @@ class PlanningAIChatViewModel @Inject constructor(
     fun setInput(text: String) = onInputChanged(text)
     fun sendSuggestion(text: String) {
         onInputChanged(text)
-        send(lastInput ?: emptyPlanningContext())
+        send()
     }
-    fun send() = send(lastInput ?: emptyPlanningContext())
     fun bind(familyId: String, familyName: String) {
-        if (!_uiState.value.conversationReady) {
-            loadOrCreateConversation(lastInput ?: emptyPlanningContext())
-        }
+        if (!_uiState.value.conversationReady) loadOrCreateConversation()
     }
     fun clearConversation() {
         val conv = conversation ?: return
@@ -456,33 +549,21 @@ class PlanningAIChatViewModel @Inject constructor(
         return messagesInSession.toDouble() >= dailyLimit.toDouble() * COMPACTION_THRESHOLD
     }
 
+    /**
+     * Ultimi 6 messaggi (più l'eventuale riassunto), con [pendingUser] in coda se
+     * c'è. Senza [pendingUser] serve alla stima del costo prima di salvare la domanda.
+     */
     private fun buildApiMessages(
         conversation: KBAIConversation,
-        latestUserText: String,
+        pendingUser: KBAIMessage?,
     ): List<KBAIMessage> {
-        val baseMessages = _uiState.value.messages
+        val summary = conversation.summary?.takeIf { it.isNotBlank() }
+        val base = _uiState.value.messages
+            .filterNot { it.id == pendingUser?.id }
+            .filterNot { msg -> summary != null && msg.roleRaw == "assistant" && msg.content == summary }
             .sortedBy { it.createdAtEpochMillis }
-            .filterNot { msg ->
-                val summary = conversation.summary
-                summary != null && msg.roleRaw == "assistant" && msg.content == summary
-            }
-            .takeLast(6)
-        val messages = if (baseMessages.isEmpty()) {
-            // Safety net: avoid empty payload when Room/Flow update is slightly delayed.
-            listOf(
-                KBAIMessage(
-                    id = "fallback-user-${System.currentTimeMillis()}",
-                    conversationId = conversation.id,
-                    roleRaw = AIMessageRole.USER.value,
-                    content = latestUserText,
-                    createdAtEpochMillis = System.currentTimeMillis(),
-                ),
-            )
-        } else {
-            baseMessages
-        }
-
-        val summary = conversation.summary?.takeIf { it.isNotBlank() } ?: return messages.take(7)
+        val recent = (base + listOfNotNull(pendingUser)).takeLast(6)
+        if (summary == null) return recent
         val summaryMessage = KBAIMessage(
             id = "summary-${conversation.id}",
             conversationId = conversation.id,
@@ -491,242 +572,7 @@ class PlanningAIChatViewModel @Inject constructor(
             createdAtEpochMillis = System.currentTimeMillis(),
             isSummary = true,
         )
-        return (listOf(summaryMessage) + messages).take(7)
-    }
-
-    private suspend fun buildContextInput(seed: PlanningContextInput): PlanningContextInput {
-        val family = if (effectiveFamilyId.isNotBlank()) familyDao.getById(effectiveFamilyId) else null
-        val childrenEntities = if (effectiveFamilyId.isNotBlank()) childDao.getChildrenByFamilyId(effectiveFamilyId) else emptyList()
-
-        val calendarEvents = if (effectiveFamilyId.isNotBlank()) {
-            val uid = FirebaseAuth.getInstance().currentUser?.uid
-            calendarEventDao.observeByFamilyId(effectiveFamilyId).first()
-                .filterNot { it.isDeleted }
-                .filter { row ->
-                    KBVisibilityScope.isVisible(
-                        KBVisibilityScope.normalized(row.visibilityScope),
-                        decodeStringList(row.visibilityMemberIdsJson),
-                        row.createdBy.takeIf { it.isNotBlank() },
-                        uid,
-                    )
-                }
-                .map { it.toDomain() }
-        } else {
-            emptyList()
-        }
-
-        // I to-do sono di famiglia: una query sola invece di una per figlio.
-        val allTodos = todoItemDao.getByFamily(effectiveFamilyId).filterNot { it.isDeleted }
-
-        val allRoutines = childrenEntities.flatMap { child ->
-            routineDao.observeByFamilyAndChild(effectiveFamilyId, child.id).first()
-        }.filterNot { it.isDeleted }.map { it.toDomain() }
-
-        val allRoutineChecks = childrenEntities.flatMap { child ->
-            allRoutines.filter { it.childId == child.id }.flatMap { routine ->
-                routineCheckDao.observeByRoutine(effectiveFamilyId, routine.id).first()
-            }
-        }.filterNot { it.isDeleted }.map { it.toDomain() }
-
-        val allTreatments = childrenEntities.flatMap { child ->
-            treatmentRepository.listByFamilyAndChild(effectiveFamilyId, child.id)
-        }
-
-        val allVisits = childrenEntities.flatMap { child ->
-            medicalVisitRepository.listRecentVisitsForChild(effectiveFamilyId, child.id, limit = 500)
-        }
-
-        val allExams = childrenEntities.flatMap { child ->
-            medicalExamRepository.listByFamilyAndChild(effectiveFamilyId, child.id)
-        }
-
-        val allVaccines = childrenEntities.flatMap { child ->
-            vaccineRepository.observe(effectiveFamilyId, child.id).first()
-        }
-
-        val notes = if (effectiveFamilyId.isNotBlank()) {
-            noteDao.observeByFamilyId(effectiveFamilyId).first()
-                .filterNot { it.isDeleted }
-                .map { it.toDomain() }
-        } else {
-            emptyList()
-        }
-
-        val expenses = if (effectiveFamilyId.isNotBlank()) {
-            expenseDao.getAllByFamilyId(effectiveFamilyId)
-                .filterNot { it.isDeleted }
-                .map { it.toDomain() }
-        } else {
-            emptyList()
-        }
-
-        val expenseCategoryNames = if (effectiveFamilyId.isNotBlank()) {
-            expenseCategoryDao.getAllByFamilyId(effectiveFamilyId)
-                .filterNot { it.isDeleted }
-                .map { it.name }
-        } else {
-            emptyList()
-        }
-
-        val groceryItems = if (effectiveFamilyId.isNotBlank()) {
-            groceryItemDao.observeByFamilyId(effectiveFamilyId).first()
-                .filterNot { it.isDeleted }
-                .map { it.toDomain() }
-        } else {
-            emptyList()
-        }
-
-        val chatMessages = if (effectiveFamilyId.isNotBlank()) {
-            chatMessageDao.getAllByFamilyId(effectiveFamilyId)
-                .filterNot { it.isDeleted }
-                .map { it.toDomain() }
-        } else {
-            emptyList()
-        }
-
-        val pediatricProfiles = if (effectiveFamilyId.isNotBlank()) {
-            pediatricProfileDao.observeByFamilyId(effectiveFamilyId).first().map { it.toDomain() }
-        } else {
-            emptyList()
-        }
-
-        val pets = if (effectiveFamilyId.isNotBlank()) {
-            petDao.getAllByFamily(effectiveFamilyId)
-        } else {
-            emptyList()
-        }
-
-        val petEvents = if (effectiveFamilyId.isNotBlank() && pets.isNotEmpty()) {
-            pets.flatMap { pet ->
-                petEventDao.observeByPet(effectiveFamilyId, pet.id).first()
-            }.filterNot { it.isDeleted }
-                .sortedByDescending { it.date }
-                .take(50)
-        } else {
-            emptyList()
-        }
-
-        val homeItems = if (effectiveFamilyId.isNotBlank()) {
-            homeItemDao.observeByFamily(effectiveFamilyId).first().filterNot { it.isDeleted }
-        } else {
-            emptyList()
-        }
-
-        val housePayments = if (effectiveFamilyId.isNotBlank()) {
-            housePaymentDao.observeByFamily(effectiveFamilyId).first().filterNot { it.isDeleted }
-        } else {
-            emptyList()
-        }
-
-        val vehicles = if (effectiveFamilyId.isNotBlank()) {
-            vehicleDao.observeByFamily(effectiveFamilyId).first().filterNot { it.isDeleted }
-        } else {
-            emptyList()
-        }
-
-        val vehicleEvents = if (effectiveFamilyId.isNotBlank() && vehicles.isNotEmpty()) {
-            vehicles.flatMap { v ->
-                vehicleEventDao.observeByVehicle(effectiveFamilyId, v.id).first()
-            }.filterNot { it.isDeleted }
-                .sortedByDescending { it.date }
-                .take(50)
-        } else {
-            emptyList()
-        }
-
-        val homeItemIds = homeItems.map { it.id }.toSet()
-        val housePaymentIds = housePayments.map { it.id }.toSet()
-        val vehicleIds = vehicles.map { it.id }.toSet()
-        val vehicleEventIds = vehicleEvents.map { it.id }.toSet()
-        val petEventIds = petEvents.map { it.id }.toSet()
-
-        if (effectiveFamilyId.isNotBlank()) {
-            healthAttachmentService.ensureLifeAreaAttachmentsForPlanning(
-                familyId = effectiveFamilyId,
-                homeItemIds = homeItemIds,
-                housePaymentIds = housePaymentIds,
-                vehicleIds = vehicleIds,
-                vehicleEventIds = vehicleEventIds,
-                petEventIds = petEventIds,
-            )
-        }
-
-        val documents = if (effectiveFamilyId.isNotBlank()) {
-            documentDao.getAllByFamilyId(effectiveFamilyId)
-                .filterNot { it.isDeleted }
-                .map { it.toDomain() }
-        } else {
-            emptyList()
-        }
-
-        val lifeAreaDocuments = documents.filter { doc ->
-            doc.extractionStatusRaw == KBTextExtractionStatus.COMPLETED.rawValue &&
-                !doc.extractedText.isNullOrBlank() &&
-                lifeAreaDocMatchesContext(
-                    doc,
-                    homeItemIds,
-                    housePaymentIds,
-                    vehicleIds,
-                    vehicleEventIds,
-                    petEventIds,
-                )
-        }
-
-        val memberNamesResolved = if (seed.memberNames.isNotEmpty()) {
-            seed.memberNames
-        } else if (effectiveFamilyId.isNotBlank()) {
-            familyMemberDao.observeActiveByFamilyId(effectiveFamilyId).first()
-                .filterNot { it.isDeleted }
-                .mapNotNull { it.displayName?.takeIf(String::isNotBlank) }
-        } else {
-            emptyList()
-        }
-
-        val children = childrenEntities.map { it.toDomain() }
-        val now = System.currentTimeMillis()
-
-        return seed.copy(
-            familyName = seed.familyName.ifBlank { family?.name ?: familyName },
-            memberNames = memberNamesResolved.ifEmpty { memberNames },
-            horizonDays = if (seed.horizonDays <= 0) horizonDays else seed.horizonDays,
-            calendarEvents = calendarEvents,
-            openTodos = allTodos.map { it.toDomain() },
-            activeRoutines = allRoutines,
-            todayChecks = allRoutineChecks,
-            childNames = children.map { it.name },
-            activeTreatments = allTreatments.filter { it.isActive },
-            visitsWithNextDate = allVisits.filter { (it.nextVisitDateEpochMillis ?: 0L) > now },
-            visitsWithPendingExams = allVisits.filter {
-                it.linkedExamIdsJson.isNotBlank() || !it.prescribedExamsJson.isNullOrBlank()
-            },
-            upcomingVaccines = allVaccines.filter { (it.scheduledDateEpochMillis ?: 0L) >= now },
-            recentNotes = notes.sortedByDescending { it.updatedAtEpochMillis }.take(10),
-            recentExpenses = expenses.sortedByDescending { it.dateEpochMillis }.take(50),
-            expenseCategoryNames = expenseCategoryNames,
-            pendingGroceryItems = groceryItems.filter { !it.isPurchased },
-            recentChatMessages = chatMessages.sortedByDescending { it.createdAtEpochMillis }.take(15),
-            recentDocuments = documents.sortedByDescending { it.updatedAtEpochMillis }.take(10),
-            recentWalletTickets = if (effectiveFamilyId.isNotBlank()) {
-                walletTicketDao.getActiveByFamilyId(
-                    effectiveFamilyId,
-                    auth.currentUser?.uid.orEmpty(),
-                ).take(10)
-            } else {
-                emptyList()
-            },
-            children = children,
-            pediatricProfiles = pediatricProfiles,
-            allVisits = allVisits,
-            allExams = allExams,
-            allVaccines = allVaccines,
-            pets = pets,
-            petEvents = petEvents,
-            homeItems = homeItems,
-            housePayments = housePayments,
-            vehicles = vehicles,
-            vehicleEvents = vehicleEvents,
-            lifeAreaDocuments = lifeAreaDocuments,
-        )
+        return (listOf(summaryMessage) + recent).take(7)
     }
 
     private fun localizeError(error: Throwable): String {
@@ -743,51 +589,31 @@ class PlanningAIChatViewModel @Inject constructor(
         }
     }
 
-    private fun lifeAreaDocMatchesContext(
-        doc: KBDocument,
-        homeItemIds: Set<String>,
-        housePaymentIds: Set<String>,
-        vehicleIds: Set<String>,
-        vehicleEventIds: Set<String>,
-        petEventIds: Set<String>,
-    ): Boolean =
-        homeItemIds.any { HomeItemAttachmentTag.matches(doc.notes, it) } ||
-            housePaymentIds.any { HousePaymentAttachmentTag.matches(doc.notes, it) } ||
-            vehicleIds.any { VehicleAttachmentTag.matches(doc.notes, it) } ||
-            vehicleEventIds.any { VehicleEventAttachmentTag.matches(doc.notes, it) } ||
-            petEventIds.any { PetEventAttachmentTag.matches(doc.notes, it) }
-
     companion object {
+        private const val TAG = "PlanningAIChatVM"
+        /** Riconosce l'assistente in log e analytics del server (`askAI`). */
+        private const val AGENT_PURPOSE = "familyAgent"
+        /** Margine sotto i 50.000 caratteri di un messaggio, per le righe di contorno. */
+        private const val UNIT_SAFETY_MARGIN = 1_500
+        /** Documenti generici da far leggere a ogni apertura: le letture successive al giro dopo. */
+        private const val EXTRACTION_BATCH_SIZE = 5
         private const val SUMMARY_SYSTEM_PROMPT =
             "Riassumi in modo conciso ma completo la conversazione seguente, mantenendo i punti chiave, le decisioni prese e il contesto importante. Il riassunto sarà usato come contesto per continuare la conversazione."
+
+        /** Il focus passato dalla rotta (`AppDestination.AiChat`), se c'è. */
+        private fun focusFrom(handle: SavedStateHandle): AgentFocus? {
+            val personId = handle.get<String>("focusPersonId")?.takeIf { it.isNotBlank() } ?: return null
+            val scope = AgentFocus.Scope.fromRaw(handle.get<String>("focusScope")) ?: AgentFocus.Scope.PERSON
+            return AgentFocus(
+                personId = personId,
+                personName = handle.get<String>("focusName").orEmpty(),
+                scope = scope,
+                itemId = handle.get<String>("focusItemId")?.takeIf { it.isNotBlank() },
+                detail = handle.get<String>("focusDetail")?.takeIf { it.isNotBlank() },
+            )
+        }
     }
 }
-
-private fun KBCalendarEventEntity.toDomain() = KBCalendarEvent(
-    id = id,
-    familyId = familyId,
-    childId = childId,
-    title = title,
-    notes = notes,
-    location = location,
-    startDateEpochMillis = startDateEpochMillis,
-    endDateEpochMillis = endDateEpochMillis,
-    isAllDay = isAllDay,
-    categoryRaw = categoryRaw,
-    recurrenceRaw = recurrenceRaw,
-    reminderMinutes = reminderMinutes,
-    linkedHealthItemId = linkedHealthItemId,
-    linkedHealthItemType = linkedHealthItemType,
-    visibilityScope = KBVisibilityScope.normalized(visibilityScope),
-    visibilityMemberIds = decodeStringList(visibilityMemberIdsJson),
-    isDeleted = isDeleted,
-    createdAtEpochMillis = createdAtEpochMillis,
-    updatedAtEpochMillis = updatedAtEpochMillis,
-    updatedBy = updatedBy,
-    createdBy = createdBy,
-    syncStateRaw = syncStateRaw,
-    lastSyncError = lastSyncError,
-)
 
 private fun KBTodoItemEntity.toDomain() = KBTodoItem(
     id = id,
@@ -796,6 +622,7 @@ private fun KBTodoItemEntity.toDomain() = KBTodoItem(
     title = title,
     notes = notes,
     dueAtEpochMillis = dueAtEpochMillis,
+    dueHasTime = dueHasTime,
     isDone = isDone,
     doneAtEpochMillis = doneAtEpochMillis,
     doneBy = doneBy,
@@ -811,218 +638,4 @@ private fun KBTodoItemEntity.toDomain() = KBTodoItem(
     assignedTo = assignedTo,
     createdBy = createdBy,
     priorityRaw = priorityRaw,
-)
-
-private fun KBRoutineEntity.toDomain() = KBRoutine(
-    id = id,
-    familyId = familyId,
-    childId = childId,
-    title = title,
-    isActive = isActive,
-    sortOrder = sortOrder,
-    createdAtEpochMillis = createdAtEpochMillis,
-    updatedAtEpochMillis = updatedAtEpochMillis,
-    updatedBy = updatedBy,
-    isDeleted = isDeleted,
-)
-
-private fun KBRoutineCheckEntity.toDomain() = KBRoutineCheck(
-    id = id,
-    familyId = familyId,
-    childId = childId,
-    routineId = routineId,
-    dayKey = dayKey,
-    checkedAtEpochMillis = checkedAtEpochMillis,
-    checkedBy = checkedBy,
-    createdAtEpochMillis = createdAtEpochMillis,
-    updatedAtEpochMillis = updatedAtEpochMillis,
-    updatedBy = updatedBy,
-    isDeleted = isDeleted,
-)
-
-private fun KBNoteEntity.toDomain() = KBNote(
-    id = id,
-    familyId = familyId,
-    title = title,
-    body = body,
-    visibilityScope = KBVisibilityScope.normalized(visibilityScope),
-    visibilityMemberIds = decodeStringList(visibilityMemberIdsJson),
-    createdBy = createdBy,
-    createdByName = createdByName,
-    updatedBy = updatedBy,
-    updatedByName = updatedByName,
-    createdAtEpochMillis = createdAtEpochMillis,
-    updatedAtEpochMillis = updatedAtEpochMillis,
-    isDeleted = isDeleted,
-    syncStateRaw = syncStateRaw,
-    lastSyncError = lastSyncError,
-)
-
-private fun KBExpenseEntity.toDomain() = KBExpense(
-    id = id,
-    familyId = familyId,
-    title = title,
-    amount = amount,
-    dateEpochMillis = dateEpochMillis,
-    categoryId = categoryId,
-    notes = notes,
-    attachedDocumentId = attachedDocumentId,
-    receiptThumbnailData = receiptThumbnailData,
-    createdByUid = createdByUid,
-    updatedBy = updatedBy,
-    createdAtEpochMillis = createdAtEpochMillis,
-    updatedAtEpochMillis = updatedAtEpochMillis,
-    isDeleted = isDeleted,
-    syncStateRaw = syncStateRaw,
-    lastSyncError = lastSyncError,
-)
-
-private fun KBGroceryItemEntity.toDomain() = KBGroceryItem(
-    id = id,
-    familyId = familyId,
-    name = name,
-    category = category,
-    notes = notes,
-    quantity = quantity,
-    isPurchased = isPurchased,
-    purchasedAtEpochMillis = purchasedAtEpochMillis,
-    purchasedBy = purchasedBy,
-    isDeleted = isDeleted,
-    createdAtEpochMillis = createdAtEpochMillis,
-    updatedAtEpochMillis = updatedAtEpochMillis,
-    updatedBy = updatedBy,
-    createdBy = createdBy,
-    syncStateRaw = syncStateRaw,
-    lastSyncError = lastSyncError,
-)
-
-private fun KBChatMessageEntity.toDomain() = KBChatMessage(
-    id = id,
-    familyId = familyId,
-    senderId = senderId,
-    senderName = senderName,
-    typeRaw = typeRaw,
-    text = text,
-    latitude = latitude,
-    longitude = longitude,
-    mediaStoragePath = mediaStoragePath,
-    mediaURL = mediaURL,
-    mediaDurationSeconds = mediaDurationSeconds,
-    mediaThumbnailURL = mediaThumbnailURL,
-    replyToId = replyToId,
-    mediaLocalPath = mediaLocalPath,
-    mediaFileSize = mediaFileSize,
-    mediaGroupURLsJSON = mediaGroupURLsJSON,
-    mediaGroupTypesJSON = mediaGroupTypesJSON,
-    contactPayloadJSON = contactPayloadJSON,
-    reactionsJSON = reactionsJSON,
-    readByJSON = readByJSON,
-    deletedForJSON = deletedForJSON,
-    transcriptText = transcriptText,
-    transcriptStatusRaw = transcriptStatusRaw,
-    transcriptSourceRaw = transcriptSourceRaw,
-    transcriptLocaleIdentifier = transcriptLocaleIdentifier,
-    transcriptIsFinal = transcriptIsFinal,
-    transcriptUpdatedAtEpochMillis = transcriptUpdatedAtEpochMillis,
-    transcriptErrorMessage = transcriptErrorMessage,
-    createdAtEpochMillis = createdAtEpochMillis,
-    editedAtEpochMillis = editedAtEpochMillis,
-    isDeleted = isDeleted,
-    isDeletedForEveryone = isDeletedForEveryone,
-    syncStateRaw = syncStateRaw,
-    lastSyncError = lastSyncError,
-)
-
-private fun KBDocumentEntity.toDomain() = KBDocument(
-    id = id,
-    familyId = familyId,
-    childId = childId,
-    categoryId = categoryId,
-    localPath = localPath,
-    title = title,
-    fileName = fileName,
-    mimeType = mimeType,
-    fileSize = fileSize,
-    storagePath = storagePath,
-    downloadURL = downloadURL,
-    notes = notes,
-    extractedText = extractedText,
-    extractedTextUpdatedAtEpochMillis = extractedTextUpdatedAtEpochMillis,
-    extractionStatusRaw = extractionStatusRaw,
-    extractionError = extractionError,
-    createdAtEpochMillis = createdAtEpochMillis,
-    updatedAtEpochMillis = updatedAtEpochMillis,
-    updatedBy = updatedBy,
-    createdBy = createdBy,
-    visibilityScope = visibilityScope,
-    visibilityMemberIdsJson = visibilityMemberIdsJson,
-    isDeleted = isDeleted,
-    syncStateRaw = syncStateRaw,
-    lastSyncError = lastSyncError,
-)
-
-private fun KBChildEntity.toDomain() = KBChild(
-    id = id,
-    familyId = familyId,
-    name = name,
-    birthDateEpochMillis = birthDateEpochMillis,
-    weightKg = weightKg,
-    heightCm = heightCm,
-    createdBy = createdBy,
-    createdAtEpochMillis = createdAtEpochMillis,
-    updatedBy = updatedBy,
-    updatedAtEpochMillis = updatedAtEpochMillis,
-)
-
-private fun KBPediatricProfileEntity.toDomain() = KBPediatricProfile(
-    id = id,
-    familyId = familyId,
-    childId = childId,
-    emergencyContactsJson = emergencyContactsJson,
-    bloodGroup = bloodGroup,
-    allergies = allergies,
-    medicalNotes = medicalNotes,
-    doctorName = doctorName,
-    doctorPhone = doctorPhone,
-    doctorEmail = doctorEmail,
-    doctorAddress = doctorAddress,
-    doctorWebsite = doctorWebsite,
-    doctorOfficeHoursJson = doctorOfficeHoursJson,
-    updatedAtEpochMillis = updatedAtEpochMillis,
-    updatedBy = updatedBy,
-    syncStateRaw = syncStateRaw,
-    lastSyncError = lastSyncError,
-)
-
-private fun emptyPlanningContext() = PlanningContextInput(
-    familyName = "",
-    memberNames = emptyList(),
-    calendarEvents = emptyList(),
-    openTodos = emptyList(),
-    activeRoutines = emptyList(),
-    todayChecks = emptyList(),
-    childNames = emptyList(),
-    activeTreatments = emptyList(),
-    visitsWithNextDate = emptyList(),
-    visitsWithPendingExams = emptyList(),
-    upcomingVaccines = emptyList(),
-    recentNotes = emptyList(),
-    recentExpenses = emptyList(),
-    expenseCategoryNames = emptyList(),
-    pendingGroceryItems = emptyList(),
-    recentChatMessages = emptyList(),
-    recentDocuments = emptyList(),
-    recentWalletTickets = emptyList(),
-    children = emptyList(),
-    pediatricProfiles = emptyList(),
-    allVisits = emptyList(),
-    allExams = emptyList(),
-    allVaccines = emptyList(),
-    pets = emptyList(),
-    petEvents = emptyList(),
-    homeItems = emptyList(),
-    housePayments = emptyList(),
-    vehicles = emptyList(),
-    vehicleEvents = emptyList(),
-    lifeAreaDocuments = emptyList(),
 )

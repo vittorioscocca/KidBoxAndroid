@@ -195,4 +195,28 @@
     <string name="chat_back">Atrás</string>
     <string name="ai_cancel">Cancelar</string>
     <string name="ai_back">Atrás</string>
+
+    <!-- Assistente unico: focus da Salute e scelta del contesto (internal/assistente-unico.md) -->
+    <string name="agent_focus_health_of">Salud de %1$s</string>
+    <string name="agent_focus_visits_of">Consultas de %1$s</string>
+    <string name="agent_focus_exams_of">Pruebas de %1$s</string>
+    <string name="agent_focus_visit_of_date">Consulta del %1$s</string>
+    <string name="agent_focus_clear">Preguntar sobre toda la familia</string>
+    <string name="agent_q_person_summary">Resúmeme la salud de %1$s</string>
+    <string name="agent_q_person_todo">¿Hay pruebas, vacunas o consultas pendientes?</string>
+    <string name="agent_q_person_last_report">Explícame el último informe</string>
+    <string name="agent_q_visits_summary">Resúmeme las últimas consultas de %1$s</string>
+    <string name="agent_q_visits_followup">¿Hay revisiones por reservar?</string>
+    <string name="agent_q_visit_explain">Explícame esta consulta</string>
+    <string name="agent_q_visit_report">¿Qué dice el informe?</string>
+    <string name="agent_q_visit_next">¿Qué tengo que hacer ahora?</string>
+    <string name="agent_q_exams_out_of_range">¿Hay valores fuera de rango en las pruebas de %1$s?</string>
+    <string name="agent_q_exams_pending">¿Qué pruebas quedan por hacer?</string>
+    <string name="agent_q_exam_values">¿Qué significan estos valores?</string>
+    <string name="agent_q_exam_normal">¿Está todo normal?</string>
+    <string name="agent_wide_context_title">Memoria muy amplia</string>
+    <string name="agent_wide_context_message">Con todos los documentos completos, esta pregunta supera un mensaje. Con el contexto reducido, los documentos relacionados con la pregunta se mantienen completos y los demás se acortan. La elección se guarda como preferencia: puedes cambiarla en Ajustes de IA.</string>
+    <string name="agent_full_accuracy_units">Máxima precisión (%1$d mensajes)</string>
+    <string name="agent_reduced_one_unit">Contexto reducido (1 mensaje)</string>
+    <string name="agent_reduced_units">Contexto reducido (%1$d mensajes)</string>
 </resources>

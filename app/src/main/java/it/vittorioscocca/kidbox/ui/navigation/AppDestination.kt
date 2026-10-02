@@ -446,8 +446,23 @@ sealed class AppDestination(val route: String) {
     }
 
     data object AskExpert : AppDestination("ask_expert")
-    data object AiChat : AppDestination("ai_chat/{familyId}") {
+    /**
+     * L'assistente unico. Dalla Home senza focus; dai pulsanti di Salute con il
+     * focus su una persona, una visita o un esame (vedi `AgentFocus`).
+     */
+    data object AiChat : AppDestination(
+        "ai_chat/{familyId}?focusPersonId={focusPersonId}&focusName={focusName}" +
+            "&focusScope={focusScope}&focusItemId={focusItemId}&focusDetail={focusDetail}",
+    ) {
         fun createRoute(familyId: String): String = "ai_chat/$familyId"
+
+        fun createRoute(familyId: String, focus: it.vittorioscocca.kidbox.ui.screens.ai.planning.AgentFocus): String {
+            // `Uri.encode` e non `URLEncoder`: gli spazi diventano %20, che Navigation
+            // decodifica; il «+» di URLEncoder resterebbe un «+» nel nome.
+            fun e(s: String?) = android.net.Uri.encode(s.orEmpty())
+            return "ai_chat/$familyId?focusPersonId=${e(focus.personId)}&focusName=${e(focus.personName)}" +
+                "&focusScope=${focus.scope.raw}&focusItemId=${e(focus.itemId)}&focusDetail=${e(focus.detail)}"
+        }
     }
     data object PlanningAiChat : AppDestination("planning_ai_chat/{familyId}?familyName={familyName}") {
         fun createRoute(familyId: String, familyName: String): String {

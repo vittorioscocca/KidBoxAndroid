@@ -37,6 +37,13 @@ fun computeScopeId(
     return "health-overview-v3-$subjectId"
 }
 
+/**
+ * Chat Salute: ruolo, regole e blocco azioni. Scheda dell'assistente unico: solo
+ * i dati, perché ruolo e azioni li mette una volta sola l'assistente
+ * (`AgentMemoryBook`, parity iOS `HealthContextBuilder.Purpose.agentMemory`).
+ */
+enum class HealthContextPurpose { HEALTH_CHAT, AGENT_MEMORY }
+
 object HealthContextBuilder {
 
     fun buildSystemPrompt(
@@ -50,12 +57,20 @@ object HealthContextBuilder {
         documentsByVisitId: Map<String, List<KBDocumentEntity>> = emptyMap(),
         documentsByTreatmentId: Map<String, List<KBDocumentEntity>> = emptyMap(),
         refertoMaxChars: Int? = HealthAiDocumentText.STANDARD_REFERTO_MAX_CHARS,
+        /**
+         * Limite per singolo referto (id documento → caratteri, 0 = solo il titolo).
+         * Vince su [refertoMaxChars] per i documenti che elenca: serve all'assistente
+         * per dividere un budget fra tutti i referti della famiglia.
+         */
+        refertoMaxCharsByDocId: Map<String, Int>? = null,
         healthSnapshot: HealthImportSnapshot? = null,
+        purpose: HealthContextPurpose = HealthContextPurpose.HEALTH_CHAT,
     ): String {
         val now = System.currentTimeMillis()
         val sb = StringBuilder()
+        val isChat = purpose == HealthContextPurpose.HEALTH_CHAT
 
-        sb.appendLine(
+        if (isChat) sb.appendLine(
             """
 Sei un assistente medico informativo integrato nell'app KidBox, pensata per genitori.
 Il tuo ruolo è offrire una visione d'insieme chiara e comprensibile della salute della persona.
@@ -70,7 +85,7 @@ REGOLE IMPORTANTI:
             """.trimIndent(),
         )
 
-        sb.appendLine()
+        if (isChat) sb.appendLine()
         sb.appendLine("--- PROFILO: $subjectName ---")
 
         // ── Treatments ──────────────────────────────────────────────────────────
@@ -86,7 +101,7 @@ REGOLE IMPORTANTI:
             val notesStr = if (!t.notes.isNullOrBlank()) " — ${t.notes}" else ""
             sb.appendLine("- ${t.drugName} — $dosageStr ${t.dosageUnit}, ${t.dailyFrequency}x/giorno, ${t.durationDays} giorni (fine: $endDate)$notesStr")
             documentsByTreatmentId[t.id]?.forEach { doc ->
-                appendReferto(sb, doc, refertoMaxChars, indent = "  ")
+                appendReferto(sb, doc, refertoMaxCharsByDocId?.get(doc.id) ?: refertoMaxChars, indent = "  ")
             }
         }
 
@@ -130,7 +145,7 @@ REGOLE IMPORTANTI:
                 sb.appendLine("  Prossima visita: $nextDateStr$nextReason")
             }
             documentsByVisitId[v.id]?.forEach { doc ->
-                appendReferto(sb, doc, refertoMaxChars, indent = "  ")
+                appendReferto(sb, doc, refertoMaxCharsByDocId?.get(doc.id) ?: refertoMaxChars, indent = "  ")
             }
         }
 
@@ -152,7 +167,7 @@ REGOLE IMPORTANTI:
             } ?: ""
             sb.appendLine("- ${e.name} [${e.statusRaw}]$urgentStr — $deadlineStr$overdueStr$resultStr")
             documentsByExamId[e.id]?.forEach { doc ->
-                appendReferto(sb, doc, refertoMaxChars, indent = "  ")
+                appendReferto(sb, doc, refertoMaxCharsByDocId?.get(doc.id) ?: refertoMaxChars, indent = "  ")
             }
         }
 
@@ -169,11 +184,13 @@ REGOLE IMPORTANTI:
                 }
         }
 
-        sb.appendLine()
-        sb.appendLine("--- FINE CONTESTO SALUTE ---")
-        sb.appendLine("Rispondi alle domande usando le informazioni sopra.")
-        sb.appendLine()
-        sb.appendLine(PlanningAIActionBlock.promptSection)
+        if (isChat) {
+            sb.appendLine()
+            sb.appendLine("--- FINE CONTESTO SALUTE ---")
+            sb.appendLine("Rispondi alle domande usando le informazioni sopra.")
+            sb.appendLine()
+            sb.appendLine(PlanningAIActionBlock.promptSection)
+        }
 
         val prompt = sb.toString()
         KBLog.ai.debug("buildSystemPrompt for $subjectName: ${prompt.take(200)}...", TAG)
@@ -202,7 +219,13 @@ REGOLE IMPORTANTI:
         indent: String,
     ) {
         if (doc.extractionStatusRaw != KBTextExtractionStatus.COMPLETED.rawValue) return
-        val text = doc.extractedText?.takeIf { it.isNotBlank() } ?: return
+        if (doc.extractedText.isNullOrBlank()) return
+        if (refertoMaxChars == 0) {
+            // Il referto esiste anche se il testo non ci sta: il modello lo deve sapere.
+            sb.appendLine("${indent}Referto allegato (${doc.title}): testo non incluso per spazio")
+            return
+        }
+        val text = doc.extractedText
         val prepared = HealthAiDocumentText.prepareExtractedTextForAi(text, refertoMaxChars)
         if (prepared.isBlank()) return
         sb.appendLine("${indent}Referto allegato (${doc.title}):")

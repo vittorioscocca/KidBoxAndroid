@@ -195,4 +195,28 @@
     <string name="chat_back">Back</string>
     <string name="ai_cancel">Cancel</string>
     <string name="ai_back">Back</string>
+
+    <!-- Assistente unico: focus da Salute e scelta del contesto (internal/assistente-unico.md) -->
+    <string name="agent_focus_health_of">%1$s\'s health</string>
+    <string name="agent_focus_visits_of">%1$s\'s visits</string>
+    <string name="agent_focus_exams_of">%1$s\'s tests</string>
+    <string name="agent_focus_visit_of_date">Visit on %1$s</string>
+    <string name="agent_focus_clear">Ask about the whole family</string>
+    <string name="agent_q_person_summary">Summarize %1$s\'s health</string>
+    <string name="agent_q_person_todo">Are any tests, vaccines or visits coming up?</string>
+    <string name="agent_q_person_last_report">Explain the latest report</string>
+    <string name="agent_q_visits_summary">Summarize %1$s\'s latest visits</string>
+    <string name="agent_q_visits_followup">Are there any check-ups to book?</string>
+    <string name="agent_q_visit_explain">Explain this visit</string>
+    <string name="agent_q_visit_report">What does the report say?</string>
+    <string name="agent_q_visit_next">What should I do now?</string>
+    <string name="agent_q_exams_out_of_range">Are any of %1$s\'s test results out of range?</string>
+    <string name="agent_q_exams_pending">Which tests are still to be done?</string>
+    <string name="agent_q_exam_values">What do these values mean?</string>
+    <string name="agent_q_exam_normal">Is everything normal?</string>
+    <string name="agent_wide_context_title">Very large memory</string>
+    <string name="agent_wide_context_message">With every document in full, this question uses more than one message. With the reduced context, the documents related to your question stay complete and the others are shortened. Your choice is saved as a preference: you can change it in AI settings.</string>
+    <string name="agent_full_accuracy_units">Maximum accuracy (%1$d messages)</string>
+    <string name="agent_reduced_one_unit">Reduced context (1 message)</string>
+    <string name="agent_reduced_units">Reduced context (%1$d messages)</string>
 </resources>

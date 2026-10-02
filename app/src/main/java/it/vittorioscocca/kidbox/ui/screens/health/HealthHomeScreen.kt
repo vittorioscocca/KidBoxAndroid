@@ -59,8 +59,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.AgentFocus
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
-import org.json.JSONArray
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 import androidx.compose.ui.platform.LocalContext
@@ -277,16 +277,12 @@ fun HealthHomeScreen(
                 subjectName = state.subjectName,
                 upgradeSubtitle = stringResource(R.string.ai_upgrade_health_home),
                 onTap = {
+                    // L'assistente unico, centrato su questa persona: i dati li legge da sé.
                     val subjectLabel = state.subjectName.ifBlank { context.getString(R.string.health_profile) }
                     onNavigate(
-                        AppDestination.HealthAIChat.routeWithContext(
-                            familyId = familyId,
-                            childId = childId,
-                            subjectName = subjectLabel,
-                            visitIdsJson = JSONArray(state.visitIds).toString(),
-                            examIdsJson = JSONArray(state.examIds).toString(),
-                            treatmentIdsJson = JSONArray(state.treatmentIds).toString(),
-                            vaccineIdsJson = JSONArray(state.vaccineIds).toString(),
+                        AppDestination.AiChat.createRoute(
+                            familyId,
+                            AgentFocus(personId = childId, personName = subjectLabel, scope = AgentFocus.Scope.PERSON),
                         ),
                     )
                 },

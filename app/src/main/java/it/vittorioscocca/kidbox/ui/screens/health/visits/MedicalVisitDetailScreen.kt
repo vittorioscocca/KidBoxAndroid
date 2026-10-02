@@ -170,7 +170,8 @@ fun MedicalVisitDetailScreen(
             onOpenVisitAiChat(
                 state.childName.ifBlank { context.getString(R.string.health_profile) },
                 v.reason.ifBlank { context.getString(R.string.health_visit_lower) },
-                DATE_LONG_FMT().format(Date(v.dateEpochMillis)),
+                // Solo il giorno: diventa l'etichetta del focus («Visita del 13 mag 2026 · Marco»).
+                SimpleDateFormat("d MMM yyyy", KBLocale.current()).format(Date(v.dateEpochMillis)),
                 v.diagnosis.orEmpty(),
                 v.notes.orEmpty(),
             )
