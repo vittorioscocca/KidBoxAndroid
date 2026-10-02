@@ -59,24 +59,25 @@ object KBFeatureFlags {
     val facebookLoginEnabled: StateFlow<Boolean> = _facebookLoginEnabled.asStateFlow()
 
     /**
-     * Memoria AI di famiglia cifrata su Firestore (`contentEnc` dei `memoryFacts`).
-     * Stessa chiave di iOS e web, dove governa anche le chat AI (che Android non
-     * sincronizza). Spento finché le build che leggono il cifrato non sono
+     * Testi cifrati su Firestore con la chiave di famiglia: memoria AI di famiglia
+     * (`contentEnc` dei `memoryFacts`) e testo letto dei documenti
+     * (`extractedTextEnc`); su iOS e web anche le chat AI, che Android non
+     * sincronizza. Spento finché le build che leggono il cifrato non sono
      * diffuse: si accende insieme alla promozione di `firestore.rules.next`.
      */
-    private const val REMOTE_KEY_AI_ENCRYPTED = "ai_conversations_encrypted"
-    private const val KEY_AI_ENCRYPTED = "kb_aiConversationsEncrypted"
-    private const val AI_ENCRYPTED_FALLBACK = false
+    private const val REMOTE_KEY_TEXT_ENCRYPTION = "text_encryption_enabled"
+    private const val KEY_TEXT_ENCRYPTION = "kb_textEncryptionEnabled"
+    private const val TEXT_ENCRYPTION_FALLBACK = false
 
-    private val _aiConversationsEncrypted = MutableStateFlow(AI_ENCRYPTED_FALLBACK)
-    val aiConversationsEncrypted: StateFlow<Boolean> = _aiConversationsEncrypted.asStateFlow()
+    private val _textEncryptionEnabled = MutableStateFlow(TEXT_ENCRYPTION_FALLBACK)
+    val textEncryptionEnabled: StateFlow<Boolean> = _textEncryptionEnabled.asStateFlow()
 
     /** Da `KidBoxApplication.onCreate()`: allinea lo stato alla cache locale. */
     fun init(context: Context) {
         _facebookLoginEnabled.value =
             prefs(context).getBoolean(KEY_FACEBOOK_LOGIN, FACEBOOK_LOGIN_FALLBACK)
-        _aiConversationsEncrypted.value =
-            prefs(context).getBoolean(KEY_AI_ENCRYPTED, AI_ENCRYPTED_FALLBACK)
+        _textEncryptionEnabled.value =
+            prefs(context).getBoolean(KEY_TEXT_ENCRYPTION, TEXT_ENCRYPTION_FALLBACK)
     }
 
     /**
@@ -90,7 +91,7 @@ object KBFeatureFlags {
         config.setDefaultsAsync(
             mapOf(
                 REMOTE_KEY_FACEBOOK_LOGIN to FACEBOOK_LOGIN_FALLBACK,
-                REMOTE_KEY_AI_ENCRYPTED to AI_ENCRYPTED_FALLBACK,
+                REMOTE_KEY_TEXT_ENCRYPTION to TEXT_ENCRYPTION_FALLBACK,
             ),
         )
         config.setConfigSettingsAsync(
@@ -104,15 +105,15 @@ object KBFeatureFlags {
 
         runCatching {
             config.fetchAndActivate().await()
-            config.getBoolean(REMOTE_KEY_FACEBOOK_LOGIN) to config.getBoolean(REMOTE_KEY_AI_ENCRYPTED)
+            config.getBoolean(REMOTE_KEY_FACEBOOK_LOGIN) to config.getBoolean(REMOTE_KEY_TEXT_ENCRYPTION)
         }.onSuccess { (enabled, encrypted) ->
             prefs(context).edit()
                 .putBoolean(KEY_FACEBOOK_LOGIN, enabled)
-                .putBoolean(KEY_AI_ENCRYPTED, encrypted)
+                .putBoolean(KEY_TEXT_ENCRYPTION, encrypted)
                 .apply()
             _facebookLoginEnabled.value = enabled
-            _aiConversationsEncrypted.value = encrypted
-            KBLog.data.info("FeatureFlags: $REMOTE_KEY_FACEBOOK_LOGIN=$enabled $REMOTE_KEY_AI_ENCRYPTED=$encrypted", TAG)
+            _textEncryptionEnabled.value = encrypted
+            KBLog.data.info("FeatureFlags: $REMOTE_KEY_FACEBOOK_LOGIN=$enabled $REMOTE_KEY_TEXT_ENCRYPTION=$encrypted", TAG)
         }.onFailure {
             // Nessun fallback qui: senza risposta resta l'ultimo valore noto,
             // che è già la scelta giusta dell'ultima volta.

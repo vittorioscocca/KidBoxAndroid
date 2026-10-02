@@ -31,7 +31,7 @@ data class RemoteMemoryFactDto(
  *
  * Cifratura (dal 02/10/2026): il testo può viaggiare cifrato con la chiave di
  * famiglia (`contentEnc`, formato di iOS e web). La lettura capisce entrambi i
- * formati; la scrittura cifra con [KBFeatureFlags.aiConversationsEncrypted]
+ * formati; la scrittura cifra con [KBFeatureFlags.textEncryptionEnabled]
  * acceso, e senza chiave non scrive: mai il chiaro come ripiego.
  */
 @Singleton
@@ -50,7 +50,7 @@ class MemoryFactRemoteStore @Inject constructor(
         snap.documents.mapNotNull { doc -> decode(doc.id, doc.data, familyId) }
             .also { facts ->
                 // A interruttore acceso i fatti ancora in chiaro si riscrivono cifrati.
-                if (KBFeatureFlags.aiConversationsEncrypted.value) {
+                if (KBFeatureFlags.textEncryptionEnabled.value) {
                     facts.filter { it.isLegacyPlain }.forEach { reencrypt(it) }
                 }
             }
@@ -88,7 +88,7 @@ class MemoryFactRemoteStore @Inject constructor(
 
     /** Un solo formato per volta; acceso l'interruttore, senza chiave lancia. */
     private fun MutableMap<String, Any?>.putContent(content: String, familyId: String) {
-        if (KBFeatureFlags.aiConversationsEncrypted.value) {
+        if (KBFeatureFlags.textEncryptionEnabled.value) {
             put("contentEnc", crypto.encryptStringToBase64(content, familyId))
             put("content", FieldValue.delete())
         } else {

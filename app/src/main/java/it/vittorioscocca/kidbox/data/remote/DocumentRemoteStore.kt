@@ -12,12 +12,18 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.SetOptions
+import it.vittorioscocca.kidbox.data.chat.crypto.ChatCryptoService
+import it.vittorioscocca.kidbox.data.local.KBFeatureFlags
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentCategoryEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
 import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 private const val TAG_DOC_SYNC = "KB_Doc_Sync"
 
@@ -80,9 +86,43 @@ sealed interface DocumentRemoteChange {
 @Singleton
 class DocumentRemoteStore @Inject constructor(
     private val auth: FirebaseAuth,
+    private val crypto: ChatCryptoService,
 ) {
     private val db: FirebaseFirestore
         get() = FirebaseFirestore.getInstance()
+
+    /** Per la ricifratura del testo letto: manutenzione, non blocca il listener. */
+    private val maintenanceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * Testo letto di un documento remoto: `extractedTextEnc` (chiave di famiglia,
+     * formato di iOS e web) se c'è, altrimenti il vecchio `extractedText`. Un blob
+     * che non si apre torna null, cioè «non letto»: il merge in entrata tiene il
+     * testo locale. A interruttore acceso il testo in chiaro si riscrive cifrato.
+     */
+    private fun readExtractedText(docId: String, familyId: String, d: Map<String, Any>): String? {
+        val enc = (d["extractedTextEnc"] as? String)?.takeIf { it.isNotBlank() }
+        if (enc != null) {
+            return runCatching { crypto.decryptStringFromBase64(enc, familyId) }.getOrNull()
+                ?.trim()?.takeIf { it.isNotEmpty() }
+        }
+        val plain = (d["extractedText"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        if (KBFeatureFlags.textEncryptionEnabled.value) {
+            maintenanceScope.launch {
+                runCatching {
+                    val encrypted = crypto.encryptStringToBase64(plain, familyId)
+                    db.collection("families").document(familyId)
+                        .collection("documents").document(docId)
+                        .set(
+                            mapOf("extractedTextEnc" to encrypted, "extractedText" to FieldValue.delete()),
+                            SetOptions.merge(),
+                        )
+                        .await()
+                }.onFailure { KBLog.data.debug("re-encrypt skipped id=$docId: ${it.javaClass.simpleName}", TAG_DOC_SYNC) }
+            }
+        }
+        return plain
+    }
 
     fun listenDocuments(
         familyId: String,
@@ -138,7 +178,7 @@ class DocumentRemoteStore @Inject constructor(
                         storagePath = (d["storagePath"] as? String)?.trim().orEmpty(),
                         downloadURL = (d["downloadURL"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
                         notes = (d["notes"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
-                        extractedText = (d["extractedText"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+                        extractedText = readExtractedText(doc.id, familyId, d),
                         extractedTextUpdatedAtEpochMillis = (d["extractedTextUpdatedAt"] as? Timestamp)?.toDate()?.time,
                         extractionStatusRaw = (d["extractionStatusRaw"] as? Number)?.toInt(),
                         extractionError = (d["extractionError"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
@@ -324,10 +364,21 @@ class DocumentRemoteStore @Inject constructor(
             payload["createdBy"] = entity.createdBy.takeIf { it.isNotBlank() } ?: uid
         }
         // OCR fields must be additive: never wipe remote OCR with null from stale/local-only updates.
+        // Il testo letto si cifra (`extractedTextEnc`) con l'interruttore remoto
+        // `text_encryption_enabled` acceso; un solo formato per volta. Acceso,
+        // senza chiave di famiglia l'upsert fallisce: niente testo in chiaro.
         entity.extractedText
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
-            ?.let { payload["extractedText"] = it }
+            ?.let { text ->
+                if (KBFeatureFlags.textEncryptionEnabled.value) {
+                    payload["extractedTextEnc"] = crypto.encryptStringToBase64(text, entity.familyId)
+                    payload["extractedText"] = FieldValue.delete()
+                } else {
+                    payload["extractedText"] = text
+                    payload["extractedTextEnc"] = FieldValue.delete()
+                }
+            }
         entity.extractedTextUpdatedAtEpochMillis?.let {
             payload["extractedTextUpdatedAt"] = timestampFromNullableMillis(it)
         }
