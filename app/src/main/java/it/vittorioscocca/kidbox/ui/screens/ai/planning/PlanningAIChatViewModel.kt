@@ -125,6 +125,8 @@ class PlanningAIChatViewModel @Inject constructor(
     private var pendingPlan: ContextPlan? = null
 
     private val COMPACTION_THRESHOLD = 0.60
+    /** I contatori in [PlanningChatUiState] vengono dal server (non sono i default). */
+    private var usageKnown = false
     private var lastCompactionStep = 0
     private var messagesInSession = 0
     private var dailyLimit = 0
@@ -148,6 +150,7 @@ class PlanningAIChatViewModel @Inject constructor(
         snapshot = null
         effectiveFamilyId = familyId
         scopeId = "planning-agent-$familyId"
+        usageKnown = false
         _uiState.value = PlanningChatUiState(focus = _uiState.value.focus)
         loadOrCreateConversation()
     }
@@ -173,6 +176,15 @@ class PlanningAIChatViewModel @Inject constructor(
                 )
             }
             dailyLimit = _uiState.value.dailyLimit
+            // Quanti messaggi restano: decide se il contesto ridotto parte da solo.
+            if (effectiveFamilyId.isNotBlank()) {
+                aiService.fetchUsage(effectiveFamilyId).onSuccess { usage ->
+                    usageKnown = true
+                    _uiState.update {
+                        it.copy(usageToday = usage.usageToday, dailyLimit = usage.dailyLimit, quotaPeriod = usage.period)
+                    }
+                }
+            }
             runCatching {
                 conversation = kbAIRepository.getOrCreateConversation(scopeId, effectiveFamilyId)
                 val snap = loadSnapshot()
@@ -224,6 +236,10 @@ class PlanningAIChatViewModel @Inject constructor(
                 performSend(text, plan.fullPrompt, "full")
                 return@launch
             }
+            if (mustUseReduced(plan.fullUnits)) {
+                performSend(text, reduced, "reduced-auto")
+                return@launch
+            }
             when (aiSettingsStore.getHealthContextSendPreference()) {
                 HealthContextSendPreference.ASK_EACH_TIME -> {
                     pendingPlan = plan
@@ -241,6 +257,19 @@ class PlanningAIChatViewModel @Inject constructor(
                 HealthContextSendPreference.COMPACT_SUMMARY -> performSend(text, reduced, "reduced")
             }
         }
+    }
+
+    /**
+     * Contesto ridotto senza chiedere, qualunque sia la preferenza: sul Free, dove
+     * i messaggi sono 5 in tutto, e sugli altri piani quando il completo costerebbe
+     * più dei messaggi rimasti (il server lo rifiuterebbe per intero). Stessa
+     * regola su iOS e web.
+     */
+    private fun mustUseReduced(fullUnits: Int): Boolean {
+        val s = _uiState.value
+        if (s.quotaPeriod == AIQuotaPeriod.LIFETIME) return true
+        if (!usageKnown || s.dailyLimit <= 0) return false
+        return s.dailyLimit - s.usageToday < fullUnits
     }
 
     /** Scelta dal dialogo: diventa la preferenza, come nella chat Salute. */
@@ -307,6 +336,7 @@ class PlanningAIChatViewModel @Inject constructor(
             )
             messagesInSession = reply.usageToday
             dailyLimit = reply.dailyLimit
+            usageKnown = true
             maybeCompactIfNeeded(conv.id, reply.usageToday, reply.dailyLimit)
             _uiState.update {
                 it.copy(

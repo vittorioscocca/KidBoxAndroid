@@ -153,7 +153,7 @@
     <string name="settings_ai_see_plans">Ver planes</string>
     <string name="settings_ai_open">Abrir</string>
     <string name="settings_ai_health_context">Memoria del asistente</string>
-    <string name="settings_ai_health_context_sub">Normalmente todo lo que guardáis en KidBox cabe en un mensaje. Con muchos documentos e informes, elige qué enviar al asistente.</string>
+    <string name="settings_ai_health_context_sub">Normalmente todo lo que guardáis en KidBox cabe en un mensaje. Con muchos documentos e informes, elige qué enviar al asistente. Con el plan Free, y cuando los mensajes restantes no bastan, se usa siempre el contexto reducido.</string>
     <string name="settings_ai_health_chat">Memoria del asistente</string>
     <string name="settings_ai_health_chat_sub">Qué enviar al asistente cuando la memoria supera un mensaje.</string>
     <string name="settings_invite_title">Invitar</string>

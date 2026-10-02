@@ -153,7 +153,7 @@
     <string name="settings_ai_see_plans">Découvrir les formules</string>
     <string name="settings_ai_open">Ouvrir</string>
     <string name="settings_ai_health_context">Mémoire de l\'assistant</string>
-    <string name="settings_ai_health_context_sub">D\'habitude, tout ce que vous gardez dans KidBox tient dans un message. Avec beaucoup de documents et de comptes rendus, choisis ce qu\'il faut envoyer à l\'assistant.</string>
+    <string name="settings_ai_health_context_sub">D\'habitude, tout ce que vous gardez dans KidBox tient dans un message. Avec beaucoup de documents et de comptes rendus, choisis ce qu\'il faut envoyer à l\'assistant. Avec la formule Free, et quand les messages restants ne suffisent pas, le contexte réduit est toujours utilisé.</string>
     <string name="settings_ai_health_chat">Mémoire de l\'assistant</string>
     <string name="settings_ai_health_chat_sub">Ce qu\'il faut envoyer à l\'assistant quand la mémoire dépasse un message.</string>
     <string name="settings_invite_title">Inviter</string>

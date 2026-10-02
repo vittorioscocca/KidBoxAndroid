@@ -314,13 +314,13 @@ fun PlansScreen(
             Text(
                 stringResource(R.string.subscription_terms_of_service),
                 color = Color(0xFFFF6B00),
-                modifier = Modifier.clickable { uriHandler.openUri("https://vittorioscocca.github.io/KidBox/") },
+                modifier = Modifier.clickable { uriHandler.openUri("https://kidboxapp.com/terms.html") },
             )
             Spacer(modifier = Modifier.width(14.dp))
             Text(
                 stringResource(R.string.subscription_privacy_policy),
                 color = Color(0xFFFF6B00),
-                modifier = Modifier.clickable { uriHandler.openUri("https://vittorioscocca.github.io/KidBox/") },
+                modifier = Modifier.clickable { uriHandler.openUri("https://kidboxapp.com/privacy.html") },
             )
         }
 
