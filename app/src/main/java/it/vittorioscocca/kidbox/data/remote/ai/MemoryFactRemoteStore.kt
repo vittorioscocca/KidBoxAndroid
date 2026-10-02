@@ -3,8 +3,11 @@ package it.vittorioscocca.kidbox.data.remote.ai
 import it.vittorioscocca.kidbox.util.KBLog
 
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import it.vittorioscocca.kidbox.data.chat.crypto.ChatCryptoService
+import it.vittorioscocca.kidbox.data.local.KBFeatureFlags
 import it.vittorioscocca.kidbox.data.local.entity.KBMemoryFactEntity
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -18,14 +21,23 @@ data class RemoteMemoryFactDto(
     val createdAtEpochMillis: Long,
     val updatedAtEpochMillis: Long,
     val sourceConversationId: String?,
+    /** Ancora in chiaro su Firestore: a interruttore acceso va riscritto cifrato. */
+    val isLegacyPlain: Boolean = false,
 )
 
 /**
  * Firestore remote store per i fatti di memoria familiare dell'agente AI.
  * Path: `families/{familyId}/memoryFacts/{factId}` (allineato a iOS).
+ *
+ * Cifratura (dal 02/10/2026): il testo può viaggiare cifrato con la chiave di
+ * famiglia (`contentEnc`, formato di iOS e web). La lettura capisce entrambi i
+ * formati; la scrittura cifra con [KBFeatureFlags.aiConversationsEncrypted]
+ * acceso, e senza chiave non scrive: mai il chiaro come ripiego.
  */
 @Singleton
-class MemoryFactRemoteStore @Inject constructor() {
+class MemoryFactRemoteStore @Inject constructor(
+    private val crypto: ChatCryptoService,
+) {
 
     private val db get() = FirebaseFirestore.getInstance()
 
@@ -36,6 +48,12 @@ class MemoryFactRemoteStore @Inject constructor() {
             .get()
             .await()
         snap.documents.mapNotNull { doc -> decode(doc.id, doc.data, familyId) }
+            .also { facts ->
+                // A interruttore acceso i fatti ancora in chiaro si riscrivono cifrati.
+                if (KBFeatureFlags.aiConversationsEncrypted.value) {
+                    facts.filter { it.isLegacyPlain }.forEach { reencrypt(it) }
+                }
+            }
     }.getOrElse { err ->
         KBLog.ai.warning("fetchAll failed familyId=$familyId: ${err.message}", TAG)
         emptyList()
@@ -48,7 +66,7 @@ class MemoryFactRemoteStore @Inject constructor() {
             val payload = buildMap<String, Any?> {
                 put("id", fact.id)
                 put("familyId", fact.familyId)
-                put("content", fact.content)
+                putContent(fact.content, fact.familyId)
                 put("categoryRaw", fact.categoryRaw)
                 put("createdAt", createdTs)
                 put("updatedAt", updatedTs)
@@ -68,16 +86,47 @@ class MemoryFactRemoteStore @Inject constructor() {
         }
     }
 
+    /** Un solo formato per volta; acceso l'interruttore, senza chiave lancia. */
+    private fun MutableMap<String, Any?>.putContent(content: String, familyId: String) {
+        if (KBFeatureFlags.aiConversationsEncrypted.value) {
+            put("contentEnc", crypto.encryptStringToBase64(content, familyId))
+            put("content", FieldValue.delete())
+        } else {
+            put("content", content)
+            put("contentEnc", FieldValue.delete())
+        }
+    }
+
+    private suspend fun reencrypt(fact: RemoteMemoryFactDto) {
+        runCatching {
+            val payload = buildMap<String, Any?> { putContent(fact.content, fact.familyId) }
+            db.collection("families")
+                .document(fact.familyId)
+                .collection("memoryFacts")
+                .document(fact.id)
+                .set(payload, SetOptions.merge())
+                .await()
+        }.onFailure { err ->
+            KBLog.ai.warning("re-encrypt failed factId=${fact.id}: ${err.javaClass.simpleName}", TAG)
+        }
+    }
+
     private fun decode(
         documentId: String,
         data: Map<String, Any>?,
         familyId: String,
     ): RemoteMemoryFactDto? {
         if (data == null) return null
-        val content = data["content"] as? String ?: return null
+        val fid = (data["familyId"] as? String)?.takeIf { it.isNotBlank() } ?: familyId
+        // Cifrato se c'è; un blob che non si apre fa saltare il fatto.
+        val enc = (data["contentEnc"] as? String)?.takeIf { it.isNotBlank() }
+        val content = if (enc != null) {
+            runCatching { crypto.decryptStringFromBase64(enc, fid) }.getOrNull() ?: return null
+        } else {
+            data["content"] as? String ?: return null
+        }
         if (content.isBlank()) return null
         val id = (data["id"] as? String)?.takeIf { it.isNotBlank() } ?: documentId
-        val fid = (data["familyId"] as? String)?.takeIf { it.isNotBlank() } ?: familyId
         val categoryRaw = (data["categoryRaw"] as? String)?.takeIf { it.isNotBlank() } ?: "altro"
         val createdAt = epochMillisFromFirestore(data["createdAt"]) ?: 0L
         val updatedAt = epochMillisFromFirestore(data["updatedAt"]) ?: createdAt
@@ -89,6 +138,7 @@ class MemoryFactRemoteStore @Inject constructor() {
             createdAtEpochMillis = createdAt,
             updatedAtEpochMillis = updatedAt,
             sourceConversationId = data["sourceConversationId"] as? String,
+            isLegacyPlain = enc == null,
         )
     }
 

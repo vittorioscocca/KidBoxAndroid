@@ -58,10 +58,25 @@ object KBFeatureFlags {
     private val _facebookLoginEnabled = MutableStateFlow(FACEBOOK_LOGIN_FALLBACK)
     val facebookLoginEnabled: StateFlow<Boolean> = _facebookLoginEnabled.asStateFlow()
 
+    /**
+     * Memoria AI di famiglia cifrata su Firestore (`contentEnc` dei `memoryFacts`).
+     * Stessa chiave di iOS e web, dove governa anche le chat AI (che Android non
+     * sincronizza). Spento finché le build che leggono il cifrato non sono
+     * diffuse: si accende insieme alla promozione di `firestore.rules.next`.
+     */
+    private const val REMOTE_KEY_AI_ENCRYPTED = "ai_conversations_encrypted"
+    private const val KEY_AI_ENCRYPTED = "kb_aiConversationsEncrypted"
+    private const val AI_ENCRYPTED_FALLBACK = false
+
+    private val _aiConversationsEncrypted = MutableStateFlow(AI_ENCRYPTED_FALLBACK)
+    val aiConversationsEncrypted: StateFlow<Boolean> = _aiConversationsEncrypted.asStateFlow()
+
     /** Da `KidBoxApplication.onCreate()`: allinea lo stato alla cache locale. */
     fun init(context: Context) {
         _facebookLoginEnabled.value =
             prefs(context).getBoolean(KEY_FACEBOOK_LOGIN, FACEBOOK_LOGIN_FALLBACK)
+        _aiConversationsEncrypted.value =
+            prefs(context).getBoolean(KEY_AI_ENCRYPTED, AI_ENCRYPTED_FALLBACK)
     }
 
     /**
@@ -72,7 +87,12 @@ object KBFeatureFlags {
      */
     suspend fun refresh(context: Context) {
         val config = FirebaseRemoteConfig.getInstance()
-        config.setDefaultsAsync(mapOf(REMOTE_KEY_FACEBOOK_LOGIN to FACEBOOK_LOGIN_FALLBACK))
+        config.setDefaultsAsync(
+            mapOf(
+                REMOTE_KEY_FACEBOOK_LOGIN to FACEBOOK_LOGIN_FALLBACK,
+                REMOTE_KEY_AI_ENCRYPTED to AI_ENCRYPTED_FALLBACK,
+            ),
+        )
         config.setConfigSettingsAsync(
             remoteConfigSettings {
                 // In debug si rilegge a ogni avvio, così una modifica in console
@@ -84,11 +104,15 @@ object KBFeatureFlags {
 
         runCatching {
             config.fetchAndActivate().await()
-            config.getBoolean(REMOTE_KEY_FACEBOOK_LOGIN)
-        }.onSuccess { enabled ->
-            prefs(context).edit().putBoolean(KEY_FACEBOOK_LOGIN, enabled).apply()
+            config.getBoolean(REMOTE_KEY_FACEBOOK_LOGIN) to config.getBoolean(REMOTE_KEY_AI_ENCRYPTED)
+        }.onSuccess { (enabled, encrypted) ->
+            prefs(context).edit()
+                .putBoolean(KEY_FACEBOOK_LOGIN, enabled)
+                .putBoolean(KEY_AI_ENCRYPTED, encrypted)
+                .apply()
             _facebookLoginEnabled.value = enabled
-            KBLog.data.info("FeatureFlags: $REMOTE_KEY_FACEBOOK_LOGIN=$enabled", TAG)
+            _aiConversationsEncrypted.value = encrypted
+            KBLog.data.info("FeatureFlags: $REMOTE_KEY_FACEBOOK_LOGIN=$enabled $REMOTE_KEY_AI_ENCRYPTED=$encrypted", TAG)
         }.onFailure {
             // Nessun fallback qui: senza risposta resta l'ultimo valore noto,
             // che è già la scelta giusta dell'ultima volta.
