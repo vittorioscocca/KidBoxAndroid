@@ -38,7 +38,9 @@ data class NewsUiState(
 /**
  * La scheda Notizie. Le edizioni si generano in coda sul server (40-100 s),
  * non dentro la chiamata: la prima apertura del giorno mostra quello che c'è
- * e richiama finché l'edizione non è pronta, come su iOS.
+ * e richiama finché l'edizione non è pronta, come su iOS. Accensione, luogo,
+ * lingua e offerte sono della famiglia ([NewsFamilyStore]): quello che trova
+ * un membro lo leggono tutti.
  */
 @HiltViewModel
 class NewsViewModel @Inject constructor(
@@ -48,6 +50,7 @@ class NewsViewModel @Inject constructor(
     private val familyDao: KBFamilyDao,
     private val familySessionPreferences: FamilySessionPreferences,
     val prefsStore: NewsPrefsStore,
+    val familyStore: NewsFamilyStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(NewsUiState())
@@ -60,26 +63,33 @@ class NewsViewModel @Inject constructor(
         viewModelScope.launch {
             val familyId = ActiveFamilyResolver.resolveFamilyId(familyDao.getAll(), familySessionPreferences.getActiveFamilyId())
             _state.update { it.copy(familyId = familyId) }
+            familyStore.bind(familyId)
             prefsStore.refreshFromRemote()
             // Il piano arriva anche dopo l'apertura: si carica quando ci sono
-            // tutte e due le condizioni, e si ricarica se cambiano le scelte.
-            combine(CurrentPlanStore.plan, prefsStore.state) { plan, prefs -> plan to prefs }
-                .collect { (plan, prefs) ->
+            // tutte le condizioni, e si ricarica se cambiano le scelte.
+            combine(CurrentPlanStore.plan, prefsStore.state, familyStore.state) { plan, _, fam -> plan to fam }
+                .collect { (plan, fam) ->
                     _state.update { it.copy(isPaid = plan != KBPlan.FREE) }
-                    if (plan != KBPlan.FREE && prefs.enabled) load(force = false)
+                    if (plan != KBPlan.FREE && fam.familyId == familyId && fam.loaded && fam.settings.enabled) load(force = false)
                 }
         }
     }
 
-    private fun key(prefs: NewsPrefs) = listOf(
-        _state.value.familyId, prefs.categories.joinToString(",") { it.id }, prefs.effectivePlace.label, prefs.enabled,
+    /** Le scelte della famiglia, solo quando sono di questa famiglia. */
+    private fun family(): NewsFamilySettings? =
+        familyStore.state.value.takeIf { it.familyId == _state.value.familyId && it.loaded }?.settings
+
+    private fun key(family: NewsFamilySettings, prefs: NewsPrefs) = listOf(
+        _state.value.familyId, prefs.categories.joinToString(",") { it.id }, family.effectivePlace.label,
+        family.effectiveLang, family.enabled,
     ).joinToString("|")
 
     fun load(force: Boolean) {
         val familyId = _state.value.familyId
         val prefs = prefsStore.current
-        if (familyId.isBlank() || !prefs.enabled || !_state.value.isPaid) return
-        val key = key(prefs)
+        val family = family() ?: return
+        if (familyId.isBlank() || !family.enabled || !_state.value.isPaid) return
+        val key = key(family, prefs)
         if (!force && key == loadedKey && _state.value.feed != null) return
         if (!force && _state.value.feed == null) {
             repository.cachedFeed?.let { (fid, feed) ->
@@ -89,13 +99,13 @@ class NewsViewModel @Inject constructor(
         pollJob?.cancel()
         _state.update { it.copy(loading = it.feed == null, error = null) }
         viewModelScope.launch {
-            runCatching { repository.fetchFeed(familyId, prefs) }
+            runCatching { repository.fetchFeed(familyId, family, prefs) }
                 .onSuccess { feed ->
                     loadedKey = key
                     _state.update { it.copy(feed = feed, loading = false, offers = feed.offers ?: it.offers) }
                     AppAnalytics.newsOpened(context, feed.items.size, feed.events.size, feed.chargedUnits, feed.isPreparing)
-                    if (feed.isPreparing) startPolling(familyId, prefs, key)
-                    if (prefs.personalOffers && _state.value.offers == null) loadSavedOffers(familyId, prefs)
+                    if (feed.isPreparing) startPolling(familyId, family, prefs, key)
+                    if (prefs.personalOffers && _state.value.offers == null) loadSavedOffers(familyId, family)
                 }
                 .onFailure { e ->
                     _state.update { it.copy(loading = false, error = (e as? NewsError)?.text ?: context.getString(R.string.news_error_unexpected)) }
@@ -103,11 +113,11 @@ class NewsViewModel @Inject constructor(
         }
     }
 
-    private fun startPolling(familyId: String, prefs: NewsPrefs, key: String) {
+    private fun startPolling(familyId: String, family: NewsFamilySettings, prefs: NewsPrefs, key: String) {
         pollJob = viewModelScope.launch {
             repeat(MAX_POLLS) {
                 delay(POLL_INTERVAL_MS)
-                val feed = runCatching { repository.fetchFeed(familyId, prefs) }.getOrNull() ?: return@repeat
+                val feed = runCatching { repository.fetchFeed(familyId, family, prefs) }.getOrNull() ?: return@repeat
                 loadedKey = key
                 _state.update { it.copy(feed = feed, offers = feed.offers ?: it.offers) }
                 if (!feed.isPreparing) return@launch
@@ -115,25 +125,24 @@ class NewsViewModel @Inject constructor(
         }
     }
 
-    private fun loadSavedOffers(familyId: String, prefs: NewsPrefs) {
+    private fun loadSavedOffers(familyId: String, family: NewsFamilySettings) {
         viewModelScope.launch {
-            runCatching { repository.fetchOffers(familyId, prefs, brief = null) }
+            runCatching { repository.fetchOffers(familyId, family, brief = null) }
                 .onSuccess { offers -> _state.update { it.copy(offers = offers) } }
         }
     }
 
     fun setFilter(category: NewsCategory?) = _state.update { it.copy(filter = category) }
 
+    /** Le accende per tutta la famiglia. */
     fun activate() {
-        viewModelScope.launch {
-            prefsStore.update { it.copy(enabled = true) }
-            AppAnalytics.newsActivated(context)
-        }
+        familyStore.update { it.copy(enabled = true) }
+        AppAnalytics.newsActivated(context)
     }
 
     fun searchOffers() {
         val familyId = _state.value.familyId
-        val prefs = prefsStore.current
+        val family = family() ?: return
         viewModelScope.launch {
             val brief = briefBuilder.build(familyId)
             if (brief.isEmpty) {
@@ -141,7 +150,7 @@ class NewsViewModel @Inject constructor(
                 return@launch
             }
             _state.update { it.copy(searchingOffers = true, offersError = null) }
-            runCatching { repository.fetchOffers(familyId, prefs, brief) }
+            runCatching { repository.fetchOffers(familyId, family, brief) }
                 .onSuccess { offers ->
                     _state.update { it.copy(offers = offers, searchingOffers = false) }
                     AppAnalytics.newsOffersSearched(context, offers.offers.size, offers.units ?: 0)

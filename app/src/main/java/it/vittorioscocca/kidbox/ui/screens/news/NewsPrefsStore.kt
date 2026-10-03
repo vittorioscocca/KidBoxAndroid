@@ -16,10 +16,11 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Le scelte delle Notizie: nel telefono per partire subito, su
- * `users/{uid}.newsPrefs` per gli altri dispositivi dello stesso utente. Vince
- * la modifica più recente (`updatedAtMs`). Stesso campo e stesso formato di iOS
- * (`NewsPrefsStore.swift`).
+ * Le scelte personali delle Notizie (argomenti, offerte in vista): nel telefono
+ * per partire subito, su `users/{uid}.newsPrefs` per gli altri dispositivi
+ * dello stesso utente. Vince la modifica più recente (`updatedAtMs`). Stesso
+ * campo e stesso formato di iOS (`NewsPrefsStore.swift`). Accensione, luogo e
+ * lingua sono della famiglia: [NewsFamilyStore].
  */
 @Singleton
 class NewsPrefsStore @Inject constructor(
@@ -69,19 +70,15 @@ class NewsPrefsStore @Inject constructor(
     // ── Formato (uguale su iOS) ─────────────────────────────────────────────
 
     private fun encode(p: NewsPrefs): Map<String, Any?> = mapOf(
-        "enabled" to p.enabled,
         "categories" to p.categories.map { it.id },
         "personalOffers" to p.personalOffers,
         "updatedAtMs" to p.updatedAtMs,
-        "place" to p.place?.toMap(),
     )
 
     private fun decode(d: Map<*, *>): NewsPrefs {
         val cats = (d["categories"] as? List<*>)?.mapNotNull { NewsCategory.fromId(it as? String) }.orEmpty()
         return NewsPrefs(
-            enabled = d["enabled"] as? Boolean ?: false,
             categories = if (cats.isEmpty()) NewsCategory.entries else NewsCategory.entries.filter { it in cats },
-            place = NewsPlace.fromMap(d["place"] as? Map<*, *>),
             personalOffers = d["personalOffers"] as? Boolean ?: true,
             updatedAtMs = (d["updatedAtMs"] as? Number)?.toLong() ?: 0L,
         )
@@ -90,26 +87,21 @@ class NewsPrefsStore @Inject constructor(
     private fun loadLocal(): NewsPrefs? = runCatching {
         val raw = prefs.getString(KEY, null) ?: return null
         val o = JSONObject(raw)
-        val placeObj = o.optJSONObject("place")
         val cats = o.optJSONArray("categories") ?: JSONArray()
         decode(
             mapOf(
-                "enabled" to o.optBoolean("enabled", false),
                 "categories" to (0 until cats.length()).map { cats.getString(it) },
                 "personalOffers" to o.optBoolean("personalOffers", true),
                 "updatedAtMs" to o.optLong("updatedAtMs", 0L),
-                "place" to placeObj?.let { p -> p.keys().asSequence().associateWith { p.optString(it) } },
             ),
         )
     }.getOrNull()
 
     private fun saveLocal(p: NewsPrefs) {
         val o = JSONObject()
-            .put("enabled", p.enabled)
             .put("categories", JSONArray(p.categories.map { it.id }))
             .put("personalOffers", p.personalOffers)
             .put("updatedAtMs", p.updatedAtMs)
-        p.place?.let { o.put("place", JSONObject(it.toMap())) }
         prefs.edit().putString(KEY, o.toString()).apply()
     }
 

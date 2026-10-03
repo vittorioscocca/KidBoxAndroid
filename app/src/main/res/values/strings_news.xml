@@ -23,6 +23,7 @@
     <string name="news_error_quota_units">Le notizie di oggi costano %1$d messaggi AI e alla famiglia ne restano %2$d. Riprova domani.</string>
     <string name="news_error_quota">La famiglia ha finito i messaggi AI di oggi. Riprova domani.</string>
     <string name="news_error_disabled">Le notizie sono sospese per qualche ora. Riprova più tardi.</string>
+    <string name="news_error_family_off">Le notizie sono state spente per tutta la famiglia. Puoi riaccenderle dalle impostazioni.</string>
     <string name="news_error_empty_brief">Aggiungi una bolletta in Casa o qualcosa alla lista della spesa: le offerte partono da lì.</string>
     <string name="news_error_timeout">La ricerca sta impiegando più del solito. Riprova fra poco.</string>
     <string name="news_title">Notizie</string>
@@ -67,8 +68,9 @@
     <string name="news_settings_enabled">Notizie attive</string>
     <string name="news_settings_enabled_sub">Bonus, scuola, salute ed eventi vicino a te, ogni giorno</string>
     <string name="news_settings_cost_note">Le ricerche si pagano in messaggi AI, dalla quota della famiglia: ogni edizione al massimo 6 messaggi, e meno quando la leggono anche altre famiglie della tua zona. Incluse nei piani Pro e Max.</string>
+    <string name="news_settings_family_scope">Accensione e città valgono per tutta la famiglia: le notizie trovate per uno le leggono tutti, e si pagano una volta sola.</string>
     <string name="news_settings_topics">Argomenti</string>
-    <string name="news_settings_topics_note">Si cercano solo gli argomenti accesi. Gli eventi vicini arrivano con Tempo libero.</string>
+    <string name="news_settings_topics_note">Gli argomenti sono solo tuoi: scegli cosa leggere senza cambiare le notizie degli altri. Gli eventi vicini arrivano con Tempo libero.</string>
     <string name="news_settings_place">Dove vivete</string>
     <string name="news_settings_remove_city">Togli la città</string>
     <string name="news_settings_use_location">Usa la mia posizione</string>

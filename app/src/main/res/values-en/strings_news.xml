@@ -23,6 +23,7 @@
     <string name="news_error_quota_units">Today\'s news costs %1$d AI messages and the family has %2$d left. Try again tomorrow.</string>
     <string name="news_error_quota">The family has used up today\'s AI messages. Try again tomorrow.</string>
     <string name="news_error_disabled">News is paused for a few hours. Try again later.</string>
+    <string name="news_error_family_off">News has been turned off for the whole family. You can turn it back on in settings.</string>
     <string name="news_error_empty_brief">Add a bill under Home or something to the shopping list: offers start from there.</string>
     <string name="news_error_timeout">The search is taking longer than usual. Try again shortly.</string>
     <string name="news_title">News</string>
@@ -67,8 +68,9 @@
     <string name="news_settings_enabled">News on</string>
     <string name="news_settings_enabled_sub">Benefits, school, health and events near you, every day</string>
     <string name="news_settings_cost_note">Searches are paid for in AI messages from the family\'s allowance: at most 6 messages per edition, and fewer when other families in your area read it too. Included in the Pro and Max plans.</string>
+    <string name="news_settings_family_scope">The switch and the city apply to the whole family: news found for one of you is read by everyone, and paid for only once.</string>
     <string name="news_settings_topics">Topics</string>
-    <string name="news_settings_topics_note">Only the topics that are on are searched. Nearby events come with Leisure.</string>
+    <string name="news_settings_topics_note">Topics are just yours: choose what to read without changing anyone else\'s news. Nearby events come with Leisure.</string>
     <string name="news_settings_place">Where you live</string>
     <string name="news_settings_remove_city">Remove city</string>
     <string name="news_settings_use_location">Use my location</string>

@@ -23,6 +23,7 @@
     <string name="news_error_quota_units">Les actualités du jour coûtent %1$d messages IA et il en reste %2$d à la famille. Réessayez demain.</string>
     <string name="news_error_quota">La famille a épuisé les messages IA du jour. Réessayez demain.</string>
     <string name="news_error_disabled">Les Actualités sont suspendues pour quelques heures. Réessayez plus tard.</string>
+    <string name="news_error_family_off">Les Actualités ont été désactivées pour toute la famille. Vous pouvez les réactiver dans les réglages.</string>
     <string name="news_error_empty_brief">Ajoutez une facture dans Maison ou un article à la liste de courses : les offres partent de là.</string>
     <string name="news_error_timeout">La recherche prend plus de temps que d\'habitude. Réessayez dans un instant.</string>
     <string name="news_title">Actualités</string>
@@ -67,8 +68,9 @@
     <string name="news_settings_enabled">Actualités activées</string>
     <string name="news_settings_enabled_sub">Aides, école, santé et événements près de chez vous, chaque jour</string>
     <string name="news_settings_cost_note">Les recherches se paient en messages IA, sur le quota de la famille : au maximum 6 messages par édition, et moins quand d\'autres familles de votre zone la lisent aussi. Incluses dans les forfaits Pro et Max.</string>
+    <string name="news_settings_family_scope">L\'activation et la ville valent pour toute la famille : les actualités trouvées pour l\'un sont lues par tous, et payées une seule fois.</string>
     <string name="news_settings_topics">Sujets</string>
-    <string name="news_settings_topics_note">Seuls les sujets activés sont recherchés. Les événements à proximité arrivent avec Loisirs.</string>
+    <string name="news_settings_topics_note">Les sujets ne concernent que vous : choisissez ce que vous lisez sans changer les actualités des autres. Les événements à proximité arrivent avec Loisirs.</string>
     <string name="news_settings_place">Où vous habitez</string>
     <string name="news_settings_remove_city">Retirer la ville</string>
     <string name="news_settings_use_location">Utiliser ma position</string>

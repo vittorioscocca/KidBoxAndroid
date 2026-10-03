@@ -91,20 +91,37 @@ data class NewsPlace(
 }
 
 /**
- * Le scelte dell'utente, sincronizzate su `users/{uid}.newsPrefs` (vince la
- * modifica più recente, `updatedAtMs`): stesso formato di iOS.
+ * Le scelte della famiglia, uguali per tutti i membri su
+ * `families/{familyId}/news/settings`: le notizie che un membro accende le
+ * vedono tutti, con lo stesso luogo e la stessa lingua, e la famiglia le paga
+ * una volta (richiesta dell'utente del 03/10/2026). Il server le legge e,
+ * quando ci sono, le preferisce a quello che manda il telefono. Stesso
+ * documento e stesso formato di iOS (`NewsFamilyStore.swift`).
  */
-data class NewsPrefs(
-    /** Presentazione letta e Notizie accese: prima non parte nessuna ricerca né si scala nulla. */
+data class NewsFamilySettings(
+    /** Qualcuno della famiglia ha letto la presentazione e acceso le Notizie: prima non parte nessuna ricerca né si scala nulla. */
     val enabled: Boolean = false,
-    val categories: List<NewsCategory> = NewsCategory.entries,
     val place: NewsPlace? = null,
-    /** Offerte su misura da bollette e spesa (si cercano solo su richiesta). */
-    val personalOffers: Boolean = true,
+    /** Lingua delle edizioni: quella di chi le ha accese. Un'altra lingua sarebbe un'altra ricerca, pagata di nuovo. */
+    val lang: String? = null,
     val updatedAtMs: Long = 0L,
+    val updatedBy: String? = null,
 ) {
     val effectivePlace: NewsPlace get() = place ?: NewsPlace.deviceDefault()
+    val effectiveLang: String get() = lang ?: newsAppLanguage()
 }
+
+/**
+ * Le scelte di ciascuno, su `users/{uid}.newsPrefs` (vince la modifica più
+ * recente): cosa leggere delle stesse edizioni della famiglia. Non cambiano le
+ * notizie degli altri e non costano niente.
+ */
+data class NewsPrefs(
+    val categories: List<NewsCategory> = NewsCategory.entries,
+    /** Mostrare le offerte su misura della famiglia (si cercano solo su richiesta). */
+    val personalOffers: Boolean = true,
+    val updatedAtMs: Long = 0L,
+)
 
 // ── Risposte del server ─────────────────────────────────────────────────────
 

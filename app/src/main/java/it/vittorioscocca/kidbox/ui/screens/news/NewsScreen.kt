@@ -98,6 +98,10 @@ fun NewsScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val prefs by viewModel.prefsStore.state.collectAsStateWithLifecycle()
+    val familyState by viewModel.familyStore.state.collectAsStateWithLifecycle()
+    // Le scelte della famiglia, solo quando sono di questa famiglia.
+    val familyLoaded = familyState.loaded && familyState.familyId == state.familyId && state.familyId.isNotBlank()
+    val family = if (familyLoaded) familyState.settings else NewsFamilySettings()
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
     val upgradeAction = LocalUpgradeAction.current
@@ -139,8 +143,13 @@ fun NewsScreen(
                 AppAnalytics.aiPaywallShown(context, "news_tab")
                 upgradeAction(context.getString(R.string.news_upgrade_subtitle))
             }
-            !prefs.enabled -> NewsIntro(
-                place = prefs.effectivePlace,
+            // Le scelte della famiglia stanno arrivando: niente presentazione a
+            // chi le ha già accese da un altro membro.
+            !familyLoaded -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(strokeWidth = 2.dp, color = Orange, modifier = Modifier.size(24.dp))
+            }
+            !family.enabled -> NewsIntro(
+                place = family.effectivePlace,
                 maxUnits = state.feed?.maxUnitsPerEdition ?: 6,
                 onEditPlace = onOpenSettings,
                 onActivate = viewModel::activate,
@@ -153,6 +162,7 @@ fun NewsScreen(
                 NewsContent(
                     state = state,
                     prefs = prefs,
+                    place = family.effectivePlace,
                     onFilter = viewModel::setFilter,
                     onOpenSettings = onOpenSettings,
                     onRetry = { viewModel.load(force = true) },
@@ -181,6 +191,7 @@ fun NewsScreen(
 private fun NewsContent(
     state: NewsUiState,
     prefs: NewsPrefs,
+    place: NewsPlace,
     onFilter: (NewsCategory?) -> Unit,
     onOpenSettings: () -> Unit,
     onRetry: () -> Unit,
@@ -212,7 +223,7 @@ private fun NewsContent(
                 ) {
                     Icon(Icons.Filled.LocationOn, contentDescription = null, tint = Orange, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text(prefs.effectivePlace.label, color = Orange, style = MaterialTheme.typography.bodyMedium)
+                    Text(place.label, color = Orange, style = MaterialTheme.typography.bodyMedium)
                 }
                 if ((feed?.totalUnits ?: 0) > 0) {
                     Text(
@@ -248,7 +259,7 @@ private fun NewsContent(
             item(key = "preparing") { PreparingCard(localOnly = "local" in feed.pending && "country" !in feed.pending) }
         }
 
-        if (!prefs.effectivePlace.hasCity) {
+        if (!place.hasCity) {
             item(key = "addCity") { AddCityCard(onOpenSettings) }
         }
 

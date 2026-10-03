@@ -30,6 +30,7 @@ sealed class NewsError(open val text: String) : Exception(text) {
 @Singleton
 class NewsRepository @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val familyStore: NewsFamilyStore,
 ) {
     private val functions = FirebaseFunctions.getInstance("europe-west1")
 
@@ -37,14 +38,20 @@ class NewsRepository @Inject constructor(
     @Volatile var cachedFeed: Pair<String, NewsFeed>? = null
         private set
 
-    suspend fun fetchFeed(familyId: String, prefs: NewsPrefs): NewsFeed {
+    /**
+     * Luogo e lingua sono quelli della famiglia ([NewsFamilyStore]), gli
+     * argomenti di chi legge. Prima si aspetta che l'ultima scelta della
+     * famiglia sia sul server: il server la legge e la preferisce.
+     */
+    suspend fun fetchFeed(familyId: String, family: NewsFamilySettings, prefs: NewsPrefs): NewsFeed {
         ensurePaidPlan()
+        familyStore.settled()
         val payload = hashMapOf(
             "familyId" to familyId,
-            "lang" to appLanguage(),
+            "lang" to family.effectiveLang,
             "timeZone" to TimeZone.getDefault().id,
             "categories" to prefs.categories.map { it.id },
-            "place" to prefs.effectivePlace.toMap(),
+            "place" to family.effectivePlace.toMap(),
         )
         val data = call("getFamilyNews", payload, 70)
         val feed = NewsParser.feed(data)
@@ -52,14 +59,18 @@ class NewsRepository @Inject constructor(
         return feed
     }
 
-    /** Senza [brief] legge solo le ultime offerte salvate (gratis); con [brief] ne cerca di nuove. */
-    suspend fun fetchOffers(familyId: String, prefs: NewsPrefs, brief: NewsBrief?): NewsOffersPayload {
+    /**
+     * Senza [brief] legge solo le ultime offerte salvate (gratis); con [brief] ne
+     * cerca di nuove. Le offerte sono della famiglia: le vede ogni membro.
+     */
+    suspend fun fetchOffers(familyId: String, family: NewsFamilySettings, brief: NewsBrief?): NewsOffersPayload {
         ensurePaidPlan()
+        familyStore.settled()
         val payload = hashMapOf<String, Any>(
             "familyId" to familyId,
-            "lang" to appLanguage(),
+            "lang" to family.effectiveLang,
             "timeZone" to TimeZone.getDefault().id,
-            "place" to prefs.effectivePlace.toMap(),
+            "place" to family.effectivePlace.toMap(),
             "refresh" to (brief != null),
         )
         if (brief != null) payload["brief"] = brief.toMap()
@@ -115,6 +126,8 @@ class NewsRepository @Inject constructor(
                 NewsError.Quota(context.getString(R.string.news_error_quota))
             e.code == FirebaseFunctionsException.Code.FAILED_PRECONDITION && reason == "news-disabled" ->
                 NewsError.Generic(context.getString(R.string.news_error_disabled))
+            e.code == FirebaseFunctionsException.Code.FAILED_PRECONDITION && reason == "news-off" ->
+                NewsError.Generic(context.getString(R.string.news_error_family_off))
             e.code == FirebaseFunctionsException.Code.INVALID_ARGUMENT && reason == "empty-brief" ->
                 NewsError.Generic(context.getString(R.string.news_error_empty_brief))
             e.code == FirebaseFunctionsException.Code.DEADLINE_EXCEEDED ||
@@ -123,15 +136,15 @@ class NewsRepository @Inject constructor(
             else -> NewsError.Generic(e.message ?: context.getString(R.string.news_error_unexpected))
         }
     }
+}
 
-    /**
-     * La lingua effettiva dell'app (it/en/fr/es), quella in cui il server scrive
-     * le notizie. Inglese con regione Italia resta italiano, come su iOS.
-     */
-    private fun appLanguage(): String {
-        val locale = KBLocale.current()
-        val code = locale.language
-        if (code == "en" && locale.country == "IT") return "it"
-        return if (code in setOf("it", "en", "fr", "es")) code else "it"
-    }
+/**
+ * La lingua effettiva dell'app (it/en/fr/es), quella in cui il server scrive
+ * le notizie. Inglese con regione Italia resta italiano, come su iOS.
+ */
+fun newsAppLanguage(): String {
+    val locale = KBLocale.current()
+    val code = locale.language
+    if (code == "en" && locale.country == "IT") return "it"
+    return if (code in setOf("it", "en", "fr", "es")) code else "it"
 }

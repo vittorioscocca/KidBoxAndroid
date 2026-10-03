@@ -65,16 +65,32 @@ import it.vittorioscocca.kidbox.ui.components.KBBackButton
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import androidx.lifecycle.viewModelScope
+import it.vittorioscocca.kidbox.data.local.ActiveFamilyResolver
+import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 
 @HiltViewModel
 class NewsSettingsViewModel @Inject constructor(
     val store: NewsPrefsStore,
+    val familyStore: NewsFamilyStore,
     val resolver: NewsLocationResolver,
-) : ViewModel()
+    familyDao: KBFamilyDao,
+    familySessionPreferences: FamilySessionPreferences,
+) : ViewModel() {
+    init {
+        // La famiglia attiva, come per la scheda Notizie.
+        viewModelScope.launch {
+            familyStore.bind(ActiveFamilyResolver.resolveFamilyId(familyDao.getAll(), familySessionPreferences.getActiveFamilyId()))
+        }
+    }
+}
 
 /**
- * Impostazioni → Notizie (e l'icona in alto nella scheda Notizie): argomenti,
- * città, offerte su misura, interruttore generale. Stessi testi di iOS.
+ * Impostazioni → Notizie (e l'icona in alto nella scheda Notizie). Stessi testi
+ * di iOS. L'interruttore generale e la città sono della famiglia
+ * ([NewsFamilyStore]): cambiano le notizie di tutti i membri. Gli argomenti e
+ * le offerte in vista sono di chi legge ([NewsPrefsStore]).
  */
 @Composable
 fun NewsSettingsScreen(
@@ -82,6 +98,8 @@ fun NewsSettingsScreen(
     viewModel: NewsSettingsViewModel = hiltViewModel(),
 ) {
     val prefs by viewModel.store.state.collectAsStateWithLifecycle()
+    val familyState by viewModel.familyStore.state.collectAsStateWithLifecycle()
+    val family = familyState.settings
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -90,6 +108,7 @@ fun NewsSettingsScreen(
     var placeError by remember { mutableStateOf<String?>(null) }
 
     fun update(change: (NewsPrefs) -> NewsPrefs) = scope.launch { viewModel.store.update(change) }
+    fun updateFamily(change: (NewsFamilySettings) -> NewsFamilySettings) = viewModel.familyStore.update(change)
 
     fun useLocation() {
         locating = true
@@ -97,7 +116,7 @@ fun NewsSettingsScreen(
         scope.launch {
             val place = viewModel.resolver.currentPlace()
             locating = false
-            if (place == null) placeError = context.getString(R.string.news_place_not_found) else update { it.copy(place = place) }
+            if (place == null) placeError = context.getString(R.string.news_place_not_found) else updateFamily { it.copy(place = place) }
         }
     }
 
@@ -116,7 +135,7 @@ fun NewsSettingsScreen(
             if (place == null) {
                 placeError = context.getString(R.string.news_place_not_found)
             } else {
-                update { it.copy(place = place) }
+                updateFamily { it.copy(place = place) }
                 cityQuery = ""
             }
         }
@@ -141,11 +160,12 @@ fun NewsSettingsScreen(
                 tint = Color(0xFFFF6B00),
                 title = stringResource(R.string.news_settings_enabled),
                 subtitle = stringResource(R.string.news_settings_enabled_sub),
-                checked = prefs.enabled,
-                onChange = { on -> update { it.copy(enabled = on) } },
+                checked = family.enabled,
+                onChange = { on -> updateFamily { it.copy(enabled = on) } },
             )
         }
         Note(stringResource(R.string.news_settings_cost_note))
+        Note(stringResource(R.string.news_settings_family_scope))
 
         SectionHeader(stringResource(R.string.news_settings_topics))
         SettingsCard {
@@ -177,9 +197,9 @@ fun NewsSettingsScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.LocationOn, contentDescription = null, tint = Color(0xFFFF6B00))
                     Spacer(Modifier.width(10.dp))
-                    Text(prefs.effectivePlace.label, color = kb.title, modifier = Modifier.weight(1f))
-                    if (prefs.place?.hasCity == true) {
-                        IconButton(onClick = { update { p -> p.copy(place = p.place?.copy(city = "", province = "", region = "")) } }) {
+                    Text(family.effectivePlace.label, color = kb.title, modifier = Modifier.weight(1f))
+                    if (family.place?.hasCity == true) {
+                        IconButton(onClick = { updateFamily { p -> p.copy(place = p.place?.copy(city = "", province = "", region = "")) } }) {
                             Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.news_settings_remove_city), tint = kb.subtitle)
                         }
                     }
