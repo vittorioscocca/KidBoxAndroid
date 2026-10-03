@@ -202,6 +202,11 @@ object AppAnalytics {
         }
     }
 
+    /** Il «+» di un evento delle Notizie (il salvataggio vero lo conta `content_created`). */
+    fun newsEventAddTapped(context: Context) {
+        log(context, "news_event_add")
+    }
+
     fun newsItemOpened(context: Context, kind: String, category: String, level: String) {
         log(context, "news_item_opened") {
             putString("kind", kind)

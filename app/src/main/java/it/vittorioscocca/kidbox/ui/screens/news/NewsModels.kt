@@ -12,8 +12,12 @@ import androidx.compose.material.icons.filled.School
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ui.screens.calendar.CalendarEventPrefill
 import it.vittorioscocca.kidbox.util.KBLocale
+import java.text.Normalizer
 import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
 
@@ -151,6 +155,40 @@ data class NewsEvent(
     val source: String,
     val url: String,
 )
+
+/**
+ * Il «+» di un evento: le edizioni danno solo le date, quindi tutto il giorno
+ * dal primo all'ultimo, Tempo libero, riassunto e link nelle note per
+ * ritrovare la fonte dal calendario. Come `CalendarEventPrefill(newsEvent:)`
+ * su iOS.
+ */
+internal fun NewsEvent.toCalendarPrefill(): CalendarEventPrefill? {
+    val start = runCatching { LocalDate.parse(startDate) }.getOrNull() ?: return null
+    val last = endDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        ?.takeIf { !it.isBefore(start) } ?: start
+    val zone = ZoneId.systemDefault()
+    val notes = listOfNotNull(summary, url).map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n\n")
+    return CalendarEventPrefill(
+        title = title,
+        notes = notes.ifEmpty { null },
+        location = place?.trim()?.ifEmpty { null },
+        startMillis = start.atStartOfDay(zone).toInstant().toEpochMilli(),
+        // Fine inclusa, come la vuole il modulo: l'ultimo istante dell'ultimo giorno.
+        endMillis = last.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1,
+        isAllDay = true,
+        category = "leisure",
+    )
+}
+
+/**
+ * Un evento è «già nel calendario» se KidBox ne ha uno con lo stesso titolo
+ * (senza maiuscole e accenti) e lo stesso giorno d'inizio, qualunque orario si
+ * sia scelto salvando. Così la spunta compare anche all'altro genitore.
+ */
+internal fun newsCalendarKey(title: String, day: String): String {
+    val t = Normalizer.normalize(title.trim().lowercase(), Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "")
+    return "$t|$day"
+}
 
 data class NewsOffer(
     val kind: String,

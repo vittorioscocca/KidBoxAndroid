@@ -159,7 +159,10 @@ fun CalendarScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     TrackSectionPresence(AppSection.CALENDAR, familyId)
-    var showForm by remember { mutableStateOf(false) }
+    // Arrivando dal «+» di un evento delle Notizie: «Nuovo evento» già aperto e
+    // compilato, e chiuso il modulo (salvato o no) si torna alle Notizie.
+    val newsPrefill = remember { CalendarPrefillHandoff.take() }
+    var showForm by remember { mutableStateOf(newsPrefill != null) }
     var editingEvent by remember { mutableStateOf<KBCalendarEventEntity?>(null) }
     var pendingSeriesDelete by remember { mutableStateOf<KBCalendarEventEntity?>(null) }
     pendingSeriesDelete?.let { series ->
@@ -194,7 +197,7 @@ fun CalendarScreen(
     var showDeviceSettings by remember { mutableStateOf(false) }
     var openedDeviceEvent by remember { mutableStateOf<DeviceCalendarEvent?>(null) }
     /** «Copia in KidBox»: i campi dell'evento del telefono per il modulo nuovo evento. */
-    var copyPrefill by remember { mutableStateOf<CalendarEventPrefill?>(null) }
+    var copyPrefill by remember { mutableStateOf(newsPrefill) }
     val calendarPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted -> viewModel.onDeviceCalendarPermissionResult(granted) }
@@ -590,6 +593,23 @@ fun CalendarScreen(
             },
             onDismiss = { openedDeviceEvent = null },
         )
+    }
+
+    if (newsPrefill != null) {
+        LaunchedEffect(Unit) {
+            viewModel.setSelectedDate(
+                Instant.ofEpochMilli(newsPrefill.startMillis).atZone(ZoneId.systemDefault()).toLocalDate(),
+            )
+        }
+        // Gli avvisi sulle notifiche negate compaiono dopo il salvataggio: si
+        // aspetta che siano chiusi, o sparirebbero con la schermata.
+        var returned by remember { mutableStateOf(false) }
+        LaunchedEffect(showForm, saveGate.showNotificationsBlockedNotice, saveGate.showFullScreenNotice) {
+            if (!returned && !showForm && !saveGate.showNotificationsBlockedNotice && !saveGate.showFullScreenNotice) {
+                returned = true
+                onBack()
+            }
+        }
     }
 
     if (saveGate.showNotificationsBlockedNotice) {
@@ -1664,7 +1684,7 @@ private fun CalendarEventFormContent(
     var title by remember { mutableStateOf(initial?.title ?: copy?.title.orEmpty()) }
     var notes by remember { mutableStateOf(initial?.notes ?: copy?.notes.orEmpty()) }
     var location by remember { mutableStateOf(initial?.location ?: copy?.location.orEmpty()) }
-    var category by remember { mutableStateOf(initial?.categoryRaw ?: "family") }
+    var category by remember { mutableStateOf(initial?.categoryRaw ?: copy?.category ?: "family") }
     var recurrence by remember { mutableStateOf(initial?.recurrenceRaw ?: "none") }
     var isAllDay by remember { mutableStateOf(initial?.isAllDay ?: copy?.isAllDay ?: false) }
     var reminderOn by remember { mutableStateOf((initial?.reminderMinutes ?: 0) > 0) }

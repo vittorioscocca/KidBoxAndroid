@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -27,6 +28,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
@@ -70,6 +73,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -78,6 +84,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ai.LocalUpgradeAction
+import it.vittorioscocca.kidbox.ui.screens.calendar.CalendarEventPrefill
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import it.vittorioscocca.kidbox.util.KBLocale
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
@@ -95,6 +102,8 @@ private val Green = Color(0xFF4DA673)
 @Composable
 fun NewsScreen(
     onOpenSettings: () -> Unit,
+    /** Il «+» di un evento: il calendario con «Nuovo evento» già compilato. */
+    onAddEventToCalendar: (familyId: String, prefill: CalendarEventPrefill) -> Unit,
     viewModel: NewsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -173,6 +182,12 @@ fun NewsScreen(
                         open(url)
                         viewModel.itemOpened(kind, category, level)
                     },
+                    onAddEvent = { event ->
+                        event.toCalendarPrefill()?.let {
+                            viewModel.eventAddTapped()
+                            onAddEventToCalendar(state.familyId, it)
+                        }
+                    },
                 )
             }
         }
@@ -200,6 +215,7 @@ private fun NewsContent(
     onRetry: () -> Unit,
     onSearchOffers: () -> Unit,
     onOpen: (url: String, kind: String, category: String, level: String) -> Unit,
+    onAddEvent: (NewsEvent) -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
     val feed = state.feed
@@ -355,7 +371,12 @@ private fun NewsContent(
             item(key = "eventsTitle") { SectionTitle(stringResource(R.string.news_events_title), Icons.Filled.ConfirmationNumber) }
             events.forEach { event ->
                 item(key = "event-${event.url}-${event.startDate}-${event.title}") {
-                    EventCard(event) { onOpen(event.url, "event", "leisure", "city") }
+                    EventCard(
+                        event = event,
+                        isInCalendar = newsCalendarKey(event.title, event.startDate) in state.savedEventKeys,
+                        onOpen = { onOpen(event.url, "event", "leisure", "city") },
+                        onAdd = { onAddEvent(event) },
+                    )
                 }
             }
         }
@@ -480,7 +501,7 @@ private fun keyDateBadge(item: NewsItem): String? {
 }
 
 @Composable
-private fun EventCard(event: NewsEvent, onOpen: () -> Unit) {
+private fun EventCard(event: NewsEvent, isInCalendar: Boolean, onOpen: () -> Unit, onAdd: () -> Unit) {
     val kb = MaterialTheme.kidBoxColors
     val tint = NewsCategory.LEISURE.tint
     val start = NewsDates.parse(event.startDate)
@@ -538,6 +559,49 @@ private fun EventCard(event: NewsEvent, onOpen: () -> Unit) {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = kb.subtitle, maxLines = 3, overflow = TextOverflow.Ellipsis)
                 }
             }
+            AddToCalendarButton(isInCalendar, onAdd)
+        }
+    }
+}
+
+/**
+ * Il «+» in alto a destra della scheda evento; diventa una spunta quando
+ * l'evento è già nel calendario KidBox. Tocco di 44 dp, cerchio di 30 spinto
+ * nell'angolo, come su iOS.
+ */
+@Composable
+private fun AddToCalendarButton(isInCalendar: Boolean, onAdd: () -> Unit) {
+    val tint = if (isInCalendar) Green else NewsCategory.LEISURE.tint
+    val label = stringResource(if (isInCalendar) R.string.news_event_in_calendar else R.string.news_event_add_to_calendar)
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .offset(x = 8.dp, y = (-8).dp)
+            .size(44.dp)
+            .then(
+                if (isInCalendar) {
+                    Modifier.semantics { contentDescription = label }
+                } else {
+                    Modifier
+                        .clip(CircleShape)
+                        .clickable(onClickLabel = label, role = Role.Button, onClick = onAdd)
+                        .semantics { contentDescription = label }
+                },
+            ),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(30.dp)
+                .clip(CircleShape)
+                .background(tint.copy(alpha = 0.14f)),
+        ) {
+            Icon(
+                if (isInCalendar) Icons.Filled.Check else Icons.Filled.Add,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
 }

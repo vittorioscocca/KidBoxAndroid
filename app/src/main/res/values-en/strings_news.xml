@@ -47,6 +47,8 @@
     <string name="news_badge_start">From %1$s</string>
     <string name="news_badge_payment">Payment on %1$s</string>
     <string name="news_event_free">Free</string>
+    <string name="news_event_add_to_calendar">Add to calendar</string>
+    <string name="news_event_in_calendar">Already in the calendar</string>
     <string name="news_preparing">Finding today\'s news…</string>
     <string name="news_preparing_local">Finding news from your area and nearby events…</string>
     <string name="news_preparing_hint">The first edition of the day takes about a minute. You can leave: it\'ll be ready when you\'re back.</string>

@@ -9,6 +9,7 @@ import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ai.CurrentPlanStore
 import it.vittorioscocca.kidbox.data.local.ActiveFamilyResolver
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
+import it.vittorioscocca.kidbox.data.local.dao.KBCalendarEventDao
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
@@ -20,6 +21,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
 import java.util.Date
 import javax.inject.Inject
 
@@ -32,6 +35,8 @@ data class NewsUiState(
     val filter: NewsCategory? = null,
     /** Capsula «Eventi»: solo gli eventi vicini. Esclude [filter], e viceversa. */
     val eventsOnly: Boolean = false,
+    /** [newsCalendarKey] degli eventi già nel calendario KidBox: lì il «+» è una spunta. */
+    val savedEventKeys: Set<String> = emptySet(),
     val offers: NewsOffersPayload? = null,
     val searchingOffers: Boolean = false,
     val offersError: String? = null,
@@ -50,6 +55,7 @@ class NewsViewModel @Inject constructor(
     private val repository: NewsRepository,
     private val briefBuilder: NewsBriefBuilder,
     private val familyDao: KBFamilyDao,
+    private val calendarEventDao: KBCalendarEventDao,
     private val familySessionPreferences: FamilySessionPreferences,
     val prefsStore: NewsPrefsStore,
     val familyStore: NewsFamilyStore,
@@ -65,6 +71,15 @@ class NewsViewModel @Inject constructor(
         viewModelScope.launch {
             val familyId = ActiveFamilyResolver.resolveFamilyId(familyDao.getAll(), familySessionPreferences.getActiveFamilyId())
             _state.update { it.copy(familyId = familyId) }
+            launch {
+                calendarEventDao.observeByFamilyId(familyId).collect { events ->
+                    val zone = ZoneId.systemDefault()
+                    val keys = events.mapTo(HashSet()) {
+                        newsCalendarKey(it.title, Instant.ofEpochMilli(it.startDateEpochMillis).atZone(zone).toLocalDate().toString())
+                    }
+                    _state.update { it.copy(savedEventKeys = keys) }
+                }
+            }
             familyStore.bind(familyId)
             prefsStore.refreshFromRemote()
             // Il piano arriva anche dopo l'apertura: si carica quando ci sono
@@ -169,6 +184,8 @@ class NewsViewModel @Inject constructor(
 
     fun itemOpened(kind: String, category: String, level: String) =
         AppAnalytics.newsItemOpened(context, kind, category, level)
+
+    fun eventAddTapped() = AppAnalytics.newsEventAddTapped(context)
 
     override fun onCleared() {
         pollJob?.cancel()

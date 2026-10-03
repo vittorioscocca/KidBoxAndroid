@@ -148,7 +148,25 @@ data class CalendarEventPrefill(
     /** Fine inclusa, pronta per il modulo. */
     val endMillis: Long,
     val isAllDay: Boolean,
+    /** Già scelta solo da chi la sa (gli eventi delle Notizie: «leisure»). */
+    val category: String? = null,
 )
+
+/**
+ * Il «+» degli eventi delle Notizie apre il calendario con «Nuovo evento» già
+ * compilato. Il prefill passa da qui e non dalla rotta: note e link non
+ * stanno in un argomento di navigazione. Lo prende il calendario alla prima
+ * composizione, una volta sola.
+ */
+internal object CalendarPrefillHandoff {
+    @Volatile private var pending: CalendarEventPrefill? = null
+
+    fun offer(prefill: CalendarEventPrefill) {
+        pending = prefill
+    }
+
+    fun take(): CalendarEventPrefill? = pending.also { pending = null }
+}
 
 internal fun DeviceCalendarEvent.toPrefill(untitled: String): CalendarEventPrefill = CalendarEventPrefill(
     title = title.ifBlank { untitled },

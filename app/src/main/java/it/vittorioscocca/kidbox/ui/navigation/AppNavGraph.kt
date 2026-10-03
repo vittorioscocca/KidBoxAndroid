@@ -92,6 +92,7 @@ import it.vittorioscocca.kidbox.ui.screens.settings.ThemeScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.LanguageScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.GuideWebViewScreen
 import it.vittorioscocca.kidbox.ui.subscription.PlansScreen
+import it.vittorioscocca.kidbox.ui.screens.calendar.CalendarPrefillHandoff
 import it.vittorioscocca.kidbox.ui.screens.calendar.CalendarScreen
 import it.vittorioscocca.kidbox.ui.screens.expenses.ExpensesHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.location.FamilyLocationScreen
@@ -415,7 +416,13 @@ fun AppNavGraph(
         startDestination = startDestination,
     ) {
         composable(AppDestination.News.route) {
-            NewsScreen(onOpenSettings = { navController.navigate(AppDestination.NewsSettings.route) })
+            NewsScreen(
+                onOpenSettings = { navController.navigate(AppDestination.NewsSettings.route) },
+                onAddEventToCalendar = { familyId, prefill ->
+                    CalendarPrefillHandoff.offer(prefill)
+                    navController.navigate(AppDestination.Calendar.createRoute(familyId)) { launchSingleTop = true }
+                },
+            )
         }
 
         composable(AppDestination.NewsSettings.route) {
