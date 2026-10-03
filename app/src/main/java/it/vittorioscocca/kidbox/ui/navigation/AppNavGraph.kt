@@ -100,6 +100,7 @@ import it.vittorioscocca.kidbox.ui.screens.location.geofence.GeofenceListScreen
 import it.vittorioscocca.kidbox.ui.screens.wallet.WalletHomeScreen
 import it.vittorioscocca.kidbox.ui.screens.wallet.WalletTicketDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.wallet.loyaltycards.LoyaltyCardDetailScreen
+import it.vittorioscocca.kidbox.ui.screens.wallet.paymentcards.PaymentCardDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.passwords.AddPasswordScreen
 import it.vittorioscocca.kidbox.ui.screens.passwords.PasswordDetailScreen
 import it.vittorioscocca.kidbox.ui.screens.passwords.PasswordGroupDetailScreen
@@ -1883,6 +1884,9 @@ fun AppNavGraph(
                 onLoyaltyCardClick = { cardId ->
                     navController.navigate(AppDestination.WalletLoyaltyCardDetail.createRoute(familyId, cardId))
                 },
+                onPaymentCardClick = { cardId ->
+                    navController.navigate(AppDestination.WalletPaymentCardDetail.createRoute(familyId, cardId))
+                },
                 onUpgrade = {
                     UpgradeMessageStore.set(null, triggerFeature = "wallet")
                     navController.navigate(AppDestination.Plans.route)
@@ -1902,6 +1906,20 @@ fun AppNavGraph(
             LoyaltyCardDetailScreen(
                 familyId = familyId,
                 cardId = cardId,
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = AppDestination.WalletPaymentCardDetail.route,
+            arguments = listOf(
+                navArgument("familyId") { type = NavType.StringType },
+                navArgument("cardId") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            PaymentCardDetailScreen(
+                familyId = backStackEntry.arguments?.getString("familyId").orEmpty(),
+                cardId = backStackEntry.arguments?.getString("cardId").orEmpty(),
                 onBack = { navController.popBackStack() },
             )
         }

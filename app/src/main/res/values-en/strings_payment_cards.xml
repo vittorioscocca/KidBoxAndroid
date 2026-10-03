@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Wallet: carte di pagamento (sezione «Pagamento»). -->
+<resources>
+    <string name="wallet_tab_payment_cards">Payment</string>
+    <string name="wallet_payment_add">Add card</string>
+    <string name="wallet_payment_empty_title">No payment cards</string>
+    <string name="wallet_payment_empty_body">Save the number, cardholder, expiry date and IBAN of your family\'s cards, with a photo of the front and back. Everything is end-to-end encrypted and never read by AI. The CVV isn\'t needed and shouldn\'t be saved.</string>
+    <string name="wallet_payment_new_title">New card</string>
+    <string name="wallet_payment_edit_title">Edit card</string>
+    <string name="wallet_payment_label_label">Card name (optional)</string>
+    <string name="wallet_payment_label_placeholder">E.g. Marco\'s Visa</string>
+    <string name="wallet_payment_number_label">Card number</string>
+    <string name="wallet_payment_number_invalid">This number doesn\'t look valid: check the digits.</string>
+    <string name="wallet_payment_holder_label">Cardholder</string>
+    <string name="wallet_payment_holder_placeholder">Full name as on the card</string>
+    <string name="wallet_payment_expiry_label">Expiry date</string>
+    <string name="wallet_payment_expiry_invalid">The month must be between 01 and 12.</string>
+    <string name="wallet_payment_iban_label">IBAN (optional)</string>
+    <string name="wallet_payment_iban_invalid">This IBAN doesn\'t look valid: check the characters.</string>
+    <string name="wallet_payment_color_label">Colour</string>
+    <string name="wallet_payment_visibility_label">Visibility</string>
+    <string name="wallet_payment_visibility_who">Who can see this card</string>
+    <string name="wallet_payment_notes_label">Note (optional)</string>
+    <string name="wallet_payment_security_footer">Don\'t save the CVV: KidBox doesn\'t ask for it. Number, cardholder, expiry date, IBAN, PIN and photos are encrypted on your phone before they leave it, and AI never reads them.</string>
+    <string name="wallet_payment_save_error">Couldn\'t save the card.</string>
+    <string name="wallet_payment_member_fallback">Member</string>
+    <string name="wallet_payment_detail_title">Payment card</string>
+    <string name="wallet_payment_not_found">Card not found</string>
+    <string name="wallet_payment_unreadable">Unreadable card</string>
+    <string name="wallet_payment_unreadable_body">This card can\'t be decrypted on this device.</string>
+    <string name="wallet_payment_expired">Expired</string>
+    <string name="wallet_payment_show_cd">Show</string>
+    <string name="wallet_payment_hide_cd">Hide</string>
+    <string name="wallet_payment_copy_cd">Copy</string>
+    <string name="wallet_payment_photos_title">Card photos</string>
+    <string name="wallet_payment_photos_hint">Photos are encrypted like the rest of the card.</string>
+    <string name="wallet_payment_note_label">Note</string>
+    <string name="wallet_payment_delete_button">Delete card</string>
+    <string name="wallet_payment_delete_confirm_title">Delete this card?</string>
+    <string name="wallet_payment_delete_confirm_text">The card and its photos will disappear for everyone who can see it.</string>
+    <string name="wallet_payment_biometric_title">Show the card number and PIN</string>
+    <string name="wallet_payment_biometric_subtitle">Confirm it\'s you</string>
+    <string name="wallet_payment_network_other">Card</string>
+    <string name="wallet_payment_pin_label">PIN (optional)</string>
+    <string name="wallet_payment_pin_title">PIN</string>
+    <string name="wallet_payment_pin_hint">It never appears on the card: you need to unlock your phone to see it.</string>
+</resources>

@@ -59,6 +59,7 @@ import it.vittorioscocca.kidbox.data.local.dao.NudgeSignalsDao
 import it.vittorioscocca.kidbox.data.local.dao.OnboardingSignalsDao
 import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
 import it.vittorioscocca.kidbox.data.local.dao.LoyaltyCardDao
+import it.vittorioscocca.kidbox.data.local.dao.PaymentCardDao
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
 import javax.inject.Singleton
 
@@ -277,6 +278,48 @@ object DatabaseModule {
      */
     // Chat: dimensioni di foto/video per dare alla bolla il formato verticale/orizzontale.
     /** Chi ha preso un to-do da fuori dall'app (richieste di famiglia). */
+    /** Carte di pagamento del Wallet: tabella nuova, nessun dato da migrare. */
+    private val MIGRATION_50_51 = object : Migration(50, 51) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `kb_payment_cards` (
+                    `id` TEXT NOT NULL,
+                    `familyId` TEXT NOT NULL,
+                    `labelEnc` TEXT,
+                    `cardNumberEnc` TEXT,
+                    `holderNameEnc` TEXT,
+                    `ibanEnc` TEXT,
+                    `expiryEnc` TEXT,
+                    `notesEnc` TEXT,
+                    `pinEnc` TEXT,
+                    `colorHex` TEXT NOT NULL,
+                    `frontPhotoStorageURL` TEXT,
+                    `frontPhotoStoragePath` TEXT,
+                    `backPhotoStorageURL` TEXT,
+                    `backPhotoStoragePath` TEXT,
+                    `createdBy` TEXT NOT NULL,
+                    `createdByName` TEXT NOT NULL,
+                    `updatedBy` TEXT NOT NULL,
+                    `updatedByName` TEXT NOT NULL,
+                    `createdAtEpochMillis` INTEGER NOT NULL,
+                    `updatedAtEpochMillis` INTEGER NOT NULL,
+                    `isDeleted` INTEGER NOT NULL,
+                    `visibilityScope` TEXT NOT NULL,
+                    `visibilityMemberIdsJson` TEXT NOT NULL,
+                    `syncStateRaw` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`),
+                    FOREIGN KEY(`familyId`) REFERENCES `kb_families`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_kb_payment_cards_familyId` ON `kb_payment_cards` (`familyId`)")
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_kb_payment_cards_familyId_isDeleted` ON `kb_payment_cards` (`familyId`, `isDeleted`)",
+            )
+        }
+    }
+
     private val MIGRATION_49_50 = object : Migration(49, 50) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE `kb_todo_items` ADD COLUMN `assignedExternalName` TEXT")
@@ -1441,6 +1484,7 @@ object DatabaseModule {
         MIGRATION_47_48,
         MIGRATION_48_49,
         MIGRATION_49_50,
+        MIGRATION_50_51,
     )
         .fallbackToDestructiveMigration()
         .build()
@@ -1558,6 +1602,10 @@ object DatabaseModule {
     @Provides
     fun provideLoyaltyCardDao(database: KidBoxDatabase): LoyaltyCardDao =
         database.loyaltyCardDao()
+
+    @Provides
+    fun providePaymentCardDao(database: KidBoxDatabase): PaymentCardDao =
+        database.paymentCardDao()
 
     @Provides
     fun provideNudgeSignalsDao(database: KidBoxDatabase): NudgeSignalsDao =

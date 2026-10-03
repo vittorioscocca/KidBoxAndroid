@@ -401,7 +401,7 @@ private fun LoyaltyCardPhotosSection(
 }
 
 @Composable
-private fun LoyaltyCardPhotoSlot(
+internal fun LoyaltyCardPhotoSlot(
     label: String,
     bitmap: Bitmap?,
     hasPhoto: Boolean,
@@ -463,7 +463,7 @@ private fun LoyaltyCardPhotoSlot(
 
 /** Foto della tessera a schermo intero, su fondo nero: tap ovunque per chiudere. */
 @Composable
-private fun LoyaltyCardPhotoViewer(bitmap: Bitmap, onDismiss: () -> Unit) {
+internal fun LoyaltyCardPhotoViewer(bitmap: Bitmap, onDismiss: () -> Unit) {
     // `usePlatformDefaultWidth = false` da solo non basta: la finestra del
     // dialog continua a rispettare le system bar, quindi il fondo nero si
     // ferma prima dei bordi dello schermo. `decorFitsSystemWindows = false`

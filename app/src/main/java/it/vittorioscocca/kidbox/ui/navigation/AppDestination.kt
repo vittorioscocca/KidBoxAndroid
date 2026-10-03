@@ -356,6 +356,10 @@ sealed class AppDestination(val route: String) {
         fun createRoute(familyId: String, cardId: String): String =
             "wallet_loyalty_card_detail/$familyId/$cardId"
     }
+    data object WalletPaymentCardDetail : AppDestination("wallet_payment_card_detail/{familyId}/{cardId}") {
+        fun createRoute(familyId: String, cardId: String): String =
+            "wallet_payment_card_detail/$familyId/$cardId"
+    }
     data object PasswordsHome : AppDestination("passwords_home/{familyId}") {
         fun createRoute(familyId: String): String = "passwords_home/$familyId"
     }

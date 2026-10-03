@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Wallet: carte di pagamento (sezione «Pagamento»). -->
+<resources>
+    <string name="wallet_tab_payment_cards">Pago</string>
+    <string name="wallet_payment_add">Añadir tarjeta</string>
+    <string name="wallet_payment_empty_title">Ninguna tarjeta de pago</string>
+    <string name="wallet_payment_empty_body">Guarda el número, el titular, la caducidad y el IBAN de las tarjetas de la familia, con una foto del anverso y del reverso. Todo cifrado de extremo a extremo, nunca leído por la IA. El CVV no hace falta y no debe guardarse.</string>
+    <string name="wallet_payment_new_title">Nueva tarjeta</string>
+    <string name="wallet_payment_edit_title">Editar tarjeta</string>
+    <string name="wallet_payment_label_label">Nombre de la tarjeta (opcional)</string>
+    <string name="wallet_payment_label_placeholder">Ej. Visa de Marco</string>
+    <string name="wallet_payment_number_label">Número de tarjeta</string>
+    <string name="wallet_payment_number_invalid">El número no parece válido: revisa las cifras.</string>
+    <string name="wallet_payment_holder_label">Titular</string>
+    <string name="wallet_payment_holder_placeholder">Nombre y apellidos como en la tarjeta</string>
+    <string name="wallet_payment_expiry_label">Caducidad</string>
+    <string name="wallet_payment_expiry_invalid">El mes debe estar entre 01 y 12.</string>
+    <string name="wallet_payment_iban_label">IBAN (opcional)</string>
+    <string name="wallet_payment_iban_invalid">El IBAN no parece válido: revisa los caracteres.</string>
+    <string name="wallet_payment_color_label">Color</string>
+    <string name="wallet_payment_visibility_label">Visibilidad</string>
+    <string name="wallet_payment_visibility_who">Quién puede ver esta tarjeta</string>
+    <string name="wallet_payment_notes_label">Nota (opcional)</string>
+    <string name="wallet_payment_security_footer">No guardes el CVV: KidBox no lo pide. El número, el titular, la caducidad, el IBAN, el PIN y las fotos se cifran en el teléfono antes de salir y la IA no los lee.</string>
+    <string name="wallet_payment_save_error">No se ha podido guardar la tarjeta.</string>
+    <string name="wallet_payment_member_fallback">Miembro</string>
+    <string name="wallet_payment_detail_title">Tarjeta de pago</string>
+    <string name="wallet_payment_not_found">Tarjeta no encontrada</string>
+    <string name="wallet_payment_unreadable">Tarjeta ilegible</string>
+    <string name="wallet_payment_unreadable_body">No se puede descifrar esta tarjeta en este dispositivo.</string>
+    <string name="wallet_payment_expired">Caducada</string>
+    <string name="wallet_payment_show_cd">Mostrar</string>
+    <string name="wallet_payment_hide_cd">Ocultar</string>
+    <string name="wallet_payment_copy_cd">Copiar</string>
+    <string name="wallet_payment_photos_title">Fotos de la tarjeta</string>
+    <string name="wallet_payment_photos_hint">Las fotos están cifradas como el resto de la tarjeta.</string>
+    <string name="wallet_payment_note_label">Nota</string>
+    <string name="wallet_payment_delete_button">Eliminar tarjeta</string>
+    <string name="wallet_payment_delete_confirm_title">¿Eliminar esta tarjeta?</string>
+    <string name="wallet_payment_delete_confirm_text">La tarjeta y sus fotos desaparecerán para todos los que la ven.</string>
+    <string name="wallet_payment_biometric_title">Mostrar el número y el PIN</string>
+    <string name="wallet_payment_biometric_subtitle">Confirma que eres tú</string>
+    <string name="wallet_payment_network_other">Tarjeta</string>
+    <string name="wallet_payment_pin_label">PIN (opcional)</string>
+    <string name="wallet_payment_pin_title">PIN</string>
+    <string name="wallet_payment_pin_hint">Nunca aparece en la tarjeta: para verlo hay que desbloquear el teléfono.</string>
+</resources>

@@ -59,6 +59,9 @@ import it.vittorioscocca.kidbox.ui.screens.wallet.documents.WalletDocumentsSecti
 import it.vittorioscocca.kidbox.ui.screens.wallet.documents.WalletDocumentsViewModel
 import it.vittorioscocca.kidbox.ui.screens.wallet.loyaltycards.LoyaltyCardsSectionContent
 import it.vittorioscocca.kidbox.ui.screens.wallet.loyaltycards.LoyaltyCardsViewModel
+import it.vittorioscocca.kidbox.ui.screens.wallet.paymentcards.PaymentCardFormScreen
+import it.vittorioscocca.kidbox.ui.screens.wallet.paymentcards.PaymentCardsSectionContent
+import it.vittorioscocca.kidbox.ui.screens.wallet.paymentcards.PaymentCardsViewModel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -99,6 +102,7 @@ fun WalletHomeScreen(
     onTicketClick: (ticketId: String) -> Unit,
     onDocumentClick: (documentId: String) -> Unit = {},
     onLoyaltyCardClick: (cardId: String) -> Unit = {},
+    onPaymentCardClick: (cardId: String) -> Unit = {},
     onUpgrade: () -> Unit = {},
     viewModel: WalletViewModel = hiltViewModel(),
 ) {
@@ -125,6 +129,9 @@ fun WalletHomeScreen(
     val loyaltyCardsViewModel: LoyaltyCardsViewModel = hiltViewModel()
     val loyaltyState by loyaltyCardsViewModel.uiState.collectAsStateWithLifecycle()
     var showLoyaltyDeleteConfirm by remember { mutableStateOf(false) }
+
+    val paymentCardsViewModel: PaymentCardsViewModel = hiltViewModel()
+    var showPaymentCardForm by remember { mutableStateOf(false) }
 
     LaunchedEffect(familyId) {
         viewModel.bind(familyId)
@@ -174,6 +181,19 @@ fun WalletHomeScreen(
         return
     }
 
+    if (showPaymentCardForm) {
+        PaymentCardFormScreen(
+            cardId = null,
+            viewModel = paymentCardsViewModel,
+            onDismiss = { showPaymentCardForm = false },
+            onSaved = { cardId ->
+                showPaymentCardForm = false
+                onPaymentCardClick(cardId)
+            },
+        )
+        return
+    }
+
     if (showDocLinkSheet) {
         LinkExistingWalletDocumentScreen(
             familyId = familyId,
@@ -215,6 +235,13 @@ fun WalletHomeScreen(
                                 Icon(
                                     Icons.Filled.Add,
                                     contentDescription = stringResource(R.string.wallet_add_ticket_cd),
+                                    tint = MaterialTheme.kidBoxColors.title,
+                                )
+                            }
+                            3 -> KBHeaderCircleButton(onClick = { showPaymentCardForm = true }) {
+                                Icon(
+                                    Icons.Filled.Add,
+                                    contentDescription = stringResource(R.string.wallet_payment_add),
                                     tint = MaterialTheme.kidBoxColors.title,
                                 )
                             }
@@ -290,11 +317,24 @@ fun WalletHomeScreen(
                     Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text(stringResource(R.string.wallet_tab_tickets)) })
                     Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text(stringResource(R.string.wallet_tab_documents)) })
                     Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text(stringResource(R.string.wallet_tab_loyalty_cards)) })
+                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text(stringResource(R.string.wallet_tab_payment_cards), maxLines = 1) })
                 }
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
+        if (selectedTab == 3) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                PaymentCardsSectionContent(
+                    familyId = familyId,
+                    onCardClick = onPaymentCardClick,
+                    onAdd = { showPaymentCardForm = true },
+                    viewModel = paymentCardsViewModel,
+                )
+            }
+            return@Scaffold
+        }
+
         if (selectedTab == 2) {
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                 LoyaltyCardsSectionContent(
