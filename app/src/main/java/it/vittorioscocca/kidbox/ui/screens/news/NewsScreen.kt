@@ -57,6 +57,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import it.vittorioscocca.kidbox.ai.getAiSettingsFromApp
+import it.vittorioscocca.kidbox.ai.AiConsentDialog
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -96,6 +101,11 @@ fun NewsScreen(
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
     val upgradeAction = LocalUpgradeAction.current
+    // Le offerte su misura mandano ad Anthropic dati della famiglia (bollette,
+    // spesa): passano dallo stesso consenso dell'assistente.
+    val aiSettings = remember(context) { context.getAiSettingsFromApp() }
+    val consentGiven by aiSettings.consentGiven.collectAsStateWithLifecycle(initialValue = false)
+    var showOffersConsent by remember { mutableStateOf(false) }
 
     fun open(url: String) {
         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
@@ -146,7 +156,7 @@ fun NewsScreen(
                     onFilter = viewModel::setFilter,
                     onOpenSettings = onOpenSettings,
                     onRetry = { viewModel.load(force = true) },
-                    onSearchOffers = viewModel::searchOffers,
+                    onSearchOffers = { if (consentGiven) viewModel.searchOffers() else showOffersConsent = true },
                     onOpen = { url, kind, category, level ->
                         open(url)
                         viewModel.itemOpened(kind, category, level)
@@ -154,6 +164,16 @@ fun NewsScreen(
                 )
             }
         }
+    }
+
+    if (showOffersConsent) {
+        AiConsentDialog(
+            onAccept = {
+                showOffersConsent = false
+                viewModel.searchOffers()
+            },
+            onDismiss = { showOffersConsent = false },
+        )
     }
 }
 
