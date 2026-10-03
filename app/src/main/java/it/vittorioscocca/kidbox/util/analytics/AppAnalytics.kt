@@ -190,6 +190,35 @@ object AppAnalytics {
         }
     }
 
+    // ── Notizie (stessi eventi di iOS) ──────────────────────────────────────
+
+    /** Edizione caricata: notizie, eventi, messaggi scalati adesso (0 se già pagata), parte in preparazione. */
+    fun newsOpened(context: Context, items: Int, events: Int, units: Int, preparing: Boolean) {
+        log(context, "news_opened") {
+            putLong("items", items.toLong())
+            putLong("events", events.toLong())
+            putLong("units", units.toLong())
+            putLong("preparing", if (preparing) 1L else 0L)
+        }
+    }
+
+    fun newsItemOpened(context: Context, kind: String, category: String, level: String) {
+        log(context, "news_item_opened") {
+            putString("kind", kind)
+            putString("category", category)
+            putString("level", level)
+        }
+    }
+
+    fun newsOffersSearched(context: Context, offers: Int, units: Int) {
+        log(context, "news_offers_searched") {
+            putLong("offers", offers.toLong())
+            putLong("units", units.toLong())
+        }
+    }
+
+    fun newsActivated(context: Context) = log(context, "news_activated")
+
     fun aiMessageSent(context: Context, agentType: String, plan: String) {
         log(context, "ai_message_sent") {
             putString("agent_type", agentType)

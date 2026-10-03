@@ -9,11 +9,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import it.vittorioscocca.kidbox.BuildConfig
+import it.vittorioscocca.kidbox.ai.AiConsentDialog
+import it.vittorioscocca.kidbox.ai.CurrentPlanStore
+import it.vittorioscocca.kidbox.ai.getAiSettingsFromApp
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -65,6 +74,11 @@ import it.vittorioscocca.kidbox.ui.screens.settings.DevicesScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.NotificationSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.AIChatScreen
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.AgentFocus
+import it.vittorioscocca.kidbox.ui.components.BottomBarRoutes
+import it.vittorioscocca.kidbox.ui.components.BottomBarViewModel
+import it.vittorioscocca.kidbox.ui.components.KidBoxBottomBar
+import it.vittorioscocca.kidbox.ui.screens.news.NewsScreen
+import it.vittorioscocca.kidbox.ui.screens.news.NewsSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.PlanningAIChatScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.AiSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.PrivacySettingsScreen
@@ -370,10 +384,38 @@ fun AppNavGraph(
         },
     )
 
+    // ── Barra in basso: Home · assistente · Notizie (dal 03/10/2026) ──────
+    // Sotto il NavHost e non sopra: le schermate finiscono dove comincia la
+    // barra. Compare sulle due radici e su Salute (dove c'erano i pulsanti
+    // AI), sparisce con la tastiera. Il cerchio al centro apre l'assistente,
+    // centrato su quello che si sta guardando in Salute (BottomBarViewModel).
+    val barRoute = currentEntry?.destination?.route
+    @OptIn(ExperimentalLayoutApi::class)
+    val imeVisible = WindowInsets.isImeVisible
+    val showBottomBar = BottomBarRoutes.showsBar(barRoute) && !imeVisible
+    val bottomBarVm: BottomBarViewModel = hiltViewModel()
+    val barScope = rememberCoroutineScope()
+    val barContext = androidx.compose.ui.platform.LocalContext.current
+    val barUpgradeAction = LocalUpgradeAction.current
+    val barAiSettings = remember(barContext) { barContext.getAiSettingsFromApp() }
+    val barConsentGiven by barAiSettings.consentGiven.collectAsStateWithLifecycle(initialValue = false)
+    val barAiLocked by CurrentPlanStore.aiAccessBlocked.collectAsStateWithLifecycle()
+    var barPendingAiRoute by remember { mutableStateOf<String?>(null) }
+
+    androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
+    Box(Modifier.weight(1f)) {
     NavHost(
         navController = navController,
         startDestination = startDestination,
     ) {
+        composable(AppDestination.News.route) {
+            NewsScreen(onOpenSettings = { navController.navigate(AppDestination.NewsSettings.route) })
+        }
+
+        composable(AppDestination.NewsSettings.route) {
+            NewsSettingsScreen(onBack = { navController.popBackStack() })
+        }
+
         composable(AppDestination.Splash.route) {
             KidBoxSplashScreen(
                 onFinished = {
@@ -519,6 +561,7 @@ fun AppNavGraph(
                 onNotifications = { navController.navigate(AppDestination.NotificationSettings.route) },
                 onDevices = { navController.navigate(AppDestination.Devices.route) },
                 onAiSettings = { navController.navigate(AppDestination.AiSettings.route) },
+                onNewsSettings = { navController.navigate(AppDestination.NewsSettings.route) },
                 onStorageUsage = { navController.navigate(AppDestination.StorageUsage.route) },
                 onAutoFillSettings = { navController.navigate(AppDestination.AutoFillSettings.route) },
                 onPrivacySettings = { navController.navigate(AppDestination.PrivacySettings.route) },
@@ -2334,6 +2377,54 @@ fun AppNavGraph(
             )
         }
     }
+    } // Box del NavHost
+
+    if (showBottomBar) {
+        KidBoxBottomBar(
+            selected = BottomBarRoutes.tabFor(barRoute),
+            onHome = {
+                if (!navController.popBackStack(AppDestination.Home.route, inclusive = false)) {
+                    navController.navigate(AppDestination.Home.route) { launchSingleTop = true }
+                }
+            },
+            onNews = {
+                navController.navigate(AppDestination.News.route) {
+                    popUpTo(AppDestination.Home.route) { inclusive = false }
+                    launchSingleTop = true
+                }
+            },
+            onAssistant = {
+                // Stessi controlli di AskAiButton, che la barra sostituisce:
+                // quota del Free esaurita → piani; senza consenso → dialogo.
+                if (barAiLocked || !BuildConfig.AI_ENABLED) {
+                    AppAnalytics.aiPaywallShown(barContext, "tab_bar")
+                    barUpgradeAction(null)
+                } else {
+                    val entry = navController.currentBackStackEntry
+                    val fid = entry?.arguments?.getString("familyId")?.takeIf { it.isNotBlank() } ?: activeFamilyId
+                    if (!fid.isNullOrBlank()) {
+                        barScope.launch {
+                            val focus = bottomBarVm.focusFor(entry?.destination?.route, entry?.arguments)
+                            val route = focus?.let { AppDestination.AiChat.createRoute(fid, it) }
+                                ?: AppDestination.AiChat.createRoute(fid)
+                            if (barConsentGiven) navController.navigate(route) else barPendingAiRoute = route
+                        }
+                    }
+                }
+            },
+        )
+    }
+    } // Column di NavHost e barra
+
+    barPendingAiRoute?.let { route ->
+        AiConsentDialog(
+            onAccept = {
+                barPendingAiRoute = null
+                navController.navigate(route)
+            },
+            onDismiss = { barPendingAiRoute = null },
+        )
+    }
 
     } // end CompositionLocalProvider
 }
@@ -2351,6 +2442,8 @@ internal fun screenNameFor(route: String?): String? {
 
     return when {
         base == "home" -> "home"
+        base == "news" -> "notizie"
+        base == "news_settings" -> "impostazioni_notizie"
         base.startsWith("calendar/") -> "calendario"
         base.startsWith("documents_home") -> "documenti"
         base == "chat" || base.startsWith("chat_media_gallery") -> "chat_famiglia"

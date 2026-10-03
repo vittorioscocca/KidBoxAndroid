@@ -1,8 +1,5 @@
 package it.vittorioscocca.kidbox.ui.screens.health
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,7 +56,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
-import it.vittorioscocca.kidbox.ui.screens.ai.planning.AgentFocus
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
@@ -255,7 +251,7 @@ fun HealthHomeScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(
-                            bottom = if (state.hasAnyHealthData) 108.dp else 32.dp,
+                            bottom = 32.dp,
                         ),
                     ) {
                         items(cards, key = { it.title }) { card -> HealthModuleCard(card) }
@@ -264,30 +260,8 @@ fun HealthHomeScreen(
             }
         }
 
-        // ── AI salute (AskAiButton: consenso / upgrade come altre schermate Salute) ──
-        AnimatedVisibility(
-            visible = state.hasAnyHealthData,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 20.dp, bottom = 20.dp),
-        ) {
-            HealthAskAiButton(
-                subjectName = state.subjectName,
-                upgradeSubtitle = stringResource(R.string.ai_upgrade_health_home),
-                onTap = {
-                    // L'assistente unico, centrato su questa persona: i dati li legge da sé.
-                    val subjectLabel = state.subjectName.ifBlank { context.getString(R.string.health_profile) }
-                    onNavigate(
-                        AppDestination.AiChat.createRoute(
-                            familyId,
-                            AgentFocus(personId = childId, personName = subjectLabel, scope = AgentFocus.Scope.PERSON),
-                        ),
-                    )
-                },
-            )
-        }
+        // L'assistente si apre dalla barra in basso, già centrato su questa persona
+        // (BottomBarViewModel): il pulsante non c'è più.
     }
 }
 

@@ -73,7 +73,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import it.vittorioscocca.kidbox.ai.AskAiButton
 import it.vittorioscocca.kidbox.domain.model.KBExamStatus
 import it.vittorioscocca.kidbox.domain.model.KBMedicalExam
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListAddBottomButton
@@ -312,27 +311,7 @@ fun MedicalExamsScreen(
             }
             }
 
-            val displayName = state.childName.ifBlank { stringResource(R.string.health_profile) }
-            val showExamsAiFab = !state.isSelecting && state.filteredExamCount > 0
-            if (showExamsAiFab) {
-                AskAiButton(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 20.dp, bottom = 0.dp)
-                        .offset(y = 16.dp),
-                    upgradeSubtitle = stringResource(R.string.ai_upgrade_exams_home),
-                    contentDescription = "Chiedi all'AI sugli esami di $displayName",
-                    analyticsContext = "health_exams_list",
-                    onTap = {
-                        val ids = (
-                            state.pending + state.booked +
-                                state.executed + state.unknownStatus
-                            ).map { it.id }
-                        val json = JSONArray(ids).toString()
-                        onOpenExamsListAiChat(displayName, json)
-                    },
-                )
-            }
+            // L'assistente si apre dalla barra in basso, già centrato qui (BottomBarViewModel): il pulsante non c'è più.
         }
     }
 }

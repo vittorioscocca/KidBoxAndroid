@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Contrast
@@ -87,6 +88,7 @@ fun SettingsScreen(
     onNotifications: () -> Unit,
     onDevices: () -> Unit,
     onAiSettings: () -> Unit,
+    onNewsSettings: () -> Unit,
     onStorageUsage: () -> Unit,
     onAutoFillSettings: () -> Unit,
     onPrivacySettings: () -> Unit,
@@ -145,6 +147,13 @@ fun SettingsScreen(
             icon = Icons.Filled.AutoAwesome,
             showChevron = true,
             onClick = onAiSettings,
+        ),
+        SettingRowItem(
+            title = stringResource(R.string.settings_row_news),
+            subtitle = stringResource(R.string.settings_row_news_sub),
+            icon = Icons.Filled.Newspaper,
+            showChevron = true,
+            onClick = onNewsSettings,
         ),
         SettingRowItem(
             title = stringResource(R.string.settings_row_notifications),

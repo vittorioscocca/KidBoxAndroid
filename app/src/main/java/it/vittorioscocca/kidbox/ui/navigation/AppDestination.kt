@@ -446,6 +446,10 @@ sealed class AppDestination(val route: String) {
     }
 
     data object AskExpert : AppDestination("ask_expert")
+
+    /** La seconda radice della barra in basso (Home · assistente · Notizie). */
+    data object News : AppDestination("news")
+    data object NewsSettings : AppDestination("news_settings")
     /**
      * L'assistente unico. Dalla Home senza focus; dai pulsanti di Salute con il
      * focus su una persona, una visita o un esame (vedi `AgentFocus`).

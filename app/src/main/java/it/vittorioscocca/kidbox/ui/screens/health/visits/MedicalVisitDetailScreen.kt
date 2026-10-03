@@ -77,7 +77,6 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import it.vittorioscocca.kidbox.ai.AskAiButton
 import it.vittorioscocca.kidbox.data.local.mapper.KBDoctorSpecialization
 import it.vittorioscocca.kidbox.data.local.mapper.KBVisitStatus
 import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
@@ -438,15 +437,7 @@ fun MedicalVisitDetailScreen(
                     }
                 }
 
-                AskAiButton(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 20.dp, bottom = 92.dp),
-                    upgradeSubtitle = stringResource(R.string.ai_upgrade_visit_detail),
-                    contentDescription = stringResource(R.string.health_ask_ai_visit),
-                    analyticsContext = "health_visit_detail",
-                    onTap = { showAiChat = true },
-                )
+                // L'assistente si apre dalla barra in basso, già centrato qui (BottomBarViewModel): il pulsante non c'è più.
             }
         }
     }

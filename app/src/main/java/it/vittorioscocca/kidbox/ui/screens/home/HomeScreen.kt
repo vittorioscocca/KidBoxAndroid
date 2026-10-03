@@ -51,7 +51,6 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocalGroceryStore
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Lock
-import it.vittorioscocca.kidbox.ai.AskAiButton
 import it.vittorioscocca.kidbox.ai.UpgradeMessageStore
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -412,26 +411,17 @@ fun HomeScreen(
                         onRecordFeatureUsage = { id -> viewModel.recordFeatureUsage(id) },
                     )
                 }
-                // Evita che l’ultima riga resti sotto al FAB (overlay in basso a destra).
-                Spacer(Modifier.height(88.dp))
+                Spacer(Modifier.height(16.dp))
             }
         }
 
-        // Stesso pulsante AI della card Salute (AskAiButton condiviso).
-        AskAiButton(
-            contentDescription = stringResource(R.string.home_ai_assistant_desc),
-            analyticsContext = "assistant_icon",
-            onTap = { onNavigate(AppDestination.AiChat.createRoute(state.familyId)) },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 16.dp),
-        )
-
+        // L'assistente si apre dalla barra in basso (KidBoxBottomBar, dal
+        // 03/10/2026): il pulsante flottante non c'è più.
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 88.dp),
+                .padding(bottom = 16.dp),
         )
     }
 

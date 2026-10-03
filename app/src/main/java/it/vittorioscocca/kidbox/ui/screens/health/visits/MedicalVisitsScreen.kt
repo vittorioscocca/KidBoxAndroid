@@ -86,7 +86,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import it.vittorioscocca.kidbox.ai.AskAiButton
 import it.vittorioscocca.kidbox.data.local.mapper.KBVisitStatus
 import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListAddBottomButton
@@ -327,27 +326,7 @@ fun MedicalVisitsScreen(
             }
             }
 
-            val displayName = state.childName.ifBlank { stringResource(R.string.health_profile) }
-            val showVisitsAiFab = !state.isSelecting && state.filteredVisitCount > 0
-            if (showVisitsAiFab) {
-                AskAiButton(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 20.dp, bottom = 0.dp)
-                        .offset(y = 16.dp),
-                    upgradeSubtitle = stringResource(R.string.ai_upgrade_visits_home),
-                    contentDescription = "Chiedi all'AI sulle visite di $displayName",
-                    analyticsContext = "health_visits_list",
-                    onTap = {
-                        val ids = (
-                            state.booked + state.pending +
-                                state.resultAvailable + state.completed
-                            ).map { it.id }
-                        val json = JSONArray(ids).toString()
-                        onOpenVisitsListAiChat(displayName, json)
-                    },
-                )
-            }
+            // L'assistente si apre dalla barra in basso, già centrato qui (BottomBarViewModel): il pulsante non c'è più.
         }
     }
 }

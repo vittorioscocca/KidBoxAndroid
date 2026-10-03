@@ -76,7 +76,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import it.vittorioscocca.kidbox.ai.AskAiButton
 import it.vittorioscocca.kidbox.data.health.ai.HealthAiDocumentText
 import it.vittorioscocca.kidbox.domain.model.KBExamStatus
 import it.vittorioscocca.kidbox.domain.model.KBMedicalExam
@@ -365,16 +364,7 @@ fun MedicalExamDetailScreen(
                     }
                 }
 
-                val examLabel = exam.name.ifBlank { "esame" }
-                AskAiButton(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 20.dp, bottom = 92.dp),
-                    upgradeSubtitle = stringResource(R.string.ai_upgrade_exam_detail),
-                    contentDescription = "Chiedi all'AI sull'analisi $examLabel",
-                    analyticsContext = "health_exam_detail",
-                    onTap = { showAiChat = true },
-                )
+                // L'assistente si apre dalla barra in basso, già centrato qui (BottomBarViewModel): il pulsante non c'è più.
             }
         }
     }
