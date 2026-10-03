@@ -2,6 +2,13 @@ package it.vittorioscocca.kidbox.ui.components
 
 import android.content.Context
 import android.os.Bundle
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -12,7 +19,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,20 +36,29 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
@@ -73,8 +88,14 @@ private val AiOrangeDeep = Color(0xFFEB5205)
  * dei pulsanti AI di Home e Salute). Ha lo stesso fondo della striscia sotto
  * la barra di navigazione di sistema (`kidBoxColors.background`, dipinto dalla
  * radice in MainActivity), così le due sembrano una superficie sola. Il cerchio
- * al centro, più grande e rialzato, non è una scheda: apre l'assistente.
+ * al centro, più grande delle altre voci, non è una scheda: apre l'assistente.
  * Gemella di `KBLiquidTabBar.swift`, che su iOS è in vetro liquido.
+ *
+ * Scorrendo per leggere oltre si fa compatta (solo icone, cerchio più piccolo)
+ * e lascia lo spazio al contenuto; torna grande scorrendo indietro o cambiando
+ * schermata ([BottomBarScrollState]). Il cerchio sta dentro la barra in
+ * entrambe le misure: fino al 03/10/2026 sporgeva di 12 dp sopra il bordo e
+ * copriva l'ultima riga o il pulsante in fondo alla schermata.
  */
 @Composable
 fun KidBoxBottomBar(
@@ -82,8 +103,14 @@ fun KidBoxBottomBar(
     onHome: () -> Unit,
     onAssistant: () -> Unit,
     onNews: () -> Unit,
+    scroll: BottomBarScrollState? = null,
 ) {
     val kb = MaterialTheme.kidBoxColors
+    // Letto qui e non da chi chiama: a ogni cambio si ricompone solo la barra.
+    val minimized = scroll?.isMinimized ?: false
+    val motion = spring<Dp>(dampingRatio = 0.82f, stiffness = 500f)
+    val barHeight by animateDpAsState(if (minimized) 52.dp else 72.dp, motion, label = "barHeight")
+    val circle by animateDpAsState(if (minimized) 42.dp else 60.dp, motion, label = "assistantSize")
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -93,7 +120,7 @@ fun KidBoxBottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp),
+                .height(barHeight),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             BarItem(
@@ -101,22 +128,72 @@ fun KidBoxBottomBar(
                 icon = Icons.Outlined.Home,
                 selectedIcon = Icons.Filled.Home,
                 isSelected = selected == BottomBarTab.HOME,
+                minimized = minimized,
                 onClick = onHome,
                 modifier = Modifier.weight(1f),
             )
             Box(Modifier.width(96.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                AssistantButton(onAssistant)
+                AssistantButton(size = circle, onClick = onAssistant)
             }
             BarItem(
                 label = stringResource(R.string.bottom_bar_news),
                 icon = Icons.Outlined.Newspaper,
                 selectedIcon = Icons.Filled.Newspaper,
                 isSelected = selected == BottomBarTab.NEWS,
+                minimized = minimized,
                 onClick = onNews,
                 modifier = Modifier.weight(1f),
             )
         }
     }
+}
+
+/**
+ * Rimpicciolisce la barra quando si scorre per leggere oltre (dito verso
+ * l'alto) e la riallarga tornando indietro: gemello di
+ * `KBTabBarScrollObserver.swift`. Sta sul Box del NavHost, quindi sente le
+ * liste e le colonne che scorrono di tutte le schermate con la barra, senza
+ * toccarle. Conta solo lo scorrimento verticale davvero consumato: una pagina
+ * corta che non scorre e un carosello orizzontale non rimpiccioliscono niente.
+ */
+@Stable
+class BottomBarScrollState(private val thresholdPx: Float) : NestedScrollConnection {
+
+    var isMinimized by mutableStateOf(false)
+        private set
+
+    /** Spostamento nella stessa direzione: sotto la soglia un tremolio del dito farebbe pulsare la barra. */
+    private var travel = 0f
+
+    fun reset() {
+        isMinimized = false
+        travel = 0f
+    }
+
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+        val dy = consumed.y
+        if (dy != 0f) {
+            if ((dy < 0f) != (travel < 0f)) travel = 0f
+            travel += dy
+            if (travel < -thresholdPx) {
+                isMinimized = true
+                travel = 0f
+            } else if (travel > thresholdPx) {
+                isMinimized = false
+                travel = 0f
+            }
+        } else if (available.y > 0f) {
+            // In cima e si tira ancora giù: grande.
+            reset()
+        }
+        return Offset.Zero
+    }
+}
+
+@Composable
+fun rememberBottomBarScrollState(): BottomBarScrollState {
+    val thresholdPx = with(LocalDensity.current) { 28.dp.toPx() }
+    return remember(thresholdPx) { BottomBarScrollState(thresholdPx) }
 }
 
 @Composable
@@ -125,6 +202,7 @@ private fun BarItem(
     icon: ImageVector,
     selectedIcon: ImageVector,
     isSelected: Boolean,
+    minimized: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -141,7 +219,11 @@ private fun BarItem(
                 role = Role.Tab,
                 onClick = onClick,
             )
-            .semantics { selected = isSelected },
+            .semantics {
+                selected = isSelected
+                // Compatta l'etichetta non c'è: il nome lo dà la descrizione.
+                if (minimized) contentDescription = label
+            },
     ) {
         Box(
             contentAlignment = Alignment.Center,
@@ -152,32 +234,37 @@ private fun BarItem(
         ) {
             Icon(if (isSelected) selectedIcon else icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
         }
-        Text(
-            text = label,
-            color = tint,
-            fontSize = 12.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-            modifier = Modifier.padding(top = 2.dp),
-        )
+        AnimatedVisibility(
+            visible = !minimized,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically(),
+        ) {
+            Text(
+                text = label,
+                color = tint,
+                fontSize = 12.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
     }
 }
 
 @Composable
-private fun AssistantButton(onClick: () -> Unit) {
+private fun AssistantButton(size: Dp, onClick: () -> Unit) {
     val description = stringResource(R.string.bottom_bar_assistant)
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            // Un po' più grande delle altre voci e rialzato: sporge sopra la barra.
-            .offset(y = (-12).dp)
-            .size(62.dp)
-            .shadow(10.dp, CircleShape, clip = false, ambientColor = AiOrange, spotColor = AiOrange)
+            // Più grande delle altre voci, ma dentro la barra: non copre il contenuto sopra.
+            .size(size)
+            .shadow(8.dp, CircleShape, clip = false, ambientColor = AiOrange, spotColor = AiOrange)
             .clip(CircleShape)
             .background(Brush.linearGradient(listOf(AiOrange, AiOrangeDeep)))
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = description },
     ) {
-        Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+        Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = Color.White, modifier = Modifier.size(size * 0.45f))
     }
 }
 

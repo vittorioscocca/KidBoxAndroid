@@ -77,6 +77,8 @@ import it.vittorioscocca.kidbox.ui.screens.ai.planning.AgentFocus
 import it.vittorioscocca.kidbox.ui.components.BottomBarRoutes
 import it.vittorioscocca.kidbox.ui.components.BottomBarViewModel
 import it.vittorioscocca.kidbox.ui.components.KidBoxBottomBar
+import it.vittorioscocca.kidbox.ui.components.rememberBottomBarScrollState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import it.vittorioscocca.kidbox.ui.screens.news.NewsScreen
 import it.vittorioscocca.kidbox.ui.screens.news.NewsSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.PlanningAIChatScreen
@@ -401,9 +403,12 @@ fun AppNavGraph(
     val barConsentGiven by barAiSettings.consentGiven.collectAsStateWithLifecycle(initialValue = false)
     val barAiLocked by CurrentPlanStore.aiAccessBlocked.collectAsStateWithLifecycle()
     var barPendingAiRoute by remember { mutableStateOf<String?>(null) }
+    // Compatta scorrendo per leggere oltre; ogni schermata riparte grande.
+    val barScroll = rememberBottomBarScrollState()
+    LaunchedEffect(barRoute, showBottomBar) { barScroll.reset() }
 
     androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
-    Box(Modifier.weight(1f)) {
+    Box(Modifier.weight(1f).nestedScroll(barScroll)) {
     NavHost(
         navController = navController,
         startDestination = startDestination,
@@ -2382,6 +2387,7 @@ fun AppNavGraph(
     if (showBottomBar) {
         KidBoxBottomBar(
             selected = BottomBarRoutes.tabFor(barRoute),
+            scroll = barScroll,
             onHome = {
                 if (!navController.popBackStack(AppDestination.Home.route, inclusive = false)) {
                     navController.navigate(AppDestination.Home.route) { launchSingleTop = true }
