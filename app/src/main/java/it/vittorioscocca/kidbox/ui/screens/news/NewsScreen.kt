@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LocalFireDepartment
@@ -164,6 +165,7 @@ fun NewsScreen(
                     prefs = prefs,
                     place = family.effectivePlace,
                     onFilter = viewModel::setFilter,
+                    onToggleEvents = viewModel::toggleEventsOnly,
                     onOpenSettings = onOpenSettings,
                     onRetry = { viewModel.load(force = true) },
                     onSearchOffers = { if (consentGiven) viewModel.searchOffers() else showOffersConsent = true },
@@ -193,6 +195,7 @@ private fun NewsContent(
     prefs: NewsPrefs,
     place: NewsPlace,
     onFilter: (NewsCategory?) -> Unit,
+    onToggleEvents: () -> Unit,
     onOpenSettings: () -> Unit,
     onRetry: () -> Unit,
     onSearchOffers: () -> Unit,
@@ -200,8 +203,16 @@ private fun NewsContent(
 ) {
     val kb = MaterialTheme.kidBoxColors
     val feed = state.feed
-    val items = feed?.items.orEmpty().filter { state.filter == null || it.category == state.filter.id }
-    val events = if (state.filter == null || state.filter == NewsCategory.LEISURE) feed?.events.orEmpty() else emptyList()
+    val items = if (state.eventsOnly) {
+        emptyList()
+    } else {
+        feed?.items.orEmpty().filter { state.filter == null || it.category == state.filter.id }
+    }
+    val events = if (state.eventsOnly || state.filter == null || state.filter == NewsCategory.LEISURE) {
+        feed?.events.orEmpty()
+    } else {
+        emptyList()
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -245,7 +256,10 @@ private fun NewsContent(
         item(key = "chips") {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 item {
-                    Chip(stringResource(R.string.news_filter_all), Icons.Filled.GridView, Orange, state.filter == null) { onFilter(null) }
+                    Chip(stringResource(R.string.news_filter_all), Icons.Filled.GridView, Orange, state.filter == null && !state.eventsOnly) { onFilter(null) }
+                }
+                item {
+                    Chip(stringResource(R.string.news_filter_events), Icons.Filled.Event, EventsTint, state.eventsOnly, onToggleEvents)
                 }
                 items(prefs.categories, key = { it.id }) { cat ->
                     Chip(stringResource(cat.title), cat.icon, cat.tint, state.filter == cat) {
@@ -263,7 +277,7 @@ private fun NewsContent(
             item(key = "addCity") { AddCityCard(onOpenSettings) }
         }
 
-        if (prefs.personalOffers && (state.filter == null || state.filter == NewsCategory.ECONOMY)) {
+        if (prefs.personalOffers && !state.eventsOnly && (state.filter == null || state.filter == NewsCategory.ECONOMY)) {
             item(key = "offersTitle") { SectionTitle(stringResource(R.string.news_offers_title), Icons.Filled.AutoAwesome) }
             state.offers?.offers.orEmpty().forEach { offer ->
                 item(key = "offer-${offer.url}-${offer.title}") {
@@ -347,7 +361,7 @@ private fun NewsContent(
         }
 
         if (items.isEmpty() && events.isEmpty() && !feed.isPreparing) {
-            item(key = "empty") { EmptyState() }
+            item(key = "empty") { if (state.eventsOnly) NoEventsState() else EmptyState() }
         }
 
         item(key = "disclaimer") {
@@ -613,6 +627,23 @@ private fun AddCityCard(onClick: () -> Unit) {
             Text(stringResource(R.string.news_add_city), fontWeight = FontWeight.SemiBold, color = kb.title)
             Text(stringResource(R.string.news_add_city_sub), style = MaterialTheme.typography.bodySmall, color = kb.subtitle)
         }
+    }
+}
+
+/** Colore della capsula «Eventi»: diverso da «Tempo libero», che gli eventi li comprende ma mostra anche le notizie. */
+private val EventsTint = Color(0xFF8E5CD9)
+
+@Composable
+private fun NoEventsState() {
+    val kb = MaterialTheme.kidBoxColors
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(Icons.Filled.Event, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(40.dp))
+        Text(stringResource(R.string.news_events_empty_title), fontWeight = FontWeight.SemiBold, color = kb.title)
+        Text(stringResource(R.string.news_events_empty_body), style = MaterialTheme.typography.bodySmall, color = kb.subtitle)
     }
 }
 

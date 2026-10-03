@@ -31,6 +31,7 @@
     <string name="news_upgrade_subtitle">News is included in the Pro and Max plans.</string>
     <string name="news_edition_units">Today\'s edition: %1$d AI messages</string>
     <string name="news_filter_all">All</string>
+    <string name="news_filter_events">Events</string>
     <string name="news_offers_title">Tailored for you</string>
     <string name="news_offers_searched">Offers found %1$s</string>
     <string name="news_offers_none">No better offer today than what you already have.</string>
@@ -39,6 +40,8 @@
     <string name="news_offers_search_again">Search again</string>
     <string name="news_offers_cost">About %1$d AI messages · uses the bills under Home and the shopping list</string>
     <string name="news_events_title">Events near you</string>
+    <string name="news_events_empty_title">No events near you today.</string>
+    <string name="news_events_empty_body">Events come with your city\'s edition: I look for ones within about 60 kilometres.</string>
     <string name="news_disclaimer">News found and summarised by AI from the sources shown. Before applying for anything or changing a contract, always check the details at the source.</string>
     <string name="news_badge_deadline">Due %1$s</string>
     <string name="news_badge_start">From %1$s</string>

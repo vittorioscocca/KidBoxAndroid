@@ -31,6 +31,7 @@
     <string name="news_upgrade_subtitle">Le Notizie sono incluse nei piani Pro e Max.</string>
     <string name="news_edition_units">Edizione di oggi: %1$d messaggi AI</string>
     <string name="news_filter_all">Tutte</string>
+    <string name="news_filter_events">Eventi</string>
     <string name="news_offers_title">Su misura per voi</string>
     <string name="news_offers_searched">Offerte cercate %1$s</string>
     <string name="news_offers_none">Per oggi nessuna offerta più conveniente di quello che avete già.</string>
@@ -39,6 +40,8 @@
     <string name="news_offers_search_again">Cerca di nuovo</string>
     <string name="news_offers_cost">Circa %1$d messaggi AI · usa le bollette in Casa e la lista della spesa</string>
     <string name="news_events_title">Eventi vicino a te</string>
+    <string name="news_events_empty_title">Oggi nessun evento vicino a te.</string>
+    <string name="news_events_empty_body">Gli eventi arrivano con l\'edizione della tua città: cerco quelli entro una sessantina di chilometri.</string>
     <string name="news_disclaimer">Notizie trovate e riassunte dall\'AI dalle fonti indicate. Prima di fare domanda o di cambiare un contratto controlla sempre i dettagli sulla fonte.</string>
     <string name="news_badge_deadline">Scade il %1$s</string>
     <string name="news_badge_start">Dal %1$s</string>

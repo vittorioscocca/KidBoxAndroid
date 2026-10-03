@@ -31,6 +31,7 @@
     <string name="news_upgrade_subtitle">Les Actualités sont incluses dans les forfaits Pro et Max.</string>
     <string name="news_edition_units">Édition du jour : %1$d messages IA</string>
     <string name="news_filter_all">Toutes</string>
+    <string name="news_filter_events">Événements</string>
     <string name="news_offers_title">Sur mesure pour vous</string>
     <string name="news_offers_searched">Offres cherchées %1$s</string>
     <string name="news_offers_none">Aujourd\'hui, aucune offre plus avantageuse que ce que vous avez déjà.</string>
@@ -39,6 +40,8 @@
     <string name="news_offers_search_again">Chercher à nouveau</string>
     <string name="news_offers_cost">Environ %1$d messages IA · utilise les factures de Maison et la liste de courses</string>
     <string name="news_events_title">Événements près de chez vous</string>
+    <string name="news_events_empty_title">Aucun événement près de chez vous aujourd\'hui.</string>
+    <string name="news_events_empty_body">Les événements arrivent avec l\'édition de votre ville : je cherche ceux qui se trouvent à une soixantaine de kilomètres.</string>
     <string name="news_disclaimer">Actualités trouvées et résumées par l\'IA à partir des sources indiquées. Avant de faire une demande ou de changer de contrat, vérifiez toujours les détails à la source.</string>
     <string name="news_badge_deadline">Échéance le %1$s</string>
     <string name="news_badge_start">Dès le %1$s</string>

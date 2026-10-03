@@ -31,6 +31,7 @@
     <string name="news_upgrade_subtitle">Las Noticias están incluidas en los planes Pro y Max.</string>
     <string name="news_edition_units">Edición de hoy: %1$d mensajes de IA</string>
     <string name="news_filter_all">Todas</string>
+    <string name="news_filter_events">Eventos</string>
     <string name="news_offers_title">A medida para ti</string>
     <string name="news_offers_searched">Ofertas buscadas %1$s</string>
     <string name="news_offers_none">Hoy no hay ninguna oferta mejor que lo que ya tienes.</string>
@@ -39,6 +40,8 @@
     <string name="news_offers_search_again">Buscar de nuevo</string>
     <string name="news_offers_cost">Unos %1$d mensajes de IA · usa las facturas de Casa y la lista de la compra</string>
     <string name="news_events_title">Eventos cerca de ti</string>
+    <string name="news_events_empty_title">Hoy no hay eventos cerca de ti.</string>
+    <string name="news_events_empty_body">Los eventos llegan con la edición de tu ciudad: busco los que están a unos sesenta kilómetros.</string>
     <string name="news_disclaimer">Noticias encontradas y resumidas por la IA a partir de las fuentes indicadas. Antes de solicitar algo o cambiar un contrato, comprueba siempre los detalles en la fuente.</string>
     <string name="news_badge_deadline">Vence el %1$s</string>
     <string name="news_badge_start">Desde el %1$s</string>

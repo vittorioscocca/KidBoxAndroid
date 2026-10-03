@@ -30,6 +30,8 @@ data class NewsUiState(
     val loading: Boolean = false,
     val error: String? = null,
     val filter: NewsCategory? = null,
+    /** Capsula «Eventi»: solo gli eventi vicini. Esclude [filter], e viceversa. */
+    val eventsOnly: Boolean = false,
     val offers: NewsOffersPayload? = null,
     val searchingOffers: Boolean = false,
     val offersError: String? = null,
@@ -132,7 +134,9 @@ class NewsViewModel @Inject constructor(
         }
     }
 
-    fun setFilter(category: NewsCategory?) = _state.update { it.copy(filter = category) }
+    fun setFilter(category: NewsCategory?) = _state.update { it.copy(filter = category, eventsOnly = false) }
+
+    fun toggleEventsOnly() = _state.update { it.copy(filter = null, eventsOnly = !it.eventsOnly) }
 
     /** Le accende per tutta la famiglia. */
     fun activate() {
