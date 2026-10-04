@@ -90,4 +90,28 @@
     <string name="bottom_bar_assistant">AI Assistant</string>
     <string name="settings_row_news">News</string>
     <string name="settings_row_news_sub">Topics, city and tailored offers</string>
+    <!-- Notizie salvate (segnalibro), 04/10/2026 -->
+    <string name="news_saved_title">Saved news</string>
+    <string name="news_save">Save article</string>
+    <string name="news_unsave">Remove from saved</string>
+    <string name="news_badge_expired">Expired %1$s</string>
+    <string name="news_saved_empty_title">No saved news</string>
+    <string name="news_saved_empty_body">Tap the bookmark on a news item to find it here, even when it\'s no longer in the day\'s edition.</string>
+    <string name="news_saved_more">More actions</string>
+    <string name="news_saved_select">Select</string>
+    <string name="news_saved_select_all">Select all</string>
+    <string name="news_saved_deselect_all">Deselect all</string>
+    <string name="news_saved_close_selection">Close selection</string>
+    <string name="news_saved_delete_selected">Delete selected</string>
+    <string name="news_saved_delete">Delete</string>
+    <string name="news_saved_delete_all">Delete all</string>
+    <string name="news_saved_delete_all_title">Delete all saved news?</string>
+    <string name="news_saved_delete_all_body">They\'ll disappear from all your devices. The articles stay on the sources\' websites.</string>
+    <string name="news_saved_cancel">Cancel</string>
+    <string name="news_saved_deleted">Article deleted</string>
+    <string name="news_saved_undo">Undo</string>
+    <plurals name="news_saved_selected">
+        <item quantity="one">%1$d selected</item>
+        <item quantity="other">%1$d selected</item>
+    </plurals>
 </resources>

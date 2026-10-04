@@ -90,4 +90,28 @@
     <string name="bottom_bar_assistant">Asistente IA</string>
     <string name="settings_row_news">Noticias</string>
     <string name="settings_row_news_sub">Temas, ciudad y ofertas a medida</string>
+    <!-- Notizie salvate (segnalibro), 04/10/2026 -->
+    <string name="news_saved_title">Noticias guardadas</string>
+    <string name="news_save">Guardar noticia</string>
+    <string name="news_unsave">Quitar de las guardadas</string>
+    <string name="news_badge_expired">Venció el %1$s</string>
+    <string name="news_saved_empty_title">No hay noticias guardadas</string>
+    <string name="news_saved_empty_body">Toca el marcador de una noticia para encontrarla aquí, aunque ya no esté en la edición del día.</string>
+    <string name="news_saved_more">Más acciones</string>
+    <string name="news_saved_select">Seleccionar</string>
+    <string name="news_saved_select_all">Seleccionar todas</string>
+    <string name="news_saved_deselect_all">Deseleccionar todas</string>
+    <string name="news_saved_close_selection">Cerrar selección</string>
+    <string name="news_saved_delete_selected">Eliminar seleccionadas</string>
+    <string name="news_saved_delete">Eliminar</string>
+    <string name="news_saved_delete_all">Eliminar todas</string>
+    <string name="news_saved_delete_all_title">¿Eliminar todas las noticias guardadas?</string>
+    <string name="news_saved_delete_all_body">Desaparecen de todos tus dispositivos. Los artículos siguen en las webs de las fuentes.</string>
+    <string name="news_saved_cancel">Cancelar</string>
+    <string name="news_saved_deleted">Noticia eliminada</string>
+    <string name="news_saved_undo">Deshacer</string>
+    <plurals name="news_saved_selected">
+        <item quantity="one">%1$d seleccionada</item>
+        <item quantity="other">%1$d seleccionadas</item>
+    </plurals>
 </resources>

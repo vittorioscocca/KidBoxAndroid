@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ui.screens.calendar.CalendarEventPrefill
 import it.vittorioscocca.kidbox.util.KBLocale
+import java.security.MessageDigest
 import java.text.Normalizer
 import java.text.SimpleDateFormat
 import java.time.LocalDate
@@ -142,6 +143,70 @@ data class NewsItem(
     val url: String,
 ) {
     val newsCategory: NewsCategory? get() = NewsCategory.fromId(category)
+}
+
+/**
+ * Una notizia salvata col segnalibro: una copia, perché l'edizione da cui viene
+ * se ne va (le edizioni cambiano ogni giorno e hanno un TTL). Di chi la salva,
+ * sincronizzata fra i suoi dispositivi su `users/{uid}/savedNews/{id}`; iOS
+ * legge e scrive lo stesso formato ([NewsSavedFormat]).
+ */
+data class NewsSavedItem(
+    val id: String,
+    val item: NewsItem,
+    /** Il luogo dell'edizione da cui viene: «Italia», «Campania», «Benevento». */
+    val placeName: String?,
+    val savedAtMs: Long,
+)
+
+/**
+ * Id del documento: SHA-256 dell'URL in esadecimale, come iOS
+ * (`NewsSavedItem.documentId`), così la stessa notizia salvata da due telefoni
+ * è un documento solo.
+ */
+fun newsSavedId(url: String): String =
+    MessageDigest.getInstance("SHA-256").digest(url.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+
+/** Il documento di `users/{uid}/savedNews`, uguale su iOS (`NewsSavedStore.swift`). */
+internal object NewsSavedFormat {
+    fun encode(s: NewsSavedItem): Map<String, Any> {
+        val i = s.item
+        val d = mutableMapOf<String, Any>(
+            "url" to i.url,
+            "title" to i.title,
+            "summary" to i.summary,
+            "category" to i.category,
+            "level" to i.level,
+            "source" to i.source,
+            "savedAtMs" to s.savedAtMs,
+        )
+        i.action?.takeIf { it.isNotEmpty() }?.let { d["action"] = it }
+        i.keyDate?.takeIf { it.isNotEmpty() }?.let { d["keyDate"] = it }
+        i.keyDateKind?.takeIf { it.isNotEmpty() }?.let { d["keyDateKind"] = it }
+        i.publishedAt?.takeIf { it.isNotEmpty() }?.let { d["publishedAt"] = it }
+        s.placeName?.takeIf { it.isNotEmpty() }?.let { d["placeName"] = it }
+        return d
+    }
+
+    fun decode(id: String, d: Map<String, Any?>?): NewsSavedItem? {
+        d ?: return null
+        fun text(key: String): String? = (d[key] as? String)?.takeIf { it.isNotEmpty() }
+        val url = text("url") ?: return null
+        val title = text("title") ?: return null
+        val item = NewsItem(
+            category = text("category").orEmpty(),
+            level = text("level").orEmpty(),
+            title = title,
+            summary = text("summary").orEmpty(),
+            action = text("action"),
+            keyDate = text("keyDate"),
+            keyDateKind = text("keyDateKind"),
+            publishedAt = text("publishedAt"),
+            source = text("source").orEmpty(),
+            url = url,
+        )
+        return NewsSavedItem(id, item, text("placeName"), (d["savedAtMs"] as? Number)?.toLong() ?: 0L)
+    }
 }
 
 data class NewsEvent(
@@ -311,4 +376,8 @@ internal object NewsDates {
 
     /** «sab 3 ott». */
     fun short(key: String?): String? = parse(key)?.let { SimpleDateFormat("EEE d MMM", KBLocale.current()).format(it) }
+
+    /** Il giorno è già passato (una scadenza vista nelle salvate). */
+    fun isPast(key: String?, today: LocalDate = LocalDate.now()): Boolean =
+        key?.let { runCatching { LocalDate.parse(it) }.getOrNull() }?.isBefore(today) ?: false
 }

@@ -90,4 +90,28 @@
     <string name="bottom_bar_assistant">Assistente AI</string>
     <string name="settings_row_news">Notizie</string>
     <string name="settings_row_news_sub">Argomenti, città e offerte su misura</string>
+    <!-- Notizie salvate (segnalibro), 04/10/2026 -->
+    <string name="news_saved_title">Notizie salvate</string>
+    <string name="news_save">Salva notizia</string>
+    <string name="news_unsave">Togli dalle salvate</string>
+    <string name="news_badge_expired">Scaduto il %1$s</string>
+    <string name="news_saved_empty_title">Nessuna notizia salvata</string>
+    <string name="news_saved_empty_body">Tocca il segnalibro su una notizia per ritrovarla qui, anche quando non è più nell\'edizione del giorno.</string>
+    <string name="news_saved_more">Altre azioni</string>
+    <string name="news_saved_select">Seleziona</string>
+    <string name="news_saved_select_all">Seleziona tutte</string>
+    <string name="news_saved_deselect_all">Deseleziona tutte</string>
+    <string name="news_saved_close_selection">Chiudi selezione</string>
+    <string name="news_saved_delete_selected">Elimina le selezionate</string>
+    <string name="news_saved_delete">Elimina</string>
+    <string name="news_saved_delete_all">Elimina tutte</string>
+    <string name="news_saved_delete_all_title">Eliminare tutte le notizie salvate?</string>
+    <string name="news_saved_delete_all_body">Spariscono da tutti i tuoi dispositivi. Gli articoli restano sui siti delle fonti.</string>
+    <string name="news_saved_cancel">Annulla</string>
+    <string name="news_saved_deleted">Notizia eliminata</string>
+    <string name="news_saved_undo">Annulla</string>
+    <plurals name="news_saved_selected">
+        <item quantity="one">%1$d selezionata</item>
+        <item quantity="other">%1$d selezionate</item>
+    </plurals>
 </resources>

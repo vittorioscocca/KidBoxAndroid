@@ -454,6 +454,8 @@ sealed class AppDestination(val route: String) {
     /** La seconda radice della barra in basso (Home · assistente · Notizie). */
     data object News : AppDestination("news")
     data object NewsSettings : AppDestination("news_settings")
+    /** Le notizie salvate col segnalibro: di chi le salva, non della famiglia. */
+    data object NewsSaved : AppDestination("news_saved")
     /**
      * L'assistente unico. Dalla Home senza focus; dai pulsanti di Salute con il
      * focus su una persona, una visita o un esame (vedi `AgentFocus`).

@@ -215,6 +215,15 @@ object AppAnalytics {
         }
     }
 
+    /** Segnalibro su una notizia; `from` = "card" (su Android solo dalla scheda). Togliere non si conta. */
+    fun newsItemSaved(context: Context, category: String, level: String, from: String) {
+        log(context, "news_item_saved") {
+            putString("category", category)
+            putString("level", level)
+            putString("from", from)
+        }
+    }
+
     fun newsOffersSearched(context: Context, offers: Int, units: Int) {
         log(context, "news_offers_searched") {
             putLong("offers", offers.toLong())

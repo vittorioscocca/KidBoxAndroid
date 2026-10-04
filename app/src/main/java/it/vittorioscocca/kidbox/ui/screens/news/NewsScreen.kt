@@ -4,8 +4,10 @@ import android.content.Intent
 import android.net.Uri
 import android.text.format.DateUtils
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +34,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.Event
@@ -102,6 +106,8 @@ private val Green = Color(0xFF4DA673)
 @Composable
 fun NewsScreen(
     onOpenSettings: () -> Unit,
+    /** L'icona del segnalibro in alto: le notizie salvate. */
+    onOpenSaved: () -> Unit,
     /** Il «+» di un evento: il calendario con «Nuovo evento» già compilato. */
     onAddEventToCalendar: (familyId: String, prefill: CalendarEventPrefill) -> Unit,
     viewModel: NewsViewModel = hiltViewModel(),
@@ -109,6 +115,7 @@ fun NewsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val prefs by viewModel.prefsStore.state.collectAsStateWithLifecycle()
     val familyState by viewModel.familyStore.state.collectAsStateWithLifecycle()
+    val saved by viewModel.savedStore.state.collectAsStateWithLifecycle()
     // Le scelte della famiglia, solo quando sono di questa famiglia.
     val familyLoaded = familyState.loaded && familyState.familyId == state.familyId && state.familyId.isNotBlank()
     val family = if (familyLoaded) familyState.settings else NewsFamilySettings()
@@ -143,6 +150,13 @@ fun NewsScreen(
                 color = kb.title,
                 modifier = Modifier.weight(1f),
             )
+            // Le salvate restano di chi le ha salvate anche tornando al Free:
+            // l'elenco non costa niente.
+            if (state.isPaid || saved.items.isNotEmpty()) {
+                IconButton(onClick = onOpenSaved) {
+                    Icon(Icons.Filled.BookmarkBorder, contentDescription = stringResource(R.string.news_saved_title), tint = kb.title)
+                }
+            }
             IconButton(onClick = onOpenSettings) {
                 Icon(Icons.Filled.Tune, contentDescription = stringResource(R.string.news_settings_desc), tint = kb.title)
             }
@@ -173,6 +187,8 @@ fun NewsScreen(
                     state = state,
                     prefs = prefs,
                     place = family.effectivePlace,
+                    savedIds = saved.ids,
+                    onToggleSave = viewModel::toggleSave,
                     onFilter = viewModel::setFilter,
                     onToggleEvents = viewModel::toggleEventsOnly,
                     onOpenSettings = onOpenSettings,
@@ -209,6 +225,8 @@ private fun NewsContent(
     state: NewsUiState,
     prefs: NewsPrefs,
     place: NewsPlace,
+    savedIds: Set<String>,
+    onToggleSave: (NewsItem, placeName: String?) -> Unit,
     onFilter: (NewsCategory?) -> Unit,
     onToggleEvents: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -361,7 +379,12 @@ private fun NewsContent(
                 item(key = "title-$level") { SectionTitle(title ?: "", icon) }
                 levelItems.forEach { news ->
                     item(key = "news-${news.url}") {
-                        NewsItemCard(news) { onOpen(news.url, "news", news.category, news.level) }
+                        NewsItemCard(
+                            item = news,
+                            onOpen = { onOpen(news.url, "news", news.category, news.level) },
+                            isSaved = newsSavedId(news.url) in savedIds,
+                            onToggleSave = { onToggleSave(news, title) },
+                        )
                     }
                 }
             }
@@ -424,8 +447,14 @@ private fun Chip(label: String, icon: ImageVector, tint: Color, selected: Boolea
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun CardSurface(onClick: (() -> Unit)?, border: BorderStroke? = null, content: @Composable () -> Unit) {
+private fun CardSurface(
+    onClick: (() -> Unit)?,
+    border: BorderStroke? = null,
+    onLongClick: (() -> Unit)? = null,
+    content: @Composable () -> Unit,
+) {
     val kb = MaterialTheme.kidBoxColors
     Surface(
         color = kb.card,
@@ -433,16 +462,35 @@ private fun CardSurface(onClick: (() -> Unit)?, border: BorderStroke? = null, co
         border = border,
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick) else Modifier),
+            .then(
+                when {
+                    onClick == null -> Modifier
+                    onLongClick != null -> Modifier.clip(RoundedCornerShape(16.dp)).combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                    else -> Modifier.clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick)
+                },
+            ),
     ) {
         Box(Modifier.padding(14.dp)) { content() }
     }
 }
 
+/**
+ * La scheda di una notizia, nell'edizione e nelle salvate. [placeName] accanto
+ * alla categoria serve nelle salvate, dove non ci sono i titoli di paese,
+ * regione e città; [onToggleSave] mette il segnalibro in basso a destra.
+ */
 @Composable
-private fun NewsItemCard(item: NewsItem, onOpen: () -> Unit) {
+internal fun NewsItemCard(
+    item: NewsItem,
+    onOpen: () -> Unit,
+    placeName: String? = null,
+    isSaved: Boolean = false,
+    onToggleSave: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+) {
     val kb = MaterialTheme.kidBoxColors
-    CardSurface(onClick = onOpen) {
+    CardSurface(onClick = onOpen, onLongClick = onLongClick) {
+      Box(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 item.newsCategory?.let { cat ->
@@ -450,7 +498,20 @@ private fun NewsItemCard(item: NewsItem, onOpen: () -> Unit) {
                     Spacer(Modifier.width(4.dp))
                     Text(stringResource(cat.title), color = cat.tint, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 }
-                Spacer(Modifier.weight(1f))
+                val place = placeName?.takeIf { it.isNotBlank() }
+                if (place != null) {
+                    // Prende lo spazio libero, così il badge resta a destra.
+                    Text(
+                        " · $place",
+                        color = kb.subtitle,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
                 keyDateBadge(item)?.let { badge ->
                     Text(
                         badge,
@@ -459,7 +520,14 @@ private fun NewsItemCard(item: NewsItem, onOpen: () -> Unit) {
                         fontSize = 11.sp,
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
-                            .background(if (item.keyDateKind == "deadline") Color(0xFFD93A3A) else Orange)
+                            .background(
+                                when {
+                                    // Una scadenza passata (succede nelle salvate) non è più rossa.
+                                    isPastDeadline(item) -> Color(0xB38E8E93)
+                                    item.keyDateKind == "deadline" -> Color(0xFFD93A3A)
+                                    else -> Orange
+                                },
+                            )
                             .padding(horizontal = 8.dp, vertical = 3.dp),
                     )
                 }
@@ -473,7 +541,11 @@ private fun NewsItemCard(item: NewsItem, onOpen: () -> Unit) {
                     Text(action, style = MaterialTheme.typography.bodySmall, color = kb.title)
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                // La riga non deve finire sotto il segnalibro.
+                modifier = Modifier.padding(end = if (onToggleSave != null) 30.dp else 0.dp),
+            ) {
                 val date = NewsDates.dayMonth(item.publishedAt)
                 Text(
                     listOfNotNull(item.source.takeIf { it.isNotBlank() }, date).joinToString(" · "),
@@ -486,12 +558,47 @@ private fun NewsItemCard(item: NewsItem, onOpen: () -> Unit) {
                 Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(14.dp))
             }
         }
+        if (onToggleSave != null) {
+            SaveButton(
+                isSaved = isSaved,
+                onToggle = onToggleSave,
+                // Tocco di 40 dp centrato sulla riga della fonte, spinto nell'angolo.
+                modifier = Modifier.align(Alignment.BottomEnd).offset(x = 10.dp, y = 12.dp),
+            )
+        }
+      }
     }
 }
+
+/** Il segnalibro della scheda: pieno quando la notizia è fra le salvate. */
+@Composable
+private fun SaveButton(isSaved: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    val kb = MaterialTheme.kidBoxColors
+    val label = stringResource(if (isSaved) R.string.news_unsave else R.string.news_save)
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .clickable(onClickLabel = label, role = Role.Button, onClick = onToggle)
+            .semantics { contentDescription = label },
+    ) {
+        Icon(
+            if (isSaved) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
+            contentDescription = null,
+            tint = if (isSaved) Orange else kb.subtitle,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
+private fun isPastDeadline(item: NewsItem): Boolean =
+    item.keyDateKind == "deadline" && NewsDates.isPast(item.keyDate)
 
 @Composable
 private fun keyDateBadge(item: NewsItem): String? {
     val day = NewsDates.dayMonth(item.keyDate) ?: return null
+    if (isPastDeadline(item)) return stringResource(R.string.news_badge_expired, day)
     return when (item.keyDateKind) {
         "deadline" -> stringResource(R.string.news_badge_deadline, day)
         "start" -> stringResource(R.string.news_badge_start, day)

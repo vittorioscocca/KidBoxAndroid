@@ -80,6 +80,7 @@ import it.vittorioscocca.kidbox.ui.components.KidBoxBottomBar
 import it.vittorioscocca.kidbox.ui.components.rememberBottomBarScrollState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import it.vittorioscocca.kidbox.ui.screens.news.NewsScreen
+import it.vittorioscocca.kidbox.ui.screens.news.NewsSavedScreen
 import it.vittorioscocca.kidbox.ui.screens.news.NewsSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.PlanningAIChatScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.AiSettingsScreen
@@ -418,6 +419,7 @@ fun AppNavGraph(
         composable(AppDestination.News.route) {
             NewsScreen(
                 onOpenSettings = { navController.navigate(AppDestination.NewsSettings.route) },
+                onOpenSaved = { navController.navigate(AppDestination.NewsSaved.route) { launchSingleTop = true } },
                 onAddEventToCalendar = { familyId, prefill ->
                     CalendarPrefillHandoff.offer(prefill)
                     navController.navigate(AppDestination.Calendar.createRoute(familyId)) { launchSingleTop = true }
@@ -427,6 +429,10 @@ fun AppNavGraph(
 
         composable(AppDestination.NewsSettings.route) {
             NewsSettingsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(AppDestination.NewsSaved.route) {
+            NewsSavedScreen(onBack = { navController.popBackStack() })
         }
 
         composable(AppDestination.Splash.route) {
@@ -2475,6 +2481,7 @@ internal fun screenNameFor(route: String?): String? {
         base == "home" -> "home"
         base == "news" -> "notizie"
         base == "news_settings" -> "impostazioni_notizie"
+        base == "news_saved" -> "notizie_salvate"
         base.startsWith("calendar/") -> "calendario"
         base.startsWith("documents_home") -> "documenti"
         base == "chat" || base.startsWith("chat_media_gallery") -> "chat_famiglia"

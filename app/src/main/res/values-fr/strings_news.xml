@@ -90,4 +90,28 @@
     <string name="bottom_bar_assistant">Assistant IA</string>
     <string name="settings_row_news">Actualités</string>
     <string name="settings_row_news_sub">Sujets, ville et offres sur mesure</string>
+    <!-- Notizie salvate (segnalibro), 04/10/2026 -->
+    <string name="news_saved_title">Actualités enregistrées</string>
+    <string name="news_save">Enregistrer l\'article</string>
+    <string name="news_unsave">Retirer des actualités enregistrées</string>
+    <string name="news_badge_expired">Expiré le %1$s</string>
+    <string name="news_saved_empty_title">Aucune actualité enregistrée</string>
+    <string name="news_saved_empty_body">Touchez le signet d\'une actualité pour la retrouver ici, même quand elle n\'est plus dans l\'édition du jour.</string>
+    <string name="news_saved_more">Autres actions</string>
+    <string name="news_saved_select">Sélectionner</string>
+    <string name="news_saved_select_all">Tout sélectionner</string>
+    <string name="news_saved_deselect_all">Tout désélectionner</string>
+    <string name="news_saved_close_selection">Fermer la sélection</string>
+    <string name="news_saved_delete_selected">Supprimer la sélection</string>
+    <string name="news_saved_delete">Supprimer</string>
+    <string name="news_saved_delete_all">Tout supprimer</string>
+    <string name="news_saved_delete_all_title">Supprimer toutes les actualités enregistrées ?</string>
+    <string name="news_saved_delete_all_body">Elles disparaissent de tous vos appareils. Les articles restent sur les sites des sources.</string>
+    <string name="news_saved_cancel">Annuler</string>
+    <string name="news_saved_deleted">Article supprimé</string>
+    <string name="news_saved_undo">Annuler</string>
+    <plurals name="news_saved_selected">
+        <item quantity="one">%1$d sélectionnée</item>
+        <item quantity="other">%1$d sélectionnées</item>
+    </plurals>
 </resources>

@@ -59,6 +59,7 @@ class NewsViewModel @Inject constructor(
     private val familySessionPreferences: FamilySessionPreferences,
     val prefsStore: NewsPrefsStore,
     val familyStore: NewsFamilyStore,
+    val savedStore: NewsSavedStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(NewsUiState())
@@ -68,6 +69,7 @@ class NewsViewModel @Inject constructor(
     private var loadedKey: String? = null
 
     init {
+        savedStore.start()
         viewModelScope.launch {
             val familyId = ActiveFamilyResolver.resolveFamilyId(familyDao.getAll(), familySessionPreferences.getActiveFamilyId())
             _state.update { it.copy(familyId = familyId) }
@@ -186,6 +188,11 @@ class NewsViewModel @Inject constructor(
         AppAnalytics.newsItemOpened(context, kind, category, level)
 
     fun eventAddTapped() = AppAnalytics.newsEventAddTapped(context)
+
+    /** Il segnalibro di una notizia; [placeName] è il titolo del suo gruppo (paese, regione, città). */
+    fun toggleSave(item: NewsItem, placeName: String?) {
+        if (savedStore.toggle(item, placeName)) AppAnalytics.newsItemSaved(context, item.category, item.level, "card")
+    }
 
     override fun onCleared() {
         pollJob?.cancel()
