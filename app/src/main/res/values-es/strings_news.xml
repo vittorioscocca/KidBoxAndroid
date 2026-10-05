@@ -22,6 +22,8 @@
     <string name="news_error_trial">Has usado todos los mensajes de IA de la prueba Pro: las Noticias vuelven con una suscripción.</string>
     <string name="news_error_quota_units">Las noticias de hoy cuestan %1$d mensajes de IA y a la familia le quedan %2$d. Vuelve a intentarlo mañana.</string>
     <string name="news_error_quota">La familia ha agotado los mensajes de IA de hoy. Vuelve a intentarlo mañana.</string>
+    <string name="news_error_quota_month_units">Las noticias de hoy cuestan %1$d mensajes de IA y a la familia le quedan %2$d este mes. Se renuevan el día 1 del mes.</string>
+    <string name="news_error_quota_month">La familia ha agotado los mensajes de IA de este mes. Se renuevan el día 1 del mes.</string>
     <string name="news_error_disabled">Las Noticias están suspendidas unas horas. Vuelve a intentarlo más tarde.</string>
     <string name="news_error_family_off">Las Noticias se han desactivado para toda la familia. Puedes volver a activarlas en los ajustes.</string>
     <string name="news_error_empty_brief">Añade una factura en Casa o algo a la lista de la compra: las ofertas parten de ahí.</string>

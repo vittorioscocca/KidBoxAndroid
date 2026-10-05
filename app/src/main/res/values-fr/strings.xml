@@ -332,6 +332,8 @@
     <string name="fitness_copilot_cost_exceeds">Ce message coûte environ %1$d messages IA ; il en reste %2$d aujourd’hui.</string>
     <string name="ai_quota_message_too_expensive">Ce message coûte %1$d messages IA car le contexte est volumineux, et il n’en reste que %2$d sur %3$d à la famille aujourd’hui. Réessayez demain.</string>
     <string name="ai_quota_daily_reached">La famille a atteint la limite de %1$d messages IA pour aujourd’hui. Réessayez demain.</string>
+    <string name="ai_quota_monthly_reached">La famille a utilisé les %1$d messages IA de ce mois-ci. Ils se renouvellent le 1er du mois.</string>
+    <string name="ai_quota_monthly_too_expensive">Ce message coûte %1$d messages IA car le contexte est large, et il reste à la famille %2$d messages sur %3$d ce mois-ci. Ils se renouvellent le 1er du mois.</string>
     <string name="fitness_copilot_delete_title">Supprimer la séance ?</string>
     <string name="fitness_copilot_delete_body">Elles seront retirées du plan et ne pourront pas être récupérées :\n%1$s</string>
     <string name="fitness_copilot_delete_confirm">Supprimer</string>

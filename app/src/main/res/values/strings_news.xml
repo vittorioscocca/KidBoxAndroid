@@ -22,6 +22,8 @@
     <string name="news_error_trial">Hai usato tutti i messaggi AI della prova Pro: le notizie tornano con un abbonamento.</string>
     <string name="news_error_quota_units">Le notizie di oggi costano %1$d messaggi AI e alla famiglia ne restano %2$d. Riprova domani.</string>
     <string name="news_error_quota">La famiglia ha finito i messaggi AI di oggi. Riprova domani.</string>
+    <string name="news_error_quota_month_units">Le notizie di oggi costano %1$d messaggi AI e questo mese alla famiglia ne restano %2$d. Si rinnovano il primo del mese.</string>
+    <string name="news_error_quota_month">La famiglia ha finito i messaggi AI di questo mese. Si rinnovano il primo del mese.</string>
     <string name="news_error_disabled">Le notizie sono sospese per qualche ora. Riprova più tardi.</string>
     <string name="news_error_family_off">Le notizie sono state spente per tutta la famiglia. Puoi riaccenderle dalle impostazioni.</string>
     <string name="news_error_empty_brief">Aggiungi una bolletta in Casa o qualcosa alla lista della spesa: le offerte partono da lì.</string>

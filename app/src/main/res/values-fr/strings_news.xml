@@ -22,6 +22,8 @@
     <string name="news_error_trial">Vous avez utilisé tous les messages IA de l\'essai Pro : les Actualités reviennent avec un abonnement.</string>
     <string name="news_error_quota_units">Les actualités du jour coûtent %1$d messages IA et il en reste %2$d à la famille. Réessayez demain.</string>
     <string name="news_error_quota">La famille a épuisé les messages IA du jour. Réessayez demain.</string>
+    <string name="news_error_quota_month_units">Les actualités du jour coûtent %1$d messages IA et il en reste %2$d à la famille ce mois-ci. Ils se renouvellent le 1er du mois.</string>
+    <string name="news_error_quota_month">La famille a épuisé ses messages IA de ce mois-ci. Ils se renouvellent le 1er du mois.</string>
     <string name="news_error_disabled">Les Actualités sont suspendues pour quelques heures. Réessayez plus tard.</string>
     <string name="news_error_family_off">Les Actualités ont été désactivées pour toute la famille. Vous pouvez les réactiver dans les réglages.</string>
     <string name="news_error_empty_brief">Ajoutez une facture dans Maison ou un article à la liste de courses : les offres partent de là.</string>

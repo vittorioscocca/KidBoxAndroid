@@ -34,6 +34,17 @@ enum class KBPlan(val rawValue: String) {
      */
     val aiMessageLimit: Int get() = spec.aiLimit
 
+    /**
+     * Tetto mensile per famiglia (0 = nessuno), oltre al giornaliero. Se il
+     * listino remoto non lo porta ancora, gli stessi valori del server.
+     */
+    val aiMonthlyLimit: Int
+        get() = spec.aiMonthlyLimit ?: when (this) {
+            FREE -> 0
+            PRO -> 100
+            MAX -> 200
+        }
+
     // Alias retro-compatibile: molte schermate mostrano ancora "aiDailyLimit" come
     // "limite della finestra di quota corrente" (nome mantenuto anche lato backend).
     val aiDailyLimit: Int get() = aiMessageLimit

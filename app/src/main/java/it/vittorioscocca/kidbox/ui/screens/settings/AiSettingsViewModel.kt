@@ -39,6 +39,9 @@ data class AiSettingsUiState(
     val aiQuotaPeriod: AIQuotaPeriod = AIQuotaPeriod.DAILY,
     /** Tetto mandato dal server: nella prova Pro non coincide con il Pro del listino. */
     val aiQuotaLimit: Int = 0,
+    /** Tetto mensile della famiglia (Pro e Max, 0 = nessuno) e quanto ne è stato usato. */
+    val aiMonthlyUsage: Int = 0,
+    val aiMonthlyLimit: Int = 0,
     /** True solo per Free con il bonus di 5 messaggi una tantum esaurito. */
     val aiAccessBlocked: Boolean = false,
     val isWeeklySummaryEnabled: Boolean = true,
@@ -129,6 +132,8 @@ class AiSettingsViewModel @Inject constructor(
                 aiUsageToday = usageToday,
                 aiQuotaPeriod = period,
                 aiQuotaLimit = limit,
+                aiMonthlyUsage = usage?.monthlyUsage ?: it.aiMonthlyUsage,
+                aiMonthlyLimit = usage?.monthlyLimit ?: it.aiMonthlyLimit,
                 aiAccessBlocked = plan == KBPlan.FREE && period == AIQuotaPeriod.LIFETIME &&
                     limit > 0 && usageToday >= limit,
                 healthContextSendPreference = remote?.healthContextSendPreference

@@ -108,6 +108,7 @@ object KBPlanCatalog {
                 storageBytes = p.optLong("storageBytes", 0L),
                 aiLimit = p.optInt("aiLimit", 0),
                 aiPeriod = p.optString("aiPeriod", "daily"),
+                aiMonthlyLimit = if (p.has("aiMonthlyLimit") && !p.isNull("aiMonthlyLimit")) p.optInt("aiMonthlyLimit", 0) else null,
                 productId = if (p.isNull("productId")) null else p.optString("productId").ifBlank { null },
                 priceLabel = stringMap(p.optJSONObject("priceLabel")),
                 tagline = stringMap(p.optJSONObject("tagline")),
@@ -167,35 +168,35 @@ object KBPlanCatalog {
         ),
         "pro" to KBPlanSpec(
             id = "pro", order = 1, displayName = "Pro",
-            storageBytes = 5L * 1024 * 1024 * 1024, aiLimit = 30, aiPeriod = "daily",
+            storageBytes = 5L * 1024 * 1024 * 1024, aiLimit = 30, aiPeriod = "daily", aiMonthlyLimit = 100,
             productId = "it.vittorioscocca.kidbox.pro.monthly",
             priceLabel = mapOf("it" to "€4,99/mese", "en" to "€4.99/month"),
             badge = mapOf("it" to "Più popolare", "en" to "Most popular"),
             features = mapOf(
                 "it" to listOf(
                     KBPlanFeature("☁️", "{storage} di storage famiglia", true),
-                    KBPlanFeature("💬", "{aiLimit} messaggi AI al giorno", true),
+                    KBPlanFeature("💬", "{aiLimit} messaggi AI al giorno, fino a 100 al mese", true),
                 ),
                 "en" to listOf(
                     KBPlanFeature("☁️", "{storage} family storage", true),
-                    KBPlanFeature("💬", "{aiLimit} AI messages per day", true),
+                    KBPlanFeature("💬", "{aiLimit} AI messages per day, up to 100 per month", true),
                 ),
             ),
         ),
         "max" to KBPlanSpec(
             id = "max", order = 2, displayName = "Max",
-            storageBytes = 20L * 1024 * 1024 * 1024, aiLimit = 100, aiPeriod = "daily",
+            storageBytes = 20L * 1024 * 1024 * 1024, aiLimit = 100, aiPeriod = "daily", aiMonthlyLimit = 200,
             productId = "it.vittorioscocca.kidbox.max.monthly",
             priceLabel = mapOf("it" to "€9,99/mese", "en" to "€9.99/month"),
             badge = mapOf("it" to "Migliore", "en" to "Best value"),
             features = mapOf(
                 "it" to listOf(
                     KBPlanFeature("☁️", "{storage} di storage famiglia", true),
-                    KBPlanFeature("💬", "{aiLimit} messaggi AI al giorno", true),
+                    KBPlanFeature("💬", "{aiLimit} messaggi AI al giorno, fino a 200 al mese", true),
                 ),
                 "en" to listOf(
                     KBPlanFeature("☁️", "{storage} family storage", true),
-                    KBPlanFeature("💬", "{aiLimit} AI messages per day", true),
+                    KBPlanFeature("💬", "{aiLimit} AI messages per day, up to 200 per month", true),
                 ),
             ),
         ),
@@ -217,6 +218,12 @@ data class KBPlanSpec(
     val storageBytes: Long,
     val aiLimit: Int,
     val aiPeriod: String,
+    /**
+     * Tetto per famiglia nel mese di calendario, oltre al giornaliero (Pro e
+     * Max). Assente nei listini salvati prima del 05/10/2026: allora vale
+     * quello di [KBPlan.aiMonthlyLimit].
+     */
+    val aiMonthlyLimit: Int? = null,
     val productId: String?,
     val priceLabel: Map<String, String> = emptyMap(),
     val tagline: Map<String, String> = emptyMap(),

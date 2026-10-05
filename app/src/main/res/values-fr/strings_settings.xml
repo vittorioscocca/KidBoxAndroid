@@ -307,6 +307,7 @@
     <string name="settings_ai_messages_sent_today">%1$d messages envoyés aujourd\'hui</string>
     <string name="settings_ai_available_count">Disponibles : %1$d</string>
     <string name="settings_ai_used_count">Utilisés : %1$d/%2$d</string>
+    <string name="settings_ai_month_used_count">Ce mois-ci : %1$d sur %2$d</string>
     <string name="settings_messages_chat_title">Discussion familiale</string>
     <string name="settings_messages_chat_sub">Permet d\'activer ou de désactiver la discussion familiale</string>
     <string name="settings_messages_chat_note">Le choix s\'applique à tous vos appareils. Les autres membres continuent de discuter entre eux, et vous retrouverez les messages en la réactivant.</string>

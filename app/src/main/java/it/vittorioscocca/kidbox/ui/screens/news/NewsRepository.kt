@@ -120,6 +120,11 @@ class NewsRepository @Inject constructor(
                 NewsError.Generic(context.getString(R.string.news_error_budget))
             e.code == FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED && reason == "trial-limit" ->
                 NewsError.Quota(context.getString(R.string.news_error_trial))
+            e.code == FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED && reason == "monthly-limit" &&
+                units != null && remaining != null && remaining > 0 ->
+                NewsError.Quota(context.getString(R.string.news_error_quota_month_units, units, remaining))
+            e.code == FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED && reason == "monthly-limit" ->
+                NewsError.Quota(context.getString(R.string.news_error_quota_month))
             e.code == FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED && units != null && remaining != null ->
                 NewsError.Quota(context.getString(R.string.news_error_quota_units, units, remaining))
             e.code == FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED ->

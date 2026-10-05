@@ -307,6 +307,7 @@
     <string name="settings_ai_messages_sent_today">%1$d mensajes enviados hoy</string>
     <string name="settings_ai_available_count">Disponibles: %1$d</string>
     <string name="settings_ai_used_count">Usados: %1$d/%2$d</string>
+    <string name="settings_ai_month_used_count">Este mes: %1$d de %2$d</string>
     <string name="settings_messages_chat_title">Chat de familia</string>
     <string name="settings_messages_chat_sub">Permite activar o desactivar el chat de familia</string>
     <string name="settings_messages_chat_note">La elección se aplica a todos tus dispositivos. Los demás miembros siguen chateando entre ellos y recuperarás los mensajes al reactivarlo.</string>

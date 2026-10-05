@@ -115,6 +115,8 @@ class AIService @Inject constructor(
                 usageToday = usageToday,
                 dailyLimit = dailyLimit,
                 period = period,
+                monthlyUsage = (data["monthlyUsage"] as? Number)?.toInt() ?: 0,
+                monthlyLimit = (data["monthlyLimit"] as? Number)?.toInt() ?: 0,
             )
         }.mapError(context)
     }
@@ -301,6 +303,7 @@ private fun Result<AIResponse>.mapError(context: Context): Result<AIResponse> =
  */
 private fun quotaExceededMessage(context: Context, details: Any?): String? {
     val map = details as? Map<*, *> ?: return null
+    if (map["reason"] == "monthly-limit") return monthlyQuotaExceededMessage(context, map)
     if (map["reason"] != "daily-limit") return null
     val units = (map["units"] as? Number)?.toInt() ?: return null
     val remaining = (map["remaining"] as? Number)?.toInt() ?: return null
@@ -309,6 +312,18 @@ private fun quotaExceededMessage(context: Context, details: Any?): String? {
         context.getString(R.string.ai_quota_message_too_expensive, units, remaining, limit)
     } else {
         context.getString(R.string.ai_quota_daily_reached, limit)
+    }
+}
+
+/** Tetto mensile della famiglia (Pro e Max): «riprova domani» sarebbe falso. */
+private fun monthlyQuotaExceededMessage(context: Context, map: Map<*, *>): String? {
+    val units = (map["units"] as? Number)?.toInt() ?: return null
+    val remaining = (map["remaining"] as? Number)?.toInt() ?: return null
+    val limit = (map["limit"] as? Number)?.toInt() ?: return null
+    return if (units > 1 && remaining > 0) {
+        context.getString(R.string.ai_quota_monthly_too_expensive, units, remaining, limit)
+    } else {
+        context.getString(R.string.ai_quota_monthly_reached, limit)
     }
 }
 

@@ -31,6 +31,9 @@ data class AIResponse(
     val usageToday: Int,
     val dailyLimit: Int,
     val period: AIQuotaPeriod = AIQuotaPeriod.DAILY,
+    /** Tetto mensile della famiglia (Pro e Max, 0 = nessuno) e quanto ne è stato usato: da `getAIUsage`. */
+    val monthlyUsage: Int = 0,
+    val monthlyLimit: Int = 0,
 )
 
 sealed class AIServiceError {

@@ -234,6 +234,8 @@ fun AiSettingsScreen(
                         state.plan.aiMessageLimit
                     },
                     period = state.aiQuotaPeriod,
+                    monthlyUsage = state.aiMonthlyUsage,
+                    monthlyLimit = state.aiMonthlyLimit,
                 )
 
                 HealthContextSettingsCard(
@@ -476,6 +478,8 @@ private fun AIUsageCard(
     usageToday: Int,
     dailyLimit: Int,
     period: it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod = it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod.DAILY,
+    monthlyUsage: Int = 0,
+    monthlyLimit: Int = 0,
 ) {
     val kb = MaterialTheme.kidBoxColors
     val isLifetime = period == it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod.LIFETIME
@@ -556,6 +560,28 @@ private fun AIUsageCard(
                     color = progressColor,
                     trackColor = progressColor.copy(alpha = 0.15f),
                 )
+                // Tetto mensile della famiglia (Pro e Max), oltre al giornaliero.
+                if (monthlyLimit > 0) {
+                    val monthProgress = monthlyUsage.toFloat() / monthlyLimit
+                    val monthColor = when {
+                        monthProgress >= 0.9f -> Color(0xFFEF4444)
+                        monthProgress >= 0.7f -> Color(0xFFF59E0B)
+                        else -> Color(0xFF3B82F6)
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        stringResource(R.string.settings_ai_month_used_count, monthlyUsage, monthlyLimit),
+                        fontSize = 13.sp,
+                        color = kb.subtitle,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    LinearProgressIndicator(
+                        progress = { monthProgress.coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                        color = monthColor,
+                        trackColor = monthColor.copy(alpha = 0.15f),
+                    )
+                }
             }
         }
     }
