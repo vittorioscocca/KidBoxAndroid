@@ -380,6 +380,14 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.size(16.dp))
                 }
 
+                // Dopo la checklist, non insieme: a chi è appena arrivato basta
+                // il permesso notifiche. Quando è nascosto non occupa spazio.
+                if (!onboarding.isVisible) {
+                    it.vittorioscocca.kidbox.ui.BatteryOptimizationBanner(
+                        modifier = Modifier.padding(bottom = 16.dp),
+                    )
+                }
+
                 // Riepilogo: cosa c'è dentro le sezioni, prima delle sezioni. Vale per
                 // entrambe le modalità. Finché la checklist è viva resta fuori, come
                 // le slide promozionali: una famiglia appena creata avrebbe sei

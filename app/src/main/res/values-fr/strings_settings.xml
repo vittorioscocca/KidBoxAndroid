@@ -385,4 +385,12 @@
     <string name="first_content_invite_subject_travel">ce voyage</string>
     <string name="first_content_invite_subject_location">ce lieu</string>
     <string name="first_content_invite_subject_generic">ce contenu</string>
+
+    <!-- Risparmio energetico: banner in Home e riga in Notifiche -->
+    <string name="battery_hint_title">Notifications en retard ?</string>
+    <string name="battery_hint_body">L\'économiseur de batterie peut les bloquer quand KidBox est fermée.</string>
+    <string name="battery_hint_action">Corriger</string>
+    <string name="battery_hint_dismiss">Fermer</string>
+    <string name="battery_settings_title">Économiseur de batterie actif</string>
+    <string name="battery_settings_sub">Le téléphone peut arrêter KidBox en arrière-plan et retarder messages et rappels. Réglez la batterie de KidBox sur « Aucune restriction ».</string>
 </resources>

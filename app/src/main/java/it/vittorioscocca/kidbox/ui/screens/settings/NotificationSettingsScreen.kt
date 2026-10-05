@@ -101,6 +101,7 @@ fun NotificationSettingsScreen(
     // toccabili, altrimenti l'interfaccia direbbe "attivo" mentre non arriva
     // niente. Non vale per i suggerimenti, che sono notifiche locali.
     val pushAllowed = state.pushEnabled && !systemDenied
+    val batteryRestricted = it.vittorioscocca.kidbox.ui.rememberBatteryRestricted()
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -181,6 +182,40 @@ fun NotificationSettingsScreen(
                     )
                     Text(
                         text = stringResource(R.string.settings_notif_blocked_sub),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = kb.subtitle,
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_notif_open),
+                        color = Color(0xFFFF6B00),
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+        // Resta anche se il banner in Home è stato chiuso: è l'unico posto
+        // dove ritrovarlo.
+        if (!systemDenied && batteryRestricted) {
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = kb.card),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { it.vittorioscocca.kidbox.ui.BatteryOptimization.openSettings(context) }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.battery_settings_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = kb.title,
+                    )
+                    Text(
+                        text = stringResource(R.string.battery_settings_sub),
                         style = MaterialTheme.typography.bodySmall,
                         color = kb.subtitle,
                     )

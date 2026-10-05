@@ -385,4 +385,12 @@
     <string name="first_content_invite_subject_travel">this trip</string>
     <string name="first_content_invite_subject_location">this place</string>
     <string name="first_content_invite_subject_generic">this item</string>
+
+    <!-- Risparmio energetico: banner in Home e riga in Notifiche -->
+    <string name="battery_hint_title">Notifications arriving late?</string>
+    <string name="battery_hint_body">Battery saver can block them while KidBox is closed.</string>
+    <string name="battery_hint_action">Fix</string>
+    <string name="battery_hint_dismiss">Close</string>
+    <string name="battery_settings_title">Battery saver is on</string>
+    <string name="battery_settings_sub">Your phone may stop KidBox in the background, so messages and reminders arrive late. Set KidBox\'s battery usage to «Unrestricted».</string>
 </resources>
