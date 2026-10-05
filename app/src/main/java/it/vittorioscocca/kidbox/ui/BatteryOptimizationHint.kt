@@ -60,8 +60,24 @@ object BatteryOptimization {
     private const val PREFS = "kidbox_prefs"
     private const val KEY_DISMISSED = "kb_battery_hint_dismissed"
 
-    /** Vero se il sistema applica il risparmio energetico a KidBox. */
+    /**
+     * Produttori che fermano le app in background anche con le push FCM ad
+     * alta priorità. Su Pixel, Samsung e Motorola il risparmio standard le
+     * lascia passare: lì l'avviso sarebbe solo rumore. Xiaomi copre anche
+     * Redmi e POCO (stesso `Build.MANUFACTURER`); tecno/infinix/itel sono
+     * Transsion.
+     */
+    private val aggressiveManufacturers = setOf(
+        "xiaomi", "huawei", "honor", "oppo", "realme", "oneplus", "vivo",
+        "meizu", "asus", "tecno", "infinix", "itel",
+    )
+
+    /**
+     * Vero se il sistema applica il risparmio energetico a KidBox su un
+     * telefono dove questo blocca davvero le notifiche.
+     */
     fun isRestricted(context: Context): Boolean {
+        if (Build.MANUFACTURER.lowercase() !in aggressiveManufacturers) return false
         val pm = context.getSystemService(PowerManager::class.java) ?: return false
         return !pm.isIgnoringBatteryOptimizations(context.packageName)
     }
