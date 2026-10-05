@@ -91,7 +91,8 @@ object BatteryOptimization {
 
     /**
      * Su Xiaomi la pagina «Dettagli batteria» dell'app (quella con «Nessuna
-     * restrizione»); altrove le info dell'app, da cui si arriva a «Batteria».
+     * restrizione»), oggi in securitycenter; altrove le info dell'app, da
+     * cui si arriva a «Batteria».
      * Ogni tentativo è protetto: le activity dei produttori cambiano nome
      * fra una versione e l'altra.
      */
@@ -99,6 +100,18 @@ object BatteryOptimization {
         val pkg = context.packageName
         val candidates = buildList {
             if (Build.MANUFACTURER.equals("xiaomi", ignoreCase = true)) {
+                // HyperOS: «Dettagli batteria» dell'app (verificato il 05/10/2026
+                // su HyperOS, 2510DRA23E). Si apre per componente, senza il
+                // permesso REQUEST_IGNORE_BATTERY_OPTIMIZATIONS.
+                add(
+                    Intent()
+                        .setClassName(
+                            "com.miui.securitycenter",
+                            "com.miui.powercenter.legacypowerrank.PowerDetailActivity",
+                        )
+                        .setData(Uri.fromParts("package", pkg, null)),
+                )
+                // MIUI più vecchie: su HyperOS questa activity non esiste più.
                 add(
                     Intent("miui.intent.action.HIDDEN_APPS_CONFIG_ACTIVITY")
                         .setClassName("com.miui.powerkeeper", "com.miui.powerkeeper.ui.HiddenAppsConfigActivity")
