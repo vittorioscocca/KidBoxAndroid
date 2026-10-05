@@ -43,12 +43,14 @@ class AIService @Inject constructor(
         familyId: String,
         purpose: String? = null,
         systemPromptStable: String? = null,
+        systemPromptTail: String? = null,
     ): Result<AIResponse> = sendMessages(
         messages = messages.map { AIMessagePayload(role = it.roleRaw, content = it.content) },
         systemPrompt = systemPrompt,
         familyId = familyId,
         purpose = purpose,
         systemPromptStable = systemPromptStable,
+        systemPromptTail = systemPromptTail,
     )
 
     /**
@@ -57,6 +59,7 @@ class AIService @Inject constructor(
     /**
      * @param systemPromptStable parte del prompt che cambia di rado (assistente
      * unico): il server la mette in cache da sola, davanti a `systemPrompt`.
+     * @param systemPromptTail coda che cambia a ogni domanda, dopo `systemPrompt` e senza cache.
      */
     suspend fun sendMessages(
         messages: List<AIMessagePayload>,
@@ -64,6 +67,7 @@ class AIService @Inject constructor(
         familyId: String,
         purpose: String? = null,
         systemPromptStable: String? = null,
+        systemPromptTail: String? = null,
     ): Result<AIResponse> = withContext(Dispatchers.IO) {
         runCatching {
             val resolvedFamilyId = resolveFamilyId(familyId)
@@ -74,6 +78,8 @@ class AIService @Inject constructor(
             )
             purpose?.trim()?.takeIf { it.isNotEmpty() }?.let { payload["purpose"] = it }
             systemPromptStable?.takeIf { it.isNotBlank() }?.let { payload["systemPromptStable"] = it }
+            // Coda che cambia a ogni domanda (testi scelti nel contesto ridotto): senza cache.
+            systemPromptTail?.takeIf { it.isNotBlank() }?.let { payload["systemPromptTail"] = it }
             @Suppress("UNCHECKED_CAST")
             val data = familyAccessGuard.guarded(resolvedFamilyId, "AIService.sendMessages") {
                 functions.getHttpsCallable("askAI").call(payload).await().getData() as? Map<String, Any?>

@@ -62,6 +62,7 @@ import it.vittorioscocca.kidbox.data.local.entity.VehicleEntity
 import it.vittorioscocca.kidbox.data.local.entity.VehicleEventEntity
 import it.vittorioscocca.kidbox.data.local.mapper.scheduleTimesList
 import it.vittorioscocca.kidbox.data.remote.DocumentCryptoManager
+import it.vittorioscocca.kidbox.data.remote.ai.AIAskAIPayload
 import it.vittorioscocca.kidbox.data.repository.MedicalExamRepository
 import it.vittorioscocca.kidbox.data.repository.MedicalVisitRepository
 import it.vittorioscocca.kidbox.data.repository.TreatmentRepository
@@ -412,6 +413,8 @@ class AgentMemoryBook(val files: List<AgentMemoryFile>) {
 
     private fun card(f: AgentMemoryFile) = "<scheda file=\"${f.name}\" titolo=\"${f.title}\">\n${f.body}\n</scheda>"
 
+    private val bookFiles: List<AgentMemoryFile> get() = files.filter { it.name != TAIL_FILE }
+
     /**
      * Indice e schede stabili. L'indice non porta i conteggi delle schede che
      * cambiano: un numero diverso farebbe uscire tutto dalla cache.
@@ -420,18 +423,22 @@ class AgentMemoryBook(val files: List<AgentMemoryFile>) {
         get() {
             val index = (
                 listOf("<indice>") +
-                    files.map { f ->
+                    bookFiles.map { f ->
                         if (f.name in VOLATILE_FILES) "- ${f.name} — ${f.title}: in fondo, aggiornata a ogni domanda"
                         else "- ${f.name} — ${f.title}: ${f.summary}"
                     } +
                     "</indice>"
                 ).joinToString("\n")
-            return (listOf(index) + files.filterNot { it.name in VOLATILE_FILES }.map(::card)).joinToString("\n\n")
+            return (listOf(index) + bookFiles.filterNot { it.name in VOLATILE_FILES }.map(::card)).joinToString("\n\n")
         }
 
     /** Le schede che cambiano, nell'ordine del quaderno. */
     val volatileRendered: String
-        get() = files.filter { it.name in VOLATILE_FILES }.joinToString("\n\n", transform = ::card)
+        get() = bookFiles.filter { it.name in VOLATILE_FILES }.joinToString("\n\n", transform = ::card)
+
+    /** I testi scelti per la domanda (contesto ridotto), o vuoto. */
+    val tailRendered: String
+        get() = files.filter { it.name == TAIL_FILE }.joinToString("\n\n", transform = ::card)
 
     companion object {
         /**
@@ -441,6 +448,9 @@ class AgentMemoryBook(val files: List<AgentMemoryFile>) {
          * nella cache di Anthropic. Stesso elenco su iOS e web.
          */
         val VOLATILE_FILES = setOf("oggi.md", "calendario.md", "todo.md", "spesa.md", "chat.md")
+
+        /** Cambia a ogni domanda: va in coda, dopo le azioni, e non entra nell'indice. */
+        const val TAIL_FILE = "domanda.md"
     }
 }
 
@@ -485,7 +495,11 @@ class AgentMemoryBookBuilder(
         AgentTextDocument(doc, length, personIdOf(doc, home), placeLabel(doc, home))
     }
 
-    fun build(docAllowance: Map<String, Int>?): AgentMemoryBook {
+    /**
+     * `appendix`: caratteri dei testi scelti per la domanda, in `domanda.md`
+     * (contesto ridotto in base + appendice).
+     */
+    fun build(docAllowance: Map<String, Int>?, appendix: Map<String, Int>? = null): AgentMemoryBook {
         val files = buildList {
             add(familyFile())
             memoryFile()?.let { add(it) }
@@ -503,8 +517,37 @@ class AgentMemoryBookBuilder(
             petsFile(docAllowance)?.let { add(it) }
             tripsFile()?.let { add(it) }
             chatFile()?.let { add(it) }
+            appendix?.let { appendixFile(it) }?.let { add(it) }
         }
         return AgentMemoryBook(files)
+    }
+
+    // domanda.md
+
+    /**
+     * I testi scelti per la domanda di adesso, più lunghi della base che sta
+     * nelle schede. Va in coda al prompt, fuori dalla cache: è la sola parte che
+     * cambia da una domanda all'altra. Stesso ordine su iOS e web.
+     */
+    private fun appendixFile(appendix: Map<String, Int>): AgentMemoryFile? {
+        val picked = textDocuments()
+            .filter { (appendix[it.doc.id] ?: 0) > 0 }
+            .sortedWith(
+                compareByDescending<AgentTextDocument> { appendix[it.doc.id] ?: 0 }
+                    .thenByDescending { it.doc.updatedAtEpochMillis }
+                    .thenBy { it.doc.id },
+            )
+        if (picked.isEmpty()) return null
+        val body = buildString {
+            appendLine("# Testi per questa domanda")
+            append("Testi letti scelti per la domanda di adesso: qui sono più lunghi che nelle schede sopra, dove sono accorciati. Per questi documenti vale il testo qui sotto.")
+            picked.forEach { item ->
+                appendLine()
+                appendLine("\n## ${item.doc.title} (${item.place}, ${fmtDate(item.doc.createdAtEpochMillis)})")
+                append(documentText(item.doc, appendix).first)
+            }
+        }
+        return AgentMemoryFile(AgentMemoryBook.TAIL_FILE, "Testi per questa domanda", "${picked.size} testi", body)
     }
 
     // famiglia.md
@@ -1321,13 +1364,17 @@ COME RISPONDI
                 PlanningAIActionBlock.promptSection,
                 focus?.promptLine,
             ).joinToString("\n\n"),
+            tail = book.tailRendered,
         )
 }
 
-/** Il prompt dell'assistente nelle due parti che il server mette in cache a sé. */
-data class AgentSystemPrompt(val stable: String, val volatile: String) {
-    /** Caratteri come li conta il server: le due parti insieme. */
-    val length: Int get() = stable.length + volatile.length
+/**
+ * Il prompt dell'assistente: le due parti che il server mette in cache a sé,
+ * più la coda senza cache coi testi scelti per la domanda (contesto ridotto).
+ */
+data class AgentSystemPrompt(val stable: String, val volatile: String, val tail: String = "") {
+    /** Caratteri come li conta il server: le parti insieme. */
+    val length: Int get() = stable.length + volatile.length + tail.length
 }
 
 // ── Fitting ──────────────────────────────────────────────────────────────────
@@ -1345,12 +1392,42 @@ object AgentContextFitter {
     private const val PER_DOC_OVERHEAD = 150
     private const val MIN_USEFUL_CHARS = 300
 
+    /**
+     * Contesto ridotto in base + appendice: la riserva fuori dalla base (schede
+     * che cambiano, storico, domanda, appendice), la quota del resto che va alla
+     * base, e il contorno di `domanda.md`. Stessi valori su iOS e web.
+     */
+    private const val BASE_RESERVE = 20_000
+    private const val BASE_SHARE = 0.5
+    const val APPENDIX_OVERHEAD = 400
+
+    /**
+     * Base dei testi nel contesto ridotto: dal più recente, senza guardare
+     * domanda né focus, con metà dello spazio che resta in un messaggio dopo le
+     * schede stabili e la riserva. Dipende solo dai dati: due domande di fila
+     * hanno la stessa base, e il blocco stabile del prompt resta nella cache.
+     * `null` se non c'è spazio.
+     */
+    fun baseAllowances(textDocuments: List<AgentTextDocument>, stableChars: Int, unitSafetyMargin: Int): Map<String, Int>? {
+        val units = AIAskAIPayload.messageUnits(stableChars + BASE_RESERVE + unitSafetyMargin)
+        val room = units * AIAskAIPayload.STANDARD_CHARS - unitSafetyMargin - BASE_RESERVE - stableChars
+        val budget = kotlin.math.floor(room * BASE_SHARE).toInt()
+        if (budget < MIN_USEFUL_CHARS) return null
+        return allowances(textDocuments, "", null, emptyMap(), budget)
+    }
+
+    /**
+     * `targetedOnly`: solo focus e pertinenti, e solo se avrebbero più testo di
+     * quanto ne hanno già in `floor` (l'appendice della domanda sopra la base).
+     */
     fun allowances(
         textDocuments: List<AgentTextDocument>,
         question: String,
         focus: AgentFocus?,
         personNames: Map<String, String>,
         availableChars: Int,
+        targetedOnly: Boolean = false,
+        floor: Map<String, Int>? = null,
     ): Map<String, Int> {
         val terms = AgentRelevance.terms(question)
         val foldedQuestion = AgentRelevance.fold(question)
@@ -1372,6 +1449,8 @@ object AgentContextFitter {
                 }
                 if (score > 0) Candidate(item, 1, score, RELEVANT_MAX_CHARS) else Candidate(item, 2, 0, OTHER_MAX_CHARS)
             }
+        }.filter { c ->
+            !targetedOnly || (c.tier < 2 && minOf(c.item.fullLength, c.cap) > (floor?.get(c.item.doc.id) ?: 0))
         }.sortedWith(
             compareBy<Candidate> { it.tier }
                 .thenByDescending { it.score }

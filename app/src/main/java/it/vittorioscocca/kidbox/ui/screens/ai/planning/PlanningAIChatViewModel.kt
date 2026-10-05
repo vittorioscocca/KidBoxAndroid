@@ -321,6 +321,7 @@ class PlanningAIChatViewModel @Inject constructor(
                 effectiveFamilyId,
                 purpose = AGENT_PURPOSE,
                 systemPromptStable = systemPrompt.stable,
+                systemPromptTail = systemPrompt.tail,
             ).getOrThrow()
             val outcome = actionPipeline.processReply(
                 reply = reply.reply,
@@ -412,18 +413,51 @@ class PlanningAIChatViewModel @Inject constructor(
             UNIT_SAFETY_MARGIN
         val personNames = snap.children.associate { it.id to it.name } +
             snap.members.mapNotNull { m -> m.displayName?.takeIf { it.isNotBlank() }?.let { m.userId to it } }
-        var available = (target - skeletonChars).coerceAtLeast(0)
-        var reducedPrompt = skeleton
-        var reducedChars = skeletonChars
-        // Il contorno stimato per documento non basta quando un allegato ha molte
-        // righe (ognuna indentata): se sfora, lo sforamento esce dal budget e si
-        // ridistribuisce. Stesso giro su iOS e web.
-        for (attempt in 0 until 3) {
-            val allowance = AgentContextFitter.allowances(textDocs, question, focus, personNames, available)
-            reducedPrompt = AgentPrompt.systemPrompt(familyName, builder.build(docAllowance = allowance), focus)
-            reducedChars = AIAskAIPayload.totalChars(reducedPrompt.length, history, question)
-            if (reducedChars <= target || available == 0) break
-            available = (available - (reducedChars - target)).coerceAtLeast(0)
+        var reducedPrompt: AgentSystemPrompt? = null
+        var reducedChars = 0
+
+        // Base + appendice: nelle schede ogni testo ha una base che dipende solo
+        // dai dati, uguale per ogni domanda, così resta nella cache; i testi
+        // scelti per la domanda vanno in coda, in domanda.md. Misurato il
+        // 05/10/2026: col budget diviso per domanda le due domande condividevano
+        // 2.165 caratteri e la cache non serviva mai. Stesso giro su iOS e web.
+        val base = AgentContextFitter.baseAllowances(textDocs, skeleton.stable.length, UNIT_SAFETY_MARGIN)
+        if (base != null) {
+            val withBase = AgentPrompt.systemPrompt(familyName, builder.build(docAllowance = base), focus)
+            var budget = target - AIAskAIPayload.totalChars(withBase.length, history, question) -
+                AgentContextFitter.APPENDIX_OVERHEAD
+            var attempt = 0
+            while (budget >= 0 && attempt < 3) {
+                attempt += 1
+                val appendix = AgentContextFitter.allowances(
+                    textDocs, question, focus, personNames, budget, targetedOnly = true, floor = base,
+                )
+                val prompt = AgentPrompt.systemPrompt(familyName, builder.build(docAllowance = base, appendix = appendix), focus)
+                reducedPrompt = prompt
+                reducedChars = AIAskAIPayload.totalChars(prompt.length, history, question)
+                if (reducedChars <= target || budget == 0) break
+                budget = (budget - (reducedChars - target)).coerceAtLeast(0)
+            }
+            if (reducedChars > target) reducedPrompt = null
+        }
+
+        // Senza spazio per la base (storico lungo, scheletro enorme): il budget si
+        // divide per domanda come prima, e la parte dei testi esce dalla cache.
+        if (reducedPrompt == null) {
+            var available = (target - skeletonChars).coerceAtLeast(0)
+            reducedPrompt = skeleton
+            reducedChars = skeletonChars
+            // Il contorno stimato per documento non basta quando un allegato ha molte
+            // righe (ognuna indentata): se sfora, lo sforamento esce dal budget e si
+            // ridistribuisce. Stesso giro su iOS e web.
+            for (attempt in 0 until 3) {
+                val allowance = AgentContextFitter.allowances(textDocs, question, focus, personNames, available)
+                val prompt = AgentPrompt.systemPrompt(familyName, builder.build(docAllowance = allowance), focus)
+                reducedPrompt = prompt
+                reducedChars = AIAskAIPayload.totalChars(prompt.length, history, question)
+                if (reducedChars <= target || available == 0) break
+                available = (available - (reducedChars - target)).coerceAtLeast(0)
+            }
         }
         val reducedUnits = AIAskAIPayload.messageUnits(reducedChars)
         KBLog.ai.debug(
