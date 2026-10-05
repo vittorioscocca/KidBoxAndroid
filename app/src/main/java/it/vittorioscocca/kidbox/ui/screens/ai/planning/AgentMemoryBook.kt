@@ -409,19 +409,39 @@ data class AgentTextDocument(
 )
 
 class AgentMemoryBook(val files: List<AgentMemoryFile>) {
-    val rendered: String
-        get() = buildString {
-            appendLine("<indice>")
-            files.forEach { appendLine("- ${it.name} — ${it.title}: ${it.summary}") }
-            append("</indice>")
-            files.forEach { f ->
-                appendLine()
-                appendLine()
-                appendLine("<scheda file=\"${f.name}\" titolo=\"${f.title}\">")
-                appendLine(f.body)
-                append("</scheda>")
-            }
+
+    private fun card(f: AgentMemoryFile) = "<scheda file=\"${f.name}\" titolo=\"${f.title}\">\n${f.body}\n</scheda>"
+
+    /**
+     * Indice e schede stabili. L'indice non porta i conteggi delle schede che
+     * cambiano: un numero diverso farebbe uscire tutto dalla cache.
+     */
+    val stableRendered: String
+        get() {
+            val index = (
+                listOf("<indice>") +
+                    files.map { f ->
+                        if (f.name in VOLATILE_FILES) "- ${f.name} — ${f.title}: in fondo, aggiornata a ogni domanda"
+                        else "- ${f.name} — ${f.title}: ${f.summary}"
+                    } +
+                    "</indice>"
+                ).joinToString("\n")
+            return (listOf(index) + files.filterNot { it.name in VOLATILE_FILES }.map(::card)).joinToString("\n\n")
         }
+
+    /** Le schede che cambiano, nell'ordine del quaderno. */
+    val volatileRendered: String
+        get() = files.filter { it.name in VOLATILE_FILES }.joinToString("\n\n", transform = ::card)
+
+    companion object {
+        /**
+         * Schede che cambiano fra una domanda e l'altra (un to-do spuntato, un
+         * articolo aggiunto, un messaggio in chat, il tempo che passa). Stanno in
+         * fondo, nel secondo blocco del prompt, così il resto del quaderno resta
+         * nella cache di Anthropic. Stesso elenco su iOS e web.
+         */
+        val VOLATILE_FILES = setOf("oggi.md", "calendario.md", "todo.md", "spesa.md", "chat.md")
+    }
 }
 
 private const val DAY_MS = 24L * 60 * 60 * 1000
@@ -1284,18 +1304,30 @@ COME RISPONDI
     """.trimIndent()
 
     /**
-     * Il focus va due volte, prima e dopo il quaderno: provato il 02/10/2026 su
-     * Haiku, solo in fondo «cosa devo fare adesso?» aperto da una visita tornava
-     * una volta su due con le cose della famiglia; in cima e in fondo, 4 su 4.
+     * Il prompt in due blocchi, ognuno con la sua cache sul server
+     * (`systemPromptStable` + `systemPrompt`): regole e schede stabili, poi
+     * focus, schede che cambiano e azioni. Il focus va due volte, prima e dopo
+     * le schede che cambiano: il 02/10/2026 su Haiku, solo in fondo «cosa devo
+     * fare adesso?» aperto da una visita tornava una volta su due con le cose
+     * della famiglia; il 05/10/2026 in questa posizione 4 su 4, come in cima al
+     * quaderno. Prima stava in cima a tutto, e ogni cambio di focus azzerava la cache.
      */
-    fun systemPrompt(familyName: String, book: AgentMemoryBook, focus: AgentFocus?): String =
-        listOfNotNull(
-            rules(familyName),
-            focus?.promptLine,
-            book.rendered,
-            PlanningAIActionBlock.promptSection,
-            focus?.promptLine,
-        ).joinToString("\n\n")
+    fun systemPrompt(familyName: String, book: AgentMemoryBook, focus: AgentFocus?): AgentSystemPrompt =
+        AgentSystemPrompt(
+            stable = listOf(rules(familyName), book.stableRendered).joinToString("\n\n"),
+            volatile = listOfNotNull(
+                focus?.promptLine,
+                book.volatileRendered.takeIf { it.isNotEmpty() },
+                PlanningAIActionBlock.promptSection,
+                focus?.promptLine,
+            ).joinToString("\n\n"),
+        )
+}
+
+/** Il prompt dell'assistente nelle due parti che il server mette in cache a sé. */
+data class AgentSystemPrompt(val stable: String, val volatile: String) {
+    /** Caratteri come li conta il server: le due parti insieme. */
+    val length: Int get() = stable.length + volatile.length
 }
 
 // ── Fitting ──────────────────────────────────────────────────────────────────

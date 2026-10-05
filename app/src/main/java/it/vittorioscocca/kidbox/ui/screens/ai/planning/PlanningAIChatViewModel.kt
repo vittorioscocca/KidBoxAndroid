@@ -306,7 +306,7 @@ class PlanningAIChatViewModel @Inject constructor(
         }
     }
 
-    private suspend fun performSend(text: String, systemPrompt: String, mode: String) {
+    private suspend fun performSend(text: String, systemPrompt: AgentSystemPrompt, mode: String) {
         val conv = conversation ?: return
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
         runCatching {
@@ -315,7 +315,13 @@ class PlanningAIChatViewModel @Inject constructor(
             // La domanda entra esplicitamente: lo stato osservato da Room potrebbe
             // non averla ancora, e uno storico che finisce con l'assistente perde la domanda.
             val payload = buildApiMessages(conversation = conv, pendingUser = userMessage)
-            val reply = aiService.sendMessage(payload, systemPrompt, effectiveFamilyId, purpose = AGENT_PURPOSE).getOrThrow()
+            val reply = aiService.sendMessage(
+                payload,
+                systemPrompt.volatile,
+                effectiveFamilyId,
+                purpose = AGENT_PURPOSE,
+                systemPromptStable = systemPrompt.stable,
+            ).getOrThrow()
             val outcome = actionPipeline.processReply(
                 reply = reply.reply,
                 familyId = effectiveFamilyId,
@@ -369,10 +375,10 @@ class PlanningAIChatViewModel @Inject constructor(
     // ── Contesto ─────────────────────────────────────────────────────────────
 
     private data class ContextPlan(
-        val fullPrompt: String,
+        val fullPrompt: AgentSystemPrompt,
         val fullUnits: Int,
         /** null se la versione completa sta già in un messaggio. */
-        val reducedPrompt: String?,
+        val reducedPrompt: AgentSystemPrompt?,
         val reducedUnits: Int,
     )
 
@@ -385,7 +391,7 @@ class PlanningAIChatViewModel @Inject constructor(
         val history = conversation?.let { buildApiMessages(it, pendingUser = null) }.orEmpty()
 
         val fullPrompt = AgentPrompt.systemPrompt(familyName, builder.build(docAllowance = null), focus)
-        val fullChars = AIAskAIPayload.totalChars(fullPrompt, history, question)
+        val fullChars = AIAskAIPayload.totalChars(fullPrompt.length, history, question)
         val fullUnits = AIAskAIPayload.messageUnits(fullChars)
         if (fullUnits <= 1) {
             KBLog.ai.debug("context full chars=$fullChars units=1", TAG)
@@ -397,7 +403,7 @@ class PlanningAIChatViewModel @Inject constructor(
         val textDocs = builder.textDocuments()
         val zero = textDocs.associate { it.doc.id to 0 }
         val skeleton = AgentPrompt.systemPrompt(familyName, builder.build(docAllowance = zero), focus)
-        val skeletonChars = AIAskAIPayload.totalChars(skeleton, history, question)
+        val skeletonChars = AIAskAIPayload.totalChars(skeleton.length, history, question)
         // Di solito lo scheletro sta in un messaggio e il ridotto costa 1. Se già lo
         // scheletro non ci sta (02/10/2026: una famiglia con 30 esami e 88 documenti,
         // 50.449 caratteri senza un rigo di testo letto), il ridotto paga i messaggi
@@ -415,7 +421,7 @@ class PlanningAIChatViewModel @Inject constructor(
         for (attempt in 0 until 3) {
             val allowance = AgentContextFitter.allowances(textDocs, question, focus, personNames, available)
             reducedPrompt = AgentPrompt.systemPrompt(familyName, builder.build(docAllowance = allowance), focus)
-            reducedChars = AIAskAIPayload.totalChars(reducedPrompt, history, question)
+            reducedChars = AIAskAIPayload.totalChars(reducedPrompt.length, history, question)
             if (reducedChars <= target || available == 0) break
             available = (available - (reducedChars - target)).coerceAtLeast(0)
         }

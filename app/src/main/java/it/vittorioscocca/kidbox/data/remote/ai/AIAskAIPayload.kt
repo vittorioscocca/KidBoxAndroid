@@ -24,10 +24,14 @@ object AIAskAIPayload {
      *  scala il triplo delle unità. Parity con `FITNESS_UNITS_MULTIPLIER`. */
     const val FITNESS_UNITS_MULTIPLIER: Int = 3
 
-    fun totalChars(systemPrompt: String, messages: List<KBAIMessage>, pendingUserText: String = ""): Int {
+    fun totalChars(systemPrompt: String, messages: List<KBAIMessage>, pendingUserText: String = ""): Int =
+        totalChars(systemPrompt.length, messages, pendingUserText)
+
+    /** Per un prompt mandato in più parti (`systemPromptStable` + `systemPrompt`). */
+    fun totalChars(systemPromptChars: Int, messages: List<KBAIMessage>, pendingUserText: String = ""): Int {
         val history = messages.sumOf { it.content.length }
         val pending = pendingUserText.trim().length
-        return systemPrompt.length + history + pending
+        return systemPromptChars + history + pending
     }
 
     fun messageUnits(totalChars: Int): Int {

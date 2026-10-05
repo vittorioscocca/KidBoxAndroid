@@ -42,21 +42,28 @@ class AIService @Inject constructor(
         systemPrompt: String,
         familyId: String,
         purpose: String? = null,
+        systemPromptStable: String? = null,
     ): Result<AIResponse> = sendMessages(
         messages = messages.map { AIMessagePayload(role = it.roleRaw, content = it.content) },
         systemPrompt = systemPrompt,
         familyId = familyId,
         purpose = purpose,
+        systemPromptStable = systemPromptStable,
     )
 
     /**
      * Chiamata askAI con content String o Array multimodale (vision).
+     */
+    /**
+     * @param systemPromptStable parte del prompt che cambia di rado (assistente
+     * unico): il server la mette in cache da sola, davanti a `systemPrompt`.
      */
     suspend fun sendMessages(
         messages: List<AIMessagePayload>,
         systemPrompt: String,
         familyId: String,
         purpose: String? = null,
+        systemPromptStable: String? = null,
     ): Result<AIResponse> = withContext(Dispatchers.IO) {
         runCatching {
             val resolvedFamilyId = resolveFamilyId(familyId)
@@ -66,6 +73,7 @@ class AIService @Inject constructor(
                 "familyId" to resolvedFamilyId,
             )
             purpose?.trim()?.takeIf { it.isNotEmpty() }?.let { payload["purpose"] = it }
+            systemPromptStable?.takeIf { it.isNotBlank() }?.let { payload["systemPromptStable"] = it }
             @Suppress("UNCHECKED_CAST")
             val data = familyAccessGuard.guarded(resolvedFamilyId, "AIService.sendMessages") {
                 functions.getHttpsCallable("askAI").call(payload).await().getData() as? Map<String, Any?>
