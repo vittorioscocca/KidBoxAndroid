@@ -334,6 +334,10 @@
     <string name="ai_quota_daily_reached">Your family has reached today’s limit of %1$d AI messages. Try again tomorrow.</string>
     <string name="ai_quota_monthly_reached">Your family has used all %1$d AI messages for this month. They renew on the 1st of the month.</string>
     <string name="ai_quota_monthly_too_expensive">This message costs %1$d AI messages because the context is large, and your family has %2$d of %3$d left this month. They renew on the 1st of the month.</string>
+    <string name="ai_counter_today">%1$d/%2$d today</string>
+    <string name="ai_counter_trial">%1$d/%2$d of the trial</string>
+    <string name="ai_counter_free">%1$d/%2$d free</string>
+    <string name="ai_counter_month">%1$d/%2$d this month</string>
     <string name="fitness_copilot_delete_title">Delete the session?</string>
     <string name="fitness_copilot_delete_body">They will be removed from the plan and cannot be recovered:\n%1$s</string>
     <string name="fitness_copilot_delete_confirm">Delete</string>

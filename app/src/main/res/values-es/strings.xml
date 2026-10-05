@@ -334,6 +334,10 @@
     <string name="ai_quota_daily_reached">La familia ha alcanzado el límite de %1$d mensajes de IA de hoy. Vuelve a intentarlo mañana.</string>
     <string name="ai_quota_monthly_reached">La familia ha usado los %1$d mensajes de IA de este mes. Se renuevan el día 1 del mes.</string>
     <string name="ai_quota_monthly_too_expensive">Este mensaje cuesta %1$d mensajes de IA porque el contexto es amplio, y a la familia le quedan %2$d de %3$d este mes. Se renuevan el día 1 del mes.</string>
+    <string name="ai_counter_today">%1$d/%2$d hoy</string>
+    <string name="ai_counter_trial">%1$d/%2$d de la prueba</string>
+    <string name="ai_counter_free">%1$d/%2$d gratuitos</string>
+    <string name="ai_counter_month">%1$d/%2$d este mes</string>
     <string name="fitness_copilot_delete_title">¿Eliminar la sesión?</string>
     <string name="fitness_copilot_delete_body">Se eliminarán del plan y no se podrán recuperar:\n%1$s</string>
     <string name="fitness_copilot_delete_confirm">Eliminar</string>

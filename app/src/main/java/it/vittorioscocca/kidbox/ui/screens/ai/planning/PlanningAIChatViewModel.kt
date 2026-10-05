@@ -55,6 +55,11 @@ data class PlanningChatUiState(
     val usageToday: Int = 0,
     val dailyLimit: Int = 30,
     val quotaPeriod: AIQuotaPeriod = AIQuotaPeriod.DAILY,
+    /** Tetto del mese (piani a pagamento e prova, 0 = nessuno) e quanto ne è stato usato. */
+    val monthlyUsage: Int = 0,
+    val monthlyLimit: Int = 0,
+    /** False finché `getAIUsage` non risponde: il contatore non mostra numeri inventati. */
+    val usageLoaded: Boolean = false,
     val isSubscribed: Boolean = true,
     val conversationReady: Boolean = false,
     val familyName: String = "",
@@ -79,6 +84,8 @@ data class PlanningChatUiState(
 ) {
     val canSend: Boolean get() = inputText.isNotBlank() && !isLoading && !isLoadingContext
     val isNearLimit: Boolean get() = dailyLimit > 0 && usageToday >= (dailyLimit * 0.8).toInt()
+    /** Il mese compare nel contatore solo quando si avvicina il tetto: prima sarebbe rumore. */
+    val showsMonth: Boolean get() = monthlyLimit > 0 && monthlyUsage >= (monthlyLimit * 0.8).toInt()
 }
 
 /**
@@ -181,7 +188,14 @@ class PlanningAIChatViewModel @Inject constructor(
                 aiService.fetchUsage(effectiveFamilyId).onSuccess { usage ->
                     usageKnown = true
                     _uiState.update {
-                        it.copy(usageToday = usage.usageToday, dailyLimit = usage.dailyLimit, quotaPeriod = usage.period)
+                        it.copy(
+                            usageToday = usage.usageToday,
+                            dailyLimit = usage.dailyLimit,
+                            quotaPeriod = usage.period,
+                            monthlyUsage = usage.monthlyUsage,
+                            monthlyLimit = usage.monthlyLimit,
+                            usageLoaded = true,
+                        )
                     }
                 }
             }
@@ -346,12 +360,18 @@ class PlanningAIChatViewModel @Inject constructor(
             usageKnown = true
             maybeCompactIfNeeded(conv.id, reply.usageToday, reply.dailyLimit)
             _uiState.update {
+                // Il mese avanza di quanto è avanzato il periodo (giorno o prova): la
+                // risposta porta solo quello, `getAIUsage` lo rilegge alla prossima
+                // apertura. Un giorno nuovo riparte da zero.
+                val advanced = if (reply.usageToday >= it.usageToday) reply.usageToday - it.usageToday else reply.usageToday
                 it.copy(
                     isLoading = false,
                     streamingMessageId = AIChatStreamingDelivery.beginAssistantReveal(assistantMsg.id),
                     usageToday = reply.usageToday,
                     dailyLimit = reply.dailyLimit,
                     quotaPeriod = reply.period,
+                    monthlyUsage = if (it.monthlyLimit > 0) minOf(it.monthlyLimit, it.monthlyUsage + advanced) else it.monthlyUsage,
+                    usageLoaded = true,
                     // Il bonus Free può esaurirsi proprio con questo messaggio: rifletti
                     // subito lo stato aggiornato di CurrentPlanStore.
                     isSubscribed = !CurrentPlanStore.aiAccessBlocked.value,

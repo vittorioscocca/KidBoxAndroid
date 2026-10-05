@@ -82,6 +82,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import it.vittorioscocca.kidbox.domain.model.ai.AIQuotaPeriod
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
@@ -217,6 +218,32 @@ fun PlanningAIChatScreen(
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(quick) { chip ->
                         AssistChip(onClick = { viewModel.onInputChanged(chip) }, label = { Text(chip) })
+                    }
+                }
+                // Messaggi usati sul periodo della quota, come nella vecchia chat Salute;
+                // il mese si aggiunge quando si avvicina il tetto.
+                if (state.usageLoaded && state.dailyLimit > 0) {
+                    val near = Color(0xFFF59E0B)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp, end = 6.dp),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        Text(
+                            when (state.quotaPeriod) {
+                                AIQuotaPeriod.TRIAL -> stringResource(R.string.ai_counter_trial, state.usageToday, state.dailyLimit)
+                                AIQuotaPeriod.LIFETIME -> stringResource(R.string.ai_counter_free, state.usageToday, state.dailyLimit)
+                                else -> stringResource(R.string.ai_counter_today, state.usageToday, state.dailyLimit)
+                            },
+                            fontSize = 11.sp,
+                            color = if (state.isNearLimit) near else kb.subtitle,
+                        )
+                        if (state.showsMonth) {
+                            Text(
+                                " · " + stringResource(R.string.ai_counter_month, state.monthlyUsage, state.monthlyLimit),
+                                fontSize = 11.sp,
+                                color = near,
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.height(8.dp))
