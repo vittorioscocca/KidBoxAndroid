@@ -426,4 +426,6 @@
     <string name="fitness_shoe_retire">Retire shoe</string>
     <string name="fitness_shoe_unretire">Reactivate shoe</string>
     <string name="fitness_shoe_more">More actions</string>
+    <string name="fitness_shoe_usedkm">Km covered</string>
+    <string name="fitness_shoe_usedkm_footer">You can adjust the km by hand, for example if the shoes were already used: new runs are added on top of this value.</string>
 </resources>

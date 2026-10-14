@@ -477,6 +477,9 @@ private fun FitnessShoeEditScreen(
             },
         )
     }
+    // Km percorsi in totale, modificabili a mano. Vuoto = nessuna correzione.
+    val initialUsedKmText = remember { if (isNew) "" else String.format(Locale.US, "%.1f", shoe.usedKm) }
+    var usedKmText by remember { mutableStateOf(initialUsedKmText) }
     var photo by remember { mutableStateOf(shoe.photoBase64) }
     var retired by remember { mutableStateOf(shoe.isRetired) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -484,7 +487,11 @@ private fun FitnessShoeEditScreen(
     var confirmDelete by remember { mutableStateOf(false) }
 
     val maxKm = maxKmText.replace(',', '.').trim().toDoubleOrNull()?.takeIf { it > 0 }
-    val canSave = brand.isNotBlank() && maxKm != null
+    // Il campo vuoto vale zero; `null` solo se non è un numero valido.
+    val usedKm = usedKmText.replace(',', '.').trim().let { text ->
+        if (text.isEmpty()) 0.0 else text.toDoubleOrNull()?.takeIf { it >= 0 }
+    }
+    val canSave = brand.isNotBlank() && maxKm != null && usedKm != null
 
     val cameraDir = remember { File(context.cacheDir, "fitness-shoes-camera").apply { mkdirs() } }
     val cameraFile = remember { File(cameraDir, "shoe_tmp.jpg") }
@@ -540,6 +547,13 @@ private fun FitnessShoeEditScreen(
                             purchaseDateEpochMillis = purchaseMillis,
                             maxKm = maxKm ?: return@TextButton,
                             photoBase64 = photo,
+                            // Solo se il campo è stato toccato: riscrivere il valore
+                            // arrotondato a un decimale sposterebbe i km a ogni salvataggio.
+                            manualKm = if (usedKmText != initialUsedKmText && usedKm != null) {
+                                usedKm - shoe.runsKm
+                            } else {
+                                shoe.manualKm
+                            },
                             retiredAtEpochMillis = when {
                                 retired == shoe.isRetired -> shoe.retiredAtEpochMillis
                                 retired -> System.currentTimeMillis()
@@ -638,6 +652,19 @@ private fun FitnessShoeEditScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(stringResource(R.string.fitness_shoe_maxkm_footer), fontSize = 12.sp, color = kb.subtitle)
+
+            OutlinedTextField(
+                value = usedKmText,
+                onValueChange = { usedKmText = it },
+                label = { Text(stringResource(R.string.fitness_shoe_usedkm)) },
+                placeholder = { Text("0") },
+                suffix = { Text("km") },
+                singleLine = true,
+                isError = usedKm == null,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(stringResource(R.string.fitness_shoe_usedkm_footer), fontSize = 12.sp, color = kb.subtitle)
 
             if (!isNew) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

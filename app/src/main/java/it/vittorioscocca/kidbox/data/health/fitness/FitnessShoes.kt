@@ -51,11 +51,19 @@ data class FitnessShoe(
     val updatedAtEpochMillis: Long = System.currentTimeMillis(),
     /** id della corsa → metri. */
     val runs: Map<String, Double> = emptyMap(),
+    /**
+     * Correzione a mano, in km, che si somma alle corse (può essere negativa):
+     * per le scarpe già usate prima di averle inserite o per un conteggio
+     * sbagliato.
+     */
+    val manualKm: Double = 0.0,
 ) {
     val displayName: String
         get() = listOf(brand, model).map { it.trim() }.filter { it.isNotEmpty() }
             .joinToString(" ").ifEmpty { brand }
-    val usedKm: Double get() = runs.values.sum() / 1000.0
+    /** Km delle sole corse registrate. */
+    val runsKm: Double get() = runs.values.sum() / 1000.0
+    val usedKm: Double get() = (runsKm + manualKm).coerceAtLeast(0.0)
     val remainingKm: Double get() = (maxKm - usedKm).coerceAtLeast(0.0)
     val progress: Float get() = if (maxKm > 0) (usedKm / maxKm).coerceIn(0.0, 1.0).toFloat() else 0f
     val isWornOut: Boolean get() = maxKm > 0 && usedKm >= maxKm
@@ -242,6 +250,7 @@ class FitnessShoeStore @Inject constructor(
         put("isDeleted", shoe.isDeleted)
         put("updatedAt", shoe.updatedAtEpochMillis)
         put("runs", JSONObject().apply { shoe.runs.forEach { (k, v) -> put(k, v) } })
+        put("manualKm", shoe.manualKm)
     }
 
     private fun decode(json: JSONObject): FitnessShoe {
@@ -261,6 +270,7 @@ class FitnessShoeStore @Inject constructor(
             isDeleted = json.optBoolean("isDeleted", false),
             updatedAtEpochMillis = json.optLong("updatedAt", 0L),
             runs = runs,
+            manualKm = json.optDouble("manualKm", 0.0),
         )
     }
 }
@@ -287,6 +297,7 @@ class FitnessShoeRemoteStore {
                     "isDeleted" to shoe.isDeleted,
                     "updatedAt" to Timestamp(Date(shoe.updatedAtEpochMillis)),
                     "runs" to shoe.runs,
+                    "manualKm" to shoe.manualKm,
                     "photoBase64" to shoe.photoBase64,
                     "retiredAt" to shoe.retiredAtEpochMillis?.let { Timestamp(Date(it)) },
                 ),
@@ -317,6 +328,7 @@ class FitnessShoeRemoteStore {
                 isDeleted = doc.getBoolean("isDeleted") ?: false,
                 updatedAtEpochMillis = doc.getTimestamp("updatedAt")?.toDate()?.time ?: 0L,
                 runs = rawRuns.mapNotNull { (k, v) -> (v as? Number)?.let { k to it.toDouble() } }.toMap(),
+                manualKm = doc.getDouble("manualKm") ?: 0.0,
             )
         }
     }

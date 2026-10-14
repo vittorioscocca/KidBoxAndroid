@@ -72,6 +72,17 @@ class FitnessShoeLedgerTest {
     }
 
     @Test
+    fun manualKmAddsToRunsAndNeverGoesBelowZero() {
+        val s = shoe("a", t0).copy(runs = mapOf("r" to 5_000.0), manualKm = 120.0)
+        assertEquals(125.0, s.usedKm, 0.001)
+        assertEquals(575.0, s.remainingKm, 0.001)
+        assertEquals(0.0, s.copy(manualKm = -50.0).usedKm, 0.001)
+        // una corsa nuova si somma al valore corretto a mano
+        val doc = plan(run("r2", t0 + day, 10_000.0))
+        assertEquals(135.0, FitnessShoeLedger.reconcile(listOf(s), doc).single().usedKm, 0.001)
+    }
+
+    @Test
     fun loggedWorkoutsCountAndMergeUnionsRuns() {
         val doc = plan(logged = listOf(FitnessLoggedWorkout("w1", t0 + day, "Running", distanceMeters = 8_000.0)))
         val changed = FitnessShoeLedger.reconcile(listOf(shoe("a", t0)), doc).single()

@@ -437,4 +437,6 @@
     <string name="fitness_shoe_retire">Ritira scarpa</string>
     <string name="fitness_shoe_unretire">Riattiva scarpa</string>
     <string name="fitness_shoe_more">Altre azioni</string>
+    <string name="fitness_shoe_usedkm">Km percorsi</string>
+    <string name="fitness_shoe_usedkm_footer">Puoi correggere i km a mano, ad esempio se le scarpe sono già state usate: le corse nuove si sommano a questo valore.</string>
 </resources>

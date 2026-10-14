@@ -426,4 +426,6 @@
     <string name="fitness_shoe_retire">Retirar zapatilla</string>
     <string name="fitness_shoe_unretire">Reactivar zapatilla</string>
     <string name="fitness_shoe_more">Más acciones</string>
+    <string name="fitness_shoe_usedkm">Km recorridos</string>
+    <string name="fitness_shoe_usedkm_footer">Puedes corregir los km a mano, por ejemplo si las zapatillas ya se han usado: las carreras nuevas se suman a este valor.</string>
 </resources>
