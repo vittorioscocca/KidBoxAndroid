@@ -107,12 +107,24 @@ class FitnessShoesViewModel @Inject constructor(
 
     fun load(childId: String) {
         _shoes.value = store.load(childId)
-        viewModelScope.launch { _shoes.value = withContext(Dispatchers.IO) { store.pull(childId) } }
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                store.pull(childId)
+                store.syncFromHealth(childId)
+            }
+            _shoes.value = store.load(childId)
+        }
     }
 
     fun save(shoe: FitnessShoe) {
         store.upsert(shoe)
         _shoes.value = store.load(shoe.childId)
+        // Una scarpa nuova o con la data cambiata va riempita subito con le
+        // corse di Health Connect, senza aspettare la prossima apertura.
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { store.syncFromHealth(shoe.childId) }
+            _shoes.value = store.load(shoe.childId)
+        }
     }
 
     fun delete(shoe: FitnessShoe) {
@@ -360,13 +372,17 @@ private fun ShoeCard(
     val dateText = remember(shoe.purchaseDateEpochMillis) {
         DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(shoe.purchaseDateEpochMillis))
     }
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(kb.subtitle.copy(alpha = 0.08f))
             .clickable(onClick = onClick)
             .padding(start = 14.dp, top = 14.dp, bottom = 14.dp, end = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         ShoeThumbnail(shoe.photoBase64, 64)
@@ -451,6 +467,40 @@ private fun ShoeCard(
             }
         }
     }
+        // Andamento: come nella scheda delle scarpe di una app di corsa.
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(end = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            ShoeStat("${shoe.runCount}", stringResource(R.string.fitness_shoe_stat_runs))
+            ShoeStat(formatPace(shoe.averagePaceSecondsPerKm), stringResource(R.string.fitness_shoe_stat_pace))
+            ShoeStat(durationText(shoe.totalMinutes), stringResource(R.string.fitness_shoe_stat_time))
+        }
+    }
+}
+
+@Composable
+private fun ShoeStat(value: String, label: String) {
+    val kb = MaterialTheme.kidBoxColors
+    Column {
+        Text(value, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = kb.title)
+        Text(label, fontSize = 12.sp, color = kb.subtitle)
+    }
+}
+
+/** Andatura come «6'55"/km»; «—» quando nessuna corsa ha durata e distanza. */
+private fun formatPace(secondsPerKm: Double?): String {
+    if (secondsPerKm == null || !secondsPerKm.isFinite()) return "—"
+    val total = Math.round(secondsPerKm).toInt()
+    return String.format(Locale.US, "%d'%02d\"/km", total / 60, total % 60)
+}
+
+/** «45 min» sotto l'ora, «6h 57min» sopra; «—» per zero. */
+@Composable
+private fun durationText(minutes: Int): String = when {
+    minutes <= 0 -> "—"
+    minutes < 60 -> stringResource(R.string.fitness_session_minutes, minutes)
+    else -> stringResource(R.string.fitness_sessions_hours, minutes / 60, minutes % 60)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

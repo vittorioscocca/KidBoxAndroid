@@ -13,6 +13,7 @@ import it.vittorioscocca.kidbox.data.health.HealthLinkStore
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessAdjustmentProposal
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessCompletionSource
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessHealthSync
+import it.vittorioscocca.kidbox.data.health.fitness.FitnessShoeStore
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessLoggedWorkout
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanAIUsageInfo
 import it.vittorioscocca.kidbox.data.health.fitness.FitnessPlanDates
@@ -117,6 +118,7 @@ class FitnessPlanViewModel @Inject constructor(
     private val planStore: FitnessPlanStore,
     private val remoteStore: FitnessPlanRemoteStore,
     private val healthSync: FitnessHealthSync,
+    private val shoeStore: FitnessShoeStore,
     private val healthConnect: HealthConnectGateway,
     private val reminderScheduler: FitnessPlanReminderScheduler,
     private val childDao: KBChildDao,
@@ -396,6 +398,9 @@ class FitnessPlanViewModel @Inject constructor(
         if (_uiState.value.isSyncingHealth) return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSyncingHealth = true)
+            // Le scarpe leggono Health Connect per conto proprio: contano anche
+            // le corse che non chiudono nessuna seduta.
+            withContext(Dispatchers.IO) { shoeStore.syncFromHealth(childId) }
             val result = withContext(Dispatchers.IO) { healthSync.reconcile(plan) }
             withContext(Dispatchers.IO) {
                 planStore.setLastHealthSync(childId, System.currentTimeMillis())
@@ -614,6 +619,7 @@ class FitnessPlanViewModel @Inject constructor(
         val plan = _uiState.value.plan ?: return
         val last = planStore.lastHealthSync(childId)
         if (last != null && System.currentTimeMillis() - last < PASSIVE_SYNC_INTERVAL_MILLIS) return
+        withContext(Dispatchers.IO) { shoeStore.syncFromHealth(childId) }
         val result = withContext(Dispatchers.IO) { healthSync.reconcile(plan) }
         withContext(Dispatchers.IO) {
             planStore.setLastHealthSync(childId, System.currentTimeMillis())

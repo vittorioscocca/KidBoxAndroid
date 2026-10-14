@@ -313,6 +313,59 @@ class HealthConnectGateway @Inject constructor(
         }.getOrDefault(emptyList())
     }
 
+    /**
+     * Tutte le corse registrate da una data in poi, a pagine: servono ai km
+     * delle scarpe, che contano anche le uscite che non chiudono nessuna seduta
+     * del piano. Si filtra per tipo PRIMA di aggregare distanza e battito
+     * (un'aggregazione per allenamento): su mesi di storico, solo le corse.
+     * Lista vuota se Health Connect non c'è o il permesso non è concesso.
+     */
+    suspend fun runningWorkoutsSince(startEpochMillis: Long): List<HealthWorkoutEntry> {
+        if (!isAvailable()) return emptyList()
+        return runCatching {
+            val client = HealthConnectClient.getOrCreate(context)
+            val granted = client.permissionController.getGrantedPermissions()
+            if (HealthPermission.getReadPermission(ExerciseSessionRecord::class) !in granted) {
+                return emptyList()
+            }
+            val start = Instant.ofEpochMilli(startEpochMillis)
+            val end = Instant.now()
+            val result = mutableListOf<HealthWorkoutEntry>()
+            var pageToken: String? = null
+            do {
+                val page = client.readRecords(
+                    ReadRecordsRequest(
+                        recordType = ExerciseSessionRecord::class,
+                        timeRangeFilter = TimeRangeFilter.between(start, end),
+                        ascendingOrder = false,
+                        pageSize = 500,
+                        pageToken = pageToken,
+                    ),
+                )
+                page.records
+                    .filter {
+                        it.exerciseType == ExerciseSessionRecord.EXERCISE_TYPE_RUNNING ||
+                            it.exerciseType == ExerciseSessionRecord.EXERCISE_TYPE_RUNNING_TREADMILL
+                    }
+                    .forEach { session ->
+                        val metrics = sessionMetrics(client, session.startTime, session.endTime)
+                        result += HealthWorkoutEntry(
+                            id = session.metadata.id,
+                            title = exerciseTitle(session.exerciseType),
+                            startedAtEpochMillis = session.startTime.toEpochMilli(),
+                            durationMinutes = ((session.endTime.epochSecond - session.startTime.epochSecond) / 60.0)
+                                .roundToInt().coerceAtLeast(1),
+                            activeEnergyKcal = metrics.kcal,
+                            averageHeartRateBpm = metrics.bpm,
+                            distanceMeters = metrics.distanceMeters,
+                        )
+                    }
+                pageToken = page.pageToken
+            } while (pageToken != null && result.size < 5000)
+            result
+        }.getOrDefault(emptyList())
+    }
+
     private suspend fun readRecentWorkouts(
         client: HealthConnectClient,
         start: Instant,

@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.data.health.fitness
 
+import it.vittorioscocca.kidbox.domain.model.HealthWorkoutEntry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -10,11 +11,12 @@ class FitnessShoeLedgerTest {
     private val day = 24L * 3600 * 1000
     private val t0 = 1_760_000_000_000L // un giorno qualsiasi
 
-    private fun run(id: String, at: Long, meters: Double?, title: String = "Corsa all'aperto", type: String = "corsa") =
+    private fun run(id: String, at: Long, meters: Double?, title: String = "Corsa all'aperto", type: String = "corsa", minutes: Int? = null) =
         FitnessSession(
             id = id, dateEpochMillis = at, weekIndex = 1, title = title, activityType = type,
             durationMinutes = 40, status = FitnessSessionStatus.DONE,
             completedAtEpochMillis = at, actualActivityTitle = title, actualDistanceMeters = meters,
+            actualMinutes = minutes,
         )
 
     private fun plan(vararg sessions: FitnessSession, logged: List<FitnessLoggedWorkout> = emptyList()) =
@@ -80,6 +82,43 @@ class FitnessShoeLedgerTest {
         // una corsa nuova si somma al valore corretto a mano
         val doc = plan(run("r2", t0 + day, 10_000.0))
         assertEquals(135.0, FitnessShoeLedger.reconcile(listOf(s), doc).single().usedKm, 0.001)
+    }
+
+    @Test
+    fun statsCountRunsTimeAndPaceOnTimedRunsOnly() {
+        val doc = plan(
+            run("a", t0 + day, 10_000.0, minutes = 60),
+            run("b", t0 + 2 * day, 5_000.0, minutes = 30),
+            run("c", t0 + 3 * day, 8_000.0), // senza durata: conta i km, non l'andatura
+        )
+        val s = FitnessShoeLedger.reconcile(listOf(shoe("a", t0)), doc).single()
+        assertEquals(3, s.runCount)
+        assertEquals(90, s.totalMinutes)
+        assertEquals(23.0, s.usedKm, 0.001)
+        assertEquals(360.0, s.averagePaceSecondsPerKm!!, 0.001) // 6'00"/km su 15 km in 90 min
+        // il tempo arrivato dopo si aggiunge alla corsa già registrata
+        val backfilled = FitnessShoeLedger.reconcile(
+            listOf(s), plan(run("c", t0 + 3 * day, 8_000.0, minutes = 48)),
+        ).single()
+        assertEquals(138, backfilled.totalMinutes)
+        assertNull(shoe("z", t0).averagePaceSecondsPerKm)
+    }
+
+    @Test
+    fun healthRunsCountEvenOutsideThePlanAndDedupeWithSessions() {
+        val s = shoe("a", t0)
+        val health = listOf(
+            HealthWorkoutEntry("w1", "Corsa", t0 + day, durationMinutes = 40, distanceMeters = 7_000.0),
+            HealthWorkoutEntry("w2", "Corsa", t0 - day, durationMinutes = 30, distanceMeters = 5_000.0), // prima dell'acquisto
+            HealthWorkoutEntry("w3", "Ciclismo", t0 + day, durationMinutes = 60, distanceMeters = 25_000.0),
+            HealthWorkoutEntry("w4", "Corsa", t0 + 2 * day, durationMinutes = 20, distanceMeters = null),
+        )
+        val first = FitnessShoeLedger.reconcile(listOf(s), FitnessShoeLedger.runs(health)).single()
+        assertEquals(setOf("w1"), first.runs.keys)
+        // la stessa corsa chiude anche una seduta del piano (matchedWorkoutId): resta una sola
+        val withSession = plan(run("sess", t0 + day, 7_000.0, minutes = 40).copy(matchedWorkoutId = "w1"))
+        assertTrue(FitnessShoeLedger.reconcile(listOf(first), withSession).isEmpty())
+        assertEquals(1, first.runCount)
     }
 
     @Test

@@ -428,4 +428,7 @@
     <string name="fitness_shoe_more">Autres actions</string>
     <string name="fitness_shoe_usedkm">Km parcourus</string>
     <string name="fitness_shoe_usedkm_footer">Vous pouvez corriger les km à la main, par exemple si les chaussures ont déjà servi : les nouvelles courses s\'ajoutent à cette valeur.</string>
+    <string name="fitness_shoe_stat_runs">Courses</string>
+    <string name="fitness_shoe_stat_pace">Allure moy.</string>
+    <string name="fitness_shoe_stat_time">Temps</string>
 </resources>
