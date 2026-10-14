@@ -104,6 +104,13 @@ object FitnessActivityIcons {
     /** Icona per un allenamento letto da Health Connect, che ha solo un titolo. */
     fun forWorkout(title: String): ImageVector = ruleFor(title)?.icon ?: fallback
 
+    /** La seduta programmata è una corsa (stessa regola dell'icona). Serve ai km delle scarpe. */
+    fun isRunSession(activityType: String, title: String): Boolean =
+        forSession(activityType, title) == Icons.Default.DirectionsRun
+
+    /** L'allenamento (con solo un titolo) è una corsa. */
+    fun isRunWorkout(title: String): Boolean = forWorkout(title) == Icons.Default.DirectionsRun
+
     private fun ruleFor(text: String): Rule? {
         val normalized = Normalizer.normalize(text.lowercase(), Normalizer.Form.NFD)
             .replace(Regex("\\p{M}+"), "")

@@ -167,6 +167,7 @@ fun FitnessPlanScreen(
     if (showSessions && planForSessions != null) {
         FitnessSessionsScreen(
             plan = planForSessions,
+            childId = childId,
             onBack = { showSessions = false },
         )
         return

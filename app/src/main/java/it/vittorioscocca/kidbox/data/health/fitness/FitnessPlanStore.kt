@@ -17,6 +17,7 @@ import javax.inject.Singleton
 @Singleton
 class FitnessPlanStore @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val shoeStore: FitnessShoeStore,
 ) {
     private val prefs by lazy { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
 
@@ -30,6 +31,9 @@ class FitnessPlanStore @Inject constructor(
 
     fun save(childId: String, document: FitnessPlanDocument) {
         file(childId).writeText(FitnessPlanJson.encode(document))
+        // Le corse del piano finiscono nel registro delle scarpe adesso: alla
+        // rigenerazione del piano sarebbe tardi.
+        shoeStore.reconcile(childId, document)
     }
 
     fun load(childId: String): FitnessPlanDocument? {

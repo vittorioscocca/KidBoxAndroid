@@ -25,12 +25,16 @@ import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Pool
 import androidx.compose.material.icons.filled.SelfImprovement
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,9 +72,15 @@ import java.util.Locale
 @Composable
 fun FitnessSessionsScreen(
     plan: FitnessPlanDocument,
+    childId: String,
     onBack: () -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
+    var showSettings by remember { mutableStateOf(false) }
+    if (showSettings) {
+        FitnessSessionsSettingsScreen(childId = childId, onBack = { showSettings = false })
+        return
+    }
 
     // La data che conta è quella di completamento quando c'è: una seduta
     // spostata è stata svolta il giorno in cui è stata chiusa, non quello in cui
@@ -110,7 +120,11 @@ fun FitnessSessionsScreen(
                 color = kb.title,
             )
             Spacer(Modifier.weight(1f))
-            Spacer(Modifier.width(40.dp))
+            KidBoxHeaderCircleButton(
+                icon = Icons.Default.Settings,
+                contentDescription = stringResource(R.string.fitness_settings_title),
+                onClick = { showSettings = true },
+            )
         }
 
         if (sessions.isEmpty()) {
