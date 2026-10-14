@@ -423,4 +423,7 @@
     <string name="fitness_shoe_delete">Eliminar zapatilla</string>
     <string name="fitness_shoe_delete_title">¿Eliminar las zapatillas?</string>
     <string name="fitness_shoe_delete_body">Los km registrados en estas zapatillas se perderán.</string>
+    <string name="fitness_shoe_retire">Retirar zapatilla</string>
+    <string name="fitness_shoe_unretire">Reactivar zapatilla</string>
+    <string name="fitness_shoe_more">Más acciones</string>
 </resources>

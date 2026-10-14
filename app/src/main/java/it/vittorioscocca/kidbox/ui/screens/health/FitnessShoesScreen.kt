@@ -35,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DirectionsRun
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -44,6 +45,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -204,6 +206,7 @@ fun FitnessSessionsSettingsScreen(
     val shoes by viewModel.shoes.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<FitnessShoe?>(null) }
     var isNew by remember { mutableStateOf(false) }
+    var shoeToDelete by remember { mutableStateOf<FitnessShoe?>(null) }
 
     LaunchedEffect(childId) { viewModel.load(childId) }
 
@@ -283,10 +286,21 @@ fun FitnessSessionsSettingsScreen(
                 }
             } else {
                 shoes.forEach { shoe ->
-                    ShoeCard(shoe) {
-                        isNew = false
-                        editing = shoe
-                    }
+                    ShoeCard(
+                        shoe = shoe,
+                        onClick = {
+                            isNew = false
+                            editing = shoe
+                        },
+                        onToggleRetired = {
+                            viewModel.save(
+                                shoe.copy(
+                                    retiredAtEpochMillis = if (shoe.isRetired) null else System.currentTimeMillis(),
+                                ),
+                            )
+                        },
+                        onDelete = { shoeToDelete = shoe },
+                    )
                 }
             }
 
@@ -311,10 +325,32 @@ fun FitnessSessionsSettingsScreen(
             Spacer(Modifier.height(24.dp))
         }
     }
+
+    shoeToDelete?.let { shoe ->
+        AlertDialog(
+            onDismissRequest = { shoeToDelete = null },
+            title = { Text(stringResource(R.string.fitness_shoe_delete_title)) },
+            text = { Text(stringResource(R.string.fitness_shoe_delete_body)) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.delete(shoe); shoeToDelete = null }) {
+                    Text(stringResource(R.string.fitness_copilot_delete_confirm), color = Color(0xFFE53935))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { shoeToDelete = null }) { Text(stringResource(R.string.fitness_undo)) }
+            },
+        )
+    }
 }
 
 @Composable
-private fun ShoeCard(shoe: FitnessShoe, onClick: () -> Unit) {
+private fun ShoeCard(
+    shoe: FitnessShoe,
+    onClick: () -> Unit,
+    onToggleRetired: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
     val kb = MaterialTheme.kidBoxColors
     val barColor = when {
         shoe.isWornOut -> Color(0xFFE53935)
@@ -330,7 +366,7 @@ private fun ShoeCard(shoe: FitnessShoe, onClick: () -> Unit) {
             .clip(RoundedCornerShape(16.dp))
             .background(kb.subtitle.copy(alpha = 0.08f))
             .clickable(onClick = onClick)
-            .padding(14.dp),
+            .padding(start = 14.dp, top = 14.dp, bottom = 14.dp, end = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         ShoeThumbnail(shoe.photoBase64, 64)
@@ -386,6 +422,31 @@ private fun ShoeCard(shoe: FitnessShoe, onClick: () -> Unit) {
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = barColor,
+                )
+            }
+        }
+        Box {
+            IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    Icons.Default.MoreVert,
+                    contentDescription = stringResource(R.string.fitness_shoe_more),
+                    tint = kb.subtitle,
+                )
+            }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            stringResource(
+                                if (shoe.isRetired) R.string.fitness_shoe_unretire else R.string.fitness_shoe_retire,
+                            ),
+                        )
+                    },
+                    onClick = { menuOpen = false; onToggleRetired() },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.fitness_shoe_delete), color = Color(0xFFE53935)) },
+                    onClick = { menuOpen = false; onDelete() },
                 )
             }
         }

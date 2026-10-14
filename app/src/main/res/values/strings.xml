@@ -434,4 +434,7 @@
     <string name="fitness_shoe_delete">Elimina scarpa</string>
     <string name="fitness_shoe_delete_title">Eliminare le scarpe?</string>
     <string name="fitness_shoe_delete_body">I km registrati su queste scarpe andranno persi.</string>
+    <string name="fitness_shoe_retire">Ritira scarpa</string>
+    <string name="fitness_shoe_unretire">Riattiva scarpa</string>
+    <string name="fitness_shoe_more">Altre azioni</string>
 </resources>

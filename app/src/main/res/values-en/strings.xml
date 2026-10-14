@@ -423,4 +423,7 @@
     <string name="fitness_shoe_delete">Delete shoe</string>
     <string name="fitness_shoe_delete_title">Delete these shoes?</string>
     <string name="fitness_shoe_delete_body">The km logged on these shoes will be lost.</string>
+    <string name="fitness_shoe_retire">Retire shoe</string>
+    <string name="fitness_shoe_unretire">Reactivate shoe</string>
+    <string name="fitness_shoe_more">More actions</string>
 </resources>
