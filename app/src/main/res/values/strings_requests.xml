@@ -32,6 +32,7 @@
     <string name="requests_cancel">Annulla</string>
     <string name="requests_done">Fatto</string>
     <string name="requests_sent_title">Richiesta inviata</string>
+    <string name="requests_sent_where">Diventa un to-do quando qualcuno risponde «Ci penso io». In Home ne vedi lo stato.</string>
     <string name="requests_sent_notified">Abbiamo avvisato chi hai scelto in famiglia. Ora manda il link a chi non ha l\'app.</string>
     <string name="requests_sent_link_only">Ora manda il link a chi vuoi: risponde dal browser, senza installare nulla.</string>
     <string name="requests_send_link">Invia il link</string>

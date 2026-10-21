@@ -37,6 +37,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
@@ -103,9 +104,6 @@ import it.vittorioscocca.kidbox.ui.screens.requests.FamilyRequestSentDialog
 @Composable
 fun TodoListScreen(
     onBack: () -> Unit,
-    // La richiesta non è ancora un to-do (lo diventa al primo «Ci penso io»):
-    // si torna in Home, dove si vede, altrimenti nella lista non compare nulla.
-    onRequestSent: () -> Unit = {},
     viewModel: TodoListViewModel = hiltViewModel(),
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -164,7 +162,7 @@ fun TodoListScreen(
 
     LaunchedEffect(pendingSnackbarMessage) {
         val message = pendingSnackbarMessage ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(message)
+        snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Long)
         pendingSnackbarMessage = null
     }
 
@@ -291,15 +289,16 @@ fun TodoListScreen(
                         onDone = {
                             viewModel.clearRequestSend()
                             showEditor = false
-                            onRequestSent()
+                            // Non è ancora un to-do (lo diventa al primo «Ci penso io»):
+                            // si dice dove se ne vede lo stato.
+                            pendingSnackbarMessage = context.getString(R.string.requests_sent_where)
                         },
                     )
                 } else {
                     LaunchedEffect(send) {
                         viewModel.clearRequestSend()
                         showEditor = false
-                        pendingSnackbarMessage = context.getString(R.string.requests_sent_title)
-                        onRequestSent()
+                        pendingSnackbarMessage = context.getString(R.string.requests_sent_where)
                     }
                 }
             }

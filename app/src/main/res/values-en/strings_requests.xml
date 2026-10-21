@@ -32,6 +32,7 @@
     <string name="requests_cancel">Cancel</string>
     <string name="requests_done">Done</string>
     <string name="requests_sent_title">Request sent</string>
+    <string name="requests_sent_where">It becomes a to-do when someone replies “I’ll do it”. You can see its status on Home.</string>
     <string name="requests_sent_notified">We\'ve notified the family members you chose. Now send the link to whoever doesn\'t have the app.</string>
     <string name="requests_sent_link_only">Now send the link to whoever you like: they reply from the browser, without installing anything.</string>
     <string name="requests_send_link">Send the link</string>

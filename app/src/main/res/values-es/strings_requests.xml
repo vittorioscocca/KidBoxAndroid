@@ -32,6 +32,7 @@
     <string name="requests_cancel">Cancelar</string>
     <string name="requests_done">Hecho</string>
     <string name="requests_sent_title">Solicitud enviada</string>
+    <string name="requests_sent_where">Se convierte en tarea cuando alguien responde «Me encargo yo». Su estado se ve en Inicio.</string>
     <string name="requests_sent_notified">Hemos avisado a quienes elegiste en la familia. Ahora envía el enlace a quien no tenga la app.</string>
     <string name="requests_sent_link_only">Ahora envía el enlace a quien quieras: responde desde el navegador, sin instalar nada.</string>
     <string name="requests_send_link">Enviar el enlace</string>

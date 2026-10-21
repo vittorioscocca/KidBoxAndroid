@@ -32,6 +32,7 @@
     <string name="requests_cancel">Annuler</string>
     <string name="requests_done">Terminé</string>
     <string name="requests_sent_title">Demande envoyée</string>
+    <string name="requests_sent_where">Elle devient une tâche quand quelqu’un répond « Je m’en occupe ». Son état est visible dans l’Accueil.</string>
     <string name="requests_sent_notified">Nous avons prévenu les membres de la famille choisis. Envoyez maintenant le lien à ceux qui n\'ont pas l\'app.</string>
     <string name="requests_sent_link_only">Envoyez maintenant le lien à qui vous voulez : la personne répond depuis le navigateur, sans rien installer.</string>
     <string name="requests_send_link">Envoyer le lien</string>
