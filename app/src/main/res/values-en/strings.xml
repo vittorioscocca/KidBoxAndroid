@@ -431,4 +431,5 @@
     <string name="fitness_shoe_stat_runs">Runs</string>
     <string name="fitness_shoe_stat_pace">Avg pace</string>
     <string name="fitness_shoe_stat_time">Time</string>
+    <string name="agent_link_not_found">I can\'t find «%1$s» anymore: opening the section.</string>
 </resources>

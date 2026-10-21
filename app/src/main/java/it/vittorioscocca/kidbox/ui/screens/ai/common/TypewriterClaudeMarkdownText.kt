@@ -20,6 +20,7 @@ fun TypewriterClaudeMarkdownText(
     modifier: Modifier = Modifier,
     onRevealTick: () -> Unit = {},
     onRevealComplete: () -> Unit = {},
+    onLinkClick: ((label: String, url: String) -> Unit)? = null,
 ) {
     var revealedCount by remember(text, streamReveal) {
         mutableIntStateOf(if (streamReveal && text.isNotEmpty()) 0 else text.length)
@@ -49,14 +50,22 @@ fun TypewriterClaudeMarkdownText(
     }
 
     val displayText = if (streamReveal && revealedCount == 0) "" else text.take(revealedCount)
-    ClaudeMarkdownText(text = displayText, modifier = modifier)
+    ClaudeMarkdownText(text = displayText, modifier = modifier, onLinkClick = onLinkClick)
 }
 
 private fun revealStep(text: String, index: Int): Int {
     if (index >= text.length) return 1
-    return when (text[index]) {
+    val step = when (text[index]) {
         '\n' -> 1
         ' ' -> 2
         else -> minOf(4, text.length - index)
     }
+    // L'indirizzo di un link si salta in un colpo: a metà comparirebbe
+    // grezzo, `](apri:…`, finché non si chiude la parentesi.
+    val open = text.indexOf("](", index)
+    if (open in index..index + step) {
+        val close = text.indexOf(')', open)
+        if (close > 0) return close - index + 1
+    }
+    return step
 }

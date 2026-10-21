@@ -108,6 +108,7 @@ fun PlanningAIChatScreen(
     onNavigateToHealth: () -> Unit,
     onNavigateToUpgrade: () -> Unit,
     onBack: () -> Unit,
+    onOpenRoute: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -334,6 +335,16 @@ fun PlanningAIChatScreen(
                                 streamingMessageId = state.streamingMessageId,
                                 onStreamScrollTick = onStreamScrollTick,
                                 onStreamingComplete = viewModel::finishStreaming,
+                                onLinkClick = { label, url ->
+                                    val link = AgentLinks.parse(label, url) ?: return@AIChatBubbleView
+                                    scope.launch {
+                                        val dest = viewModel.resolveAgentLink(link)
+                                        if (!dest.found) {
+                                            launch { snackHost.showSnackbar(context.getString(R.string.agent_link_not_found, link.title)) }
+                                        }
+                                        dest.routes.forEach(onOpenRoute)
+                                    }
+                                },
                             )
                             if (msg.isAssistant && state.streamingMessageId != msg.id &&
                                 msg.id !in state.autoExecutedMessageIds
@@ -505,6 +516,7 @@ fun AIChatBubbleView(
     streamingMessageId: String? = null,
     onStreamScrollTick: () -> Unit = {},
     onStreamingComplete: (String) -> Unit = {},
+    onLinkClick: ((label: String, url: String) -> Unit)? = null,
 ) {
     val isUser = message.isUser
     val maxUserWidth = LocalConfiguration.current.screenWidthDp.dp * 0.75f
@@ -547,6 +559,7 @@ fun AIChatBubbleView(
                         modifier = Modifier.fillMaxWidth(),
                         onRevealTick = onStreamScrollTick,
                         onRevealComplete = { onStreamingComplete(message.id) },
+                        onLinkClick = onLinkClick,
                     )
                 }
             }

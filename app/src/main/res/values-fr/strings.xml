@@ -431,4 +431,5 @@
     <string name="fitness_shoe_stat_runs">Courses</string>
     <string name="fitness_shoe_stat_pace">Allure moy.</string>
     <string name="fitness_shoe_stat_time">Temps</string>
+    <string name="agent_link_not_found">Je ne trouve plus « %1$s » : j\'ouvre la section.</string>
 </resources>

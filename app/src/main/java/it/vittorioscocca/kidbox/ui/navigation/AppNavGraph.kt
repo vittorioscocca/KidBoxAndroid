@@ -2379,6 +2379,7 @@ fun AppNavGraph(
                 onNavigateToHealth = { navController.navigate(AppDestination.PediatricChildSelector.createRoute(familyId)) },
                 onNavigateToUpgrade = { navController.navigate(AppDestination.AiSettings.route) },
                 onBack = { navController.popBackStack() },
+                onOpenRoute = { navController.navigate(it) },
             )
         }
 

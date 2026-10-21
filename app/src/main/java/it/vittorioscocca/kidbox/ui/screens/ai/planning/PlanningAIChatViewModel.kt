@@ -489,6 +489,17 @@ class PlanningAIChatViewModel @Inject constructor(
         return ContextPlan(fullPrompt, fullUnits, reducedPrompt, reducedUnits)
     }
 
+    /**
+     * Dove porta un link dell'assistente: la voce si cerca nel quaderno
+     * dell'ultima domanda (o in uno letto adesso, dopo un riavvio).
+     */
+    suspend fun resolveAgentLink(link: AgentLinks.Link): AgentLinks.Destination {
+        val snap = snapshot ?: loadSnapshot()
+        val dest = AgentLinks.destination(link, snap)
+        AppAnalytics.aiLinkOpened(context, link.kind.raw, dest.found)
+        return dest
+    }
+
     private suspend fun loadSnapshot(): AgentMemorySnapshot {
         val familyName = routeFamilyName.ifBlank {
             if (effectiveFamilyId.isNotBlank()) familyDao.getById(effectiveFamilyId)?.name.orEmpty() else ""

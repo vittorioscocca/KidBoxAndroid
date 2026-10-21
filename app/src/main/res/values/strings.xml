@@ -442,4 +442,5 @@
     <string name="fitness_shoe_stat_runs">Corse</string>
     <string name="fitness_shoe_stat_pace">Andat. media</string>
     <string name="fitness_shoe_stat_time">Tempo</string>
+    <string name="agent_link_not_found">Non trovo più «%1$s»: ti apro la sezione.</string>
 </resources>

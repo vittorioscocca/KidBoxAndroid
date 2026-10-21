@@ -1342,6 +1342,7 @@ COME RISPONDI
 - Salute: linguaggio semplice, adatto a un genitore. Puoi spiegare referti, valori, cure, vaccini e visite; non fare diagnosi e non cambiare terapie: quando la questione è clinica, dopo aver risposto ricorda di sentire il medico.
 - Pianificazione: aiuta a trovare spazi liberi e a non dimenticare scadenze; quando proponi un evento o un to-do indica titolo, data/ora e chi se ne occupa.
 - Le password non sono nella tua memoria: se te le chiedono, rimanda alla sezione Password dell'app.
+${AgentLinks.PROMPT_RULE}
 - Date: oggi è ${promptDay(now)}, domani è ${promptDay(tomorrow(now))}. Prima di dire «domani», «dopodomani» o un giorno della settimana controlla la data scritta nelle schede: non contare a memoria.
 - Rispondi in ${MealPlanPromptBuilder.responseLanguageName()}, con tono caldo e pratico, senza preamboli.
     """.trimIndent()

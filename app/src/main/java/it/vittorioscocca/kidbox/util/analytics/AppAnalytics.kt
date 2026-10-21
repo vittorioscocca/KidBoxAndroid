@@ -240,6 +240,17 @@ object AppAnalytics {
         }
     }
 
+    /**
+     * Tocco su un link dell'assistente a una voce dell'app (`AgentLinks`).
+     * `found` falso = la voce non c'era più e si è aperta la sezione.
+     */
+    fun aiLinkOpened(context: Context, kind: String, found: Boolean) {
+        log(context, "ai_link_opened") {
+            putString("kind", kind)
+            putString("found", if (found) "true" else "false")
+        }
+    }
+
     fun aiBriefingReceived(context: Context) {
         log(context, "ai_briefing_received")
     }

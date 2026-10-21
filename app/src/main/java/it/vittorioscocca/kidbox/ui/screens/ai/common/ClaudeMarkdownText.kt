@@ -14,7 +14,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -31,11 +36,18 @@ private sealed class MarkdownBlock {
     data class CodeBlock(val text: String) : MarkdownBlock()
 }
 
+/**
+ * `onLinkClick`: con un gestore i link `[testo](indirizzo)` diventano
+ * toccabili (testo e indirizzo al gestore); senza, il testo resta com'è.
+ */
 @Composable
 fun ClaudeMarkdownText(
     text: String,
     modifier: Modifier = Modifier,
+    onLinkClick: ((label: String, url: String) -> Unit)? = null,
 ) {
+    val linkColor = MaterialTheme.colorScheme.primary
+    val inline: (String) -> AnnotatedString = { inlineMarkdown(it, onLinkClick, linkColor) }
     // Il parse si rifà solo quando cambia il testo, non a ogni ricomposizione della lista.
     val blocks = remember(text) { parseBlocks(text) }
 
@@ -45,7 +57,7 @@ fun ClaudeMarkdownText(
                 when (block) {
                     is MarkdownBlock.Heading -> {
                         Text(
-                            text = remember(block.text) { inlineMarkdown(block.text) },
+                            text = remember(block.text, onLinkClick) { inline(block.text) },
                             fontWeight = if (block.level == 1) FontWeight.Bold else FontWeight.SemiBold,
                             fontSize = when (block.level) {
                                 1 -> 26.sp
@@ -65,7 +77,7 @@ fun ClaudeMarkdownText(
 
                     is MarkdownBlock.Paragraph -> {
                         Text(
-                            text = remember(block.text) { inlineMarkdown(block.text) },
+                            text = remember(block.text, onLinkClick) { inline(block.text) },
                             fontSize = 16.sp,
                             lineHeight = 22.sp,
                             color = MaterialTheme.colorScheme.onBackground,
@@ -85,7 +97,7 @@ fun ClaudeMarkdownText(
                                         modifier = Modifier.padding(end = 8.dp),
                                     )
                                     Text(
-                                        text = remember(item) { inlineMarkdown(item) },
+                                        text = remember(item, onLinkClick) { inline(item) },
                                         fontSize = 16.sp,
                                         lineHeight = 22.sp,
                                         color = MaterialTheme.colorScheme.onBackground,
@@ -190,14 +202,35 @@ private fun parseBlocks(raw: String): List<MarkdownBlock> {
     return out
 }
 
-private fun inlineMarkdown(input: String): AnnotatedString {
-    val regex = Regex("""(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)""")
+private val markdownLink = Regex("""^\[([^\]\n]+)\]\(([^)\n]*)\)$""")
+
+private fun inlineMarkdown(
+    input: String,
+    onLinkClick: ((String, String) -> Unit)? = null,
+    linkColor: Color = Color.Unspecified,
+): AnnotatedString {
+    val regex = if (onLinkClick != null) {
+        Regex("""(\[[^\]\n]+\]\([^)\n]*\)|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)""")
+    } else {
+        Regex("""(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)""")
+    }
     val out = buildAnnotatedString {
         var cursor = 0
         regex.findAll(input).forEach { m ->
             if (m.range.first > cursor) append(input.substring(cursor, m.range.first))
             val token = m.value
+            val link = if (onLinkClick != null) markdownLink.find(token) else null
             when {
+                link != null -> {
+                    val label = link.groupValues[1].replace("**", "")
+                    val url = link.groupValues[2]
+                    withLink(
+                        LinkAnnotation.Clickable(
+                            tag = url,
+                            styles = TextLinkStyles(SpanStyle(color = linkColor, fontWeight = FontWeight.SemiBold, textDecoration = TextDecoration.Underline)),
+                        ) { onLinkClick?.invoke(label, url) },
+                    ) { append(label) }
+                }
                 token.startsWith("**") && token.endsWith("**") -> withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
                     append(token.removePrefix("**").removeSuffix("**"))
                 }
