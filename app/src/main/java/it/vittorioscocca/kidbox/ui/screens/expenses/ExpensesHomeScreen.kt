@@ -34,6 +34,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
+import it.vittorioscocca.kidbox.ui.components.KidBoxSearchField
+import it.vittorioscocca.kidbox.ui.components.matchesSearch
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -1668,43 +1670,80 @@ private fun AllExpensesScreen(
                 .fillMaxSize()
                 .padding(padding),
         ) {
+            var searchQuery by remember { mutableStateOf("") }
+            val searching = searchQuery.isNotBlank()
+            // Con una ricerca attiva si cerca in tutto lo storico, non nel
+            // periodo scelto: chi cerca «la bolletta» non sa in che mese l'ha messa.
+            val shownExpenses = remember(state.expenses, state.categories, searchQuery) {
+                if (!searching) {
+                    state.visibleExpenses
+                } else {
+                    state.expenses
+                        .filter { e ->
+                            val amount = String.format(java.util.Locale.ITALY, "%.2f", e.amount)
+                            e.title.matchesSearch(searchQuery) ||
+                                e.notes.matchesSearch(searchQuery) ||
+                                state.categories.firstOrNull { it.id == e.categoryId }?.name.matchesSearch(searchQuery) ||
+                                amount.matchesSearch(searchQuery) ||
+                                amount.replace(",", ".").matchesSearch(searchQuery)
+                        }
+                        .sortedByDescending { it.dateEpochMillis }
+                }
+            }
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp)
                     .verticalScroll(rememberScrollState()),
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    ExpensePeriod.entries.forEach { p ->
-                        PeriodPill(
-                            label = stringResource(p.labelRes),
-                            selected = state.period == p,
-                            onClick = { onSetPeriod(p) },
-                        )
+                KidBoxSearchField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = stringResource(R.string.search_expenses),
+                )
+                Spacer(Modifier.height(12.dp))
+
+                if (!searching) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        ExpensePeriod.entries.forEach { p ->
+                            PeriodPill(
+                                label = stringResource(p.labelRes),
+                                selected = state.period == p,
+                                onClick = { onSetPeriod(p) },
+                            )
+                        }
                     }
+
+                    Spacer(Modifier.height(12.dp))
+                    ExpenseTotalCard(total = state.totalAmount, count = state.visibleExpenses.size)
+                    Spacer(Modifier.height(12.dp))
                 }
 
-                Spacer(Modifier.height(12.dp))
-                ExpenseTotalCard(total = state.totalAmount, count = state.visibleExpenses.size)
-                Spacer(Modifier.height(12.dp))
-
-                ExpenseListCard(
-                    expenses = state.visibleExpenses,
-                    categories = state.categories,
-                    selecting = false,
-                    selectedExpenseIds = emptySet(),
-                    onToggleSelecting = {},
-                    onToggleExpenseSelection = {},
-                    onDeleteSelected = {},
-                    onSelect = onSelect,
-                    onAddExpense = {},
-                    showChrome = true,
-                )
+                if (searching && shownExpenses.isEmpty()) {
+                    Text(
+                        stringResource(R.string.search_nothing_found),
+                        color = kb.subtitle,
+                        modifier = Modifier.padding(vertical = 24.dp),
+                    )
+                } else {
+                    ExpenseListCard(
+                        expenses = shownExpenses,
+                        categories = state.categories,
+                        selecting = false,
+                        selectedExpenseIds = emptySet(),
+                        onToggleSelecting = {},
+                        onToggleExpenseSelection = {},
+                        onDeleteSelected = {},
+                        onSelect = onSelect,
+                        onAddExpense = {},
+                        showChrome = true,
+                    )
+                }
 
                 Spacer(Modifier.height(24.dp))
             }

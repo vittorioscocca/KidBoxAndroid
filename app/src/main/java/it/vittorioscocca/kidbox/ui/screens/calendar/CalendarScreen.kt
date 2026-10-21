@@ -8,6 +8,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.material.icons.filled.EditCalendar
+import androidx.compose.material.icons.filled.Search
+import it.vittorioscocca.kidbox.ui.components.KidBoxSearchField
+import it.vittorioscocca.kidbox.ui.components.matchesSearch
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import androidx.compose.foundation.background
@@ -163,6 +166,8 @@ fun CalendarScreen(
     // compilato, e chiuso il modulo (salvato o no) si torna alle Notizie.
     val newsPrefill = remember { CalendarPrefillHandoff.take() }
     var showForm by remember { mutableStateOf(newsPrefill != null) }
+    var searchOpen by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
     var editingEvent by remember { mutableStateOf<KBCalendarEventEntity?>(null) }
     var pendingSeriesDelete by remember { mutableStateOf<KBCalendarEventEntity?>(null) }
     pendingSeriesDelete?.let { series ->
@@ -352,6 +357,15 @@ fun CalendarScreen(
                         color = MaterialTheme.kidBoxColors.title,
                     )
                     HeaderCircleButton(
+                        icon = Icons.Filled.Search,
+                        contentDescription = stringResource(R.string.search_calendar),
+                        onClick = {
+                            searchOpen = !searchOpen
+                            if (!searchOpen) searchQuery = ""
+                        },
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    HeaderCircleButton(
                         icon = Icons.Filled.EditCalendar,
                         contentDescription = stringResource(R.string.device_calendar_settings_title),
                         onClick = { showDeviceSettings = true },
@@ -384,6 +398,34 @@ fun CalendarScreen(
                 modifier = Modifier
                     .fillMaxSize(),
             ) {
+                if (searchOpen) {
+                    KidBoxSearchField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = stringResource(R.string.search_calendar),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+                if (searchOpen && searchQuery.isNotBlank()) {
+                    CalendarSearchResults(
+                        query = searchQuery,
+                        events = state.events,
+                        reminders = state.reminders,
+                        onEditEvent = {
+                            editingEvent = state.events.seriesOf(it)
+                            editingReminder = null
+                            newEventTime = null
+                            copyPrefill = null
+                            showForm = true
+                        },
+                        onEditReminder = {
+                            editingReminder = it
+                            editingEvent = null
+                            newEventTime = null
+                            showForm = true
+                        },
+                    )
+                } else {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -512,6 +554,7 @@ fun CalendarScreen(
                             viewModel.setMode(CalendarMode.MONTH)
                         },
                     )
+                }
                 }
             }
         }
@@ -1426,6 +1469,78 @@ private fun MiniMonthCard(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/** Titolo, note e luogo degli eventi; titolo e note dei promemoria. Le serie compaiono una volta sola. */
+@Composable
+private fun CalendarSearchResults(
+    query: String,
+    events: List<KBCalendarEventEntity>,
+    reminders: List<KBTodoItemEntity>,
+    onEditEvent: (KBCalendarEventEntity) -> Unit,
+    onEditReminder: (KBTodoItemEntity) -> Unit,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    val now = System.currentTimeMillis()
+    val foundEvents = remember(events, query) {
+        events.filter {
+            it.title.matchesSearch(query) || it.notes.matchesSearch(query) || it.location.matchesSearch(query)
+        }
+    }
+    val upcoming = foundEvents.filter { it.endDateEpochMillis >= now }.sortedBy { it.startDateEpochMillis }
+    val past = foundEvents.filter { it.endDateEpochMillis < now }.sortedByDescending { it.startDateEpochMillis }
+    val foundReminders = remember(reminders, query) {
+        reminders.filter { it.title.matchesSearch(query) || it.notes.matchesSearch(query) }
+    }
+    val dateFormat = remember { DateTimeFormatter.ofPattern("EEE d MMM yyyy", KBLocale.current()) }
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        if (foundEvents.isEmpty() && foundReminders.isEmpty()) {
+            item {
+                Text(
+                    stringResource(R.string.search_nothing_found),
+                    color = kb.subtitle,
+                    modifier = Modifier.padding(16.dp),
+                )
+            }
+        }
+        items(upcoming + past, key = { "found_${it.id}" }) { event ->
+            val day = Instant.ofEpochMilli(event.startDateEpochMillis).atZone(ZoneId.systemDefault()).toLocalDate()
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 3.dp)
+                    .clickable { onEditEvent(event) },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = kb.card),
+            ) {
+                Column(Modifier.padding(14.dp)) {
+                    Text(event.title, color = kb.title, fontWeight = FontWeight.SemiBold)
+                    Text(day.format(dateFormat), color = kb.subtitle, fontSize = 13.sp)
+                    if (!event.location.isNullOrBlank()) {
+                        Text(event.location, color = kb.subtitle, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+        items(foundReminders, key = { "found_rem_${it.id}" }) { todo ->
+            val due = todo.dueAtEpochMillis?.let {
+                Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate().format(dateFormat)
+            }
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 3.dp)
+                    .clickable { onEditReminder(todo) },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = kb.card),
+            ) {
+                Column(Modifier.padding(14.dp)) {
+                    Text(todo.title, color = kb.title, fontWeight = FontWeight.SemiBold)
+                    if (due != null) Text(due, color = kb.subtitle, fontSize = 13.sp)
                 }
             }
         }

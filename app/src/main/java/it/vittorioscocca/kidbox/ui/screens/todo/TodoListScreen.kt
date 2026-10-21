@@ -94,6 +94,8 @@ import it.vittorioscocca.kidbox.ui.components.KidBoxFormPage
 import it.vittorioscocca.kidbox.ui.components.FormSectionTitle
 import it.vittorioscocca.kidbox.ui.components.FormSectionHeader
 import it.vittorioscocca.kidbox.data.remote.requests.FamilyRequestRemoteStore
+import it.vittorioscocca.kidbox.ui.components.KidBoxSearchField
+import it.vittorioscocca.kidbox.ui.components.matchesSearch
 import it.vittorioscocca.kidbox.ui.screens.requests.FamilyRequestAskDialog
 import it.vittorioscocca.kidbox.ui.screens.requests.FamilyRequestAvailability
 import it.vittorioscocca.kidbox.ui.screens.requests.FamilyRequestAskMember
@@ -112,8 +114,22 @@ fun TodoListScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var showEditor by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
     var editingTodo by remember { mutableStateOf<KBTodoItemEntity?>(null) }
     val requestSend by viewModel.requestSend.collectAsStateWithLifecycle()
+    // Titolo, note e a chi è assegnato (membro o persona fuori dall'app).
+    val shownTodos = remember(state.filteredTodos, state.members, searchQuery) {
+        if (searchQuery.isBlank()) {
+            state.filteredTodos
+        } else {
+            state.filteredTodos.filter { todo ->
+                todo.title.matchesSearch(searchQuery) ||
+                    todo.notes.matchesSearch(searchQuery) ||
+                    state.members.firstOrNull { it.uid == todo.assignedTo }?.displayName.matchesSearch(searchQuery) ||
+                    externalAssignee(todo).matchesSearch(searchQuery)
+            }
+        }
+    }
     // Tiene vivo l'ascolto di to-do ed eventi per «chi è libero».
     viewModel.availabilitySources.collectAsStateWithLifecycle()
 
@@ -379,7 +395,13 @@ fun TodoListScreen(
             }
             Spacer(Modifier.height(12.dp))
             Text(state.listName, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold, color = kb.title)
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
+            KidBoxSearchField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = stringResource(R.string.search_todos),
+            )
+            Spacer(Modifier.height(12.dp))
 
             PullToRefreshBox(
                 isRefreshing = isRefreshing,
@@ -391,7 +413,7 @@ fun TodoListScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    if (state.filteredTodos.isEmpty()) {
+                    if (shownTodos.isEmpty()) {
                         item {
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
@@ -399,14 +421,14 @@ fun TodoListScreen(
                                 colors = CardDefaults.cardColors(containerColor = kb.card),
                             ) {
                                 Text(
-                                    stringResource(R.string.todo_no_items),
+                                    stringResource(if (searchQuery.isBlank()) R.string.todo_no_items else R.string.search_nothing_found),
                                     modifier = Modifier.padding(16.dp),
                                     color = kb.subtitle,
                                 )
                             }
                         }
                     } else {
-                        items(state.filteredTodos, key = { it.id }) { todo ->
+                        items(shownTodos, key = { it.id }) { todo ->
                             TodoRow(
                                 todo = todo,
                                 assigneeName = state.members.firstOrNull { it.uid == todo.assignedTo }?.displayName

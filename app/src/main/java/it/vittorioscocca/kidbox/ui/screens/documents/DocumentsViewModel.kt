@@ -29,6 +29,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import it.vittorioscocca.kidbox.ui.components.matchesSearch
+import it.vittorioscocca.kidbox.domain.model.WalletDocumentMetadata
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -75,6 +83,40 @@ class DocumentsViewModel @Inject constructor(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DocumentsUiState())
     val uiState: StateFlow<DocumentsUiState> = _uiState.asStateFlow()
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    /**
+     * Ricerca su tutti i documenti della famiglia, non solo nella cartella
+     * aperta: titolo, nome del file e testo letto. Il testo dei documenti
+     * d'identità non entra mai, come nel quaderno dell'assistente.
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val searchResults: StateFlow<List<KBDocumentEntity>> =
+        kotlinx.coroutines.flow.combine(
+            _searchQuery,
+            _uiState.map { it.familyId }.distinctUntilChanged(),
+        ) { query, familyId -> query.trim() to familyId }
+            .flatMapLatest { (query, familyId) ->
+                if (query.isEmpty() || familyId.isBlank()) {
+                    flowOf(emptyList())
+                } else {
+                    repository.observeAllDocuments(familyId).map { docs ->
+                        docs.filter { d ->
+                            val isIdentity = d.notes?.startsWith(WalletDocumentMetadata.NOTES_PREFIX) == true
+                            d.title.matchesSearch(query) ||
+                                d.fileName.matchesSearch(query) ||
+                                (!isIdentity && d.extractedText.matchesSearch(query))
+                        }.sortedByDescending { it.createdAtEpochMillis }
+                    }
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     private var folderObservationJob: Job? = null
     private var debounceHealJob: Job? = null
     private var visibilityMembersJob: Job? = null

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="search_todos">Search to-dos</string>
+    <string name="search_calendar">Search events and reminders</string>
+    <string name="search_expenses">Search expenses</string>
+    <string name="search_documents">Search documents</string>
+    <string name="search_nothing_found">No results</string>
+</resources>

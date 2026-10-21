@@ -45,6 +45,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.lazy.LazyColumn
+import it.vittorioscocca.kidbox.ui.components.KidBoxSearchField
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -165,6 +166,8 @@ fun DocumentBrowserScreen(
     viewModel: DocumentsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     TrackSectionPresence(AppSection.DOCUMENTS, familyId)
     val context = LocalContext.current
@@ -408,6 +411,49 @@ fun DocumentBrowserScreen(
             }
 
             Spacer(Modifier.height(10.dp))
+            KidBoxSearchField(
+                value = searchQuery,
+                onValueChange = viewModel::setSearchQuery,
+                placeholder = stringResource(R.string.search_documents),
+            )
+            Spacer(Modifier.height(10.dp))
+            if (searchQuery.isNotBlank()) {
+                // Risultati su tutta la famiglia, qualunque cartella sia aperta.
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (searchResults.isEmpty()) {
+                        item {
+                            Text(
+                                stringResource(R.string.search_nothing_found),
+                                color = MaterialTheme.kidBoxColors.subtitle,
+                                modifier = Modifier.padding(vertical = 24.dp),
+                            )
+                        }
+                    }
+                    items(searchResults, key = { "found_${it.id}" }) { doc ->
+                        DocumentListItem(
+                            document = doc,
+                            selecting = false,
+                            isSelected = false,
+                            isHighlighted = false,
+                            onClick = {
+                                scope.launch {
+                                    isOpeningDocument = true
+                                    try {
+                                        openDocument(context, viewModel, doc)
+                                    } finally {
+                                        isOpeningDocument = false
+                                    }
+                                }
+                            },
+                            onLongPress = {},
+                        )
+                    }
+                }
+            } else
             PullToRefreshBox(
                 isRefreshing = isRefreshing,
                 onRefresh = { viewModel.forceRefresh() },

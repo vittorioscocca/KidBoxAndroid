@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="search_todos">Rechercher dans les tâches</string>
+    <string name="search_calendar">Rechercher événements et rappels</string>
+    <string name="search_expenses">Rechercher dans les dépenses</string>
+    <string name="search_documents">Rechercher dans les documents</string>
+    <string name="search_nothing_found">Aucun résultat</string>
+</resources>
