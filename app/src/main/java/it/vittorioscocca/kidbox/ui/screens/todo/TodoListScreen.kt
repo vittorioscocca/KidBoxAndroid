@@ -103,6 +103,9 @@ import it.vittorioscocca.kidbox.ui.screens.requests.FamilyRequestSentDialog
 @Composable
 fun TodoListScreen(
     onBack: () -> Unit,
+    // La richiesta non è ancora un to-do (lo diventa al primo «Ci penso io»):
+    // si torna in Home, dove si vede, altrimenti nella lista non compare nulla.
+    onRequestSent: () -> Unit = {},
     viewModel: TodoListViewModel = hiltViewModel(),
 ) {
     val kb = MaterialTheme.kidBoxColors
@@ -288,6 +291,7 @@ fun TodoListScreen(
                         onDone = {
                             viewModel.clearRequestSend()
                             showEditor = false
+                            onRequestSent()
                         },
                     )
                 } else {
@@ -295,6 +299,7 @@ fun TodoListScreen(
                         viewModel.clearRequestSend()
                         showEditor = false
                         pendingSnackbarMessage = context.getString(R.string.requests_sent_title)
+                        onRequestSent()
                     }
                 }
             }

@@ -837,7 +837,10 @@ fun AppNavGraph(
                 },
             ),
         ) {
-            TodoListScreen(onBack = { navController.popBackStack() })
+            TodoListScreen(
+                onBack = { navController.popBackStack() },
+                onRequestSent = { navController.popBackStack(AppDestination.Home.route, inclusive = false) },
+            )
         }
 
         composable(
@@ -848,7 +851,10 @@ fun AppNavGraph(
                 navArgument("kind") { type = NavType.StringType },
             ),
         ) {
-            TodoListScreen(onBack = { navController.popBackStack() })
+            TodoListScreen(
+                onBack = { navController.popBackStack() },
+                onRequestSent = { navController.popBackStack(AppDestination.Home.route, inclusive = false) },
+            )
         }
 
         composable(
