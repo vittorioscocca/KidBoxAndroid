@@ -432,4 +432,26 @@
     <string name="fitness_shoe_stat_pace">Ritmo medio</string>
     <string name="fitness_shoe_stat_time">Tiempo</string>
     <string name="agent_link_not_found">Ya no encuentro «%1$s»: abro la sección.</string>
+    <string name="search_placeholder">Buscar en KidBox</string>
+    <string name="search_clear">Borrar</string>
+    <string name="search_hint">Busca en gastos, documentos (también en el texto leído), notas, calendario, tareas, salud, wallet, casa, vehículos, mascotas y viajes.</string>
+    <string name="search_no_results">Ningún resultado para «%1$s».</string>
+    <string name="search_ask_assistant">Pregunta al asistente: «%1$s»</string>
+    <string name="search_ask_assistant_footer">Para preguntas sobre los datos, como «¿cuánto hemos gastado en el colegio?». Usa un mensaje de IA.</string>
+    <string name="search_section_expenses">Gastos</string>
+    <string name="search_section_documents">Documentos</string>
+    <string name="search_section_notes">Notas</string>
+    <string name="search_section_calendar">Calendario</string>
+    <string name="search_section_todo">Tareas</string>
+    <string name="search_section_grocery">Lista de la compra</string>
+    <string name="search_section_visits">Visitas</string>
+    <string name="search_section_exams">Pruebas</string>
+    <string name="search_section_treatments">Tratamientos</string>
+    <string name="search_section_wallet">Wallet</string>
+    <string name="search_section_home">Casa</string>
+    <string name="search_section_vehicles">Vehículos</string>
+    <string name="search_section_pets">Mascotas</string>
+    <string name="search_section_trips">Viajes</string>
+    <string name="search_untitled">(sin título)</string>
+    <string name="search_visit">Visita</string>
 </resources>

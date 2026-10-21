@@ -1,5 +1,19 @@
 package it.vittorioscocca.kidbox.ui.screens.ai.planning
 
+import it.vittorioscocca.kidbox.data.local.entity.HomeItemEntity
+import it.vittorioscocca.kidbox.data.local.entity.HousePaymentEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBCalendarEventEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBExpenseEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBNoteEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBTodoItemEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBTripEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBWalletTicketEntity
+import it.vittorioscocca.kidbox.data.local.entity.PetEntity
+import it.vittorioscocca.kidbox.data.local.entity.VehicleEntity
+import it.vittorioscocca.kidbox.domain.model.KBMedicalExam
+import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
+import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -94,86 +108,117 @@ object AgentLinks {
     private fun attachmentTitles(tag: String, s: AgentMemorySnapshot): List<String> =
         s.documents.filter { it.notes == tag }.map { it.title }
 
-    private fun destination(kind: Kind, link: Link, s: AgentMemorySnapshot): Destination {
-        val fid = s.familyId
-        return when (kind) {
-            Kind.EXPENSE -> best(s.expenses, link, { it.title }, { it.dateEpochMillis })
-                ?.let { Destination(listOf(AppDestination.ExpensesHome.createRoute(fid, highlightExpenseId = it.id)), true) }
-                ?: Destination(listOf(AppDestination.ExpensesHome.createRoute(fid)), false)
-            Kind.DOCUMENT -> {
-                val docs = s.documents + s.walletIdentity.map { it.first }.filter { w -> s.documents.none { it.id == w.id } }
-                best(docs, link, { it.title }, { it.createdAtEpochMillis })
-                    ?.let { documentDestination(it, s) }
-                    ?: Destination(listOf(AppDestination.DocumentsHome.createRoute(fid)), false)
-            }
-            Kind.NOTE -> best(s.notes, link, { it.title }, { it.updatedAtEpochMillis })
-                ?.let { Destination(listOf(AppDestination.NoteDetail.createRoute(fid, it.id)), true) }
-                ?: Destination(listOf(AppDestination.NotesHome.createRoute(fid)), false)
-            Kind.EVENT -> {
-                val e = best(s.events, link, { it.title }, { it.startDateEpochMillis })
-                Destination(listOf(AppDestination.Calendar.createRoute(fid, e?.id)), e != null)
-            }
-            Kind.TODO -> best(s.todos, link, { it.title }, { it.dueAtEpochMillis ?: it.createdAtEpochMillis })
-                ?.takeIf { !it.listId.isNullOrBlank() }
-                ?.let { Destination(listOf(AppDestination.TodoList.createRoute(fid, it.childId, it.listId!!, it.id)), true) }
-                ?: Destination(listOf(AppDestination.Todo.route), false)
-            Kind.GROCERY -> Destination(listOf(AppDestination.ShoppingList.createRoute(fid)), true)
-            // Una visita nel quaderno non ha titolo: è «VISITA n — data» con
-            // motivo, medico, diagnosi e referti. Si confronta con tutto quello,
-            // e la data da sola basta.
-            Kind.VISIT -> bestOf(
-                s.allVisits, link,
-                { listOf(it.reason, it.doctorName.orEmpty(), it.diagnosis.orEmpty()) + attachmentTitles("visit:${it.id}", s) },
-                { it.dateEpochMillis }, dayIsIdentity = true,
-            )
-                ?.let { Destination(listOf(AppDestination.MedicalVisitDetail.route(fid, it.childId, it.id)), true) }
-                ?: healthFallback(fid)
-            Kind.EXAM -> bestOf(
-                s.healthPersons.flatMap { it.exams }, link,
-                { listOf(it.name) + attachmentTitles("exam:${it.id}", s) },
-                { it.resultDateEpochMillis ?: it.deadlineEpochMillis ?: it.createdAtEpochMillis }, dayIsIdentity = true,
-            )
-                ?.let { Destination(listOf(AppDestination.MedicalExamDetail.route(fid, it.childId, it.id)), true) }
-                ?: healthFallback(fid)
-            Kind.TREATMENT -> bestOf(
-                s.healthPersons.flatMap { it.treatments } + s.petTreatments, link,
-                { listOf(it.drugName) + attachmentTitles("treatment:${it.id}", s) },
-                { it.startDateEpochMillis },
-            )
-                ?.let { t ->
-                    val route = if (t.petId.isNotBlank()) AppDestination.PetTreatmentDetail.route(fid, t.petId, t.id)
-                    else AppDestination.TreatmentDetail.route(fid, t.childId, t.id)
-                    Destination(listOf(route), true)
-                }
-                ?: healthFallback(fid)
-            Kind.TICKET -> best(s.walletTickets, link, { it.title }, { it.eventDateEpochMillis ?: it.createdAtEpochMillis })
-                ?.let { Destination(listOf(AppDestination.WalletDetail.createRoute(fid, it.id)), true) }
-                ?: Destination(listOf(AppDestination.WalletHome.createRoute(fid)), false)
-            Kind.HOME -> best(s.homeItems, link, { it.name }, { it.createdAt })
-                ?.let { Destination(listOf(AppDestination.HomeItemDetail.createRoute(fid, it.id)), true) }
-                ?: best(s.housePayments, link, { it.name }, { it.createdAt })
-                    ?.let { Destination(listOf(AppDestination.HousePaymentDetail.createRoute(fid, it.id)), true) }
-                ?: Destination(listOf(AppDestination.HomeItems.createRoute(fid)), false)
-            Kind.VEHICLE -> best(s.vehicles, link, { it.name }, { it.createdAt })
-                ?.let { Destination(listOf(AppDestination.VehicleDetail.createRoute(fid, it.id)), true) }
-                ?: Destination(listOf(AppDestination.Vehicles.createRoute(fid)), false)
-            Kind.PET -> best(s.pets, link, { it.name }, { it.createdAt })
-                ?.let { Destination(listOf(AppDestination.PetDetail.createRoute(fid, it.id)), true) }
-                ?: Destination(listOf(AppDestination.Pets.createRoute(fid)), false)
-            Kind.TRIP -> best(s.trips, link, { it.name }, { it.startDateEpoch })
-                ?.let { Destination(listOf(AppDestination.TravelDetail.createRoute(fid, it.id)), true) }
-                ?: Destination(listOf(AppDestination.TravelList.createRoute(fid)), false)
-        }
+    /**
+     * Una voce dell'app, già trovata: la usa anche la ricerca in Home
+     * (`SearchIndex`), che sa quale voce ha toccato l'utente.
+     */
+    sealed interface Item {
+        data class Expense(val e: KBExpenseEntity) : Item
+        data class Document(val d: KBDocumentEntity) : Item
+        data class Note(val n: KBNoteEntity) : Item
+        data class Event(val e: KBCalendarEventEntity) : Item
+        data class Todo(val t: KBTodoItemEntity) : Item
+        data object Grocery : Item
+        data class Visit(val v: KBMedicalVisit) : Item
+        data class Exam(val e: KBMedicalExam) : Item
+        data class Treatment(val t: KBTreatment) : Item
+        data class Ticket(val t: KBWalletTicketEntity) : Item
+        data class HomeItem(val h: HomeItemEntity) : Item
+        data class HousePayment(val p: HousePaymentEntity) : Item
+        data class Vehicle(val v: VehicleEntity) : Item
+        data class Pet(val p: PetEntity) : Item
+        data class Trip(val t: KBTripEntity) : Item
     }
 
-    private fun healthFallback(fid: String) =
-        Destination(listOf(AppDestination.PediatricChildSelector.createRoute(fid)), false)
+    private fun destination(kind: Kind, link: Link, s: AgentMemorySnapshot): Destination =
+        find(kind, link, s)?.let { destination(it, s) } ?: Destination(section(kind, s.familyId), false)
+
+    private fun find(kind: Kind, link: Link, s: AgentMemorySnapshot): Item? = when (kind) {
+        Kind.EXPENSE -> best(s.expenses, link, { it.title }, { it.dateEpochMillis })?.let(Item::Expense)
+        Kind.DOCUMENT -> {
+            val docs = s.documents + s.walletIdentity.map { it.first }.filter { w -> s.documents.none { it.id == w.id } }
+            best(docs, link, { it.title }, { it.createdAtEpochMillis })?.let(Item::Document)
+        }
+        Kind.NOTE -> best(s.notes, link, { it.title }, { it.updatedAtEpochMillis })?.let(Item::Note)
+        Kind.EVENT -> best(s.events, link, { it.title }, { it.startDateEpochMillis })?.let(Item::Event)
+        Kind.TODO -> best(s.todos.filter { !it.listId.isNullOrBlank() }, link, { it.title }, { it.dueAtEpochMillis ?: it.createdAtEpochMillis })
+            ?.let(Item::Todo)
+        Kind.GROCERY -> Item.Grocery
+        // Una visita nel quaderno non ha titolo: è «VISITA n — data» con
+        // motivo, medico, diagnosi e referti. Si confronta con tutto quello,
+        // e la data da sola basta.
+        Kind.VISIT -> bestOf(
+            s.allVisits, link,
+            { listOf(it.reason, it.doctorName.orEmpty(), it.diagnosis.orEmpty()) + attachmentTitles("visit:${it.id}", s) },
+            { it.dateEpochMillis }, dayIsIdentity = true,
+        )?.let(Item::Visit)
+        Kind.EXAM -> bestOf(
+            s.healthPersons.flatMap { it.exams }, link,
+            { listOf(it.name) + attachmentTitles("exam:${it.id}", s) },
+            { it.resultDateEpochMillis ?: it.deadlineEpochMillis ?: it.createdAtEpochMillis }, dayIsIdentity = true,
+        )?.let(Item::Exam)
+        Kind.TREATMENT -> bestOf(
+            s.healthPersons.flatMap { it.treatments } + s.petTreatments, link,
+            { listOf(it.drugName) + attachmentTitles("treatment:${it.id}", s) },
+            { it.startDateEpochMillis },
+        )?.let(Item::Treatment)
+        Kind.TICKET -> best(s.walletTickets, link, { it.title }, { it.eventDateEpochMillis ?: it.createdAtEpochMillis })?.let(Item::Ticket)
+        Kind.HOME -> best(s.homeItems, link, { it.name }, { it.createdAt })?.let(Item::HomeItem)
+            ?: best(s.housePayments, link, { it.name }, { it.createdAt })?.let(Item::HousePayment)
+        Kind.VEHICLE -> best(s.vehicles, link, { it.name }, { it.createdAt })?.let(Item::Vehicle)
+        Kind.PET -> best(s.pets, link, { it.name }, { it.createdAt })?.let(Item::Pet)
+        Kind.TRIP -> best(s.trips, link, { it.name }, { it.startDateEpoch })?.let(Item::Trip)
+    }
+
+    /** La sezione, quando la voce non c'è più. */
+    fun section(kind: Kind, fid: String): List<String> = listOf(
+        when (kind) {
+            Kind.EXPENSE -> AppDestination.ExpensesHome.createRoute(fid)
+            Kind.DOCUMENT -> AppDestination.DocumentsHome.createRoute(fid)
+            Kind.NOTE -> AppDestination.NotesHome.createRoute(fid)
+            Kind.EVENT -> AppDestination.Calendar.createRoute(fid)
+            Kind.TODO -> AppDestination.Todo.route
+            Kind.GROCERY -> AppDestination.ShoppingList.createRoute(fid)
+            Kind.VISIT, Kind.EXAM, Kind.TREATMENT -> AppDestination.PediatricChildSelector.createRoute(fid)
+            Kind.TICKET -> AppDestination.WalletHome.createRoute(fid)
+            Kind.HOME -> AppDestination.HomeItems.createRoute(fid)
+            Kind.VEHICLE -> AppDestination.Vehicles.createRoute(fid)
+            Kind.PET -> AppDestination.Pets.createRoute(fid)
+            Kind.TRIP -> AppDestination.TravelList.createRoute(fid)
+        },
+    )
+
+    /** Le rotte di una voce, sopra chi la apre. */
+    fun destination(item: Item, s: AgentMemorySnapshot): Destination {
+        val fid = s.familyId
+        val route = when (item) {
+            is Item.Expense -> AppDestination.ExpensesHome.createRoute(fid, highlightExpenseId = item.e.id)
+            is Item.Document -> return documentDestination(item.d, s)
+            is Item.Note -> AppDestination.NoteDetail.createRoute(fid, item.n.id)
+            is Item.Event -> AppDestination.Calendar.createRoute(fid, item.e.id)
+            is Item.Todo -> item.t.listId?.takeIf { it.isNotBlank() }
+                ?.let { AppDestination.TodoList.createRoute(fid, item.t.childId, it, item.t.id) }
+                ?: AppDestination.Todo.route
+            Item.Grocery -> AppDestination.ShoppingList.createRoute(fid)
+            is Item.Visit -> AppDestination.MedicalVisitDetail.route(fid, item.v.childId, item.v.id)
+            is Item.Exam -> AppDestination.MedicalExamDetail.route(fid, item.e.childId, item.e.id)
+            is Item.Treatment -> if (item.t.petId.isNotBlank()) AppDestination.PetTreatmentDetail.route(fid, item.t.petId, item.t.id)
+                else AppDestination.TreatmentDetail.route(fid, item.t.childId, item.t.id)
+            is Item.Ticket -> AppDestination.WalletDetail.createRoute(fid, item.t.id)
+            is Item.HomeItem -> AppDestination.HomeItemDetail.createRoute(fid, item.h.id)
+            is Item.HousePayment -> AppDestination.HousePaymentDetail.createRoute(fid, item.p.id)
+            is Item.Vehicle -> AppDestination.VehicleDetail.createRoute(fid, item.v.id)
+            is Item.Pet -> AppDestination.PetDetail.createRoute(fid, item.p.id)
+            is Item.Trip -> AppDestination.TravelDetail.createRoute(fid, item.t.id)
+        }
+        return Destination(listOf(route), true)
+    }
 
     /**
      * Un allegato si apre dove vive (la visita, l'oggetto di casa…), un
      * documento d'identità nel Wallet, gli altri nella loro cartella.
      */
-    private fun documentDestination(d: it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity, s: AgentMemorySnapshot): Destination {
+    private fun documentDestination(d: KBDocumentEntity, s: AgentMemorySnapshot): Destination {
         val fid = s.familyId
         if (s.walletIdentity.any { it.first.id == d.id }) {
             return Destination(listOf(AppDestination.WalletDocumentDetail.createRoute(fid, d.id)), true)

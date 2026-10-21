@@ -251,6 +251,17 @@ object AppAnalytics {
         }
     }
 
+    /** Tocco su un risultato di «Cerca in KidBox»; `inText` = trovato nel testo, non nel titolo. */
+    fun searchResultOpened(context: Context, kind: String, inText: Boolean) {
+        log(context, "search_result_opened") {
+            putString("kind", kind)
+            putString("in_text", if (inText) "true" else "false")
+        }
+    }
+
+    /** «Chiedi all'assistente» in fondo ai risultati della ricerca. */
+    fun searchAskedAssistant(context: Context) = log(context, "search_ask_assistant")
+
     fun aiBriefingReceived(context: Context) {
         log(context, "ai_briefing_received")
     }

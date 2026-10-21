@@ -124,7 +124,10 @@ class PlanningAIChatViewModel @Inject constructor(
     private var scopeId: String = "planning-agent-$effectiveFamilyId"
     private val routeFamilyName: String = savedStateHandle["familyName"] ?: ""
 
-    private val _uiState = MutableStateFlow(PlanningChatUiState(focus = focusFrom(savedStateHandle)))
+    // `draft`: la frase di «Chiedi all'assistente» della ricerca, nel campo e non mandata.
+    private val _uiState = MutableStateFlow(
+        PlanningChatUiState(focus = focusFrom(savedStateHandle), inputText = savedStateHandle["draft"] ?: ""),
+    )
     val uiState: StateFlow<PlanningChatUiState> = _uiState.asStateFlow()
     private var observeJob: Job? = null
     private var conversation: KBAIConversation? = null

@@ -432,4 +432,26 @@
     <string name="fitness_shoe_stat_pace">Avg pace</string>
     <string name="fitness_shoe_stat_time">Time</string>
     <string name="agent_link_not_found">I can\'t find «%1$s» anymore: opening the section.</string>
+    <string name="search_placeholder">Search KidBox</string>
+    <string name="search_clear">Clear</string>
+    <string name="search_hint">Search expenses, documents (including their scanned text), notes, calendar, to-dos, health, wallet, home, vehicles, pets and trips.</string>
+    <string name="search_no_results">No results for «%1$s».</string>
+    <string name="search_ask_assistant">Ask the assistant: «%1$s»</string>
+    <string name="search_ask_assistant_footer">For questions about your data, like «how much did we spend on school?». Uses one AI message.</string>
+    <string name="search_section_expenses">Expenses</string>
+    <string name="search_section_documents">Documents</string>
+    <string name="search_section_notes">Notes</string>
+    <string name="search_section_calendar">Calendar</string>
+    <string name="search_section_todo">To-dos</string>
+    <string name="search_section_grocery">Shopping list</string>
+    <string name="search_section_visits">Visits</string>
+    <string name="search_section_exams">Tests</string>
+    <string name="search_section_treatments">Treatments</string>
+    <string name="search_section_wallet">Wallet</string>
+    <string name="search_section_home">Home</string>
+    <string name="search_section_vehicles">Vehicles</string>
+    <string name="search_section_pets">Pets</string>
+    <string name="search_section_trips">Trips</string>
+    <string name="search_untitled">(untitled)</string>
+    <string name="search_visit">Visit</string>
 </resources>

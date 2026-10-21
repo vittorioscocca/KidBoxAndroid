@@ -462,9 +462,13 @@ sealed class AppDestination(val route: String) {
      */
     data object AiChat : AppDestination(
         "ai_chat/{familyId}?focusPersonId={focusPersonId}&focusName={focusName}" +
-            "&focusScope={focusScope}&focusItemId={focusItemId}&focusDetail={focusDetail}",
+            "&focusScope={focusScope}&focusItemId={focusItemId}&focusDetail={focusDetail}&draft={draft}",
     ) {
         fun createRoute(familyId: String): String = "ai_chat/$familyId"
+
+        /** Da «Chiedi all'assistente» della ricerca: la frase resta nel campo, non parte. */
+        fun createRoute(familyId: String, draft: String): String =
+            "ai_chat/$familyId?draft=${android.net.Uri.encode(draft)}"
 
         fun createRoute(familyId: String, focus: it.vittorioscocca.kidbox.ui.screens.ai.planning.AgentFocus): String {
             // `Uri.encode` e non `URLEncoder`: gli spazi diventano %20, che Navigation
@@ -473,6 +477,10 @@ sealed class AppDestination(val route: String) {
             return "ai_chat/$familyId?focusPersonId=${e(focus.personId)}&focusName=${e(focus.personName)}" +
                 "&focusScope=${focus.scope.raw}&focusItemId=${e(focus.itemId)}&focusDetail=${e(focus.detail)}"
         }
+    }
+    /** «Cerca in KidBox» dalla Home (`SearchScreen`). */
+    data object Search : AppDestination("search/{familyId}") {
+        fun createRoute(familyId: String): String = "search/$familyId"
     }
     data object PlanningAiChat : AppDestination("planning_ai_chat/{familyId}?familyName={familyName}") {
         fun createRoute(familyId: String, familyName: String): String {

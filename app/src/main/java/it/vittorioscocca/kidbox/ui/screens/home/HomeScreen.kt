@@ -70,6 +70,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -284,6 +285,12 @@ fun HomeScreen(
                     )
                 }
 
+                // «Cerca in KidBox»: sembra un campo, apre la schermata di ricerca.
+                if (state.familyId.isNotBlank()) {
+                    Spacer(modifier = Modifier.size(12.dp))
+                    HomeSearchBar(onClick = { onNavigate(AppDestination.Search.createRoute(state.familyId)) })
+                }
+
                 Spacer(modifier = Modifier.size(16.dp))
 
                 HomeHeroCarousel(
@@ -448,6 +455,26 @@ fun HomeScreen(
 
     if (showQuickInvite) {
         QuickInviteSheet(onDismiss = { showQuickInvite = false })
+    }
+}
+
+// ── HomeSearchBar ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun HomeSearchBar(onClick: () -> Unit) {
+    val kb = MaterialTheme.kidBoxColors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(kb.card)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.Search, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(20.dp))
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(stringResource(R.string.search_placeholder), color = kb.subtitle, fontSize = 16.sp)
     }
 }
 
