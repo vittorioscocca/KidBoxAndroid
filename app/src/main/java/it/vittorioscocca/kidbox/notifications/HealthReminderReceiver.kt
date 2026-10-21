@@ -18,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 class HealthReminderReceiver : BroadcastReceiver() {
 
@@ -49,6 +50,9 @@ class HealthReminderReceiver : BroadcastReceiver() {
                 val childId = intent.getStringExtra(EXTRA_CHILD_ID).orEmpty()
                 val dayOffset = intent.getIntExtra(EXTRA_DAY_OFFSET, 0)
                 val slotIndex = intent.getIntExtra(EXTRA_SLOT_INDEX, 0)
+                // Una cura chiusa, sospesa o cancellata da un altro membro non tocca
+                // gli alarm già armati qui: si decide alla consegna.
+                if (treatmentId.isNotEmpty() && isTreatmentStopped(context.applicationContext, treatmentId)) return
                 // Prima la chiave (tradotta ora, alla consegna), poi la frase già
                 // composta: gli alarm armati da una versione precedente hanno solo
                 // quella, e sopravvivono all'aggiornamento dell'app.
@@ -485,6 +489,17 @@ class HealthReminderReceiver : BroadcastReceiver() {
             }
         }
     }
+
+    /** Vero se la cura locale è terminata, sospesa, senza promemoria o cancellata: allora disarma i suoi alarm. */
+    private fun isTreatmentStopped(appCtx: Context, treatmentId: String): Boolean = runCatching {
+        runBlocking(Dispatchers.IO) {
+            val ep = EntryPointAccessors.fromApplication(appCtx, VehicleReminderEntryPoint::class.java)
+            val entity = ep.treatmentDao().getById(treatmentId) ?: return@runBlocking false
+            val stopped = entity.isDeleted || !entity.isActive || !entity.reminderEnabled
+            if (stopped) ep.treatmentNotificationManager().cancel(treatmentId)
+            stopped
+        }
+    }.getOrDefault(false)
 
     /**
      * Ricarica la cura da Room e allunga la finestra di alarm. La cura può essere
