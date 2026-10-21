@@ -22,7 +22,7 @@ object AgentLinks {
         "- Quando parli di una voce precisa delle schede (una spesa, un documento, una nota, un evento, un to-do, una visita…) " +
             "o l'utente cerca qualcosa («trovami…», «dov'è…», «la bolletta di…»), mettila come link, così si apre con un tocco: " +
             "[titolo esatto come nella scheda](apri:TIPO), oppure [titolo](apri:TIPO/AAAA-MM-GG) con la data della voce se più voci " +
-            "hanno lo stesso titolo. TIPO: spese, documento, nota, evento, todo, listaspesa, visita, esame, cura, biglietto, casa, " +
+            "hanno lo stesso titolo; per visite, esami e cure metti sempre la data. TIPO: spese, documento, nota, evento, todo, listaspesa, visita, esame, cura, biglietto, casa, " +
             "veicolo, animale, viaggio. Solo voci che ci sono nelle schede, mai altri indirizzi; non dire «clicca qui»: il link è il titolo."
 
     enum class Kind(val raw: String) {
@@ -70,9 +70,33 @@ object AgentLinks {
      */
     data class Destination(val routes: List<String>, val found: Boolean)
 
+    /**
+     * Ordine in cui si cerca negli altri tipi quando quello indicato non ha la
+     * voce: il modello a volte scrive `visita` per il referto di una
+     * gastroscopia o `documento` per una visita. La lista della spesa no:
+     * «trovata» lo è sempre.
+     */
+    private val FALLBACK_ORDER = listOf(
+        Kind.DOCUMENT, Kind.VISIT, Kind.EXAM, Kind.TREATMENT, Kind.EXPENSE, Kind.NOTE, Kind.EVENT, Kind.TODO,
+        Kind.TICKET, Kind.HOME, Kind.VEHICLE, Kind.PET, Kind.TRIP,
+    )
+
     fun destination(link: Link, s: AgentMemorySnapshot): Destination {
+        val first = destination(link.kind, link, s)
+        if (first.found) return first
+        return FALLBACK_ORDER.asSequence()
+            .filter { it != link.kind }
+            .map { destination(it, link, s) }
+            .firstOrNull { it.found }
+            ?: first
+    }
+
+    private fun attachmentTitles(tag: String, s: AgentMemorySnapshot): List<String> =
+        s.documents.filter { it.notes == tag }.map { it.title }
+
+    private fun destination(kind: Kind, link: Link, s: AgentMemorySnapshot): Destination {
         val fid = s.familyId
-        return when (link.kind) {
+        return when (kind) {
             Kind.EXPENSE -> best(s.expenses, link, { it.title }, { it.dateEpochMillis })
                 ?.let { Destination(listOf(AppDestination.ExpensesHome.createRoute(fid, highlightExpenseId = it.id)), true) }
                 ?: Destination(listOf(AppDestination.ExpensesHome.createRoute(fid)), false)
@@ -94,13 +118,28 @@ object AgentLinks {
                 ?.let { Destination(listOf(AppDestination.TodoList.createRoute(fid, it.childId, it.listId!!, it.id)), true) }
                 ?: Destination(listOf(AppDestination.Todo.route), false)
             Kind.GROCERY -> Destination(listOf(AppDestination.ShoppingList.createRoute(fid)), true)
-            Kind.VISIT -> best(s.allVisits, link, { it.reason.ifBlank { it.doctorName.orEmpty() } }, { it.dateEpochMillis })
+            // Una visita nel quaderno non ha titolo: è «VISITA n — data» con
+            // motivo, medico, diagnosi e referti. Si confronta con tutto quello,
+            // e la data da sola basta.
+            Kind.VISIT -> bestOf(
+                s.allVisits, link,
+                { listOf(it.reason, it.doctorName.orEmpty(), it.diagnosis.orEmpty()) + attachmentTitles("visit:${it.id}", s) },
+                { it.dateEpochMillis }, dayIsIdentity = true,
+            )
                 ?.let { Destination(listOf(AppDestination.MedicalVisitDetail.route(fid, it.childId, it.id)), true) }
                 ?: healthFallback(fid)
-            Kind.EXAM -> best(s.healthPersons.flatMap { it.exams }, link, { it.name }, { it.deadlineEpochMillis ?: it.createdAtEpochMillis })
+            Kind.EXAM -> bestOf(
+                s.healthPersons.flatMap { it.exams }, link,
+                { listOf(it.name) + attachmentTitles("exam:${it.id}", s) },
+                { it.resultDateEpochMillis ?: it.deadlineEpochMillis ?: it.createdAtEpochMillis }, dayIsIdentity = true,
+            )
                 ?.let { Destination(listOf(AppDestination.MedicalExamDetail.route(fid, it.childId, it.id)), true) }
                 ?: healthFallback(fid)
-            Kind.TREATMENT -> best(s.healthPersons.flatMap { it.treatments } + s.petTreatments, link, { it.drugName }, { it.startDateEpochMillis })
+            Kind.TREATMENT -> bestOf(
+                s.healthPersons.flatMap { it.treatments } + s.petTreatments, link,
+                { listOf(it.drugName) + attachmentTitles("treatment:${it.id}", s) },
+                { it.startDateEpochMillis },
+            )
                 ?.let { t ->
                     val route = if (t.petId.isNotBlank()) AppDestination.PetTreatmentDetail.route(fid, t.petId, t.id)
                     else AppDestination.TreatmentDetail.route(fid, t.childId, t.id)
@@ -165,38 +204,56 @@ object AgentLinks {
         )
     }
 
+    /** Parole che non distinguono una voce dall'altra: «Referto gastroscopia» deve trovare la visita «Gastroscopia». */
+    private val STOPWORDS = setOf(
+        "del", "della", "dello", "dei", "degli", "delle", "per", "con", "dal", "alla", "allo",
+        "referto", "referti", "visita", "visite", "esame", "esami", "documento", "allegato",
+        "risultato", "risultati", "cura", "terapia", "spesa", "nota",
+    )
+
     private fun words(text: String): Set<String> =
-        text.split(Regex("[^\\p{L}\\p{N}]+")).filter { it.length > 2 }.toSet()
+        text.split(Regex("[^\\p{L}\\p{N}]+")).filter { it.length > 2 }.toSet() - STOPWORDS
+
+    fun <T> best(items: List<T>, link: Link, title: (T) -> String, date: (T) -> Long): T? =
+        bestOf(items, link, { listOf(title(it)) }, date)
 
     /**
-     * La voce più simile al titolo: uguale, poi contenuta, poi parole in
-     * comune; a parità vince il giorno indicato, poi la più recente.
+     * La voce più simile al titolo: uguale, poi contenuta, poi più di metà
+     * delle parole in comune. Il primo testo è il nome della voce, gli altri
+     * (diagnosi, referti allegati) contano meno. Con `dayIsIdentity` il giorno
+     * indicato basta anche senza parole in comune. A parità vince il giorno
+     * indicato, poi la più recente.
      */
-    fun <T> best(items: List<T>, link: Link, title: (T) -> String, date: (T) -> Long): T? {
+    fun <T> bestOf(items: List<T>, link: Link, texts: (T) -> List<String>, date: (T) -> Long, dayIsIdentity: Boolean = false): T? {
         val wanted = AgentRelevance.fold(link.title).trim()
         if (wanted.isEmpty()) return null
         val wantedWords = words(wanted)
-        val day = link.day?.let {
-            runCatching { SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(it)?.time }.getOrNull()
-        }
+        val dayFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val day = link.day?.let { runCatching { dayFmt.parse(it)?.time }.getOrNull() }
         var bestItem: T? = null
         var bestScore = 0
         var bestDistance = Double.POSITIVE_INFINITY
         for (item in items) {
-            val t = AgentRelevance.fold(title(item)).trim()
-            if (t.isEmpty()) continue
-            val score = when {
-                t == wanted -> 1000
-                t.contains(wanted) || wanted.contains(t) -> 500
-                else -> {
-                    val common = words(t).intersect(wantedWords).size
-                    // Più di metà delle parole chieste: una parola sola in comune
-                    // («Bolletta gas» per «Bolletta luce») non è la voce cercata.
-                    if (common == 0 || common * 2 <= wantedWords.size) continue
-                    100 * common
+            var score = 0
+            texts(item).forEachIndexed { index, raw ->
+                val t = AgentRelevance.fold(raw).trim()
+                if (t.isEmpty()) return@forEachIndexed
+                val primary = index == 0
+                val textScore = when {
+                    t == wanted -> if (primary) 1000 else 400
+                    t.contains(wanted) || (words(t).isNotEmpty() && wanted.contains(t)) -> if (primary) 500 else 300
+                    else -> {
+                        val common = words(t).intersect(wantedWords).size
+                        // Più di metà delle parole chieste: una parola sola in comune
+                        // («Bolletta gas» per «Bolletta luce») non è la voce cercata.
+                        if (common > 0 && common * 2 > wantedWords.size) 100 * common else 0
+                    }
                 }
+                score = maxOf(score, textScore)
             }
             val d = date(item)
+            if (dayIsIdentity && day != null && dayFmt.format(java.util.Date(d)) == link.day) score += 50
+            if (score == 0) continue
             val distance = day?.let { abs(d - it).toDouble() } ?: -d.toDouble()
             if (score > bestScore || (score == bestScore && distance < bestDistance)) {
                 bestItem = item
