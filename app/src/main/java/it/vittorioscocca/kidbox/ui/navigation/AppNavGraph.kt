@@ -1,6 +1,5 @@
 package it.vittorioscocca.kidbox.ui.navigation
 
-import it.vittorioscocca.kidbox.ui.screens.search.SearchScreen
 import it.vittorioscocca.kidbox.util.KBLog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -2382,16 +2381,6 @@ fun AppNavGraph(
                 onNavigateToUpgrade = { navController.navigate(AppDestination.AiSettings.route) },
                 onBack = { navController.popBackStack() },
                 onOpenRoute = { navController.navigate(it) },
-            )
-        }
-
-        composable(
-            route = AppDestination.Search.route,
-            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
-        ) {
-            SearchScreen(
-                onBack = { navController.popBackStack() },
-                onOpenRoute = { route -> navController.navigate(route) },
             )
         }
 

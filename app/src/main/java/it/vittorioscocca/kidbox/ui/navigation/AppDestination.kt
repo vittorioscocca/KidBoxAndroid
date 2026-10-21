@@ -478,10 +478,6 @@ sealed class AppDestination(val route: String) {
                 "&focusScope=${focus.scope.raw}&focusItemId=${e(focus.itemId)}&focusDetail=${e(focus.detail)}"
         }
     }
-    /** «Cerca in KidBox» dalla Home (`SearchScreen`). */
-    data object Search : AppDestination("search/{familyId}") {
-        fun createRoute(familyId: String): String = "search/$familyId"
-    }
     data object PlanningAiChat : AppDestination("planning_ai_chat/{familyId}?familyName={familyName}") {
         fun createRoute(familyId: String, familyName: String): String {
             val encodedName = java.net.URLEncoder.encode(familyName, Charsets.UTF_8.name())

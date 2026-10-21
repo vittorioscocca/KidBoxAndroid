@@ -130,6 +130,7 @@ import it.vittorioscocca.kidbox.util.KBLocale
 import it.vittorioscocca.kidbox.data.notification.CounterField
 import it.vittorioscocca.kidbox.ui.components.KidBoxAvatar
 import it.vittorioscocca.kidbox.ui.components.KidBoxWordmark
+import it.vittorioscocca.kidbox.ui.screens.search.SearchSheet
 import it.vittorioscocca.kidbox.ui.family.FamilySwitcherBottomSheet
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import it.vittorioscocca.kidbox.ui.permissions.rememberNotificationPermissionRequester
@@ -154,6 +155,7 @@ fun HomeScreen(
     val showDashboard by viewModel.showDashboard.collectAsStateWithLifecycle()
     var showFamilySwitcher by remember { mutableStateOf(false) }
     var showQuickInvite by remember { mutableStateOf(false) }
+    var showSearch by remember { mutableStateOf(false) }
     val familySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val snackbarHostState = remember { SnackbarHostState() }
     val requestsScope = rememberCoroutineScope()
@@ -246,6 +248,15 @@ fun HomeScreen(
                             .clickable { onNavigate(AppDestination.Profile.route) },
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (state.familyId.isNotBlank()) {
+                            IconButton(onClick = { showSearch = true }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Search,
+                                    contentDescription = stringResource(R.string.search_placeholder),
+                                    tint = MaterialTheme.kidBoxColors.title,
+                                )
+                            }
+                        }
                         IconButton(onClick = { onNavigate(AppDestination.Suggestions.route) }) {
                             Icon(
                                 imageVector = Icons.Filled.Lightbulb,
@@ -283,12 +294,6 @@ fun HomeScreen(
                         onViewModeChange = { viewModel.setHomeViewMode(it) },
                         onSwitchFamily = { showFamilySwitcher = true },
                     )
-                }
-
-                // «Cerca in KidBox»: sembra un campo, apre la schermata di ricerca.
-                if (state.familyId.isNotBlank()) {
-                    Spacer(modifier = Modifier.size(12.dp))
-                    HomeSearchBar(onClick = { onNavigate(AppDestination.Search.createRoute(state.familyId)) })
                 }
 
                 Spacer(modifier = Modifier.size(16.dp))
@@ -453,28 +458,16 @@ fun HomeScreen(
         )
     }
 
+    // «Cerca in KidBox»: il foglio si chiude da sé prima di aprire una voce.
+    if (showSearch && state.familyId.isNotBlank()) {
+        SearchSheet(
+            familyId = state.familyId,
+            onDismiss = { showSearch = false },
+            onOpenRoute = onNavigate,
+        )
+    }
     if (showQuickInvite) {
         QuickInviteSheet(onDismiss = { showQuickInvite = false })
-    }
-}
-
-// ── HomeSearchBar ─────────────────────────────────────────────────────────────
-
-@Composable
-private fun HomeSearchBar(onClick: () -> Unit) {
-    val kb = MaterialTheme.kidBoxColors
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(kb.card)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(Icons.Filled.Search, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(20.dp))
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(stringResource(R.string.search_placeholder), color = kb.subtitle, fontSize = 16.sp)
     }
 }
 

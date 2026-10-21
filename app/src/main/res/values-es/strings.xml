@@ -454,4 +454,7 @@
     <string name="search_section_trips">Viajes</string>
     <string name="search_untitled">(sin título)</string>
     <string name="search_visit">Visita</string>
+    <string name="search_close">Cerrar</string>
+    <string name="search_all">Todo</string>
+    <string name="search_section_empty">Nada en esta sección.</string>
 </resources>

@@ -454,4 +454,7 @@
     <string name="search_section_trips">Trips</string>
     <string name="search_untitled">(untitled)</string>
     <string name="search_visit">Visit</string>
+    <string name="search_close">Close</string>
+    <string name="search_all">All</string>
+    <string name="search_section_empty">Nothing in this section.</string>
 </resources>

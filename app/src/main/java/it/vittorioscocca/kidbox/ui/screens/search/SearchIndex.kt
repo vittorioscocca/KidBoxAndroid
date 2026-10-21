@@ -44,22 +44,31 @@ class SearchIndex(val snapshot: AgentMemorySnapshot, untitled: String, visit: St
 
     /**
      * Tutte le parole della ricerca, nel titolo o nel testo: prima le voci col
-     * titolo che corrisponde, poi le più recenti.
+     * titolo che corrisponde, poi le più recenti. `kinds` vuoto = tutte le
+     * sezioni; con una sezione scelta e niente scritto si vedono le sue voci
+     * più recenti.
      */
-    fun search(query: String): List<Section> {
+    fun search(query: String, kinds: Set<AgentLinks.Kind> = emptySet()): List<Section> {
         val words = AgentRelevance.fold(query).split(Regex("[^\\p{L}\\p{N}]+")).filter { it.isNotEmpty() }
-        if (words.isEmpty() || words.joinToString("").length < 2) return emptyList()
-        val hits = entries.mapNotNull { e ->
-            val inTitle = words.all { e.foldedTitle.contains(it) }
-            if (!inTitle && !words.all { e.foldedTitle.contains(it) || e.foldedText.contains(it) }) return@mapNotNull null
-            Hit(e, if (inTitle) null else snippet(e.text, words), inTitle)
-        }
+        val typed = words.isNotEmpty() && words.joinToString("").length >= 2
+        if (!typed && kinds.isEmpty()) return emptyList()
+        val hits = entries.asSequence()
+            .filter { kinds.isEmpty() || it.kind in kinds }
+            .mapNotNull { e ->
+                if (!typed) return@mapNotNull Hit(e, null, true)
+                val inTitle = words.all { e.foldedTitle.contains(it) }
+                if (!inTitle && !words.all { e.foldedTitle.contains(it) || e.foldedText.contains(it) }) return@mapNotNull null
+                Hit(e, if (inTitle) null else snippet(e.text, words), inTitle)
+            }
+            .toList()
+        // Con una sola sezione scelta si vede di più: è una lista, non un riepilogo.
+        val limit = if (kinds.size == 1) PER_SINGLE_SECTION else PER_SECTION
         val grouped = hits.groupBy { it.entry.kind }
         return ORDER.mapNotNull { kind ->
             grouped[kind]?.takeIf { it.isNotEmpty() }?.let { list ->
                 Section(
                     kind,
-                    list.sortedWith(compareByDescending<Hit> { it.inTitle }.thenByDescending { it.entry.date }).take(PER_SECTION),
+                    list.sortedWith(compareByDescending<Hit> { it.inTitle }.thenByDescending { it.entry.date }).take(limit),
                 )
             }
         }
@@ -74,6 +83,7 @@ class SearchIndex(val snapshot: AgentMemorySnapshot, untitled: String, visit: St
             AgentLinks.Kind.TRIP, AgentLinks.Kind.GROCERY,
         )
         const val PER_SECTION = 8
+        const val PER_SINGLE_SECTION = 50
 
         private fun build(s: AgentMemorySnapshot, untitled: String, visit: String): List<Entry> {
             val locale = Locale.getDefault()
@@ -88,9 +98,11 @@ class SearchIndex(val snapshot: AgentMemorySnapshot, untitled: String, visit: St
                 val clean = title.trim()
                 if (clean.isEmpty()) return
                 val body = text.mapNotNull { it?.trim()?.takeIf { t -> t.isNotEmpty() } }.joinToString("\n")
+                // La riga sotto il titolo (persona, data, importo) si cerca anche lei:
+                // «Marco visita», «84,20», «ottobre».
                 out += Entry(
                     "${kind.raw}:$id", kind, item, clean, subtitle, date, body,
-                    AgentRelevance.fold(clean), AgentRelevance.fold(body),
+                    AgentRelevance.fold(clean), AgentRelevance.fold(subtitle + "\n" + body),
                 )
             }
             fun join(vararg parts: String?) = parts.filterNot { it.isNullOrBlank() }.joinToString(" · ")
