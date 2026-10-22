@@ -29,6 +29,16 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.pager.VerticalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalFocusManager
+import java.time.DayOfWeek
+import java.time.format.TextStyle
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -166,8 +176,18 @@ fun CalendarScreen(
     // compilato, e chiuso il modulo (salvato o no) si torna alle Notizie.
     val newsPrefill = remember { CalendarPrefillHandoff.take() }
     var showForm by remember { mutableStateOf(newsPrefill != null) }
+    // La ricerca si apre dalla lente in alto a destra, come in Calendario di
+    // Apple, e si chiude con «Annulla».
     var searchOpen by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    val searchFocus = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    val closeSearch = {
+        focusManager.clearFocus()
+        searchQuery = ""
+        searchOpen = false
+    }
+    LaunchedEffect(searchOpen) { if (searchOpen) searchFocus.requestFocus() }
     var editingEvent by remember { mutableStateOf<KBCalendarEventEntity?>(null) }
     var pendingSeriesDelete by remember { mutableStateOf<KBCalendarEventEntity?>(null) }
     pendingSeriesDelete?.let { series ->
@@ -359,10 +379,7 @@ fun CalendarScreen(
                     HeaderCircleButton(
                         icon = Icons.Filled.Search,
                         contentDescription = stringResource(R.string.search_calendar),
-                        onClick = {
-                            searchOpen = !searchOpen
-                            if (!searchOpen) searchQuery = ""
-                        },
+                        onClick = { if (searchOpen) closeSearch() else searchOpen = true },
                     )
                     Spacer(Modifier.width(8.dp))
                     HeaderCircleButton(
@@ -399,12 +416,22 @@ fun CalendarScreen(
                     .fillMaxSize(),
             ) {
                 if (searchOpen) {
-                    KidBoxSearchField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        placeholder = stringResource(R.string.search_calendar),
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
+                    Row(
+                        modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        KidBoxSearchField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = stringResource(R.string.search_calendar),
+                            modifier = Modifier
+                                .weight(1f)
+                                .focusRequester(searchFocus),
+                        )
+                        TextButton(onClick = closeSearch) {
+                            Text(stringResource(R.string.calendar_cancel), color = MaterialTheme.kidBoxColors.title)
+                        }
+                    }
                 }
                 if (searchOpen && searchQuery.isNotBlank()) {
                     CalendarSearchResults(
@@ -426,7 +453,9 @@ fun CalendarScreen(
                         },
                     )
                 } else {
-                Row(
+                // Con la ricerca aperta il campo prende il posto del selettore,
+                // come in Calendario di Apple.
+                if (!searchOpen) Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -456,7 +485,7 @@ fun CalendarScreen(
                     ) { viewModel.setMode(CalendarMode.YEAR) }
                 }
 
-                if (deviceState.showsPrompt) {
+                if (deviceState.showsPrompt && !searchOpen) {
                     DeviceCalendarPromptCard(
                         onConnect = requestCalendarPermission,
                         onDismiss = viewModel::dismissDeviceCalendarPrompt,
@@ -500,7 +529,6 @@ fun CalendarScreen(
 
                     CalendarMode.MONTH -> CalendarMonthView(
                         selectedDate = state.selectedDate,
-                        displayedMonth = state.displayedMonth,
                         events = gridEvents,
                         deviceEventsById = deviceById,
                         onOpenDeviceEvent = { openedDeviceEvent = it },
@@ -688,7 +716,6 @@ fun CalendarScreen(
 @Composable
 private fun CalendarMonthView(
     selectedDate: LocalDate,
-    displayedMonth: LocalDate,
     events: List<KBCalendarEventEntity>,
     /** Gli eventi del telefono dietro le copie `device:` di `events`. */
     deviceEventsById: Map<String, DeviceCalendarEvent>,
@@ -708,116 +735,188 @@ private fun CalendarMonthView(
     }
     val remindersByDate = remember(reminders) { buildRemindersByDay(reminders) }
 
-    val days = remember(displayedMonth) { monthGridDays(displayedMonth.withDayOfMonth(1)) }
     val kb = MaterialTheme.kidBoxColors
     val locale = KBLocale.current()
-    val monthLabel = displayedMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy", locale))
+    val today = LocalDate.now()
+    val todayIndex = monthIndex(today)
+    // Dieci anni prima e dopo oggi: la vista Anno serve per i salti più lunghi.
+    val firstIndex = todayIndex - MONTH_PAGES_EACH_SIDE
+    // Già sul mese giusto dalla prima composizione, senza partire da dieci anni fa.
+    val pagerState = rememberPagerState(
+        initialPage = (monthIndex(selectedDate) - firstIndex).coerceIn(0, MONTH_PAGES_EACH_SIDE * 2),
+    ) { MONTH_PAGES_EACH_SIDE * 2 + 1 }
+    val visibleIndex = firstIndex + pagerState.currentPage
+    val visibleMonth = monthDate(visibleIndex)
+    val monthName = visibleMonth.format(DateTimeFormatter.ofPattern("LLLL", locale))
         .replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
+    val weekdays = remember(locale) {
+        // Lunedì in testa, come la griglia; iniziali nella lingua dell'app.
+        DayOfWeek.values().map { it.getDisplayName(TextStyle.NARROW, locale) }
+    }
+
+    // Il titolo segue la pagina mentre scorre, e con lui la finestra di
+    // ripetizioni e calendari del telefono.
+    LaunchedEffect(visibleIndex) { onChangeDisplayedMonth(visibleMonth) }
+    // A pagina ferma si sceglie un giorno del nuovo mese: oggi se è il mese
+    // corrente, altrimenti il primo. Durante lo scorrimento no, o la lista sotto
+    // cambierebbe a ogni mese attraversato.
+    LaunchedEffect(pagerState.settledPage) {
+        val index = firstIndex + pagerState.settledPage
+        if (monthIndex(selectedDate) != index) {
+            onSelectDate(if (index == todayIndex) today else monthDate(index))
+        }
+    }
+    // Giorno scelto da fuori (Anno, notifica, «Oggi»): la griglia lo raggiunge.
+    LaunchedEffect(selectedDate) {
+        val target = monthIndex(selectedDate) - firstIndex
+        if (target in 0 until pagerState.pageCount && target != pagerState.currentPage) {
+            pagerState.animateScrollToPage(target)
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
+        // «Ottobre 2026» grande a sinistra, come il titolo di Calendario di
+        // Apple; «Oggi» compare solo lontano dal mese corrente.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
+                .heightIn(min = 44.dp)
+                .padding(start = 16.dp, end = 16.dp, top = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = { onChangeDisplayedMonth(displayedMonth.minusMonths(1).withDayOfMonth(1)) }) {
-                Icon(
-                    Icons.Default.ChevronLeft,
-                    contentDescription = stringResource(R.string.calendar_previous_month_cd),
-                    tint = kb.title,
-                )
-            }
             Text(
-                monthLabel,
-                modifier = Modifier.weight(1f),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
+                monthName,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
                 // Come il titolo: senza colore esplicito resterebbe nero anche
                 // in tema scuro.
                 color = kb.title,
             )
-            IconButton(onClick = { onChangeDisplayedMonth(displayedMonth.plusMonths(1).withDayOfMonth(1)) }) {
-                Icon(
-                    Icons.Default.ChevronRight,
-                    contentDescription = stringResource(R.string.calendar_next_month_cd),
-                    tint = kb.title,
-                )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                visibleMonth.year.toString(),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = kb.subtitle,
+            )
+            Spacer(Modifier.weight(1f))
+            if (visibleIndex != todayIndex) {
+                PillButton(text = stringResource(R.string.calendar_today_btn)) { onSelectDate(today) }
             }
         }
 
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-            listOf("L", "M", "M", "G", "V", "S", "D").forEach { d ->
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 6.dp),
+        ) {
+            weekdays.forEach { d ->
                 Text(
                     text = d,
                     modifier = Modifier.weight(1f),
-                    color = MaterialTheme.kidBoxColors.subtitle,
+                    color = kb.subtitle,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    fontSize = 13.sp,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
         }
 
-        days.chunked(7).forEach { week ->
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                week.forEach { day ->
-                    if (day == null) {
-                        Spacer(modifier = Modifier.weight(1f).height(46.dp))
-                    } else {
-                        val hasEvents = eventsByDate[day].isNullOrEmpty().not()
-                        val isSelected = day == selectedDate
-                        val isToday = day == LocalDate.now()
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(46.dp)
-                                .clickable { onSelectDate(day) },
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        when {
-                                            isSelected -> Color(0xFF2196F3)
-                                            isToday -> Color(0xFFE9F2FF)
-                                            else -> Color.Transparent
-                                        },
-                                    ),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    text = day.dayOfMonth.toString(),
-                                    color = if (isSelected) Color.White else MaterialTheme.kidBoxColors.title,
-                                    fontWeight = if (isToday || isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                )
+        // I mesi uno sotto l'altro, una pagina per mese: si scorre in su e in
+        // giù per cambiare mese. Sei settimane per pagina, così le pagine sono
+        // tutte alte uguali.
+        VerticalPager(
+            state = pagerState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(MONTH_ROW_HEIGHT * 6),
+            beyondViewportPageCount = 1,
+            key = { firstIndex + it },
+        ) { page ->
+            val monthFirst = monthDate(firstIndex + page)
+            val days = remember(monthFirst) {
+                monthGridDays(monthFirst).toMutableList().apply { while (size < 42) add(null) }
+            }
+            val lineColor = kb.title.copy(alpha = 0.12f)
+            Column(modifier = Modifier.fillMaxSize()) {
+                days.chunked(7).forEach { week ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(MONTH_ROW_HEIGHT)
+                            .padding(horizontal = 16.dp)
+                            .drawBehind {
+                                // Una riga sottile sopra ogni settimana che ha
+                                // giorni del mese.
+                                if (week.any { it != null }) {
+                                    drawLine(
+                                        color = lineColor,
+                                        start = Offset(0f, 0f),
+                                        end = Offset(size.width, 0f),
+                                        strokeWidth = 0.5.dp.toPx(),
+                                    )
+                                }
+                            },
+                    ) {
+                        week.forEach { day ->
+                            if (day == null) {
+                                Spacer(modifier = Modifier.weight(1f).fillMaxHeight())
+                            } else {
+                                val hasEvents = eventsByDate[day].isNullOrEmpty().not()
+                                val isSelected = day == selectedDate
+                                val isToday = day == today
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .clickable { onSelectDate(day) },
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                when {
+                                                    isSelected -> Color(0xFF2196F3)
+                                                    isToday -> Color(0xFFE9F2FF)
+                                                    else -> Color.Transparent
+                                                },
+                                            ),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            text = day.dayOfMonth.toString(),
+                                            color = if (isSelected) Color.White else kb.title,
+                                            fontWeight = if (isToday || isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(top = 3.dp)
+                                            .size(5.dp)
+                                            .background(
+                                                // Anche i promemoria accendono il
+                                                // pallino: un giorno che ne ha uno non
+                                                // può sembrare vuoto.
+                                                if (hasEvents || remindersByDate[day]?.isNotEmpty() == true) {
+                                                    Color(0xFF42A5F5)
+                                                } else {
+                                                    Color.Transparent
+                                                },
+                                                CircleShape,
+                                            ),
+                                    )
+                                }
                             }
-                            Box(
-                                modifier = Modifier
-                                    .padding(top = 2.dp)
-                                    .size(4.dp)
-                                    .background(
-                                        // Anche i promemoria accendono il
-                                        // pallino: un giorno che ne ha uno non
-                                        // può sembrare vuoto.
-                                        if (hasEvents || remindersByDate[day]?.isNotEmpty() == true) {
-                                            Color(0xFF42A5F5)
-                                        } else {
-                                            Color.Transparent
-                                        },
-                                        CircleShape,
-                                    ),
-                            )
                         }
                     }
                 }
             }
         }
 
-        Divider(modifier = Modifier.padding(top = 6.dp))
+        Divider()
         val selectedAll = eventsByDate[selectedDate].orEmpty().sortedBy { it.startDateEpochMillis }
         // Quelli del telefono in una sezione a parte e senza «elimina»: da qui
         // non si toccano.
@@ -2374,6 +2473,15 @@ private fun calendarTextFieldColors() = TextFieldDefaults.colors(
     focusedPlaceholderColor = MaterialTheme.kidBoxColors.subtitle.copy(alpha = 0.72f),
     unfocusedPlaceholderColor = MaterialTheme.kidBoxColors.subtitle.copy(alpha = 0.72f),
 )
+
+/** Altezza di una settimana nella vista Mese: sei per pagina. */
+private val MONTH_ROW_HEIGHT = 52.dp
+private const val MONTH_PAGES_EACH_SIDE = 120
+
+/** Mese come indice `anno × 12 + mese − 1`, una pagina della vista Mese. */
+private fun monthIndex(date: LocalDate): Int = date.year * 12 + date.monthValue - 1
+
+private fun monthDate(index: Int): LocalDate = LocalDate.of(index / 12, index % 12 + 1, 1)
 
 private fun monthGridDays(monthFirstDate: LocalDate): List<LocalDate?> {
     // Prima colonna Lunedì (L), come iOS e convenzione italiana.
