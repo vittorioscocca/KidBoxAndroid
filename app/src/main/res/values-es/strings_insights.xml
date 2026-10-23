@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Avvisi proattivi (motore, azioni, preferenze, delega). Stesse frasi di iOS. -->
+<resources>
+    <string name="insight_todo_title">Nadie se está encargando</string>
+    <string name="insight_todo_body">%1$s · vence %2$s</string>
+    <string name="insight_action_take">Me encargo yo</string>
+    <string name="insight_action_ask">Pregunta a los demás</string>
+    <string name="insight_action_snooze">Recuérdamelo en una hora</string>
+    <string name="insight_action_dismiss">No me interesa</string>
+    <string name="insight_action_dose_taken">Tomada</string>
+    <string name="insight_dose_title">Dosis por registrar</string>
+    <string name="insight_dose_body">La dosis de hoy de %1$s no está registrada</string>
+    <string name="insight_dose_body_generic">Una dosis de hoy no está registrada</string>
+    <string name="insight_digest_title">Resumen de la tarde</string>
+    <string name="insight_digest_body">Tareas que nadie ha cogido: %1$d</string>
+    <string name="insight_settings_title">Avisos proactivos</string>
+    <string name="insight_settings_how">Cómo llegan</string>
+    <string name="insight_delivery_immediate">Al momento</string>
+    <string name="insight_delivery_digest">A las 19</string>
+    <string name="insight_delivery_off">Desactivados</string>
+    <string name="insight_delivery_footer">Con el resumen de las 19, las tareas llegan todas juntas; las dosis siguen siendo puntuales. Los avisos no usan mensajes de IA.</string>
+    <string name="insight_quiet_hours">Horas de silencio</string>
+    <string name="insight_quiet_footer">En estas horas los avisos esperan a que termine el silencio. Las dosis por registrar llegan igualmente.</string>
+    <string name="insight_type_todo">Tareas que nadie ha cogido</string>
+    <string name="insight_type_dose">Dosis por registrar</string>
+    <string name="insight_delegate_header">Deja que KidBox se encargue</string>
+    <string name="insight_delegate_toggle">Pregunta a los demás por mí</string>
+    <string name="insight_delegate_footer">Si 12 horas antes del vencimiento nadie ha cogido una tarea que creaste tú, KidBox envía la solicitud a los demás miembros que la ven y te avisa. Puedes retirarla cuando quieras.</string>
+</resources>

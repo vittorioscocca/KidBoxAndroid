@@ -6,6 +6,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.ai.AiSettings
 import it.vittorioscocca.kidbox.ai.DailyBriefingPrefs
 import it.vittorioscocca.kidbox.ai.HealthPatternFrequency
+import it.vittorioscocca.kidbox.feature.insights.InsightPreferences
+import it.vittorioscocca.kidbox.feature.insights.InsightRunner
 import it.vittorioscocca.kidbox.ai.HealthPatternPrefs
 import it.vittorioscocca.kidbox.ai.WeeklySummaryPrefs
 import it.vittorioscocca.kidbox.data.ai.AISettingsStore
@@ -71,7 +73,14 @@ class AiSettingsViewModel @Inject constructor(
     private val familySessionPreferences: FamilySessionPreferences,
     private val aiUsageTracker: AIUsageTracker,
     private val aiSettingsStore: AISettingsStore,
+    private val insightRunner: InsightRunner,
 ) : ViewModel() {
+
+    /** Preferenze degli avvisi proattivi (e della delega), le stesse di iOS. */
+    val insightPrefs: StateFlow<InsightPreferences> = insightRunner.prefs
+
+    fun updateInsightPrefs(change: (InsightPreferences) -> InsightPreferences) = insightRunner.updatePrefs(change)
+
 
     private val _uiState = MutableStateFlow(
         AiSettingsUiState(

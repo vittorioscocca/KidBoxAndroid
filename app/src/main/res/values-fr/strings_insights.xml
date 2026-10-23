@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Avvisi proattivi (motore, azioni, preferenze, delega). Stesse frasi di iOS. -->
+<resources>
+    <string name="insight_todo_title">Personne ne s\'en occupe</string>
+    <string name="insight_todo_body">%1$s · échéance %2$s</string>
+    <string name="insight_action_take">Je m\'en occupe</string>
+    <string name="insight_action_ask">Demander aux autres</string>
+    <string name="insight_action_snooze">Me le rappeler dans une heure</string>
+    <string name="insight_action_dismiss">Pas intéressé</string>
+    <string name="insight_action_dose_taken">Prise</string>
+    <string name="insight_dose_title">Dose à enregistrer</string>
+    <string name="insight_dose_body">La dose d\'aujourd\'hui pour %1$s n\'est pas enregistrée</string>
+    <string name="insight_dose_body_generic">Une dose d\'aujourd\'hui n\'est pas enregistrée</string>
+    <string name="insight_digest_title">Récap du soir</string>
+    <string name="insight_digest_body">Tâches que personne n\'a prises : %1$d</string>
+    <string name="insight_settings_title">Alertes proactives</string>
+    <string name="insight_settings_how">Comment elles arrivent</string>
+    <string name="insight_delivery_immediate">Tout de suite</string>
+    <string name="insight_delivery_digest">À 19 h</string>
+    <string name="insight_delivery_off">Désactivées</string>
+    <string name="insight_delivery_footer">Avec le récap de 19 h, les tâches arrivent toutes ensemble ; les doses restent ponctuelles. Les alertes n\'utilisent pas de messages IA.</string>
+    <string name="insight_quiet_hours">Heures de silence</string>
+    <string name="insight_quiet_footer">Pendant ces heures, les alertes attendent la fin du silence. Les doses à enregistrer arrivent quand même.</string>
+    <string name="insight_type_todo">Tâches que personne n\'a prises</string>
+    <string name="insight_type_dose">Doses à enregistrer</string>
+    <string name="insight_delegate_header">Laisse faire KidBox</string>
+    <string name="insight_delegate_toggle">Demander aux autres à ma place</string>
+    <string name="insight_delegate_footer">Si personne n\'a pris une tâche que tu as créée 12 heures avant l\'échéance, KidBox envoie la demande aux autres membres qui la voient et te prévient. Tu peux la retirer quand tu veux.</string>
+</resources>

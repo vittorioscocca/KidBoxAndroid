@@ -75,6 +75,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ai.AIConsentBottomSheet
 import it.vittorioscocca.kidbox.ai.HealthPatternFrequency
+import it.vittorioscocca.kidbox.feature.insights.InsightPreferences
+import it.vittorioscocca.kidbox.feature.insights.InsightType
 import it.vittorioscocca.kidbox.notifications.ExactAlarmScheduler
 import it.vittorioscocca.kidbox.data.health.ai.HealthContextSendPreference
 import it.vittorioscocca.kidbox.domain.model.KBPlan
@@ -264,6 +266,9 @@ fun AiSettingsScreen(
                 frequency = state.healthPatternFrequency,
                 onFrequencyChange = viewModel::setHealthPatternFrequency,
             )
+
+            val insightPrefs by viewModel.insightPrefs.collectAsStateWithLifecycle()
+            InsightCard(prefs = insightPrefs, onChange = viewModel::updateInsightPrefs)
 
             ExactAlarmPermissionBanner(
                 visible = state.isDailyBriefingEnabled || state.isWeeklySummaryEnabled,
@@ -711,6 +716,85 @@ private fun DailyBriefingCard(isEnabled: Boolean, onToggle: (Boolean) -> Unit) {
                 }
                 Switch(checked = isEnabled, onCheckedChange = onToggle)
             }
+        }
+    }
+}
+
+/**
+ * Avvisi proattivi — gemello di `InsightSettingsView.swift`: come arrivano,
+ * orari di silenzio, quali tipi e la delega «Chiedi agli altri al posto mio».
+ */
+@Composable
+private fun InsightCard(
+    prefs: InsightPreferences,
+    onChange: ((InsightPreferences) -> InsightPreferences) -> Unit,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    val context = LocalContext.current
+    fun hhmm(m: Int) = String.format(java.util.Locale.ROOT, "%02d:%02d", m / 60, m % 60)
+    fun pickTime(current: Int, set: (Int) -> Unit) {
+        android.app.TimePickerDialog(
+            context,
+            { _, h, min -> set(h * 60 + min) },
+            current / 60,
+            current % 60,
+            android.text.format.DateFormat.is24HourFormat(context),
+        ).show()
+    }
+    SettingCard {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.insight_settings_title), fontSize = 15.sp, color = kb.title, fontWeight = FontWeight.Medium)
+            Text(stringResource(R.string.insight_settings_how), fontSize = 13.sp, color = kb.title)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for ((value, label) in listOf(
+                    InsightPreferences.Delivery.IMMEDIATE to R.string.insight_delivery_immediate,
+                    InsightPreferences.Delivery.EVENING_DIGEST to R.string.insight_delivery_digest,
+                    InsightPreferences.Delivery.OFF to R.string.insight_delivery_off,
+                )) {
+                    FilterChip(
+                        selected = prefs.delivery == value,
+                        onClick = { onChange { it.copy(delivery = value) } },
+                        label = { Text(stringResource(label)) },
+                    )
+                }
+            }
+            Text(stringResource(R.string.insight_delivery_footer), fontSize = 12.sp, color = kb.subtitle)
+
+            if (prefs.delivery != InsightPreferences.Delivery.OFF) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.insight_quiet_hours), fontSize = 13.sp, color = kb.title, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { pickTime(prefs.quietStartMinutes) { m -> onChange { it.copy(quietStartMinutes = m) } } }) {
+                        Text(hhmm(prefs.quietStartMinutes))
+                    }
+                    Text("–", color = kb.subtitle)
+                    TextButton(onClick = { pickTime(prefs.quietEndMinutes) { m -> onChange { it.copy(quietEndMinutes = m) } } }) {
+                        Text(hhmm(prefs.quietEndMinutes))
+                    }
+                }
+                Text(stringResource(R.string.insight_quiet_footer), fontSize = 12.sp, color = kb.subtitle)
+                for ((type, label) in listOf(
+                    InsightType.TODO_UNASSIGNED_DUE_SOON to R.string.insight_type_todo,
+                    InsightType.TREATMENT_DOSE_MISSING to R.string.insight_type_dose,
+                )) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(label), fontSize = 14.sp, color = kb.title, modifier = Modifier.weight(1f))
+                        Switch(
+                            checked = !prefs.isMuted(type),
+                            onCheckedChange = { on ->
+                                onChange { if (on) it.copy(mutedTypes = it.mutedTypes - type) else it.copy(mutedTypes = it.mutedTypes + type) }
+                            },
+                        )
+                    }
+                }
+            }
+
+            HorizontalDivider()
+            Text(stringResource(R.string.insight_delegate_header), fontSize = 13.sp, color = kb.title, fontWeight = FontWeight.Medium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.insight_delegate_toggle), fontSize = 14.sp, color = kb.title, modifier = Modifier.weight(1f))
+                Switch(checked = prefs.delegateAsk, onCheckedChange = { on -> onChange { it.copy(delegateAsk = on) } })
+            }
+            Text(stringResource(R.string.insight_delegate_footer), fontSize = 12.sp, color = kb.subtitle)
         }
     }
 }

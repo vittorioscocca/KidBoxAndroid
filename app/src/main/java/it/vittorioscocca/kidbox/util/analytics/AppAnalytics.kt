@@ -366,6 +366,34 @@ object AppAnalytics {
         appOpen(context, daysSinceInstall, daysSinceLastOpen)
     }
 
+    // ── Avvisi proattivi ─────────────────────────────────────────────────────
+    // Solo il tipo e l'esito, mai il contenuto. Stessi eventi di iOS: la
+    // scommessa 11 di /auto-miglioramento li legge insieme.
+
+    fun insightShown(context: Context, type: String, channel: String) {
+        log(context, "insight_shown") { putString("type", type); putString("channel", channel) }
+    }
+
+    fun insightActed(context: Context, type: String, via: String, minutes: Int) {
+        log(context, "insight_acted") { putString("type", type); putString("via", via); putLong("minutes", minutes.toLong()) }
+    }
+
+    fun insightDismissed(context: Context, type: String) {
+        log(context, "insight_dismissed") { putString("type", type) }
+    }
+
+    fun insightSnoozed(context: Context, type: String) {
+        log(context, "insight_snoozed") { putString("type", type) }
+    }
+
+    fun insightPrefsChanged(context: Context, delivery: String, mutedTypes: Int, delegateAsk: Boolean) {
+        log(context, "insight_prefs_changed") {
+            putString("delivery", delivery)
+            putLong("muted_types", mutedTypes.toLong())
+            putLong("delegate_ask", if (delegateAsk) 1 else 0)
+        }
+    }
+
     private fun log(context: Context, name: String, build: (Bundle.() -> Unit)? = null) {
         val bundle = build?.let { Bundle().apply(it) }
         FirebaseAnalytics.getInstance(context).logEvent(name, bundle)

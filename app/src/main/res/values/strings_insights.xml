@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Avvisi proattivi (motore, azioni, preferenze, delega). Stesse frasi di iOS. -->
+<resources>
+    <string name="insight_todo_title">Nessuno se ne sta occupando</string>
+    <string name="insight_todo_body">%1$s · scade %2$s</string>
+    <string name="insight_action_take">Ci penso io</string>
+    <string name="insight_action_ask">Chiedi agli altri</string>
+    <string name="insight_action_snooze">Rimanda di un\'ora</string>
+    <string name="insight_action_dismiss">Non mi interessa</string>
+    <string name="insight_action_dose_taken">Presa</string>
+    <string name="insight_dose_title">Dose da registrare</string>
+    <string name="insight_dose_body">La dose di oggi per %1$s non risulta registrata</string>
+    <string name="insight_dose_body_generic">Una dose di oggi non risulta registrata</string>
+    <string name="insight_digest_title">Riepilogo della sera</string>
+    <string name="insight_digest_body">To-do che nessuno ha preso: %1$d</string>
+    <string name="insight_settings_title">Avvisi proattivi</string>
+    <string name="insight_settings_how">Come arrivano</string>
+    <string name="insight_delivery_immediate">Subito</string>
+    <string name="insight_delivery_digest">Alle 19</string>
+    <string name="insight_delivery_off">Spenti</string>
+    <string name="insight_delivery_footer">Con il riepilogo delle 19 i to-do arrivano tutti insieme; le dosi restano puntuali. Gli avvisi non usano messaggi AI.</string>
+    <string name="insight_quiet_hours">Orari di silenzio</string>
+    <string name="insight_quiet_footer">In questi orari gli avvisi aspettano la fine del silenzio. Le dosi da registrare arrivano comunque.</string>
+    <string name="insight_type_todo">To-do che nessuno ha preso</string>
+    <string name="insight_type_dose">Dosi da registrare</string>
+    <string name="insight_delegate_header">Lascia fare a KidBox</string>
+    <string name="insight_delegate_toggle">Chiedi agli altri al posto mio</string>
+    <string name="insight_delegate_footer">Se 12 ore prima della scadenza nessuno ha preso un to-do che hai creato tu, KidBox manda la richiesta agli altri membri che lo vedono e ti avvisa. Puoi ritirarla quando vuoi.</string>
+</resources>

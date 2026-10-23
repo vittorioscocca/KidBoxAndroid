@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.notifications
 
 import android.content.Context
+import it.vittorioscocca.kidbox.feature.insights.InsightRunner
 import androidx.core.app.NotificationManagerCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.notifications.nudge.NudgeEngine
@@ -29,12 +30,14 @@ class ReminderLogoutCleaner @Inject constructor(
     private val alarmRegistry: ReminderAlarmRegistry,
     private val treatmentNotificationManager: TreatmentNotificationManager,
     private val nudgeEngine: NudgeEngine,
+    private val insightRunner: InsightRunner,
 ) {
     fun clearEverything() {
         // Registro unico: to-do, salute, terapie, Wallet, veicoli, pagamenti casa, password.
         runCatching { alarmRegistry.cancelAll() }
         runCatching { treatmentNotificationManager.clearAllRecords() }
         runCatching { nudgeEngine.cancelAllScheduled() }
+        runCatching { insightRunner.cancelAllAlarms() }
         runCatching { NudgeState.setFires(context, emptyList()) }
 
         val familyId = context.getSharedPreferences("kidbox_prefs", Context.MODE_PRIVATE)

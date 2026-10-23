@@ -256,6 +256,14 @@
             android:name=".notifications.nudge.NudgeReceiver"
             android:exported="false" />
 
+        <!-- Avvisi proattivi: consegna e azioni rapide. -->
+        <receiver
+            android:name=".feature.insights.InsightReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".feature.insights.InsightActionReceiver"
+            android:exported="false" />
+
         <receiver
             android:name=".notifications.BootReceiver"
             android:exported="true">

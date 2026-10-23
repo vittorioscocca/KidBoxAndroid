@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Avvisi proattivi (motore, azioni, preferenze, delega). Stesse frasi di iOS. -->
+<resources>
+    <string name="insight_todo_title">Nobody has taken this yet</string>
+    <string name="insight_todo_body">%1$s · due %2$s</string>
+    <string name="insight_action_take">I\'ll do it</string>
+    <string name="insight_action_ask">Ask the others</string>
+    <string name="insight_action_snooze">Remind me in an hour</string>
+    <string name="insight_action_dismiss">Not interested</string>
+    <string name="insight_action_dose_taken">Taken</string>
+    <string name="insight_dose_title">Dose to record</string>
+    <string name="insight_dose_body">Today\'s dose for %1$s hasn\'t been recorded</string>
+    <string name="insight_dose_body_generic">A dose for today hasn\'t been recorded</string>
+    <string name="insight_digest_title">Evening summary</string>
+    <string name="insight_digest_body">To-dos nobody has taken: %1$d</string>
+    <string name="insight_settings_title">Proactive alerts</string>
+    <string name="insight_settings_how">How they arrive</string>
+    <string name="insight_delivery_immediate">Right away</string>
+    <string name="insight_delivery_digest">At 7 pm</string>
+    <string name="insight_delivery_off">Off</string>
+    <string name="insight_delivery_footer">With the 7 pm summary, to-dos arrive all together; doses stay on time. Alerts don\'t use AI messages.</string>
+    <string name="insight_quiet_hours">Quiet hours</string>
+    <string name="insight_quiet_footer">During these hours alerts wait until quiet time ends. Doses to record still arrive.</string>
+    <string name="insight_type_todo">To-dos nobody has taken</string>
+    <string name="insight_type_dose">Doses to record</string>
+    <string name="insight_delegate_header">Let KidBox handle it</string>
+    <string name="insight_delegate_toggle">Ask the others for me</string>
+    <string name="insight_delegate_footer">If nobody has taken a to-do you created 12 hours before it\'s due, KidBox sends the request to the other members who can see it and lets you know. You can withdraw it anytime.</string>
+</resources>

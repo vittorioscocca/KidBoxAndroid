@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.notifications
 
 import it.vittorioscocca.kidbox.util.KBLog
+import it.vittorioscocca.kidbox.feature.insights.InsightEntryPoint
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -38,6 +39,13 @@ class BootReceiver : BroadcastReceiver() {
                     EntryPointAccessors.fromApplication(appCtx, VehicleReminderEntryPoint::class.java)
                         .reminderAlarmRegistry()
                         .restoreAll()
+                }
+
+                // Avvisi proattivi: gli allarmi muoiono al riavvio, il giro li ri-arma.
+                runCatching {
+                    EntryPointAccessors.fromApplication(appCtx, InsightEntryPoint::class.java)
+                        .insightRunner()
+                        .run("boot")
                 }
 
                 val familyId = appCtx.getSharedPreferences("kidbox_prefs", Context.MODE_PRIVATE)

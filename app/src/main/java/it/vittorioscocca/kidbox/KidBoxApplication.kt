@@ -23,6 +23,7 @@ import it.vittorioscocca.kidbox.data.remote.AppCheckTokenCache
 import it.vittorioscocca.kidbox.data.notification.PushNotificationManager
 import it.vittorioscocca.kidbox.notifications.KidBoxFirebaseMessagingService
 import it.vittorioscocca.kidbox.notifications.nudge.NudgeEngine
+import it.vittorioscocca.kidbox.feature.insights.InsightRunner
 import it.vittorioscocca.kidbox.util.CrashAnalyzer
 import it.vittorioscocca.kidbox.util.KBCrashHandler
 import it.vittorioscocca.kidbox.util.KBFileLogger
@@ -59,6 +60,9 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
 
     @Inject
     lateinit var nudgeEngine: NudgeEngine
+
+    @Inject
+    lateinit var insightRunner: InsightRunner
 
     @Inject
     lateinit var themePreference: ThemePreference
@@ -111,6 +115,8 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
         // e mostrano un popup chiaro dentro un'app messa in scuro dall'utente (o viceversa).
         AppCompatDelegate.setDefaultNightMode(themePreference.getTheme().toNightMode())
         WorkManager.initialize(this, workManagerConfiguration)
+        // Dopo WorkManager: il runner programma il suo giro periodico.
+        insightRunner.start()
         KidBoxFirebaseMessagingService.createNotificationChannels(this)
         // Analytics utenti attivi — internal/analytics-active-users.md
         registerActivityLifecycleCallbacks(KBAnalyticsLifecycleObserver())
@@ -147,6 +153,9 @@ class KidBoxApplication : Application(), Configuration.Provider, ImageLoaderFact
                 if (now - lastRunAt >= THROTTLE_MS) {
                     lastRunAt = now
                     appInitScope.launch { runCatching { nudgeEngine.refresh() } }
+                    // Avvisi proattivi: il giro al rientro, oltre a quelli che
+                    // partono da soli quando cambiano to-do, cure e dosi.
+                    insightRunner.requestRun("foreground", 0)
                     // Listino piani: senza questo, un piano modificato dalla
                     // console si vedrebbe solo dopo un avvio a freddo del processo.
                     appInitScope.launch {

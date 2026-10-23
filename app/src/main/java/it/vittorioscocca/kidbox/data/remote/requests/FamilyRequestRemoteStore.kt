@@ -207,6 +207,8 @@ object FamilyRequestRemoteStore {
         draft: Draft,
         familyName: String,
         inviterName: String,
+        /** To-do che esiste già (avviso proattivo): il sì lo assegna invece di crearne un altro. */
+        sourceTodoId: String? = null,
     ): Created {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: error("Not authenticated")
         val expires = expiresAt(dueAtMillis, dueHasTime) ?: throw DueInPastException()
@@ -259,6 +261,7 @@ object FamilyRequestRemoteStore {
             "createdAt" to FieldValue.serverTimestamp(),
             "updatedAt" to FieldValue.serverTimestamp(),
         )
+        if (sourceTodoId != null) data["sourceTodoId"] = sourceTodoId
         collection(familyId).document(requestId).set(data).await()
         KBLog.app.info(
             "FamilyRequest creata requestId=$requestId destinatari=${recipients.size} fuori=${draft.askOutside}",
