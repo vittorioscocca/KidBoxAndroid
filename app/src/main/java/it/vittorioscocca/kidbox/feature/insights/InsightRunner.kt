@@ -20,6 +20,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBTreatmentDao
 import it.vittorioscocca.kidbox.data.local.dao.PetDao
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoItemEntity
+import it.vittorioscocca.kidbox.ai.CurrentPlanStore
 import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
@@ -95,6 +96,11 @@ class InsightRunner @Inject constructor(
                 override fun onInvalidated(tables: Set<String>) = requestRun("data")
             },
         )
+        // Il piano arriva quando la Home lo carica: un passaggio a Pro o Max fa
+        // ripartire il giro, come su iOS.
+        scope.launch {
+            CurrentPlanStore.plan.collect { plan -> if (plan != KBPlan.FREE) requestRun("plan") }
+        }
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             WORK_NAME,
             ExistingPeriodicWorkPolicy.KEEP,
@@ -171,11 +177,16 @@ class InsightRunner @Inject constructor(
         refreshRemotePrefsIfNeeded(uid)
 
         val prefs = _prefs.value
-        if (prefs.delivery == InsightPreferences.Delivery.OFF || !isPaid(uid, familyId)) {
+        val paid = prefs.delivery != InsightPreferences.Delivery.OFF && isPaid(uid, familyId)
+        if (!paid) {
+            KBLog.app.debug("Insight[$reason]: fermo (consegna=${prefs.delivery.raw}, piano non Pro/Max)", TAG)
             cancelAllAlarms()
             return@withLock
         }
-        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return@withLock
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+            KBLog.app.debug("Insight[$reason]: notifiche dell'app spente", TAG)
+            return@withLock
+        }
 
         runCatching {
             val now = System.currentTimeMillis()
@@ -190,6 +201,10 @@ class InsightRunner @Inject constructor(
             val shown = reportShown(plan.rows, now, prefs)
             saveRows(shown)
             arm(plan, shown, familyId)
+            KBLog.app.debug(
+                "Insight[$reason]: candidati=${candidates.size} aperti=${shown.count { it.state.isOpen }} allarmi=${plan.notifications.size}",
+                TAG,
+            )
             if (!changes.isEmpty) {
                 KBLog.app.info(
                     "Insight[$reason]: aperti=${changes.opened.size} spostati=${changes.rescheduled.size} risolti=${changes.resolved.size}",
@@ -199,15 +214,22 @@ class InsightRunner @Inject constructor(
         }.onFailure { KBLog.app.warning("Insight[$reason]: ${it.message}", TAG) }
     }
 
+    /**
+     * Pro o Max? Prima il piano già caricato dalla Home, poi Firestore con una
+     * cache. `loadPlan` restituisce Free anche quando la lettura fallisce (per
+     * esempio subito dopo l'accesso), quindi un Free si tiene solo 10 minuti:
+     * con un'ora intera un errore spegneva gli avvisi per un'ora.
+     */
     private suspend fun isPaid(uid: String, familyId: String): Boolean {
+        if (CurrentPlanStore.plan.value != KBPlan.FREE) return true
         val cachedAt = local.getLong(KEY_PLAN_AT, 0)
-        val cachedFamily = local.getString(KEY_PLAN_FAMILY, null)
         val cached = local.getString(KEY_PLAN, null)
-        val plan = if (cached != null && cachedFamily == familyId && System.currentTimeMillis() - cachedAt < 3600_000) {
+        val sameFamily = local.getString(KEY_PLAN_FAMILY, null) == familyId
+        val ttl = if (cached == KBPlan.FREE.rawValue) 10 * 60_000L else 3600_000L
+        val plan = if (cached != null && sameFamily && System.currentTimeMillis() - cachedAt < ttl) {
             cached
         } else {
-            val fresh = runCatching { subscriptionRepository.loadPlan(familyId, uid).rawValue }.getOrNull()
-                ?: return cached != null && cached != KBPlan.FREE.rawValue
+            val fresh = subscriptionRepository.loadPlan(familyId, uid).rawValue
             local.edit().putString(KEY_PLAN, fresh).putString(KEY_PLAN_FAMILY, familyId)
                 .putLong(KEY_PLAN_AT, System.currentTimeMillis()).apply()
             fresh
