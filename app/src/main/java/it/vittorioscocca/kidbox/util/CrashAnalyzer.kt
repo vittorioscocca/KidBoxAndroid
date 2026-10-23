@@ -172,7 +172,19 @@ object CrashAnalyzer {
         }
     }
 
+    /**
+     * Lo dice MainActivity (onResume/onPause). Il controllo di sistema da solo non
+     * basta: provato su un Redmi Note 15, in onResume il processo risultava ancora
+     * non in primo piano e l'analisi veniva rimandata per sempre.
+     */
+    @Volatile private var activityVisible = false
+
+    fun setActivityVisible(visible: Boolean) {
+        activityVisible = visible
+    }
+
     private fun isInForeground(): Boolean {
+        if (activityVisible) return true
         val info = ActivityManager.RunningAppProcessInfo()
         ActivityManager.getMyMemoryState(info)
         return info.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND

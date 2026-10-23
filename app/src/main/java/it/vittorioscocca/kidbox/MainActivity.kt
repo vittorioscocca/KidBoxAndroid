@@ -237,7 +237,13 @@ class MainActivity : AppCompatActivity() {
         // Gemini Nano analizza i log solo con l'app in primo piano: all'avvio del
         // processo (anche da una push, in background) l'analisi può essere stata
         // rimandata. Il limite delle 6 ore sta dentro CrashAnalyzer.
+        CrashAnalyzer.setActivityVisible(true)
         lifecycleScope.launch(Dispatchers.IO) { runCatching { CrashAnalyzer.analyzeIfNeeded(applicationContext) } }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        CrashAnalyzer.setActivityVisible(false)
     }
 
     /**
