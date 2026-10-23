@@ -48,6 +48,10 @@ import it.vittorioscocca.kidbox.data.location.LocationSharingService
 import it.vittorioscocca.kidbox.data.location.LocationSharingStateStore
 import it.vittorioscocca.kidbox.data.remote.family.InviteReferrerPickup
 import it.vittorioscocca.kidbox.data.remote.family.PendingFamilyInvite
+import it.vittorioscocca.kidbox.ai.ProactiveAIGate
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.DailyBriefingService
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.HealthPatternAnalyzerService
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.WeeklySummaryService
 import javax.inject.Inject
 import kotlinx.coroutines.launch
 
@@ -228,6 +232,23 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         NotificationDeepLinkRouter.claimOwnership(deepLinkOwnerToken)
         resumeLocationSharingIfNeeded()
+        scheduleProactiveAIIfNeeded()
+    }
+
+    /**
+     * Mente proattiva: briefing, recap settimanale e pattern salute, come iOS
+     * all'apertura dell'app. Ogni servizio esce da solo se il periodo è già
+     * coperto; il piano lo controllano i worker ([ProactiveAIGate]).
+     * Era sparito il 21/05/2026 (commit «Invio report») e per cinque mesi su
+     * Android non è partito niente.
+     */
+    private fun scheduleProactiveAIIfNeeded() {
+        val familyId = getSharedPreferences("kidbox_prefs", MODE_PRIVATE)
+            .getString("active_family_id", null)
+            ?.takeIf { it.isNotBlank() } ?: return
+        WeeklySummaryService.scheduleWeeklyIfNeeded(this, familyId)
+        DailyBriefingService.scheduleDailyIfNeeded(this, familyId)
+        HealthPatternAnalyzerService.scheduleIfNeeded(this, familyId)
     }
 
     /**

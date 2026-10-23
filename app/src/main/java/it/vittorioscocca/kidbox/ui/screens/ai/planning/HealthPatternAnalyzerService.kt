@@ -26,6 +26,8 @@ import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ai.AiSettings
 import it.vittorioscocca.kidbox.ai.HealthPatternFrequency
 import it.vittorioscocca.kidbox.ai.HealthPatternPrefs
+import it.vittorioscocca.kidbox.ai.ProactiveAIGate
+import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.data.local.dao.KBHealthInsightDao
 import it.vittorioscocca.kidbox.data.local.entity.KBHealthInsightEntity
 import it.vittorioscocca.kidbox.data.remote.ai.AIService
@@ -205,6 +207,7 @@ object HealthPatternAnalyzerService {
         private val dataMessageBuilder: HealthPatternDataMessageBuilder,
         private val aiSettings: AiSettings,
         private val healthPatternPrefs: HealthPatternPrefs,
+        private val subscriptionRepository: SubscriptionRepository,
     ) : CoroutineWorker(appContext, params) {
 
         override suspend fun doWork(): Result {
@@ -219,6 +222,7 @@ object HealthPatternAnalyzerService {
             if (alreadyAnalyzed(applicationContext, monthKey)) {
                 return Result.success()
             }
+            if (!ProactiveAIGate.allows(aiSettings, subscriptionRepository, familyId)) return Result.success()
 
             val systemPrompt = """
                 Sei un assistente sanitario AI per la famiglia $familyName su KidBox.

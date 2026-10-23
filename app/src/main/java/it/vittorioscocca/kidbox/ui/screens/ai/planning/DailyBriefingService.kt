@@ -25,8 +25,10 @@ import it.vittorioscocca.kidbox.MainActivity
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ai.AiSettings
 import it.vittorioscocca.kidbox.ai.DailyBriefingPrefs
+import it.vittorioscocca.kidbox.ai.ProactiveAIGate
 import it.vittorioscocca.kidbox.data.remote.ai.AIService
 import it.vittorioscocca.kidbox.data.remote.ai.AIServiceException
+import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
 import it.vittorioscocca.kidbox.domain.model.ai.AIMessageRole
 import it.vittorioscocca.kidbox.domain.model.ai.AIServiceError
@@ -143,6 +145,7 @@ object DailyBriefingService {
         private val dailyDataMessageBuilder: DailyBriefingDataMessageBuilder,
         private val aiSettings: AiSettings,
         private val dailyBriefingPrefs: DailyBriefingPrefs,
+        private val subscriptionRepository: SubscriptionRepository,
     ) : CoroutineWorker(appContext, params) {
 
         override suspend fun doWork(): Result {
@@ -154,6 +157,7 @@ object DailyBriefingService {
             val today = todayIsoDate()
             val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             if (prefs.getString(PREF_LAST_ISO_DATE, null) == today) return Result.success()
+            if (!ProactiveAIGate.allows(aiSettings, subscriptionRepository, familyId)) return Result.success()
 
             val systemPrompt = """
                 Sei l'assistente AI di KidBox per la famiglia $familyName.

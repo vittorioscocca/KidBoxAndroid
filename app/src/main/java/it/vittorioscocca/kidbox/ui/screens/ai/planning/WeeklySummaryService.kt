@@ -23,6 +23,9 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import it.vittorioscocca.kidbox.MainActivity
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.ai.AiSettings
+import it.vittorioscocca.kidbox.ai.ProactiveAIGate
+import it.vittorioscocca.kidbox.data.repository.SubscriptionRepository
 import it.vittorioscocca.kidbox.data.remote.ai.AIService
 import it.vittorioscocca.kidbox.data.remote.ai.AIServiceException
 import it.vittorioscocca.kidbox.data.repository.KBAIRepository
@@ -141,10 +144,16 @@ object WeeklySummaryService {
         private val aiService: AIService,
         private val kbAIRepository: KBAIRepository,
         private val weeklyDataMessageBuilder: WeeklySummaryDataMessageBuilder,
+        private val aiSettings: AiSettings,
+        private val subscriptionRepository: SubscriptionRepository,
     ) : CoroutineWorker(appContext, params) {
 
         override suspend fun doWork(): Result {
             val familyId = inputData.getString(KEY_FAMILY_ID) ?: return Result.failure()
+            val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            if (!prefs.getBoolean(PREF_ENABLED, true)) return Result.success()
+            if (prefs.getString(PREF_LAST_ISO_WEEK, null) == currentISOWeek()) return Result.success()
+            if (!ProactiveAIGate.allows(aiSettings, subscriptionRepository, familyId)) return Result.success()
             val familyName = inputData.getString(KEY_FAMILY_NAME) ?: applicationContext.getString(R.string.ai_your_family)
 
             val systemPrompt = """
@@ -175,7 +184,6 @@ object WeeklySummaryService {
                 familyId = familyId,
             )
             result.onSuccess { response ->
-                val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 prefs.edit()
                     .putString(PREF_LAST_ISO_WEEK, currentISOWeek())
                     .putString(PREF_LAST_TEXT, response.reply)
