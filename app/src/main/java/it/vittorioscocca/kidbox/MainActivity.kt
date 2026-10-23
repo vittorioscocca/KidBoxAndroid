@@ -53,6 +53,7 @@ import it.vittorioscocca.kidbox.ui.screens.ai.planning.DailyBriefingService
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.HealthPatternAnalyzerService
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.WeeklySummaryService
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
@@ -233,6 +234,10 @@ class MainActivity : AppCompatActivity() {
         NotificationDeepLinkRouter.claimOwnership(deepLinkOwnerToken)
         resumeLocationSharingIfNeeded()
         scheduleProactiveAIIfNeeded()
+        // Gemini Nano analizza i log solo con l'app in primo piano: all'avvio del
+        // processo (anche da una push, in background) l'analisi può essere stata
+        // rimandata. Il limite delle 6 ore sta dentro CrashAnalyzer.
+        lifecycleScope.launch(Dispatchers.IO) { runCatching { CrashAnalyzer.analyzeIfNeeded(applicationContext) } }
     }
 
     /**

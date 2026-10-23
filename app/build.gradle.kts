@@ -200,6 +200,11 @@ dependencies {
     // ML Kit barcode scanning (used by WalletPdfParser to scan barcodes from rendered PDF pages)
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("com.google.mlkit:text-recognition:16.0.1")
+    // Gemini Nano sul telefono (AICore): analisi dei log di crash, gemella di Apple
+    // Intelligence su iOS. Nessun costo per chiamata; solo app in primo piano.
+    // Ferma ad alpha1: dalla beta2 la libreria è compilata con Kotlin 2.2/2.3 e il
+    // compilatore 2.0 del progetto non ne legge i metadati. Si aggiorna con Kotlin.
+    implementation("com.google.mlkit:genai-prompt:1.0.0-alpha1")
     // ML Kit Document Scanner (Wallet → Documenti d'identità): equivalente VisionKit,
     // rilevamento bordi automatico + multi-pagina, restituisce sia JPEG che PDF pronto.
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0-beta1")

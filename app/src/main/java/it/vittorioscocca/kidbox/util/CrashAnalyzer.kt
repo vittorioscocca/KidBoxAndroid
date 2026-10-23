@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.util
 
+import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
 import com.google.firebase.auth.FirebaseAuth
@@ -18,14 +19,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 /**
- * Rilevamento crash via euristica locale (marker `[CRASH]`/`TEST: crash` nei log) e upload
- * opzionale su Firestore collection "crash_reports".
+ * Rilevamento crash via euristica locale (marker `[CRASH]`/`TEST: crash` nei log), analisi dei
+ * log con Gemini Nano sul telefono dove c'è, e upload opzionale su Firestore `crash_reports`.
  *
- * Non usa più una Cloud Function basata su Gemini per l'analisi "proattiva" (log senza crash
- * conclamati): richiedeva una API key a pagamento. Su iOS l'equivalente gira on-device via
- * Apple Intelligence (gratis); su Android non c'è un modello on-device comparabile per copertura
- * di device, quindi qui resta solo il rilevamento euristico — identico a quello che scatta anche
- * su iOS in assenza di Apple Intelligence.
+ * Come su iOS con Apple Intelligence: l'analisi "proattiva" (errori senza crash conclamato) gira
+ * on-device, gratis, senza mandare i log a nessuno finché l'utente non acconsente. La vecchia
+ * Cloud Function con Gemini nel cloud è stata tolta perché voleva una API key a pagamento.
+ * Sui telefoni senza Gemini Nano resta solo il rilevamento euristico, come su iOS senza Apple
+ * Intelligence. Gemini Nano gira solo con l'app in primo piano: in background si salta senza
+ * segnare il giro, e si riprova al prossimo passaggio in primo piano.
  */
 object CrashAnalyzer {
 
@@ -102,11 +104,78 @@ object CrashAnalyzer {
             return
         }
 
-        // Nessuna analisi "proattiva" AI-assisted su Android (nessun modello on-device
-        // comparabile ad Apple Intelligence con copertura device sufficiente, e niente
-        // servizi cloud a pagamento). Il rilevamento crash euristico sopra resta attivo.
-        KBLog.app.info("CrashAnalyzer: nessun crash rilevato nei log — skip (nessuna analisi AI su Android)")
-        CrashReportPreferences.markAnalysisRun(context)
+        analyzeOnDevice(context, rawLogs)
+    }
+
+    // ── Gemini Nano sul telefono ─────────────────────────────────────────────
+
+    /** In memoria: dopo un «non adesso» del modello non si riprova a ogni ritorno in primo piano. */
+    @Volatile private var lastOnDeviceAttemptMillis = 0L
+    private const val ON_DEVICE_RETRY_MS = 10L * 60L * 1000L
+
+    private suspend fun analyzeOnDevice(context: Context, rawLogs: String) {
+        // Il dialog del consenso è già aperto: aspetta la risposta, non si rianalizza.
+        if (_consentPrompt.value != null) return
+        val now = System.currentTimeMillis()
+        if (now - lastOnDeviceAttemptMillis < ON_DEVICE_RETRY_MS) return
+        val significant = CrashLogAnalysis.significantLines(rawLogs)
+        if (significant.isEmpty()) {
+            KBLog.app.info("CrashAnalyzer: nessuna riga ERROR/CRASH → niente da analizzare")
+            CrashReportPreferences.markAnalysisRun(context)
+            return
+        }
+        if (!isInForeground()) {
+            // Gemini Nano rifiuta le richieste in background: si riprova in primo piano.
+            KBLog.app.info("CrashAnalyzer: app non in primo piano → analisi rimandata")
+            return
+        }
+        lastOnDeviceAttemptMillis = now
+        when (val outcome = OnDeviceCrashModel.analyze { budget -> CrashLogAnalysis.buildPrompt(significant, budget) }) {
+            is OnDeviceCrashModel.Outcome.Text -> {
+                val result = CrashLogAnalysis.parse(outcome.text)
+                if (result == null) {
+                    KBLog.app.warning("CrashAnalyzer: risposta del modello non leggibile")
+                    CrashReportPreferences.markAnalysisRun(context)
+                } else if (result.hasIssues) {
+                    requestPermissionAndUpload(context, result.issues, rawLogs)
+                } else {
+                    KBLog.app.info("CrashAnalyzer: nessun problema rilevato nei log")
+                    CrashReportPreferences.markAnalysisRun(context)
+                }
+            }
+            OnDeviceCrashModel.Outcome.Unavailable -> {
+                KBLog.app.info("CrashAnalyzer: Gemini Nano non disponibile su questo telefono → solo euristica")
+                CrashReportPreferences.markAnalysisRun(context)
+            }
+            OnDeviceCrashModel.Outcome.NotNow ->
+                KBLog.app.info("CrashAnalyzer: Gemini Nano occupato o in quota → riprovo più avanti")
+            is OnDeviceCrashModel.Outcome.Failed -> {
+                KBLog.app.warning("CrashAnalyzer: analisi on-device non riuscita: ${outcome.message}")
+                CrashReportPreferences.markAnalysisRun(context)
+            }
+        }
+    }
+
+    /** Come `requestPermissionAndUpload` di iOS: si chiede una volta, poi vale la scelta. */
+    private suspend fun requestPermissionAndUpload(context: Context, issues: List<IssueReport>, rawLogs: String) {
+        when {
+            CrashReportPreferences.isReportingEnabled(context) -> uploadToFirestore(context, issues, rawLogs)
+            CrashReportPreferences.hasBeenAsked(context) -> {
+                KBLog.app.debug("CrashAnalyzer: skip upload (report automatici disattivati)")
+                CrashReportPreferences.markAnalysisRun(context)
+            }
+            else -> {
+                // Il dialog lo mostra MainActivity; «Invia» e «No» passano da onConsentSend/onConsentDecline.
+                _consentPrompt.value = ConsentPrompt(issues.size, issues, rawLogs)
+                _showConsentDialog.value = true
+            }
+        }
+    }
+
+    private fun isInForeground(): Boolean {
+        val info = ActivityManager.RunningAppProcessInfo()
+        ActivityManager.getMyMemoryState(info)
+        return info.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
     }
 
     private fun containsCrashMarkers(logs: String): Boolean =
