@@ -24,6 +24,7 @@ import dagger.assisted.AssistedInject
 import it.vittorioscocca.kidbox.MainActivity
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ai.AiSettings
+import it.vittorioscocca.kidbox.ai.HealthPatternFrequency
 import it.vittorioscocca.kidbox.ai.HealthPatternPrefs
 import it.vittorioscocca.kidbox.data.local.dao.KBHealthInsightDao
 import it.vittorioscocca.kidbox.data.local.entity.KBHealthInsightEntity
@@ -32,9 +33,13 @@ import it.vittorioscocca.kidbox.data.remote.ai.AIServiceException
 import it.vittorioscocca.kidbox.domain.model.KBAIMessage
 import it.vittorioscocca.kidbox.domain.model.ai.AIServiceError
 import it.vittorioscocca.kidbox.notifications.ExactAlarmScheduler
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
+import java.time.DayOfWeek
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 import java.util.UUID
 import androidx.compose.ui.res.stringResource
@@ -42,7 +47,9 @@ import androidx.compose.ui.platform.LocalContext
 
 object HealthPatternAnalyzerService {
     private const val PREFS_NAME = "kidbox_prefs"
+    /** Chiave dell'ultimo periodo analizzato: il nome resta quello di quando era solo mensile. */
     private const val PREF_LAST_MONTH_KEY = "kb_healthPattern_lastMonth"
+    private const val PREF_LAST_ANALYZED_AT = "kb_healthPattern_lastAnalyzedAt"
     private const val PREF_LAST_TEXT = "kb_healthPattern_lastText"
     private const val PREF_ENABLED = "kb_healthPatternEnabled"
     private const val WORK_NAME = "kb_health_pattern_generation"
@@ -50,11 +57,11 @@ object HealthPatternAnalyzerService {
     private const val KEY_FAMILY_ID = "familyId"
     private const val KEY_FAMILY_NAME = "familyName"
 
-    fun scheduleMonthlyIfNeeded(context: Context, familyId: String) {
+    fun scheduleIfNeeded(context: Context, familyId: String) {
         if (familyId.isBlank()) return
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         if (!prefs.getBoolean(PREF_ENABLED, true)) return
-        if (prefs.getString(PREF_LAST_MONTH_KEY, null) == currentMonthKey()) return
+        if (alreadyAnalyzed(context, currentPeriodKey(context))) return
 
         val familyName = prefs.getString("active_family_name", context.getString(R.string.ai_your_family)) ?: context.getString(R.string.ai_your_family)
         val request = OneTimeWorkRequestBuilder<HealthPatternWorker>()
@@ -79,19 +86,58 @@ object HealthPatternAnalyzerService {
         )
     }
 
-    fun currentMonthKey(): String {
-        val fmt = SimpleDateFormat("yyyy-MM", Locale.US)
-        return fmt.format(Date())
+    fun frequency(context: Context): HealthPatternFrequency =
+        HealthPatternFrequency.fromRaw(
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getString(HealthPatternPrefs.WORKER_KEY_FREQUENCY, null),
+        )
+
+    fun currentPeriodKey(context: Context): String = frequency(context).periodKey(LocalDate.now())
+
+    /**
+     * Si confronta la data dell'ultima analisi, non la chiave salvata: cambiando
+     * frequenza un'analisi fatta in questo periodo resta valida e non si ripaga.
+     */
+    private fun alreadyAnalyzed(context: Context, period: String): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val last = prefs.getLong(PREF_LAST_ANALYZED_AT, 0L)
+        if (last > 0L) {
+            val day = Instant.ofEpochMilli(last).atZone(ZoneId.systemDefault()).toLocalDate()
+            return frequency(context).periodKey(day) == period
+        }
+        // Build precedenti: salvavano solo la chiave del mese.
+        return prefs.getString(PREF_LAST_MONTH_KEY, null) == period
     }
 
-    fun scheduleFirstOfMonth9am(
+    private fun markAnalyzed(context: Context, period: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putString(PREF_LAST_MONTH_KEY, period)
+            .putLong(PREF_LAST_ANALYZED_AT, System.currentTimeMillis())
+            .apply()
+    }
+
+    /**
+     * Dopo un cambio di frequenza: riarma l'allarme dell'ultimo insight sul ritmo
+     * nuovo. Stesso request code, quindi sostituisce quello programmato prima.
+     */
+    fun rescheduleAfterFrequencyChange(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (!prefs.getBoolean(PREF_ENABLED, true)) return
+        val familyId = prefs.getString("active_family_id", null)?.takeIf { it.isNotBlank() } ?: return
+        val text = prefs.getString(PREF_LAST_TEXT, null)?.takeIf { it.isNotBlank() } ?: return
+        val familyName = prefs.getString("active_family_name", null)
+            ?: context.getString(R.string.ai_your_family)
+        scheduleNext9am(context, familyId, familyName, text)
+    }
+
+    fun scheduleNext9am(
         context: Context,
         familyId: String,
         familyName: String,
         fullText: String,
     ) {
         ensureChannel(context)
-        val triggerAt = nextFirstOfMonth9am()
+        val triggerAt = nextTrigger9am(frequency(context))
         val intent = Intent(context, HealthPatternBroadcastReceiver::class.java).apply {
             action = HealthPatternBroadcastReceiver.ACTION_HEALTH_PATTERN
             putExtra("familyId", familyId)
@@ -108,17 +154,26 @@ object HealthPatternAnalyzerService {
         ExactAlarmScheduler.scheduleRtcWakeupAllowWhileIdle(context, triggerAt, pendingIntent)
     }
 
-    private fun nextFirstOfMonth9am(): Long {
-        val now = Calendar.getInstance()
-        val target = Calendar.getInstance().apply {
-            set(Calendar.DAY_OF_MONTH, 1)
-            set(Calendar.HOUR_OF_DAY, 9)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-            if (!after(now)) add(Calendar.MONTH, 1)
+    /** Mensile: il giorno 1 alle 9. Settimanale: il lunedì alle 9, un'ora dopo la sintesi. */
+    internal fun nextTrigger9am(
+        frequency: HealthPatternFrequency,
+        now: LocalDateTime = LocalDateTime.now(),
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): Long {
+        val nineAm = LocalTime.of(9, 0)
+        val target = when (frequency) {
+            HealthPatternFrequency.MONTHLY -> {
+                val first = now.toLocalDate().withDayOfMonth(1).atTime(nineAm)
+                if (first.isAfter(now)) first else first.plusMonths(1)
+            }
+            HealthPatternFrequency.WEEKLY -> {
+                val monday = now.toLocalDate()
+                    .with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY))
+                    .atTime(nineAm)
+                if (monday.isAfter(now)) monday else monday.plusWeeks(1)
+            }
         }
-        return target.timeInMillis
+        return target.atZone(zone).toInstant().toEpochMilli()
     }
 
     private fun ensureChannel(context: Context) {
@@ -158,10 +213,10 @@ object HealthPatternAnalyzerService {
 
             val familyId = inputData.getString(KEY_FAMILY_ID) ?: return Result.failure()
             val familyName = inputData.getString(KEY_FAMILY_NAME) ?: applicationContext.getString(R.string.ai_your_family)
-            val monthKey = currentMonthKey()
+            val monthKey = currentPeriodKey(applicationContext)
             val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-            if (prefs.getString(PREF_LAST_MONTH_KEY, null) == monthKey) {
+            if (alreadyAnalyzed(applicationContext, monthKey)) {
                 return Result.success()
             }
 
@@ -205,7 +260,7 @@ object HealthPatternAnalyzerService {
 
             result.onSuccess { response ->
                 val reply = response.reply.trim()
-                prefs.edit().putString(PREF_LAST_MONTH_KEY, monthKey).apply()
+                markAnalyzed(applicationContext, monthKey)
 
                 if (!isNoPattern(reply)) {
                     prefs.edit().putString(PREF_LAST_TEXT, response.reply).apply()
@@ -220,7 +275,7 @@ object HealthPatternAnalyzerService {
                             isRead = false,
                         ),
                     )
-                    scheduleFirstOfMonth9am(applicationContext, familyId, familyName, response.reply)
+                    scheduleNext9am(applicationContext, familyId, familyName, response.reply)
                 }
             }
 
@@ -305,7 +360,7 @@ class HealthPatternBroadcastReceiver : BroadcastReceiver() {
             )
         }
 
-        HealthPatternAnalyzerService.scheduleFirstOfMonth9am(context, familyId, familyName, fullText)
+        HealthPatternAnalyzerService.scheduleNext9am(context, familyId, familyName, fullText)
     }
 
     companion object {

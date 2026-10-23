@@ -146,6 +146,11 @@
     <string name="settings_ai_daily_sub">Notification chaque matin à 8h00 avec le programme du jour</string>
     <string name="settings_ai_patterns">Tendances santé IA</string>
     <string name="settings_ai_patterns_sub">Analyse mensuelle de l\'historique de santé des enfants</string>
+    <string name="settings_ai_patterns_sub_weekly">Analyse hebdomadaire de l\'historique de santé des enfants</string>
+    <string name="settings_ai_patterns_frequency">Fréquence</string>
+    <string name="settings_ai_patterns_monthly">Chaque mois</string>
+    <string name="settings_ai_patterns_weekly">Chaque semaine</string>
+    <string name="settings_ai_patterns_cost">Chaque analyse consomme des messages IA</string>
     <string name="settings_ai_requires_plan">Messages IA gratuits épuisés</string>
     <string name="settings_ai_upgrade_hint">Tu as utilisé les %1$d messages IA gratuits inclus dans la formule Free. Passe à Pro pour continuer à utiliser l\'assistant.</string>
     <string name="settings_ai_bonus_free_title">Bonus IA gratuit</string>

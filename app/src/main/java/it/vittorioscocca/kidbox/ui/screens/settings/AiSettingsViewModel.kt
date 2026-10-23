@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.ai.AiSettings
 import it.vittorioscocca.kidbox.ai.DailyBriefingPrefs
+import it.vittorioscocca.kidbox.ai.HealthPatternFrequency
 import it.vittorioscocca.kidbox.ai.HealthPatternPrefs
 import it.vittorioscocca.kidbox.ai.WeeklySummaryPrefs
 import it.vittorioscocca.kidbox.data.ai.AISettingsStore
@@ -47,6 +48,7 @@ data class AiSettingsUiState(
     val isWeeklySummaryEnabled: Boolean = true,
     val isDailyBriefingEnabled: Boolean = true,
     val isHealthPatternEnabled: Boolean = true,
+    val healthPatternFrequency: HealthPatternFrequency = HealthPatternFrequency.MONTHLY,
     val healthContextSendPreference: HealthContextSendPreference = HealthContextSendPreference.ASK_EACH_TIME,
     val pendingShowConsent: Boolean = false,
     /** Solo chi ha creato la famiglia può attivare o cambiare un abbonamento. */
@@ -79,6 +81,7 @@ class AiSettingsViewModel @Inject constructor(
             isWeeklySummaryEnabled = weeklySummaryPrefs.isEnabled.value,
             isDailyBriefingEnabled = dailyBriefingPrefs.isEnabled.value,
             isHealthPatternEnabled = healthPatternPrefs.isEnabled.value,
+            healthPatternFrequency = healthPatternPrefs.frequency.value,
             healthContextSendPreference = aiSettingsStore.getHealthContextSendPreference(),
         ),
     )
@@ -216,6 +219,11 @@ class AiSettingsViewModel @Inject constructor(
     fun toggleHealthPattern(enabled: Boolean) {
         healthPatternPrefs.setEnabled(enabled)
         _uiState.update { it.copy(isHealthPatternEnabled = enabled) }
+    }
+
+    fun setHealthPatternFrequency(frequency: HealthPatternFrequency) {
+        healthPatternPrefs.setFrequency(frequency)
+        _uiState.update { it.copy(healthPatternFrequency = frequency) }
     }
 
     fun dismissMessage() {

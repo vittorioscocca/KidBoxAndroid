@@ -146,6 +146,11 @@
     <string name="settings_ai_daily_sub">A notification every morning at 8:00 with the day\'s plans</string>
     <string name="settings_ai_patterns">AI health patterns</string>
     <string name="settings_ai_patterns_sub">Monthly analysis of your children\'s health history</string>
+    <string name="settings_ai_patterns_sub_weekly">Weekly analysis of your children\'s health history</string>
+    <string name="settings_ai_patterns_frequency">Frequency</string>
+    <string name="settings_ai_patterns_monthly">Every month</string>
+    <string name="settings_ai_patterns_weekly">Every week</string>
+    <string name="settings_ai_patterns_cost">Each analysis uses AI messages</string>
     <string name="settings_ai_requires_plan">Free AI messages used up</string>
     <string name="settings_ai_upgrade_hint">You\'ve used all %1$d free AI messages included in the Free plan. Upgrade to Pro to keep using the assistant.</string>
     <string name="settings_ai_bonus_free_title">Free AI bonus</string>

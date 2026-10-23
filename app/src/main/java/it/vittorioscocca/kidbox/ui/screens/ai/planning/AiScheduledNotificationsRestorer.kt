@@ -36,7 +36,7 @@ object AiScheduledNotificationsRestorer {
 
         if (prefs.getBoolean(HealthPatternPrefs.WORKER_KEY_ENABLED, true)) {
             prefs.getString(PREF_HEALTH_TEXT, null)?.takeIf { it.isNotBlank() }?.let { text ->
-                HealthPatternAnalyzerService.scheduleFirstOfMonth9am(context, familyId, familyName, text)
+                HealthPatternAnalyzerService.scheduleNext9am(context, familyId, familyName, text)
             }
         }
     }

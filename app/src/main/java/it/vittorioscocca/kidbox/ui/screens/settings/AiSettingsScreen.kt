@@ -36,6 +36,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -73,6 +74,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ai.AIConsentBottomSheet
+import it.vittorioscocca.kidbox.ai.HealthPatternFrequency
 import it.vittorioscocca.kidbox.notifications.ExactAlarmScheduler
 import it.vittorioscocca.kidbox.data.health.ai.HealthContextSendPreference
 import it.vittorioscocca.kidbox.domain.model.KBPlan
@@ -259,6 +261,8 @@ fun AiSettingsScreen(
             HealthPatternCard(
                 isEnabled = state.isHealthPatternEnabled,
                 onToggle = viewModel::toggleHealthPattern,
+                frequency = state.healthPatternFrequency,
+                onFrequencyChange = viewModel::setHealthPatternFrequency,
             )
 
             ExactAlarmPermissionBanner(
@@ -712,7 +716,12 @@ private fun DailyBriefingCard(isEnabled: Boolean, onToggle: (Boolean) -> Unit) {
 }
 
 @Composable
-private fun HealthPatternCard(isEnabled: Boolean, onToggle: (Boolean) -> Unit) {
+private fun HealthPatternCard(
+    isEnabled: Boolean,
+    onToggle: (Boolean) -> Unit,
+    frequency: HealthPatternFrequency,
+    onFrequencyChange: (HealthPatternFrequency) -> Unit,
+) {
     val kb = MaterialTheme.kidBoxColors
     SettingCard {
         Column(modifier = Modifier.padding(vertical = 4.dp)) {
@@ -730,9 +739,35 @@ private fun HealthPatternCard(isEnabled: Boolean, onToggle: (Boolean) -> Unit) {
                 )
                 Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
                     Text(stringResource(R.string.settings_ai_patterns), fontSize = 15.sp, color = kb.title, fontWeight = FontWeight.Medium)
-                    Text(stringResource(R.string.settings_ai_patterns_sub), fontSize = 12.sp, color = kb.subtitle)
+                    Text(
+                        stringResource(
+                            if (frequency == HealthPatternFrequency.WEEKLY) {
+                                R.string.settings_ai_patterns_sub_weekly
+                            } else {
+                                R.string.settings_ai_patterns_sub
+                            },
+                        ),
+                        fontSize = 12.sp,
+                        color = kb.subtitle,
+                    )
                 }
                 Switch(checked = isEnabled, onCheckedChange = onToggle)
+            }
+            Column(modifier = Modifier.padding(start = 48.dp, end = 16.dp, bottom = 12.dp)) {
+                Text(stringResource(R.string.settings_ai_patterns_frequency), fontSize = 13.sp, color = kb.title)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = frequency == HealthPatternFrequency.MONTHLY,
+                        onClick = { onFrequencyChange(HealthPatternFrequency.MONTHLY) },
+                        label = { Text(stringResource(R.string.settings_ai_patterns_monthly)) },
+                    )
+                    FilterChip(
+                        selected = frequency == HealthPatternFrequency.WEEKLY,
+                        onClick = { onFrequencyChange(HealthPatternFrequency.WEEKLY) },
+                        label = { Text(stringResource(R.string.settings_ai_patterns_weekly)) },
+                    )
+                }
+                Text(stringResource(R.string.settings_ai_patterns_cost), fontSize = 12.sp, color = kb.subtitle)
             }
         }
     }

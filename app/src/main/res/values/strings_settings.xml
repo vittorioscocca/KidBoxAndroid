@@ -146,6 +146,11 @@
     <string name="settings_ai_daily_sub">Notifica ogni mattina alle 8:00 con gli impegni del giorno</string>
     <string name="settings_ai_patterns">Pattern salute AI</string>
     <string name="settings_ai_patterns_sub">Analisi mensile della storia sanitaria dei figli</string>
+    <string name="settings_ai_patterns_sub_weekly">Analisi settimanale della storia sanitaria dei figli</string>
+    <string name="settings_ai_patterns_frequency">Frequenza</string>
+    <string name="settings_ai_patterns_monthly">Ogni mese</string>
+    <string name="settings_ai_patterns_weekly">Ogni settimana</string>
+    <string name="settings_ai_patterns_cost">Ogni analisi consuma messaggi AI</string>
     <string name="settings_ai_requires_plan">Messaggi AI gratuiti terminati</string>
     <string name="settings_ai_upgrade_hint">Hai usato tutti i %1$d messaggi AI gratuiti inclusi nel piano Free. Passa a Pro per continuare a usare l\'assistente.</string>
     <string name="settings_ai_bonus_free_title">Bonus AI gratuito</string>

@@ -146,6 +146,11 @@
     <string name="settings_ai_daily_sub">Aviso cada mañana a las 8:00 con los planes del día</string>
     <string name="settings_ai_patterns">Patrones de salud con IA</string>
     <string name="settings_ai_patterns_sub">Análisis mensual del historial de salud de tus hijos</string>
+    <string name="settings_ai_patterns_sub_weekly">Análisis semanal del historial de salud de tus hijos</string>
+    <string name="settings_ai_patterns_frequency">Frecuencia</string>
+    <string name="settings_ai_patterns_monthly">Cada mes</string>
+    <string name="settings_ai_patterns_weekly">Cada semana</string>
+    <string name="settings_ai_patterns_cost">Cada análisis consume mensajes de IA</string>
     <string name="settings_ai_requires_plan">Mensajes de IA gratuitos agotados</string>
     <string name="settings_ai_upgrade_hint">Has usado los %1$d mensajes de IA gratuitos incluidos en el plan Free. Cambia a Pro para seguir usando el asistente.</string>
     <string name="settings_ai_bonus_free_title">Bono de IA gratuito</string>
