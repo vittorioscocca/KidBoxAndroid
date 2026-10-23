@@ -26,4 +26,8 @@
     <string name="insight_delegate_header">Deja que KidBox se encargue</string>
     <string name="insight_delegate_toggle">Pregunta a los demás por mí</string>
     <string name="insight_delegate_footer">Si 12 horas antes del vencimiento nadie ha cogido una tarea que creaste tú, KidBox envía la solicitud a los demás miembros que la ven y te avisa. Puedes retirarla cuando quieras.</string>
+    <string name="insight_payment_title">%1$s vence %2$s</string>
+    <string name="insight_payment_body">¿Quién se encarga?</string>
+    <string name="insight_payment_todo_title">Pagar: %1$s</string>
+    <string name="insight_type_payment">Pagos de casa que nadie ha cogido</string>
 </resources>

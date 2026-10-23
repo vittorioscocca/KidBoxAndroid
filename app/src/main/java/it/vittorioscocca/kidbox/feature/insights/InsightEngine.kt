@@ -25,6 +25,8 @@ enum class InsightType(val raw: String) {
     EVENT_TOMORROW_NO_REMINDER("event_tomorrow_no_reminder"),
     VACCINE_DUE("vaccine_due"),
     GROCERY_STALE("grocery_stale"),
+    /** Pagamento di casa in scadenza per cui nessuno ha preso il to-do «Pagare: …». */
+    HOUSE_PAYMENT_DUE("house_payment_due"),
     ;
 
     companion object {
@@ -68,7 +70,19 @@ data class InsightSnapshot(
     val todos: List<Todo> = emptyList(),
     val treatments: List<Treatment> = emptyList(),
     val doseLogs: List<DoseLog> = emptyList(),
+    val housePayments: List<HousePayment> = emptyList(),
+    /** Id dei to-do della famiglia, anche fatti: il to-do «Pagare: …» dice che qualcuno se n'è occupato. */
+    val todoIds: Set<String> = emptySet(),
 ) {
+    data class HousePayment(
+        val id: String,
+        val isDeleted: Boolean,
+        /** Scadenza unica: ha la precedenza sul giorno del mese. */
+        val dueDateMillis: Long?,
+        /** Scadenza ricorrente: giorno del mese (1-31). */
+        val monthlyDay: Int?,
+    )
+
     data class Todo(
         val id: String,
         val dueAtMillis: Long?,
@@ -110,7 +124,48 @@ object InsightEngine {
     const val DOSE_GRACE_MS = 3600L * 1000
 
     fun evaluate(snapshot: InsightSnapshot, nowMillis: Long, zone: ZoneId = ZoneId.systemDefault()): List<InsightCandidate> =
-        unassignedTodos(snapshot.todos, nowMillis, zone) + missingDoses(snapshot, nowMillis, zone)
+        unassignedTodos(snapshot.todos, nowMillis, zone) + missingDoses(snapshot, nowMillis, zone) +
+            unclaimedHousePayments(snapshot, nowMillis, zone)
+
+    private const val PAYMENT_LEAD_DAYS = 3L
+    private const val PAYMENT_HORIZON_DAYS = 7L
+
+    /** Id del to-do «Pagare: …» di una scadenza: lo stesso su ogni telefono e su iOS. */
+    fun paymentTodoId(paymentId: String, due: LocalDate): String = "hp-$paymentId-$due"
+
+    /** Prossima scadenza da oggi compreso: la data unica, o il giorno del mese (il 31 diventa l'ultimo). */
+    fun nextDue(p: InsightSnapshot.HousePayment, today: LocalDate, zone: ZoneId): LocalDate? {
+        p.dueDateMillis?.let { millis ->
+            val day = Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
+            return if (day.isBefore(today)) null else day
+        }
+        val d = p.monthlyDay?.takeIf { it in 1..31 } ?: return null
+        for (offset in 0L..1L) {
+            val month = today.plusMonths(offset)
+            val due = month.withDayOfMonth(minOf(d, month.lengthOfMonth()))
+            if (!due.isBefore(today)) return due
+        }
+        return null
+    }
+
+    /** Pagamento che scade entro una settimana senza il suo to-do: avviso 3 giorni prima alle 9. */
+    fun unclaimedHousePayments(snapshot: InsightSnapshot, nowMillis: Long, zone: ZoneId): List<InsightCandidate> {
+        val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+        return snapshot.housePayments.mapNotNull { p ->
+            if (p.isDeleted) return@mapNotNull null
+            val due = nextDue(p, today, zone) ?: return@mapNotNull null
+            val days = ChronoUnit.DAYS.between(today, due)
+            if (days > PAYMENT_HORIZON_DAYS) return@mapNotNull null
+            if (paymentTodoId(p.id, due) in snapshot.todoIds) return@mapNotNull null
+            InsightCandidate(
+                type = InsightType.HOUSE_PAYMENT_DUE,
+                entityId = "${p.id}@$due",
+                priority = if (days <= 1) InsightPriority.HIGH else InsightPriority.NORMAL,
+                fireAtMillis = due.minusDays(PAYMENT_LEAD_DAYS).atTime(LocalTime.of(9, 0))
+                    .atZone(zone).toInstant().toEpochMilli(),
+            )
+        }
+    }
 
     /**
      * To-do da fare, visibile, che nessuno ha preso e scade nella prossima

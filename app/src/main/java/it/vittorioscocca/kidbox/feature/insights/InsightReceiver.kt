@@ -83,6 +83,23 @@ class InsightReceiver : BroadcastReceiver() {
                 builder.addAction(0, context.getString(R.string.insight_action_snooze), action(context, intent, InsightActionReceiver.ACTION_SNOOZE, 3))
                 builder.addAction(0, context.getString(R.string.insight_action_dismiss), action(context, intent, InsightActionReceiver.ACTION_DISMISS, 4))
             }
+            InsightType.HOUSE_PAYMENT_DUE.raw -> {
+                val name = intent.getStringExtra(EXTRA_TITLE).orEmpty()
+                val due = intent.getLongExtra(EXTRA_DUE_AT, 0)
+                builder.setContentTitle(context.getString(R.string.insight_payment_title, name, relativeDue(context, due, false)))
+                    .setContentText(context.getString(R.string.insight_payment_body))
+                tap.putExtra("push_type", "house_payment_reminder")
+                    .putExtra("push_house_payment_id", intent.getStringExtra(EXTRA_PAYMENT_ID))
+                // Stessi pulsanti del to-do: «chi paga» è il to-do «Pagare: …».
+                builder.addAction(0, context.getString(R.string.insight_action_take), action(context, intent, InsightActionReceiver.ACTION_TAKE, 1))
+                if (intent.getBooleanExtra(EXTRA_CAN_ASK, false)) {
+                    builder.addAction(0, context.getString(R.string.insight_action_ask), action(context, intent, InsightActionReceiver.ACTION_ASK, 2))
+                    builder.addAction(0, context.getString(R.string.insight_action_snooze), action(context, intent, InsightActionReceiver.ACTION_SNOOZE, 3))
+                } else {
+                    builder.addAction(0, context.getString(R.string.insight_action_snooze), action(context, intent, InsightActionReceiver.ACTION_SNOOZE, 3))
+                    builder.addAction(0, context.getString(R.string.insight_action_dismiss), action(context, intent, InsightActionReceiver.ACTION_DISMISS, 4))
+                }
+            }
             TYPE_DIGEST -> {
                 val count = intent.getIntExtra(EXTRA_COUNT, 0)
                 if (count <= 0) return
@@ -138,5 +155,6 @@ class InsightReceiver : BroadcastReceiver() {
         const val EXTRA_TREATMENT_ID = "kb.insight.treatmentId"
         const val EXTRA_SUBJECT = "kb.insight.subject"
         const val EXTRA_COUNT = "kb.insight.count"
+        const val EXTRA_PAYMENT_ID = "kb.insight.paymentId"
     }
 }

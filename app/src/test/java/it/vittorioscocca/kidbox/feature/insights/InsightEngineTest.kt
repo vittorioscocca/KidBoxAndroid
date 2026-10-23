@@ -191,4 +191,35 @@ class InsightEngineTest {
         assertEquals(listOf("dad"), InsightRunner.askRecipients("members", listOf("me", "dad"), members, "me"))
         assertEquals(emptyList<String>(), InsightRunner.askRecipients("private", emptyList(), members, "me"))
     }
+
+    // ── Pagamenti di casa (stessi casi di iOS) ─────────────────────────────
+
+    private fun payment(day: Int? = null, date: Long? = null) = InsightSnapshot.HousePayment("p1", false, date, day)
+
+    @Test
+    fun monthlyPaymentAsksThreeDaysBeforeAtNine() {
+        assertEquals(
+            listOf(InsightCandidate(InsightType.HOUSE_PAYMENT_DUE, "p1@2026-10-26", InsightPriority.NORMAL, at(23, 9, 0))),
+            eval(InsightSnapshot(housePayments = listOf(payment(day = 26)))),
+        )
+        assertEquals(InsightPriority.HIGH, eval(InsightSnapshot(housePayments = listOf(payment(day = 24)))).single().priority)
+    }
+
+    @Test
+    fun day31AndPastDaysAndOneOff() {
+        assertEquals(
+            java.time.LocalDate.of(2026, 11, 30),
+            InsightEngine.nextDue(payment(day = 31), java.time.LocalDate.of(2026, 11, 25), rome),
+        )
+        assertEquals(emptyList<InsightCandidate>(), eval(InsightSnapshot(housePayments = listOf(payment(day = 10)))))
+        assertEquals("p1@2026-10-28", eval(InsightSnapshot(housePayments = listOf(payment(day = 1, date = at(28, 0, 0))))).single().entityId)
+        assertEquals(emptyList<InsightCandidate>(), eval(InsightSnapshot(housePayments = listOf(payment(date = at(20, 0, 0))))))
+    }
+
+    @Test
+    fun paymentWithItsTodoIsNotAsked() {
+        val id = InsightEngine.paymentTodoId("p1", java.time.LocalDate.of(2026, 10, 26))
+        assertEquals("hp-p1-2026-10-26", id)
+        assertEquals(emptyList<InsightCandidate>(), eval(InsightSnapshot(housePayments = listOf(payment(day = 26)), todoIds = setOf(id))))
+    }
 }

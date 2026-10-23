@@ -18,6 +18,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoItemDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTreatmentDao
 import it.vittorioscocca.kidbox.data.local.dao.PetDao
+import it.vittorioscocca.kidbox.data.local.dao.HousePaymentDao
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoItemEntity
 import it.vittorioscocca.kidbox.ai.CurrentPlanStore
@@ -70,6 +71,7 @@ class InsightRunner @Inject constructor(
     private val memberDao: KBFamilyMemberDao,
     private val childDao: KBChildDao,
     private val petDao: PetDao,
+    private val housePaymentDao: HousePaymentDao,
     private val subscriptionRepository: SubscriptionRepository,
     private val auth: FirebaseAuth,
 ) {
@@ -238,7 +240,9 @@ class InsightRunner @Inject constructor(
     }
 
     private suspend fun snapshot(familyId: String, uid: String): InsightSnapshot {
-        val todos = todoDao.getByFamily(familyId).filter { !it.isDone }
+        val allTodos = todoDao.getByFamily(familyId)
+        val todos = allTodos.filter { !it.isDone }
+        val payments = housePaymentDao.listActiveByFamily(familyId)
         val treatments = treatmentDao.observeByFamilyId(familyId).first().filter { it.isActive && !it.isDeleted }
         val logs = treatments.flatMap { doseLogDao.listByTreatment(it.id) }.filter { it.taken && !it.isDeleted }
         return InsightSnapshot(
@@ -264,6 +268,10 @@ class InsightRunner @Inject constructor(
                 )
             },
             doseLogs = logs.map { InsightSnapshot.DoseLog(it.treatmentId, it.dayNumber, it.slotIndex, it.taken, it.isDeleted) },
+            housePayments = payments.map {
+                InsightSnapshot.HousePayment(it.id, it.isDeleted, it.dataScadenza, it.giornoDiScadenzaMensile)
+            },
+            todoIds = allTodos.map { it.id }.toSet(),
         )
     }
 
@@ -349,6 +357,17 @@ class InsightRunner @Inject constructor(
                 intent.putExtra(InsightReceiver.EXTRA_TREATMENT_ID, t.id)
                     .putExtra(InsightReceiver.EXTRA_CHILD_ID, t.childId)
                     .putExtra(InsightReceiver.EXTRA_SUBJECT, name.orEmpty())
+            }
+            InsightType.HOUSE_PAYMENT_DUE -> {
+                val paymentId = row.entityId.substringBefore("@")
+                val day = row.entityId.substringAfter("@")
+                val payment = housePaymentDao.getById(paymentId) ?: return null
+                val uid = auth.currentUser?.uid.orEmpty()
+                val others = memberDao.observeActiveByFamilyId(row.familyId).first().any { it.userId.isNotBlank() && it.userId != uid }
+                intent.putExtra(InsightReceiver.EXTRA_PAYMENT_ID, paymentId)
+                    .putExtra(InsightReceiver.EXTRA_TITLE, payment.name)
+                    .putExtra(InsightReceiver.EXTRA_DUE_AT, java.time.LocalDate.parse(day).atTime(9, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
+                    .putExtra(InsightReceiver.EXTRA_CAN_ASK, others)
             }
             else -> return null
         }

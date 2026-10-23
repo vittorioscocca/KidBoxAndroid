@@ -237,6 +237,8 @@ class TodoRepository @Inject constructor(
         reminderEnabled: Boolean,
         visibilityScope: String = KBVisibilityScope.FAMILY,
         visibilityMemberIds: List<String> = emptyList(),
+        /** Id già deciso: il to-do «Pagare: …» degli avvisi ha un id legato alla scadenza. */
+        id: String = java.util.UUID.randomUUID().toString(),
     ) {
         KBLog.sync.info("addTodo START familyId=$familyId childId=$childId listId=$listId", tag = "todo")
         if (childId.isBlank()) ensureNoChildPlaceholder()
@@ -248,7 +250,7 @@ class TodoRepository @Inject constructor(
             if (normalizedScope == KBVisibilityScope.MEMBERS) visibilityMemberIds else emptyList(),
         )
         val todo = KBTodoItemEntity(
-            id = java.util.UUID.randomUUID().toString(),
+            id = id,
             familyId = familyId,
             childId = childId,
             title = title,

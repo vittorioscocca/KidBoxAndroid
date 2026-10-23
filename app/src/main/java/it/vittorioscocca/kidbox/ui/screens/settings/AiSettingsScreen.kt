@@ -775,6 +775,7 @@ private fun InsightCard(
                 for ((type, label) in listOf(
                     InsightType.TODO_UNASSIGNED_DUE_SOON to R.string.insight_type_todo,
                     InsightType.TREATMENT_DOSE_MISSING to R.string.insight_type_dose,
+                    InsightType.HOUSE_PAYMENT_DUE to R.string.insight_type_payment,
                 )) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(stringResource(label), fontSize = 14.sp, color = kb.title, modifier = Modifier.weight(1f))

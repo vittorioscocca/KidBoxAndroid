@@ -26,4 +26,8 @@
     <string name="insight_delegate_header">Laisse faire KidBox</string>
     <string name="insight_delegate_toggle">Demander aux autres à ma place</string>
     <string name="insight_delegate_footer">Si personne n\'a pris une tâche que tu as créée 12 heures avant l\'échéance, KidBox envoie la demande aux autres membres qui la voient et te prévient. Tu peux la retirer quand tu veux.</string>
+    <string name="insight_payment_title">%1$s arrive à échéance %2$s</string>
+    <string name="insight_payment_body">Qui s\'en occupe ?</string>
+    <string name="insight_payment_todo_title">Payer : %1$s</string>
+    <string name="insight_type_payment">Paiements de la maison que personne n\'a pris</string>
 </resources>

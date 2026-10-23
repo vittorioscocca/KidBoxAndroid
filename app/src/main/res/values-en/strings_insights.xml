@@ -26,4 +26,8 @@
     <string name="insight_delegate_header">Let KidBox handle it</string>
     <string name="insight_delegate_toggle">Ask the others for me</string>
     <string name="insight_delegate_footer">If nobody has taken a to-do you created 12 hours before it\'s due, KidBox sends the request to the other members who can see it and lets you know. You can withdraw it anytime.</string>
+    <string name="insight_payment_title">%1$s is due %2$s</string>
+    <string name="insight_payment_body">Who\'s taking care of it?</string>
+    <string name="insight_payment_todo_title">Pay: %1$s</string>
+    <string name="insight_type_payment">House payments nobody has taken</string>
 </resources>

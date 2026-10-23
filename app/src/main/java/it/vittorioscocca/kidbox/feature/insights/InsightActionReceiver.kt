@@ -16,6 +16,9 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import it.vittorioscocca.kidbox.data.local.dao.KBDoseLogDao
 import it.vittorioscocca.kidbox.data.local.dao.KBTodoItemDao
+import it.vittorioscocca.kidbox.data.local.dao.KBTodoListDao
+import it.vittorioscocca.kidbox.data.local.dao.HousePaymentDao
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.local.dao.KBTreatmentDao
 import it.vittorioscocca.kidbox.data.remote.requests.FamilyRequestRemoteStore
 import it.vittorioscocca.kidbox.data.repository.DoseLogRepository
@@ -41,6 +44,8 @@ interface InsightEntryPoint {
     fun treatmentDao(): KBTreatmentDao
     fun doseLogDao(): KBDoseLogDao
     fun doseLogRepository(): DoseLogRepository
+    fun todoListDao(): KBTodoListDao
+    fun housePaymentDao(): HousePaymentDao
 }
 
 /**
@@ -102,9 +107,16 @@ class InsightActionReceiver : BroadcastReceiver() {
             row = row.copy(actedReportedAtMillis = now)
         }
 
+        // Pagamento di casa: «Ci penso io» e «Chiedi agli altri» lavorano sul
+        // to-do «Pagare: …» di quella scadenza, che nasce qui se non c'è ancora.
+        var targetTodoId = intent.getStringExtra(InsightReceiver.EXTRA_TODO_ID).orEmpty()
+        if (row.type == InsightType.HOUSE_PAYMENT_DUE && (action == ACTION_TAKE || action == ACTION_ASK)) {
+            targetTodoId = ensurePaymentTodo(context, ep, row).orEmpty()
+        }
+
         when (action) {
             ACTION_TAKE -> {
-                val todoId = intent.getStringExtra(InsightReceiver.EXTRA_TODO_ID).orEmpty()
+                val todoId = targetTodoId
                 if (takeTodo(ep, todoId)) {
                     row = row.mark(InsightState.DONE, now)
                     acted("action")
@@ -112,7 +124,7 @@ class InsightActionReceiver : BroadcastReceiver() {
             }
             ACTION_ASK -> {
                 // L'avviso resta aperto: si chiude quando qualcuno prende il to-do.
-                val todoId = intent.getStringExtra(InsightReceiver.EXTRA_TODO_ID).orEmpty()
+                val todoId = targetTodoId
                 if (askOthers(context, ep, todoId, familyId)) acted("ask")
             }
             ACTION_DOSE_TAKEN -> {
@@ -133,6 +145,36 @@ class InsightActionReceiver : BroadcastReceiver() {
             }
         }
         runner.saveRows(rows.map { if (it.id == insightId) row else it })
+    }
+
+    /**
+     * Il to-do della scadenza (`<pagamento>@<giorno>`), creato senza nessuno se
+     * non c'è. Id prevedibile ([InsightEngine.paymentTodoId], uguale a iOS): due
+     * genitori che toccano insieme scrivono lo stesso to-do. Va nella lista
+     * modificata più di recente; senza liste non si crea niente.
+     */
+    private suspend fun ensurePaymentTodo(context: Context, ep: InsightEntryPoint, row: InsightRecord): String? {
+        val paymentId = row.entityId.substringBefore("@")
+        val day = runCatching { LocalDate.parse(row.entityId.substringAfter("@")) }.getOrNull() ?: return null
+        val payment = ep.housePaymentDao().getById(paymentId) ?: return null
+        val todoId = InsightEngine.paymentTodoId(paymentId, day)
+        if (ep.todoDao().getById(todoId) != null) return todoId
+        val list = ep.todoListDao().getByFamily(row.familyId).maxByOrNull { it.updatedAtEpochMillis } ?: return null
+        ep.todoRepository().addTodo(
+            familyId = row.familyId,
+            childId = list.childId,
+            listId = list.id,
+            title = context.getString(R.string.insight_payment_todo_title, payment.name),
+            notes = null,
+            // Senza orario: come i to-do «tutto il giorno», alle 9.
+            dueAtEpochMillis = day.atTime(9, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+            dueHasTime = false,
+            assignedTo = null,
+            priorityRaw = 0,
+            reminderEnabled = false,
+            id = todoId,
+        )
+        return todoId
     }
 
     private suspend fun takeTodo(ep: InsightEntryPoint, todoId: String): Boolean {

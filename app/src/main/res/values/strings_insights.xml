@@ -26,4 +26,8 @@
     <string name="insight_delegate_header">Lascia fare a KidBox</string>
     <string name="insight_delegate_toggle">Chiedi agli altri al posto mio</string>
     <string name="insight_delegate_footer">Se 12 ore prima della scadenza nessuno ha preso un to-do che hai creato tu, KidBox manda la richiesta agli altri membri che lo vedono e ti avvisa. Puoi ritirarla quando vuoi.</string>
+    <string name="insight_payment_title">%1$s scade %2$s</string>
+    <string name="insight_payment_body">Chi se ne occupa?</string>
+    <string name="insight_payment_todo_title">Pagare: %1$s</string>
+    <string name="insight_type_payment">Pagamenti di casa senza nessuno</string>
 </resources>
