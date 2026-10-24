@@ -96,7 +96,6 @@ class WidgetsViewModel @Inject constructor(
     fun setShowWeather(show: Boolean) = homeViewModePreference.setShowWeather(show)
 
     fun isHintAllowed(): Boolean = homeViewModePreference.isWidgetHintAllowed()
-    fun markHintShown() = homeViewModePreference.markWidgetHintShown()
     fun neverShowHint() = homeViewModePreference.neverShowWidgetHint()
 }
 
@@ -234,7 +233,6 @@ fun HomeWidgetHint(
     }
     if (showDashboard || showWeather || !viewModel.isHintAllowed()) return
 
-    LaunchedEffect(Unit) { viewModel.markHintShown() }
     val transition = rememberInfiniteTransition(label = "widgetHint")
     val phase by transition.animateFloat(
         initialValue = 0f,

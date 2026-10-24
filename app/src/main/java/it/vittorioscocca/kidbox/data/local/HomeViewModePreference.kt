@@ -56,35 +56,12 @@ class HomeViewModePreference @Inject constructor(
 
     /**
      * Consiglio «Aggiungi widget» sotto la foto di famiglia (finché nessun
-     * widget è acceso). La prima volta subito; poi a un avvio a freddo solo se
-     * dall'ultima volta che si è visto sono passati tre giorni, a meno di «Non
-     * visualizzare più». La decisione vale per tutto il processo: questa
-     * classe è `@Singleton`, quindi il campo vive finché l'app non viene uccisa.
+     * widget è acceso): sempre, a meno di «Non visualizzare più».
      */
-    private var widgetHintAllowedThisLaunch: Boolean? = null
-    private var widgetHintRecordedThisLaunch = false
-
-    fun isWidgetHintAllowed(): Boolean {
-        widgetHintAllowedThisLaunch?.let { return it }
-        val allowed = when {
-            prefs.getBoolean(KEY_WIDGET_HINT_NEVER, false) -> false
-            !prefs.contains(KEY_WIDGET_HINT_LAST_SHOWN) -> true
-            else -> System.currentTimeMillis() - prefs.getLong(KEY_WIDGET_HINT_LAST_SHOWN, 0L) >= WIDGET_HINT_INTERVAL_MS
-        }
-        widgetHintAllowedThisLaunch = allowed
-        return allowed
-    }
-
-    /** I tre giorni partono da quando il consiglio arriva a schermo, non dall'avvio. */
-    fun markWidgetHintShown() {
-        if (widgetHintRecordedThisLaunch) return
-        widgetHintRecordedThisLaunch = true
-        prefs.edit().putLong(KEY_WIDGET_HINT_LAST_SHOWN, System.currentTimeMillis()).apply()
-    }
+    fun isWidgetHintAllowed(): Boolean = !prefs.getBoolean(KEY_WIDGET_HINT_NEVER, false)
 
     fun neverShowWidgetHint() {
         prefs.edit().putBoolean(KEY_WIDGET_HINT_NEVER, true).apply()
-        widgetHintAllowedThisLaunch = false
     }
 
     fun getOrder(): List<String>? =
@@ -107,7 +84,5 @@ class HomeViewModePreference @Inject constructor(
         const val KEY_SHOW_DASHBOARD = "home_show_dashboard"
         const val KEY_SHOW_WEATHER = "home_show_weather"
         const val KEY_WIDGET_HINT_NEVER = "home_widget_hint_never"
-        const val KEY_WIDGET_HINT_LAST_SHOWN = "home_widget_hint_last_shown"
-        const val WIDGET_HINT_INTERVAL_MS = 3L * 24 * 60 * 60 * 1000
     }
 }
