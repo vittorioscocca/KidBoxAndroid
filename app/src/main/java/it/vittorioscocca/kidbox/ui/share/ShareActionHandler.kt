@@ -35,6 +35,8 @@ data class ShareActionInput(
     val selectedDestination: ShareDestination,
     val title: String,
     val text: String,
+    /** Inizio già riconosciuto (es. dal «Salva in…» della chat); se manca si cerca nel testo. */
+    val eventStartMillis: Long? = null,
 )
 
 @Singleton
@@ -214,7 +216,7 @@ class ShareActionHandler @Inject constructor(
 
     private suspend fun handleEvent(input: ShareActionInput) {
         val now = System.currentTimeMillis()
-        val start = parseDateFromText(input.text) ?: (now + 60 * 60 * 1000L)
+        val start = input.eventStartMillis ?: parseDateFromText(input.text) ?: (now + 60 * 60 * 1000L)
         val end = start + 60 * 60 * 1000L
         val uid = "local"
         calendarRepository.upsertEventLocal(

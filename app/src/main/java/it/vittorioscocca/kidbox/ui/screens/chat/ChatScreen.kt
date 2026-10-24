@@ -207,6 +207,7 @@ fun ChatScreen(
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     var actionTarget by remember { mutableStateOf<UiChatMessage?>(null) }
+    var saveToKidBoxTarget by remember { mutableStateOf<UiChatMessage?>(null) }
     // Unified gallery request: (urls, types, startIndex). Single-media taps produce a 1-item list.
     var galleryRequest by remember { mutableStateOf<Triple<List<String>, List<String>, Int>?>(null) }
     // Visore con tutti i media della chat (lo stesso della galleria del dettaglio).
@@ -863,6 +864,15 @@ fun ChatScreen(
                 editDraft = target.text.orEmpty()
                 actionTarget = null
             },
+            onSaveToKidBox = if (!target.isDeletedForEveryone &&
+                target.type == ChatMessageType.TEXT &&
+                !target.text.isNullOrBlank()
+            ) {
+                {
+                    saveToKidBoxTarget = target
+                    actionTarget = null
+                }
+            } else null,
             onSave = if (isSaveable) {
                 {
                     val msg = target
@@ -885,6 +895,36 @@ fun ChatScreen(
             onDeleteForEveryone = {
                 viewModel.deleteForEveryone(target.id)
                 actionTarget = null
+            },
+        )
+    }
+    saveToKidBoxTarget?.let { target ->
+        val savedLabels = mapOf(
+            it.vittorioscocca.kidbox.ui.share.ShareDestination.TODO to R.string.share_destination_todo,
+            it.vittorioscocca.kidbox.ui.share.ShareDestination.EVENT to R.string.share_destination_event,
+            it.vittorioscocca.kidbox.ui.share.ShareDestination.SHOPPING to R.string.share_destination_shopping,
+            it.vittorioscocca.kidbox.ui.share.ShareDestination.NOTE to R.string.share_destination_note,
+        )
+        ChatSaveToKidBoxSheet(
+            text = target.text.orEmpty(),
+            onDismiss = { saveToKidBoxTarget = null },
+            onSelect = { action ->
+                saveToKidBoxTarget = null
+                val destination = when (action) {
+                    is it.vittorioscocca.kidbox.domain.save.SaveAction.Todo -> it.vittorioscocca.kidbox.ui.share.ShareDestination.TODO
+                    is it.vittorioscocca.kidbox.domain.save.SaveAction.Event -> it.vittorioscocca.kidbox.ui.share.ShareDestination.EVENT
+                    is it.vittorioscocca.kidbox.domain.save.SaveAction.Grocery -> it.vittorioscocca.kidbox.ui.share.ShareDestination.SHOPPING
+                    is it.vittorioscocca.kidbox.domain.save.SaveAction.Note -> it.vittorioscocca.kidbox.ui.share.ShareDestination.NOTE
+                }
+                viewModel.saveToKidBox(action) { result ->
+                    val message = result.fold(
+                        onSuccess = {
+                            context.getString(R.string.chat_save_in_saved, context.getString(savedLabels.getValue(destination)))
+                        },
+                        onFailure = { it.message?.takeIf { m -> m.isNotBlank() } ?: context.getString(R.string.chat_save_failed) },
+                    )
+                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                }
             },
         )
     }
@@ -1581,6 +1621,7 @@ private fun MessageActionDialog(
     onPickReaction: (String) -> Unit,
     onReply: () -> Unit,
     onEdit: () -> Unit,
+    onSaveToKidBox: (() -> Unit)?,
     onSave: (() -> Unit)?,
     onDeleteForMe: () -> Unit,
     onDeleteForEveryone: () -> Unit,
@@ -1639,6 +1680,16 @@ private fun MessageActionDialog(
                     text = "Modifica",
                     textColor = MaterialTheme.colorScheme.primary,
                     onClick = onEdit,
+                )
+            }
+
+            // Salva in KidBox — testo: to-do, evento, spesa o nota
+            if (onSaveToKidBox != null) {
+                ActionSheetRow(
+                    icon = Icons.Default.SaveAlt,
+                    text = stringResource(R.string.chat_save_to_kidbox),
+                    textColor = MaterialTheme.kidBoxColors.title,
+                    onClick = onSaveToKidBox,
                 )
             }
 

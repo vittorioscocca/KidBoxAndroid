@@ -90,6 +90,8 @@ class ChatViewModel @Inject constructor(
     private val messageSettingsPreferences: MessageSettingsPreferences,
     private val photoVideoRepository: PhotoVideoRepository,
     private val photoDao: it.vittorioscocca.kidbox.data.local.dao.KBFamilyPhotoDao,
+    private val shareActionHandler: it.vittorioscocca.kidbox.ui.share.ShareActionHandler,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ChatUiState(currentUid = auth.currentUser?.uid.orEmpty()))
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
@@ -649,6 +651,56 @@ class ChatViewModel @Inject constructor(
             )
         }
     }
+
+    /**
+     * «Salva in KidBox…» da un messaggio di testo: stessa creazione del menu
+     * Condividi (`ShareActionHandler`), quindi gli stessi default e gli stessi
+     * errori (es. to-do senza un figlio in famiglia).
+     */
+    fun saveToKidBox(
+        action: it.vittorioscocca.kidbox.domain.save.SaveAction,
+        onDone: (Result<Unit>) -> Unit,
+    ) {
+        val familyId = _uiState.value.familyId
+        if (familyId.isBlank()) {
+            onDone(Result.failure(IllegalStateException("famiglia non pronta")))
+            return
+        }
+        val (destination, title, text, start) = when (action) {
+            is it.vittorioscocca.kidbox.domain.save.SaveAction.Todo ->
+                SaveInput(it.vittorioscocca.kidbox.ui.share.ShareDestination.TODO, action.title, action.title, null)
+            is it.vittorioscocca.kidbox.domain.save.SaveAction.Event ->
+                SaveInput(it.vittorioscocca.kidbox.ui.share.ShareDestination.EVENT, action.title.lineSequence().first(), action.title, action.dateMillis)
+            is it.vittorioscocca.kidbox.domain.save.SaveAction.Grocery ->
+                SaveInput(it.vittorioscocca.kidbox.ui.share.ShareDestination.SHOPPING, "", action.lines.joinToString("\n"), null)
+            is it.vittorioscocca.kidbox.domain.save.SaveAction.Note ->
+                SaveInput(it.vittorioscocca.kidbox.ui.share.ShareDestination.NOTE, action.title, action.body, null)
+        }
+        viewModelScope.launch {
+            val result = runCatching {
+                shareActionHandler.execute(
+                    it.vittorioscocca.kidbox.ui.share.ShareActionInput(
+                        familyId = familyId,
+                        contentType = it.vittorioscocca.kidbox.ui.share.ShareContentType.TextContent(text),
+                        allUris = emptyList(),
+                        selectedDestination = destination,
+                        title = title,
+                        text = text,
+                        eventStartMillis = start,
+                    ),
+                    appContext.contentResolver,
+                )
+            }
+            onDone(result)
+        }
+    }
+
+    private data class SaveInput(
+        val destination: it.vittorioscocca.kidbox.ui.share.ShareDestination,
+        val title: String,
+        val text: String,
+        val start: Long?,
+    )
 
     fun canDeleteForEveryone(message: UiChatMessage): Boolean {
         val uid = _uiState.value.currentUid

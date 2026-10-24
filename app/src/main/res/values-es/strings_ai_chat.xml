@@ -219,4 +219,8 @@
     <string name="agent_full_accuracy_units">Máxima precisión (%1$d mensajes)</string>
     <string name="agent_reduced_one_unit">Contexto reducido (1 mensaje)</string>
     <string name="agent_reduced_units">Contexto reducido (%1$d mensajes)</string>
+    <string name="chat_save_to_kidbox">Guardar en KidBox…</string>
+    <string name="chat_save_in_title">Guardar en…</string>
+    <string name="chat_save_in_on_device">Calculado en el teléfono</string>
+    <string name="chat_save_in_saved">Guardado en %1$s</string>
 </resources>
