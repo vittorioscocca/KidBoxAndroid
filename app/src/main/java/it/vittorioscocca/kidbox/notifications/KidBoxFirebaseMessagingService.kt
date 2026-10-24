@@ -13,6 +13,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.AndroidEntryPoint
+import it.vittorioscocca.kidbox.data.chat.crypto.ChatCryptoService
 import it.vittorioscocca.kidbox.data.location.LocationSharingService
 import it.vittorioscocca.kidbox.data.notification.PushNotificationManager
 import javax.inject.Inject
@@ -26,6 +27,7 @@ import kotlinx.coroutines.launch
 class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
 
     @Inject lateinit var pushNotificationManager: PushNotificationManager
+    @Inject lateinit var chatCrypto: ChatCryptoService
 
     /**
      * Delega a `persistFcmToken` invece di scrivere il documento per conto suo.
@@ -85,11 +87,30 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
             !rawTitle.isNullOrBlank() -> rawTitle
             else -> "KidBox"
         }
-        val body = remoteMessage.data["body"]
+        val body = chatPreview(type, remoteMessage.data)
+            ?: remoteMessage.data["body"]
             ?: remoteMessage.data["fallbackBody"]
             ?: remoteMessage.notification?.body
             ?: "Nuova notifica"
         showNotification(title, body, remoteMessage.data, type)
+    }
+
+    /**
+     * Anteprima di un messaggio di chat: il server manda `textEnc` (cifrato con
+     * la chiave di famiglia) dentro `data`, e il testo si decifra qui. Arriva
+     * solo quando il push passa da `onMessageReceived`, cioè con app aperta o
+     * con push solo-dati (prova per gli account di test). Chiave mancante o
+     * testo illeggibile: si ricade sul corpo generico, mai su un errore.
+     */
+    private fun chatPreview(type: String, data: Map<String, String>): String? {
+        if (type != "new_chat_message" && type != "chat_mention") return null
+        val enc = data["textEnc"]?.takeIf { it.isNotBlank() } ?: return null
+        val familyId = data["familyId"]?.takeIf { it.isNotBlank() } ?: return null
+        val plain = runCatching { chatCrypto.decryptStringFromBase64(enc, familyId) }.getOrNull()
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: return null
+        return if (plain.length > 100) plain.take(97) + "…" else plain
     }
 
     /**
