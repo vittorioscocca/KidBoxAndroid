@@ -87,4 +87,29 @@ class SaveClassifierTest {
         assertEquals(rules.actions.size, out.actions.size)
         assertTrue(out.isModelClassified)
     }
+
+    @Test
+    fun otherLanguagesDestinations() {
+        assertEquals(SaveDestination.GROCERY, first("milk\nbread\neggs\ncheese"))
+        assertEquals(SaveDestination.GROCERY, first("lait\npain\noeufs\nfromage"))
+        assertEquals(SaveDestination.GROCERY, first("leche\npan\nhuevos\nqueso"))
+        assertEquals(SaveDestination.TODO, first("Don't forget to call the pediatrician"))
+        assertEquals(SaveDestination.TODO, first("N'oublie pas de payer la facture"))
+        assertEquals(SaveDestination.TODO, first("Recuerda llamar al pediatra"))
+        assertEquals(SaveDestination.EVENT, first("Dentist appointment on friday at 5pm"))
+        assertEquals(SaveDestination.EVENT, first("Rendez-vous chez le dentiste vendredi à 17h30"))
+        assertEquals(SaveDestination.EVENT, first("Cita con el dentista el viernes a las 17:30"))
+    }
+
+    @Test
+    fun datesInOtherLanguages() {
+        assertEquals(LocalDateTime.of(2026, 10, 25, 18, 0), SaveDateDetector.detect("tomorrow at 6pm", now))
+        assertEquals(LocalDateTime.of(2026, 10, 25, 18, 30), SaveDateDetector.detect("demain à 18h30", now))
+        assertEquals(LocalDateTime.of(2026, 10, 30, 18, 0), SaveDateDetector.detect("el viernes a las 18", now))
+        assertEquals(LocalDateTime.of(2026, 10, 30, 17, 0), SaveDateDetector.detect("friday at 5 pm", now))
+        assertEquals(LocalDateTime.of(2026, 11, 3, 12, 0), SaveDateDetector.detect("november 3rd", now))
+        assertEquals(LocalDateTime.of(2026, 11, 3, 12, 0), SaveDateDetector.detect("3 de noviembre", now))
+        assertEquals(LocalDateTime.of(2026, 12, 15, 12, 0), SaveDateDetector.detect("le 15 décembre", now))
+        assertEquals(LocalDateTime.of(2026, 10, 26, 12, 0), SaveDateDetector.detect("pasado mañana", now))
+    }
 }

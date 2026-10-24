@@ -94,6 +94,90 @@ object SaveClassifier {
         "ricetta", "ingredienti", "procedimento", "istruzioni",
     )
 
+    // Le altre tre lingue dell'app. Le parole italiane sopra si cercano come
+    // sottostringa (come su iOS); queste a parola intera, perché le parole corte
+    // di una lingua cadono dentro quelle di un'altra («sale» è sale in italiano
+    // e saldi in inglese, «pan» sta in «pantaloni»).
+    private val groceryWords = listOf(
+        // en
+        "shopping", "groceries", "supermarket", "store", "buy", "milk", "bread", "eggs", "pasta", "rice",
+        "flour", "butter", "oil", "salt", "sugar", "coffee", "meat", "chicken", "fish", "ham", "cheese",
+        "vegetables", "fruit", "potatoes", "tomatoes", "salad", "carrots", "onions", "garlic", "yogurt",
+        "juice", "water", "wine", "beer", "cookies", "cereal", "honey", "jam", "detergent", "shampoo",
+        "soap", "toilet paper", "napkins",
+        // fr
+        "courses", "supermarché", "magasin", "acheter", "achète", "lait", "pain", "oeufs", "œufs", "pâtes",
+        "riz", "farine", "beurre", "huile", "sel", "sucre", "café", "viande", "poulet", "poisson", "jambon",
+        "fromage", "légumes", "fruits", "pommes de terre", "tomates", "salade", "carottes", "oignons", "ail",
+        "yaourt", "jus", "eau", "vin", "bière", "biscuits", "céréales", "miel", "confiture", "lessive",
+        "shampooing", "savon", "papier toilette", "serviettes",
+        // es
+        "compra", "supermercado", "tienda", "comprar", "leche", "pan", "huevos", "arroz", "harina",
+        "mantequilla", "aceite", "sal", "azúcar", "carne", "pollo", "pescado", "jamón", "queso", "verdura",
+        "fruta", "patatas", "ensalada", "zanahorias", "cebollas", "ajo", "yogur", "zumo", "agua", "vino",
+        "cerveza", "galletas", "cereales", "mermelada", "detergente", "champú", "jabón", "papel higiénico",
+        "servilletas",
+    )
+
+    private val eventWords = listOf(
+        // en
+        "appointment", "visit", "meeting", "lesson", "class", "practice", "match", "game", "show", "concert",
+        "cinema", "theater", "theatre", "birthday", "anniversary", "party", "ceremony", "wedding", "holiday",
+        "trip", "flight", "booking", "reservation", "deadline", "due", "tomorrow", "tonight", "today",
+        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "week", "month", "next",
+        "o'clock", "january", "february", "march", "april", "may", "june", "july", "august", "september",
+        "october", "november", "december",
+        // fr
+        "rendez-vous", "visite", "réunion", "rencontre", "cours", "entraînement", "spectacle", "cinéma",
+        "théâtre", "anniversaire", "fête", "cérémonie", "mariage", "vacances", "voyage", "vol", "réservation",
+        "échéance", "demain", "ce soir", "aujourd'hui", "lundi", "mardi", "mercredi", "jeudi", "vendredi",
+        "samedi", "dimanche", "semaine", "mois", "prochain", "prochaine", "janvier", "février", "mars",
+        "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+        // es
+        "cita", "visita", "reunión", "encuentro", "clase", "entrenamiento", "partido", "espectáculo",
+        "concierto", "cine", "teatro", "cumpleaños", "aniversario", "fiesta", "ceremonia", "boda",
+        "vacaciones", "viaje", "vuelo", "reserva", "plazo", "mañana", "esta noche", "hoy", "lunes", "martes",
+        "miércoles", "jueves", "viernes", "sábado", "domingo", "semana", "mes", "próximo", "próxima",
+        "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre",
+        "noviembre", "diciembre",
+    )
+
+    private val todoWords = listOf(
+        // en
+        "i need to", "we need to", "have to", "must", "should", "remember", "don't forget", "call", "write",
+        "send", "book", "pay", "pick up", "bring", "drop off", "fix", "prepare", "to do", "todo", "task",
+        "reminder", "urgent", "important", "priority",
+        // fr
+        "je dois", "on doit", "il faut", "rappelle-toi", "n'oublie pas", "appelle", "appeler", "écris",
+        "envoie", "envoyer", "réserve", "réserver", "paie", "payer", "récupère", "récupérer", "apporte",
+        "apporter", "répare", "prépare", "à faire", "rappel", "priorité",
+        // es
+        "tengo que", "debo", "debemos", "hay que", "recuerda", "no olvides", "llama", "llamar", "escribe",
+        "envía", "enviar", "reservar", "paga", "pagar", "recoge", "recoger", "trae", "traer", "arregla",
+        "prepara", "por hacer", "recordatorio", "urgente", "importante", "prioridad",
+    )
+
+    private val noteWords = listOf(
+        // en
+        "note", "info", "information", "link", "article", "read", "see", "interesting", "keep", "address",
+        "number", "code", "password", "pin", "recipe", "ingredients", "steps", "instructions",
+        // fr
+        "lien", "lis", "voir", "intéressant", "garde", "adresse", "numéro", "mot de passe", "recette",
+        "ingrédients",
+        // es
+        "nota", "apunte", "información", "enlace", "artículo", "lee", "ver", "interesante", "guarda",
+        "dirección", "número", "código", "contraseña", "receta", "ingredientes", "instrucciones",
+    )
+
+    private val wordRegexes = HashMap<String, Regex>()
+
+    private fun hasWord(lower: String, word: String): Boolean =
+        wordRegexes.getOrPut(word) { Regex("(?<!\\p{L})${Regex.escape(word)}(?!\\p{L})") }.containsMatchIn(lower)
+
+    /** Italiano a sottostringa (come iOS), le altre lingue a parola intera. */
+    private fun hits(lower: String, italian: List<String>, others: List<String>): Int =
+        italian.count { lower.contains(it) } + others.count { it !in italian && hasWord(lower, it) }
+
     /**
      * Le destinazioni in ordine di pertinenza, la migliore per prima. Le note
      * ci sono sempre (catch-all con punteggio minimo 1), come su iOS.
@@ -111,23 +195,23 @@ object SaveClassifier {
 
         val scored = ArrayList<Pair<SaveAction, Int>>()
 
-        var grocery = groceryKeywords.count { lower.contains(it) }
+        var grocery = hits(lower, groceryKeywords, groceryWords)
         if (lines.size >= 2) grocery += 3
         if (lines.size >= 2 && lines.all { it.length < 30 }) grocery += 2
         if (grocery >= 2) scored += SaveAction.Grocery(lines) to grocery
 
-        var event = eventKeywords.count { lower.contains(it) }
+        var event = hits(lower, eventKeywords, eventWords)
         if (date != null) event += 4
         if (event >= 2) scored += SaveAction.Event(trimmed, date) to event
 
-        var todo = todoKeywords.count { lower.contains(it) }
+        var todo = hits(lower, todoKeywords, todoWords)
         if (trimmed.length < 80 && lines.size == 1) todo += 2
         if (lines.size >= 3) todo -= 3
         if (lines.size >= 5) todo -= 5
         if (trimmed.length > 200) todo -= 3
         if (todo >= 1) scored += SaveAction.Todo(lines.first()) to (todo + 1)
 
-        val note = noteKeywords.count { lower.contains(it) }
+        val note = hits(lower, noteKeywords, noteWords)
         val body = if (lines.size > 1) lines.drop(1).joinToString("\n") else trimmed
         scored += SaveAction.Note(lines.first(), body) to maxOf(note + 1, 1)
 
@@ -138,14 +222,16 @@ object SaveClassifier {
 }
 
 /**
- * Date scritte in italiano dentro un messaggio: «domani alle 18», «venerdì»,
- * «3 marzo», «15/10», «tra due settimane» no (fuori misura). Gemello povero
- * di `NSDataDetector`: copre quello che si scrive davvero in una chat di
- * famiglia. Senza orario il momento è mezzogiorno, come fa iOS.
+ * Date scritte in un messaggio, nelle quattro lingue dell'app: «domani alle 18»,
+ * «tomorrow at 6pm», «demain à 18h», «el viernes a las 18», «3 marzo», «15/10».
+ * Gemello povero di `NSDataDetector`: copre quello che si scrive davvero in una
+ * chat di famiglia. Senza orario il momento è mezzogiorno, come fa iOS. Le date
+ * numeriche si leggono giorno/mese.
  */
 object SaveDateDetector {
 
     private val weekdays = mapOf(
+        // it
         "lunedì" to DayOfWeek.MONDAY, "lunedi" to DayOfWeek.MONDAY,
         "martedì" to DayOfWeek.TUESDAY, "martedi" to DayOfWeek.TUESDAY,
         "mercoledì" to DayOfWeek.WEDNESDAY, "mercoledi" to DayOfWeek.WEDNESDAY,
@@ -153,19 +239,49 @@ object SaveDateDetector {
         "venerdì" to DayOfWeek.FRIDAY, "venerdi" to DayOfWeek.FRIDAY,
         "sabato" to DayOfWeek.SATURDAY,
         "domenica" to DayOfWeek.SUNDAY,
+        // en
+        "monday" to DayOfWeek.MONDAY, "tuesday" to DayOfWeek.TUESDAY, "wednesday" to DayOfWeek.WEDNESDAY,
+        "thursday" to DayOfWeek.THURSDAY, "friday" to DayOfWeek.FRIDAY, "saturday" to DayOfWeek.SATURDAY,
+        "sunday" to DayOfWeek.SUNDAY,
+        // fr
+        "lundi" to DayOfWeek.MONDAY, "mardi" to DayOfWeek.TUESDAY, "mercredi" to DayOfWeek.WEDNESDAY,
+        "jeudi" to DayOfWeek.THURSDAY, "vendredi" to DayOfWeek.FRIDAY, "samedi" to DayOfWeek.SATURDAY,
+        "dimanche" to DayOfWeek.SUNDAY,
+        // es
+        "lunes" to DayOfWeek.MONDAY, "martes" to DayOfWeek.TUESDAY, "miércoles" to DayOfWeek.WEDNESDAY,
+        "miercoles" to DayOfWeek.WEDNESDAY, "jueves" to DayOfWeek.THURSDAY, "viernes" to DayOfWeek.FRIDAY,
+        "sábado" to DayOfWeek.SATURDAY, "sabado" to DayOfWeek.SATURDAY, "domingo" to DayOfWeek.SUNDAY,
     )
 
-    private val months = listOf(
-        "gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
-        "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre",
-    )
+    /** Nome del mese (qualunque lingua) → numero. */
+    private val monthNumbers: Map<String, Int> = buildMap {
+        val tables = listOf(
+            listOf("gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"),
+            listOf("january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"),
+            listOf("janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"),
+            listOf("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"),
+        )
+        for (t in tables) t.forEachIndexed { i, name -> put(name, i + 1) }
+        put("fevrier", 2); put("aout", 8); put("decembre", 12)
+    }
 
     /** `\b` di Java non vede le lettere accentate come parola: «venerdì» non combacerebbe. */
     private fun word(pattern: String) = Regex("(?<!\\p{L})$pattern(?!\\p{L})")
 
-    private val timeRegex = Regex("""(?:\balle(?:\s+ore)?|\bore|\bh)\s*(\d{1,2})(?:[:.](\d{2}))?\b""")
+    private val monthAlt = monthNumbers.keys.sortedByDescending { it.length }.joinToString("|")
+
+    // «alle 18», «alle ore 18.30», «h 18» · «at 6pm», «6 pm», «at 18:30» · «à 18h», «18h30» · «a las 18»
+    private val timeAmPm = Regex("""\b(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)\b""")
+    private val timeIt = Regex("""(?:\balle(?:\s+ore)?|\bore|\bh)\s*(\d{1,2})(?:[:.](\d{2}))?\b""")
+    private val timeEn = Regex("""\bat\s+(\d{1,2})(?::(\d{2}))?\b""")
+    private val timeFr = Regex("""\b(\d{1,2})\s*h\s*(\d{2})?\b""")
+    private val timeEs = Regex("""\ba\s+las?\s+(\d{1,2})(?:[:.](\d{2}))?\b""")
+
     private val numericDate = Regex("""\b(\d{1,2})[/\-.](\d{1,2})(?:[/\-.](\d{2,4}))?\b""")
-    private val monthDate = Regex("""\b(\d{1,2})\s+(${months.joinToString("|")})(?:\s+(\d{4}))?\b""")
+    // «3 novembre», «3 de noviembre», «3rd of november»
+    private val dayMonth = Regex("""\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:de\s+|of\s+)?($monthAlt)(?:\s+(?:de\s+)?(\d{4}))?\b""")
+    // «november 3», «november 3rd»
+    private val monthDay = Regex("""\b($monthAlt)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\b""")
 
     fun detect(text: String, now: LocalDateTime): LocalDateTime? {
         val lower = text.lowercase()
@@ -176,24 +292,42 @@ object SaveDateDetector {
     }
 
     private fun timeFrom(lower: String): LocalTime? {
-        val m = timeRegex.find(lower) ?: return null
-        val h = m.groupValues[1].toIntOrNull() ?: return null
-        val min = m.groupValues[2].takeIf { it.isNotEmpty() }?.toIntOrNull() ?: 0
-        if (h !in 0..23 || min !in 0..59) return null
-        return LocalTime.of(h, min)
+        timeAmPm.find(lower)?.let { m ->
+            var h = m.groupValues[1].toInt()
+            val min = m.groupValues[2].takeIf { it.isNotEmpty() }?.toInt() ?: 0
+            if (h !in 1..12 || min !in 0..59) return@let
+            val pm = m.groupValues[3] == "pm"
+            h = when { pm && h < 12 -> h + 12; !pm && h == 12 -> 0; else -> h }
+            return LocalTime.of(h, min)
+        }
+        for (r in listOf(timeIt, timeEs, timeEn, timeFr)) {
+            val m = r.find(lower) ?: continue
+            val h = m.groupValues[1].toIntOrNull() ?: continue
+            val min = m.groupValues[2].takeIf { it.isNotEmpty() }?.toIntOrNull() ?: 0
+            if (h in 0..23 && min in 0..59) return LocalTime.of(h, min)
+        }
+        return null
     }
 
     private fun dayFrom(lower: String, today: LocalDate): LocalDate? {
         // Le parole prima dei numeri: «domani» batte «15/10» se compaiono insieme.
-        if (word("dopodomani").containsMatchIn(lower)) return today.plusDays(2)
-        if (word("domani").containsMatchIn(lower)) return today.plusDays(1)
-        if (word("(?:oggi|stasera|stamattina|stanotte)").containsMatchIn(lower)) return today
+        if (word("(?:dopodomani|day after tomorrow|après-demain|apres-demain|pasado mañana|pasado manana)").containsMatchIn(lower)) {
+            return today.plusDays(2)
+        }
+        if (word("(?:domani|tomorrow|demain|mañana|manana)").containsMatchIn(lower)) return today.plusDays(1)
+        if (word("(?:oggi|stasera|stamattina|stanotte|today|tonight|aujourd'hui|ce soir|hoy|esta noche)").containsMatchIn(lower)) {
+            return today
+        }
 
-        monthDate.find(lower)?.let { m ->
-            val d = m.groupValues[1].toInt()
-            val mo = months.indexOf(m.groupValues[2]) + 1
-            val explicitYear = m.groupValues[3].takeIf { it.isNotEmpty() }?.toInt()
-            return resolve(d, mo, explicitYear, today)
+        dayMonth.find(lower)?.let { m ->
+            val mo = monthNumbers[m.groupValues[2]] ?: return@let
+            val y = m.groupValues[3].takeIf { it.isNotEmpty() }?.toInt()
+            resolve(m.groupValues[1].toInt(), mo, y, today)?.let { return it }
+        }
+        monthDay.find(lower)?.let { m ->
+            val mo = monthNumbers[m.groupValues[1]] ?: return@let
+            val y = m.groupValues[3].takeIf { it.isNotEmpty() }?.toInt()
+            resolve(m.groupValues[2].toInt(), mo, y, today)?.let { return it }
         }
         numericDate.find(lower)?.let { m ->
             val d = m.groupValues[1].toInt()
