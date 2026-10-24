@@ -6,6 +6,13 @@
 
 package it.vittorioscocca.kidbox.ui.screens.chat
 
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.platform.ViewConfiguration
+import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.runtime.CompositionLocalProvider
+
 import it.vittorioscocca.kidbox.data.remote.chat.ChatUploadProgress
 import android.content.Intent
 import android.media.MediaPlayer
@@ -36,7 +43,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.border
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
@@ -155,6 +161,18 @@ internal fun ChatBubble(
     val avatarToBubbleGap = 6.dp
     val incomingLeadingInset = 12.dp + 32.dp + avatarToBubbleGap
 
+    // Lo swipe per rispondere scattava alla soglia di sistema (8 dp): il leggero
+    // tremolio di un dito appoggiato bastava a farlo partire, e il trascinamento
+    // annullava la pressione lunga, cioè il menu del messaggio (visto nei log: solo
+    // «drag start», mai «long click»). Con una soglia tripla per la bolla serve un
+    // gesto orizzontale voluto; la lista fuori dalla bolla non cambia.
+    val baseViewConfiguration = LocalViewConfiguration.current
+    val bubbleViewConfiguration = remember(baseViewConfiguration) {
+        object : ViewConfiguration by baseViewConfiguration {
+            override val touchSlop: Float get() = baseViewConfiguration.touchSlop * 3f
+        }
+    }
+    CompositionLocalProvider(LocalViewConfiguration provides bubbleViewConfiguration) {
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -414,6 +432,7 @@ internal fun ChatBubble(
             }
         }
     }
+    }
 }
 
 /**
@@ -483,7 +502,6 @@ private fun ReplyContextHeader(
     }
 }
 
-@Suppress("DEPRECATION") // ClickableText is the most stable multi-version solution
 @Composable
 private fun TextContent(
     message: UiChatMessage,
@@ -505,7 +523,7 @@ private fun TextContent(
     // sono token "@DisplayName" che non contengono URL, quindi le rileviamo prima
     // (matchando il displayName più lungo per evitare collisioni "Mario" vs
     // "Mario Rossi") e poi gli URL nel resto del testo.
-    val annotated = remember(rawText, linkColor, mentionColor, mentions, currentUid) {
+    val annotated = remember(rawText, linkColor, mentionColor, mentions, currentUid, context) {
         buildAnnotatedString {
             // 1) Trova tutte le occorrenze "@displayName" da evidenziare.
             data class MentionRange(val start: Int, val end: Int, val mentionsMe: Boolean)
@@ -547,11 +565,19 @@ private fun TextContent(
                     if (segCursor < s) append(segment, segCursor, s)
                     val url = matcher.group() ?: continue
                     val resolved = if (url.startsWith("http")) url else "https://$url"
-                    pushStringAnnotation(tag = "URL", annotation = resolved)
-                    withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) {
+                    // Solo il link è toccabile: il resto del testo lascia passare i gesti
+                    // alla bolla (la pressione lunga apre il menu del messaggio).
+                    withLink(
+                        LinkAnnotation.Url(
+                            url = resolved,
+                            styles = TextLinkStyles(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)),
+                            linkInteractionListener = {
+                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(resolved))) }
+                            },
+                        ),
+                    ) {
                         append(url)
                     }
-                    pop()
                     segCursor = e
                 }
                 if (segCursor < segment.length) append(segment, segCursor, segment.length)
@@ -576,16 +602,12 @@ private fun TextContent(
         }
     }
 
-    ClickableText(
+    // Era un ClickableText: il suo rilevatore di tocchi copriva tutto il testo e si
+    // prendeva anche la pressione lunga, che così non arrivava mai alla bolla. Il menu
+    // del messaggio si apriva solo premendo sul bordo o sull'ora, fuori dalle lettere.
+    Text(
         text = annotated,
         style = TextStyle(color = textColor, fontSize = 15.sp),
-        onClick = { offset ->
-            annotated.getStringAnnotations("URL", offset, offset)
-                .firstOrNull()?.let { annotation ->
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(annotation.item))
-                    runCatching { context.startActivity(intent) }
-                }
-        },
     )
 
     // Show preview card for the first URL found
