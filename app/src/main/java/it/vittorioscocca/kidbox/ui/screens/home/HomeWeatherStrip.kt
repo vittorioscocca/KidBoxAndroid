@@ -3,7 +3,15 @@ package it.vittorioscocca.kidbox.ui.screens.home
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material3.Icon
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
+import it.vittorioscocca.kidbox.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -47,7 +55,8 @@ import org.json.JSONObject
  * Barra del meteo in Home: ora, prossime ore, minima e massima di oggi.
  * Stessa fonte di iOS (Open-Meteo, senza chiave) così i due client non danno
  * previsioni diverse. La posizione è approssimata e resta sul telefono; senza
- * permesso o senza rete la barra non compare.
+ * permesso o senza rete la barra non compare. Open-Meteo è CC BY 4.0: la
+ * citazione sotto i dati è un obbligo di licenza, non un vezzo.
  */
 data class WeatherHour(val timeMillis: Long, val temp: Int, val code: Int, val isDay: Boolean)
 
@@ -58,6 +67,7 @@ data class WeatherForecast(
     val min: Int,
     val max: Int,
     val hours: List<WeatherHour>,
+    val city: String?,
     val fetchedAt: Long,
 )
 
@@ -92,11 +102,33 @@ private suspend fun loadWeather(context: android.content.Context): WeatherForeca
         val loc = client.lastLocation.await()
             ?: client.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, CancellationTokenSource().token).await()
             ?: return null
-        val f = withContext(Dispatchers.IO) { fetch(loc.latitude, loc.longitude) }
+        val f = withContext(Dispatchers.IO) {
+            fetch(loc.latitude, loc.longitude).copy(city = cityName(context, loc.latitude, loc.longitude))
+        }
         WeatherCache.value = f
         f
     }.getOrNull()
 }
+
+/** Nome della località; se il geocoder non risponde resta l'ultimo noto. */
+private fun cityName(context: android.content.Context, lat: Double, lon: Double): String? {
+    val prefs = context.getSharedPreferences("kidbox_prefs", android.content.Context.MODE_PRIVATE)
+    val name = runCatching {
+        @Suppress("DEPRECATION")
+        android.location.Geocoder(context, Locale.getDefault()).getFromLocation(lat, lon, 1)?.firstOrNull()
+            ?.let { it.locality ?: it.subAdminArea }
+    }.getOrNull()
+    if (!name.isNullOrBlank()) {
+        prefs.edit().putString(KEY_WEATHER_CITY, name).apply()
+        return name
+    }
+    return prefs.getString(KEY_WEATHER_CITY, null)
+}
+
+private const val KEY_WEATHER_CITY = "home_weather_city"
+
+/** La fonte: Open-Meteo non ha un'app, il tocco apre il suo sito. */
+private const val WEATHER_SOURCE_URL = "https://open-meteo.com/"
 
 private fun fetch(lat: Double, lon: Double): WeatherForecast {
     val url = "https://api.open-meteo.com/v1/forecast?latitude=%.2f&longitude=%.2f".format(Locale.US, lat, lon) +
@@ -137,6 +169,7 @@ private fun fetch(lat: Double, lon: Double): WeatherForecast {
         min = Math.round(d.getJSONArray("temperature_2m_min").getDouble(0)).toInt(),
         max = Math.round(d.getJSONArray("temperature_2m_max").getDouble(0)).toInt(),
         hours = hours.drop(1),
+        city = null,
         fetchedAt = now,
     )
 }
@@ -148,6 +181,7 @@ fun HomeWeatherStrip(modifier: Modifier = Modifier) {
         value = loadWeather(context) ?: value
     }
     val f = forecast ?: return
+    val uriHandler = LocalUriHandler.current
     val hourFmt = SimpleDateFormat("HH", Locale.getDefault())
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -155,7 +189,24 @@ fun HomeWeatherStrip(modifier: Modifier = Modifier) {
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.kidBoxColors.card),
     ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            modifier = Modifier
+                .clickable { uriHandler.openUri(WEATHER_SOURCE_URL) }
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            f.city?.let { city ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Filled.LocationOn,
+                        contentDescription = null,
+                        tint = MaterialTheme.kidBoxColors.subtitle,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(city, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.kidBoxColors.subtitle)
+                }
+            }
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(weatherEmoji(f.code, f.isDay), fontSize = 30.sp)
                 Spacer(Modifier.width(10.dp))
@@ -180,6 +231,11 @@ fun HomeWeatherStrip(modifier: Modifier = Modifier) {
                     }
                 }
             }
+            Text(
+                stringResource(R.string.home_weather_source),
+                fontSize = 11.sp,
+                color = MaterialTheme.kidBoxColors.subtitle,
+            )
         }
     }
 }

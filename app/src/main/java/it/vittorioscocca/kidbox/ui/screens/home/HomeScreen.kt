@@ -352,6 +352,15 @@ fun HomeScreen(
 
                 Spacer(modifier = Modifier.size(16.dp))
 
+                // Consiglio «Aggiungi widget»: dopo la checklist, perché prima la
+                // Dashboard resterebbe nascosta comunque. Se un widget è acceso o
+                // non è il suo turno non disegna niente.
+                if (state.familyId.isNotBlank() && !onboarding.isVisible) {
+                    it.vittorioscocca.kidbox.ui.screens.settings.HomeWidgetHint(
+                        modifier = Modifier.padding(bottom = 16.dp),
+                    )
+                }
+
                 // Richieste aperte («Chi prende Marco?»): sopra a tutto, perché
                 // aspettano una risposta. Senza richieste non disegna niente.
                 // L'esito va nello snackbar: dopo un «Io» la card sparisce.
@@ -401,7 +410,9 @@ fun HomeScreen(
                     )
                 }
 
-                if (showWeather && state.familyId.isNotBlank() && !onboarding.isVisible) {
+                // Niente esclusione per la checklist, a differenza della Dashboard:
+                // il meteo non ha tessere vuote, e l'ha acceso l'utente.
+                if (showWeather && state.familyId.isNotBlank()) {
                     HomeWeatherStrip(modifier = Modifier.padding(bottom = 16.dp))
                 }
 

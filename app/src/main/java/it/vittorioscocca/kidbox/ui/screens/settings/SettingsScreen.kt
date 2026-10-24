@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Contrast
+import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Star
@@ -79,6 +80,7 @@ private data class SettingRowItem(
 fun SettingsScreen(
     onBack: () -> Unit,
     onTheme: () -> Unit,
+    onWidgets: () -> Unit,
     onLanguage: () -> Unit,
     onUsageGuide: () -> Unit,
     onFamilySettings: () -> Unit,
@@ -94,10 +96,13 @@ fun SettingsScreen(
     onPrivacySettings: () -> Unit,
     onSupportChat: () -> Unit,
     viewModel: ThemeViewModel = hiltViewModel(),
+    widgetsViewModel: WidgetsViewModel = hiltViewModel(),
 ) {
     val uriHandler = LocalUriHandler.current
     BackHandler { onBack() }
     val theme by viewModel.theme.collectAsStateWithLifecycle()
+    val showDashboard by widgetsViewModel.showDashboard.collectAsStateWithLifecycle()
+    val showWeather by widgetsViewModel.showWeather.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val (appVersionName, appVersionCode) = remember(context.packageName) {
         runCatching {
@@ -117,6 +122,13 @@ fun SettingsScreen(
             icon = Icons.Filled.Contrast,
             showChevron = true,
             onClick = onTheme,
+        ),
+        SettingRowItem(
+            title = stringResource(R.string.settings_row_widgets),
+            subtitle = widgetSummary(showDashboard, showWeather),
+            icon = Icons.Filled.Widgets,
+            showChevron = true,
+            onClick = onWidgets,
         ),
         SettingRowItem(
             title = stringResource(R.string.settings_row_language),

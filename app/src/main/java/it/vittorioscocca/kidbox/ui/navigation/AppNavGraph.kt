@@ -90,6 +90,7 @@ import it.vittorioscocca.kidbox.ui.screens.settings.support.SupportChatScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.AutoFillSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.StorageUsageScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.ThemeScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.WidgetSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.LanguageScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.GuideWebViewScreen
 import it.vittorioscocca.kidbox.ui.subscription.PlansScreen
@@ -572,6 +573,7 @@ fun AppNavGraph(
                     restartApp(settingsContext)
                 },
                 onTheme = { navController.navigate(AppDestination.Theme.route) },
+                onWidgets = { navController.navigate(AppDestination.WidgetSettings.route) },
                 onLanguage = { navController.navigate(AppDestination.Language.route) },
                 onUsageGuide = { navController.navigate(AppDestination.UsageGuide.route) },
                 onFamilySettings = { navController.navigate(AppDestination.FamilySettings.route) },
@@ -665,6 +667,10 @@ fun AppNavGraph(
 
         composable(AppDestination.Theme.route) {
             ThemeScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(AppDestination.WidgetSettings.route) {
+            WidgetSettingsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(AppDestination.Language.route) {
