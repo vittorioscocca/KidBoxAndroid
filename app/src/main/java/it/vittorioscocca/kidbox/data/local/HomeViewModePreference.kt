@@ -27,6 +27,7 @@ class HomeViewModePreference @Inject constructor(
     private val prefs = context.getSharedPreferences("kidbox_prefs", Context.MODE_PRIVATE)
     private val _viewModeFlow = MutableStateFlow(readViewMode())
     private val _showDashboardFlow = MutableStateFlow(readShowDashboard())
+    private val _showWeatherFlow = MutableStateFlow(prefs.getBoolean(KEY_SHOW_WEATHER, false))
 
     fun getViewMode(): HomeViewMode = readViewMode()
 
@@ -43,6 +44,14 @@ class HomeViewModePreference @Inject constructor(
     fun setShowDashboard(show: Boolean) {
         prefs.edit().putBoolean(KEY_SHOW_DASHBOARD, show).apply()
         _showDashboardFlow.value = show
+    }
+
+    /** Barra del meteo in Home: opt-in come la Dashboard, si accende da Impostazioni > Tema. */
+    fun getShowWeatherFlow(): StateFlow<Boolean> = _showWeatherFlow.asStateFlow()
+
+    fun setShowWeather(show: Boolean) {
+        prefs.edit().putBoolean(KEY_SHOW_WEATHER, show).apply()
+        _showWeatherFlow.value = show
     }
 
     fun getOrder(): List<String>? =
@@ -63,5 +72,6 @@ class HomeViewModePreference @Inject constructor(
         const val KEY_VIEW_MODE = "home_view_mode"
         const val KEY_GRID_ORDER = "home_grid_order"
         const val KEY_SHOW_DASHBOARD = "home_show_dashboard"
+        const val KEY_SHOW_WEATHER = "home_show_weather"
     }
 }

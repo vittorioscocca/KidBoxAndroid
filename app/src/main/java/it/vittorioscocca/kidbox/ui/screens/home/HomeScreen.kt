@@ -153,6 +153,7 @@ fun HomeScreen(
     val homeViewMode by viewModel.homeViewMode.collectAsStateWithLifecycle()
     val onboarding by viewModel.onboarding.collectAsStateWithLifecycle()
     val showDashboard by viewModel.showDashboard.collectAsStateWithLifecycle()
+    val showWeather by viewModel.showWeather.collectAsStateWithLifecycle()
     var showFamilySwitcher by remember { mutableStateOf(false) }
     var showQuickInvite by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
@@ -398,6 +399,10 @@ fun HomeScreen(
                     it.vittorioscocca.kidbox.ui.BatteryOptimizationBanner(
                         modifier = Modifier.padding(bottom = 16.dp),
                     )
+                }
+
+                if (showWeather && state.familyId.isNotBlank() && !onboarding.isVisible) {
+                    HomeWeatherStrip(modifier = Modifier.padding(bottom = 16.dp))
                 }
 
                 // Riepilogo: cosa c'è dentro le sezioni, prima delle sezioni. Vale per

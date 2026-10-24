@@ -161,6 +161,10 @@ class HomeViewModel @Inject constructor(
     val showDashboard: StateFlow<Boolean> =
         homeViewModePreference.getShowDashboardFlow()
 
+    /** Barra del meteo in Home: preferenza per-device, spenta di default. */
+    val showWeather: StateFlow<Boolean> =
+        homeViewModePreference.getShowWeatherFlow()
+
     fun setHomeViewMode(mode: it.vittorioscocca.kidbox.data.local.HomeViewMode) {
         homeViewModePreference.setViewMode(mode)
     }

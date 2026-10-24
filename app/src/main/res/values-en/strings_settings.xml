@@ -318,6 +318,7 @@
     <string name="settings_messages_chat_note">The choice applies to all your devices. Other members keep chatting with each other, and you\'ll find the messages again when you turn it back on.</string>
     <string name="settings_notif_chat_disabled">Chat is turned off in Settings → Messages.</string>
     <string name="settings_section_home">Home</string>
+    <string name="settings_home_show_weather">Show the weather forecast on the home page</string>
     <string name="settings_home_show_dashboard">Show the Dashboard on the home page</string>
     <string name="settings_row_alexa">Alexa</string>
     <string name="settings_row_alexa_sub">Shopping list and reminders by voice on your Echos</string>

@@ -18,6 +18,13 @@ class ThemeViewModel @Inject constructor(
     /** Dashboard in Home: spenta di default, chi la vuole la accende da qui. */
     val showDashboard: StateFlow<Boolean> = homeViewModePreference.getShowDashboardFlow()
 
+    /** Barra del meteo in Home: spenta di default. */
+    val showWeather: StateFlow<Boolean> = homeViewModePreference.getShowWeatherFlow()
+
+    fun setShowWeather(show: Boolean) {
+        homeViewModePreference.setShowWeather(show)
+    }
+
     fun setTheme(theme: AppTheme) {
         themePreference.setTheme(theme)
     }

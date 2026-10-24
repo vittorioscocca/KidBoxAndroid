@@ -318,6 +318,7 @@
     <string name="settings_messages_chat_note">Le choix s\'applique à tous vos appareils. Les autres membres continuent de discuter entre eux, et vous retrouverez les messages en la réactivant.</string>
     <string name="settings_notif_chat_disabled">La discussion est désactivée dans Réglages → Messages.</string>
     <string name="settings_section_home">Accueil</string>
+    <string name="settings_home_show_weather">Afficher la météo sur la page d\'accueil</string>
     <string name="settings_home_show_dashboard">Afficher le tableau de bord sur la page d\'accueil</string>
     <string name="settings_row_alexa">Alexa</string>
     <string name="settings_row_alexa_sub">Courses et rappels à la voix sur les Echo</string>

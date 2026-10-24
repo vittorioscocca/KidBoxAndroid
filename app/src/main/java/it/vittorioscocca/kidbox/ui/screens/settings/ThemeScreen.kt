@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.WbSunny
@@ -61,6 +62,21 @@ fun ThemeScreen(
     BackHandler { onBack() }
     val current by viewModel.theme.collectAsStateWithLifecycle()
     val showDashboard by viewModel.showDashboard.collectAsStateWithLifecycle()
+    val showWeather by viewModel.showWeather.collectAsStateWithLifecycle()
+    // Posizione approssimata, solo per il meteo: si chiede quando lo si accende.
+    val locationLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val setWeather: (Boolean) -> Unit = { on ->
+        viewModel.setShowWeather(on)
+        if (on && androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.ACCESS_COARSE_LOCATION,
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            locationLauncher.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION)
+        }
+    }
 
     val rows = listOf(
         ThemeRow(stringResource(R.string.settings_theme_light), Icons.Filled.WbSunny, AppTheme.LIGHT),
@@ -171,6 +187,42 @@ fun ThemeScreen(
                 Switch(
                     checked = showDashboard,
                     onCheckedChange = { viewModel.setShowDashboard(it) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = Color(0xFFFF6B00),
+                    ),
+                )
+            }
+            Divider()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp)
+                    .clickable { setWeather(!showWeather) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Cloud,
+                        contentDescription = null,
+                        tint = Color(0xFFFF6B00),
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Spacer(modifier = Modifier.size(12.dp))
+                    Text(
+                        stringResource(R.string.settings_home_show_weather),
+                        fontSize = 16.sp,
+                        color = MaterialTheme.kidBoxColors.title,
+                    )
+                }
+                Switch(
+                    checked = showWeather,
+                    onCheckedChange = { setWeather(it) },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = Color.White,
                         checkedTrackColor = Color(0xFFFF6B00),

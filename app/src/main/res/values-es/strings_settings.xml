@@ -318,6 +318,7 @@
     <string name="settings_messages_chat_note">La elección se aplica a todos tus dispositivos. Los demás miembros siguen chateando entre ellos y recuperarás los mensajes al reactivarlo.</string>
     <string name="settings_notif_chat_disabled">El chat está desactivado en Ajustes → Mensajes.</string>
     <string name="settings_section_home">Inicio</string>
+    <string name="settings_home_show_weather">Mostrar el tiempo en la página de inicio</string>
     <string name="settings_home_show_dashboard">Mostrar el Panel en la página de inicio</string>
     <string name="settings_row_alexa">Alexa</string>
     <string name="settings_row_alexa_sub">Compra y recordatorios por voz en los Echo</string>

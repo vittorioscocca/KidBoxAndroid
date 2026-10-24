@@ -318,6 +318,7 @@
     <string name="settings_messages_chat_note">La scelta vale su tutti i tuoi dispositivi. Gli altri membri continuano a scriversi e ritrovi i messaggi riattivandola.</string>
     <string name="settings_notif_chat_disabled">La chat è disattivata in Impostazioni → Messaggi.</string>
     <string name="settings_section_home">Home</string>
+    <string name="settings_home_show_weather">Visualizza le previsioni del tempo in home page</string>
     <string name="settings_home_show_dashboard">Visualizza Dashboard in home page</string>
     <string name="settings_row_alexa">Alexa</string>
     <string name="settings_row_alexa_sub">Spesa e promemoria a voce sugli Echo</string>
