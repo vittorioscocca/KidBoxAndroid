@@ -411,4 +411,22 @@
     <string name="battery_hint_dismiss">Fermer</string>
     <string name="battery_settings_title">Économiseur de batterie actif</string>
     <string name="battery_settings_sub">Le téléphone peut arrêter KidBox en arrière-plan et retarder messages et rappels. Réglez la batterie de KidBox sur « Aucune restriction ».</string>
+    <string name="weather_feels_like">Ressenti</string>
+    <string name="weather_wind">Vent</string>
+    <string name="weather_wind_value">%1$d km/h</string>
+    <string name="weather_humidity">Humidité</string>
+    <string name="weather_next_hours">Prochaines heures</string>
+    <string name="weather_next_days">Prochains jours</string>
+    <string name="weather_today">Aujourd\'hui</string>
+    <string name="weather_no_location">La météo a besoin de l\'autorisation de position approximative. Vous pouvez l\'accorder dans Réglages → Widgets.</string>
+    <string name="weather_error">Impossible de charger les prévisions. Vérifiez votre connexion.</string>
+    <string name="weather_retry">Réessayer</string>
+    <string name="weather_cond_clear">Dégagé</string>
+    <string name="weather_cond_partly">Peu nuageux</string>
+    <string name="weather_cond_cloudy">Nuageux</string>
+    <string name="weather_cond_fog">Brouillard</string>
+    <string name="weather_cond_drizzle">Bruine</string>
+    <string name="weather_cond_rain">Pluie</string>
+    <string name="weather_cond_snow">Neige</string>
+    <string name="weather_cond_storm">Orage</string>
 </resources>

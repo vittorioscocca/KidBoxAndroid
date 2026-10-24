@@ -413,7 +413,10 @@ fun HomeScreen(
                 // Niente esclusione per la checklist, a differenza della Dashboard:
                 // il meteo non ha tessere vuote, e l'ha acceso l'utente.
                 if (showWeather && state.familyId.isNotBlank()) {
-                    HomeWeatherStrip(modifier = Modifier.padding(bottom = 16.dp))
+                    HomeWeatherStrip(
+                        onOpen = { onNavigate(AppDestination.Weather.route) },
+                        modifier = Modifier.padding(bottom = 16.dp),
+                    )
                 }
 
                 // Riepilogo: cosa c'è dentro le sezioni, prima delle sezioni. Vale per

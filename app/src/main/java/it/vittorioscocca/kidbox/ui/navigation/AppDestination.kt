@@ -23,6 +23,7 @@ sealed class AppDestination(val route: String) {
     data object SupportChat : AppDestination("support_chat")
     data object Theme : AppDestination("theme")
     data object WidgetSettings : AppDestination("widget_settings")
+    data object Weather : AppDestination("weather")
     data object Language : AppDestination("language")
     data object UsageGuide : AppDestination("usage_guide")
     data object Suggestions : AppDestination("suggestions")

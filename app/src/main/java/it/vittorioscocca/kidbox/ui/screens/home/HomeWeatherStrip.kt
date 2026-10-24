@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Icon
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 import androidx.compose.foundation.layout.Arrangement
@@ -52,7 +51,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * Barra del meteo in Home: ora, prossime ore, minima e massima di oggi.
+ * Barra del meteo in Home (il tocco apre WeatherScreen): ora, prossime ore, minima e massima di oggi.
  * Stessa fonte di iOS (Open-Meteo, senza chiave) così i due client non danno
  * previsioni diverse. La posizione è approssimata e resta sul telefono; senza
  * permesso o senza rete la barra non compare. Open-Meteo è CC BY 4.0: la
@@ -89,9 +88,9 @@ private object WeatherCache {
     const val TTL_MS = 30 * 60 * 1000L
 }
 
+/** Posizione approssimata del telefono, o null senza permesso. */
 @SuppressLint("MissingPermission")
-private suspend fun loadWeather(context: android.content.Context): WeatherForecast? {
-    WeatherCache.value?.let { if (System.currentTimeMillis() - it.fetchedAt < WeatherCache.TTL_MS) return it }
+internal suspend fun currentCoordinates(context: android.content.Context): Pair<Double, Double>? {
     val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
         PackageManager.PERMISSION_GRANTED ||
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
@@ -101,9 +100,16 @@ private suspend fun loadWeather(context: android.content.Context): WeatherForeca
         val client = LocationServices.getFusedLocationProviderClient(context)
         val loc = client.lastLocation.await()
             ?: client.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, CancellationTokenSource().token).await()
-            ?: return null
+        loc?.let { it.latitude to it.longitude }
+    }.getOrNull()
+}
+
+private suspend fun loadWeather(context: android.content.Context): WeatherForecast? {
+    WeatherCache.value?.let { if (System.currentTimeMillis() - it.fetchedAt < WeatherCache.TTL_MS) return it }
+    val (lat, lon) = currentCoordinates(context) ?: return null
+    return runCatching {
         val f = withContext(Dispatchers.IO) {
-            fetch(loc.latitude, loc.longitude).copy(city = cityName(context, loc.latitude, loc.longitude))
+            fetch(lat, lon).copy(city = cityName(context, lat, lon))
         }
         WeatherCache.value = f
         f
@@ -111,7 +117,7 @@ private suspend fun loadWeather(context: android.content.Context): WeatherForeca
 }
 
 /** Nome della località; se il geocoder non risponde resta l'ultimo noto. */
-private fun cityName(context: android.content.Context, lat: Double, lon: Double): String? {
+internal fun cityName(context: android.content.Context, lat: Double, lon: Double): String? {
     val prefs = context.getSharedPreferences("kidbox_prefs", android.content.Context.MODE_PRIVATE)
     val name = runCatching {
         @Suppress("DEPRECATION")
@@ -126,9 +132,6 @@ private fun cityName(context: android.content.Context, lat: Double, lon: Double)
 }
 
 private const val KEY_WEATHER_CITY = "home_weather_city"
-
-/** La fonte: Open-Meteo non ha un'app, il tocco apre il suo sito. */
-private const val WEATHER_SOURCE_URL = "https://open-meteo.com/"
 
 private fun fetch(lat: Double, lon: Double): WeatherForecast {
     val url = "https://api.open-meteo.com/v1/forecast?latitude=%.2f&longitude=%.2f".format(Locale.US, lat, lon) +
@@ -175,13 +178,12 @@ private fun fetch(lat: Double, lon: Double): WeatherForecast {
 }
 
 @Composable
-fun HomeWeatherStrip(modifier: Modifier = Modifier) {
+fun HomeWeatherStrip(onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val forecast by produceState<WeatherForecast?>(initialValue = WeatherCache.value) {
         value = loadWeather(context) ?: value
     }
     val f = forecast ?: return
-    val uriHandler = LocalUriHandler.current
     val hourFmt = SimpleDateFormat("HH", Locale.getDefault())
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -191,7 +193,7 @@ fun HomeWeatherStrip(modifier: Modifier = Modifier) {
     ) {
         Column(
             modifier = Modifier
-                .clickable { uriHandler.openUri(WEATHER_SOURCE_URL) }
+                .clickable(onClick = onOpen)
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {

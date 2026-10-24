@@ -91,6 +91,7 @@ import it.vittorioscocca.kidbox.ui.screens.settings.AutoFillSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.StorageUsageScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.ThemeScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.WidgetSettingsScreen
+import it.vittorioscocca.kidbox.ui.screens.home.WeatherScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.LanguageScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.GuideWebViewScreen
 import it.vittorioscocca.kidbox.ui.subscription.PlansScreen
@@ -667,6 +668,10 @@ fun AppNavGraph(
 
         composable(AppDestination.Theme.route) {
             ThemeScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(AppDestination.Weather.route) {
+            WeatherScreen(onBack = { navController.popBackStack() })
         }
 
         composable(AppDestination.WidgetSettings.route) {
