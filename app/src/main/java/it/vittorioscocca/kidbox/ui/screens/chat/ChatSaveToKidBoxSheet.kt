@@ -27,6 +27,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -58,6 +60,7 @@ internal fun ChatSaveToKidBoxSheet(
 ) {
     val kb = MaterialTheme.kidBoxColors
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
     var result by remember(text) { mutableStateOf(SaveClassifier.classify(text)) }
     var thinking by remember(text) { mutableStateOf(true) }
 
@@ -126,7 +129,9 @@ internal fun ChatSaveToKidBoxSheet(
                     color = kb.subtitle.copy(alpha = 0.08f),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onSelect(action) },
+                        .clickable {
+                            scope.launch { sheetState.hide() }.invokeOnCompletion { onSelect(action) }
+                        },
                 ) {
                     Row(
                         modifier = Modifier.padding(14.dp),

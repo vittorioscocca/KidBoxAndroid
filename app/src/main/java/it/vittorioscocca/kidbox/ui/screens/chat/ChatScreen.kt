@@ -1628,6 +1628,7 @@ private fun MessageActionDialog(
 ) {
     val emojis = listOf("👍", "❤️", "😂", "😮", "😢", "🙏")
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetScope = rememberCoroutineScope()
     val dividerColor = MaterialTheme.kidBoxColors.subtitle.copy(alpha = 0.15f)
 
     ModalBottomSheet(
@@ -1689,7 +1690,13 @@ private fun MessageActionDialog(
                     icon = Icons.Default.SaveAlt,
                     text = stringResource(R.string.chat_save_to_kidbox),
                     textColor = MaterialTheme.kidBoxColors.title,
-                    onClick = onSaveToKidBox,
+                    // Si chiude questo foglio con la sua animazione e solo dopo se ne apre un
+                    // altro: toglierlo di colpo nello stesso istante lasciava la finestra
+                    // del primo a intercettare i tocchi, e il menu non si apriva più.
+                    onClick = {
+                        sheetScope.launch { sheetState.hide() }
+                            .invokeOnCompletion { onSaveToKidBox() }
+                    },
                 )
             }
 
