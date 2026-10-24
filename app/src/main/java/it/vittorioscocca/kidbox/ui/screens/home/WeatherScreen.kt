@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import it.vittorioscocca.kidbox.R
@@ -298,9 +299,15 @@ private fun WeatherContent(w: WeatherDetail) {
                         if (d.rain > 0) "💧${d.rain}%" else "",
                         fontSize = 12.sp,
                         color = MaterialTheme.kidBoxColors.subtitle,
+                        textAlign = TextAlign.End,
                         modifier = Modifier.width(56.dp),
                     )
-                    Text(weatherEmoji(d.code, true), fontSize = 20.sp, modifier = Modifier.width(36.dp))
+                    Text(
+                        weatherEmoji(d.code, true),
+                        fontSize = 20.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.width(44.dp),
+                    )
                     Text("${d.max}° / ${d.min}°", fontSize = 15.sp, color = MaterialTheme.kidBoxColors.title)
                 }
             }
