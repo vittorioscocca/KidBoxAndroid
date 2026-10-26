@@ -1,13 +1,22 @@
 package it.vittorioscocca.kidbox.ui.screens.ai.planning
 
 import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ai.CurrentPlanStore
 import it.vittorioscocca.kidbox.data.ai.AISettingsStore
+import it.vittorioscocca.kidbox.data.docintel.DocIntelAction
+import it.vittorioscocca.kidbox.data.docintel.DocIntelBadResponseException
+import it.vittorioscocca.kidbox.data.docintel.DocIntelPayload
+import it.vittorioscocca.kidbox.data.docintel.DocIntelUnreadableException
+import it.vittorioscocca.kidbox.data.docintel.DocumentIntelligenceExecutor
+import it.vittorioscocca.kidbox.data.docintel.DocumentIntelligenceService
 import it.vittorioscocca.kidbox.data.health.HealthAttachmentService
 import it.vittorioscocca.kidbox.data.health.ai.HealthContextSendMode
 import it.vittorioscocca.kidbox.data.health.ai.HealthContextSendPreference
@@ -36,6 +45,7 @@ import it.vittorioscocca.kidbox.ui.screens.ai.common.AIChatStreamingDelivery
 import it.vittorioscocca.kidbox.util.KBLog
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,6 +54,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class PlanningChatUiState(
     val messages: List<KBAIMessage> = emptyList(),
@@ -81,6 +92,10 @@ data class PlanningChatUiState(
     val pendingSendText: String = "",
     val choiceFullUnits: Int = 1,
     val choiceReducedUnits: Int = 1,
+    /** Documento caricato col «+»: in lettura, poi la scheda di conferma. */
+    val isAnalyzingDocument: Boolean = false,
+    val isSavingDocument: Boolean = false,
+    val docIntelPayload: DocIntelPayload? = null,
 ) {
     val canSend: Boolean get() = inputText.isNotBlank() && !isLoading && !isLoadingContext
     val isNearLimit: Boolean get() = dailyLimit > 0 && usageToday >= (dailyLimit * 0.8).toInt()
@@ -114,6 +129,8 @@ class PlanningAIChatViewModel @Inject constructor(
     private val familyMemoryService: FamilyMemoryService,
     private val aiSettingsStore: AISettingsStore,
     private val aiRemotePrefs: AIRemotePreferences,
+    private val docIntelService: DocumentIntelligenceService,
+    private val docIntelExecutor: DocumentIntelligenceExecutor,
     @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
@@ -678,6 +695,136 @@ class PlanningAIChatViewModel @Inject constructor(
         )
         return (listOf(summaryMessage) + recent).take(7)
     }
+
+    // ── Documenti dal «+» ───────────────────────────────────────────────
+    //
+    // L'assistente è il posto da cui smistare un documento quando non si sa
+    // dove va: l'AI capisce cos'è (bolletta, referto, analisi, ricetta…), la
+    // scheda mostra dove finirà, il file si allega alla scheda creata. Ogni
+    // pagina letta costa un messaggio. Gemello del «+» iOS.
+
+    /** File o foto scelti dal telefono. */
+    fun importDocument(uri: Uri) {
+        viewModelScope.launch {
+            val file = runCatching {
+                withContext(Dispatchers.IO) {
+                    val name = displayName(uri) ?: "${context.getString(R.string.docintel_file_photo)} ${stamp()}.jpg"
+                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        ?: error("unreadable")
+                    writeImportFile(name, bytes)
+                }
+            }.getOrNull()
+            if (file == null) {
+                _uiState.update { it.copy(errorMessage = context.getString(R.string.docintel_error_unreadable_file)) }
+                return@launch
+            }
+            analyzeImported(file)
+        }
+    }
+
+    /** PDF dallo scanner di documenti. */
+    fun importScan(pdfBytes: ByteArray) {
+        viewModelScope.launch {
+            val file = withContext(Dispatchers.IO) {
+                writeImportFile("${context.getString(R.string.docintel_file_scan)} ${stamp()}.pdf", pdfBytes)
+            }
+            analyzeImported(file)
+        }
+    }
+
+    /** Conferma della scheda: crea le schede, poi resta traccia nella conversazione. */
+    fun confirmDocument(actions: List<DocIntelAction>) {
+        val payload = _uiState.value.docIntelPayload ?: return
+        if (_uiState.value.isSavingDocument) return
+        _uiState.update { it.copy(isSavingDocument = true) }
+        viewModelScope.launch {
+            val summary = runCatching {
+                docIntelExecutor.execute(
+                    familyId = effectiveFamilyId,
+                    actions = actions,
+                    sourceFile = payload.sourceFile,
+                    persons = payload.persons,
+                    vehicles = payload.vehicles,
+                )
+            }.onFailure { KBLog.ai.warning("document execute failed: ${it.message}", TAG) }.getOrNull()
+            payload.sourceFile.parentFile?.deleteRecursively()
+            _uiState.update { it.copy(isSavingDocument = false, docIntelPayload = null) }
+            val conv = conversation
+            if (summary.isNullOrBlank() || conv == null) {
+                _uiState.update { it.copy(actionExecutionSummary = context.getString(R.string.docintel_nothing_created)) }
+                return@launch
+            }
+            val title = payload.result.suggestedTitle ?: payload.sourceFile.nameWithoutExtension
+            val kind = payload.result.documentType ?: context.getString(R.string.docintel_a_document)
+            kbAIRepository.addMessage(conv.id, AIMessageRole.USER, "📎 $title")
+            kbAIRepository.addMessage(conv.id, AIMessageRole.ASSISTANT, context.getString(R.string.docintel_saved_reply, kind, summary))
+            _uiState.update { it.copy(actionExecutionSummary = context.getString(R.string.docintel_toast_filed)) }
+        }
+    }
+
+    fun dismissDocument() {
+        val payload = _uiState.value.docIntelPayload ?: return
+        if (_uiState.value.isSavingDocument) return
+        payload.sourceFile.parentFile?.deleteRecursively()
+        _uiState.update { it.copy(docIntelPayload = null) }
+    }
+
+    private suspend fun analyzeImported(file: java.io.File) {
+        if (_uiState.value.isAnalyzingDocument || _uiState.value.isLoading || effectiveFamilyId.isBlank()) return
+        _uiState.update { it.copy(isAnalyzingDocument = true, errorMessage = null) }
+        val (persons, vehicles) = docIntelService.familyRefs(effectiveFamilyId)
+        val mime = DocumentIntelligenceExecutor.mimeFor(file.name)
+        docIntelService.analyze(file, mime, effectiveFamilyId, persons, vehicles)
+            .onSuccess { raw ->
+                // Con il focus di Salute la persona è già scelta.
+                val focusId = _uiState.value.focus?.personId?.takeIf { id -> persons.any { it.id == id } }
+                val result = if (focusId == null) raw else raw.copy(
+                    actions = raw.actions.map { a -> if (a.needsPerson && a.childId == null) a.copy(childId = focusId) else a },
+                )
+                AppAnalytics.aiMessageSent(context, "documento", CurrentPlanStore.plan.value.rawValue)
+                KBLog.ai.debug("document analyzed category=${result.category} actions=${result.actions.size}", TAG)
+                _uiState.update {
+                    it.copy(isAnalyzingDocument = false, docIntelPayload = DocIntelPayload(result, file, persons, vehicles))
+                }
+            }
+            .onFailure { err ->
+                file.parentFile?.deleteRecursively()
+                val message = when (err) {
+                    is DocIntelUnreadableException -> context.getString(R.string.docintel_error_only_pdf_images)
+                    is DocIntelBadResponseException -> context.getString(R.string.docintel_error_bad_response)
+                    else -> localizeError(err)
+                }
+                _uiState.update { it.copy(isAnalyzingDocument = false, errorMessage = message) }
+            }
+        aiService.fetchUsage(effectiveFamilyId).onSuccess { usage ->
+            _uiState.update {
+                it.copy(
+                    usageToday = usage.usageToday,
+                    dailyLimit = usage.dailyLimit,
+                    quotaPeriod = usage.period,
+                    monthlyUsage = usage.monthlyUsage,
+                    monthlyLimit = usage.monthlyLimit,
+                    usageLoaded = true,
+                )
+            }
+        }
+    }
+
+    /** Copia privata: l'allegato si carica dopo la conferma. */
+    private fun writeImportFile(name: String, bytes: ByteArray): java.io.File {
+        val dir = java.io.File(context.cacheDir, "assistant-import-${java.util.UUID.randomUUID()}").apply { mkdirs() }
+        val safe = name.replace('/', '-').replace(':', '-').ifBlank { "documento" }
+        return java.io.File(dir, safe).apply { writeBytes(bytes) }
+    }
+
+    private fun displayName(uri: Uri): String? = runCatching {
+        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        }
+    }.getOrNull()?.takeIf { it.isNotBlank() }
+
+    private fun stamp(): String =
+        java.text.SimpleDateFormat("yyyy-MM-dd HH.mm", java.util.Locale.ROOT).format(java.util.Date())
 
     private fun localizeError(error: Throwable): String {
         val mapped = (error as? AIServiceException)?.serviceError

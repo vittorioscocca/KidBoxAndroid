@@ -33,10 +33,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
+import it.vittorioscocca.kidbox.ui.screens.wallet.documents.rememberWalletDocumentScannerLauncher
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.DocumentScanner
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -123,6 +131,18 @@ fun PlanningAIChatScreen(
     val reminderService = actionsViewModel.reminderService
     var showMenu by remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
+    // «+»: un documento da smistare (scansione, foto, file).
+    var showAttachMenu by remember { mutableStateOf(false) }
+    val launchScanner = rememberWalletDocumentScannerLauncher(
+        pageLimit = 3,
+        onResult = { scan -> scan.pdfBytes?.let(viewModel::importScan) },
+    )
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let(viewModel::importDocument)
+    }
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::importDocument)
+    }
 
     LaunchedEffect(state.actionExecutionSummary) {
         val summary = state.actionExecutionSummary ?: return@LaunchedEffect
@@ -249,6 +269,42 @@ fun PlanningAIChatScreen(
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.Bottom) {
+                    Box {
+                        val busy = state.isLoading || state.isAnalyzingDocument
+                        IconButton(onClick = { showAttachMenu = true }, enabled = !busy) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = stringResource(R.string.docintel_upload_document),
+                                tint = if (busy) kb.subtitle else Color(0xFFFF6B00),
+                            )
+                        }
+                        DropdownMenu(expanded = showAttachMenu, onDismissRequest = { showAttachMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.docintel_scan_document)) },
+                                leadingIcon = { Icon(Icons.Default.DocumentScanner, null) },
+                                onClick = {
+                                    showAttachMenu = false
+                                    launchScanner()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.docintel_photo)) },
+                                leadingIcon = { Icon(Icons.Default.PhotoLibrary, null) },
+                                onClick = {
+                                    showAttachMenu = false
+                                    photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.docintel_file)) },
+                                leadingIcon = { Icon(Icons.Default.FolderOpen, null) },
+                                onClick = {
+                                    showAttachMenu = false
+                                    filePicker.launch(arrayOf("application/pdf", "image/*"))
+                                },
+                            )
+                        }
+                    }
                     OutlinedTextField(
                         value = state.inputText,
                         onValueChange = viewModel::onInputChanged,
@@ -432,7 +488,30 @@ fun PlanningAIChatScreen(
                     }
                 }
             }
+
+            if (state.isAnalyzingDocument) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .background(kb.card, RoundedCornerShape(14.dp))
+                        .padding(22.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    CircularProgressIndicator(color = Color(0xFFFF6B00))
+                    Spacer(Modifier.height(10.dp))
+                    Text(stringResource(R.string.docintel_reading), color = kb.title, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                }
+            }
         }
+    }
+
+    state.docIntelPayload?.let { payload ->
+        DocumentIntelligenceSheet(
+            payload = payload,
+            isSaving = state.isSavingDocument,
+            onConfirm = viewModel::confirmDocument,
+            onDismiss = viewModel::dismissDocument,
+        )
     }
 
     if (state.showContextModeDialog) {
