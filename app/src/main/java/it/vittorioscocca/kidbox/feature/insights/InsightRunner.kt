@@ -243,7 +243,11 @@ class InsightRunner @Inject constructor(
         val allTodos = todoDao.getByFamily(familyId)
         val todos = allTodos.filter { !it.isDone }
         val payments = housePaymentDao.listActiveByFamily(familyId)
-        val treatments = treatmentDao.observeByFamilyId(familyId).first().filter { it.isActive && !it.isDeleted }
+        // Solo le cure che riguardano chi riceve l'avviso: lui, i bambini registrati
+        // e gli animali. La cura di un altro adulto la legge lui, dal suo telefono.
+        val subjects = childDao.getChildrenByFamilyId(familyId).map { it.id }.toSet() + uid
+        val treatments = treatmentDao.observeByFamilyId(familyId).first()
+            .filter { it.isActive && !it.isDeleted && (it.petId.isNotBlank() || it.childId in subjects) }
         val logs = treatments.flatMap { doseLogDao.listByTreatment(it.id) }.filter { it.taken && !it.isDeleted }
         return InsightSnapshot(
             todos = todos.map {
@@ -325,6 +329,10 @@ class InsightRunner @Inject constructor(
         // Risolti o scartati: anche il banner già mostrato non serve più.
         val nm = NotificationManagerCompat.from(context)
         plan.finishedIds.forEach { runCatching { nm.cancel(it.hashCode()) } }
+        // Una consegna futura al posto di una passata (la dose delle 8 è stata presa,
+        // resta quella della sera): il banner già mostrato non è più vero.
+        val nowMs = System.currentTimeMillis()
+        plan.notifications.filter { it.atMillis > nowMs + 10_000 }.forEach { runCatching { nm.cancel(it.insightId.hashCode()) } }
     }
 
     /** Il testo si compone alla consegna, nella lingua di quel momento: qui solo i dati. */

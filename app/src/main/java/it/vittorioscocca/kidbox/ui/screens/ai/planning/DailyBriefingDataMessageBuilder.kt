@@ -8,6 +8,11 @@ import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
 import it.vittorioscocca.kidbox.data.local.mapper.scheduleTimesList
 import it.vittorioscocca.kidbox.data.repository.MedicalVisitRepository
 import it.vittorioscocca.kidbox.data.repository.TreatmentRepository
+import java.time.ZoneId
+import java.time.Instant
+import it.vittorioscocca.kidbox.feature.insights.InsightSnapshot
+import it.vittorioscocca.kidbox.feature.insights.InsightEngine
+import it.vittorioscocca.kidbox.data.local.dao.KBDoseLogDao
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -28,6 +33,7 @@ class DailyBriefingDataMessageBuilder @Inject constructor(
     private val calendarEventDao: KBCalendarEventDao,
     private val todoItemDao: KBTodoItemDao,
     private val treatmentRepository: TreatmentRepository,
+    private val doseLogDao: KBDoseLogDao,
     private val medicalVisitRepository: MedicalVisitRepository,
     private val auth: FirebaseAuth,
 ) {
@@ -72,8 +78,9 @@ class DailyBriefingDataMessageBuilder @Inject constructor(
                 )
         }
 
-        val treats = children.flatMap { child ->
-            treatmentRepository.listByFamilyAndChild(familyId, child.id)
+        // Le cure di chi riceve il briefing e dei bambini registrati, non degli altri adulti.
+        val treats = (children.map { it.id } + listOfNotNull(uid?.takeIf { it.isNotBlank() })).distinct().flatMap { subject ->
+            treatmentRepository.listByFamilyAndChild(familyId, subject)
         }.filter { it.isActive && !it.isDeleted }
 
         val allVisits = children.flatMap { child ->
@@ -98,20 +105,30 @@ class DailyBriefingDataMessageBuilder @Inject constructor(
             }
         }
 
-        if (treats.isNotEmpty()) {
-            lines += ""
-            lines += "DOSI MEDICINE OGGI:"
-            treats.take(8).forEach { t ->
-                val child = childNames[t.childId] ?: t.childId
-                val times = t.scheduleTimesList()
-                if (times.isEmpty()) {
-                    lines += "  • ${t.drugName} per $child"
-                } else {
-                    times.forEach { slot ->
-                        lines += "  • $slot: ${t.drugName} ($child)"
-                    }
-                }
+        // Solo le dosi ancora da prendere: quelle già registrate non si elencano,
+        // altrimenti l'AI le riporta come «da fare» e la cura sembra incompleta.
+        val today = Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).toLocalDate()
+        val doseLines = mutableListOf<String>()
+        treats.take(8).forEach { t ->
+            val snap = InsightSnapshot.Treatment(
+                id = t.id, isActive = t.isActive, isDeleted = t.isDeleted, isLongTerm = t.isLongTerm,
+                durationDays = t.durationDays, startDateMillis = t.startDateEpochMillis,
+                endDateMillis = t.endDateEpochMillis, intervalBetweenDosesDays = t.intervalBetweenDosesDays,
+                scheduleTimes = t.scheduleTimesList(),
+            )
+            val taken = doseLogDao.listByTreatment(t.id)
+                .filter { it.taken && !it.isDeleted }
+                .map { "${it.treatmentId}|${it.dayNumber}|${it.slotIndex}" }
+                .toSet()
+            val who = if (t.petId.isBlank()) childNames[t.childId]?.let { " ($it)" }.orEmpty() else ""
+            InsightEngine.uncoveredSlots(snap, taken, today, ZoneId.systemDefault()).forEach { slot ->
+                doseLines += "  • ${slot.time}: ${t.drugName}$who"
             }
+        }
+        if (doseLines.isNotEmpty()) {
+            lines += ""
+            lines += "DOSI MEDICINE ANCORA DA PRENDERE OGGI (quelle già registrate sono escluse):"
+            lines += doseLines
         }
 
         if (dueTodos.isNotEmpty()) {

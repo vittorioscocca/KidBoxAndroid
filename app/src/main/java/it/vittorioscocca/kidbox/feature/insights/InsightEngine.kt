@@ -198,32 +198,56 @@ object InsightEngine {
      */
     fun missingDoses(snapshot: InsightSnapshot, nowMillis: Long, zone: ZoneId): List<InsightCandidate> {
         val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
-        val taken = snapshot.doseLogs
-            .filter { it.taken && !it.isDeleted }
-            .map { "${it.treatmentId}|${it.dayNumber}|${it.slotIndex}" }
-            .toSet()
+        val taken = takenKeys(snapshot)
         return snapshot.treatments.mapNotNull { t ->
-            if (!t.isActive || t.isDeleted) return@mapNotNull null
-            val start = Instant.ofEpochMilli(t.startDateMillis).atZone(zone).toLocalDate()
-            val offset = ChronoUnit.DAYS.between(start, today).toInt()
-            if (offset < 0) return@mapNotNull null
-            if (!t.isLongTerm && offset >= t.durationDays) return@mapNotNull null
-            t.endDateMillis?.let { end ->
-                if (Instant.ofEpochMilli(end).atZone(zone).toLocalDate().isBefore(today)) return@mapNotNull null
-            }
-            if (t.intervalBetweenDosesDays > 0 && offset % t.intervalBetweenDosesDays != 0) return@mapNotNull null
-
-            val dayNumber = offset + 1
-            val firstMissing = t.scheduleTimes.mapIndexedNotNull { slot, hhmm ->
-                if ("${t.id}|$dayNumber|$slot" in taken) null else time(hhmm, today, zone)
-            }.minOrNull() ?: return@mapNotNull null
-
+            val firstMissing = uncoveredSlots(t, taken, today, zone).minOfOrNull { it.atMillis } ?: return@mapNotNull null
             InsightCandidate(
                 type = InsightType.TREATMENT_DOSE_MISSING,
                 entityId = "${t.id}@$today",
                 priority = InsightPriority.HIGH,
                 fireAtMillis = firstMissing + DOSE_GRACE_MS,
             )
+        }
+    }
+
+    /** Chiavi `cura|giorno|dose` delle dosi segnate come prese. */
+    fun takenKeys(snapshot: InsightSnapshot): Set<String> = snapshot.doseLogs
+        .filter { it.taken && !it.isDeleted }
+        .map { "${it.treatmentId}|${it.dayNumber}|${it.slotIndex}" }
+        .toSet()
+
+    /** Una dose di oggi non ancora segnata come presa, con l'orario previsto. */
+    data class UncoveredSlot(val slot: Int, val time: String, val atMillis: Long)
+
+    /**
+     * Le dosi di oggi di una cura non ancora segnate come prese. Vuoto se la cura
+     * oggi non ha dosi (finita, non ancora iniziata, giorno senza dose in una
+     * cura a intervalli) o se sono tutte prese. Gemella di
+     * `KBInsightEngine.uncoveredSlots` su iOS.
+     */
+    fun uncoveredSlots(
+        t: InsightSnapshot.Treatment,
+        taken: Set<String>,
+        today: LocalDate,
+        zone: ZoneId,
+    ): List<UncoveredSlot> {
+        if (!t.isActive || t.isDeleted) return emptyList()
+        val start = Instant.ofEpochMilli(t.startDateMillis).atZone(zone).toLocalDate()
+        val offset = ChronoUnit.DAYS.between(start, today).toInt()
+        if (offset < 0) return emptyList()
+        if (!t.isLongTerm && offset >= t.durationDays) return emptyList()
+        t.endDateMillis?.let { end ->
+            if (Instant.ofEpochMilli(end).atZone(zone).toLocalDate().isBefore(today)) return emptyList()
+        }
+        if (t.intervalBetweenDosesDays > 0 && offset % t.intervalBetweenDosesDays != 0) return emptyList()
+
+        val dayNumber = offset + 1
+        // Una cura a intervalli ha una sola dose nel giorno, al primo orario: gli
+        // altri orari in elenco non sono dosi da registrare.
+        val times = if (t.intervalBetweenDosesDays > 0) t.scheduleTimes.take(1) else t.scheduleTimes
+        return times.mapIndexedNotNull { slot, hhmm ->
+            if ("${t.id}|$dayNumber|$slot" in taken) null
+            else time(hhmm, today, zone)?.let { UncoveredSlot(slot, hhmm, it) }
         }
     }
 

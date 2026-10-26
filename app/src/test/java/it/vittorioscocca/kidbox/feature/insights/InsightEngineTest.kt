@@ -94,6 +94,27 @@ class InsightEngineTest {
     // ── Riconciliazione ────────────────────────────────────────────────────
 
     @Test
+    fun intervalTreatmentOnlyCountsFirstTime() {
+        // Una dose ogni 2 giorni (oggi è il giorno 3, offset 2): solo il primo orario.
+        val s = InsightSnapshot(
+            treatments = listOf(treatment(interval = 2, times = listOf("08:00", "20:00"))),
+            doseLogs = listOf(InsightSnapshot.DoseLog("c1", 3, 0, true, false)),
+        )
+        assertTrue(eval(s).isEmpty())
+    }
+
+    @Test
+    fun uncoveredSlotsListsOnlyTheNotTakenOnes() {
+        val s = InsightSnapshot(
+            treatments = listOf(treatment()),
+            doseLogs = listOf(InsightSnapshot.DoseLog("c1", 3, 0, true, false)),
+        )
+        val today = java.time.Instant.ofEpochMilli(now).atZone(rome).toLocalDate()
+        val slots = InsightEngine.uncoveredSlots(s.treatments[0], InsightEngine.takenKeys(s), today, rome)
+        assertEquals(listOf("20:00"), slots.map { it.time })
+    }
+
+    @Test
     fun reconcileOpensResolvesAndKeepsDismissed() {
         val a = InsightCandidate(InsightType.TODO_UNASSIGNED_DUE_SOON, "t1", InsightPriority.NORMAL, now)
         val b = InsightCandidate(InsightType.TODO_UNASSIGNED_DUE_SOON, "t2", InsightPriority.NORMAL, now)
