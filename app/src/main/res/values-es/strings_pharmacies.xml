@@ -60,4 +60,10 @@
     <string name="pharmacies_service_holiday">Servicio festivo</string>
     <string name="pharmacies_service_afternoon_holiday">Servicio de tarde y festivos</string>
     <string name="pharmacies_service_h24">Abierta 24 horas</string>
+    <string name="pharmacies_why_outdated">He encontrado turnos, pero no son de este periodo: puede que el sitio no esté actualizado.</string>
+    <string name="pharmacies_why_too_large">El archivo es demasiado grande para leerlo.</string>
+    <string name="pharmacies_why_too_many_pages">El documento es demasiado largo para ser una lista de turnos.</string>
+    <string name="pharmacies_why_blocked">El sitio no permite la lectura automática: puedes abrirlo desde el enlace.</string>
+    <string name="pharmacies_why_not_found">Esta página ya no existe: comprueba la dirección.</string>
+    <string name="pharmacies_why_unsupported">Este tipo de archivo no se puede leer: debe ser una página web, un PDF o una imagen.</string>
 </resources>

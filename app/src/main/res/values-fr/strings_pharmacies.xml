@@ -60,4 +60,10 @@
     <string name="pharmacies_service_holiday">Service des jours fériés</string>
     <string name="pharmacies_service_afternoon_holiday">Service de l\'après-midi et des jours fériés</string>
     <string name="pharmacies_service_h24">Ouverte 24 h/24</string>
+    <string name="pharmacies_why_outdated">J\'ai trouvé des gardes, mais elles ne sont pas de cette période : le site n\'est peut-être pas à jour.</string>
+    <string name="pharmacies_why_too_large">Le fichier est trop volumineux pour être lu.</string>
+    <string name="pharmacies_why_too_many_pages">Le document est trop long pour être une liste de gardes.</string>
+    <string name="pharmacies_why_blocked">Le site n\'autorise pas la lecture automatique : vous pouvez l\'ouvrir depuis le lien.</string>
+    <string name="pharmacies_why_not_found">Cette page n\'existe plus : vérifiez l\'adresse.</string>
+    <string name="pharmacies_why_unsupported">Ce type de fichier ne peut pas être lu : il faut une page web, un PDF ou une image.</string>
 </resources>

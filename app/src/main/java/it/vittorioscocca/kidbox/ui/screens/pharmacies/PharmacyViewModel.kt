@@ -85,14 +85,18 @@ class PharmacyViewModel @Inject constructor(
     }
 
     fun find() = work { s ->
-        val status = repository.findSource(s.familyId, s.settings.effectivePlace)
-        if (status == "not-found") context.getString(R.string.pharmacies_notice_not_found) else null
+        val result = repository.findSource(s.familyId, s.settings.effectivePlace)
+        when (result.status) {
+            "not-found" -> context.getString(R.string.pharmacies_notice_not_found)
+            "unreadable" -> explain(result.why)
+            else -> null
+        }
     }
 
     /** `url == null`: torna alla fonte automatica. */
     fun setSource(url: String?) = work { s ->
-        val status = repository.setSource(s.familyId, s.settings.effectivePlace, url)
-        if (status == "unreadable") context.getString(R.string.pharmacies_notice_unreadable) else null
+        val result = repository.setSource(s.familyId, s.settings.effectivePlace, url)
+        if (result.status == "unreadable") explain(result.why) else null
     }
 
     private fun work(block: suspend (PharmacyUiState) -> String?) {
@@ -110,6 +114,20 @@ class PharmacyViewModel @Inject constructor(
             }
         }
     }
+
+    /** Il motivo, in parole, per chi non riesce a leggere i turni. */
+    private fun explain(why: String): String = context.getString(
+        when (why) {
+            "outdated" -> R.string.pharmacies_why_outdated
+            "too-large" -> R.string.pharmacies_why_too_large
+            "too-many-pages" -> R.string.pharmacies_why_too_many_pages
+            "blocked" -> R.string.pharmacies_why_blocked
+            "not-found" -> R.string.pharmacies_why_not_found
+            "unsupported" -> R.string.pharmacies_why_unsupported
+            "unreachable" -> R.string.pharmacies_error_unreachable
+            else -> R.string.pharmacies_notice_unreadable
+        },
+    )
 
     private fun message(e: Throwable): String =
         (e as? PharmacyError)?.text ?: context.getString(R.string.pharmacies_error_unexpected)

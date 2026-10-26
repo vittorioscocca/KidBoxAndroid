@@ -15,6 +15,13 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Esito di una ricerca o di un sito indicato a mano. [why]: outdated, too-large,
+ * too-many-pages, blocked, not-found, unsupported, unreachable o no-data (vuoto
+ * quando è andata bene).
+ */
+data class PharmacySourceResult(val status: String, val why: String = "")
+
 /** Errori delle farmacie di turno, già con il testo da mostrare. */
 class PharmacyError(val text: String, val planRequired: Boolean = false) : Exception(text)
 
@@ -37,22 +44,24 @@ class PharmacyRepository @Inject constructor(
     }
 
     /** `exists`, `found`, `unreadable` o `not-found`. Scala i messaggi AI. */
-    suspend fun findSource(familyId: String, place: NewsPlace): String {
+    suspend fun findSource(familyId: String, place: NewsPlace): PharmacySourceResult {
         ensurePaidPlan()
         familyStore.settled()
-        return call("findPharmacySource", payload(familyId, place), 300)["status"] as? String ?: "not-found"
+        val reply = call("findPharmacySource", payload(familyId, place), 300)
+        return PharmacySourceResult(reply["status"] as? String ?: "not-found", reply["why"] as? String ?: "")
     }
 
     /**
      * `url == null` toglie la scelta e torna alla fonte automatica. Risposta:
      * `ok`, `unreadable` (resta il link) o `cleared`.
      */
-    suspend fun setSource(familyId: String, place: NewsPlace, url: String?): String {
+    suspend fun setSource(familyId: String, place: NewsPlace, url: String?): PharmacySourceResult {
         ensurePaidPlan()
         familyStore.settled()
         val body = payload(familyId, place).toMutableMap<String, Any?>()
         body["url"] = url
-        return call("setPharmacySource", body, 190)["status"] as? String ?: "unreadable"
+        val reply = call("setPharmacySource", body, 190)
+        return PharmacySourceResult(reply["status"] as? String ?: "unreadable", reply["why"] as? String ?: "")
     }
 
     private fun payload(familyId: String, place: NewsPlace): Map<String, Any?> =
@@ -101,6 +110,14 @@ class PharmacyRepository @Inject constructor(
                 )
             code == FirebaseFunctionsException.Code.FAILED_PRECONDITION && reason == "pharmacies-disabled" ->
                 PharmacyError(context.getString(R.string.pharmacies_error_disabled))
+            code == FirebaseFunctionsException.Code.FAILED_PRECONDITION && reason == "blocked" ->
+                PharmacyError(context.getString(R.string.pharmacies_why_blocked))
+            code == FirebaseFunctionsException.Code.FAILED_PRECONDITION && reason == "not-found" ->
+                PharmacyError(context.getString(R.string.pharmacies_why_not_found))
+            code == FirebaseFunctionsException.Code.FAILED_PRECONDITION && reason == "too-large" ->
+                PharmacyError(context.getString(R.string.pharmacies_why_too_large))
+            code == FirebaseFunctionsException.Code.FAILED_PRECONDITION && reason == "unsupported" ->
+                PharmacyError(context.getString(R.string.pharmacies_why_unsupported))
             code == FirebaseFunctionsException.Code.FAILED_PRECONDITION ->
                 PharmacyError(context.getString(R.string.pharmacies_error_unreachable))
             code == FirebaseFunctionsException.Code.INVALID_ARGUMENT && reason == "invalid-url" ->

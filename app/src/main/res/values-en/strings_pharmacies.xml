@@ -60,4 +60,10 @@
     <string name="pharmacies_service_holiday">Holiday service</string>
     <string name="pharmacies_service_afternoon_holiday">Afternoon and holiday service</string>
     <string name="pharmacies_service_h24">Open 24 hours</string>
+    <string name="pharmacies_why_outdated">I found shifts, but they\'re not for this period: the site may be out of date.</string>
+    <string name="pharmacies_why_too_large">The file is too large to be read.</string>
+    <string name="pharmacies_why_too_many_pages">The document is too long to be a shift list.</string>
+    <string name="pharmacies_why_blocked">The site doesn\'t allow automatic reading: you can open it from the link.</string>
+    <string name="pharmacies_why_not_found">This page no longer exists: check the address.</string>
+    <string name="pharmacies_why_unsupported">This file type can\'t be read: it must be a web page, a PDF or an image.</string>
 </resources>
