@@ -310,6 +310,9 @@ private fun ShiftCard(s: PharmacyShift, showComune: Boolean) {
         Modifier.fillMaxWidth().background(kb.card, RoundedCornerShape(12.dp)).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        serviceLabel(s.service)?.let {
+            Text(it, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = Green)
+        }
         Text(s.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = kb.title)
         val line = listOf(s.address, if (showComune) s.comune else "").filter { it.isNotEmpty() }.joinToString(" · ")
         if (line.isNotEmpty()) Text(line, style = MaterialTheme.typography.bodySmall, color = kb.subtitle)
@@ -410,6 +413,16 @@ private fun Locked(onUpgrade: () -> Unit) {
             Text(stringResource(R.string.pharmacies_discover_pro))
         }
     }
+}
+
+@Composable
+private fun serviceLabel(service: String): String? = when (service) {
+    "night" -> stringResource(R.string.pharmacies_service_night)
+    "afternoon" -> stringResource(R.string.pharmacies_service_afternoon)
+    "holiday" -> stringResource(R.string.pharmacies_service_holiday)
+    "afternoon_holiday" -> stringResource(R.string.pharmacies_service_afternoon_holiday)
+    "h24" -> stringResource(R.string.pharmacies_service_h24)
+    else -> null
 }
 
 @Composable

@@ -10,6 +10,8 @@ data class PharmacyShift(
     val comune: String = "",
     val address: String = "",
     val phone: String = "",
+    /** night, afternoon, holiday, afternoon_holiday, h24: vuoto se la fonte non lo dice. */
+    val service: String = "",
 ) {
     val id: String get() = "$date|$name|$comune|$address"
 
@@ -55,6 +57,7 @@ internal object PharmacyParser {
         comune = m["comune"] as? String ?: "",
         address = m["address"] as? String ?: "",
         phone = m["phone"] as? String ?: "",
+        service = m["service"] as? String ?: "",
     )
 
     private fun shifts(any: Any?): List<PharmacyShift> =

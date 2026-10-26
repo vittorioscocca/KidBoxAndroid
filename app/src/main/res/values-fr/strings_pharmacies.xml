@@ -55,4 +55,9 @@
     <string name="pharmacies_use">Utiliser</string>
     <string name="home_feature_pharmacies_title">Pharmacies de garde</string>
     <string name="home_feature_pharmacies_subtitle">Ouvertes près de chez vous</string>
+    <string name="pharmacies_service_night">Service de nuit</string>
+    <string name="pharmacies_service_afternoon">Service de l\'après-midi</string>
+    <string name="pharmacies_service_holiday">Service des jours fériés</string>
+    <string name="pharmacies_service_afternoon_holiday">Service de l\'après-midi et des jours fériés</string>
+    <string name="pharmacies_service_h24">Ouverte 24 h/24</string>
 </resources>

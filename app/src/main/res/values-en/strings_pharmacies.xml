@@ -55,4 +55,9 @@
     <string name="pharmacies_use">Use</string>
     <string name="home_feature_pharmacies_title">Duty pharmacies</string>
     <string name="home_feature_pharmacies_subtitle">Open near you</string>
+    <string name="pharmacies_service_night">Night service</string>
+    <string name="pharmacies_service_afternoon">Afternoon service</string>
+    <string name="pharmacies_service_holiday">Holiday service</string>
+    <string name="pharmacies_service_afternoon_holiday">Afternoon and holiday service</string>
+    <string name="pharmacies_service_h24">Open 24 hours</string>
 </resources>

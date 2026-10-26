@@ -55,4 +55,9 @@
     <string name="pharmacies_use">Usa</string>
     <string name="home_feature_pharmacies_title">Farmacie di turno</string>
     <string name="home_feature_pharmacies_subtitle">Aperte vicino a te</string>
+    <string name="pharmacies_service_night">Servizio notturno</string>
+    <string name="pharmacies_service_afternoon">Servizio pomeridiano</string>
+    <string name="pharmacies_service_holiday">Servizio festivo</string>
+    <string name="pharmacies_service_afternoon_holiday">Servizio pomeridiano e festivo</string>
+    <string name="pharmacies_service_h24">Aperta 24 ore</string>
 </resources>
