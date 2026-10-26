@@ -82,6 +82,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import it.vittorioscocca.kidbox.ui.screens.news.NewsScreen
 import it.vittorioscocca.kidbox.ui.screens.news.NewsSavedScreen
 import it.vittorioscocca.kidbox.ui.screens.news.NewsSettingsScreen
+import it.vittorioscocca.kidbox.ui.screens.pharmacies.PharmacyScreen
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.PlanningAIChatScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.AiSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.PrivacySettingsScreen
@@ -435,6 +436,13 @@ fun AppNavGraph(
 
         composable(AppDestination.NewsSaved.route) {
             NewsSavedScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(AppDestination.Pharmacies.route) {
+            PharmacyScreen(
+                onBack = { navController.popBackStack() },
+                onOpenPlaceSettings = { navController.navigate(AppDestination.NewsSettings.route) },
+            )
         }
 
         composable(AppDestination.Splash.route) {

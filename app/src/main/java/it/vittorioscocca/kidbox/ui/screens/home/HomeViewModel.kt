@@ -1040,6 +1040,7 @@ class HomeViewModel @Inject constructor(
         "pets",
         "home_items",
         "vehicles",
+        "pharmacies",
         "ai",
     )
 

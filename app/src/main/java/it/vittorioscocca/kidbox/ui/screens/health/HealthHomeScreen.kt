@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Biotech
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.LocalPharmacy
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.Restaurant
@@ -165,6 +166,13 @@ fun HealthHomeScreen(
                 icon = Icons.Default.DirectionsRun,
                 tint = Color(0xFF5A9EE0),
                 onClick = { onNavigate(AppDestination.FitnessPlan.route(familyId, childId)) },
+            ),
+            HealthCard(
+                title = context.getString(R.string.pharmacies_title),
+                subtitle = context.getString(R.string.pharmacies_card_subtitle),
+                icon = Icons.Default.LocalPharmacy,
+                tint = Color(0xFF34A885),
+                onClick = { onNavigate(AppDestination.Pharmacies.createRoute(familyId)) },
             ),
             HealthCard(
                 title = context.getString(R.string.health_history),

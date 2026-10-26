@@ -61,6 +61,7 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Pets
+import androidx.compose.material.icons.filled.LocalPharmacy
 import androidx.compose.material.icons.filled.Luggage
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Settings
@@ -1124,6 +1125,15 @@ internal fun featureItems(
         Color(0xFF8B6914),
     ),
     FeatureItem(
+        "pharmacies",
+        context.getString(R.string.home_feature_pharmacies_title),
+        context.getString(R.string.home_feature_pharmacies_subtitle),
+        AppDestination.Pharmacies.createRoute(familyId),
+        Icons.Filled.LocalPharmacy,
+        Color(0xFFE6F6F0),
+        Color(0xFF34A885),
+    ),
+    FeatureItem(
         "vehicles",
         context.getString(R.string.home_feature_vehicles_title),
         context.getString(R.string.home_feature_vehicles_subtitle),
@@ -1202,7 +1212,7 @@ private fun HomeCategorySection(
     // Assistente ("ai") escluso: è il bottone AI flottante.
     val groups = listOf(
         stringResource(R.string.home_group_organization) to listOf("notes", "todo", "shopping", "calendar"),
-        stringResource(R.string.home_group_family_health) to listOf("health", "chat"),
+        stringResource(R.string.home_group_family_health) to listOf("health", "pharmacies", "chat"),
         stringResource(R.string.home_group_documents_money) to listOf("documents", "expenses", "wallet", "passwords"),
         stringResource(R.string.home_group_daily_life) to listOf("location", "photos", "travel", "pets", "home_items", "vehicles"),
     )

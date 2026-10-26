@@ -458,6 +458,11 @@ sealed class AppDestination(val route: String) {
     data object NewsSettings : AppDestination("news_settings")
     /** Le notizie salvate col segnalibro: di chi le salva, non della famiglia. */
     data object NewsSaved : AppDestination("news_saved")
+
+    /** Farmacie di turno (Pro e Max): fonte ufficiale letta dal codice o scelta dall'utente. */
+    data object Pharmacies : AppDestination("pharmacies/{familyId}") {
+        fun createRoute(familyId: String): String = "pharmacies/$familyId"
+    }
     /**
      * L'assistente unico. Dalla Home senza focus; dai pulsanti di Salute con il
      * focus su una persona, una visita o un esame (vedi `AgentFocus`).
