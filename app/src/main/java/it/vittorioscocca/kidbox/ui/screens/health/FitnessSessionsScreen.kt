@@ -86,8 +86,7 @@ fun FitnessSessionsScreen(
     // spostata è stata svolta il giorno in cui è stata chiusa, non quello in cui
     // era stata programmata.
     val sessions = remember(plan) {
-        plan.allSessions
-            .filter { it.status == FitnessSessionStatus.DONE }
+        plan.doneHistory
             .sortedByDescending { performedAt(it) }
     }
     val months = remember(sessions) {

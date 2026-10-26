@@ -352,7 +352,16 @@ data class FitnessPlanDocument(
      * Parity con `previousCycles` su iOS.
      */
     val previousCycles: List<FitnessPlanRecap> = emptyList(),
+    /**
+     * Sedute fatte dei piani precedenti: la rigenerazione non le cancella, lo
+     * storico delle sessioni resta consultabile. Parity con `archivedSessions` su iOS.
+     */
+    val archivedSessions: List<FitnessSession> = emptyList(),
 ) {
+    /** Sedute fatte di questo piano e dei precedenti, per storico e registro corse. */
+    val doneHistory: List<FitnessSession>
+        get() = archivedSessions + allSessions.filter { it.status == FitnessSessionStatus.DONE }
+
     /** Numero del mese nel percorso: 1 per il primo piano generato. */
     val cycleNumber: Int get() = previousCycles.size + 1
 

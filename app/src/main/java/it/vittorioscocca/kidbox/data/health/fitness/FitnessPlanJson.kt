@@ -65,6 +65,9 @@ object FitnessPlanJson {
         if (document.previousCycles.isNotEmpty()) {
             put("previousCycles", JSONArray().apply { document.previousCycles.forEach { put(encodeRecap(it)) } })
         }
+        if (document.archivedSessions.isNotEmpty()) {
+            put("archivedSessions", encodeSessions(document.archivedSessions))
+        }
         put(
             "weeks",
             JSONArray().apply {
@@ -120,6 +123,7 @@ object FitnessPlanJson {
             messageUnitsConsumed = json.optInt("messageUnitsConsumed", 0),
             loggedWorkouts = decodeLoggedWorkouts(json.optJSONArray("loggedWorkouts")),
             previousCycles = decodeRecaps(json.optJSONArray("previousCycles")),
+            archivedSessions = decodeSessions(json.optJSONArray("archivedSessions")),
         )
     }.getOrNull()
 
@@ -249,6 +253,12 @@ object FitnessPlanJson {
     }
 
     // ── Seduta ─────────────────────────────────────────────────────────────
+
+    fun encodeSessions(sessions: List<FitnessSession>) =
+        JSONArray().apply { sessions.forEach { put(encodeSession(it)) } }
+
+    fun decodeSessions(array: JSONArray?): List<FitnessSession> =
+        List(array?.length() ?: 0) { array?.optJSONObject(it)?.let(::decodeSession) }.filterNotNull()
 
     private fun encodeSession(session: FitnessSession) = JSONObject().apply {
         put("id", session.id)

@@ -42,6 +42,26 @@ class FitnessPlanStore @Inject constructor(
         return FitnessPlanJson.decode(file.readText())
     }
 
+    private fun archiveFile(childId: String) = File(directory(), "fitness_archive_$childId.json")
+
+    /** Mette da parte le sedute fatte del piano che sta per sparire (eliminato dall'utente). */
+    fun archiveHistory(childId: String, plan: FitnessPlanDocument) {
+        val done = plan.doneHistory
+        if (done.isEmpty()) return
+        archiveFile(childId).writeText(FitnessPlanJson.encodeSessions(done).toString())
+    }
+
+    /** Porta lo storico (del piano corrente o messo da parte) dentro un piano nuovo. */
+    fun carryHistory(childId: String, document: FitnessPlanDocument, old: FitnessPlanDocument?): FitnessPlanDocument {
+        val stored = archiveFile(childId).takeIf { it.exists() }
+            ?.let { runCatching { FitnessPlanJson.decodeSessions(org.json.JSONArray(it.readText())) }.getOrNull() }
+            .orEmpty()
+        archiveFile(childId).delete()
+        val history = (old?.doneHistory.orEmpty() + stored).distinctBy { it.id }
+        val workouts = (old?.loggedWorkouts.orEmpty() + document.loggedWorkouts).distinctBy { it.id }
+        return document.copy(archivedSessions = history, loggedWorkouts = workouts)
+    }
+
     fun clear(childId: String) {
         file(childId).delete()
         prefs.edit()

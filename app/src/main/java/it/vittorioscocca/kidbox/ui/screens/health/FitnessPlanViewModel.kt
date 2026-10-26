@@ -227,7 +227,11 @@ class FitnessPlanViewModel @Inject constructor(
                 }
             }.onSuccess { result ->
                 withContext(Dispatchers.IO) { planStore.resetReviewedWeeks(childId) }
-                persist(result.document)
+                persist(
+                    withContext(Dispatchers.IO) {
+                        planStore.carryHistory(childId, result.document, _uiState.value.plan)
+                    },
+                )
                 // Se subito dopo si apre la richiesta dei permessi Health Connect,
                 // `ReviewPrompter` vede l'Activity senza focus e rinuncia.
                 ReviewPrompter.note(context, ReviewPrompter.Moment.AI_PLAN_GENERATED)
@@ -506,6 +510,7 @@ class FitnessPlanViewModel @Inject constructor(
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 reminderScheduler.cancelAll(id)
+                _uiState.value.plan?.let { planStore.archiveHistory(id, it) }
                 planStore.clear(id)
                 remoteStore.delete(id)
             }

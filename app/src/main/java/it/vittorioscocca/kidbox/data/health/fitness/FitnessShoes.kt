@@ -104,7 +104,7 @@ object FitnessShoeLedger {
      */
     fun runs(plan: FitnessPlanDocument): List<Run> {
         val result = mutableListOf<Run>()
-        plan.allSessions.filter { it.status == FitnessSessionStatus.DONE }.forEach { session ->
+        plan.doneHistory.forEach { session ->
             val meters = session.actualDistanceMeters ?: return@forEach
             if (meters < 10.0) return@forEach
             val actual = session.actualActivityTitle?.takeIf { it.isNotBlank() }
