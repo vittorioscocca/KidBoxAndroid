@@ -231,9 +231,9 @@
     <string name="chat_suggested_note">Add to Notes</string>
     <string name="chat_suggested_map">Show on map</string>
     <string name="settings_suggested_actions_title">Suggested actions</string>
-    <string name="settings_suggested_actions_sub">Banners under messages: calendar, shopping, to-dos, Notes, map, photos and documents</string>
+    <string name="settings_suggested_actions_sub">In the long-press menu: calendar, shopping, to-dos, Notes, map, photos and documents</string>
     <string name="settings_suggested_actions_expiry">Suggestions you don\'t use will stop appearing after 30 days.</string>
-    <string name="settings_suggested_actions_note">Banners for the active actions appear under a message: one tap and the action runs. Recognition happens on your device.</string>
+    <string name="settings_suggested_actions_note">Long-press a message and choose «Suggested actions»: only the active actions appear, and one tap runs them. Recognition happens on your device.</string>
     <string name="chat_suggested_photos">Save to Photos &amp; Videos</string>
     <string name="chat_suggested_documents">Save to Documents</string>
 </resources>

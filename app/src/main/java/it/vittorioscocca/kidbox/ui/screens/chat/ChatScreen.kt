@@ -133,6 +133,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.runtime.collectAsState
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -740,7 +742,6 @@ fun ChatScreen(
                                             },
                                             isHighlighted = state.highlightedMessageId == item.message.id,
                                             isTranscriptionEnabled = state.isAudioTranscriptionEnabled,
-                                            onSuggestedAction = runSuggestedAction,
                                         )
                                     }
                                 }
@@ -892,6 +893,16 @@ fun ChatScreen(
                 ChatMessageType.AUDIO,
                 ChatMessageType.DOCUMENT,
             )
+        val enabledSuggestions by remember { SuggestedActionsPrefs.enabled(context) }.collectAsState()
+        val suggestionsForTarget = remember(target.id, target.text, target.mediaUrl, enabledSuggestions) {
+            if (target.isDeletedForEveryone) {
+                emptyList()
+            } else if (target.type == ChatMessageType.TEXT) {
+                SuggestedActionsFinder.find(target.id, target.text.orEmpty())
+            } else {
+                SuggestedActionsFinder.forMedia(target)
+            }.filter { it.kind in enabledSuggestions.orEmpty() }
+        }
         MessageActionDialog(
             message = target,
             canEdit = viewModel.canDeleteForEveryone(target),
@@ -910,8 +921,11 @@ fun ChatScreen(
                 editDraft = target.text.orEmpty()
                 actionTarget = null
             },
-            // Il testo si salva dai banner sotto la bolla («Azioni suggerite»).
-            onSaveToKidBox = null,
+            suggestions = suggestionsForTarget,
+            onSuggestedAction = { suggested ->
+                actionTarget = null
+                runSuggestedAction(suggested)
+            },
             onSave = if (isSaveable) {
                 {
                     val msg = target
@@ -1630,14 +1644,15 @@ private fun MessageActionDialog(
     onPickReaction: (String) -> Unit,
     onReply: () -> Unit,
     onEdit: () -> Unit,
-    onSaveToKidBox: (() -> Unit)?,
+    suggestions: List<SuggestedChatAction>,
+    onSuggestedAction: (SuggestedChatAction) -> Unit,
     onSave: (() -> Unit)?,
     onDeleteForMe: () -> Unit,
     onDeleteForEveryone: () -> Unit,
 ) {
     val emojis = listOf("👍", "❤️", "😂", "😮", "😢", "🙏")
+    var showingSuggestions by remember(message.id) { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val sheetScope = rememberCoroutineScope()
     val dividerColor = MaterialTheme.kidBoxColors.subtitle.copy(alpha = 0.15f)
 
     ModalBottomSheet(
@@ -1693,20 +1708,34 @@ private fun MessageActionDialog(
                 )
             }
 
-            // Salva in KidBox — testo: to-do, evento, spesa o nota
-            if (onSaveToKidBox != null) {
+            // Azioni suggerite — si aprono qui dentro: un tocco esegue l'azione
+            if (suggestions.isNotEmpty()) {
+                val context = LocalContext.current
                 ActionSheetRow(
-                    icon = Icons.Default.SaveAlt,
-                    text = stringResource(R.string.chat_save_to_kidbox),
+                    icon = Icons.Default.AutoAwesome,
+                    text = stringResource(R.string.settings_suggested_actions_title),
                     textColor = MaterialTheme.kidBoxColors.title,
-                    // Si chiude questo foglio con la sua animazione e solo dopo se ne apre un
-                    // altro: toglierlo di colpo nello stesso istante lasciava la finestra
-                    // del primo a intercettare i tocchi, e il menu non si apriva più.
                     onClick = {
-                        sheetScope.launch { sheetState.hide() }
-                            .invokeOnCompletion { onSaveToKidBox() }
+                        // Compaiono ora: per i 30 giorni contano come mostrate.
+                        suggestions.map { it.kind }.toSet().forEach { SuggestedActionsPrefs.noteShown(context, it) }
+                        showingSuggestions = !showingSuggestions
                     },
                 )
+                if (showingSuggestions) {
+                    suggestions.forEach { suggested ->
+                        ActionSheetRow(
+                            icon = suggested.kind.icon,
+                            text = stringResource(suggested.kind.labelRes),
+                            textColor = MaterialTheme.kidBoxColors.title,
+                            iconTint = suggested.kind.tint,
+                            modifier = Modifier.padding(start = 28.dp),
+                            onClick = {
+                                SuggestedActionsPrefs.markUsed(context, suggested.kind)
+                                onSuggestedAction(suggested)
+                            },
+                        )
+                    }
+                }
             }
 
             // Salva — foto, video, audio, documento con media disponibile
@@ -2228,16 +2257,18 @@ private fun ActionSheetRow(
     text: String,
     textColor: Color,
     onClick: () -> Unit,
+    iconTint: Color = textColor,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = textColor)
+        Icon(icon, contentDescription = null, tint = iconTint)
         Text(text = text, color = textColor)
     }
 }

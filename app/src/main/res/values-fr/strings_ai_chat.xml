@@ -231,9 +231,9 @@
     <string name="chat_suggested_note">Ajouter aux Notes</string>
     <string name="chat_suggested_map">Afficher sur la carte</string>
     <string name="settings_suggested_actions_title">Actions suggérées</string>
-    <string name="settings_suggested_actions_sub">Bannières sous les messages : calendrier, courses, tâches, Notes, carte, photos et documents</string>
+    <string name="settings_suggested_actions_sub">Dans le menu d’appui long : calendrier, courses, tâches, Notes, carte, photos et documents</string>
     <string name="settings_suggested_actions_expiry">Les suggestions que vous n\'utilisez pas cesseront d\'apparaître après 30 jours.</string>
-    <string name="settings_suggested_actions_note">Sous un message apparaissent les bannières des actions actives : un appui et l\'action s\'exécute. La reconnaissance se fait sur votre appareil.</string>
+    <string name="settings_suggested_actions_note">Appuyez longuement sur un message et choisissez « Actions suggérées » : seules les actions actives apparaissent et un appui les exécute. La reconnaissance se fait sur votre appareil.</string>
     <string name="chat_suggested_photos">Enregistrer dans Photos et vidéos</string>
     <string name="chat_suggested_documents">Enregistrer dans Documents</string>
 </resources>

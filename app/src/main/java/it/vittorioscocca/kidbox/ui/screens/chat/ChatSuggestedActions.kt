@@ -1,17 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.chat
 
 import android.content.Context
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
@@ -20,38 +9,20 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Note
 import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.chat.model.ChatMessageType
 import it.vittorioscocca.kidbox.domain.save.AddressDetector
 import it.vittorioscocca.kidbox.domain.save.SaveAction
 import it.vittorioscocca.kidbox.domain.save.SaveClassifier
-import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * «Azioni suggerite»: piccoli banner sotto la bolla di un messaggio (testo, foto,
- * video, documento) che
- * alla pressione eseguono subito l'azione. Gemello di `ChatSuggestedActions.swift`.
+ * «Azioni suggerite»: la voce del foglio a pressione lunga (MessageActionDialog)
+ * che propone le azioni per un messaggio (testo, foto, video, documento); un
+ * tocco le esegue subito. Gemello di `ChatSuggestedActions.swift`.
  * Ogni tipo si accende/spegne da Impostazioni > Messaggi > Azioni suggerite; un
  * tipo acceso ma mai toccato per 30 giorni si spegne da solo (l'orologio parte la
  * prima volta che compare e riparte a ogni tocco e a ogni riaccensione).
@@ -171,67 +142,5 @@ object SuggestedActionsFinder {
             SaveClassifier.classify(trimmed, forChips = true).actions.forEach { out += SuggestedChatAction.Save(it) }
         }
         return out.take(3).also { cache[key] = it }
-    }
-}
-
-@Composable
-internal fun ChatSuggestedActionsRow(
-    message: UiChatMessage,
-    onTap: (SuggestedChatAction) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val context = LocalContext.current
-    val kb = MaterialTheme.kidBoxColors
-    val enabled by remember { SuggestedActionsPrefs.enabled(context) }.collectAsState()
-    val text = message.text.orEmpty()
-    val found = remember(message.id, message.type, text) {
-        if (message.type == ChatMessageType.TEXT) {
-            SuggestedActionsFinder.find(message.id, text)
-        } else {
-            SuggestedActionsFinder.forMedia(message)
-        }
-    }
-    var done by remember(message.id) { mutableStateOf(emptySet<SuggestedActionKind>()) }
-
-    // Fuori dalla composizione: può spegnere un tipo scaduto.
-    LaunchedEffect(message.id, text) {
-        found.map { it.kind }.toSet().forEach { SuggestedActionsPrefs.noteShown(context, it) }
-    }
-
-    val visible = found.filter { it.kind in enabled.orEmpty() }
-    if (visible.isEmpty()) return
-    Row(
-        modifier = modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        visible.forEach { action ->
-            val isDone = action.kind in done
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(kb.surfaceOverlay)
-                    .clickable {
-                        done = done + action.kind
-                        SuggestedActionsPrefs.markUsed(context, action.kind)
-                        onTap(action)
-                    }
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = if (isDone) Icons.Default.CheckCircle else action.kind.icon,
-                    contentDescription = null,
-                    tint = if (isDone) Color(0xFF34C759) else action.kind.tint,
-                    modifier = Modifier.size(16.dp),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = stringResource(action.kind.labelRes),
-                    color = kb.title,
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                )
-            }
-        }
     }
 }
