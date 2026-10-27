@@ -135,6 +135,7 @@ internal fun ChatBubble(
     onAudioPlaybackStateChange: (Boolean) -> Unit,
     isHighlighted: Boolean,
     isTranscriptionEnabled: Boolean = true,
+    onSuggestedAction: ((SuggestedChatAction) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val isOwn = message.senderId == currentUid
@@ -430,6 +431,23 @@ internal fun ChatBubble(
                     )
                 }
             }
+        }
+
+        if (onSuggestedAction != null &&
+            message.type == ChatMessageType.TEXT &&
+            !message.isDeletedForEveryone &&
+            !message.text.isNullOrBlank()
+        ) {
+            ChatSuggestedActionsRow(
+                message = message,
+                onTap = onSuggestedAction,
+                modifier = Modifier.padding(
+                    start = if (isOwn) 12.dp else incomingLeadingInset,
+                    end = if (isOwn) 16.dp else 12.dp,
+                    top = 4.dp,
+                    bottom = 2.dp,
+                ),
+            )
         }
     }
     }

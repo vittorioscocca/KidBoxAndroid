@@ -225,4 +225,13 @@
     <string name="chat_save_in_saved">Enregistré dans %1$s</string>
     <string name="chat_show_in_maps">Afficher dans Plans</string>
     <string name="chat_show_in_maps_failed">Aucune application de cartes disponible</string>
+    <string name="chat_suggested_calendar">Ajouter au calendrier</string>
+    <string name="chat_suggested_grocery">Ajouter à la liste de courses</string>
+    <string name="chat_suggested_todo">Ajouter aux tâches</string>
+    <string name="chat_suggested_note">Ajouter aux Notes</string>
+    <string name="chat_suggested_map">Afficher sur la carte</string>
+    <string name="settings_suggested_actions_title">Actions suggérées</string>
+    <string name="settings_suggested_actions_sub">Bannières sous les messages : calendrier, courses, tâches, Notes, carte</string>
+    <string name="settings_suggested_actions_expiry">Les suggestions que vous n\'utilisez pas cesseront d\'apparaître après 30 jours.</string>
+    <string name="settings_suggested_actions_note">Sous un message texte apparaissent les bannières des actions actives : un appui et l\'action s\'exécute. La reconnaissance se fait sur votre appareil.</string>
 </resources>

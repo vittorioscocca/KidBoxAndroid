@@ -186,6 +186,8 @@ object SaveClassifier {
         text: String,
         zone: ZoneId = ZoneId.systemDefault(),
         now: LocalDateTime = LocalDateTime.now(zone),
+        /** Banner sotto la bolla: la nota catch-all solo se il testo la merita. */
+        forChips: Boolean = false,
     ): SaveClassification {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return SaveClassification(emptyList(), null, false)
@@ -213,7 +215,9 @@ object SaveClassifier {
 
         val note = hits(lower, noteKeywords, noteWords)
         val body = if (lines.size > 1) lines.drop(1).joinToString("\n") else trimmed
-        scored += SaveAction.Note(lines.first(), body) to maxOf(note + 1, 1)
+        if (!forChips || note >= 2 || lines.size >= 3 || trimmed.length > 160) {
+            scored += SaveAction.Note(lines.first(), body) to maxOf(note + 1, 1)
+        }
 
         // sortedByDescending è stabile: a parità resta l'ordine di inserimento, come su iOS.
         val actions = scored.sortedByDescending { it.second }.map { it.first }

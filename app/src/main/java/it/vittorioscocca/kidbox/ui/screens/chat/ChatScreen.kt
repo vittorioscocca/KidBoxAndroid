@@ -207,7 +207,38 @@ fun ChatScreen(
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     var actionTarget by remember { mutableStateOf<UiChatMessage?>(null) }
-    var saveToKidBoxTarget by remember { mutableStateOf<UiChatMessage?>(null) }
+    val runSuggestedAction: (SuggestedChatAction) -> Unit = remember(context, viewModel) {
+        { suggested ->
+            when (suggested) {
+                is SuggestedChatAction.ShowMap -> {
+                    val geo = android.net.Uri.parse("geo:0,0?q=" + android.net.Uri.encode(suggested.address))
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent(android.content.Intent.ACTION_VIEW, geo)
+                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }.onFailure {
+                        Toast.makeText(context, context.getString(R.string.chat_show_in_maps_failed), Toast.LENGTH_SHORT).show()
+                    }
+                }
+                is SuggestedChatAction.Save -> {
+                    val savedLabel = when (suggested.action) {
+                        is it.vittorioscocca.kidbox.domain.save.SaveAction.Todo -> R.string.share_destination_todo
+                        is it.vittorioscocca.kidbox.domain.save.SaveAction.Event -> R.string.share_destination_event
+                        is it.vittorioscocca.kidbox.domain.save.SaveAction.Grocery -> R.string.share_destination_shopping
+                        is it.vittorioscocca.kidbox.domain.save.SaveAction.Note -> R.string.share_destination_note
+                    }
+                    viewModel.saveToKidBox(suggested.action) { result ->
+                        val message = result.fold(
+                            onSuccess = { context.getString(R.string.chat_save_in_saved, context.getString(savedLabel)) },
+                            onFailure = { it.message?.takeIf { m -> m.isNotBlank() } ?: context.getString(R.string.chat_save_failed) },
+                        )
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
     // Unified gallery request: (urls, types, startIndex). Single-media taps produce a 1-item list.
     var galleryRequest by remember { mutableStateOf<Triple<List<String>, List<String>, Int>?>(null) }
     // Visore con tutti i media della chat (lo stesso della galleria del dettaglio).
@@ -695,6 +726,7 @@ fun ChatScreen(
                                             },
                                             isHighlighted = state.highlightedMessageId == item.message.id,
                                             isTranscriptionEnabled = state.isAudioTranscriptionEnabled,
+                                            onSuggestedAction = runSuggestedAction,
                                         )
                                     }
                                 }
@@ -864,15 +896,8 @@ fun ChatScreen(
                 editDraft = target.text.orEmpty()
                 actionTarget = null
             },
-            onSaveToKidBox = if (!target.isDeletedForEveryone &&
-                target.type == ChatMessageType.TEXT &&
-                !target.text.isNullOrBlank()
-            ) {
-                {
-                    saveToKidBoxTarget = target
-                    actionTarget = null
-                }
-            } else null,
+            // Il testo si salva dai banner sotto la bolla («Azioni suggerite»).
+            onSaveToKidBox = null,
             onSave = if (isSaveable) {
                 {
                     val msg = target
@@ -895,48 +920,6 @@ fun ChatScreen(
             onDeleteForEveryone = {
                 viewModel.deleteForEveryone(target.id)
                 actionTarget = null
-            },
-        )
-    }
-    saveToKidBoxTarget?.let { target ->
-        val savedLabels = mapOf(
-            it.vittorioscocca.kidbox.ui.share.ShareDestination.TODO to R.string.share_destination_todo,
-            it.vittorioscocca.kidbox.ui.share.ShareDestination.EVENT to R.string.share_destination_event,
-            it.vittorioscocca.kidbox.ui.share.ShareDestination.SHOPPING to R.string.share_destination_shopping,
-            it.vittorioscocca.kidbox.ui.share.ShareDestination.NOTE to R.string.share_destination_note,
-        )
-        ChatSaveToKidBoxSheet(
-            text = target.text.orEmpty(),
-            onDismiss = { saveToKidBoxTarget = null },
-            onShowMap = { address ->
-                saveToKidBoxTarget = null
-                val geo = android.net.Uri.parse("geo:0,0?q=" + android.net.Uri.encode(address))
-                runCatching {
-                    context.startActivity(
-                        android.content.Intent(android.content.Intent.ACTION_VIEW, geo)
-                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
-                }.onFailure {
-                    Toast.makeText(context, context.getString(R.string.chat_show_in_maps_failed), Toast.LENGTH_SHORT).show()
-                }
-            },
-            onSelect = { action ->
-                saveToKidBoxTarget = null
-                val destination = when (action) {
-                    is it.vittorioscocca.kidbox.domain.save.SaveAction.Todo -> it.vittorioscocca.kidbox.ui.share.ShareDestination.TODO
-                    is it.vittorioscocca.kidbox.domain.save.SaveAction.Event -> it.vittorioscocca.kidbox.ui.share.ShareDestination.EVENT
-                    is it.vittorioscocca.kidbox.domain.save.SaveAction.Grocery -> it.vittorioscocca.kidbox.ui.share.ShareDestination.SHOPPING
-                    is it.vittorioscocca.kidbox.domain.save.SaveAction.Note -> it.vittorioscocca.kidbox.ui.share.ShareDestination.NOTE
-                }
-                viewModel.saveToKidBox(action) { result ->
-                    val message = result.fold(
-                        onSuccess = {
-                            context.getString(R.string.chat_save_in_saved, context.getString(savedLabels.getValue(destination)))
-                        },
-                        onFailure = { it.message?.takeIf { m -> m.isNotBlank() } ?: context.getString(R.string.chat_save_failed) },
-                    )
-                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                }
             },
         )
     }

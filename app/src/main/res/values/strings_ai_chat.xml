@@ -238,4 +238,13 @@
     <string name="chat_save_in_saved">Salvato in %1$s</string>
     <string name="chat_show_in_maps">Mostra in Mappe</string>
     <string name="chat_show_in_maps_failed">Nessuna app di mappe disponibile</string>
+    <string name="chat_suggested_calendar">Aggiungi a calendario</string>
+    <string name="chat_suggested_grocery">Aggiungi a lista spesa</string>
+    <string name="chat_suggested_todo">Aggiungi a to-do</string>
+    <string name="chat_suggested_note">Aggiungi a Note</string>
+    <string name="chat_suggested_map">Mostra in mappa</string>
+    <string name="settings_suggested_actions_title">Azioni suggerite</string>
+    <string name="settings_suggested_actions_sub">Banner sotto i messaggi: calendario, spesa, to-do, Note, mappa</string>
+    <string name="settings_suggested_actions_expiry">I suggerimenti che non usi smetteranno di apparire dopo 30 giorni.</string>
+    <string name="settings_suggested_actions_note">Sotto un messaggio di testo compaiono i banner delle azioni attive: un tocco e l\'azione parte. Il riconoscimento avviene sul dispositivo.</string>
 </resources>

@@ -37,10 +37,14 @@ import it.vittorioscocca.kidbox.ui.components.KBBackButton
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.ChevronRight
 
 @Composable
 fun MessageSettingsScreen(
     onBack: () -> Unit,
+    onOpenSuggestedActions: () -> Unit = {},
     viewModel: MessageSettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -107,6 +111,42 @@ fun MessageSettingsScreen(
             style = MaterialTheme.typography.bodySmall,
             color = kb.subtitle,
         )
+        Spacer(Modifier.height(16.dp))
+        Card(
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = kb.card),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onOpenSuggestedActions)
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = Color(0xFF27AE60),
+                )
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 12.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_suggested_actions_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = kb.title,
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_suggested_actions_sub),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = kb.subtitle,
+                    )
+                }
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = kb.subtitle)
+            }
+        }
         Spacer(Modifier.height(16.dp))
         Card(
             shape = RoundedCornerShape(18.dp),
