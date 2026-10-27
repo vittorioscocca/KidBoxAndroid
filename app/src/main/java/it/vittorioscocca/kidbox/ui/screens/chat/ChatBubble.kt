@@ -433,11 +433,12 @@ internal fun ChatBubble(
             }
         }
 
-        if (onSuggestedAction != null &&
-            message.type == ChatMessageType.TEXT &&
-            !message.isDeletedForEveryone &&
-            !message.text.isNullOrBlank()
-        ) {
+        val hasSuggestionSource = when (message.type) {
+            ChatMessageType.TEXT -> !message.text.isNullOrBlank()
+            ChatMessageType.PHOTO, ChatMessageType.VIDEO, ChatMessageType.DOCUMENT -> message.mediaUrl != null
+            else -> false
+        }
+        if (onSuggestedAction != null && hasSuggestionSource && !message.isDeletedForEveryone) {
             ChatSuggestedActionsRow(
                 message = message,
                 onTap = onSuggestedAction,

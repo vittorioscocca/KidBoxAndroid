@@ -695,6 +695,78 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Banner «Salva in Foto e video» / «Salva in Documenti» sotto un media della
+     * chat: scarica il file in cache e lo passa allo stesso gestore della
+     * condivisione verso KidBox (via FileProvider, così tipo e nome si leggono).
+     */
+    fun saveMediaToKidBox(
+        message: UiChatMessage,
+        onDone: (Result<Unit>) -> Unit,
+    ) {
+        val familyId = _uiState.value.familyId
+        val url = message.mediaLocalPath?.let { "file://$it" } ?: message.mediaUrl
+        if (familyId.isBlank() || url == null) {
+            onDone(Result.failure(IllegalStateException("famiglia non pronta")))
+            return
+        }
+        viewModelScope.launch {
+            val result = runCatching {
+                val file = withContext(Dispatchers.IO) {
+                    val bytes = if (url.startsWith("file://")) {
+                        java.io.File(android.net.Uri.parse(url).path!!).readBytes()
+                    } else {
+                        java.net.URL(url).openStream().use { it.readBytes() }
+                    }
+                    val ts = System.currentTimeMillis()
+                    val name = when (message.type) {
+                        ChatMessageType.PHOTO -> "KidBox_$ts.jpg"
+                        ChatMessageType.VIDEO -> "KidBox_$ts.mp4"
+                        else -> it.vittorioscocca.kidbox.util.ChatDocumentFileNaming.finalFileNameForUpload(
+                            displayName = message.text,
+                            declaredMime = it.vittorioscocca.kidbox.util.ChatDocumentFileNaming.mimeFromBytes(bytes),
+                            bytes = bytes,
+                        )
+                    }
+                    val dir = java.io.File(appContext.cacheDir, "kb_save").also { it.mkdirs() }
+                    java.io.File(dir, name).also { it.writeBytes(bytes) }
+                }
+                val uri = androidx.core.content.FileProvider.getUriForFile(
+                    appContext, "${appContext.packageName}.fileprovider", file,
+                )
+                val (destination, content) = when (message.type) {
+                    ChatMessageType.PHOTO ->
+                        it.vittorioscocca.kidbox.ui.share.ShareDestination.PHOTOS to
+                            it.vittorioscocca.kidbox.ui.share.ShareContentType.ImageContent(uri)
+                    ChatMessageType.VIDEO ->
+                        it.vittorioscocca.kidbox.ui.share.ShareDestination.PHOTOS to
+                            it.vittorioscocca.kidbox.ui.share.ShareContentType.VideoContent(uri)
+                    else ->
+                        it.vittorioscocca.kidbox.ui.share.ShareDestination.DOCUMENTS to
+                            it.vittorioscocca.kidbox.ui.share.ShareContentType.FileContent(
+                                uri, appContext.contentResolver.getType(uri) ?: "application/octet-stream",
+                            )
+                }
+                try {
+                    shareActionHandler.execute(
+                        it.vittorioscocca.kidbox.ui.share.ShareActionInput(
+                            familyId = familyId,
+                            contentType = content,
+                            allUris = listOf(uri),
+                            selectedDestination = destination,
+                            title = "",
+                            text = "",
+                        ),
+                        appContext.contentResolver,
+                    )
+                } finally {
+                    file.delete()
+                }
+            }
+            onDone(result)
+        }
+    }
+
     private data class SaveInput(
         val destination: it.vittorioscocca.kidbox.ui.share.ShareDestination,
         val title: String,

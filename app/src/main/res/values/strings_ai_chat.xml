@@ -244,7 +244,9 @@
     <string name="chat_suggested_note">Aggiungi a Note</string>
     <string name="chat_suggested_map">Mostra in mappa</string>
     <string name="settings_suggested_actions_title">Azioni suggerite</string>
-    <string name="settings_suggested_actions_sub">Banner sotto i messaggi: calendario, spesa, to-do, Note, mappa</string>
+    <string name="settings_suggested_actions_sub">Banner sotto i messaggi: calendario, spesa, to-do, Note, mappa, foto e documenti</string>
     <string name="settings_suggested_actions_expiry">I suggerimenti che non usi smetteranno di apparire dopo 30 giorni.</string>
-    <string name="settings_suggested_actions_note">Sotto un messaggio di testo compaiono i banner delle azioni attive: un tocco e l\'azione parte. Il riconoscimento avviene sul dispositivo.</string>
+    <string name="settings_suggested_actions_note">Sotto un messaggio compaiono i banner delle azioni attive: un tocco e l\'azione parte. Il riconoscimento avviene sul dispositivo.</string>
+    <string name="chat_suggested_photos">Salva in Foto e video</string>
+    <string name="chat_suggested_documents">Salva in Documenti</string>
 </resources>

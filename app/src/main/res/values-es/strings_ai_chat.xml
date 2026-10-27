@@ -231,7 +231,9 @@
     <string name="chat_suggested_note">Añadir a Notas</string>
     <string name="chat_suggested_map">Mostrar en el mapa</string>
     <string name="settings_suggested_actions_title">Acciones sugeridas</string>
-    <string name="settings_suggested_actions_sub">Banners bajo los mensajes: calendario, compra, tareas, Notas, mapa</string>
+    <string name="settings_suggested_actions_sub">Banners bajo los mensajes: calendario, compra, tareas, Notas, mapa, fotos y documentos</string>
     <string name="settings_suggested_actions_expiry">Las sugerencias que no uses dejarán de aparecer después de 30 días.</string>
-    <string name="settings_suggested_actions_note">Bajo un mensaje de texto aparecen los banners de las acciones activas: un toque y la acción se ejecuta. El reconocimiento se hace en tu dispositivo.</string>
+    <string name="settings_suggested_actions_note">Bajo un mensaje aparecen los banners de las acciones activas: un toque y la acción se ejecuta. El reconocimiento se hace en tu dispositivo.</string>
+    <string name="chat_suggested_photos">Guardar en Fotos y vídeos</string>
+    <string name="chat_suggested_documents">Guardar en Documentos</string>
 </resources>

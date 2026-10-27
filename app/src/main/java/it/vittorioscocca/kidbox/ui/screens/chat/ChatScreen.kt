@@ -221,6 +221,20 @@ fun ChatScreen(
                         Toast.makeText(context, context.getString(R.string.chat_show_in_maps_failed), Toast.LENGTH_SHORT).show()
                     }
                 }
+                is SuggestedChatAction.SaveMedia -> {
+                    val savedLabel = if (suggested.kind == SuggestedActionKind.PHOTOS) {
+                        R.string.share_destination_photos
+                    } else {
+                        R.string.share_destination_documents
+                    }
+                    viewModel.saveMediaToKidBox(suggested.message) { result ->
+                        val message = result.fold(
+                            onSuccess = { context.getString(R.string.chat_save_in_saved, context.getString(savedLabel)) },
+                            onFailure = { it.message?.takeIf { m -> m.isNotBlank() } ?: context.getString(R.string.chat_save_failed) },
+                        )
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    }
+                }
                 is SuggestedChatAction.Save -> {
                     val savedLabel = when (suggested.action) {
                         is it.vittorioscocca.kidbox.domain.save.SaveAction.Todo -> R.string.share_destination_todo

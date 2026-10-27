@@ -15,7 +15,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Note
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Icon
@@ -38,6 +40,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.data.chat.model.ChatMessageType
 import it.vittorioscocca.kidbox.domain.save.AddressDetector
 import it.vittorioscocca.kidbox.domain.save.SaveAction
 import it.vittorioscocca.kidbox.domain.save.SaveClassifier
@@ -46,7 +49,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * «Azioni suggerite»: piccoli banner sotto la bolla di un messaggio di testo che
+ * «Azioni suggerite»: piccoli banner sotto la bolla di un messaggio (testo, foto,
+ * video, documento) che
  * alla pressione eseguono subito l'azione. Gemello di `ChatSuggestedActions.swift`.
  * Ogni tipo si accende/spegne da Impostazioni > Messaggi > Azioni suggerite; un
  * tipo acceso ma mai toccato per 30 giorni si spegne da solo (l'orologio parte la
@@ -63,6 +67,8 @@ enum class SuggestedActionKind(
     TODO("todo", R.string.chat_suggested_todo, Icons.Default.CheckCircle, Color(0xFFFF9500)),
     NOTE("note", R.string.chat_suggested_note, Icons.Default.Note, Color(0xFFFFCC00)),
     MAP("map", R.string.chat_suggested_map, Icons.Default.Map, Color(0xFF007AFF)),
+    PHOTOS("photos", R.string.chat_suggested_photos, Icons.Default.PhotoLibrary, Color(0xFF32ADE6)),
+    DOCUMENTS("documents", R.string.chat_suggested_documents, Icons.Default.Folder, Color(0xFF9973D9)),
 }
 
 sealed interface SuggestedChatAction {
@@ -81,6 +87,9 @@ sealed interface SuggestedChatAction {
     data class ShowMap(val address: String) : SuggestedChatAction {
         override val kind get() = SuggestedActionKind.MAP
     }
+
+    /** Foto o video → «Foto e video»; documento → «Documenti». */
+    data class SaveMedia(override val kind: SuggestedActionKind, val message: UiChatMessage) : SuggestedChatAction
 }
 
 /** Preferenze per dispositivo, in `kidbox_prefs` come il resto delle impostazioni messaggi. */
@@ -139,6 +148,14 @@ object SuggestedActionsPrefs {
 
 /** Banner per un testo: mappa se c'è un indirizzo, poi le regole di «Salva in». Al massimo tre. */
 object SuggestedActionsFinder {
+    /** Banner per un media: uno solo, secondo il tipo. */
+    fun forMedia(message: UiChatMessage): List<SuggestedChatAction> = when (message.type) {
+        ChatMessageType.PHOTO, ChatMessageType.VIDEO ->
+            listOf(SuggestedChatAction.SaveMedia(SuggestedActionKind.PHOTOS, message))
+        ChatMessageType.DOCUMENT -> listOf(SuggestedChatAction.SaveMedia(SuggestedActionKind.DOCUMENTS, message))
+        else -> emptyList()
+    }
+
     private val cache = object : LinkedHashMap<String, List<SuggestedChatAction>>(64, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<SuggestedChatAction>>?) = size > 300
     }
@@ -167,7 +184,13 @@ internal fun ChatSuggestedActionsRow(
     val kb = MaterialTheme.kidBoxColors
     val enabled by remember { SuggestedActionsPrefs.enabled(context) }.collectAsState()
     val text = message.text.orEmpty()
-    val found = remember(message.id, text) { SuggestedActionsFinder.find(message.id, text) }
+    val found = remember(message.id, message.type, text) {
+        if (message.type == ChatMessageType.TEXT) {
+            SuggestedActionsFinder.find(message.id, text)
+        } else {
+            SuggestedActionsFinder.forMedia(message)
+        }
+    }
     var done by remember(message.id) { mutableStateOf(emptySet<SuggestedActionKind>()) }
 
     // Fuori dalla composizione: può spegnere un tipo scaduto.
