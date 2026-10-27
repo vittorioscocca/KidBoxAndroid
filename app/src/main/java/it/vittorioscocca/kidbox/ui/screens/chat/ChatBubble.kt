@@ -119,6 +119,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import it.vittorioscocca.kidbox.R
 
 @Composable
@@ -127,6 +129,8 @@ internal fun ChatBubble(
     repliedTo: UiChatMessage?,
     currentUid: String,
     onLongPress: (UiChatMessage) -> Unit,
+    /** Se c'è, la pressione lunga riceve anche la cornice della bolla nella finestra. */
+    onLongPressAt: ((UiChatMessage, androidx.compose.ui.geometry.Rect) -> Unit)? = null,
     onReplyTap: (UiChatMessage) -> Unit,
     onReactionTap: (UiChatMessage, String) -> Unit,
     onReplyContextTap: (String) -> Unit,
@@ -151,6 +155,11 @@ internal fun ChatBubble(
     )
     val highlightColor = if (isOwn) Color.White.copy(alpha = 0.12f) else Color(0x12FF6B00)
     val dragOffsetX = remember(message.id) { Animatable(0f) }
+    // Non è stato osservabile: aggiornarlo a ogni scorrimento non deve ricomporre la bolla.
+    val bubbleBounds = remember(message.id) { arrayOf(androidx.compose.ui.geometry.Rect.Zero) }
+    val longPress: () -> Unit = {
+        onLongPressAt?.invoke(message, bubbleBounds[0]) ?: onLongPress(message)
+    }
     val uiScope = rememberCoroutineScope()
     val swipeThresholdPx = 86f
     // NB: `dragOffsetX.value` non va letto qui. È snapshot state: leggerlo nel corpo di
@@ -218,6 +227,7 @@ internal fun ChatBubble(
                     message.type == ChatMessageType.LOCATION)
 
             val gestureModifier = Modifier
+                .onGloballyPositioned { bubbleBounds[0] = it.boundsInWindow() }
                 .offset { IntOffset(dragOffsetX.value.roundToInt(), 0) }
                 // Media-only bubbles use a narrower fixed width (65 % of screen, max
                 // 260 dp) so photos/videos/maps don't dominate the thread visually.
@@ -278,7 +288,7 @@ internal fun ChatBubble(
                 }
                 .combinedClickable(
                     onClick = {},
-                    onLongClick = { onLongPress(message) },
+                    onLongClick = { longPress() },
                 )
 
             if (isMediaOnly) {
@@ -287,12 +297,12 @@ internal fun ChatBubble(
                         .background(if (isHighlighted) highlightColor else Color.Transparent),
                 ) {
                     when (message.type) {
-                        ChatMessageType.PHOTO -> MediaContent(message, isVideo = false, onMediaTap = onMediaTap, onLongPress = { onLongPress(message) })
-                        ChatMessageType.VIDEO -> MediaContent(message, isVideo = true, onMediaTap = onMediaTap, onLongPress = { onLongPress(message) })
+                        ChatMessageType.PHOTO -> MediaContent(message, isVideo = false, onMediaTap = onMediaTap, onLongPress = { longPress() })
+                        ChatMessageType.VIDEO -> MediaContent(message, isVideo = true, onMediaTap = onMediaTap, onLongPress = { longPress() })
                         ChatMessageType.MEDIA_GROUP ->
                             if (message.mediaGroupUrls.isEmpty()) PendingMediaGroupContent(message)
-                            else MediaGroupContent(message, onMediaGroupTap = onMediaGroupTap, onLongPress = { onLongPress(message) })
-                        ChatMessageType.LOCATION -> LocationContent(message, onLongPress = { onLongPress(message) })
+                            else MediaGroupContent(message, onMediaGroupTap = onMediaGroupTap, onLongPress = { longPress() })
+                        ChatMessageType.LOCATION -> LocationContent(message, onLongPress = { longPress() })
                         else -> Unit
                     }
                     // Floating time/checks pill so the timestamp stays legible over the image
@@ -358,12 +368,12 @@ internal fun ChatBubble(
                     } else {
                         when (message.type) {
                             ChatMessageType.TEXT -> TextContent(message, textColor, subtitleColor, isOwn, currentUid)
-                            ChatMessageType.PHOTO -> MediaContent(message, isVideo = false, onMediaTap = onMediaTap, onLongPress = { onLongPress(message) })
-                            ChatMessageType.VIDEO -> MediaContent(message, isVideo = true, onMediaTap = onMediaTap, onLongPress = { onLongPress(message) })
+                            ChatMessageType.PHOTO -> MediaContent(message, isVideo = false, onMediaTap = onMediaTap, onLongPress = { longPress() })
+                            ChatMessageType.VIDEO -> MediaContent(message, isVideo = true, onMediaTap = onMediaTap, onLongPress = { longPress() })
                             ChatMessageType.MEDIA_GROUP ->
                                 if (message.mediaGroupUrls.isEmpty()) PendingMediaGroupContent(message)
-                                else MediaGroupContent(message, onMediaGroupTap = onMediaGroupTap, onLongPress = { onLongPress(message) })
-                            ChatMessageType.LOCATION -> LocationContent(message, onLongPress = { onLongPress(message) })
+                                else MediaGroupContent(message, onMediaGroupTap = onMediaGroupTap, onLongPress = { longPress() })
+                            ChatMessageType.LOCATION -> LocationContent(message, onLongPress = { longPress() })
                             ChatMessageType.CONTACT -> ContactContent(message, textColor, subtitleColor, isOwn)
                             ChatMessageType.DOCUMENT -> DocumentContent(message, textColor, subtitleColor)
                             ChatMessageType.AUDIO -> AudioContent(
@@ -422,7 +432,7 @@ internal fun ChatBubble(
                             .background(MaterialTheme.kidBoxColors.surfaceOverlay)
                             .combinedClickable(
                                 onClick = { onReactionTap(message, emoji) },
-                                onLongClick = { onLongPress(message) },
+                                onLongClick = { longPress() },
                             )
                             .padding(horizontal = 8.dp, vertical = 3.dp),
                         color = MaterialTheme.kidBoxColors.title,

@@ -209,6 +209,7 @@ fun ChatScreen(
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     var actionTarget by remember { mutableStateOf<UiChatMessage?>(null) }
+    var actionBounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
     val runSuggestedAction: (SuggestedChatAction) -> Unit = remember(context, viewModel) {
         { suggested ->
             when (suggested) {
@@ -720,6 +721,10 @@ fun ChatScreen(
                                             repliedTo = replied,
                                             currentUid = state.currentUid,
                                             onLongPress = { actionTarget = it },
+                                            onLongPressAt = { msg, bounds ->
+                                                actionBounds = bounds
+                                                actionTarget = msg
+                                            },
                                             onReplyTap = { viewModel.startReply(it.id) },
                                             onReactionTap = { msg, emoji -> viewModel.toggleReaction(msg, emoji) },
                                             onReplyContextTap = { msgId -> viewModel.highlightMessage(msgId) },
@@ -903,8 +908,19 @@ fun ChatScreen(
                 SuggestedActionsFinder.forMedia(target)
             }.filter { it.kind in enabledSuggestions.orEmpty() }
         }
-        MessageActionDialog(
+        ChatMessageActionsOverlay(
             message = target,
+            bubbleInWindow = actionBounds,
+            isOwn = target.senderId == state.currentUid,
+            currentUid = state.currentUid,
+            onCopy = if (target.type == ChatMessageType.TEXT && !target.text.isNullOrBlank()) {
+                {
+                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                        as android.content.ClipboardManager
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("KidBox", target.text.orEmpty()))
+                    actionTarget = null
+                }
+            } else null,
             canEdit = viewModel.canDeleteForEveryone(target),
             canDeleteForEveryone = viewModel.canDeleteForEveryone(target),
             onDismiss = { actionTarget = null },
@@ -1631,162 +1647,6 @@ private fun ComposerAttachmentSheet(
                 onClick = onPickContact,
             )
             Spacer(Modifier.height(16.dp))
-        }
-    }
-}
-
-@Composable
-private fun MessageActionDialog(
-    message: UiChatMessage,
-    canEdit: Boolean,
-    canDeleteForEveryone: Boolean,
-    onDismiss: () -> Unit,
-    onPickReaction: (String) -> Unit,
-    onReply: () -> Unit,
-    onEdit: () -> Unit,
-    suggestions: List<SuggestedChatAction>,
-    onSuggestedAction: (SuggestedChatAction) -> Unit,
-    onSave: (() -> Unit)?,
-    onDeleteForMe: () -> Unit,
-    onDeleteForEveryone: () -> Unit,
-) {
-    val emojis = listOf("👍", "❤️", "😂", "😮", "😢", "🙏")
-    var showingSuggestions by remember(message.id) { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val dividerColor = MaterialTheme.kidBoxColors.subtitle.copy(alpha = 0.15f)
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.kidBoxColors.card,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(top = 4.dp, bottom = 24.dp),
-        ) {
-            // ── Emoji reactions ──────────────────────────────────────────────
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                emojis.forEach { emoji ->
-                    Text(
-                        text = emoji,
-                        fontSize = 32.sp,
-                        modifier = Modifier
-                            .padding(4.dp)
-                            .clickable { onPickReaction(emoji) },
-                    )
-                }
-            }
-
-            HorizontalDivider(color = dividerColor)
-            Spacer(Modifier.height(6.dp))
-
-            // ── Azioni principali ────────────────────────────────────────────
-            // Rispondi — per tutti i tipi non eliminati
-            if (!message.isDeletedForEveryone) {
-                ActionSheetRow(
-                    icon = Icons.Default.Reply,
-                    text = stringResource(R.string.chat_reply),
-                    textColor = MaterialTheme.kidBoxColors.title,
-                    onClick = onReply,
-                )
-            }
-
-            // Modifica — solo testo, solo l'autore, entro 5 min
-            if (canEdit && message.type == ChatMessageType.TEXT) {
-                ActionSheetRow(
-                    icon = Icons.Default.ModeEdit,
-                    text = "Modifica",
-                    textColor = MaterialTheme.colorScheme.primary,
-                    onClick = onEdit,
-                )
-            }
-
-            // Azioni suggerite — si aprono qui dentro: un tocco esegue l'azione
-            if (suggestions.isNotEmpty()) {
-                val context = LocalContext.current
-                ActionSheetRow(
-                    icon = Icons.Default.AutoAwesome,
-                    text = stringResource(R.string.settings_suggested_actions_title),
-                    textColor = MaterialTheme.kidBoxColors.title,
-                    onClick = {
-                        // Compaiono ora: per i 30 giorni contano come mostrate.
-                        suggestions.map { it.kind }.toSet().forEach { SuggestedActionsPrefs.noteShown(context, it) }
-                        showingSuggestions = !showingSuggestions
-                    },
-                )
-                if (showingSuggestions) {
-                    suggestions.forEach { suggested ->
-                        ActionSheetRow(
-                            icon = suggested.kind.icon,
-                            text = stringResource(suggested.kind.labelRes),
-                            textColor = MaterialTheme.kidBoxColors.title,
-                            iconTint = suggested.kind.tint,
-                            modifier = Modifier.padding(start = 28.dp),
-                            onClick = {
-                                SuggestedActionsPrefs.markUsed(context, suggested.kind)
-                                onSuggestedAction(suggested)
-                            },
-                        )
-                    }
-                }
-            }
-
-            // Salva — foto, video, audio, documento con media disponibile
-            if (onSave != null) {
-                val saveLabel = when (message.type) {
-                    ChatMessageType.PHOTO -> stringResource(R.string.chat_save_photo)
-                    ChatMessageType.VIDEO -> stringResource(R.string.chat_save_video)
-                    ChatMessageType.AUDIO -> stringResource(R.string.chat_save_audio)
-                    ChatMessageType.DOCUMENT -> stringResource(R.string.chat_save_document)
-                    else -> stringResource(R.string.chat_save)
-                }
-                ActionSheetRow(
-                    icon = Icons.Default.SaveAlt,
-                    text = saveLabel,
-                    textColor = MaterialTheme.kidBoxColors.title,
-                    onClick = onSave,
-                )
-            }
-
-            Spacer(Modifier.height(6.dp))
-            HorizontalDivider(color = dividerColor)
-            Spacer(Modifier.height(6.dp))
-
-            // ── Elimina ──────────────────────────────────────────────────────
-            ActionSheetRow(
-                icon = Icons.Default.DeleteOutline,
-                text = stringResource(R.string.chat_delete_for_me),
-                textColor = MaterialTheme.colorScheme.error,
-                onClick = onDeleteForMe,
-            )
-            if (canDeleteForEveryone) {
-                ActionSheetRow(
-                    icon = Icons.Default.DeleteOutline,
-                    text = stringResource(R.string.chat_delete_for_all),
-                    textColor = MaterialTheme.colorScheme.error,
-                    onClick = onDeleteForEveryone,
-                )
-            }
-
-            Spacer(Modifier.height(6.dp))
-            HorizontalDivider(color = dividerColor)
-
-            // ── Chiudi ───────────────────────────────────────────────────────
-            Text(
-                text = stringResource(R.string.chat_close),
-                color = MaterialTheme.kidBoxColors.subtitle,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onDismiss)
-                    .padding(vertical = 10.dp),
-            )
         }
     }
 }

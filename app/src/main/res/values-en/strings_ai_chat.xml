@@ -236,4 +236,6 @@
     <string name="settings_suggested_actions_note">Long-press a message and choose «Suggested actions»: only the active actions appear, and one tap runs them. Recognition happens on your device.</string>
     <string name="chat_suggested_photos">Save to Photos &amp; Videos</string>
     <string name="chat_suggested_documents">Save to Documents</string>
+    <string name="chat_menu_copy">Copy</string>
+    <string name="chat_menu_edit">Edit</string>
 </resources>

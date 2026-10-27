@@ -249,4 +249,6 @@
     <string name="settings_suggested_actions_note">Tieni premuto un messaggio e scegli «Azioni suggerite»: compaiono solo le azioni attive e un tocco le esegue. Il riconoscimento avviene sul dispositivo.</string>
     <string name="chat_suggested_photos">Salva in Foto e video</string>
     <string name="chat_suggested_documents">Salva in Documenti</string>
+    <string name="chat_menu_copy">Copia</string>
+    <string name="chat_menu_edit">Modifica</string>
 </resources>

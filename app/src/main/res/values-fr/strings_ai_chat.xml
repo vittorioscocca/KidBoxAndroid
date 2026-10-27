@@ -236,4 +236,6 @@
     <string name="settings_suggested_actions_note">Appuyez longuement sur un message et choisissez « Actions suggérées » : seules les actions actives apparaissent et un appui les exécute. La reconnaissance se fait sur votre appareil.</string>
     <string name="chat_suggested_photos">Enregistrer dans Photos et vidéos</string>
     <string name="chat_suggested_documents">Enregistrer dans Documents</string>
+    <string name="chat_menu_copy">Copier</string>
+    <string name="chat_menu_edit">Modifier</string>
 </resources>

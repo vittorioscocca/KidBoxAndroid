@@ -236,4 +236,6 @@
     <string name="settings_suggested_actions_note">Mantén pulsado un mensaje y elige «Acciones sugeridas»: solo aparecen las acciones activas y un toque las ejecuta. El reconocimiento se hace en tu dispositivo.</string>
     <string name="chat_suggested_photos">Guardar en Fotos y vídeos</string>
     <string name="chat_suggested_documents">Guardar en Documentos</string>
+    <string name="chat_menu_copy">Copiar</string>
+    <string name="chat_menu_edit">Editar</string>
 </resources>
