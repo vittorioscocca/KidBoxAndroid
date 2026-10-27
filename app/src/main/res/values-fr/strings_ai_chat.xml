@@ -223,4 +223,6 @@
     <string name="chat_save_in_title">Enregistrer dans…</string>
     <string name="chat_save_in_on_device">Calculé sur le téléphone</string>
     <string name="chat_save_in_saved">Enregistré dans %1$s</string>
+    <string name="chat_show_in_maps">Afficher dans Plans</string>
+    <string name="chat_show_in_maps_failed">Aucune application de cartes disponible</string>
 </resources>

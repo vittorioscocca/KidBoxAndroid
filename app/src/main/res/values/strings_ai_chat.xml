@@ -236,4 +236,6 @@
     <string name="chat_save_in_title">Salva in…</string>
     <string name="chat_save_in_on_device">Calcolato sul telefono</string>
     <string name="chat_save_in_saved">Salvato in %1$s</string>
+    <string name="chat_show_in_maps">Mostra in Mappe</string>
+    <string name="chat_show_in_maps_failed">Nessuna app di mappe disponibile</string>
 </resources>

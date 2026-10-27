@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.domain.save.AddressDetector
 import it.vittorioscocca.kidbox.domain.save.SaveAction
 import it.vittorioscocca.kidbox.domain.save.SaveClassifier
 import it.vittorioscocca.kidbox.domain.save.SaveModelAnswer
@@ -57,6 +59,7 @@ internal fun ChatSaveToKidBoxSheet(
     text: String,
     onDismiss: () -> Unit,
     onSelect: (SaveAction) -> Unit,
+    onShowMap: (String) -> Unit,
 ) {
     val kb = MaterialTheme.kidBoxColors
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -115,6 +118,42 @@ internal fun ChatSaveToKidBoxSheet(
                     Icon(Icons.Default.AutoAwesome, null, tint = kb.subtitle, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))
                     Text(stringResource(R.string.chat_save_in_on_device), color = kb.subtitle, fontSize = 11.sp)
+                }
+            }
+            val address = remember(text) { AddressDetector.firstAddress(text) }
+            if (address != null) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = kb.subtitle.copy(alpha = 0.08f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            scope.launch { sheetState.hide() }.invokeOnCompletion { onShowMap(address) }
+                        },
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Default.Map, null, tint = kb.title, modifier = Modifier.size(22.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.chat_show_in_maps),
+                                color = kb.title,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            Text(
+                                text = address,
+                                color = kb.subtitle,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Icon(Icons.Default.ChevronRight, null, tint = kb.subtitle, modifier = Modifier.size(18.dp))
+                    }
                 }
             }
             result.actions.forEach { action ->

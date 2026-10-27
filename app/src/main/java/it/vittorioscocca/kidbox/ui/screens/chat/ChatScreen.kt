@@ -908,6 +908,18 @@ fun ChatScreen(
         ChatSaveToKidBoxSheet(
             text = target.text.orEmpty(),
             onDismiss = { saveToKidBoxTarget = null },
+            onShowMap = { address ->
+                saveToKidBoxTarget = null
+                val geo = android.net.Uri.parse("geo:0,0?q=" + android.net.Uri.encode(address))
+                runCatching {
+                    context.startActivity(
+                        android.content.Intent(android.content.Intent.ACTION_VIEW, geo)
+                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }.onFailure {
+                    Toast.makeText(context, context.getString(R.string.chat_show_in_maps_failed), Toast.LENGTH_SHORT).show()
+                }
+            },
             onSelect = { action ->
                 saveToKidBoxTarget = null
                 val destination = when (action) {

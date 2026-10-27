@@ -223,4 +223,6 @@
     <string name="chat_save_in_title">Save to…</string>
     <string name="chat_save_in_on_device">Worked out on your phone</string>
     <string name="chat_save_in_saved">Saved to %1$s</string>
+    <string name="chat_show_in_maps">Show in Maps</string>
+    <string name="chat_show_in_maps_failed">No maps app available</string>
 </resources>
