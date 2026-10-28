@@ -98,6 +98,7 @@ import it.vittorioscocca.kidbox.ui.util.rememberSingleImagePicker
 import it.vittorioscocca.kidbox.ui.util.singleImageRequest
 
 private val AccentOrange = Color(0xFFF2611A)
+private val DELETE_CONFIRM_WORDS = setOf("ELIMINA", "DELETE", "SUPPRIMER", "ELIMINAR")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -227,7 +228,9 @@ fun ProfileScreen(
                     TextButton(onClick = { showDeleteSheet = false }) { Text(stringResource(R.string.home_profile_cancel)) }
                     Button(
                         onClick = { viewModel.deleteAccount(onLoggedOut) },
-                        enabled = deleteConfirmText.trim().uppercase() == "ELIMINA" && !state.isDeleting,
+                        // Il testo chiede la parola della lingua dell'app (DELETE,
+                        // SUPPRIMER, ELIMINAR): accettarle tutte, come su iOS.
+                        enabled = deleteConfirmText.trim().uppercase() in DELETE_CONFIRM_WORDS && !state.isDeleting,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
                     ) {
                         if (state.isDeleting) {
