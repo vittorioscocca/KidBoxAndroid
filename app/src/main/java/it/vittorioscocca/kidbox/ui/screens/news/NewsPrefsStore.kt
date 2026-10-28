@@ -50,7 +50,7 @@ class NewsPrefsStore @Inject constructor(
 
     suspend fun update(change: (NewsPrefs) -> NewsPrefs) {
         var next = change(_prefs.value)
-        if (next.categories.isEmpty()) next = next.copy(categories = NewsCategory.entries)
+        if (next.categories.isEmpty()) next = next.copy(categories = NewsCategory.defaults)
         next = next.copy(updatedAtMs = System.currentTimeMillis())
         if (next == _prefs.value) return
         _prefs.value = next
@@ -78,7 +78,7 @@ class NewsPrefsStore @Inject constructor(
     private fun decode(d: Map<*, *>): NewsPrefs {
         val cats = (d["categories"] as? List<*>)?.mapNotNull { NewsCategory.fromId(it as? String) }.orEmpty()
         return NewsPrefs(
-            categories = if (cats.isEmpty()) NewsCategory.entries else NewsCategory.entries.filter { it in cats },
+            categories = if (cats.isEmpty()) NewsCategory.defaults else NewsCategory.entries.filter { it in cats },
             personalOffers = d["personalOffers"] as? Boolean ?: true,
             updatedAtMs = (d["updatedAtMs"] as? Number)?.toLong() ?: 0L,
         )

@@ -15,6 +15,8 @@
     <string name="news_cat_leisure_sub">Événements près de chez vous et initiatives pour les familles</string>
     <string name="news_cat_society">Société</string>
     <string name="news_cat_society_sub">Lois et changements qui touchent les familles</string>
+    <string name="news_cat_utilities">Eau et électricité</string>
+    <string name="news_cat_utilities_sub">Coupures, restrictions et urgences d\'eau et d\'électricité près de chez vous</string>
     <string name="news_error_plan">Les Actualités sont incluses dans les forfaits Pro et Max.</string>
     <string name="news_error_unexpected">Réponse inattendue du serveur. Réessayez dans un instant.</string>
     <string name="news_error_offline">Pas de connexion. Vérifiez le Wi‑Fi ou les données mobiles.</string>

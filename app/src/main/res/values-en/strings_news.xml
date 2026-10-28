@@ -15,6 +15,8 @@
     <string name="news_cat_leisure_sub">Events near you and initiatives for families</string>
     <string name="news_cat_society">Society</string>
     <string name="news_cat_society_sub">Laws and changes that affect families</string>
+    <string name="news_cat_utilities">Water and power</string>
+    <string name="news_cat_utilities_sub">Outages, rationing and emergencies for water and electricity in your area</string>
     <string name="news_error_plan">News is included in the Pro and Max plans.</string>
     <string name="news_error_unexpected">Unexpected response from the server. Try again shortly.</string>
     <string name="news_error_offline">No connection. Check Wi‑Fi or mobile data.</string>

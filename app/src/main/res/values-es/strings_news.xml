@@ -15,6 +15,8 @@
     <string name="news_cat_leisure_sub">Eventos cerca de ti e iniciativas para familias</string>
     <string name="news_cat_society">Sociedad</string>
     <string name="news_cat_society_sub">Leyes y cambios que afectan a las familias</string>
+    <string name="news_cat_utilities">Agua y luz</string>
+    <string name="news_cat_utilities_sub">Cortes, restricciones y emergencias de agua y electricidad en tu zona</string>
     <string name="news_error_plan">Las Noticias están incluidas en los planes Pro y Max.</string>
     <string name="news_error_unexpected">Respuesta inesperada del servidor. Vuelve a intentarlo en un momento.</string>
     <string name="news_error_offline">Sin conexión. Comprueba el wifi o los datos móviles.</string>

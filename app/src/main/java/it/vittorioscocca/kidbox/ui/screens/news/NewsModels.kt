@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.FamilyRestroom
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import it.vittorioscocca.kidbox.R
@@ -46,10 +47,14 @@ enum class NewsCategory(
     GROWTH("growth", R.string.news_cat_growth, R.string.news_cat_growth_sub, Icons.Filled.FamilyRestroom, Color(0xFF8C66D9)),
     LEISURE("leisure", R.string.news_cat_leisure, R.string.news_cat_leisure_sub, Icons.Filled.ConfirmationNumber, Color(0xFF1A99B3)),
     SOCIETY("society", R.string.news_cat_society, R.string.news_cat_society_sub, Icons.Filled.Groups, Color(0xFF73738C)),
+    UTILITIES("utilities", R.string.news_cat_utilities, R.string.news_cat_utilities_sub, Icons.Filled.WaterDrop, Color(0xFF2680CC)),
     ;
 
     companion object {
         fun fromId(id: String?): NewsCategory? = entries.firstOrNull { it.id == id }
+
+        /** Gli argomenti accesi di default: «Acqua e luce» si accende dalle impostazioni. */
+        val defaults: List<NewsCategory> get() = entries.filter { it != UTILITIES }
     }
 }
 
@@ -122,7 +127,7 @@ data class NewsFamilySettings(
  * notizie degli altri e non costano niente.
  */
 data class NewsPrefs(
-    val categories: List<NewsCategory> = NewsCategory.entries,
+    val categories: List<NewsCategory> = NewsCategory.defaults,
     /** Mostrare le offerte su misura della famiglia (si cercano solo su richiesta). */
     val personalOffers: Boolean = true,
     val updatedAtMs: Long = 0L,
