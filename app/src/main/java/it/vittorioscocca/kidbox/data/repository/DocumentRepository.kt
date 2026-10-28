@@ -1230,7 +1230,10 @@ class DocumentRepository @Inject constructor(
     suspend fun preparePreviewFile(document: KBDocumentEntity): File {
         KBLog.data.debug("preparePreviewFile docId=${document.id} hasLocal=${!document.localPath.isNullOrBlank()} storagePath=${document.storagePath}", TAG_DOC_REPO)
         val previewDir = File(context.cacheDir, "kb_documents_preview").apply { mkdirs() }
-        val output = File(previewDir, "${document.id}_${safeFileName(document.fileName)}")
+        // Il lettore e la condivisione mostrano il nome del file: una cartella
+        // per documento, e dentro il titolo con l'estensione originale (come iOS),
+        // invece di «{id}_nome».
+        val output = File(File(previewDir, document.id).apply { mkdirs() }, previewFileName(document))
         val local = document.localPath?.let { File(it) }
         if (local != null && local.exists()) {
             KBLog.data.debug("preparePreviewFile using local file docId=${document.id} localPath=${local.absolutePath}", TAG_DOC_REPO)
@@ -1947,6 +1950,14 @@ class DocumentRepository @Inject constructor(
 
     private fun safeFileName(name: String): String =
         name.replace(Regex("[^a-zA-Z0-9._-]"), "_").ifBlank { "file.bin" }
+
+    private fun previewFileName(document: KBDocumentEntity): String {
+        val ext = document.fileName.substringAfterLast('.', "")
+        val base = document.title.ifBlank { titleFromFileName(document.fileName) }
+            .replace('/', '-').replace(':', '-').replace('\\', '-').trim()
+            .ifBlank { document.id }
+        return if (ext.isEmpty() || base.endsWith(".$ext", ignoreCase = true)) base else "$base.$ext"
+    }
 
     private fun titleFromFileName(name: String): String {
         val idx = name.lastIndexOf('.')

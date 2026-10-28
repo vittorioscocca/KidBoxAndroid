@@ -47,6 +47,7 @@ data class AiSettingsUiState(
     val aiMonthlyLimit: Int = 0,
     /** True solo per Free con il bonus di 5 messaggi una tantum esaurito. */
     val aiAccessBlocked: Boolean = false,
+    val isDocumentIntelligenceEnabled: Boolean = false,
     val isWeeklySummaryEnabled: Boolean = true,
     val isDailyBriefingEnabled: Boolean = true,
     val isHealthPatternEnabled: Boolean = true,
@@ -87,6 +88,7 @@ class AiSettingsViewModel @Inject constructor(
             isEnabled = aiSettings.isEnabled.value,
             consentGiven = aiSettings.consentGiven.value,
             consentDate = aiSettings.consentDate.value,
+            isDocumentIntelligenceEnabled = aiSettings.documentIntelligenceEnabled.value,
             isWeeklySummaryEnabled = weeklySummaryPrefs.isEnabled.value,
             isDailyBriefingEnabled = dailyBriefingPrefs.isEnabled.value,
             isHealthPatternEnabled = healthPatternPrefs.isEnabled.value,
@@ -213,6 +215,11 @@ class AiSettingsViewModel @Inject constructor(
             )
         }
         viewModelScope.launch { runCatching { aiRemotePrefs.setAiEnabled(false) } }
+    }
+
+    fun toggleDocumentIntelligence(enabled: Boolean) {
+        aiSettings.setDocumentIntelligenceEnabled(enabled)
+        _uiState.update { it.copy(isDocumentIntelligenceEnabled = enabled) }
     }
 
     fun toggleWeeklySummary(enabled: Boolean) {

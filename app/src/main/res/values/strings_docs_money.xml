@@ -379,4 +379,32 @@
     <string name="wallet_loyalty_save_error">Errore salvataggio</string>
     <string name="wallet_loyalty_update_error">Aggiornamento non riuscito</string>
     <string name="wallet_loyalty_delete_error">Errore eliminazione</string>
+
+    <!-- Documenti: date relative, conferme di eliminazione, analisi AI dopo il caricamento -->
+    <plurals name="documents_modified_minutes">
+        <item quantity="one">Modificata %d min fa</item>
+        <item quantity="other">Modificata %d min fa</item>
+    </plurals>
+    <plurals name="documents_modified_hours">
+        <item quantity="one">Modificata %d ora fa</item>
+        <item quantity="other">Modificata %d ore fa</item>
+    </plurals>
+    <plurals name="documents_modified_days">
+        <item quantity="one">Modificata %d giorno fa</item>
+        <item quantity="other">Modificata %d giorni fa</item>
+    </plurals>
+    <plurals name="documents_modified_weeks">
+        <item quantity="one">Modificata %d settimana fa</item>
+        <item quantity="other">Modificata %d settimane fa</item>
+    </plurals>
+    <string name="documents_delete_confirm_title">Eliminare «%1$s»?</string>
+    <string name="documents_delete_document_confirm_message">Il documento verrà eliminato per tutta la famiglia, su tutti i dispositivi.</string>
+    <string name="documents_delete_folder_confirm_message">La cartella e tutto quello che contiene verranno eliminati per tutta la famiglia, su tutti i dispositivi.</string>
+    <plurals name="documents_delete_selected_confirm_title">
+        <item quantity="one">Eliminare %d elemento?</item>
+        <item quantity="other">Eliminare %d elementi?</item>
+    </plurals>
+    <string name="documents_delete_selected_confirm_message">Cartelle e documenti selezionati verranno eliminati per tutta la famiglia, su tutti i dispositivi.</string>
+    <string name="documents_analyzing_title">Analisi del documento…</string>
+    <string name="documents_analyzing_subtitle">L\'AI sta leggendo le pagine</string>
 </resources>

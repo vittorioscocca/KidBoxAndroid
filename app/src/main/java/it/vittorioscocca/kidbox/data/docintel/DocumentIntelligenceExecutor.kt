@@ -42,7 +42,9 @@ import kotlinx.coroutines.withContext
 
 /**
  * Esegue le azioni confermate nella scheda. Gemello di
- * `DocumentIntelligenceExecutor.swift`: prima le schede che prendono il file
+ * `DocumentIntelligenceExecutor.swift`. Due ingressi: l'import in Documenti
+ * (`existingDocumentId`, il file è già un documento e resta lì) e il «+»
+ * dell'assistente (solo il file). Prima le schede che prendono il file
  * (Casa, visita, esame, cura, vaccino), poi il file allegato alla prima di
  * queste — o in Documenti se nessuna lo prende —, poi il resto, che può
  * puntare al documento (spesa, rinomina).
@@ -71,6 +73,7 @@ class DocumentIntelligenceExecutor @Inject constructor(
         sourceFile: File,
         persons: List<DocIntelPerson>,
         vehicles: List<DocIntelVehicle>,
+        existingDocumentId: String? = null,
     ): String? = withContext(Dispatchers.IO) {
         if (actions.isEmpty() && !sourceFile.exists()) return@withContext null
         val personIds = persons.map { it.id }.toSet()
@@ -105,9 +108,10 @@ class DocumentIntelligenceExecutor @Inject constructor(
             line?.let { lines += it }
         }
 
-        // Il file: alla scheda principale, o in Documenti.
-        var documentId: String? = null
-        if (sourceFile.exists()) {
+        // Il file: alla scheda principale, o in Documenti. Dall'import in
+        // Documenti il file è già un documento e resta lì (come iOS).
+        var documentId: String? = existingDocumentId
+        if (existingDocumentId == null && sourceFile.exists()) {
             val attached = attach(familyId, sourceFile, target)
             if (attached != null) {
                 documentId = attached

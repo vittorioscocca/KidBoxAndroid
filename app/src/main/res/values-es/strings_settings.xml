@@ -429,4 +429,6 @@
     <string name="weather_cond_rain">Lluvia</string>
     <string name="weather_cond_snow">Nieve</string>
     <string name="weather_cond_storm">Tormenta</string>
+    <string name="settings_ai_document_intelligence">Clasifica automáticamente los documentos</string>
+    <string name="settings_ai_document_intelligence_sub">Cuando subes un documento a Documentos, la IA lo lee y propone acciones (gastos, eventos, vencimientos, salud). Consume mensajes de IA: 1 por página analizada.</string>
 </resources>

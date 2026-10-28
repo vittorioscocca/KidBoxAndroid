@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
@@ -246,6 +247,13 @@ fun AiSettingsScreen(
                     selected = state.healthContextSendPreference,
                     onSelected = viewModel::setHealthContextSendPreference,
                 )
+
+                if (state.consentGiven) {
+                    DocumentIntelligenceCard(
+                        isEnabled = state.isDocumentIntelligenceEnabled,
+                        onToggle = viewModel::toggleDocumentIntelligence,
+                    )
+                }
             }
 
             AIPrivacyCard()
@@ -620,6 +628,29 @@ private fun PrivacyLine(text: String) {
     Row(modifier = Modifier.padding(vertical = 3.dp)) {
         Text("·  ", fontSize = 13.sp, color = kb.subtitle)
         Text(text, fontSize = 13.sp, color = kb.subtitle, lineHeight = 18.sp)
+    }
+}
+
+/** «Smista automaticamente i documenti», come in AISettingsView iOS. */
+@Composable
+private fun DocumentIntelligenceCard(isEnabled: Boolean, onToggle: (Boolean) -> Unit) {
+    val kb = MaterialTheme.kidBoxColors
+    SettingCard {
+        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.Description, contentDescription = null, tint = Color(0xFFF2611A), modifier = Modifier.size(20.dp))
+                Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text(stringResource(R.string.settings_ai_document_intelligence), fontSize = 15.sp, color = kb.title, fontWeight = FontWeight.Medium)
+                    Text(stringResource(R.string.settings_ai_document_intelligence_sub), fontSize = 12.sp, color = kb.subtitle)
+                }
+                Switch(checked = isEnabled, onCheckedChange = onToggle)
+            }
+        }
     }
 }
 

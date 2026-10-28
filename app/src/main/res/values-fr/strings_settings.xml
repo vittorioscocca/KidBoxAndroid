@@ -429,4 +429,6 @@
     <string name="weather_cond_rain">Pluie</string>
     <string name="weather_cond_snow">Neige</string>
     <string name="weather_cond_storm">Orage</string>
+    <string name="settings_ai_document_intelligence">Trier automatiquement les documents</string>
+    <string name="settings_ai_document_intelligence_sub">Quand vous ajoutez un document dans Documents, l\'IA le lit et propose des actions (dépenses, événements, échéances, santé). Consomme des messages IA : 1 par page analysée.</string>
 </resources>

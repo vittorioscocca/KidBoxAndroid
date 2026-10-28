@@ -379,4 +379,32 @@
     <string name="wallet_loyalty_save_error">Erreur d\'enregistrement</string>
     <string name="wallet_loyalty_update_error">Échec de la mise à jour</string>
     <string name="wallet_loyalty_delete_error">Erreur de suppression</string>
+
+    <!-- Documenti: date relative, conferme di eliminazione, analisi AI dopo il caricamento -->
+    <plurals name="documents_modified_minutes">
+        <item quantity="one">Modifié il y a %d min</item>
+        <item quantity="other">Modifié il y a %d min</item>
+    </plurals>
+    <plurals name="documents_modified_hours">
+        <item quantity="one">Modifié il y a %d heure</item>
+        <item quantity="other">Modifié il y a %d heures</item>
+    </plurals>
+    <plurals name="documents_modified_days">
+        <item quantity="one">Modifié il y a %d jour</item>
+        <item quantity="other">Modifié il y a %d jours</item>
+    </plurals>
+    <plurals name="documents_modified_weeks">
+        <item quantity="one">Modifié il y a %d semaine</item>
+        <item quantity="other">Modifié il y a %d semaines</item>
+    </plurals>
+    <string name="documents_delete_confirm_title">Supprimer « %1$s » ?</string>
+    <string name="documents_delete_document_confirm_message">Le document sera supprimé pour toute la famille, sur tous les appareils.</string>
+    <string name="documents_delete_folder_confirm_message">Le dossier et tout son contenu seront supprimés pour toute la famille, sur tous les appareils.</string>
+    <plurals name="documents_delete_selected_confirm_title">
+        <item quantity="one">Supprimer %d élément ?</item>
+        <item quantity="other">Supprimer %d éléments ?</item>
+    </plurals>
+    <string name="documents_delete_selected_confirm_message">Les dossiers et documents sélectionnés seront supprimés pour toute la famille, sur tous les appareils.</string>
+    <string name="documents_analyzing_title">Analyse du document…</string>
+    <string name="documents_analyzing_subtitle">L\'IA lit les pages</string>
 </resources>

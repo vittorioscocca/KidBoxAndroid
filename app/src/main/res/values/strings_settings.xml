@@ -429,4 +429,6 @@
     <string name="weather_cond_rain">Pioggia</string>
     <string name="weather_cond_snow">Neve</string>
     <string name="weather_cond_storm">Temporale</string>
+    <string name="settings_ai_document_intelligence">Smista automaticamente i documenti</string>
+    <string name="settings_ai_document_intelligence_sub">Quando carichi un documento in Documenti, l\'AI lo legge e propone azioni (spese, eventi, scadenze, salute). Consuma messaggi AI: 1 per pagina analizzata.</string>
 </resources>

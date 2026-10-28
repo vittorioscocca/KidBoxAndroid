@@ -82,6 +82,7 @@ import androidx.compose.material.icons.filled.DriveFileMove
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.AlertDialog
+import it.vittorioscocca.kidbox.ui.screens.ai.planning.DocumentIntelligenceSheet
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -102,11 +103,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -203,6 +206,8 @@ fun DocumentBrowserScreen(
     var renameText by remember { mutableStateOf("") }
     var renameTarget by remember { mutableStateOf<ContextMenuTarget?>(null) }
     var contextMenuTarget by remember { mutableStateOf<ContextMenuTarget?>(null) }
+    var pendingDelete by remember { mutableStateOf<ContextMenuTarget?>(null) }
+    var confirmDeleteSelected by remember { mutableStateOf(false) }
     var singleMoveTarget by remember { mutableStateOf<ContextMenuTarget?>(null) }
     var singleCopyTarget by remember { mutableStateOf<ContextMenuTarget?>(null) }
     var uploadTargetFolderId by remember { mutableStateOf<String?>(null) }
@@ -251,6 +256,7 @@ fun DocumentBrowserScreen(
             mimeType = "image/jpeg",
             bytes = bytes,
             targetFolderId = uploadTargetFolderId,
+            analyzeAfter = true,
         )
     }
     val requestDocumentCamera = rememberCameraPermissionRequester(
@@ -271,6 +277,7 @@ fun DocumentBrowserScreen(
                     mimeType = mime,
                     bytes = bytes,
                     targetFolderId = uploadTargetFolderId,
+                    analyzeAfter = true,
                 )
             }
         }
@@ -295,6 +302,7 @@ fun DocumentBrowserScreen(
                 mimeType = mime,
                 bytes = bytes,
                 targetFolderId = uploadTargetFolderId,
+                analyzeAfter = true,
             )
         }
     }
@@ -639,7 +647,7 @@ fun DocumentBrowserScreen(
                         Toast.makeText(context, msgSelectAtLeastOneFile, Toast.LENGTH_SHORT).show()
                     }
                 },
-                onDelete = { viewModel.deleteSelected() },
+                onDelete = { if (selectedCount > 0) confirmDeleteSelected = true },
                 shareEnabled = state.selectedDocumentIds.isNotEmpty(),
                 mergeEnabled = canMergeNow,
                 unlockEnabled = canUnlockNow,
@@ -1193,12 +1201,90 @@ fun DocumentBrowserScreen(
                 contextMenuTarget = null
             },
             onDelete = {
-                when (val target = contextMenuTarget) {
-                    is ContextMenuTarget.Document -> viewModel.deleteDocument(target.value)
-                    is ContextMenuTarget.Folder -> viewModel.deleteFolder(target.value)
-                    null -> Unit
-                }
+                pendingDelete = contextMenuTarget
                 contextMenuTarget = null
+            },
+        )
+    }
+
+    // L'eliminazione vale per tutta la famiglia e su tutti i dispositivi:
+    // prima si chiede conferma, come per la selezione multipla.
+    pendingDelete?.let { target ->
+        val name = when (target) {
+            is ContextMenuTarget.Document -> target.value.title.ifBlank { target.value.fileName }
+            is ContextMenuTarget.Folder -> target.value.title
+        }
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text(stringResource(R.string.documents_delete_confirm_title, name)) },
+            text = {
+                Text(
+                    stringResource(
+                        if (target is ContextMenuTarget.Folder) R.string.documents_delete_folder_confirm_message
+                        else R.string.documents_delete_document_confirm_message,
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    when (target) {
+                        is ContextMenuTarget.Document -> viewModel.deleteDocument(target.value)
+                        is ContextMenuTarget.Folder -> viewModel.deleteFolder(target.value)
+                    }
+                    pendingDelete = null
+                }) { Text(stringResource(R.string.documents_menu_delete), color = Color(0xFFD32F2F)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.documents_cancel)) }
+            },
+        )
+    }
+
+    // Lettura AI dopo il caricamento: attesa, scheda delle azioni, esito.
+    if (state.isAnalyzingDocument) {
+        Dialog(onDismissRequest = {}) {
+            Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.kidBoxColors.card) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    CircularProgressIndicator()
+                    Text(stringResource(R.string.documents_analyzing_title), color = MaterialTheme.kidBoxColors.title, fontSize = 15.sp)
+                    Text(stringResource(R.string.documents_analyzing_subtitle), color = MaterialTheme.kidBoxColors.subtitle, fontSize = 12.sp)
+                }
+            }
+        }
+    }
+    state.docIntelPayload?.let { payload ->
+        DocumentIntelligenceSheet(
+            payload = payload,
+            isSaving = state.isSavingDocIntel,
+            onConfirm = viewModel::confirmDocIntel,
+            onDismiss = viewModel::dismissDocIntel,
+        )
+    }
+    LaunchedEffect(state.docIntelSummary) {
+        state.docIntelSummary?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            viewModel.clearDocIntelSummary()
+        }
+    }
+
+    if (confirmDeleteSelected) {
+        val count = state.selectedDocumentIds.size + state.selectedFolderIds.size
+        AlertDialog(
+            onDismissRequest = { confirmDeleteSelected = false },
+            title = { Text(pluralStringResource(R.plurals.documents_delete_selected_confirm_title, count, count)) },
+            text = { Text(stringResource(R.string.documents_delete_selected_confirm_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteSelected()
+                    confirmDeleteSelected = false
+                }) { Text(stringResource(R.string.documents_menu_delete), color = Color(0xFFD32F2F)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDeleteSelected = false }) { Text(stringResource(R.string.documents_cancel)) }
             },
         )
     }
@@ -2222,7 +2308,7 @@ private suspend fun openDocument(
         KBLog.ui.error("openDocument failed docId=${document.id}", TAG_DOC_OPEN, e)
         Toast.makeText(
             context,
-            "Impossibile aprire il documento: ${e.localizedMessage ?: "errore sconosciuto"}",
+            context.getString(R.string.documents_cannot_open_document, e.localizedMessage ?: ""),
             Toast.LENGTH_LONG,
         ).show()
     } catch (t: Throwable) {
@@ -2349,15 +2435,16 @@ private fun sortDocuments(
     return if (ascending) sorted else sorted.reversed()
 }
 
+@Composable
 private fun formatRelativeTime(epochMillis: Long): String {
     val delta = (System.currentTimeMillis() - epochMillis).coerceAtLeast(0L)
-    val minutes = TimeUnit.MILLISECONDS.toMinutes(delta)
+    val minutes = TimeUnit.MILLISECONDS.toMinutes(delta).toInt()
     return when {
-        minutes < 1 -> "Modificata ora"
-        minutes < 60 -> "Modificata ${minutes} min fa"
-        minutes < 60 * 24 -> "Modificata ${minutes / 60} ore fa"
-        minutes < 60 * 24 * 7 -> "Modificata ${minutes / (60 * 24)} giorni fa"
-        else -> "Modificata ${minutes / (60 * 24 * 7)} settimane fa"
+        minutes < 1 -> stringResource(R.string.documents_modified_now)
+        minutes < 60 -> pluralStringResource(R.plurals.documents_modified_minutes, minutes, minutes)
+        minutes < 60 * 24 -> (minutes / 60).let { pluralStringResource(R.plurals.documents_modified_hours, it, it) }
+        minutes < 60 * 24 * 7 -> (minutes / (60 * 24)).let { pluralStringResource(R.plurals.documents_modified_days, it, it) }
+        else -> (minutes / (60 * 24 * 7)).let { pluralStringResource(R.plurals.documents_modified_weeks, it, it) }
     }
 }
 

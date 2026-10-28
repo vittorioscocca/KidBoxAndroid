@@ -6,6 +6,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.vittorioscocca.kidbox.ai.AiSettings
+import it.vittorioscocca.kidbox.data.docintel.DocIntelAction
+import it.vittorioscocca.kidbox.data.docintel.DocIntelPayload
+import it.vittorioscocca.kidbox.data.docintel.DocumentIntelligenceExecutor
+import it.vittorioscocca.kidbox.data.docintel.DocumentIntelligenceService
 import it.vittorioscocca.kidbox.data.local.ActiveFamilyResolver
 import it.vittorioscocca.kidbox.data.local.DocumentsSavedSort
 import it.vittorioscocca.kidbox.data.local.DocumentsSavedViewMode
@@ -68,6 +73,12 @@ data class DocumentsUiState(
     val isStabilizingHierarchy: Boolean = false,
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
+    /** Lettura AI dopo il caricamento (opt-in, come iOS). */
+    val isAnalyzingDocument: Boolean = false,
+    val docIntelPayload: DocIntelPayload? = null,
+    val docIntelDocumentId: String? = null,
+    val isSavingDocIntel: Boolean = false,
+    val docIntelSummary: String? = null,
 )
 
 @HiltViewModel
@@ -80,6 +91,10 @@ class DocumentsViewModel @Inject constructor(
     private val familySessionPreferences: FamilySessionPreferences,
     private val familyMemberDao: KBFamilyMemberDao,
     private val auth: FirebaseAuth,
+    private val aiSettings: AiSettings,
+    private val docIntelService: DocumentIntelligenceService,
+    private val docIntelExecutor: DocumentIntelligenceExecutor,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DocumentsUiState())
     val uiState: StateFlow<DocumentsUiState> = _uiState.asStateFlow()
@@ -532,10 +547,12 @@ class DocumentsViewModel @Inject constructor(
         mimeType: String,
         bytes: ByteArray,
         targetFolderId: String? = null,
+        analyzeAfter: Boolean = false,
     ) {
         val familyId = _uiState.value.familyId
         if (familyId.isBlank()) return
         val parentId = targetFolderId ?: _uiState.value.breadcrumbs.lastOrNull()?.id
+        val documentId = java.util.UUID.randomUUID().toString()
         viewModelScope.launch {
             runCatching {
                 val uid = auth.currentUser?.uid.orEmpty()
@@ -553,6 +570,7 @@ class DocumentsViewModel @Inject constructor(
                     fileName = fileName,
                     mimeType = mimeType,
                     bytes = bytes,
+                    forcedId = documentId,
                     visibilityScope = scope,
                     visibilityMemberIdsJson = membersJson,
                     createdBy = uid.ifBlank { null },
@@ -560,8 +578,85 @@ class DocumentsViewModel @Inject constructor(
                 repository.flushPending(familyId)
             }.onFailure {
                 _uiState.value = _uiState.value.copy(errorMessage = it.localizedMessage ?: "Errore caricamento documento")
+            }.onSuccess {
+                if (analyzeAfter) maybeRunDocumentIntelligence(familyId, documentId, fileName, mimeType, bytes)
             }
         }
+    }
+
+    // ── Lettura AI dopo il caricamento ─────────────────────────────────
+    //
+    // Gemello di `maybeRunDocumentIntelligence` iOS: solo con l'AI accesa e
+    // «Smista automaticamente i documenti» attivo, solo per un file alla
+    // volta. Il documento resta dov'è; le azioni confermate (spesa, evento,
+    // scadenza, visita…) puntano a lui. Se l'AI non propone niente o non
+    // risponde, non si mostra nulla: il caricamento è già riuscito.
+
+    private suspend fun maybeRunDocumentIntelligence(
+        familyId: String,
+        documentId: String,
+        fileName: String,
+        mimeType: String,
+        bytes: ByteArray,
+    ) {
+        if (!aiSettings.isEnabled.value || !aiSettings.documentIntelligenceEnabled.value) return
+        val file = withContext(Dispatchers.IO) {
+            val dir = File(appContext.cacheDir, "docintel-${java.util.UUID.randomUUID()}").apply { mkdirs() }
+            val safe = fileName.replace('/', '-').replace(':', '-').ifBlank { "documento" }
+            File(dir, safe).apply { writeBytes(bytes) }
+        }
+        _uiState.value = _uiState.value.copy(isAnalyzingDocument = true)
+        val (persons, vehicles) = docIntelService.familyRefs(familyId)
+        val result = docIntelService.analyze(file, mimeType, familyId, persons, vehicles)
+            .onFailure { KBLog.ai.warning("DocIntel documenti: ${it.message}", TAG_DOC_VM) }
+            .getOrNull()
+        if (result == null || result.actions.isEmpty()) {
+            file.parentFile?.deleteRecursively()
+            _uiState.value = _uiState.value.copy(isAnalyzingDocument = false)
+            return
+        }
+        _uiState.value = _uiState.value.copy(
+            isAnalyzingDocument = false,
+            docIntelPayload = DocIntelPayload(result, file, persons, vehicles),
+            docIntelDocumentId = documentId,
+        )
+    }
+
+    fun confirmDocIntel(actions: List<DocIntelAction>) {
+        val state = _uiState.value
+        val payload = state.docIntelPayload ?: return
+        if (state.isSavingDocIntel) return
+        _uiState.value = state.copy(isSavingDocIntel = true)
+        viewModelScope.launch {
+            val summary = runCatching {
+                docIntelExecutor.execute(
+                    familyId = state.familyId,
+                    actions = actions,
+                    sourceFile = payload.sourceFile,
+                    persons = payload.persons,
+                    vehicles = payload.vehicles,
+                    existingDocumentId = state.docIntelDocumentId,
+                )
+            }.onFailure { KBLog.ai.warning("DocIntel documenti execute: ${it.message}", TAG_DOC_VM) }.getOrNull()
+            payload.sourceFile.parentFile?.deleteRecursively()
+            _uiState.value = _uiState.value.copy(
+                isSavingDocIntel = false,
+                docIntelPayload = null,
+                docIntelDocumentId = null,
+                docIntelSummary = summary,
+            )
+        }
+    }
+
+    fun dismissDocIntel() {
+        val payload = _uiState.value.docIntelPayload ?: return
+        if (_uiState.value.isSavingDocIntel) return
+        payload.sourceFile.parentFile?.deleteRecursively()
+        _uiState.value = _uiState.value.copy(docIntelPayload = null, docIntelDocumentId = null)
+    }
+
+    fun clearDocIntelSummary() {
+        _uiState.value = _uiState.value.copy(docIntelSummary = null)
     }
 
     fun deleteDocument(document: KBDocumentEntity) {

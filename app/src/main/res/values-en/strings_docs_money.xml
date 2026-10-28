@@ -379,4 +379,32 @@
     <string name="wallet_loyalty_save_error">Save error</string>
     <string name="wallet_loyalty_update_error">Update failed</string>
     <string name="wallet_loyalty_delete_error">Delete error</string>
+
+    <!-- Documenti: date relative, conferme di eliminazione, analisi AI dopo il caricamento -->
+    <plurals name="documents_modified_minutes">
+        <item quantity="one">Modified %d min ago</item>
+        <item quantity="other">Modified %d min ago</item>
+    </plurals>
+    <plurals name="documents_modified_hours">
+        <item quantity="one">Modified %d hour ago</item>
+        <item quantity="other">Modified %d hours ago</item>
+    </plurals>
+    <plurals name="documents_modified_days">
+        <item quantity="one">Modified %d day ago</item>
+        <item quantity="other">Modified %d days ago</item>
+    </plurals>
+    <plurals name="documents_modified_weeks">
+        <item quantity="one">Modified %d week ago</item>
+        <item quantity="other">Modified %d weeks ago</item>
+    </plurals>
+    <string name="documents_delete_confirm_title">Delete “%1$s”?</string>
+    <string name="documents_delete_document_confirm_message">The document will be deleted for the whole family, on every device.</string>
+    <string name="documents_delete_folder_confirm_message">The folder and everything in it will be deleted for the whole family, on every device.</string>
+    <plurals name="documents_delete_selected_confirm_title">
+        <item quantity="one">Delete %d item?</item>
+        <item quantity="other">Delete %d items?</item>
+    </plurals>
+    <string name="documents_delete_selected_confirm_message">The selected folders and documents will be deleted for the whole family, on every device.</string>
+    <string name="documents_analyzing_title">Analyzing document…</string>
+    <string name="documents_analyzing_subtitle">The AI is reading the pages</string>
 </resources>

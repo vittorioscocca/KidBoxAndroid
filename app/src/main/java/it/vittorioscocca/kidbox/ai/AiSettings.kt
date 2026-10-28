@@ -29,6 +29,20 @@ class AiSettings @Inject constructor(
     )
     val consentDate: StateFlow<Long?> = _consentDate.asStateFlow()
 
+    /**
+     * Opt-in esplicito (come iOS): i documenti caricati in Documenti vengono
+     * letti dall'AI, che propone azioni. Spento di default; consuma messaggi AI.
+     */
+    private val _documentIntelligenceEnabled = MutableStateFlow(
+        prefs.getBoolean(KEY_DOCUMENT_INTELLIGENCE, false),
+    )
+    val documentIntelligenceEnabled: StateFlow<Boolean> = _documentIntelligenceEnabled.asStateFlow()
+
+    fun setDocumentIntelligenceEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_DOCUMENT_INTELLIGENCE, enabled).apply()
+        _documentIntelligenceEnabled.value = enabled
+    }
+
     fun setEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_IS_ENABLED, enabled).apply()
         _isEnabled.value = enabled
@@ -67,7 +81,9 @@ class AiSettings @Inject constructor(
             .putBoolean(KEY_IS_ENABLED, false)
             .putBoolean(KEY_CONSENT_GIVEN, false)
             .remove(KEY_CONSENT_DATE)
+            .putBoolean(KEY_DOCUMENT_INTELLIGENCE, false)
             .apply()
+        _documentIntelligenceEnabled.value = false
         _isEnabled.value = false
         _consentGiven.value = false
         _consentDate.value = null
@@ -78,5 +94,6 @@ class AiSettings @Inject constructor(
         private const val KEY_IS_ENABLED = "kb_ai_is_enabled"
         private const val KEY_CONSENT_GIVEN = "kb_ai_consent_given"
         private const val KEY_CONSENT_DATE = "kb_ai_consent_date"
+        private const val KEY_DOCUMENT_INTELLIGENCE = "kb_ai_document_intelligence_enabled"
     }
 }
