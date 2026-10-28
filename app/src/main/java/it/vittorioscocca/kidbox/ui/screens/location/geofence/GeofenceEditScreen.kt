@@ -273,7 +273,7 @@ fun GeofenceEditScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun GeofenceMemberPickerSheet(
+internal fun GeofenceMemberPickerSheet(
     title: String,
     footer: String,
     useAll: Boolean,

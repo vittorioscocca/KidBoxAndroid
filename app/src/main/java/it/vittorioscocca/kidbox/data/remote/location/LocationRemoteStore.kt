@@ -165,11 +165,18 @@ class LocationRemoteStore @Inject constructor(
                     return@addSnapshotListener
                 }
                 val docs = snap?.documents.orEmpty()
+                val myUid = auth.currentUser?.uid.orEmpty()
                 statusByUid.clear()
                 docs.forEach { doc ->
                     val data = doc.data.orEmpty()
+                    // Condivisa solo con alcuni: chi non è nell'elenco la tratta
+                    // come spenta (la propria si vede sempre).
+                    val sharedWith = (data["sharedWith"] as? List<*>)
+                        ?.filterIsInstance<String>().orEmpty()
+                    val hiddenFromMe = sharedWith.isNotEmpty() &&
+                        doc.id != myUid && myUid !in sharedWith
                     statusByUid[doc.id] = Status(
-                        isSharing = data["isSharing"] as? Boolean ?: false,
+                        isSharing = (data["isSharing"] as? Boolean ?: false) && !hiddenFromMe,
                         name = data["name"] as? String ?: "",
                         modeRaw = data["mode"] as? String ?: "realtime",
                         startedAtEpochMillis = data.timestampOrNull("startedAt"),
@@ -227,6 +234,7 @@ class LocationRemoteStore @Inject constructor(
         displayName: String,
         modeRaw: String,
         expiresAtEpochMillis: Long?,
+        sharedWith: List<String> = emptyList(),
     ) {
         val data = mutableMapOf<String, Any?>(
             "isSharing" to true,
@@ -240,6 +248,9 @@ class LocationRemoteStore @Inject constructor(
         } else {
             data["expiresAt"] = FieldValue.delete()
         }
+        // Destinatari: vuoto = tutta la famiglia (anche i documenti delle
+        // versioni vecchie, che il campo non ce l'hanno).
+        data["sharedWith"] = if (sharedWith.isEmpty()) FieldValue.delete() else sharedWith
         // Allega l'avatar dell'utente al documento locations/{uid} così che gli altri
         // dispositivi (Android e iOS) possano mostrarlo nel cerchio. iOS scrive avatarURL
         // qui in fase di upload foto (AvatarRemoteStore.uploadAvatar); su Android l'URL

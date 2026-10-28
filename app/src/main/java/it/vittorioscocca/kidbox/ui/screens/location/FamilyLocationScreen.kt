@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.location
 
+import it.vittorioscocca.kidbox.ui.screens.location.geofence.GeofenceMemberPickerSheet
 import androidx.compose.ui.res.stringResource
 import android.Manifest
 import android.os.Build
@@ -159,6 +160,10 @@ fun FamilyLocationScreen(
     var showShareOptions by remember { mutableStateOf(false) }
     var showTemporaryDialog by remember { mutableStateOf(false) }
     var temporaryHours by remember { mutableIntStateOf(2) }
+    // Destinatari della condivisione: tutta la famiglia, o solo alcuni membri.
+    var shareAllMembers by remember { mutableStateOf(true) }
+    var shareSelectedIds by remember { mutableStateOf(emptySet<String>()) }
+    var showRecipientPicker by remember { mutableStateOf(false) }
     var followingUserId by remember { mutableStateOf<String?>(null) }
     // Vista satellitare. Non si persiste: la mappa riparte sempre da quella
     // standard, come fa Google Maps.
@@ -540,16 +545,48 @@ fun FamilyLocationScreen(
         }
 
         if (showShareOptions) {
+            val recipientsLabel = if (shareAllMembers || shareSelectedIds.isEmpty()) {
+                stringResource(R.string.location_all_family)
+            } else {
+                state.members
+                    .filter { it.userId in shareSelectedIds }
+                    .joinToString(", ") { m ->
+                        m.displayName?.takeIf { it.isNotBlank() } ?: m.email ?: m.userId
+                    }
+            }
             ShareModeOverlay(
+                recipientsLabel = recipientsLabel,
+                onPickRecipients = { showRecipientPicker = true },
                 onDismiss = { showShareOptions = false },
                 onRealtime = {
                     showShareOptions = false
-                    viewModel.startRealtime()
+                    viewModel.startRealtime(if (shareAllMembers) emptyList() else shareSelectedIds.sorted())
                 },
                 onTemporary = {
                     showShareOptions = false
                     showTemporaryDialog = true
                 },
+            )
+        }
+
+        if (showRecipientPicker) {
+            val myUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+            GeofenceMemberPickerSheet(
+                title = stringResource(R.string.location_share_with_title),
+                footer = stringResource(R.string.location_share_with_footer),
+                useAll = shareAllMembers,
+                onUseAllChange = { all ->
+                    shareAllMembers = all
+                    if (all) shareSelectedIds = emptySet()
+                },
+                selectedIds = shareSelectedIds,
+                onToggle = { id ->
+                    shareAllMembers = false
+                    shareSelectedIds = if (id in shareSelectedIds) shareSelectedIds - id else shareSelectedIds + id
+                    if (shareSelectedIds.isEmpty()) shareAllMembers = true
+                },
+                members = state.members.filter { it.userId != myUid },
+                onDismiss = { showRecipientPicker = false },
             )
         }
 
@@ -560,7 +597,10 @@ fun FamilyLocationScreen(
                 onDismiss = { showTemporaryDialog = false },
                 onConfirm = {
                     showTemporaryDialog = false
-                    viewModel.startTemporary(temporaryHours)
+                    viewModel.startTemporary(
+                        temporaryHours,
+                        if (shareAllMembers) emptyList() else shareSelectedIds.sorted(),
+                    )
                 },
             )
         }
@@ -1176,6 +1216,8 @@ private fun BackgroundLocationDisclosureOverlay(
 
 @Composable
 private fun ShareModeOverlay(
+    recipientsLabel: String,
+    onPickRecipients: () -> Unit,
     onDismiss: () -> Unit,
     onRealtime: () -> Unit,
     onTemporary: () -> Unit,
@@ -1213,6 +1255,11 @@ private fun ShareModeOverlay(
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Medium,
                     color = if (isDarkTheme) Color(0xFFEAF0F7) else Color.Black,
+                )
+                ShareActionButton(
+                    label = stringResource(R.string.location_share_with_row, recipientsLabel),
+                    onClick = onPickRecipients,
+                    isDarkTheme = isDarkTheme,
                 )
                 ShareActionButton(label = stringResource(R.string.location_realtime_option), onClick = onRealtime, isDarkTheme = isDarkTheme)
                 ShareActionButton(label = stringResource(R.string.location_temporary_option), onClick = onTemporary, isDarkTheme = isDarkTheme)

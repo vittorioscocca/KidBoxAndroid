@@ -20,6 +20,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.ActiveFamilyResolver
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.dao.KBFamilyDao
+import it.vittorioscocca.kidbox.data.local.dao.KBFamilyMemberDao
+import it.vittorioscocca.kidbox.data.local.entity.KBFamilyMemberEntity
 import it.vittorioscocca.kidbox.data.local.dao.KBUserProfileDao
 import it.vittorioscocca.kidbox.data.local.entity.KBSharedLocationEntity
 import it.vittorioscocca.kidbox.data.notification.CounterField
@@ -58,11 +60,14 @@ data class FamilyLocationUiState(
     val deviceLatitude: Double? = null,
     val deviceLongitude: Double? = null,
     val errorMessage: String? = null,
+    /** Membri della famiglia, per scegliere con chi condividere. */
+    val members: List<KBFamilyMemberEntity> = emptyList(),
 )
 
 @HiltViewModel
 class FamilyLocationViewModel @Inject constructor(
     private val familyDao: KBFamilyDao,
+    private val familyMemberDao: KBFamilyMemberDao,
     private val familySessionPreferences: FamilySessionPreferences,
     private val repository: FamilyLocationRepository,
     private val geofenceRepository: GeofenceRepository,
@@ -75,6 +80,8 @@ class FamilyLocationViewModel @Inject constructor(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(FamilyLocationUiState())
     val uiState: StateFlow<FamilyLocationUiState> = _uiState.asStateFlow()
+
+    private var membersJob: kotlinx.coroutines.Job? = null
 
     private val fusedClient by lazy { LocationServices.getFusedLocationProviderClient(context) }
     private var locationCallback: LocationCallback? = null
@@ -127,6 +134,12 @@ class FamilyLocationViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(familyId = familyId, isLoading = true, errorMessage = null)
         applySharingState()
         viewModelScope.launch { refreshDisplayName() }
+        membersJob?.cancel()
+        membersJob = viewModelScope.launch {
+            familyMemberDao.observeActiveByFamilyId(familyId).collectLatest { list ->
+                _uiState.value = _uiState.value.copy(members = list)
+            }
+        }
         repository.startRealtime(
             familyId = familyId,
             onError = { err ->
@@ -166,15 +179,17 @@ class FamilyLocationViewModel @Inject constructor(
         }
     }
 
-    fun startRealtime() = startSharing(
+    fun startRealtime(sharedWith: List<String> = emptyList()) = startSharing(
         mode = LocationShareMode.REALTIME,
         expiresAtEpochMillis = null,
+        sharedWith = sharedWith,
         errorFallback = "Errore avvio condivisione",
     )
 
-    fun startTemporary(hours: Int) = startSharing(
+    fun startTemporary(hours: Int, sharedWith: List<String> = emptyList()) = startSharing(
         mode = LocationShareMode.TEMPORARY,
         expiresAtEpochMillis = System.currentTimeMillis() + hours * 3_600_000L,
+        sharedWith = sharedWith,
         errorFallback = "Errore condivisione temporanea",
     )
 
@@ -188,6 +203,7 @@ class FamilyLocationViewModel @Inject constructor(
     private fun startSharing(
         mode: LocationShareMode,
         expiresAtEpochMillis: Long?,
+        sharedWith: List<String>,
         errorFallback: String,
     ) {
         val familyId = _uiState.value.familyId
@@ -208,6 +224,7 @@ class FamilyLocationViewModel @Inject constructor(
                         displayName = currentDisplayName,
                         mode = mode,
                         expiresAtEpochMillis = expiresAtEpochMillis,
+                        sharedWith = sharedWith,
                     )
                 }.onSuccess {
                     val uid = auth.currentUser?.uid.orEmpty()

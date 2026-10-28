@@ -81,6 +81,7 @@ class FamilyLocationRepository @Inject constructor(
         displayName: String,
         mode: LocationShareMode,
         expiresAtEpochMillis: Long? = null,
+        sharedWith: List<String> = emptyList(),
     ) {
         val uid = auth.currentUser?.uid ?: return
         remoteStore.startSharing(
@@ -89,6 +90,7 @@ class FamilyLocationRepository @Inject constructor(
             displayName = displayName,
             modeRaw = mode.raw,
             expiresAtEpochMillis = expiresAtEpochMillis,
+            sharedWith = sharedWith,
         )
     }
 
