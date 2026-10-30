@@ -39,8 +39,8 @@ class AiRepository @Inject constructor(
         // Presidio client sui purpose riservati ai piani a pagamento: è il collo
         // di bottiglia attraversato da ogni percorso (generazione, rigenerazione,
         // spostamento seduta, copilota). Il gate vero resta lato server
-        // (`quota.period === "lifetime"`), questo evita di bruciare una chiamata.
-        if (purpose in PAID_ONLY_PURPOSES && CurrentPlanStore.plan.value == KBPlan.FREE) {
+        // (il bonus Free una tantum), questo evita di bruciare una chiamata.
+        if (purpose in PAID_ONLY_PURPOSES && CurrentPlanStore.aiAccessBlocked.value) {
             error("Questa funzione AI è inclusa nei piani Pro e Max. Passa a Pro per usarla.")
         }
         val payload = hashMapOf(

@@ -57,13 +57,14 @@ class PharmacyViewModel @Inject constructor(
             val familyId = ActiveFamilyResolver.resolveFamilyId(familyDao.getAll(), familySessionPreferences.getActiveFamilyId())
             _state.update { it.copy(familyId = familyId) }
             familyStore.bind(familyId)
-            combine(CurrentPlanStore.plan, familyStore.state) { plan, fam -> plan to fam }
-                .collect { (plan, fam) ->
+            // Aperte ai Free finché dura il bonus una tantum, chiuse a bonus esaurito.
+            combine(CurrentPlanStore.aiAccessBlocked, familyStore.state) { blocked, fam -> !blocked to fam }
+                .collect { (open, fam) ->
                     val loaded = fam.loaded && fam.familyId == familyId && familyId.isNotBlank()
                     _state.update {
-                        it.copy(isPaid = plan != KBPlan.FREE, familyLoaded = loaded, settings = if (loaded) fam.settings else NewsFamilySettings())
+                        it.copy(isPaid = open, familyLoaded = loaded, settings = if (loaded) fam.settings else NewsFamilySettings())
                     }
-                    if (plan != KBPlan.FREE && loaded) load(force = false)
+                    if (open && loaded) load(force = false)
                 }
         }
     }

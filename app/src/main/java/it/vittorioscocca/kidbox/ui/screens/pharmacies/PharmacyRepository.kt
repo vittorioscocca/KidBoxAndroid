@@ -67,9 +67,9 @@ class PharmacyRepository @Inject constructor(
     private fun payload(familyId: String, place: NewsPlace): Map<String, Any?> =
         hashMapOf("familyId" to familyId, "place" to place.toMap())
 
-    /** Il piano, non `aiAccessBlocked`: quello è falso anche per un Free col bonus intatto. */
+    /** Aperto ai Free finché dura il bonus una tantum, chiuso a bonus esaurito. */
     private fun ensurePaidPlan() {
-        if (CurrentPlanStore.plan.value == KBPlan.FREE) {
+        if (CurrentPlanStore.aiAccessBlocked.value) {
             throw PharmacyError(context.getString(R.string.pharmacies_error_plan), planRequired = true)
         }
     }

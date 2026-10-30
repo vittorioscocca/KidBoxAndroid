@@ -86,10 +86,11 @@ class NewsViewModel @Inject constructor(
             prefsStore.refreshFromRemote()
             // Il piano arriva anche dopo l'apertura: si carica quando ci sono
             // tutte le condizioni, e si ricarica se cambiano le scelte.
-            combine(CurrentPlanStore.plan, prefsStore.state, familyStore.state) { plan, _, fam -> plan to fam }
-                .collect { (plan, fam) ->
-                    _state.update { it.copy(isPaid = plan != KBPlan.FREE) }
-                    if (plan != KBPlan.FREE && fam.familyId == familyId && fam.loaded && fam.settings.enabled) load(force = false)
+            // Aperte ai Free finché dura il bonus una tantum, chiuse a bonus esaurito.
+            combine(CurrentPlanStore.aiAccessBlocked, prefsStore.state, familyStore.state) { blocked, _, fam -> !blocked to fam }
+                .collect { (open, fam) ->
+                    _state.update { it.copy(isPaid = open) }
+                    if (open && fam.familyId == familyId && fam.loaded && fam.settings.enabled) load(force = false)
                 }
         }
     }

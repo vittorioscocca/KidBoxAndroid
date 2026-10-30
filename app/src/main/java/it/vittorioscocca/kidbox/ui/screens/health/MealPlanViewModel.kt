@@ -93,7 +93,7 @@ class MealPlanViewModel @Inject constructor(
         this.childId = childId
         _uiState.value = _uiState.value.copy(
             subjectName = subjectName,
-            isPaidPlan = CurrentPlanStore.plan.value != KBPlan.FREE,
+            isPaidPlan = !CurrentPlanStore.aiAccessBlocked.value,
         )
         load()
     }
@@ -206,7 +206,7 @@ class MealPlanViewModel @Inject constructor(
                     document = cached,
                     input = cached?.input ?: _uiState.value.input,
                     estimatedUnits = units,
-                    isPaidPlan = CurrentPlanStore.plan.value != KBPlan.FREE,
+                    isPaidPlan = !CurrentPlanStore.aiAccessBlocked.value,
                     ageYears = inputs.ageYears,
                     weightKg = inputs.health?.weightKg,
                     heightCm = inputs.health?.heightCm,

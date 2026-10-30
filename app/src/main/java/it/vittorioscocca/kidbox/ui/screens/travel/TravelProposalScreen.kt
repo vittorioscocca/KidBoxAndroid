@@ -115,11 +115,9 @@ private fun TravelProposalContent(
     val dailyLimit by viewModel.dailyLimit.collectAsStateWithLifecycle()
     val regeneratingDayIndex by viewModel.regeneratingDayIndex.collectAsStateWithLifecycle()
     val proposalRevision by viewModel.proposalRevision.collectAsStateWithLifecycle()
-    // Il pianificatore viaggi è incluso nei soli piani a pagamento: `aiAccessBlocked`
-    // da solo non basta, perché è true solo per i Free che hanno già esaurito il bonus
-    // una tantum — un Free con bonus intatto riuscirebbe a generare itinerari.
-    val currentPlan by it.vittorioscocca.kidbox.ai.CurrentPlanStore.plan.collectAsStateWithLifecycle()
-    val aiAvailable = currentPlan != it.vittorioscocca.kidbox.domain.model.KBPlan.FREE
+    // Aperto ai Free finché dura il bonus una tantum, chiuso a bonus esaurito.
+    val aiBlocked by it.vittorioscocca.kidbox.ai.CurrentPlanStore.aiAccessBlocked.collectAsStateWithLifecycle()
+    val aiAvailable = !aiBlocked
     val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(error) {

@@ -168,9 +168,8 @@ class AIService @Inject constructor(
     ): Result<TravelPlanResponse> = withContext(Dispatchers.IO) {
         runCatching {
             val resolvedFamilyId = resolveFamilyId(familyId)
-            // Feature dei soli piani a pagamento (il server rifiuta comunque i Free):
-            // `isAIAccessible` da solo lascerebbe passare un Free col bonus intatto.
-            if (CurrentPlanStore.plan.value == KBPlan.FREE) {
+            // Aperto ai Free finché dura il bonus una tantum (il server decide comunque).
+            if (CurrentPlanStore.aiAccessBlocked.value) {
                 error("Il Pianificatore Viaggi è incluso nei piani Pro e Max. Passa a Pro per generare un itinerario.")
             }
             val payload = hashMapOf<String, Any>(

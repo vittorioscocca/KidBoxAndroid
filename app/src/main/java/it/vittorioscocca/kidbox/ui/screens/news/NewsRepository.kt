@@ -83,9 +83,9 @@ class NewsRepository @Inject constructor(
 
     // ── Presidio di piano ───────────────────────────────────────────────────
 
-    /** Il piano, non `aiAccessBlocked`: quello è falso anche per un Free col bonus intatto. */
+    /** Aperto ai Free finché dura il bonus una tantum, chiuso a bonus esaurito. */
     private fun ensurePaidPlan() {
-        if (CurrentPlanStore.plan.value == KBPlan.FREE) {
+        if (CurrentPlanStore.aiAccessBlocked.value) {
             throw NewsError.PlanRequired(context.getString(R.string.news_error_plan))
         }
     }
