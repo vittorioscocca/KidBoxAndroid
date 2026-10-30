@@ -383,7 +383,7 @@ class TravelPlanningViewModel @Inject constructor(
             ) {
                 val remaining = (usageSnapshot.dailyLimit - usageSnapshot.usageToday).coerceAtLeast(0)
                 val message = if (usageSnapshot.period == AIQuotaPeriod.LIFETIME) {
-                    "Questo viaggio di $tripDayCount giorni richiede $messageCost messaggi AI, ma ti restano solo $remaining messaggi gratuiti. Accorcia il viaggio o passa a Pro."
+                    "Questo viaggio di $tripDayCount giorni richiede $messageCost messaggi AI, ma ti restano solo $remaining messaggi gratuiti. Accorcia il viaggio."
                 } else {
                     "Questo viaggio di $tripDayCount giorni richiede $messageCost messaggi AI " +
                         "(${usageSnapshot.usageToday}/${usageSnapshot.dailyLimit} usati oggi). " +
