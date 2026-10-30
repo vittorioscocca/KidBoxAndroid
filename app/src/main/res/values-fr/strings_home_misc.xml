@@ -212,6 +212,7 @@
     <string name="share_default_shopping_item">Nouvel élément</string>
     <string name="share_default_event_title">Nouvel événement</string>
     <string name="share_error_storage_full">Espace épuisé. Change de plan pour continuer.</string>
+    <string name="docintel_remove_attachment">Retirer la pièce jointe</string>
     <string name="share_error_assistant_unreadable">Impossible de lire le fichier partagé.</string>
 
     <string name="share_destination_chat">Chat de famille</string>

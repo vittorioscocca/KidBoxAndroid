@@ -10,6 +10,17 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.draw.clip
+import androidx.compose.runtime.produceState
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -275,6 +286,13 @@ fun PlanningAIChatScreen(
                     }
                 }
                 Spacer(Modifier.height(8.dp))
+                state.stagedFile?.let { file ->
+                    StagedAttachmentPreview(
+                        file = file,
+                        onRemove = viewModel::discardAttachment,
+                        modifier = Modifier.padding(start = 12.dp, bottom = 8.dp),
+                    )
+                }
                 Row(verticalAlignment = Alignment.Bottom) {
                     Box {
                         val busy = state.isLoading || state.isAnalyzingDocument
@@ -326,7 +344,8 @@ fun PlanningAIChatScreen(
                     )
                     IconButton(
                         onClick = { viewModel.send() },
-                        enabled = state.inputText.isNotBlank() && !state.isLoading,
+                        enabled = (state.inputText.isNotBlank() || state.stagedFile != null) &&
+                            !state.isLoading && !state.isAnalyzingDocument,
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.chat_send), tint = Color(0xFF598FDB))
                     }
@@ -571,6 +590,68 @@ fun PlanningAIChatScreen(
 }
 
 /** Etichetta del focus (es. «Salute di Marco») con la crocetta per toglierlo. */
+/** Il documento scelto, pronto nel campo di testo: parte solo con l'invio. */
+@Composable
+private fun StagedAttachmentPreview(file: java.io.File, onRemove: () -> Unit, modifier: Modifier = Modifier) {
+    val isPdf = file.extension.equals("pdf", ignoreCase = true)
+    val pdfThumb by produceState<android.graphics.Bitmap?>(null, file) {
+        if (!isPdf) return@produceState
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
+                    android.graphics.pdf.PdfRenderer(fd).use { renderer ->
+                        renderer.openPage(0).use { page ->
+                            val w = 240
+                            val h = (w * page.height.toFloat() / page.width).toInt().coerceAtLeast(1)
+                            android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888).also { bmp ->
+                                bmp.eraseColor(android.graphics.Color.WHITE)
+                                page.render(bmp, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                            }
+                        }
+                    }
+                }
+            }.getOrNull()
+        }
+    }
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Box {
+            val shape = RoundedCornerShape(12.dp)
+            val thumbModifier = Modifier.size(72.dp).clip(shape).background(MaterialTheme.colorScheme.surfaceVariant)
+            when {
+                isPdf && pdfThumb != null -> Image(
+                    bitmap = pdfThumb!!.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = thumbModifier,
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.TopCenter,
+                )
+                !isPdf -> AsyncImage(
+                    model = file,
+                    contentDescription = null,
+                    modifier = thumbModifier,
+                    contentScale = ContentScale.Crop,
+                )
+                else -> Box(thumbModifier, contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Description, contentDescription = null)
+                }
+            }
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-8).dp).size(28.dp),
+            ) {
+                Icon(
+                    Icons.Default.Cancel,
+                    contentDescription = stringResource(R.string.docintel_remove_attachment),
+                    tint = Color(0xBF000000),
+                    modifier = Modifier.background(Color.White, CircleShape),
+                )
+            }
+        }
+        Spacer(Modifier.width(14.dp))
+        Text(file.name, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, color = MaterialTheme.kidBoxColors.subtitle)
+    }
+}
+
 @Composable
 private fun AgentFocusChip(label: String, onClear: () -> Unit, modifier: Modifier = Modifier) {
     val kb = MaterialTheme.kidBoxColors

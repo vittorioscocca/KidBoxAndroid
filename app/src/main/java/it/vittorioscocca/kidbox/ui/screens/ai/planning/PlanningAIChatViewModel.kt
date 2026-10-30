@@ -96,6 +96,8 @@ data class PlanningChatUiState(
     val isAnalyzingDocument: Boolean = false,
     val isSavingDocument: Boolean = false,
     val docIntelPayload: DocIntelPayload? = null,
+    /** Documento scelto e non ancora letto: resta nel campo di testo finché non si preme invio. */
+    val stagedFile: java.io.File? = null,
 ) {
     val canSend: Boolean get() = inputText.isNotBlank() && !isLoading && !isLoadingContext
     val isNearLimit: Boolean get() = dailyLimit > 0 && usageToday >= (dailyLimit * 0.8).toInt()
@@ -257,6 +259,11 @@ class PlanningAIChatViewModel @Inject constructor(
     }
 
     fun send() {
+        _uiState.value.stagedFile?.let { file ->
+            _uiState.update { it.copy(stagedFile = null) }
+            viewModelScope.launch { analyzeImported(file) }
+            return
+        }
         val text = _uiState.value.inputText.trim()
         if (text.isBlank() || _uiState.value.isLoading || conversation == null) return
         viewModelScope.launch {
@@ -718,13 +725,13 @@ class PlanningAIChatViewModel @Inject constructor(
                 _uiState.update { it.copy(errorMessage = context.getString(R.string.docintel_error_unreadable_file)) }
                 return@launch
             }
-            analyzeImported(file)
+            stageFile(file)
         }
     }
 
     /** PDF o foto condivisi da un'altra app («Assistente AI» dello share sheet): già una copia nella cache. */
     fun importSharedFile(file: java.io.File) {
-        viewModelScope.launch { analyzeImported(file) }
+        viewModelScope.launch { stageFile(file) }
     }
 
     /** PDF dallo scanner di documenti. */
@@ -733,8 +740,23 @@ class PlanningAIChatViewModel @Inject constructor(
             val file = withContext(Dispatchers.IO) {
                 writeImportFile("${context.getString(R.string.docintel_file_scan)} ${stamp()}.pdf", pdfBytes)
             }
-            analyzeImported(file)
+            stageFile(file)
         }
+    }
+
+    /**
+     * Il documento resta nel campo di testo, pronto per l'invio: la lettura
+     * (e il messaggio AI che costa) parte solo quando l'utente preme invio.
+     */
+    private fun stageFile(file: java.io.File) {
+        discardAttachment()
+        _uiState.update { it.copy(stagedFile = file, errorMessage = null) }
+    }
+
+    /** La X sull'anteprima. */
+    fun discardAttachment() {
+        _uiState.value.stagedFile?.parentFile?.deleteRecursively()
+        _uiState.update { it.copy(stagedFile = null) }
     }
 
     /** Conferma della scheda: crea le schede, poi resta traccia nella conversazione. */

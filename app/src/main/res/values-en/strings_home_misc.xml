@@ -212,6 +212,7 @@
     <string name="share_default_shopping_item">New item</string>
     <string name="share_default_event_title">New event</string>
     <string name="share_error_storage_full">Storage full. Upgrade your plan to continue.</string>
+    <string name="docintel_remove_attachment">Remove attachment</string>
     <string name="share_error_assistant_unreadable">Couldn\'t read the shared file.</string>
 
     <string name="share_destination_chat">Family chat</string>

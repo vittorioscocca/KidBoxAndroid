@@ -212,6 +212,7 @@
     <string name="share_default_shopping_item">Nuevo elemento</string>
     <string name="share_default_event_title">Nuevo evento</string>
     <string name="share_error_storage_full">Espacio agotado. Mejora tu plan para continuar.</string>
+    <string name="docintel_remove_attachment">Quitar adjunto</string>
     <string name="share_error_assistant_unreadable">No se pudo leer el archivo compartido.</string>
 
     <string name="share_destination_chat">Chat de familia</string>
