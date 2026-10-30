@@ -156,7 +156,15 @@ class ShareReceiverActivity : AppCompatActivity() {
                                         contentResolver,
                                     )
                                 }.onSuccess {
-                                    snackState.showSnackbar(getString(R.string.share_receiver_shared_success))
+                                    if (selected == ShareDestination.ASSISTANT) {
+                                        // Il file è in coda: la chat dell'assistente lo legge all'apertura.
+                                        startActivity(
+                                            Intent(this@ShareReceiverActivity, MainActivity::class.java)
+                                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                                        )
+                                    } else {
+                                        snackState.showSnackbar(getString(R.string.share_receiver_shared_success))
+                                    }
                                     finish()
                                 }.onFailure { err ->
                                     snackState.showSnackbar(err.message ?: getString(R.string.share_receiver_error_generic))

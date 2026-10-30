@@ -105,6 +105,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
+import it.vittorioscocca.kidbox.data.docintel.PendingAssistantShare
 import it.vittorioscocca.kidbox.data.health.ai.HealthContextSendMode
 import androidx.compose.ui.platform.LocalContext
 
@@ -151,6 +152,12 @@ fun PlanningAIChatScreen(
     }
 
     LaunchedEffect(Unit) { viewModel.loadOrCreateConversation() }
+    // File condiviso verso l'assistente: all'apertura, o con la chat già aperta.
+    val sharedFile by PendingAssistantShare.file.collectAsStateWithLifecycle()
+    LaunchedEffect(sharedFile, state.conversationReady) {
+        if (sharedFile == null || !state.conversationReady || state.focus != null) return@LaunchedEffect
+        PendingAssistantShare.take()?.let(viewModel::importSharedFile)
+    }
     LaunchedEffect(state.conversationReady, recapTick) {
         if (state.conversationReady && recapTick > 0) {
             viewModel.injectPendingRecapFromStores()

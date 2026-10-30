@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.ui.share
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.CheckCircle
@@ -20,6 +21,8 @@ enum class ShareDestination(val labelRes: Int, val icon: ImageVector) {
     SHOPPING(R.string.share_destination_shopping, Icons.Default.ShoppingCart),
     PHOTOS(R.string.share_destination_photos, Icons.Default.Photo),
     EVENT(R.string.share_destination_event, Icons.Default.CalendarMonth),
+    /** PDF o foto letti dall'assistente (Document Intelligence), come il «+» della sua chat. */
+    ASSISTANT(R.string.share_destination_assistant, Icons.Default.AutoAwesome),
 }
 
 object ShareDestinationSuggester {
@@ -27,9 +30,9 @@ object ShareDestinationSuggester {
         return when (content) {
             is ShareContentType.TextContent -> textSuggestions(content.text)
             is ShareContentType.UrlContent -> listOf(ShareDestination.CHAT, ShareDestination.NOTE, ShareDestination.TODO)
-            is ShareContentType.ImageContent -> listOf(ShareDestination.CHAT, ShareDestination.PHOTOS)
+            is ShareContentType.ImageContent -> listOf(ShareDestination.CHAT, ShareDestination.PHOTOS, ShareDestination.ASSISTANT)
             is ShareContentType.VideoContent -> listOf(ShareDestination.CHAT, ShareDestination.PHOTOS)
-            is ShareContentType.PdfContent -> listOf(ShareDestination.CHAT, ShareDestination.DOCUMENTS)
+            is ShareContentType.PdfContent -> listOf(ShareDestination.CHAT, ShareDestination.DOCUMENTS, ShareDestination.ASSISTANT)
             is ShareContentType.FileContent -> listOf(ShareDestination.CHAT, ShareDestination.DOCUMENTS)
             ShareContentType.Unknown -> listOf(ShareDestination.CHAT)
         }

@@ -23,10 +23,16 @@ import it.vittorioscocca.kidbox.data.repository.TodoRepository
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
+import it.vittorioscocca.kidbox.data.docintel.PendingAssistantShare
+import it.vittorioscocca.kidbox.notifications.NotificationDeepLinkRouter
+import it.vittorioscocca.kidbox.ui.navigation.AppDestination
+import java.io.File
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 
 data class ShareActionInput(
     val familyId: String,
@@ -64,6 +70,7 @@ class ShareActionHandler @Inject constructor(
             ShareDestination.PHOTOS -> handlePhotos(input, resolver)
             ShareDestination.SHOPPING -> handleShopping(input)
             ShareDestination.EVENT -> handleEvent(input)
+            ShareDestination.ASSISTANT -> handleAssistant(input, resolver)
         }
     }
 
@@ -143,6 +150,38 @@ class ShareActionHandler @Inject constructor(
                 }
             }
         }
+    }
+
+    /**
+     * Copia il file nella cache e lo mette in coda per l'assistente; apre la
+     * chat `ShareReceiverActivity`, che qui non ha l'Activity per farlo.
+     */
+    private suspend fun handleAssistant(input: ShareActionInput, resolver: ContentResolver) {
+        val uri = input.allUris.ifEmpty { extractSingleUri(input.contentType) }.firstOrNull()
+            ?: error(appContext.getString(R.string.share_error_assistant_unreadable))
+        val mime = resolver.getType(uri).orEmpty().lowercase()
+        val ext = when {
+            mime == "application/pdf" -> "pdf"
+            mime == "image/png" -> "png"
+            mime == "image/webp" -> "webp"
+            mime == "image/heic" || mime == "image/heif" -> "heic"
+            mime.startsWith("image/") -> "jpg"
+            else -> uri.lastPathSegment.orEmpty().substringAfterLast('.', "").lowercase()
+        }
+        val rawName = resolveFileName(resolver, uri).orEmpty().replace('/', '-').replace(':', '-')
+        val name = when {
+            rawName.isBlank() -> "${appContext.getString(R.string.share_default_document_name)}.$ext"
+            ext.isNotEmpty() && !rawName.lowercase().endsWith(".$ext") -> "${rawName.substringBeforeLast('.')}.$ext"
+            else -> rawName
+        }
+        val file = withContext(Dispatchers.IO) {
+            val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
+                ?: error(appContext.getString(R.string.share_error_assistant_unreadable))
+            val dir = File(appContext.cacheDir, "assistant-import-${UUID.randomUUID()}").apply { mkdirs() }
+            File(dir, name).apply { writeBytes(bytes) }
+        }
+        PendingAssistantShare.set(file)
+        NotificationDeepLinkRouter.queueRoute(input.familyId, AppDestination.AiChat.createRoute(input.familyId))
     }
 
     private suspend fun handleNote(input: ShareActionInput) {

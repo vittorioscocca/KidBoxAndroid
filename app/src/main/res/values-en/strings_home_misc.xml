@@ -212,6 +212,7 @@
     <string name="share_default_shopping_item">New item</string>
     <string name="share_default_event_title">New event</string>
     <string name="share_error_storage_full">Storage full. Upgrade your plan to continue.</string>
+    <string name="share_error_assistant_unreadable">Couldn\'t read the shared file.</string>
 
     <string name="share_destination_chat">Family chat</string>
     <string name="share_destination_note">Notes</string>
@@ -220,6 +221,7 @@
     <string name="share_destination_shopping">Shopping list</string>
     <string name="share_destination_photos">Photos and videos</string>
     <string name="share_destination_event">Event</string>
+    <string name="share_destination_assistant">AI assistant</string>
 
     <string name="share_sheet_title">Share to KidBox</string>
     <string name="share_sheet_title_field_label">Title (optional)</string>

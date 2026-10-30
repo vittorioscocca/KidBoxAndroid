@@ -722,6 +722,11 @@ class PlanningAIChatViewModel @Inject constructor(
         }
     }
 
+    /** PDF o foto condivisi da un'altra app («Assistente AI» dello share sheet): già una copia nella cache. */
+    fun importSharedFile(file: java.io.File) {
+        viewModelScope.launch { analyzeImported(file) }
+    }
+
     /** PDF dallo scanner di documenti. */
     fun importScan(pdfBytes: ByteArray) {
         viewModelScope.launch {

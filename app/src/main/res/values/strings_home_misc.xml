@@ -212,6 +212,7 @@
     <string name="share_default_shopping_item">Nuovo elemento</string>
     <string name="share_default_event_title">Nuovo evento</string>
     <string name="share_error_storage_full">Spazio esaurito. Aggiorna il piano per continuare.</string>
+    <string name="share_error_assistant_unreadable">Impossibile leggere il file da condividere.</string>
 
     <string name="share_destination_chat">Chat famiglia</string>
     <string name="share_destination_note">Note</string>
@@ -220,6 +221,7 @@
     <string name="share_destination_shopping">Lista spesa</string>
     <string name="share_destination_photos">Foto e video</string>
     <string name="share_destination_event">Evento</string>
+    <string name="share_destination_assistant">Assistente AI</string>
 
     <string name="share_sheet_title">Condividi in KidBox</string>
     <string name="share_sheet_title_field_label">Titolo (opzionale)</string>

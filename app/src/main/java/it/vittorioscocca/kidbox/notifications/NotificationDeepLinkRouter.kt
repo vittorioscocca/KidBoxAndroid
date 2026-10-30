@@ -495,6 +495,12 @@ object NotificationDeepLinkRouter {
             .orEmpty()
     }
 
+    /** Mette in coda una rotta dell'app (ad esempio dallo share sheet), con cambio famiglia se serve. */
+    fun queueRoute(familyId: String, route: String) {
+        _pendingFamilyId.value = familyId.takeIf { it.isNotBlank() }
+        _pendingRoute.value = route
+    }
+
     private fun queueAiChatRoute(familyId: String, type: String) {
         if (familyId.isBlank()) {
             KBLog.app.warning("NotificationDeepLink: familyId mancante per type=$type", TAG)
