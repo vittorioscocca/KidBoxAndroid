@@ -24,6 +24,9 @@ object KBVisibilityScope {
         return normalized(scope)
     }
 
+    /** Lavoro: solo `private` o `members` (mai la famiglia: le rules lo rifiutano). */
+    fun normalizedWork(scope: String?): String = if (scope?.trim() == MEMBERS) MEMBERS else ONLY_CREATOR
+
     /** Wallet: default creator-only; unknown/blank → [ONLY_CREATOR]. */
     fun normalizedWallet(scope: String?): String {
         val s = scope?.trim().orEmpty()

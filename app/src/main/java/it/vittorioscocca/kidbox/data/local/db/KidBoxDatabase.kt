@@ -55,6 +55,7 @@ import it.vittorioscocca.kidbox.data.local.dao.KBTripLegDao
 import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
 import it.vittorioscocca.kidbox.data.local.dao.LoyaltyCardDao
 import it.vittorioscocca.kidbox.data.local.dao.PaymentCardDao
+import it.vittorioscocca.kidbox.data.local.dao.WorkDao
 import it.vittorioscocca.kidbox.data.local.entity.KBAIConversationEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBAIMessageEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBHealthInsightEntity
@@ -91,6 +92,8 @@ import it.vittorioscocca.kidbox.data.local.entity.KBVaccineEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBWalletTicketEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBLoyaltyCardEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBPaymentCardEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBWorkProfileEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBWorkRecordEntity
 import it.vittorioscocca.kidbox.data.local.entity.HomeItemEntity
 import it.vittorioscocca.kidbox.data.local.entity.HousePaymentEntity
 import it.vittorioscocca.kidbox.data.local.entity.PetEntity
@@ -108,7 +111,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBShoppingTripEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTripLegEntity
 
 @Database(
-    version = 51,
+    version = 52,
     exportSchema = true,
     entities = [
         KBUserProfileEntity::class,
@@ -146,6 +149,8 @@ import it.vittorioscocca.kidbox.data.local.entity.KBTripLegEntity
         KBWalletTicketEntity::class,
         KBLoyaltyCardEntity::class,
         KBPaymentCardEntity::class,
+        KBWorkProfileEntity::class,
+        KBWorkRecordEntity::class,
         PetEntity::class,
         PetEventEntity::class,
         HomeItemEntity::class,
@@ -200,6 +205,7 @@ abstract class KidBoxDatabase : RoomDatabase() {
     abstract fun walletTicketDao(): WalletTicketDao
     abstract fun loyaltyCardDao(): LoyaltyCardDao
     abstract fun paymentCardDao(): PaymentCardDao
+    abstract fun workDao(): WorkDao
     abstract fun petDao(): PetDao
     abstract fun petEventDao(): PetEventDao
     abstract fun homeItemDao(): HomeItemDao

@@ -60,6 +60,7 @@ import it.vittorioscocca.kidbox.data.local.dao.OnboardingSignalsDao
 import it.vittorioscocca.kidbox.data.local.dao.WalletTicketDao
 import it.vittorioscocca.kidbox.data.local.dao.LoyaltyCardDao
 import it.vittorioscocca.kidbox.data.local.dao.PaymentCardDao
+import it.vittorioscocca.kidbox.data.local.dao.WorkDao
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
 import javax.inject.Singleton
 
@@ -279,6 +280,58 @@ object DatabaseModule {
     // Chat: dimensioni di foto/video per dare alla bolla il formato verticale/orizzontale.
     /** Chi ha preso un to-do da fuori dall'app (richieste di famiglia). */
     /** Carte di pagamento del Wallet: tabella nuova, nessun dato da migrare. */
+    private val MIGRATION_51_52 = object : Migration(51, 52) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `kb_work_profiles` (
+                    `familyId` TEXT NOT NULL,
+                    `ownerUid` TEXT NOT NULL,
+                    `employerEnc` TEXT,
+                    `visibilityScope` TEXT NOT NULL,
+                    `visibilityMemberIdsJson` TEXT NOT NULL,
+                    `createdBy` TEXT NOT NULL,
+                    `createdByName` TEXT NOT NULL,
+                    `updatedBy` TEXT NOT NULL,
+                    `updatedByName` TEXT NOT NULL,
+                    `createdAtEpochMillis` INTEGER NOT NULL,
+                    `updatedAtEpochMillis` INTEGER NOT NULL,
+                    `isDeleted` INTEGER NOT NULL,
+                    `syncStateRaw` INTEGER NOT NULL,
+                    PRIMARY KEY(`familyId`, `ownerUid`),
+                    FOREIGN KEY(`familyId`) REFERENCES `kb_families`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_kb_work_profiles_familyId` ON `kb_work_profiles` (`familyId`)")
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `kb_work_records` (
+                    `id` TEXT NOT NULL,
+                    `familyId` TEXT NOT NULL,
+                    `ownerUid` TEXT NOT NULL,
+                    `kind` TEXT NOT NULL,
+                    `referenceDateEpochMillis` INTEGER NOT NULL,
+                    `fieldsEnc` TEXT,
+                    `attachmentDocumentId` TEXT,
+                    `createdBy` TEXT NOT NULL,
+                    `createdByName` TEXT NOT NULL,
+                    `updatedBy` TEXT NOT NULL,
+                    `updatedByName` TEXT NOT NULL,
+                    `createdAtEpochMillis` INTEGER NOT NULL,
+                    `updatedAtEpochMillis` INTEGER NOT NULL,
+                    `isDeleted` INTEGER NOT NULL,
+                    `syncStateRaw` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`),
+                    FOREIGN KEY(`familyId`) REFERENCES `kb_families`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_kb_work_records_familyId` ON `kb_work_records` (`familyId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_kb_work_records_familyId_ownerUid` ON `kb_work_records` (`familyId`, `ownerUid`)")
+        }
+    }
+
     private val MIGRATION_50_51 = object : Migration(50, 51) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(
@@ -1485,6 +1538,7 @@ object DatabaseModule {
         MIGRATION_48_49,
         MIGRATION_49_50,
         MIGRATION_50_51,
+        MIGRATION_51_52,
     )
         .fallbackToDestructiveMigration()
         .build()
@@ -1606,6 +1660,9 @@ object DatabaseModule {
     @Provides
     fun providePaymentCardDao(database: KidBoxDatabase): PaymentCardDao =
         database.paymentCardDao()
+
+    @Provides
+    fun provideWorkDao(database: KidBoxDatabase): WorkDao = database.workDao()
 
     @Provides
     fun provideNudgeSignalsDao(database: KidBoxDatabase): NudgeSignalsDao =
