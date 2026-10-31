@@ -497,6 +497,15 @@ fun AppNavGraph(
                         popUpTo(AppDestination.Onboarding.route) { inclusive = true }
                     }
                 },
+                onFamilyCreatedOpenDocuments = { familyId ->
+                    onboardingPreferences.completeOnboarding()
+                    navController.navigate(AppDestination.Home.route) {
+                        popUpTo(AppDestination.Onboarding.route) { inclusive = true }
+                    }
+                    if (familyId.isNotBlank()) {
+                        navController.navigate(AppDestination.DocumentsHome.createRoute(familyId))
+                    }
+                },
                 onSignedOut = {
                     navController.navigate(AppDestination.Login.route) {
                         popUpTo(navController.graph.id) { inclusive = true }

@@ -9,6 +9,13 @@ import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.remote.family.FamilyFirestoreCreationRepository
 import it.vittorioscocca.kidbox.data.remote.family.isPermissionDenied
 import it.vittorioscocca.kidbox.domain.auth.LogoutUseCase
+import com.google.firebase.auth.FirebaseAuth
+import it.vittorioscocca.kidbox.data.local.dao.KBCalendarEventDao
+import it.vittorioscocca.kidbox.data.local.dao.KBGroceryItemDao
+import it.vittorioscocca.kidbox.data.local.entity.KBCalendarEventEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBGroceryItemEntity
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
+import java.util.UUID
 import it.vittorioscocca.kidbox.util.analytics.OnboardingAnalyticsState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +28,9 @@ class OnboardingViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val familyCreation: FamilyFirestoreCreationRepository,
     private val logoutUseCase: LogoutUseCase,
+    private val calendarEventDao: KBCalendarEventDao,
+    private val groceryItemDao: KBGroceryItemDao,
+    private val auth: FirebaseAuth,
 ) : ViewModel() {
 
     private val _isSigningOut = MutableStateFlow(false)
@@ -95,5 +105,87 @@ class OnboardingViewModel @Inject constructor(
                 _isCreatingFamily.value = false
             }
         }
+    }
+
+    // ── Primo contenuto (ultima pagina del wizard «crea») ──────────────────
+    //
+    // Stessa scrittura dell'assistente (PlanningActionExecutor): riga in Room
+    // da sincronizzare. Il `content_created` su Firestore lo scrive il trigger
+    // del server alla creazione del documento, ed è la misura della
+    // scommessa 13 del registro.
+
+    fun saveFirstEvent(title: String, startMillis: Long, onSaved: () -> Unit) {
+        val familyId = _createdFamilyId.value ?: return
+        val uid = auth.currentUser?.uid ?: return
+        val clean = title.trim()
+        if (clean.isEmpty()) return
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            calendarEventDao.upsert(
+                KBCalendarEventEntity(
+                    id = UUID.randomUUID().toString(),
+                    familyId = familyId,
+                    childId = null,
+                    title = clean,
+                    notes = null,
+                    location = null,
+                    startDateEpochMillis = startMillis,
+                    endDateEpochMillis = startMillis + 3_600_000L,
+                    isAllDay = false,
+                    categoryRaw = "family",
+                    recurrenceRaw = "none",
+                    reminderMinutes = null,
+                    linkedHealthItemId = null,
+                    linkedHealthItemType = null,
+                    visibilityScope = KBVisibilityScope.FAMILY,
+                    visibilityMemberIdsJson = "[]",
+                    isDeleted = false,
+                    createdAtEpochMillis = now,
+                    updatedAtEpochMillis = now,
+                    updatedBy = uid,
+                    createdBy = uid,
+                    syncStateRaw = SYNC_PENDING_UPSERT,
+                    lastSyncError = null,
+                ),
+            )
+            onSaved()
+        }
+    }
+
+    fun saveFirstGroceries(names: List<String>, onSaved: () -> Unit) {
+        val familyId = _createdFamilyId.value ?: return
+        val uid = auth.currentUser?.uid ?: return
+        val unique = names.map { it.trim() }.filter { it.isNotEmpty() }.distinctBy { it.lowercase() }
+        if (unique.isEmpty()) return
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            for (name in unique) {
+                groceryItemDao.upsert(
+                    KBGroceryItemEntity(
+                        id = UUID.randomUUID().toString(),
+                        familyId = familyId,
+                        name = name,
+                        category = null,
+                        notes = null,
+                        quantity = null,
+                        isPurchased = false,
+                        purchasedAtEpochMillis = null,
+                        purchasedBy = null,
+                        isDeleted = false,
+                        createdAtEpochMillis = now,
+                        updatedAtEpochMillis = now,
+                        updatedBy = uid,
+                        createdBy = uid,
+                        syncStateRaw = SYNC_PENDING_UPSERT,
+                        lastSyncError = null,
+                    ),
+                )
+            }
+            onSaved()
+        }
+    }
+
+    private companion object {
+        const val SYNC_PENDING_UPSERT = 1
     }
 }

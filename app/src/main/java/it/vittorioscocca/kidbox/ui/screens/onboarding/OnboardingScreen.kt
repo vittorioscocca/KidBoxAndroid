@@ -76,6 +76,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
+import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
 import it.vittorioscocca.kidbox.util.analytics.OnboardingAnalyticsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -137,6 +138,7 @@ private fun stepName(page: Int, familyPath: FamilyPath): String = when {
     familyPath == FamilyPath.LinkJoin -> "link_invite_confirm"
     page == 0 -> "setup"
     familyPath == FamilyPath.Join -> "join_family"
+    page == 2 -> "first_content"
     else -> "invite"
 }
 
@@ -145,6 +147,8 @@ private fun stepName(page: Int, familyPath: FamilyPath): String = when {
 fun OnboardingScreen(
     onFamilyCreated: (familyId: String) -> Unit,
     onSignedOut: () -> Unit,
+    /** «Un documento» sull'ultima pagina: come [onFamilyCreated], poi Documenti. */
+    onFamilyCreatedOpenDocuments: (familyId: String) -> Unit = onFamilyCreated,
     viewModel: OnboardingViewModel = hiltViewModel(),
 ) {
     // `.Create` è il default: la scelta esplicita «Come vuoi iniziare?» non c'è
@@ -159,9 +163,10 @@ fun OnboardingScreen(
     EdgeToEdgeController.RequestFullBleed()
 
     val pagerState = rememberPagerState(
-        // 0 setup (nome, cognome, nome famiglia) · 1 invita (Create) o QR (Join).
-        // Percorso LinkJoin: una pagina sola, la conferma d'invito.
-        pageCount = { if (familyPath == FamilyPath.LinkJoin) 1 else 2 },
+        // 0 setup (nome, cognome, nome famiglia) · 1 invita (Create) o QR (Join)
+        // · 2 primo contenuto (solo Create). Percorso LinkJoin: una pagina sola,
+        // la conferma d'invito. Chi entra in una famiglia ci trova già qualcosa.
+        pageCount = { familyPageCount(familyPath) },
     )
     val scope = rememberCoroutineScope()
 
@@ -248,11 +253,14 @@ fun OnboardingScreen(
         OnboardingAnalyticsState.lastStepSeen = name
     }
 
-    val onFamilyCreatedTracked: (String) -> Unit = { familyId ->
+    val trackCompleted: () -> Unit = {
         val elapsedSeconds = ((System.currentTimeMillis() - onboardingStartTime) / 1000).toInt()
         AppAnalytics.onboardingCompleted(context, elapsedSeconds)
         OnboardingAnalyticsState.lastStepSeen = null
         OnboardingAnalyticsState.abandonReportedStep = null
+    }
+    val onFamilyCreatedTracked: (String) -> Unit = { familyId ->
+        trackCompleted()
         onFamilyCreated(familyId)
     }
 
@@ -334,14 +342,40 @@ fun OnboardingScreen(
                             onFamilyCreatedTracked(familyId)
                         },
                     )
+                    page == 2 -> FirstContentPageContent(
+                        onSaveEvent = { title, start, onSaved ->
+                            viewModel.saveFirstEvent(title, start) {
+                                logFirstContent(context, FirstContentChoice.EVENT, "calendar")
+                                onSaved()
+                            }
+                        },
+                        onSaveGrocery = { names, onSaved ->
+                            viewModel.saveFirstGroceries(names) {
+                                logFirstContent(context, FirstContentChoice.GROCERY, "grocery")
+                                onSaved()
+                            }
+                        },
+                        onOpenDocuments = {
+                            logFirstContent(context, FirstContentChoice.DOCUMENT, null)
+                            trackCompleted()
+                            onFamilyCreatedOpenDocuments(createdFamilyId.orEmpty())
+                        },
+                        onSkip = {
+                            AppAnalytics.onboardingFirstContentSkipped(context)
+                            KBAnalytics.logOnboarding("first_content", "skipped")
+                            onFamilyCreatedTracked(createdFamilyId.orEmpty())
+                        },
+                        onFinished = { onFamilyCreatedTracked(createdFamilyId.orEmpty()) },
+                    )
                     else -> InvitePartnerPageContent(
                         familyId = createdFamilyId.orEmpty(),
-                        onFinish = { onFamilyCreatedTracked(createdFamilyId.orEmpty()) },
+                        // Si passa al primo contenuto invece che alla Home vuota.
+                        onFinish = { scope.launch { pagerState.animateScrollToPage(2) } },
                     )
                 }
             }
 
-            val totalPages = if (familyPath == FamilyPath.LinkJoin) 1 else 2
+            val totalPages = familyPageCount(familyPath)
 
             if (totalPages > 1) {
                 Row(
@@ -449,6 +483,25 @@ fun OnboardingScreen(
             },
         )
     }
+}
+
+private fun familyPageCount(familyPath: FamilyPath): Int = when (familyPath) {
+    FamilyPath.LinkJoin -> 1
+    FamilyPath.Join -> 2
+    FamilyPath.Create -> 3
+}
+
+/**
+ * Il primo contenuto dall'ultima pagina. Non [AppAnalytics.contentCreated]:
+ * aprirebbe subito «Per ora lo vedi solo tu», un secondo invito a pochi
+ * secondi dalla pagina invito. Il `content_created` su Firestore lo scrive il
+ * trigger del server; qui c'è il passo per famiglia (`onboarding_step`).
+ */
+private fun logFirstContent(context: Context, choice: FirstContentChoice, contentType: String?) {
+    val step = choice.name.lowercase()
+    AppAnalytics.onboardingStepCompleted(context, "first_content_$step")
+    if (contentType != null) AppAnalytics.contentCreatedInOnboarding(context, contentType)
+    KBAnalytics.logOnboarding("first_content", step)
 }
 
 /** «Esci», in alto a destra su ogni pagina del wizard. */

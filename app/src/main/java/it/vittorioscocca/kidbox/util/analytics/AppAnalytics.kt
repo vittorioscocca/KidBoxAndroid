@@ -99,6 +99,23 @@ object AppAnalytics {
         log(context, "onboarding_invite_step_skipped")
     }
 
+    /** «Lo faccio dopo» sulla pagina del primo contenuto. */
+    fun onboardingFirstContentSkipped(context: Context) {
+        log(context, "onboarding_first_content_skipped")
+    }
+
+    /**
+     * Il primo contenuto creato dall'ultima pagina del wizard. Stesso evento di
+     * [contentCreated], ma senza il foglio d'invito contestuale (la pagina
+     * invito è appena passata) e senza la richiesta di recensione.
+     */
+    fun contentCreatedInOnboarding(context: Context, type: String) {
+        log(context, "content_created") {
+            putString("content_type", type)
+            putString("source", "onboarding")
+        }
+    }
+
     fun inviteGenerated(context: Context) {
         log(context, "invite_generated")
     }
