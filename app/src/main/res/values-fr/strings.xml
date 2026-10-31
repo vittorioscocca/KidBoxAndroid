@@ -2,6 +2,8 @@
 <resources>
 
     <!-- Nudge: suggerimenti in-app su aree mai usate (NudgeCatalog.kt) -->
+    <string name="nudge_first_content_title">Commencez par la semaine qui vient</string>
+    <string name="nudge_first_content_body">Ajoutez un rendez-vous ou un article à acheter : ça prend une minute, et la personne que vous inviterez le trouvera déjà là.</string>
     <string name="nudge_family_invite_title">KidBox prend tout son sens en famille</string>
     <string name="nudge_family_invite_body">Invitez l\'autre parent ou les autres membres : documents, wallet, santé, dépenses et calendrier deviennent partagés et à jour pour tout le monde, en temps réel.</string>
     <string name="nudge_documents_title">Vos documents, toujours avec vous</string>

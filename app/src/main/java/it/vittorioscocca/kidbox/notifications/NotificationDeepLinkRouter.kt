@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicLong
+import it.vittorioscocca.kidbox.util.analytics.KBAnalytics
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsEntryPoint
 import it.vittorioscocca.kidbox.util.analytics.KBAnalyticsOrigin
 
@@ -471,6 +472,9 @@ object NotificationDeepLinkRouter {
                     destination = NudgeDestination.from(
                         intent.getStringExtra("push_destination")),
                 )
+                // Il tap sulla notifica, a sé: `nudge_opened` è il pulsante del
+                // dialog, e da solo non diceva se la notifica fosse mai arrivata.
+                KBAnalytics.logNudge("nudge_tapped", campaignId)
                 KBLog.app.info("NotificationDeepLink: nudge $campaignId", TAG)
             }
             else -> Unit

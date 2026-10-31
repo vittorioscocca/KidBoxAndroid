@@ -17,7 +17,13 @@ import it.vittorioscocca.kidbox.R
  */
 
 /** Aree su cui si può misurare "non l'ha mai usata". */
-enum class NudgeFeature { DOCUMENTS, WALLET, HEALTH, AI, CHAT, CALENDAR;
+/**
+ * `CONTENT` vale «in famiglia non c'è ancora niente», né eventi né to-do né spesa
+ * né documenti né note né foto. Un client vecchio che la riceve da remoto non la
+ * riconosce e perde la condizione: da `config/nudges` solo quando quelle
+ * versioni sono sparite.
+ */
+enum class NudgeFeature { DOCUMENTS, WALLET, HEALTH, AI, CHAT, CALENDAR, CONTENT;
     companion object {
         fun from(raw: String?): NudgeFeature? =
             entries.firstOrNull { it.name.equals(raw, ignoreCase = true) }
@@ -105,6 +111,26 @@ data class NudgeConfig(
             quietHoursStart = 21,
             quietHoursEnd = 9,
             campaigns = listOf(
+                // Per chi ha creato la famiglia e non ci ha messo niente: al
+                // 31/10/2026 il 60% delle famiglie nuove, e 8 su 10 non riaprono
+                // l'app dopo il primo giorno. Una volta sola, il giorno dopo;
+                // l'invito viene dopo il cooldown.
+                NudgeCampaign(
+                    id = "first_content",
+                    order = -1,
+                    firstDelayDays = 1,
+                    maxFires = 1,
+                    requires = NudgeRequirements(
+                        familyMembersMax = 1,
+                        featureUnused = NudgeFeature.CONTENT,
+                    ),
+                    titleRes = R.string.nudge_first_content_title,
+                    bodyRes = R.string.nudge_first_content_body,
+                    titleFallback = "Comincia dalla settimana che arriva",
+                    bodyFallback = "Aggiungi un impegno o qualcosa da comprare: ci vuole un " +
+                        "minuto, e chi inviterai lo troverà già lì.",
+                    destination = NudgeDestination.CALENDAR,
+                ),
                 NudgeCampaign(
                     id = "family_invite",
                     order = 0,

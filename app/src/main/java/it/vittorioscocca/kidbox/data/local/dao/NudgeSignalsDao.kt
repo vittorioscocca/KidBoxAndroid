@@ -33,6 +33,15 @@ interface NudgeSignalsDao {
     suspend fun calendarEventCount(familyId: String): Int
 
     /** `kb_children` non ha `isDeleted`: le righe o ci sono o sono state rimosse. */
+    /** Le altre cose che una famiglia mette per prime: insieme a documenti e calendario fanno «niente di niente». */
+    @Query(
+        "SELECT (SELECT COUNT(*) FROM kb_todo_items WHERE familyId = :familyId AND isDeleted = 0)" +
+            " + (SELECT COUNT(*) FROM kb_grocery_items WHERE familyId = :familyId AND isDeleted = 0)" +
+            " + (SELECT COUNT(*) FROM kb_notes WHERE familyId = :familyId AND isDeleted = 0)" +
+            " + (SELECT COUNT(*) FROM kb_family_photos WHERE familyId = :familyId AND isDeleted = 0)"
+    )
+    suspend fun firstContentCount(familyId: String): Int
+
     @Query("SELECT COUNT(*) FROM kb_children WHERE familyId = :familyId")
     suspend fun childCount(familyId: String): Int
 

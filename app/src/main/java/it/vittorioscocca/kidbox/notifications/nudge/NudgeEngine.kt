@@ -116,6 +116,10 @@ class NudgeEngine @Inject constructor(
             if (signalsDao.chatMessageCount(familyId) == 0) add(NudgeFeature.CHAT)
             if (signalsDao.calendarEventCount(familyId) == 0) add(NudgeFeature.CALENDAR)
             if (signalsDao.aiConversationCount(familyId) == 0) add(NudgeFeature.AI)
+            // Niente di niente: le cose che una famiglia mette per prime.
+            if (NudgeFeature.DOCUMENTS in this && NudgeFeature.CALENDAR in this &&
+                signalsDao.firstContentCount(familyId) == 0
+            ) add(NudgeFeature.CONTENT)
         }
         return Signals(
             familyMembers = signalsDao.familyMemberCount(familyId),
@@ -178,7 +182,12 @@ class NudgeEngine @Inject constructor(
         r.familyMembersMax?.let { if (signals.familyMembers > it) return false }
         r.familyMembersMin?.let { if (signals.familyMembers < it) return false }
         r.featureUnused?.let { if (it !in signals.unusedFeatures) return false }
-        if (isCoveredByChecklist(campaign)) return false
+        // Solo per chi ha già qualcuno in famiglia: a chi è da solo la
+        // checklist non basta, perché 8 su 10 escono il primo giorno e non la
+        // rivedono più (31/10/2026). Col filtro anche per loro la coda restava
+        // vuota proprio quando se ne andavano: `family_invite` raggiungeva 15
+        // utenti in tre mesi su ~250 famiglie da un membro.
+        if (signals.familyMembers > 1 && isCoveredByChecklist(campaign)) return false
         return true
     }
 

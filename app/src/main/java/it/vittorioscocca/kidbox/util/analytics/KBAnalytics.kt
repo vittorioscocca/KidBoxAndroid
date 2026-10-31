@@ -170,7 +170,8 @@ object KBAnalytics {
      * segnale di ritorno sarebbe la disattivazione dei permessi — che è
      * irreversibile e arriva quando è troppo tardi.
      *
-     * @param name `nudge_scheduled`, `nudge_opened` o `nudge_dismissed`.
+     * @param name `nudge_scheduled`, `nudge_tapped` (tap sulla notifica),
+     *   `nudge_opened` («Vai» nel dialog) o `nudge_dismissed`.
      */
     fun logNudge(name: String, campaignId: String) {
         val uid = currentUid() ?: return
