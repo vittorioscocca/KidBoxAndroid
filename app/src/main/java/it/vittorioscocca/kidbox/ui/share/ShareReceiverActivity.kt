@@ -156,8 +156,8 @@ class ShareReceiverActivity : AppCompatActivity() {
                                         contentResolver,
                                     )
                                 }.onSuccess {
-                                    if (selected == ShareDestination.ASSISTANT) {
-                                        // Il file è in coda: la chat dell'assistente lo legge all'apertura.
+                                    if (selected == ShareDestination.ASSISTANT || selected == ShareDestination.WORK) {
+                                        // Il file è in coda: la chat dell'assistente (o la scheda Lavoro) lo prende all'apertura.
                                         startActivity(
                                             Intent(this@ShareReceiverActivity, MainActivity::class.java)
                                                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),

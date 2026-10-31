@@ -57,6 +57,7 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Work
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lightbulb
@@ -1134,6 +1135,15 @@ internal fun featureItems(
         Color(0xFF34A885),
     ),
     FeatureItem(
+        "work",
+        context.getString(R.string.home_feature_work_title),
+        context.getString(R.string.home_feature_work_subtitle),
+        AppDestination.WorkHome.createRoute(familyId),
+        Icons.Filled.Work,
+        Color(0xFFE8EFFA),
+        Color(0xFF4073BF),
+    ),
+    FeatureItem(
         "vehicles",
         context.getString(R.string.home_feature_vehicles_title),
         context.getString(R.string.home_feature_vehicles_subtitle),
@@ -1213,7 +1223,7 @@ private fun HomeCategorySection(
     val groups = listOf(
         stringResource(R.string.home_group_organization) to listOf("notes", "todo", "shopping", "calendar"),
         stringResource(R.string.home_group_family_health) to listOf("health", "pharmacies", "chat"),
-        stringResource(R.string.home_group_documents_money) to listOf("documents", "expenses", "wallet", "passwords"),
+        stringResource(R.string.home_group_documents_money) to listOf("documents", "expenses", "wallet", "passwords", "work"),
         stringResource(R.string.home_group_daily_life) to listOf("location", "photos", "travel", "pets", "home_items", "vehicles"),
     )
 

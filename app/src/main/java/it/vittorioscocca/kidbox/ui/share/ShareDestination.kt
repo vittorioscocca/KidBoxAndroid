@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Note
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Work
 import androidx.compose.ui.graphics.vector.ImageVector
 import it.vittorioscocca.kidbox.R
 import java.util.Locale
@@ -23,6 +24,8 @@ enum class ShareDestination(val labelRes: Int, val icon: ImageVector) {
     EVENT(R.string.share_destination_event, Icons.Default.CalendarMonth),
     /** PDF o foto letti dall'assistente (Document Intelligence), come il «+» della sua chat. */
     ASSISTANT(R.string.share_destination_assistant, Icons.Default.AutoAwesome),
+    /** PDF o foto nella scheda Lavoro: restano in attesa, si leggono solo con «Leggi il documento». */
+    WORK(R.string.share_destination_work, Icons.Default.Work),
 }
 
 object ShareDestinationSuggester {
@@ -30,9 +33,9 @@ object ShareDestinationSuggester {
         return when (content) {
             is ShareContentType.TextContent -> textSuggestions(content.text)
             is ShareContentType.UrlContent -> listOf(ShareDestination.CHAT, ShareDestination.NOTE, ShareDestination.TODO)
-            is ShareContentType.ImageContent -> listOf(ShareDestination.CHAT, ShareDestination.PHOTOS, ShareDestination.ASSISTANT)
+            is ShareContentType.ImageContent -> listOf(ShareDestination.CHAT, ShareDestination.PHOTOS, ShareDestination.ASSISTANT, ShareDestination.WORK)
             is ShareContentType.VideoContent -> listOf(ShareDestination.CHAT, ShareDestination.PHOTOS)
-            is ShareContentType.PdfContent -> listOf(ShareDestination.CHAT, ShareDestination.DOCUMENTS, ShareDestination.ASSISTANT)
+            is ShareContentType.PdfContent -> listOf(ShareDestination.CHAT, ShareDestination.DOCUMENTS, ShareDestination.ASSISTANT, ShareDestination.WORK)
             is ShareContentType.FileContent -> listOf(ShareDestination.CHAT, ShareDestination.DOCUMENTS)
             ShareContentType.Unknown -> listOf(ShareDestination.CHAT)
         }

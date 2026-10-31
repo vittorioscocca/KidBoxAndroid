@@ -37,6 +37,11 @@ class AIService @Inject constructor(
 ) {
     private val functions = FirebaseFunctions.getInstance("europe-west1")
 
+    private companion object {
+        /** Purpose riservati a Pro e Max, bonus Free escluso (scheda Lavoro). */
+        val STRICTLY_PAID_PURPOSES = setOf("workDoc")
+    }
+
     suspend fun sendMessage(
         messages: List<KBAIMessage>,
         systemPrompt: String,
@@ -70,6 +75,11 @@ class AIService @Inject constructor(
         systemPromptTail: String? = null,
     ): Result<AIResponse> = withContext(Dispatchers.IO) {
         runCatching {
+            // Purpose chiusi ai Free ANCHE col bonus intatto: `aiAccessBlocked` non dice il
+            // piano, quindi qui si guarda il piano (vedi `/gating-pro`). Il gate vero è sul server.
+            if (purpose != null && purpose in STRICTLY_PAID_PURPOSES && CurrentPlanStore.plan.value == KBPlan.FREE) {
+                error(context.getString(R.string.work_error_paid_only))
+            }
             val resolvedFamilyId = resolveFamilyId(familyId)
             val payload = hashMapOf<String, Any>(
                 "messages" to messages.map { mapOf("role" to it.role, "content" to it.content) },

@@ -739,6 +739,21 @@ class DocumentRepository @Inject constructor(
         )
     }
 
+    fun workRootFolderId(familyId: String): String = "work-root-$familyId"
+
+    /** Cartella «Lavoro» in Documenti (id deterministico, come iOS): i suoi file sono privati o condivisi con la scheda. */
+    suspend fun ensureWorkRootFolder(familyId: String, title: String): KBDocumentCategoryEntity {
+        val all = categoryDao.getAllByFamilyId(familyId)
+        val nextSort = (all.filter { it.parentId == null }.maxOfOrNull { it.sortOrder } ?: 0) + 1
+        return createFolderLocal(
+            familyId = familyId,
+            title = title,
+            parentId = null,
+            forcedId = workRootFolderId(familyId),
+            sortOrder = nextSort.coerceAtMost(97),
+        )
+    }
+
     fun casaRootFolderId(familyId: String): String = "home-root-$familyId"
 
     suspend fun ensureCasaRootFolder(familyId: String): KBDocumentCategoryEntity {

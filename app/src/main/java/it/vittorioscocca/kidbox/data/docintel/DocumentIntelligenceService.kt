@@ -88,7 +88,8 @@ class DocumentIntelligenceService @Inject constructor(
 
     // ── Rendering ────────────────────────────────────────────────────────
 
-    private fun renderImages(file: File, mimeType: String): List<String> {
+    /** Anche per la scheda Lavoro (`WorkDocumentService`): stesse pagine, stesso costo. */
+    internal fun renderImages(file: File, mimeType: String): List<String> {
         if (mimeType.startsWith("image/")) {
             val bmp = runCatching { BitmapFactory.decodeFile(file.absolutePath) }.getOrNull() ?: return emptyList()
             return listOfNotNull(jpegBase64(bmp))

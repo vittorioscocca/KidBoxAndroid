@@ -444,6 +444,11 @@ sealed class AppDestination(val route: String) {
         fun createRoute(familyId: String): String = "vehicles/$familyId"
     }
 
+    /** Lavoro: buste paga, contratti e fogli ferie di un adulto (Pro e Max). */
+    data object WorkHome : AppDestination("work/{familyId}") {
+        fun createRoute(familyId: String): String = "work/$familyId"
+    }
+
     data object VehicleDetail : AppDestination("vehicle_detail/{familyId}/{vehicleId}") {
         fun createRoute(familyId: String, vehicleId: String): String = "vehicle_detail/$familyId/$vehicleId"
     }

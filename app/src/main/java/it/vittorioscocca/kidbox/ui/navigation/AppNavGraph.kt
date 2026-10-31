@@ -85,6 +85,7 @@ import it.vittorioscocca.kidbox.ui.screens.news.NewsSavedScreen
 import it.vittorioscocca.kidbox.ui.screens.news.NewsSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.pharmacies.PharmacyScreen
 import it.vittorioscocca.kidbox.ui.screens.ai.planning.PlanningAIChatScreen
+import it.vittorioscocca.kidbox.ui.screens.work.WorkScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.AiSettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.PrivacySettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.SettingsScreen
@@ -1016,6 +1017,21 @@ fun AppNavGraph(
                 onOpenVehicle = { vehicleId ->
                     navController.navigate(AppDestination.VehicleDetail.createRoute(familyId, vehicleId))
                 },
+            )
+        }
+
+        composable(
+            route = AppDestination.WorkHome.route,
+            arguments = listOf(navArgument("familyId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val familyId = backStackEntry.arguments?.getString("familyId").orEmpty()
+            WorkScreen(
+                familyId = familyId,
+                onBack = { navController.popBackStack() },
+                onAskAssistant = { question ->
+                    navController.navigate(AppDestination.AiChat.createRoute(familyId, question))
+                },
+                onUpgrade = { navController.navigate(AppDestination.Plans.route) },
             )
         }
 

@@ -147,6 +147,7 @@ class HomeViewModel @Inject constructor(
     private val homeBadgeManager: HomeBadgeManager,
     private val walletRepository: WalletRepository,
     private val passwordsRepository: PasswordsRepository,
+    private val workRepository: it.vittorioscocca.kidbox.data.repository.WorkRepository,
     private val subscriptionRepository: SubscriptionRepository,
     private val aiService: AIService,
     private val familyMemoryService: FamilyMemoryService,
@@ -246,6 +247,7 @@ class HomeViewModel @Inject constructor(
                     homeBadgeManager.stopListening()
                     walletRepository.stopRealtime()
                     passwordsRepository.stopRealtime()
+                    workRepository.stopRealtime()
                     syncedFamilyId = null
                     initialSyncCompleted = false
                     cancelMembersSyncTimeout()
@@ -341,6 +343,8 @@ class HomeViewModel @Inject constructor(
                     homeBadgeManager.startListening(familyId)
                     walletRepository.startRealtime(familyId)
                     passwordsRepository.startRealtime(familyId)
+                    // Lavoro serve anche al quaderno dell'assistente: i listener vivono con la Home.
+                    workRepository.startRealtime(familyId)
                     val shouldSyncMembers = !syncDone || memberCount <= 0
                     val currentUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
                     val isLocationSharing = if (currentUid.isBlank()) {
@@ -1041,6 +1045,7 @@ class HomeViewModel @Inject constructor(
         "home_items",
         "vehicles",
         "pharmacies",
+        "work",
         "ai",
     )
 
@@ -1059,6 +1064,7 @@ class HomeViewModel @Inject constructor(
         homeBadgeManager.stopListening()
         walletRepository.stopRealtime()
         passwordsRepository.stopRealtime()
+        workRepository.stopRealtime()
         super.onCleared()
     }
 }

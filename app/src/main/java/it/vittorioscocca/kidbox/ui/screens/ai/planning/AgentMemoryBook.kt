@@ -1,5 +1,11 @@
 package it.vittorioscocca.kidbox.ui.screens.ai.planning
 
+import it.vittorioscocca.kidbox.domain.work.WorkRecordKind
+import it.vittorioscocca.kidbox.domain.work.WorkFields
+import it.vittorioscocca.kidbox.data.repository.WorkRepository
+import it.vittorioscocca.kidbox.data.local.entity.KBWorkRecordEntity
+import it.vittorioscocca.kidbox.data.local.entity.KBWorkProfileEntity
+import it.vittorioscocca.kidbox.data.local.dao.WorkDao
 import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.R
@@ -239,6 +245,11 @@ data class AgentMemorySnapshot(
     val housePayments: List<HousePaymentEntity>,
     val vehicles: List<VehicleEntity>,
     val vehicleEvents: List<VehicleEventEntity>,
+    /** Lavoro: solo le schede che chi chiede può vedere (la sua e quelle condivise con lui), già decifrate. */
+    val workProfiles: List<KBWorkProfileEntity>,
+    val workRecords: List<KBWorkRecordEntity>,
+    val workFields: Map<String, WorkFields>,
+    val workEmployers: Map<String, String>,
     val trips: List<KBTripEntity>,
     val tripLegs: List<KBTripLegEntity>,
     val tripDays: List<KBTripDayPlanEntity>,
@@ -290,6 +301,8 @@ class AgentMemoryRepository @Inject constructor(
     private val housePaymentDao: HousePaymentDao,
     private val vehicleDao: VehicleDao,
     private val vehicleEventDao: VehicleEventDao,
+    private val workDao: WorkDao,
+    private val workRepository: WorkRepository,
     private val tripDao: KBTripDao,
     private val tripLegDao: KBTripLegDao,
     private val tripDayPlanDao: KBTripDayPlanDao,
@@ -308,6 +321,13 @@ class AgentMemoryRepository @Inject constructor(
                 uid,
             )
 
+        // Lavoro: la scheda di un altro adulto entra solo se l'ha condivisa con chi chiede.
+        val workProfiles = workDao.listProfiles(familyId).filter { p ->
+            p.ownerUid == uid ||
+                (p.visibilityScope == KBVisibilityScope.MEMBERS && uid != null && uid in decodeStringList(p.visibilityMemberIdsJson))
+        }
+        val workOwners = workProfiles.map { it.ownerUid }.toSet()
+        val workRecords = workDao.listRecords(familyId).filter { it.ownerUid in workOwners }
         val members = familyMemberDao.getAllByFamilyId(familyId).filter { !it.isDeleted }
         val children = childDao.getChildrenByFamilyId(familyId)
             .sortedBy { it.birthDateEpochMillis ?: Long.MAX_VALUE }
@@ -389,6 +409,10 @@ class AgentMemoryRepository @Inject constructor(
             housePayments = housePaymentDao.observeByFamily(familyId).first().filter { !it.isDeleted },
             vehicles = vehicleDao.observeByFamily(familyId).first().filter { !it.isDeleted },
             vehicleEvents = vehicleEventDao.observeByFamily(familyId).first().filter { !it.isDeleted },
+            workProfiles = workProfiles,
+            workRecords = workRecords,
+            workFields = workRecords.mapNotNull { r -> workRepository.open(r)?.let { r.id to it } }.toMap(),
+            workEmployers = workProfiles.associate { it.ownerUid to workRepository.employer(it) },
             trips = trips,
             tripLegs = tripLegDao.observeByFamily(familyId).first(),
             tripDays = recentTripIds.flatMap { tripDayPlanDao.observeByTrip(it).first() },
@@ -514,6 +538,7 @@ class AgentMemoryBookBuilder(
             walletFile()?.let { add(it) }
             homeFile(docAllowance)?.let { add(it) }
             vehiclesFile(docAllowance)?.let { add(it) }
+            workFile()?.let { add(it) }
             petsFile(docAllowance)?.let { add(it) }
             tripsFile()?.let { add(it) }
             chatFile()?.let { add(it) }
@@ -1129,6 +1154,125 @@ class AgentMemoryBookBuilder(
         return AgentMemoryFile("veicoli.md", "Veicoli", "${s.vehicles.size} veicoli, ${s.vehicleEvents.size} interventi", body)
     }
 
+    // lavoro.md
+
+    /**
+     * Buste paga, contratti e fogli ferie già letti dall'AI, per persona. Solo
+     * schede che chi chiede può vedere: il quaderno nasce sul suo dispositivo e
+     * le altre non entrano nello snapshot. Gemello di `workFile()` (iOS).
+     */
+    private fun workFile(): AgentMemoryFile? {
+        if (s.workRecords.isEmpty()) return null
+        val zone = java.time.ZoneId.systemDefault()
+        val lines = mutableListOf(
+            "# Lavoro",
+            "Valori letti da buste paga, contratti e fogli ferie. Se un valore non c'è, non c'era nel documento: dillo, non stimarlo. " +
+                "Non dare consulenza fiscale o legale: riporta i numeri e, se serve, suggerisci il consulente del lavoro o il sindacato.",
+        )
+        fun num(v: Double) = java.text.NumberFormat.getNumberInstance(java.util.Locale.ITALY).apply { maximumFractionDigits = 2 }.format(v)
+        fun money(v: Double) = num(v) + " €"
+        fun signed(v: Double) = (if (v >= 0) "+" else "") + num(v)
+        fun day(d: java.time.LocalDate) = fmtDate(d.atStartOfDay(zone).toInstant().toEpochMilli())
+
+        for (p in s.workProfiles.sortedBy { if (it.ownerUid == s.uid) 0 else 1 }) {
+            val mine = s.workRecords.filter { it.ownerUid == p.ownerUid }
+            if (mine.isEmpty()) continue
+            val who = if (p.ownerUid == s.uid) "${s.memberName(p.ownerUid) ?: "Io"} (chi chiede)" else (s.memberName(p.ownerUid) ?: "Un familiare")
+            lines += "\n## $who"
+            s.workEmployers[p.ownerUid]?.takeIf { it.isNotBlank() }?.let { lines += "Datore di lavoro: $it" }
+
+            val payslips = mine.filter { it.kind == WorkRecordKind.PAYSLIP }
+                .sortedByDescending { it.referenceDateEpochMillis }
+                .mapNotNull { r -> s.workFields[r.id]?.let { r to it } }
+            payslips.firstOrNull()?.let { (r, f) ->
+                lines += "### Ultima busta paga: ${f.period.ifBlank { fmtDate(r.referenceDateEpochMillis) }}"
+                val money = listOfNotNull(
+                    f.gross?.let { "lordo ${money(it)}" }, f.net?.let { "netto ${money(it)}" },
+                    f.taxes?.let { "imposte trattenute ${money(it)}" }, f.contributions?.let { "contributi ${money(it)}" },
+                    f.tfr?.let { "TFR ${money(it)}" },
+                )
+                if (money.isNotEmpty()) lines += "- " + money.joinToString(" · ")
+                val vac = listOfNotNull(
+                    f.vacationAccrued?.let { "maturate ${num(it)}" }, f.vacationTaken?.let { "godute ${num(it)}" },
+                    f.vacationRemaining?.let { "residue ${num(it)}" },
+                )
+                if (vac.isNotEmpty()) lines += "- Ferie (giorni): " + vac.joinToString(", ")
+                val per = listOfNotNull(
+                    f.permitHoursAccrued?.let { "maturati ${num(it)}" }, f.permitHoursRemaining?.let { "residui ${num(it)}" },
+                )
+                if (per.isNotEmpty()) lines += "- Permessi (ore): " + per.joinToString(", ")
+                if (f.notes.isNotBlank()) lines += "Note: ${clip(f.notes, 200)}"
+                if (payslips.size > 1) {
+                    val prev = payslips[1].second
+                    val diff = listOfNotNull(
+                        if (f.net != null && prev.net != null) "netto ${signed(f.net - prev.net)} €" else null,
+                        if (f.gross != null && prev.gross != null) "lordo ${signed(f.gross - prev.gross)} €" else null,
+                        if (f.vacationRemaining != null && prev.vacationRemaining != null) "ferie residue ${signed(f.vacationRemaining - prev.vacationRemaining)} giorni" else null,
+                    )
+                    if (diff.isNotEmpty()) lines += "- Rispetto alla busta precedente (${prev.period.ifBlank { prev.title }}): ${diff.joinToString(", ")}"
+                }
+                val year = java.time.LocalDate.now(zone).year
+                val taxes = payslips.filter {
+                    java.time.Instant.ofEpochMilli(it.first.referenceDateEpochMillis).atZone(zone).year == year
+                }.mapNotNull { it.second.taxes }
+                if (taxes.isNotEmpty()) {
+                    lines += "- Imposte $year: ${money(taxes.sum())} sommando le ${taxes.size} buste paga caricate (non necessariamente tutto l'anno)"
+                }
+                if (payslips.size > 1) {
+                    lines += "### Storico buste paga (più recenti prima)"
+                    payslips.take(12).forEach { (rr, ff) ->
+                        val parts = listOfNotNull(
+                            ff.gross?.let { "lordo ${money(it)}" }, ff.net?.let { "netto ${money(it)}" },
+                            ff.taxes?.let { "imposte ${money(it)}" },
+                            ff.vacationRemaining?.let { "ferie residue ${num(it)} g" },
+                            ff.permitHoursRemaining?.let { "permessi residui ${num(it)} h" },
+                        )
+                        lines += "- ${ff.period.ifBlank { fmtDate(rr.referenceDateEpochMillis) }}: ${parts.joinToString(" · ")}"
+                    }
+                }
+            }
+            mine.filter { it.kind == WorkRecordKind.CONTRACT }
+                .sortedByDescending { it.referenceDateEpochMillis }
+                .mapNotNull { r -> s.workFields[r.id]?.let { r to it } }
+                .take(3)
+                .forEach { (r, f) ->
+                    val start = WorkFields.parseDay(f.startDate)?.let { day(it) } ?: fmtDate(r.referenceDateEpochMillis)
+                    lines += "### Contratto${if (f.title.isBlank()) "" else ": ${f.title}"} (dal $start)"
+                    val facts = listOfNotNull(
+                        f.contractType.takeIf { it.isNotBlank() }, f.level.takeIf { it.isNotBlank() }?.let { "livello/CCNL $it" },
+                        f.grossAnnual?.let { "RAL ${money(it)}" }, f.vacationDaysPerYear?.let { "${num(it)} giorni di ferie l'anno" },
+                        f.noticePeriod.takeIf { it.isNotBlank() }?.let { "preavviso $it" },
+                    )
+                    if (facts.isNotEmpty()) lines += facts.joinToString(" · ")
+                    val end = WorkFields.parseDay(f.endDate)
+                    if (end != null) {
+                        val left = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(zone), end)
+                        lines += "- Scadenza: ${day(end)}${if (left < 0) " ⚠️ PASSATA" else " (tra $left giorni)"}"
+                    } else if (f.contractType.lowercase().contains("indeterm")) {
+                        lines += "- Scadenza: nessuna (tempo indeterminato)"
+                    }
+                    if (f.notes.isNotBlank()) lines += "Note: ${clip(f.notes, 200)}"
+                }
+            val today = java.time.LocalDate.now(zone)
+            val leave = mine.filter { it.kind == WorkRecordKind.LEAVE_PLAN }
+                .mapNotNull { s.workFields[it.id] }
+                .flatMap { it.leavePeriods }
+                .filter { (it.endDay ?: java.time.LocalDate.MIN) >= today }
+                .sortedBy { it.startDay }
+            if (leave.isNotEmpty()) {
+                lines += "### Ferie e permessi programmati (con 📅 = anche nel calendario di famiglia)"
+                leave.take(30).forEach { l ->
+                    val a = l.startDay ?: return@forEach
+                    val b = l.endDay ?: a
+                    val range = if (b.isAfter(a)) "dal ${day(a)} al ${day(b)}" else day(a)
+                    lines += "- ${l.label.ifBlank { "Ferie" }}: $range${if (l.inCalendar) " 📅" else ""}"
+                }
+            }
+        }
+        if (lines.size <= 2) return null
+        return AgentMemoryFile("lavoro.md", "Lavoro", "${s.workRecords.size} documenti di lavoro (buste paga, contratti, fogli ferie)", lines.joinToString("\n"))
+    }
+
     // animali.md
     private fun petsFile(docAllowance: Map<String, Int>?): AgentMemoryFile? {
         if (s.pets.isEmpty()) return null
@@ -1332,7 +1476,7 @@ object AgentPrompt {
 
     /** Ruolo e regole dell'assistente unico. Stesso testo su iOS e web. */
     fun rules(familyName: String, now: Long = System.currentTimeMillis()): String = """
-Sei l'assistente di KidBox della famiglia $familyName. KidBox è l'app in cui la famiglia tiene calendario, to-do, lista della spesa, note, spese, documenti, salute, wallet, casa, veicoli, animali e viaggi.
+Sei l'assistente di KidBox della famiglia $familyName. KidBox è l'app in cui la famiglia tiene calendario, to-do, lista della spesa, note, spese, documenti, salute, wallet, casa, veicoli, animali, viaggi e, per ogni adulto, buste paga e contratti di lavoro.
 Qui sotto c'è la tua memoria: una scheda per ogni sezione dell'app, aggiornata adesso, con un indice in cima.
 
 COME RISPONDI
@@ -1341,6 +1485,7 @@ COME RISPONDI
 - Se l'indice o una scheda dice che un testo è accorciato o non incluso e la domanda riguarda proprio quello, dillo e suggerisci di ripetere la domanda con la massima accuratezza.
 - Salute: linguaggio semplice, adatto a un genitore. Puoi spiegare referti, valori, cure, vaccini e visite; non fare diagnosi e non cambiare terapie: quando la questione è clinica, dopo aver risposto ricorda di sentire il medico.
 - Pianificazione: aiuta a trovare spazi liberi e a non dimenticare scadenze; quando proponi un evento o un to-do indica titolo, data/ora e chi se ne occupa.
+- Lavoro (buste paga e contratti): rispondi con i valori della scheda («ferie residue», «permessi», «imposte», «lordo», «scadenza») e dì da quale busta paga o contratto vengono. Ogni adulto vede solo la propria scheda e quelle che altri hanno condiviso con lui: non parlare di dati di lavoro di una persona che non compare nelle schede. Niente consulenza fiscale o legale.
 - Le password non sono nella tua memoria: se te le chiedono, rimanda alla sezione Password dell'app.
 ${AgentLinks.PROMPT_RULE}
 - Date: oggi è ${promptDay(now)}, domani è ${promptDay(tomorrow(now))}. Prima di dire «domani», «dopodomani» o un giorno della settimana controlla la data scritta nelle schede: non contare a memoria.

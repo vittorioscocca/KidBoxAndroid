@@ -24,6 +24,7 @@ import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.domain.model.KBSyncState
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import it.vittorioscocca.kidbox.data.docintel.PendingAssistantShare
+import it.vittorioscocca.kidbox.data.work.PendingWorkShare
 import it.vittorioscocca.kidbox.notifications.NotificationDeepLinkRouter
 import it.vittorioscocca.kidbox.ui.navigation.AppDestination
 import java.io.File
@@ -71,6 +72,7 @@ class ShareActionHandler @Inject constructor(
             ShareDestination.SHOPPING -> handleShopping(input)
             ShareDestination.EVENT -> handleEvent(input)
             ShareDestination.ASSISTANT -> handleAssistant(input, resolver)
+            ShareDestination.WORK -> handleWork(input, resolver)
         }
     }
 
@@ -182,6 +184,37 @@ class ShareActionHandler @Inject constructor(
         }
         PendingAssistantShare.set(file)
         NotificationDeepLinkRouter.queueRoute(input.familyId, AppDestination.AiChat.createRoute(input.familyId))
+    }
+
+    /**
+     * Copia il file nella cache e lo mette in attesa per la scheda Lavoro, che
+     * lo mostra in «Documento pronto da leggere» senza leggerlo.
+     */
+    private suspend fun handleWork(input: ShareActionInput, resolver: ContentResolver) {
+        val uri = input.allUris.ifEmpty { extractSingleUri(input.contentType) }.firstOrNull()
+            ?: error(appContext.getString(R.string.share_error_assistant_unreadable))
+        val mime = resolver.getType(uri).orEmpty().lowercase()
+        val ext = when {
+            mime == "application/pdf" -> "pdf"
+            mime == "image/png" -> "png"
+            mime == "image/webp" -> "webp"
+            mime.startsWith("image/") -> "jpg"
+            else -> uri.lastPathSegment.orEmpty().substringAfterLast('.', "").lowercase()
+        }
+        val rawName = resolveFileName(resolver, uri).orEmpty().replace('/', '-').replace(':', '-')
+        val name = when {
+            rawName.isBlank() -> "${appContext.getString(R.string.share_default_document_name)}.$ext"
+            ext.isNotEmpty() && !rawName.lowercase().endsWith(".$ext") -> "${rawName.substringBeforeLast('.')}.$ext"
+            else -> rawName
+        }
+        val file = withContext(Dispatchers.IO) {
+            val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
+                ?: error(appContext.getString(R.string.share_error_assistant_unreadable))
+            val dir = File(appContext.cacheDir, "work-import-${UUID.randomUUID()}").apply { mkdirs() }
+            File(dir, name).apply { writeBytes(bytes) }
+        }
+        PendingWorkShare.set(file)
+        NotificationDeepLinkRouter.queueRoute(input.familyId, AppDestination.WorkHome.createRoute(input.familyId))
     }
 
     private suspend fun handleNote(input: ShareActionInput) {
