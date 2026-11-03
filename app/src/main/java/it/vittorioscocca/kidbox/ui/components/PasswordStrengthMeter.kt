@@ -55,7 +55,7 @@ fun PasswordStrengthMeter(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = result.level.labelIt(),
+                text = androidx.compose.ui.res.stringResource(result.level.labelRes),
                 style = MaterialTheme.typography.labelMedium,
                 color = bar,
             )

@@ -324,11 +324,11 @@ fun PasswordDetailScreen(
                 trackColor = kb.divider,
             )
             Row(modifier = Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(state.strengthLabel, color = Color(0xFFFF8A00), fontWeight = FontWeight.SemiBold)
+                Text(state.strengthLevel?.let { stringResource(it.labelRes) }.orEmpty(), color = Color(0xFFFF8A00), fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.weight(1f))
                 Text(stringResource(R.string.passwords_bits_label, state.estimatedBits), color = kb.subtitle)
             }
-            Text(state.strengthAdvice, color = Color(0xFFFF8A00), modifier = Modifier.padding(top = 4.dp))
+            Text(state.strengthLevel?.let { stringResource(it.adviceRes) }.orEmpty(), color = Color(0xFFFF8A00), modifier = Modifier.padding(top = 4.dp))
             if (state.isVulnerable) {
                 Text(
                     stringResource(R.string.passwords_vulnerable_warning),

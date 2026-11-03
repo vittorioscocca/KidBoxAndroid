@@ -326,7 +326,7 @@ fun AddPasswordScreen(
                         trackColor = kb.divider.copy(alpha = 0.4f),
                     )
                     Text(
-                        strength.level.labelIt(),
+                        stringResource(strength.level.labelRes),
                         modifier = Modifier.padding(top = 6.dp),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Medium,

@@ -213,16 +213,16 @@ class AddPasswordViewModel @Inject constructor(
         val t = title.trim()
         val p = password
         if (t.isEmpty()) {
-            onError("Il titolo è obbligatorio")
+            onError(appContext.getString(R.string.passwords_error_title_required))
             return
         }
         if (p.isEmpty()) {
-            onError("La password è obbligatoria")
+            onError(appContext.getString(R.string.passwords_error_password_required))
             return
         }
         val uid = auth.currentUser?.uid?.trim().orEmpty()
         if (uid.isEmpty()) {
-            onError("Utente non autenticato")
+            onError(appContext.getString(R.string.passwords_error_not_signed_in))
             return
         }
         viewModelScope.launch {
@@ -272,11 +272,11 @@ class AddPasswordViewModel @Inject constructor(
 
                 if (existing != null) {
                     if (existing.createdBy != uid) {
-                        onError("Non puoi modificare questa password")
+                        onError(appContext.getString(R.string.passwords_error_cannot_edit))
                         return@launch
                     }
                     if (existing.familyId != familyId) {
-                        onError("Famiglia non valida")
+                        onError(appContext.getString(R.string.passwords_error_invalid_family))
                         return@launch
                     }
                     val oldPassPlain = runCatching {
@@ -354,7 +354,7 @@ class AddPasswordViewModel @Inject constructor(
                 passwordExpiryReminderScheduler.sync(entity.id, familyId, t, entity.expiresAtEpochMillis)
                 onDone()
             } catch (e: Exception) {
-                onError(e.message ?: "Errore durante il salvataggio")
+                onError(e.message ?: appContext.getString(R.string.passwords_error_save))
             }
         }
     }

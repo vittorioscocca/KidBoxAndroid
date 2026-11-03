@@ -1,9 +1,12 @@
 package it.vittorioscocca.kidbox.ui.screens.passwords
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.crypto.PasswordCypher
 import it.vittorioscocca.kidbox.data.local.entity.PasswordEntryEntity
 import it.vittorioscocca.kidbox.data.passwords.security.DuplicateDetector
@@ -42,6 +45,7 @@ data class PasswordsSecurityUiState(
 
 @HiltViewModel
 class PasswordsSecurityViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val repository: PasswordsRepository,
     private val passwordCypher: PasswordCypher,
     private val auth: FirebaseAuth,
@@ -73,7 +77,7 @@ class PasswordsSecurityViewModel @Inject constructor(
                 .onSuccess { r ->
                     _scanState.value = ScanState.Done(r.compromised.size, r.duplicates.size, r.weak.size, r.unknown)
                 }
-                .onFailure { _scanState.value = ScanState.Error(it.localizedMessage ?: "Errore scansione") }
+                .onFailure { _scanState.value = ScanState.Error(it.localizedMessage ?: appContext.getString(R.string.passwords_error_scan)) }
         }
     }
 
@@ -91,7 +95,7 @@ class PasswordsSecurityViewModel @Inject constructor(
                 PasswordCompromisedUi(
                     id = e.id,
                     title = title,
-                    subtitle = "Trovata ${e.pwnedCount ?: 0} volte in data breach",
+                    subtitle = appContext.getString(R.string.passwords_found_in_breaches, e.pwnedCount ?: 0),
                 )
             }
             .sortedBy { it.title.lowercase() }
@@ -100,10 +104,10 @@ class PasswordsSecurityViewModel @Inject constructor(
         val duplicates = clusters.mapIndexed { index, group ->
             PasswordDuplicateClusterUi(
                 id = "cluster_$index",
-                header = "Cluster da ${group.size} voci",
+                header = appContext.getString(R.string.passwords_cluster_entries, group.size),
                 items = group.mapNotNull { e ->
                     val title = decryptOrNull(e.titleCipher, e, uid)?.ifBlank { null } ?: return@mapNotNull null
-                    PasswordCompromisedUi(e.id, title, "Password uguale ad altre credenziali")
+                    PasswordCompromisedUi(e.id, title, appContext.getString(R.string.passwords_same_as_others))
                 },
             )
         }.filter { it.items.size >= 2 }
@@ -113,7 +117,7 @@ class PasswordsSecurityViewModel @Inject constructor(
             val strength = PasswordStrength.evaluate(password).level
             if (strength != PasswordStrengthLevel.WEAK && strength != PasswordStrengthLevel.VERY_WEAK) return@mapNotNull null
             val title = decryptOrNull(e.titleCipher, e, uid)?.ifBlank { null } ?: return@mapNotNull null
-            PasswordCompromisedUi(e.id, title, "Password debole")
+            PasswordCompromisedUi(e.id, title, appContext.getString(R.string.passwords_weak_subtitle))
         }
 
         val totalIssues = compromised.size + weak.size + duplicates.sumOf { it.items.size }

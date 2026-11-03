@@ -1,5 +1,7 @@
 package it.vittorioscocca.kidbox.feature.passwords
 
+import androidx.annotation.StringRes
+import it.vittorioscocca.kidbox.R
 import kotlin.math.log2
 import kotlin.math.max
 import kotlin.math.min
@@ -12,13 +14,22 @@ enum class PasswordStrengthLevel {
     VERY_STRONG,
     ;
 
-    /** Breve etichetta UI (italiano). */
-    fun labelIt(): String = when (this) {
-        VERY_WEAK -> "Molto debole"
-        WEAK -> "Debole"
-        FAIR -> "Discreta"
-        STRONG -> "Forte"
-        VERY_STRONG -> "Molto forte"
+    /** Breve etichetta UI. */
+    @get:StringRes
+    val labelRes: Int get() = when (this) {
+        VERY_WEAK -> R.string.passwords_strength_very_weak
+        WEAK -> R.string.passwords_strength_weak
+        FAIR -> R.string.passwords_strength_fair
+        STRONG -> R.string.passwords_strength_strong
+        VERY_STRONG -> R.string.passwords_strength_very_strong
+    }
+
+    /** Consiglio mostrato sotto la barra nel dettaglio. */
+    @get:StringRes
+    val adviceRes: Int get() = when (this) {
+        VERY_WEAK, WEAK -> R.string.passwords_advice_weak
+        FAIR -> R.string.passwords_advice_fair
+        else -> R.string.passwords_advice_good
     }
 }
 

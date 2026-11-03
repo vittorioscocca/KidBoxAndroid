@@ -42,8 +42,7 @@ data class PasswordDetailUiState(
     val hasDuplicate: Boolean = false,
     val isVulnerable: Boolean = false,
     val estimatedBits: Int = 0,
-    val strengthLabel: String = "",
-    val strengthAdvice: String = "",
+    val strengthLevel: it.vittorioscocca.kidbox.feature.passwords.PasswordStrengthLevel? = null,
     val updatedAtLabel: String = "",
     val passwordUpdatedAtLabel: String = "",
     val createdBy: String = "",
@@ -185,14 +184,6 @@ private fun PasswordEntryEntity.toUiState(
     }.orEmpty()
     val strength = PasswordStrength.evaluate(password)
     val dateFmt = SimpleDateFormat("dd MMM yyyy, HH:mm", KBLocale.current())
-    val advice = when (strength.level) {
-        it.vittorioscocca.kidbox.feature.passwords.PasswordStrengthLevel.VERY_WEAK,
-        it.vittorioscocca.kidbox.feature.passwords.PasswordStrengthLevel.WEAK,
-        -> "Considera una password piu lunga e varia."
-        it.vittorioscocca.kidbox.feature.passwords.PasswordStrengthLevel.FAIR -> "Aggiungi simboli e aumenta la lunghezza."
-        else -> "Buona password."
-    }
-
     return PasswordDetailUiState(
         isLoading = false,
         notFound = false,
@@ -210,8 +201,7 @@ private fun PasswordEntryEntity.toUiState(
         hasDuplicate = hasDuplicate,
         isVulnerable = (pwnedCount ?: 0) > 0 || hasDuplicate,
         estimatedBits = strength.estimatedBits.toInt(),
-        strengthLabel = strength.level.labelIt(),
-        strengthAdvice = advice,
+        strengthLevel = strength.level,
         createdAtEpochMillis = createdAtEpochMillis,
         updatedAtLabel = dateFmt.format(Date(updatedAtEpochMillis)),
         passwordUpdatedAtLabel = dateFmt.format(Date(passwordUpdatedAtEpochMillis)),
