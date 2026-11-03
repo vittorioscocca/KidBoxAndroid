@@ -110,20 +110,20 @@ fun TravelDetailScreen(
 
     LaunchedEffect(dayRegenerateError) {
         dayRegenerateError?.let { message ->
-            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            Toast.makeText(context, message.resolve(context), Toast.LENGTH_LONG).show()
         }
     }
 
     val deleteTripError by viewModel.deleteTripError.collectAsStateWithLifecycle()
     LaunchedEffect(deleteTripError) {
         deleteTripError?.let { message ->
-            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            Toast.makeText(context, message.resolve(context), Toast.LENGTH_LONG).show()
         }
     }
 
     LaunchedEffect(dayRegenerateSuccess) {
         dayRegenerateSuccess?.let { message ->
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, message.resolve(context), Toast.LENGTH_SHORT).show()
             viewModel.clearDayRegenerateSuccess()
         }
     }

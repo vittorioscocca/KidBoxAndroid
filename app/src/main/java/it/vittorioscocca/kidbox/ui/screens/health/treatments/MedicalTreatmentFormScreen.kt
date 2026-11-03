@@ -75,6 +75,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
@@ -124,9 +125,9 @@ fun MedicalTreatmentFormScreen(
     val reminderPermission = rememberReminderPermission(onEnable = { viewModel.setReminderEnabled(true) })
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val frequencySummary = if (state.intervalBetweenDosesDays > 0) {
-        "Ogni ${state.intervalBetweenDosesDays} giorni"
+        pluralStringResource(R.plurals.health_every_n_days, state.intervalBetweenDosesDays, state.intervalBetweenDosesDays)
     } else {
-        "${state.dailyFrequency} dosi al giorno"
+        pluralStringResource(R.plurals.health_doses_per_day, state.dailyFrequency, state.dailyFrequency)
     }
 
     LaunchedEffect(familyId, childId, petId, treatmentId) { viewModel.bind(familyId, childId, petId, treatmentId) }
@@ -228,7 +229,7 @@ fun MedicalTreatmentFormScreen(
                 Text(state.childName, fontSize = 14.sp, color = kb.subtitle)
             }
             Spacer(Modifier.height(10.dp))
-            Text("Step ${currentStep + 1} di $totalSteps · $stepTitle", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = kb.subtitle)
+            Text(stringResource(R.string.health_step_of, currentStep + 1, totalSteps, stepTitle), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = kb.subtitle)
             Text(stepSubtitle, fontSize = 12.sp, color = kb.subtitle)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
@@ -340,13 +341,13 @@ fun MedicalTreatmentFormScreen(
                 if (!state.isLongTerm) {
                     TreatSectionLabel(stringResource(R.string.health_duration))
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("${state.durationDays} giorni", fontWeight = FontWeight.SemiBold, color = kb.title, fontSize = 14.sp)
+                        Text(pluralStringResource(R.plurals.health_duration_days, state.durationDays, state.durationDays), fontWeight = FontWeight.SemiBold, color = kb.title, fontSize = 14.sp)
                         Row {
                             IconButton(onClick = { viewModel.setDurationDays(state.durationDays - 1) }) { Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.health_less), tint = kb.title) }
                             IconButton(onClick = { viewModel.setDurationDays(state.durationDays + 1) }) { Icon(Icons.Default.Add, contentDescription = stringResource(R.string.health_more), tint = kb.title) }
                         }
                     }
-                    Text("Fine: ${DATE_FMT_TREAT_FORM().format(Date(state.endDateEpochMillis))}", fontSize = 12.sp, color = kb.subtitle)
+                    Text(stringResource(R.string.health_end_date, DATE_FMT_TREAT_FORM().format(Date(state.endDateEpochMillis))), fontSize = 12.sp, color = kb.subtitle)
                     Spacer(Modifier.height(16.dp))
                 }
 
@@ -365,7 +366,7 @@ fun MedicalTreatmentFormScreen(
                                 .padding(12.dp),
                         ) {
                             Column {
-                                Text("${freq}x/die", fontWeight = FontWeight.SemiBold, color = kb.title, fontSize = 14.sp)
+                                Text(stringResource(R.string.health_times_per_day_short, freq), fontWeight = FontWeight.SemiBold, color = kb.title, fontSize = 14.sp)
                                 Text(subtitle, fontSize = 12.sp, color = kb.subtitle)
                             }
                         }
@@ -381,7 +382,7 @@ fun MedicalTreatmentFormScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
-                            "Ogni ${state.intervalBetweenDosesDays} giorni",
+                            pluralStringResource(R.plurals.health_every_n_days, state.intervalBetweenDosesDays, state.intervalBetweenDosesDays),
                             fontWeight = FontWeight.SemiBold,
                             color = kb.title,
                             fontSize = 14.sp,
@@ -429,7 +430,7 @@ fun MedicalTreatmentFormScreen(
                     state.scheduleTimes.forEachIndexed { idx, time ->
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(
-                                schedulePeriodLabel(state.scheduleTimes[idx], idx),
+                                schedulePeriodLabel(LocalContext.current.resources, state.scheduleTimes[idx], idx),
                                 fontWeight = FontWeight.SemiBold,
                                 color = kb.title,
                                 fontSize = 14.sp,
@@ -448,7 +449,7 @@ fun MedicalTreatmentFormScreen(
                 }
                 Spacer(Modifier.height(12.dp))
                 TreatSectionLabel(stringResource(R.string.health_quick_summary))
-                Text("$frequencySummary · ${if (state.isLongTerm) stringResource(R.string.health_long_term_cap) else "${state.durationDays} giorni"}", fontSize = 12.sp, color = kb.subtitle)
+                Text("$frequencySummary · ${if (state.isLongTerm) stringResource(R.string.health_long_term_cap) else pluralStringResource(R.plurals.health_duration_days, state.durationDays, state.durationDays)}", fontSize = 12.sp, color = kb.subtitle)
             }
 
             if (currentStep == 3) {
@@ -472,7 +473,7 @@ fun MedicalTreatmentFormScreen(
                 }
                 Text(
                     if (state.intervalBetweenDosesDays > 0) {
-                        "Le notifiche arrivano nei giorni di dose (ogni ${state.intervalBetweenDosesDays} giorni), all'orario impostato."
+                        stringResource(R.string.health_notifications_dose_days_every, state.intervalBetweenDosesDays)
                     } else {
                         stringResource(R.string.health_notifications_all_days)
                     },
@@ -634,7 +635,7 @@ fun MedicalTreatmentFormScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text("Ogni ${state.customIntervalDaysDraft} giorni", color = kb.title, fontWeight = FontWeight.SemiBold)
+                    Text(pluralStringResource(R.plurals.health_every_n_days, state.customIntervalDaysDraft, state.customIntervalDaysDraft), color = kb.title, fontWeight = FontWeight.SemiBold)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = { viewModel.setCustomIntervalDaysDraft(state.customIntervalDaysDraft - 1) }) {
                             Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.health_fewer_days), tint = kb.title)
@@ -658,7 +659,7 @@ fun MedicalTreatmentFormScreen(
                 val yearsLabel = if (state.customIntervalYearsDraft == 1) {
                     stringResource(R.string.health_every_1_year)
                 } else {
-                    "Ogni ${state.customIntervalYearsDraft} anni"
+                    stringResource(R.string.health_every_n_years, state.customIntervalYearsDraft)
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),

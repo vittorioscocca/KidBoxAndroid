@@ -83,6 +83,7 @@ import it.vittorioscocca.kidbox.util.KBLocale
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 
 private val PURPLE = Color(0xFF9573D9)
 
@@ -158,10 +159,9 @@ fun MedicalTreatmentsScreen(
 
     if (showDeleteConfirm) {
         val n = state.selectedIds.size
-        val curaWord = if (n == 1) "cura" else "cure"
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Eliminare $n $curaWord?") },
+            title = { Text(pluralStringResource(R.plurals.health_delete_treatments_title, n, n)) },
             text = { Text(stringResource(R.string.health_treatments_removed_all)) },
             confirmButton = {
                 TextButton(
@@ -726,7 +726,7 @@ private fun TreatmentRow(
                 }
                 val dosageStr = if (treatment.dosageValue % 1.0 == 0.0) "%.0f".format(treatment.dosageValue) else "%.1f".format(treatment.dosageValue)
                 Text(
-                    "$dosageStr ${treatment.dosageUnit} · ${treatment.frequencyDisplayLabel}",
+                    "$dosageStr ${treatment.dosageUnit} · ${treatment.frequencyDisplayLabel(LocalContext.current.resources)}",
                     fontSize = 12.sp,
                     color = PURPLE,
                 )
@@ -744,7 +744,7 @@ private fun TreatmentRow(
                         Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = kb.subtitle, modifier = Modifier.size(13.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            "Giorno $currentDay di ${treatment.durationDays}  \u2013  $taken/$totalPlanned",
+                            stringResource(R.string.health_day_of_progress, currentDay.toInt(), treatment.durationDays, taken, totalPlanned),
                             fontSize = 12.sp,
                             color = kb.subtitle,
                         )

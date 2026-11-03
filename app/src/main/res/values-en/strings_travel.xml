@@ -306,4 +306,8 @@
     <string name="onboarding_scanner_hint">Point the camera at the QR code</string>
     <string name="travel_place_details">Details</string>
     <string name="travel_hub_duration">~2 MIN</string>
+    <string name="travel_day_regenerated">Day %1$d regenerated</string>
+    <string name="travel_regenerate_failed_invalid">Couldn\'t regenerate the day: invalid AI response.</string>
+    <string name="travel_regenerate_failed">Couldn\'t regenerate the day.</string>
+    <string name="travel_delete_failed">Couldn\'t delete the trip. Check your connection and try again.</string>
 </resources>

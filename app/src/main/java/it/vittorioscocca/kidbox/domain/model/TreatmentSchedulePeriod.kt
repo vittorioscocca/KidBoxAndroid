@@ -1,5 +1,8 @@
 package it.vittorioscocca.kidbox.domain.model
 
+import android.content.res.Resources
+import androidx.annotation.StringRes
+import it.vittorioscocca.kidbox.R
 import java.time.Instant
 import java.time.ZoneId
 
@@ -12,11 +15,11 @@ import java.time.ZoneId
  * - 16:00–21:59 → Sera
  * - 22:00–05:59 → Notte
  */
-enum class TreatmentSchedulePeriod(val labelIt: String) {
-    MATTINA("Mattina"),
-    PRANZO("Pranzo"),
-    SERA("Sera"),
-    NOTTE("Notte"),
+enum class TreatmentSchedulePeriod(@StringRes val labelRes: Int) {
+    MATTINA(R.string.treatment_period_morning),
+    PRANZO(R.string.treatment_period_lunch),
+    SERA(R.string.treatment_period_evening),
+    NOTTE(R.string.treatment_period_night),
     ;
 
     companion object {
@@ -82,6 +85,6 @@ fun schedulePeriodForTime(scheduledTime: String, slotIndexFallback: Int = 0): Tr
 /**
  * Etichetta periodo da orario programmato; se non parsabile usa [slotLabelFor] sull’indice.
  */
-fun schedulePeriodLabel(scheduledTime: String, slotIndexFallback: Int = 0): String =
-    TreatmentSchedulePeriod.fromScheduleTimeString(scheduledTime)?.labelIt
-        ?: slotLabelFor(slotIndexFallback)
+fun schedulePeriodLabel(res: Resources, scheduledTime: String, slotIndexFallback: Int = 0): String =
+    TreatmentSchedulePeriod.fromScheduleTimeString(scheduledTime)?.let { res.getString(it.labelRes) }
+        ?: slotLabelFor(res, slotIndexFallback)

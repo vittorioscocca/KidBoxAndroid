@@ -1,5 +1,8 @@
 package it.vittorioscocca.kidbox.ui.screens.travel
 
+import it.vittorioscocca.kidbox.R
+import androidx.annotation.StringRes
+import android.content.Context
 import it.vittorioscocca.kidbox.util.KBLog
 
 import androidx.lifecycle.ViewModel
@@ -130,8 +133,8 @@ class TravelDetailViewModel @Inject constructor(
     private val _extrasState = MutableStateFlow(TravelTripExtrasUiState())
     val extrasState: StateFlow<TravelTripExtrasUiState> = _extrasState.asStateFlow()
 
-    private val _deleteTripError = MutableStateFlow<String?>(null)
-    val deleteTripError: StateFlow<String?> = _deleteTripError.asStateFlow()
+    private val _deleteTripError = MutableStateFlow<TravelMessage?>(null)
+    val deleteTripError: StateFlow<TravelMessage?> = _deleteTripError.asStateFlow()
 
     private val _isDeletingTrip = MutableStateFlow(false)
     val isDeletingTrip: StateFlow<Boolean> = _isDeletingTrip.asStateFlow()
@@ -256,11 +259,11 @@ class TravelDetailViewModel @Inject constructor(
     private val _regeneratingDayId = MutableStateFlow<String?>(null)
     val regeneratingDayId: StateFlow<String?> = _regeneratingDayId.asStateFlow()
 
-    private val _dayRegenerateError = MutableStateFlow<String?>(null)
-    val dayRegenerateError: StateFlow<String?> = _dayRegenerateError.asStateFlow()
+    private val _dayRegenerateError = MutableStateFlow<TravelMessage?>(null)
+    val dayRegenerateError: StateFlow<TravelMessage?> = _dayRegenerateError.asStateFlow()
 
-    private val _dayRegenerateSuccess = MutableStateFlow<String?>(null)
-    val dayRegenerateSuccess: StateFlow<String?> = _dayRegenerateSuccess.asStateFlow()
+    private val _dayRegenerateSuccess = MutableStateFlow<TravelMessage?>(null)
+    val dayRegenerateSuccess: StateFlow<TravelMessage?> = _dayRegenerateSuccess.asStateFlow()
 
     fun clearDayRegenerateSuccess() {
         _dayRegenerateSuccess.value = null
@@ -302,7 +305,7 @@ class TravelDetailViewModel @Inject constructor(
                     val newDayMap = TravelDayRegeneration.extractRegeneratedDay(response, day.dateString)
                         ?: run {
                             KBLog.ui.error("regenerateDayPlan parse failed date=${day.dateString} narrativeLen=${response.narrativeText.length}", TAG)
-                            _dayRegenerateError.value = "Rigenerazione giorno fallita: risposta AI non valida."
+                            _dayRegenerateError.value = TravelMessage(R.string.travel_regenerate_failed_invalid)
                             return@onSuccess
                         }
                     val morningStops = (newDayMap["morningStops"] as? List<*>)?.size ?: 0
@@ -331,13 +334,13 @@ class TravelDetailViewModel @Inject constructor(
                     }
                     val newJson = updateDayInProposalJson(tripEntity.aiProposalJson, day.dateString, newDayMap)
                     tripDao.upsert(tripEntity.copy(aiProposalJson = newJson))
-                    _dayRegenerateSuccess.value = "Giorno ${day.dayIndex} rigenerato"
+                    _dayRegenerateSuccess.value = TravelMessage(R.string.travel_day_regenerated, day.dayIndex)
                     tripRemoteStore.syncTrip(tripEntity.id)
                     KBLog.ui.info("regenerateDayPlan synced tripId=${tripEntity.id}", TAG)
                 }
                 .onFailure { err ->
                     KBLog.ui.error("regenerateDayPlan failed", TAG, err)
-                    _dayRegenerateError.value = err.message ?: "Rigenerazione giorno fallita."
+                    _dayRegenerateError.value = TravelMessage(R.string.travel_regenerate_failed, raw = err.message)
                 }
             _regeneratingDayId.value = null
         }
@@ -421,7 +424,7 @@ class TravelDetailViewModel @Inject constructor(
             } else {
                 // Si resta sul viaggio: uscire dopo un fallimento faceva
                 // credere che fosse cancellato, e poi ricompariva in lista.
-                _deleteTripError.value = "Non è stato possibile eliminare il viaggio. Controlla la connessione e riprova."
+                _deleteTripError.value = TravelMessage(R.string.travel_delete_failed)
             }
         }
     }
@@ -452,4 +455,13 @@ class TravelDetailViewModel @Inject constructor(
                 .onFailure { KBLog.data.warning("Trip cleanup: deleteList failed listId=$listId", TAG) }
         }
     }
+}
+
+/**
+ * Messaggio per un Toast della schermata: la risorsa si risolve lì, con la
+ * lingua dell'app; [raw] è il testo dell'errore quando c'è e vince sulla risorsa.
+ */
+data class TravelMessage(@StringRes val res: Int, val arg: Int? = null, val raw: String? = null) {
+    fun resolve(context: Context): String =
+        raw ?: if (arg != null) context.getString(res, arg) else context.getString(res)
 }

@@ -1,11 +1,18 @@
 package it.vittorioscocca.kidbox.domain.model
 
+import android.content.res.Resources
+import it.vittorioscocca.kidbox.R
 import kotlin.math.max
 
-private val SLOT_LABELS = listOf("Mattina", "Pranzo", "Sera", "Notte")
+private val SLOT_LABELS = listOf(
+    R.string.treatment_period_morning,
+    R.string.treatment_period_lunch,
+    R.string.treatment_period_evening,
+    R.string.treatment_period_night,
+)
 
-fun slotLabelFor(index: Int): String =
-    if (index < SLOT_LABELS.size) SLOT_LABELS[index] else "Dose ${index + 1}"
+fun slotLabelFor(res: Resources, index: Int): String =
+    if (index < SLOT_LABELS.size) res.getString(SLOT_LABELS[index]) else res.getString(R.string.treatment_dose_n, index + 1)
 
 /** Terapia farmacologica — allineato a [KBTreatment] iOS. */
 data class KBTreatment(
@@ -54,13 +61,11 @@ fun KBTreatment.isScheduledDoseDayTherapeutic(dayNumber1Based: Int): Boolean {
     return (dayNumber1Based - 1) % n == 0
 }
 
-val KBTreatment.frequencyDisplayLabel: String
-    get() = if (intervalBetweenDosesDays > 0) {
-        "Ogni $intervalBetweenDosesDays giorni"
-    } else if (dailyFrequency == 1) {
-        "1 volta al giorno"
+fun KBTreatment.frequencyDisplayLabel(res: Resources): String =
+    if (intervalBetweenDosesDays > 0) {
+        res.getQuantityString(R.plurals.health_every_n_days, intervalBetweenDosesDays, intervalBetweenDosesDays)
     } else {
-        "$dailyFrequency volte al giorno"
+        res.getQuantityString(R.plurals.health_times_per_day, dailyFrequency, dailyFrequency)
     }
 
 /** Dosi pianificate totali per cure a durata finita (allineato a iOS [totalDoses]). */

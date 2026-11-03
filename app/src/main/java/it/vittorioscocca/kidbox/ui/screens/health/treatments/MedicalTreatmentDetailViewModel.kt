@@ -24,7 +24,6 @@ import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import it.vittorioscocca.kidbox.domain.model.TreatmentSchedulePeriod
 import it.vittorioscocca.kidbox.domain.model.isScheduledDoseDayTherapeutic
 import it.vittorioscocca.kidbox.domain.model.schedulePeriodForTime
-import it.vittorioscocca.kidbox.domain.model.schedulePeriodLabel
 import it.vittorioscocca.kidbox.notifications.TreatmentNotificationManager
 import it.vittorioscocca.kidbox.ui.screens.health.common.PrescribingVisitSummary
 import java.io.File
@@ -51,8 +50,6 @@ data class DoseSlot(
     val dayNumber: Int,
     val slotIndex: Int,
     val scheduledTime: String,
-    /** Etichetta fascia da orario programmato (Mattina / Pranzo / …). */
-    val label: String,
     /** Fascia da [scheduledTime] (ordinamento e chip “programmato”); `null` se non deducibile (es. dose 5+ senza orario valido). */
     val schedulePeriod: TreatmentSchedulePeriod?,
     /** Fascia mostrata: se assunta, da [takenAtEpochMillis], altrimenti uguale a [schedulePeriod]. */
@@ -333,7 +330,6 @@ class MedicalTreatmentDetailViewModel @Inject constructor(
 
     private fun makeDoseSlot(dayNumber: Int, slotIndex: Int, time: String, log: KBDoseLog?): DoseSlot {
         val schedPeriod = schedulePeriodForTime(time, slotIndex)
-        val label = schedulePeriodLabel(time, slotIndex)
         val dispPeriod = when {
             log?.taken == true && log.takenAtEpochMillis != null ->
                 TreatmentSchedulePeriod.fromEpochMillis(log.takenAtEpochMillis)
@@ -343,7 +339,6 @@ class MedicalTreatmentDetailViewModel @Inject constructor(
             dayNumber = dayNumber,
             slotIndex = slotIndex,
             scheduledTime = time,
-            label = label,
             schedulePeriod = schedPeriod,
             displayPeriod = dispPeriod,
             state = when {

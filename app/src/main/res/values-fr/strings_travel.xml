@@ -306,4 +306,8 @@
     <string name="onboarding_scanner_hint">Visez le QR code</string>
     <string name="travel_place_details">Détails</string>
     <string name="travel_hub_duration">~2 MIN</string>
+    <string name="travel_day_regenerated">Jour %1$d régénéré</string>
+    <string name="travel_regenerate_failed_invalid">Impossible de régénérer le jour : réponse de l\'IA non valide.</string>
+    <string name="travel_regenerate_failed">Impossible de régénérer le jour.</string>
+    <string name="travel_delete_failed">Impossible de supprimer le voyage. Vérifiez la connexion et réessayez.</string>
 </resources>

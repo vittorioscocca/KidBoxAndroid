@@ -582,4 +582,43 @@
     </plurals>
     <string name="health_error_refresh">Couldn\'t update the record. Try again.</string>
     <string name="health_error_export">Couldn\'t export the PDF. Try again.</string>
+    <string name="health_day_of">Day %1$d of %2$d</string>
+    <string name="health_day_of_progress">Day %1$d of %2$d  –  %3$d/%4$d</string>
+    <string name="health_total_doses_count">%1$d/%2$d total doses</string>
+    <string name="health_ongoing_since">Ongoing since %1$s</string>
+    <string name="health_single_time_every_n_days">One time only on dose days (every %1$d days).</string>
+    <string name="health_notify_dose_days_every">Notification on dose days (every %1$d days)</string>
+    <string name="health_notifications_dose_days_every">Notifications arrive on dose days (every %1$d days), at the set time.</string>
+    <string name="health_step_of">Step %1$d of %2$d · %3$s</string>
+    <string name="health_end_date">End: %1$s</string>
+    <string name="health_times_per_day_short">%1$dx/day</string>
+    <string name="health_every_n_years">Every %1$d years</string>
+    <plurals name="health_every_n_days">
+        <item quantity="one">Every day</item>
+        <item quantity="other">Every %d days</item>
+    </plurals>
+    <plurals name="health_times_per_day">
+        <item quantity="one">Once a day</item>
+        <item quantity="other">%d times a day</item>
+    </plurals>
+    <plurals name="health_doses_per_day">
+        <item quantity="one">%d dose a day</item>
+        <item quantity="other">%d doses a day</item>
+    </plurals>
+    <plurals name="health_doses_given">
+        <item quantity="one">%d dose administered</item>
+        <item quantity="other">%d doses administered</item>
+    </plurals>
+    <plurals name="health_set_times_for_doses">
+        <item quantity="one">Set the time for %d daily dose</item>
+        <item quantity="other">Set the times for %d daily doses</item>
+    </plurals>
+    <plurals name="health_duration_days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <plurals name="health_delete_treatments_title">
+        <item quantity="one">Delete %d treatment?</item>
+        <item quantity="other">Delete %d treatments?</item>
+    </plurals>
 </resources>

@@ -98,6 +98,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.ui.text.font.FontWeight
@@ -113,7 +114,6 @@ import it.vittorioscocca.kidbox.domain.model.TreatmentSchedulePeriod
 import it.vittorioscocca.kidbox.domain.model.frequencyDisplayLabel
 import it.vittorioscocca.kidbox.domain.model.plannedFiniteDosesTotal
 import it.vittorioscocca.kidbox.domain.model.schedulePeriodForTime
-import it.vittorioscocca.kidbox.domain.model.schedulePeriodLabel
 import it.vittorioscocca.kidbox.ui.screens.health.attachments.HealthAttachmentsCard
 import it.vittorioscocca.kidbox.ui.screens.health.common.PrescribingVisitLinkCard
 import it.vittorioscocca.kidbox.ui.screens.health.attachments.KidBoxDocumentPickerSheet
@@ -358,7 +358,7 @@ fun MedicalTreatmentDetailScreen(
                     }
                     Spacer(Modifier.height(8.dp))
                     Text("$dosageStr ${treatment.dosageUnit}", fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = PURPLE_DETAIL)
-                    Text(treatment.frequencyDisplayLabel, fontSize = 14.sp, color = kb.subtitle)
+                    Text(treatment.frequencyDisplayLabel(LocalContext.current.resources), fontSize = 14.sp, color = kb.subtitle)
                 }
             }
 
@@ -416,19 +416,19 @@ fun MedicalTreatmentDetailScreen(
                                     )
                                 }
                                 Text(
-                                    "In corso dal ${DATE_FMT_RANGE().format(Date(treatment.startDateEpochMillis))}",
+                                    stringResource(R.string.health_ongoing_since, DATE_FMT_RANGE().format(Date(treatment.startDateEpochMillis))),
                                     fontSize = 12.sp,
                                     color = kb.subtitle,
                                 )
                                 Text(
-                                    "$takenDoses dosi somministrate",
+                                    pluralStringResource(R.plurals.health_doses_given, takenDoses, takenDoses),
                                     fontSize = 12.sp,
                                     color = kb.subtitle,
                                 )
                             } else {
                                 val totalLabel = treatment.durationDays
                                 Text(
-                                    "Giorno ${selectedDay?.dayNumber ?: 1} di $totalLabel",
+                                    stringResource(R.string.health_day_of, selectedDay?.dayNumber ?: 1, totalLabel),
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 14.sp,
                                     color = kb.title,
@@ -439,7 +439,7 @@ fun MedicalTreatmentDetailScreen(
                                     color = kb.subtitle,
                                 )
                                 Text(
-                                    "$takenDoses/$totalDoses Dosi totali",
+                                    stringResource(R.string.health_total_doses_count, takenDoses, totalDoses),
                                     fontSize = 12.sp,
                                     color = kb.subtitle,
                                 )
@@ -541,9 +541,9 @@ fun MedicalTreatmentDetailScreen(
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text(
                         if (treatment.intervalBetweenDosesDays > 0) {
-                            "È previsto un solo orario nei giorni di dose (ogni ${treatment.intervalBetweenDosesDays} giorni)."
+                            stringResource(R.string.health_single_time_every_n_days, treatment.intervalBetweenDosesDays)
                         } else {
-                            "Imposta gli orari per ${treatment.dailyFrequency} dosi giornaliere"
+                            pluralStringResource(R.plurals.health_set_times_for_doses, treatment.dailyFrequency, treatment.dailyFrequency)
                         },
                         color = kb.subtitle,
                         fontSize = 13.sp,
@@ -552,7 +552,7 @@ fun MedicalTreatmentDetailScreen(
                     treatment.scheduleTimesData.split(",").map { it.trim() }.filter { it.isNotBlank() }.forEachIndexed { i, time ->
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             val p = schedulePeriodForTime(time, i)
-                            if (p != null) TreatmentPeriodBadge(p) else NeutralPeriodBadge(schedulePeriodLabel(time, i), kb)
+                            if (p != null) TreatmentPeriodBadge(p) else NeutralPeriodBadge(stringResource(R.string.treatment_dose_n, i + 1), kb)
                             Spacer(Modifier.width(8.dp))
                             Spacer(Modifier.weight(1f))
                             Text(time, color = kb.title, fontWeight = FontWeight.SemiBold)
@@ -579,7 +579,7 @@ fun MedicalTreatmentDetailScreen(
                         Text(if (treatment.reminderEnabled) stringResource(R.string.health_reminder_active) else stringResource(R.string.health_reminder_off), color = kb.title)
                         Text(
                             if (treatment.intervalBetweenDosesDays > 0) {
-                                "Notifica nei giorni di dose (ogni ${treatment.intervalBetweenDosesDays} giorni)"
+                                stringResource(R.string.health_notify_dose_days_every, treatment.intervalBetweenDosesDays)
                             } else {
                                 stringResource(R.string.health_notify_each_dose)
                             },
@@ -753,7 +753,7 @@ private fun TreatmentPeriodBadge(period: TreatmentSchedulePeriod) {
     val (bg, fg) = periodBadgeColors(period)
     Surface(shape = RoundedCornerShape(50), color = bg, shadowElevation = 0.dp) {
         Text(
-            period.labelIt,
+            stringResource(period.labelRes),
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
@@ -814,7 +814,7 @@ private fun SlotCompactRow(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val p = slot.displayPeriod
-                    if (p != null) TreatmentPeriodBadge(p) else NeutralPeriodBadge(slot.label, kb)
+                    if (p != null) TreatmentPeriodBadge(p) else NeutralPeriodBadge(stringResource(R.string.treatment_dose_n, slot.slotIndex + 1), kb)
                     Spacer(Modifier.width(8.dp))
                     Text(slot.scheduledTime, fontWeight = FontWeight.SemiBold, color = kb.title, fontSize = 18.sp)
                 }
