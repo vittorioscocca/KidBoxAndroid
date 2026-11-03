@@ -77,7 +77,7 @@
     <string name="travel_apartment">Apartment</string>
     <string name="travel_intro">Introduction</string>
     <string name="travel_estimated_total">ESTIMATED TOTAL</string>
-    <string name="travel_flights">Flights</string>
+    <string name="travel_flights">Transport</string>
     <string name="travel_regenerate_day">Regenerate day</string>
     <string name="travel_title">Travel</string>
     <string name="travel_new_trip">New trip</string>

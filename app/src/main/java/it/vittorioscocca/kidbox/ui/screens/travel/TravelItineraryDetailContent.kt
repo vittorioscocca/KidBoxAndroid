@@ -176,7 +176,8 @@ private fun BudgetCategorySection(
         } else {
             BudgetRow("🛏️", stringResource(R.string.travel_hotels), "~${formatMoney(overview.budget.hotels, overview.currency)} per $nights notti", hotelAction, kb, tappable = false)
         }
-        BudgetRow("✈️", stringResource(R.string.travel_flights), formatMoney(overview.budget.flights, overview.currency), null, kb, tappable = false)
+        // «Trasporti» e non «Voli»: senza un volo la stima copre treno o auto.
+        BudgetRow("🧳", stringResource(R.string.travel_flights), formatMoney(overview.budget.flights, overview.currency), null, kb, tappable = false)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             if (onRestaurantsClick != null && restaurantsCount > 0) {
                 Surface(
