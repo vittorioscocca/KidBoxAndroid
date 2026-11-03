@@ -235,6 +235,7 @@ internal fun DeviceCalendarPromptCard(onConnect: () -> Unit, onDismiss: () -> Un
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun DeviceCalendarSettingsSheet(
+    familyId: String,
     state: DeviceCalendarState,
     onRequestPermission: () -> Unit,
     onSetEnabled: (Boolean) -> Unit,
@@ -393,6 +394,8 @@ internal fun DeviceCalendarSettingsSheet(
                 },
                 onRemove = { feedToRemove = it },
             )
+
+            CalendarExportSection(familyId = familyId)
         }
     }
 

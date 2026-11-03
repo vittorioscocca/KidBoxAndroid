@@ -240,6 +240,22 @@
     <!-- Calendari iscritti da link (feed ICS) -->
     <string name="calendar_feeds_section">Calendriers abonnés</string>
     <string name="calendar_feeds_footer">Le lien d\'un calendrier publié : école, équipe, jours fériés, ou l\'adresse iCal d\'un Google Agenda. Toute la famille voit les événements, qui se mettent à jour tout seuls toutes les quelques heures.</string>
+    <string name="calendar_export_section">KidBox dans les autres calendriers</string>
+    <string name="calendar_export_intro">Un lien rien qu\'à vous : Google Agenda ou Outlook le lisent et affichent les événements de famille que vous voyez. Il est en lecture seule : les événements se créent et se modifient dans KidBox.</string>
+    <string name="calendar_export_enable">Créer mon lien</string>
+    <string name="calendar_export_google">Ajouter à Google Agenda</string>
+    <string name="calendar_export_outlook">Ajouter à Outlook.com</string>
+    <string name="calendar_export_outlook_work">Outlook professionnel (Microsoft 365)</string>
+    <string name="calendar_export_copy">Copier le lien</string>
+    <string name="calendar_export_copied">Copié</string>
+    <string name="calendar_export_rotate">Régénérer le lien</string>
+    <string name="calendar_export_disable">Désactiver</string>
+    <string name="calendar_export_rotate_confirm">Le lien actuel cessera aussitôt de fonctionner : il faudra l\'ajouter à nouveau dans Google ou Outlook.</string>
+    <string name="calendar_export_disable_confirm">Le lien cessera de fonctionner et les événements disparaîtront de Google ou Outlook à la prochaine mise à jour.</string>
+    <string name="calendar_export_error">L\'opération n\'a pas abouti. Réessayez.</string>
+    <string name="calendar_export_google_hint">Si Google Agenda ne s\'ouvre pas depuis le téléphone, ajoutez-le depuis un ordinateur : calendar.google.com › Autres agendas › + › À partir de l\'URL, et collez le lien.</string>
+    <string name="calendar_export_refresh">Google relit les calendriers abonnés quand il le décide, en général toutes les 12 à 24 heures : un nouvel événement peut y apparaître le lendemain. Outlook est plus rapide.</string>
+    <string name="calendar_export_privacy">Toute personne qui a ce lien voit vos événements de famille. Si vous l\'avez partagé par erreur, régénérez-le : l\'ancien cesse aussitôt de fonctionner.</string>
     <string name="calendar_feeds_add">Ajouter depuis un lien</string>
     <string name="calendar_feeds_add_title">S\'abonner à un calendrier</string>
     <string name="calendar_feeds_url_label">Lien du calendrier (.ics ou webcal://)</string>

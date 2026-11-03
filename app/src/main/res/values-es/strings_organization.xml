@@ -240,6 +240,22 @@
     <!-- Calendari iscritti da link (feed ICS) -->
     <string name="calendar_feeds_section">Calendarios suscritos</string>
     <string name="calendar_feeds_footer">El enlace de un calendario publicado: colegio, equipo, festivos o la dirección iCal de un Google Calendar. Toda la familia ve los eventos, que se actualizan solos cada pocas horas.</string>
+    <string name="calendar_export_section">KidBox en otros calendarios</string>
+    <string name="calendar_export_intro">Un enlace solo tuyo: Google Calendar u Outlook lo leen y muestran los eventos de familia que tú ves. Es de solo lectura: los eventos se crean y se cambian en KidBox.</string>
+    <string name="calendar_export_enable">Crear mi enlace</string>
+    <string name="calendar_export_google">Añadir a Google Calendar</string>
+    <string name="calendar_export_outlook">Añadir a Outlook.com</string>
+    <string name="calendar_export_outlook_work">Outlook del trabajo (Microsoft 365)</string>
+    <string name="calendar_export_copy">Copiar enlace</string>
+    <string name="calendar_export_copied">Copiado</string>
+    <string name="calendar_export_rotate">Regenerar enlace</string>
+    <string name="calendar_export_disable">Desactivar</string>
+    <string name="calendar_export_rotate_confirm">El enlace actual dejará de funcionar enseguida: habrá que volver a añadirlo en Google u Outlook.</string>
+    <string name="calendar_export_disable_confirm">El enlace dejará de funcionar y los eventos desaparecerán de Google u Outlook en la próxima actualización.</string>
+    <string name="calendar_export_error">No se ha podido completar la operación. Inténtalo de nuevo.</string>
+    <string name="calendar_export_google_hint">Si Google Calendar no se abre desde el móvil, añádelo desde el ordenador: calendar.google.com › Otros calendarios › + › Desde URL, y pega el enlace.</string>
+    <string name="calendar_export_refresh">Google vuelve a leer los calendarios suscritos cuando él decide, normalmente cada 12-24 horas: un evento nuevo puede aparecer allí al día siguiente. Outlook es más rápido.</string>
+    <string name="calendar_export_privacy">Quien tenga este enlace ve tus eventos de familia. Si lo compartiste por error, regéneralo: el anterior deja de funcionar enseguida.</string>
     <string name="calendar_feeds_add">Añadir desde enlace</string>
     <string name="calendar_feeds_add_title">Suscribirse a un calendario</string>
     <string name="calendar_feeds_url_label">Enlace del calendario (.ics o webcal://)</string>

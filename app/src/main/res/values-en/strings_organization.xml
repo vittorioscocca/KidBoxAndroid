@@ -240,6 +240,22 @@
     <!-- Calendari iscritti da link (feed ICS) -->
     <string name="calendar_feeds_section">Subscribed calendars</string>
     <string name="calendar_feeds_footer">The link to a published calendar: school, team, holidays, or a Google Calendar\'s iCal address. The whole family sees the events, and they update on their own every few hours.</string>
+    <string name="calendar_export_section">KidBox in other calendars</string>
+    <string name="calendar_export_intro">A link just for you: Google Calendar or Outlook read it and show the family events you can see. It\'s read-only: events are created and changed in KidBox.</string>
+    <string name="calendar_export_enable">Create my link</string>
+    <string name="calendar_export_google">Add to Google Calendar</string>
+    <string name="calendar_export_outlook">Add to Outlook.com</string>
+    <string name="calendar_export_outlook_work">Work Outlook (Microsoft 365)</string>
+    <string name="calendar_export_copy">Copy link</string>
+    <string name="calendar_export_copied">Copied</string>
+    <string name="calendar_export_rotate">Regenerate link</string>
+    <string name="calendar_export_disable">Turn off</string>
+    <string name="calendar_export_rotate_confirm">The current link will stop working right away and will need to be added again in Google or Outlook.</string>
+    <string name="calendar_export_disable_confirm">The link will stop working and the events will disappear from Google or Outlook at the next refresh.</string>
+    <string name="calendar_export_error">Something went wrong. Please try again.</string>
+    <string name="calendar_export_google_hint">If Google Calendar doesn\'t open from your phone, add it from a computer: calendar.google.com › Other calendars › + › From URL, and paste the link.</string>
+    <string name="calendar_export_refresh">Google refreshes subscribed calendars on its own schedule, usually every 12-24 hours: a new event may show up there the next day. Outlook is quicker.</string>
+    <string name="calendar_export_privacy">Anyone with this link can see your family events. If you shared it by mistake, regenerate it: the old one stops working right away.</string>
     <string name="calendar_feeds_add">Add from link</string>
     <string name="calendar_feeds_add_title">Subscribe to a calendar</string>
     <string name="calendar_feeds_url_label">Calendar link (.ics or webcal://)</string>

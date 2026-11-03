@@ -635,6 +635,7 @@ fun CalendarScreen(
 
     if (showDeviceSettings) {
         DeviceCalendarSettingsSheet(
+            familyId = familyId,
             state = deviceState,
             onRequestPermission = requestCalendarPermission,
             onSetEnabled = viewModel::setDeviceCalendarsEnabled,
