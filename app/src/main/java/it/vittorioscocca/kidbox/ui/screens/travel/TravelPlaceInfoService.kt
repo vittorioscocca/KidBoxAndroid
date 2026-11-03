@@ -84,6 +84,12 @@ class TravelPlaceInfoService @Inject constructor(
 
         val images = base.imageUrls.toMutableList()
         extraImages.forEach { if (it !in images) images += it }
+        // Stemmi, bandiere e mappe su Wikipedia sono SVG: in testa alla galleria
+        // (e come copertina del viaggio) va una foto. it.wikipedia apre Firenze
+        // con lo stemma, en.wikipedia con una veduta.
+        val (drawings, photos) = images.partition { it.lowercase().contains(".svg") }
+        images.clear()
+        images += photos + drawings
 
         return base.copy(
             paragraphs = fullText.ifEmpty { base.paragraphs },
