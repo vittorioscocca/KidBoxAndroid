@@ -373,7 +373,14 @@ private fun DaySection(
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(day.headline, fontWeight = FontWeight.Bold, color = kb.title)
+                // Composto qui e non nel builder: lì «Arrivo a …» e «Giorno N»
+                // erano letterali italiani in ogni lingua.
+                val headline = when {
+                    day.location.isBlank() -> stringResource(R.string.travel_day_n, day.dayIndex)
+                    day.dayIndex == 1 -> stringResource(R.string.travel_arrival_in, day.location)
+                    else -> day.location
+                }
+                Text(headline, fontWeight = FontWeight.Bold, color = kb.title)
                 if (day.dateString.isNotBlank()) {
                     Text(formatDate(day.dateString), fontSize = 12.sp, color = kb.subtitle)
                 }
@@ -420,7 +427,7 @@ private fun PeriodBlockCard(
 ) {
     val context = LocalContext.current
     val currency = overview.currency
-    val stopLabel = if (block.stops.size == 1) "tappa" else "tappe"
+    val stopLabel = if (block.stops.size == 1) stringResource(R.string.travel_stop_one, 1) else stringResource(R.string.travel_stops, block.stops.size)
     val meta = listOfNotNull(
         block.durationSummary.takeIf { it.isNotBlank() },
         block.costSummary.takeIf { it.isNotBlank() }?.let { "~$it ${currencySymbol(currency)}" },
@@ -445,7 +452,7 @@ private fun PeriodBlockCard(
                         .background(block.period.dotColor),
                 )
                 Text(
-                    "${stringResource(block.period.titleRes)} · ${block.stops.size} $stopLabel",
+                    "${stringResource(block.period.titleRes)} · $stopLabel",
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(start = 8.dp),

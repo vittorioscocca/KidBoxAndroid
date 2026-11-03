@@ -78,6 +78,10 @@
     <string name="travel_intro">Introducción</string>
     <string name="travel_estimated_total">TOTAL ESTIMADO</string>
     <string name="travel_flights">Transporte</string>
+    <string name="travel_day_n">Día %1$d</string>
+    <string name="travel_arrival_in">Llegada a %1$s</string>
+    <string name="travel_stop_one">%1$d parada</string>
+    <string name="travel_stops">%1$d paradas</string>
     <string name="travel_regenerate_day">Regenerar el día</string>
     <string name="travel_title">Viajes</string>
     <string name="travel_new_trip">Nuevo viaje</string>

@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.travel
 
 import it.vittorioscocca.kidbox.data.remote.travel.TravelPlacesService
+import it.vittorioscocca.kidbox.util.KBLocale
 import it.vittorioscocca.kidbox.network.KidBoxHttpHeaders
 import java.net.HttpURLConnection
 import java.net.URL
@@ -39,7 +40,11 @@ class TravelPlaceInfoService @Inject constructor(
     private val cache = ConcurrentHashMap<String, TravelPlaceInfo>()
 
     suspend fun info(place: String, familyId: String?): TravelPlaceInfo? {
-        val key = place.trim().lowercase()
+        // Prima la Wikipedia della lingua dell'app: il nome della destinazione
+        // arriva tradotto («Florence», «Florencia») e cercato su it.wikipedia
+        // dava il carcere ADX Florence del Colorado, o nessuna scheda.
+        val appLanguage = KBLocale.current().language.ifBlank { "it" }
+        val key = appLanguage + "|" + place.trim().lowercase()
         if (key.isEmpty()) return null
         cache[key]?.let { cached ->
             if (cached.googleDetails != null || familyId.isNullOrBlank()) return cached
@@ -48,7 +53,7 @@ class TravelPlaceInfoService @Inject constructor(
         // Italiano prima: per una località italiana l'articolo it.wikipedia è
         // quasi sempre più ricco di quello inglese.
         var base: TravelPlaceInfo? = null
-        for (language in listOf("it", "en")) {
+        for (language in (listOf(appLanguage) + listOf("it", "en")).distinct()) {
             if (base != null) break
             base = fetchInfo(place, language)
         }
