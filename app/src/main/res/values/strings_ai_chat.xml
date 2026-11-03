@@ -14,6 +14,7 @@
         <item quantity="other">Lista spesa: %1$d articoli aggiunti.</item>
     </plurals>
     <string name="chat_edited">Modificato</string>
+    <string name="chat_you">Tu</string>
     <string name="chat_message_deleted">Messaggio eliminato</string>
     <string name="chat_message">Messaggio</string>
     <string name="chat_message_unavailable">Messaggio non disponibile</string>

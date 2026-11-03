@@ -189,7 +189,7 @@ internal fun ChatBubble(
         horizontalAlignment = if (isOwn) Alignment.End else Alignment.Start,
     ) {
         Text(
-            text = if (isOwn) "Tu" else message.senderName,
+            text = if (isOwn) stringResource(R.string.chat_you) else message.senderName,
             color = MaterialTheme.kidBoxColors.subtitle,
             fontSize = 11.sp,
             modifier = Modifier.padding(

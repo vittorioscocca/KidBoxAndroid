@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="chat_edited">Editado</string>
+    <string name="chat_you">Tú</string>
     <string name="chat_message_deleted">Mensaje eliminado</string>
     <string name="chat_message">Mensaje</string>
     <string name="chat_message_unavailable">Mensaje no disponible</string>
