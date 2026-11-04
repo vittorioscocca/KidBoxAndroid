@@ -1,6 +1,7 @@
 package it.vittorioscocca.kidbox.ui.screens.news
 
 import android.content.Context
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -8,8 +9,12 @@ import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.ai.CurrentPlanStore
 import it.vittorioscocca.kidbox.domain.model.KBPlan
 import it.vittorioscocca.kidbox.util.KBLocale
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.io.IOException
+import java.util.Date
 import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -33,6 +38,7 @@ class NewsRepository @Inject constructor(
     private val familyStore: NewsFamilyStore,
 ) {
     private val functions = FirebaseFunctions.getInstance("europe-west1")
+    private val storedFeedFile get() = File(context.cacheDir, "news-feed.json")
 
     /** L'ultima edizione scaricata, per riaprire la scheda senza attese. */
     @Volatile var cachedFeed: Pair<String, NewsFeed>? = null
@@ -43,7 +49,7 @@ class NewsRepository @Inject constructor(
      * argomenti di chi legge. Prima si aspetta che l'ultima scelta della
      * famiglia sia sul server: il server la legge e la preferisce.
      */
-    suspend fun fetchFeed(familyId: String, family: NewsFamilySettings, prefs: NewsPrefs): NewsFeed {
+    suspend fun fetchFeed(familyId: String, family: NewsFamilySettings, prefs: NewsPrefs, key: String): NewsFeed {
         ensurePaidPlan()
         familyStore.settled()
         val payload = hashMapOf(
@@ -56,7 +62,23 @@ class NewsRepository @Inject constructor(
         val data = call("getFamilyNews", payload, 70)
         val feed = NewsParser.feed(data)
         cachedFeed = familyId to feed
+        if (NewsFeedCache.isComplete(data)) storeFeed(familyId, key, feed.dateKey, data)
         return feed
+    }
+
+    /** L'edizione di oggi già salvata su disco, se è di questo utente e di queste scelte. */
+    suspend fun storedFeed(familyId: String, key: String): NewsFeed? = withContext(Dispatchers.IO) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@withContext null
+        val text = runCatching { storedFeedFile.readText() }.getOrNull() ?: return@withContext null
+        val data = NewsFeedCache.decode(text, uid, familyId, key, NewsDates.key(Date())) ?: return@withContext null
+        runCatching { NewsParser.feed(data) }.getOrNull()
+    }
+
+    private suspend fun storeFeed(familyId: String, key: String, dateKey: String, data: Map<*, *>) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        withContext(Dispatchers.IO) {
+            runCatching { storedFeedFile.writeText(NewsFeedCache.encode(uid, familyId, key, dateKey, data)) }
+        }
     }
 
     /**
@@ -79,6 +101,7 @@ class NewsRepository @Inject constructor(
 
     fun clearCache() {
         cachedFeed = null
+        storedFeedFile.delete()
     }
 
     // ── Presidio di piano ───────────────────────────────────────────────────

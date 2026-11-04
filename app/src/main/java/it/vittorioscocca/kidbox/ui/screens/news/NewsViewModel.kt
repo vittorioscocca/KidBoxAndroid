@@ -116,12 +116,33 @@ class NewsViewModel @Inject constructor(
         if (familyId.isBlank() || !family.enabled || !_state.value.isPaid) return
         val key = key(family, prefs)
         if (!force && key == loadedKey && _state.value.feed != null) return
+        pollJob?.cancel()
+        viewModelScope.launch {
+            if (!force) {
+                val stored = repository.storedFeed(familyId, key)
+                if (stored != null) {
+                    showStored(stored, familyId, family, prefs, key)
+                    return@launch
+                }
+            }
+            fetch(familyId, family, prefs, key, force)
+        }
+    }
+
+    /** Le offerte non vengono da qui: le ultime cercate possono essere più nuove dell'edizione salvata. */
+    private fun showStored(feed: NewsFeed, familyId: String, family: NewsFamilySettings, prefs: NewsPrefs, key: String) {
+        loadedKey = key
+        _state.update { it.copy(feed = feed, loading = false, error = null, preparingSince = null) }
+        AppAnalytics.newsOpened(context, feed.items.size, feed.events.size, 0, false)
+        if (prefs.personalOffers && _state.value.offers == null) loadSavedOffers(familyId, family)
+    }
+
+    private fun fetch(familyId: String, family: NewsFamilySettings, prefs: NewsPrefs, key: String, force: Boolean) {
         if (!force && _state.value.feed == null) {
             repository.cachedFeed?.let { (fid, feed) ->
                 if (fid == familyId && feed.dateKey == NewsDates.key(Date())) _state.update { it.copy(feed = feed) }
             }
         }
-        pollJob?.cancel()
         _state.update {
             it.copy(
                 loading = it.feed == null,
@@ -130,7 +151,7 @@ class NewsViewModel @Inject constructor(
             )
         }
         viewModelScope.launch {
-            runCatching { repository.fetchFeed(familyId, family, prefs) }
+            runCatching { repository.fetchFeed(familyId, family, prefs, key) }
                 .onSuccess { feed ->
                     loadedKey = key
                     _state.update { it.copy(feed = feed, loading = false, offers = feed.offers ?: it.offers, preparingSince = nextPreparingSince(it, feed)) }
@@ -151,7 +172,7 @@ class NewsViewModel @Inject constructor(
         pollJob = viewModelScope.launch {
             repeat(MAX_POLLS) {
                 delay(POLL_INTERVAL_MS)
-                val feed = runCatching { repository.fetchFeed(familyId, family, prefs) }.getOrNull() ?: return@repeat
+                val feed = runCatching { repository.fetchFeed(familyId, family, prefs, key) }.getOrNull() ?: return@repeat
                 loadedKey = key
                 _state.update { it.copy(feed = feed, offers = feed.offers ?: it.offers, preparingSince = nextPreparingSince(it, feed)) }
                 if (!feed.isPreparing) return@launch
