@@ -56,6 +56,17 @@
     <string name="news_preparing">Je cherche les actualités du jour…</string>
     <string name="news_preparing_local">Je cherche les actualités de votre zone et les événements à proximité…</string>
     <string name="news_preparing_hint">La première édition du jour prend environ une minute. Vous pouvez quitter : elle sera prête à votre retour.</string>
+    <string name="news_step_bonus">Je cherche les aides pour les familles…</string>
+    <string name="news_step_bills">Je vérifie factures, prix et impôts du foyer…</string>
+    <string name="news_step_laws">Je regarde les nouvelles lois qui touchent les familles…</string>
+    <string name="news_step_school">Je vérifie calendrier scolaire, inscriptions et cantines…</string>
+    <string name="news_step_health">Je cherche vaccins, prévention et rappels de produits…</string>
+    <string name="news_step_growth">Je cherche des conseils sur l\'éducation des enfants…</string>
+    <string name="news_step_city">Je cherche les actualités de %1$s…</string>
+    <string name="news_step_events">Je cherche des événements familiaux à moins de 60 km…</string>
+    <string name="news_step_utilities">Je vérifie les avis sur l\'eau et l\'électricité…</string>
+    <string name="news_step_filter">J\'écarte les actualités anciennes et les doublons…</string>
+    <string name="news_step_almost">Presque prêtes…</string>
     <string name="news_retry">Réessayer</string>
     <string name="news_add_city">Ajoutez votre ville</string>
     <string name="news_add_city_sub">Pour les actualités de votre région et de votre commune, et les événements à moins de 60 km.</string>

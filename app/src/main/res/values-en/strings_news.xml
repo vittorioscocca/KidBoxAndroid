@@ -56,6 +56,17 @@
     <string name="news_preparing">Finding today\'s news…</string>
     <string name="news_preparing_local">Finding news from your area and nearby events…</string>
     <string name="news_preparing_hint">The first edition of the day takes about a minute. You can leave: it\'ll be ready when you\'re back.</string>
+    <string name="news_step_bonus">Looking for family grants and benefits…</string>
+    <string name="news_step_bills">Checking bills, prices and household taxes…</string>
+    <string name="news_step_laws">Looking at new laws that affect families…</string>
+    <string name="news_step_school">Checking school calendars, enrolment and canteens…</string>
+    <string name="news_step_health">Looking for vaccinations, prevention and product recalls…</string>
+    <string name="news_step_growth">Looking for advice on growth and parenting…</string>
+    <string name="news_step_city">Looking for news from %1$s…</string>
+    <string name="news_step_events">Looking for family events within 60 km…</string>
+    <string name="news_step_utilities">Checking water and power notices…</string>
+    <string name="news_step_filter">Removing old news and duplicates…</string>
+    <string name="news_step_almost">Almost ready…</string>
     <string name="news_retry">Try again</string>
     <string name="news_add_city">Add your city</string>
     <string name="news_add_city_sub">For news from your region and town, and events within 60 km.</string>

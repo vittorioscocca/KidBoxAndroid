@@ -56,6 +56,17 @@
     <string name="news_preparing">Sto cercando le notizie di oggi…</string>
     <string name="news_preparing_local">Sto cercando le notizie della tua zona e gli eventi vicini…</string>
     <string name="news_preparing_hint">La prima edizione del giorno richiede circa un minuto. Puoi uscire: la ritrovi pronta.</string>
+    <string name="news_step_bonus">Cerco bonus e agevolazioni per le famiglie…</string>
+    <string name="news_step_bills">Controllo bollette, prezzi e tasse di casa…</string>
+    <string name="news_step_laws">Guardo le nuove leggi che toccano le famiglie…</string>
+    <string name="news_step_school">Controllo calendario, iscrizioni e mense…</string>
+    <string name="news_step_health">Cerco vaccinazioni, prevenzione e prodotti richiamati…</string>
+    <string name="news_step_growth">Cerco consigli su crescita ed educazione…</string>
+    <string name="news_step_city">Cerco le notizie di %1$s…</string>
+    <string name="news_step_events">Cerco eventi per famiglie entro 60 km…</string>
+    <string name="news_step_utilities">Controllo avvisi su acqua e luce…</string>
+    <string name="news_step_filter">Scarto le notizie vecchie e i doppioni…</string>
+    <string name="news_step_almost">Quasi pronte…</string>
     <string name="news_retry">Riprova</string>
     <string name="news_add_city">Aggiungi la tua città</string>
     <string name="news_add_city_sub">Per le notizie della tua regione e del tuo comune, e gli eventi entro 60 km.</string>

@@ -3,6 +3,11 @@ package it.vittorioscocca.kidbox.ui.screens.news
 import android.content.Intent
 import android.net.Uri
 import android.text.format.DateUtils
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -64,7 +69,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import it.vittorioscocca.kidbox.ai.getAiSettingsFromApp
 import it.vittorioscocca.kidbox.ai.AiConsentDialog
 import androidx.compose.runtime.setValue
@@ -93,6 +100,7 @@ import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import it.vittorioscocca.kidbox.util.KBLocale
 import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import java.util.Date
+import kotlinx.coroutines.delay
 
 private val Orange = Color(0xFFFF6B00)
 private val Green = Color(0xFF4DA673)
@@ -282,7 +290,11 @@ private fun NewsContent(
 
         if (feed == null) {
             item(key = "waiting") {
-                if (state.error != null) ErrorCard(state.error, onRetry) else PreparingCard(localOnly = false)
+                if (state.error != null) {
+                    ErrorCard(state.error, onRetry)
+                } else {
+                    PreparingCard(listOf("country", "local"), place.city, state.preparingSince)
+                }
             }
             return@LazyColumn
         }
@@ -304,7 +316,7 @@ private fun NewsContent(
         }
 
         if (feed.isPreparing) {
-            item(key = "preparing") { PreparingCard(localOnly = "local" in feed.pending && "country" !in feed.pending) }
+            item(key = "preparing") { PreparingCard(feed.pending, place.city, state.preparingSince) }
         }
 
         if (!place.hasCity) {
@@ -744,18 +756,96 @@ private fun OfferCard(offer: NewsOffer, onOpen: () -> Unit) {
     }
 }
 
+private const val PREPARING_EXPECTED_SECONDS = 60
+private const val PREPARING_SECONDS_PER_STEP = 5
+
+/** Una riga dell'attesa: il testo e, per quella sulla città, il nome. */
+private data class PreparingStep(val text: Int, val arg: String? = null)
+
+/**
+ * Gli argomenti che l'edizione cerca davvero. Le ricerche girano sul server e il
+ * telefono non le vede in diretta: le frasi seguono i prompt
+ * (`functions/news/prompts.js`), non i singoli passi. Stesso ordine di iOS.
+ */
+private fun preparingSteps(pending: List<String>, city: String): List<PreparingStep> {
+    val local = if ("local" in pending && city.isNotBlank()) {
+        listOf(
+            PreparingStep(R.string.news_step_city, city),
+            PreparingStep(R.string.news_step_events),
+            PreparingStep(R.string.news_step_utilities),
+        )
+    } else {
+        emptyList()
+    }
+    val filter = PreparingStep(R.string.news_step_filter)
+    if ("country" !in pending) return local + filter
+    val country = listOf(
+        R.string.news_step_bonus,
+        R.string.news_step_bills,
+        R.string.news_step_school,
+        R.string.news_step_health,
+        R.string.news_step_laws,
+        R.string.news_step_growth,
+    ).map { PreparingStep(it) }
+    return country.flatMapIndexed { i, step -> listOfNotNull(step, local.getOrNull(i)) } + filter
+}
+
 @Composable
-private fun PreparingCard(localOnly: Boolean) {
+private fun PreparingCard(pending: List<String>, city: String, since: Long?) {
     val kb = MaterialTheme.kidBoxColors
+    val startedAt = since ?: remember { System.currentTimeMillis() }
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = System.currentTimeMillis()
+            delay(1_000)
+        }
+    }
+    val elapsed = ((now - startedAt) / 1_000).toInt().coerceAtLeast(0)
+    val left = (PREPARING_EXPECTED_SECONDS - elapsed).coerceAtLeast(0)
+    val steps = remember(pending, city) { preparingSteps(pending, city) }
+    val stepIndex = (elapsed / PREPARING_SECONDS_PER_STEP) % steps.size
+    val title = when {
+        left == 0 -> R.string.news_step_almost
+        "country" in pending -> R.string.news_preparing
+        else -> R.string.news_preparing_local
+    }
+
     CardSurface(onClick = null) {
-        Row(verticalAlignment = Alignment.Top) {
-            CircularProgressIndicator(strokeWidth = 2.dp, color = Orange, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(58.dp)) {
+                if (left > 0) {
+                    val fraction by animateFloatAsState(left / PREPARING_EXPECTED_SECONDS.toFloat(), label = "newsPreparingRing")
+                    CircularProgressIndicator(
+                        progress = { fraction },
+                        strokeWidth = 4.dp,
+                        color = Orange,
+                        trackColor = kb.title.copy(alpha = 0.08f),
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    Text("$left s", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall, color = kb.title)
+                } else {
+                    CircularProgressIndicator(strokeWidth = 3.dp, color = Orange, modifier = Modifier.size(26.dp))
+                }
+            }
+            Spacer(Modifier.width(14.dp))
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(
-                    stringResource(if (localOnly) R.string.news_preparing_local else R.string.news_preparing),
-                    fontWeight = FontWeight.SemiBold, color = kb.title,
-                )
+                Text(stringResource(title), fontWeight = FontWeight.SemiBold, color = kb.title)
+                AnimatedContent(
+                    targetState = stepIndex,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = "newsPreparingStep",
+                ) { index ->
+                    val step = steps[index]
+                    Text(
+                        if (step.arg != null) stringResource(step.text, step.arg) else stringResource(step.text),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = Orange,
+                        minLines = 2,
+                        maxLines = 2,
+                    )
+                }
                 Text(stringResource(R.string.news_preparing_hint), style = MaterialTheme.typography.bodySmall, color = kb.subtitle)
             }
         }

@@ -40,6 +40,11 @@ data class NewsUiState(
     val offers: NewsOffersPayload? = null,
     val searchingOffers: Boolean = false,
     val offersError: String? = null,
+    /**
+     * Da quando si aspetta l'edizione, in millisecondi. Sta qui e non nella card,
+     * che scorrendo esce dalla composizione e ripartirebbe da capo.
+     */
+    val preparingSince: Long? = null,
 )
 
 /**
@@ -117,12 +122,18 @@ class NewsViewModel @Inject constructor(
             }
         }
         pollJob?.cancel()
-        _state.update { it.copy(loading = it.feed == null, error = null) }
+        _state.update {
+            it.copy(
+                loading = it.feed == null,
+                error = null,
+                preparingSince = if (it.feed == null) it.preparingSince ?: System.currentTimeMillis() else it.preparingSince,
+            )
+        }
         viewModelScope.launch {
             runCatching { repository.fetchFeed(familyId, family, prefs) }
                 .onSuccess { feed ->
                     loadedKey = key
-                    _state.update { it.copy(feed = feed, loading = false, offers = feed.offers ?: it.offers) }
+                    _state.update { it.copy(feed = feed, loading = false, offers = feed.offers ?: it.offers, preparingSince = nextPreparingSince(it, feed)) }
                     AppAnalytics.newsOpened(context, feed.items.size, feed.events.size, feed.chargedUnits, feed.isPreparing)
                     if (feed.isPreparing) startPolling(familyId, family, prefs, key)
                     if (prefs.personalOffers && _state.value.offers == null) loadSavedOffers(familyId, family)
@@ -133,13 +144,16 @@ class NewsViewModel @Inject constructor(
         }
     }
 
+    private fun nextPreparingSince(state: NewsUiState, feed: NewsFeed): Long? =
+        if (feed.isPreparing) state.preparingSince ?: System.currentTimeMillis() else null
+
     private fun startPolling(familyId: String, family: NewsFamilySettings, prefs: NewsPrefs, key: String) {
         pollJob = viewModelScope.launch {
             repeat(MAX_POLLS) {
                 delay(POLL_INTERVAL_MS)
                 val feed = runCatching { repository.fetchFeed(familyId, family, prefs) }.getOrNull() ?: return@repeat
                 loadedKey = key
-                _state.update { it.copy(feed = feed, offers = feed.offers ?: it.offers) }
+                _state.update { it.copy(feed = feed, offers = feed.offers ?: it.offers, preparingSince = nextPreparingSince(it, feed)) }
                 if (!feed.isPreparing) return@launch
             }
         }
