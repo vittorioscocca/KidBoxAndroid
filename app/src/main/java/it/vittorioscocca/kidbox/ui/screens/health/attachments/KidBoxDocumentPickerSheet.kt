@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
+import it.vittorioscocca.kidbox.domain.model.WalletDocumentMetadata
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
 import androidx.compose.ui.res.stringResource
 import it.vittorioscocca.kidbox.R
@@ -62,23 +63,28 @@ private val PickerTint = Color(0xFF9573D9)
 fun KidBoxDocumentPickerSheet(
     familyId: String,
     pdfOnly: Boolean = false,
+    /** Nasconde i documenti d'identità del Wallet (es. per l'assistente AI). */
+    hidesIdentityDocuments: Boolean = false,
     onDismiss: () -> Unit,
-    onPickedUri: (Uri) -> Unit,
+    onPickedUri: (Uri) -> Unit = {},
+    /** Al posto di [onPickedUri], per chi deve sapere anche quale documento è stato scelto. */
+    onPickedDocument: ((Uri, String) -> Unit)? = null,
     viewModel: KidBoxDocumentPickerViewModel = hiltViewModel(),
 ) {
     val kb = MaterialTheme.kidBoxColors
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val visibleDocuments = remember(state.documents, pdfOnly) {
-        if (pdfOnly) {
-            state.documents.filter { doc ->
-                doc.mimeType.contains("pdf", ignoreCase = true) ||
+    val visibleDocuments = remember(state.documents, pdfOnly, hidesIdentityDocuments) {
+        state.documents
+            .filter { doc ->
+                !pdfOnly || doc.mimeType.contains("pdf", ignoreCase = true) ||
                     doc.fileName.lowercase().endsWith(".pdf")
             }
-        } else {
-            state.documents
-        }
+            .filter { doc ->
+                !hidesIdentityDocuments ||
+                    doc.notes?.startsWith(WalletDocumentMetadata.NOTES_PREFIX) != true
+            }
     }
 
     LaunchedEffect(familyId) { viewModel.bindFamily(familyId) }
@@ -198,7 +204,11 @@ fun KidBoxDocumentPickerSheet(
                                 .clickable {
                                     viewModel.pickDocument(doc) { result ->
                                         result.onSuccess { uri ->
-                                            onPickedUri(uri)
+                                            if (onPickedDocument != null) {
+                                                onPickedDocument(uri, doc.id)
+                                            } else {
+                                                onPickedUri(uri)
+                                            }
                                             onDismiss()
                                         }
                                     }

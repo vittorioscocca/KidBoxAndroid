@@ -48,12 +48,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
+import it.vittorioscocca.kidbox.ui.screens.health.attachments.KidBoxDocumentPickerSheet
 import it.vittorioscocca.kidbox.ui.screens.wallet.documents.rememberWalletDocumentScannerLauncher
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.DocumentScanner
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -143,6 +145,7 @@ fun PlanningAIChatScreen(
     val reminderService = actionsViewModel.reminderService
     var showMenu by remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
+    var showKidBoxPicker by remember { mutableStateOf(false) }
     // «+»: un documento da smistare (scansione, foto, file).
     var showAttachMenu by remember { mutableStateOf(false) }
     val launchScanner = rememberWalletDocumentScannerLauncher(
@@ -326,6 +329,14 @@ fun PlanningAIChatScreen(
                                 onClick = {
                                     showAttachMenu = false
                                     filePicker.launch(arrayOf("application/pdf", "image/*"))
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.health_from_kidbox_docs)) },
+                                leadingIcon = { Icon(Icons.Default.Folder, null) },
+                                onClick = {
+                                    showAttachMenu = false
+                                    showKidBoxPicker = true
                                 },
                             )
                         }
@@ -529,6 +540,15 @@ fun PlanningAIChatScreen(
                 }
             }
         }
+    }
+
+    if (showKidBoxPicker) {
+        KidBoxDocumentPickerSheet(
+            familyId = viewModel.documentsFamilyId,
+            hidesIdentityDocuments = true,
+            onDismiss = { showKidBoxPicker = false },
+            onPickedDocument = viewModel::importKidBoxDocument,
+        )
     }
 
     state.docIntelPayload?.let { payload ->

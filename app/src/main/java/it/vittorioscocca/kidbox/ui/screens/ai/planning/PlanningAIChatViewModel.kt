@@ -98,6 +98,8 @@ data class PlanningChatUiState(
     val docIntelPayload: DocIntelPayload? = null,
     /** Documento scelto e non ancora letto: resta nel campo di testo finché non si preme invio. */
     val stagedFile: java.io.File? = null,
+    /** Il file in attesa viene da Documenti di KidBox. */
+    val stagedKidBoxDocumentId: String? = null,
 ) {
     val canSend: Boolean get() = inputText.isNotBlank() && !isLoading && !isLoadingContext
     val isNearLimit: Boolean get() = dailyLimit > 0 && usageToday >= (dailyLimit * 0.8).toInt()
@@ -260,8 +262,9 @@ class PlanningAIChatViewModel @Inject constructor(
 
     fun send() {
         _uiState.value.stagedFile?.let { file ->
-            _uiState.update { it.copy(stagedFile = null) }
-            viewModelScope.launch { analyzeImported(file) }
+            val kidBoxDocumentId = _uiState.value.stagedKidBoxDocumentId
+            _uiState.update { it.copy(stagedFile = null, stagedKidBoxDocumentId = null) }
+            viewModelScope.launch { analyzeImported(file, kidBoxDocumentId) }
             return
         }
         val text = _uiState.value.inputText.trim()
@@ -713,19 +716,37 @@ class PlanningAIChatViewModel @Inject constructor(
     /** File o foto scelti dal telefono. */
     fun importDocument(uri: Uri) {
         viewModelScope.launch {
-            val file = runCatching {
-                withContext(Dispatchers.IO) {
-                    val name = displayName(uri) ?: "${context.getString(R.string.docintel_file_photo)} ${stamp()}.jpg"
-                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                        ?: error("unreadable")
-                    writeImportFile(name, bytes)
-                }
-            }.getOrNull()
+            val file = copyToImportFile(uri)
             if (file == null) {
                 _uiState.update { it.copy(errorMessage = context.getString(R.string.docintel_error_unreadable_file)) }
                 return@launch
             }
             stageFile(file)
+        }
+    }
+
+    private suspend fun copyToImportFile(uri: Uri): java.io.File? = runCatching {
+        withContext(Dispatchers.IO) {
+            val name = displayName(uri) ?: "${context.getString(R.string.docintel_file_photo)} ${stamp()}.jpg"
+            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                ?: error("unreadable")
+            writeImportFile(name, bytes)
+        }
+    }.getOrNull()
+
+    /** Famiglia dell'assistente, nota anche prima che il contesto sia pronto. */
+    val documentsFamilyId: String get() = effectiveFamilyId
+
+    /** Documento già in KidBox: la copia in chiaro del selettore non serve più dopo l'import. */
+    fun importKidBoxDocument(uri: Uri, documentId: String) {
+        viewModelScope.launch {
+            val file = copyToImportFile(uri)
+            withContext(Dispatchers.IO) { runCatching { context.contentResolver.delete(uri, null, null) } }
+            if (file == null) {
+                _uiState.update { it.copy(errorMessage = context.getString(R.string.docintel_error_unreadable_file)) }
+                return@launch
+            }
+            stageFile(file, documentId)
         }
     }
 
@@ -748,15 +769,15 @@ class PlanningAIChatViewModel @Inject constructor(
      * Il documento resta nel campo di testo, pronto per l'invio: la lettura
      * (e il messaggio AI che costa) parte solo quando l'utente preme invio.
      */
-    private fun stageFile(file: java.io.File) {
+    private fun stageFile(file: java.io.File, kidBoxDocumentId: String? = null) {
         discardAttachment()
-        _uiState.update { it.copy(stagedFile = file, errorMessage = null) }
+        _uiState.update { it.copy(stagedFile = file, stagedKidBoxDocumentId = kidBoxDocumentId, errorMessage = null) }
     }
 
     /** La X sull'anteprima. */
     fun discardAttachment() {
         _uiState.value.stagedFile?.parentFile?.deleteRecursively()
-        _uiState.update { it.copy(stagedFile = null) }
+        _uiState.update { it.copy(stagedFile = null, stagedKidBoxDocumentId = null) }
     }
 
     /** Conferma della scheda: crea le schede, poi resta traccia nella conversazione. */
@@ -772,6 +793,7 @@ class PlanningAIChatViewModel @Inject constructor(
                     sourceFile = payload.sourceFile,
                     persons = payload.persons,
                     vehicles = payload.vehicles,
+                    kidBoxDocumentId = payload.kidBoxDocumentId,
                 )
             }.onFailure { KBLog.ai.warning("document execute failed: ${it.message}", TAG) }.getOrNull()
             payload.sourceFile.parentFile?.deleteRecursively()
@@ -796,7 +818,7 @@ class PlanningAIChatViewModel @Inject constructor(
         _uiState.update { it.copy(docIntelPayload = null) }
     }
 
-    private suspend fun analyzeImported(file: java.io.File) {
+    private suspend fun analyzeImported(file: java.io.File, kidBoxDocumentId: String? = null) {
         if (_uiState.value.isAnalyzingDocument || _uiState.value.isLoading || effectiveFamilyId.isBlank()) return
         _uiState.update { it.copy(isAnalyzingDocument = true, errorMessage = null) }
         val (persons, vehicles) = docIntelService.familyRefs(effectiveFamilyId)
@@ -811,7 +833,7 @@ class PlanningAIChatViewModel @Inject constructor(
                 AppAnalytics.aiMessageSent(context, "documento", CurrentPlanStore.plan.value.rawValue)
                 KBLog.ai.debug("document analyzed category=${result.category} actions=${result.actions.size}", TAG)
                 _uiState.update {
-                    it.copy(isAnalyzingDocument = false, docIntelPayload = DocIntelPayload(result, file, persons, vehicles))
+                    it.copy(isAnalyzingDocument = false, docIntelPayload = DocIntelPayload(result, file, persons, vehicles, kidBoxDocumentId))
                 }
             }
             .onFailure { err ->

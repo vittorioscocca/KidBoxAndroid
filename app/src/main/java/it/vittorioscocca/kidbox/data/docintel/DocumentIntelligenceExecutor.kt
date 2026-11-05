@@ -74,6 +74,8 @@ class DocumentIntelligenceExecutor @Inject constructor(
         persons: List<DocIntelPerson>,
         vehicles: List<DocIntelVehicle>,
         existingDocumentId: String? = null,
+        /** Scelto da Documenti di KidBox: si allega alla scheda, ma non si ricarica in Documenti. */
+        kidBoxDocumentId: String? = null,
     ): String? = withContext(Dispatchers.IO) {
         if (actions.isEmpty() && !sourceFile.exists()) return@withContext null
         val personIds = persons.map { it.id }.toSet()
@@ -116,6 +118,8 @@ class DocumentIntelligenceExecutor @Inject constructor(
             if (attached != null) {
                 documentId = attached
                 lines += context.getString(R.string.docintel_line_attached)
+            } else if (kidBoxDocumentId != null) {
+                documentId = kidBoxDocumentId
             } else {
                 documentId = saveInDocuments(familyId, sourceFile)
                 if (documentId != null) lines += context.getString(R.string.docintel_line_saved_documents)

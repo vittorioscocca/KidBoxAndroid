@@ -182,15 +182,18 @@ fun DocumentIntelligenceSheet(
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Text(
-                if (attachLabelRes != null) {
-                    stringResource(R.string.docintel_file_attached_to, stringResource(attachLabelRes))
-                } else {
-                    stringResource(R.string.docintel_file_to_documents)
-                },
-                color = kb.subtitle,
-                fontSize = 12.sp,
-            )
+            // Scelto da Documenti di KidBox: senza una scheda il file resta dov'è.
+            if (attachLabelRes != null || payload.kidBoxDocumentId == null) {
+                Text(
+                    if (attachLabelRes != null) {
+                        stringResource(R.string.docintel_file_attached_to, stringResource(attachLabelRes))
+                    } else {
+                        stringResource(R.string.docintel_file_to_documents)
+                    },
+                    color = kb.subtitle,
+                    fontSize = 12.sp,
+                )
+            }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onDismiss, enabled = !isSaving) { Text(stringResource(R.string.docintel_cancel)) }

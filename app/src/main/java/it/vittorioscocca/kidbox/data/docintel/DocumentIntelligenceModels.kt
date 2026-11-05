@@ -80,4 +80,6 @@ data class DocIntelPayload(
     val sourceFile: File,
     val persons: List<DocIntelPerson>,
     val vehicles: List<DocIntelVehicle>,
+    /** Scelto da Documenti di KidBox: il file è già lì. */
+    val kidBoxDocumentId: String? = null,
 )
