@@ -457,6 +457,7 @@
     <string name="health_pick_from_kidbox">Choisir depuis KidBox</string>
     <string name="health_no_pdf_folder">Aucun PDF dans ce dossier.</string>
     <string name="health_preparing_attachment">Préparation de la pièce jointe…</string>
+    <string name="health_no_connection">Pas de connexion. Vérifiez le Wi‑Fi ou les données mobiles.</string>
     <string name="health_ctx_large_notice">Contexte de santé étendu : à la prochaine question, tu pourras choisir entre une réponse précise et un contexte résumé.</string>
     <string name="health_ctx_choice_cached">Le profil de santé envoyé à l\'IA dépasse la taille standard (~%1$d caractères). Choisis comment procéder pour cette question : précis (%2$d messages) ou résumé (%3$d).</string>
     <string name="health_ctx_choice_fresh">Le profil de santé est très volumineux. Précision : %1$d messages pour cette question. Résumé : %2$d pour cette question, plus %3$d une seule fois dans ce chat pour créer le résumé (les questions suivantes avec résumé coûtent moins).</string>

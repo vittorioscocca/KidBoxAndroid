@@ -1279,6 +1279,10 @@ class DocumentRepository @Inject constructor(
         return output
     }
 
+    /** Vero se [preparePreviewFile] può servire il documento senza passare da Storage. */
+    fun hasLocalCopy(document: KBDocumentEntity): Boolean =
+        document.localPath?.let { File(it).exists() } == true
+
     /** File allegati chat: su Storage sono in chiaro (stesso modello iOS), salvo legacy `.kbenc`. */
     private fun isChatStoragePath(storagePath: String): Boolean =
         storagePath.contains("/chat/")

@@ -9,11 +9,14 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentCategoryEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBDocumentEntity
+import it.vittorioscocca.kidbox.data.passwords.security.NetworkMonitor
 import it.vittorioscocca.kidbox.data.repository.DocumentRepository
 import java.io.File
+import java.io.IOException
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +27,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -36,9 +40,13 @@ data class KidBoxPickerUiState(
     val error: String? = null,
 )
 
+/** Il documento non è sul telefono e non c'è rete per scaricarlo. Il testo lo mette la schermata. */
+class DocumentOfflineException : IOException("offline")
+
 @HiltViewModel
 class KidBoxDocumentPickerViewModel @Inject constructor(
     private val documentRepository: DocumentRepository,
+    private val networkMonitor: NetworkMonitor,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -46,6 +54,7 @@ class KidBoxDocumentPickerViewModel @Inject constructor(
     private val folderStack = MutableStateFlow<List<Pair<String?, String>>>(listOf(null to ""))
     private val busy = MutableStateFlow(false)
     private val error = MutableStateFlow<String?>(null)
+    private var pickJob: Job? = null
 
     private val nav = combine(familyId, folderStack) { fid, stack -> fid to stack }
         .distinctUntilChanged()
@@ -98,17 +107,33 @@ class KidBoxDocumentPickerViewModel @Inject constructor(
     }
 
     fun pickDocument(doc: KBDocumentEntity, onResult: (Result<Uri>) -> Unit) {
-        viewModelScope.launch {
+        if (busy.value) return
+        pickJob = viewModelScope.launch {
             busy.value = true
             error.value = null
             val result = runCatching { prepareAttachmentUri(doc) }
+            // Chi ha annullato ha chiuso il foglio: niente allegato in ritardo.
+            if (!isActive) return@launch
             busy.value = false
-            result.exceptionOrNull()?.let { error.value = it.message ?: "Errore" }
+            result.exceptionOrNull()
+                ?.takeUnless { it is DocumentOfflineException }
+                ?.let { error.value = it.message ?: "Errore" }
             onResult(result)
         }
     }
 
+    /** Da chiamare alla chiusura del foglio: un download su una rete che non risponde dura minuti. */
+    fun cancelPick() {
+        pickJob?.cancel()
+        pickJob = null
+        busy.value = false
+    }
+
     private suspend fun prepareAttachmentUri(doc: KBDocumentEntity): Uri = withContext(Dispatchers.IO) {
+        // Firebase Storage senza rete non fallisce: ritenta per minuti col foglio in attesa.
+        if (!documentRepository.hasLocalCopy(doc) && !networkMonitor.isOnline.value) {
+            throw DocumentOfflineException()
+        }
         val src = documentRepository.preparePreviewFile(doc)
         val name = buildDisplayFileName(doc)
         val sub = File(appContext.cacheDir, "kidbox-pick/${UUID.randomUUID()}").apply { mkdirs() }

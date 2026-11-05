@@ -87,6 +87,11 @@ fun KidBoxDocumentPickerSheet(
             }
     }
 
+    val dismiss = {
+        viewModel.cancelPick()
+        onDismiss()
+    }
+
     LaunchedEffect(familyId) { viewModel.bindFamily(familyId) }
 
     LaunchedEffect(state.error) {
@@ -97,7 +102,7 @@ fun KidBoxDocumentPickerSheet(
     }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = dismiss,
         sheetState = sheetState,
         containerColor = kb.background,
         dragHandle = {
@@ -149,7 +154,7 @@ fun KidBoxDocumentPickerSheet(
                         fontSize = 16.sp,
                         color = kb.title,
                     )
-                    TextButton(onClick = onDismiss) {
+                    TextButton(onClick = dismiss) {
                         Text(stringResource(R.string.health_cancel), color = PickerTint, fontWeight = FontWeight.SemiBold)
                     }
                 }
@@ -210,6 +215,14 @@ fun KidBoxDocumentPickerSheet(
                                                 onPickedUri(uri)
                                             }
                                             onDismiss()
+                                        }.onFailure { error ->
+                                            if (error is DocumentOfflineException) {
+                                                Toast.makeText(
+                                                    context,
+                                                    context.getString(R.string.health_no_connection),
+                                                    Toast.LENGTH_LONG,
+                                                ).show()
+                                            }
                                         }
                                     }
                                 }
