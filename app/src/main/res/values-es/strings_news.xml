@@ -87,7 +87,7 @@
     <string name="news_place_denied">Ubicación no permitida. Escribe tu ciudad abajo o activa la ubicación en Ajustes.</string>
     <string name="news_settings_enabled">Noticias activadas</string>
     <string name="news_settings_enabled_sub">Ayudas, escuela, salud y eventos cerca de ti, cada día</string>
-    <string name="news_settings_cost_note">Las búsquedas se pagan en mensajes de IA, de la cuota de la familia: como máximo 6 mensajes por edición, y menos cuando también la leen otras familias de tu zona. Incluidas en los planes Pro y Max.</string>
+    <string name="news_settings_cost_note">Las búsquedas se pagan en mensajes de IA, de la cuota de la familia: como máximo 10 mensajes por edición, y menos cuando también la leen otras familias de tu zona. Incluidas en los planes Pro y Max.</string>
     <string name="news_settings_family_scope">El interruptor y la ciudad valen para toda la familia: las noticias encontradas para uno las leen todos, y se pagan una sola vez.</string>
     <string name="news_settings_topics">Temas</string>
     <string name="news_settings_topics_note">Los temas son solo tuyos: elige qué leer sin cambiar las noticias de los demás. Los eventos cercanos llegan con Ocio.</string>

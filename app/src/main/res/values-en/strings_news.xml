@@ -87,7 +87,7 @@
     <string name="news_place_denied">Location not allowed. Type your city below, or turn on location in Settings.</string>
     <string name="news_settings_enabled">News on</string>
     <string name="news_settings_enabled_sub">Benefits, school, health and events near you, every day</string>
-    <string name="news_settings_cost_note">Searches are paid for in AI messages from the family\'s allowance: at most 6 messages per edition, and fewer when other families in your area read it too. Included in the Pro and Max plans.</string>
+    <string name="news_settings_cost_note">Searches are paid for in AI messages from the family\'s allowance: at most 10 messages per edition, and fewer when other families in your area read it too. Included in the Pro and Max plans.</string>
     <string name="news_settings_family_scope">The switch and the city apply to the whole family: news found for one of you is read by everyone, and paid for only once.</string>
     <string name="news_settings_topics">Topics</string>
     <string name="news_settings_topics_note">Topics are just yours: choose what to read without changing anyone else\'s news. Nearby events come with Leisure.</string>

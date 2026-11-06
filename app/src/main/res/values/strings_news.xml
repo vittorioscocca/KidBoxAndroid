@@ -87,7 +87,7 @@
     <string name="news_place_denied">Posizione non consentita. Scrivi la tua città qui sotto, oppure abilita la posizione in Impostazioni.</string>
     <string name="news_settings_enabled">Notizie attive</string>
     <string name="news_settings_enabled_sub">Bonus, scuola, salute ed eventi vicino a te, ogni giorno</string>
-    <string name="news_settings_cost_note">Le ricerche si pagano in messaggi AI, dalla quota della famiglia: ogni edizione al massimo 6 messaggi, e meno quando la leggono anche altre famiglie della tua zona. Incluse nei piani Pro e Max.</string>
+    <string name="news_settings_cost_note">Le ricerche si pagano in messaggi AI, dalla quota della famiglia: ogni edizione al massimo 10 messaggi, e meno quando la leggono anche altre famiglie della tua zona. Incluse nei piani Pro e Max.</string>
     <string name="news_settings_family_scope">Accensione e città valgono per tutta la famiglia: le notizie trovate per uno le leggono tutti, e si pagano una volta sola.</string>
     <string name="news_settings_topics">Argomenti</string>
     <string name="news_settings_topics_note">Gli argomenti sono solo tuoi: scegli cosa leggere senza cambiare le notizie degli altri. Gli eventi vicini arrivano con Tempo libero.</string>

@@ -182,7 +182,7 @@ fun NewsScreen(
             }
             !family.enabled -> NewsIntro(
                 place = family.effectivePlace,
-                maxUnits = state.feed?.maxUnitsPerEdition ?: 6,
+                maxUnits = state.feed?.maxUnitsPerEdition ?: 10,
                 onEditPlace = onOpenSettings,
                 onActivate = viewModel::activate,
             )
