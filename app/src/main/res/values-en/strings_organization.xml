@@ -205,6 +205,8 @@
     <string name="urgent_reminder_fullscreen_permission_body">The reminder is saved and will ring. For it to take over the screen like an alarm when your phone is locked, KidBox needs the “Full-screen notifications” permission. Without it, it stays an alert that disappears after a minute.</string>
     <string name="urgent_reminder_fullscreen_permission_open">Open settings</string>
     <string name="urgent_reminder_fullscreen_permission_later">Not now</string>
+    <string name="todo_reminder_action_done">Done</string>
+    <string name="todo_reminder_done_failed_title">Not marked as done</string>
     <string name="calendar_reminder_who_can_see">Who can see this reminder</string>
     <string name="calendar_reminder_visibility_locked_hint">Only whoever created the reminder can change who sees it.</string>
     <string name="calendar_event_who_can_see">Who can see this event</string>

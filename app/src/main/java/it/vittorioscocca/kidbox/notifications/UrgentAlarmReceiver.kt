@@ -77,6 +77,20 @@ class UrgentAlarmReceiver : BroadcastReceiver() {
             // A schermo bloccato apre direttamente la schermata; sbloccato
             // Android la degrada da sé in un avviso in cima.
             .setFullScreenIntent(pendingIntent, true)
+            .apply {
+                // Un evento non ha uno stato «fatto»: il pulsante è solo dei to-do.
+                if (kind == KIND_TODO) {
+                    TodoReminderActionReceiver.doneAction(
+                        context = context,
+                        todoId = entityId,
+                        notificationId = entityId.hashCode(),
+                        title = title,
+                        familyId = familyId,
+                        childId = intent.getStringExtra(EXTRA_CHILD_ID),
+                        listId = intent.getStringExtra(EXTRA_LIST_ID),
+                    )?.let(::addAction)
+                }
+            }
             .build()
 
         runCatching {

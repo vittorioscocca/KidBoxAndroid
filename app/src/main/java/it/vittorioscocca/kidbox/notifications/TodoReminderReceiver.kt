@@ -52,6 +52,17 @@ class TodoReminderReceiver : BroadcastReceiver() {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
+            .apply {
+                TodoReminderActionReceiver.doneAction(
+                    context = context,
+                    todoId = todoId,
+                    notificationId = todoId.hashCode(),
+                    title = title,
+                    familyId = familyId,
+                    childId = childId,
+                    listId = listId,
+                )?.let(::addAction)
+            }
             .build()
 
         runCatching {
@@ -59,20 +70,20 @@ class TodoReminderReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun ensureChannel(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (manager.getNotificationChannel(CHANNEL_ID_TODO_REMINDERS) != null) return
-        manager.createNotificationChannel(
-            NotificationChannel(
-                CHANNEL_ID_TODO_REMINDERS,
-                context.getString(R.string.todo_reminder_notification_title),
-                NotificationManager.IMPORTANCE_HIGH,
-            ).apply { description = context.getString(R.string.todo_reminder_channel_description) },
-        )
-    }
-
     companion object {
+        fun ensureChannel(context: Context) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (manager.getNotificationChannel(CHANNEL_ID_TODO_REMINDERS) != null) return
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_ID_TODO_REMINDERS,
+                    context.getString(R.string.todo_reminder_notification_title),
+                    NotificationManager.IMPORTANCE_HIGH,
+                ).apply { description = context.getString(R.string.todo_reminder_channel_description) },
+            )
+        }
+
         const val CHANNEL_ID_TODO_REMINDERS = "todo_reminders"
         const val EXTRA_TODO_ID = "extra_todo_id"
         const val EXTRA_TITLE = "extra_title"

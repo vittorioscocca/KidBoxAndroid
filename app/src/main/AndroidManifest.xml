@@ -231,6 +231,11 @@
             android:name=".notifications.TodoReminderReceiver"
             android:exported="false" />
 
+        <!-- «Fatto» sul promemoria di un to-do. -->
+        <receiver
+            android:name=".notifications.TodoReminderActionReceiver"
+            android:exported="false" />
+
         <receiver
             android:name=".notifications.HealthReminderReceiver"
             android:exported="false" />

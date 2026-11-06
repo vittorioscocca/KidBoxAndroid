@@ -25,6 +25,7 @@ import it.vittorioscocca.kidbox.util.analytics.AppAnalytics
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -395,6 +396,44 @@ class TodoRepository @Inject constructor(
         )
         itemDao.upsert(local)
         remoteStore.upsertTodo(local)
+        itemDao.upsert(local.copy(syncStateRaw = KBSyncState.SYNCED.rawValue))
+    }
+
+    /**
+     * «Fatto» dal promemoria. Non è [toggleTodoDone]: se nel frattempo un altro
+     * membro ha già chiuso il to-do, un interruttore lo riaprirebbe.
+     *
+     * Senza rete `set().await()` resta sospeso con la scrittura già in coda su
+     * Firestore: il chiamante può smettere di aspettare senza perderla, perciò
+     * una cancellazione non è un fallimento. Un rifiuto vero rimette la riga
+     * com'era, così l'app non mostra chiuso ciò che sul server è aperto.
+     */
+    suspend fun markTodoDoneFromReminder(todoId: String) {
+        reminderScheduler.cancel(todoId)
+        val existing = itemDao.getById(todoId) ?: return
+        if (existing.isDone || existing.isDeleted) return
+        val uid = auth.currentUser?.uid ?: error("Not authenticated")
+        val now = System.currentTimeMillis()
+        val local = existing.copy(
+            isDone = true,
+            doneAtEpochMillis = now,
+            doneBy = uid,
+            reminderEnabled = false,
+            reminderId = null,
+            updatedAtEpochMillis = now,
+            updatedBy = uid,
+            syncStateRaw = KBSyncState.PENDING_UPSERT.rawValue,
+            lastSyncError = null,
+        )
+        itemDao.upsert(local)
+        try {
+            remoteStore.upsertTodo(local)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            itemDao.upsert(existing)
+            throw e
+        }
         itemDao.upsert(local.copy(syncStateRaw = KBSyncState.SYNCED.rawValue))
     }
 

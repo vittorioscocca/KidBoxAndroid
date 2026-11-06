@@ -205,6 +205,8 @@
     <string name="urgent_reminder_fullscreen_permission_body">Le rappel est enregistré et sonnera. Pour qu\'il occupe tout l\'écran comme une alarme lorsque le téléphone est verrouillé, KidBox a besoin de l\'autorisation « Notifications en plein écran ». Sans elle, il reste une alerte qui disparaît au bout d\'une minute.</string>
     <string name="urgent_reminder_fullscreen_permission_open">Ouvrir les réglages</string>
     <string name="urgent_reminder_fullscreen_permission_later">Pas maintenant</string>
+    <string name="todo_reminder_action_done">Fait</string>
+    <string name="todo_reminder_done_failed_title">Non marqué comme fait</string>
     <string name="calendar_reminder_who_can_see">Qui peut voir ce rappel</string>
     <string name="calendar_reminder_visibility_locked_hint">Seule la personne qui a créé le rappel peut en modifier la visibilité.</string>
     <string name="calendar_event_who_can_see">Qui peut voir cet événement</string>
