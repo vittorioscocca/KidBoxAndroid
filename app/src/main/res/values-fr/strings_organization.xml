@@ -99,6 +99,8 @@
     <string name="grocery_empty_list">Liste vide</string>
     <string name="grocery_purchased_count">Achetés (%1$d)</string>
     <string name="grocery_delete_all">Tout supprimer</string>
+    <string name="grocery_category_collapsed">Réduite</string>
+    <string name="grocery_category_expanded">Développée</string>
     <string name="grocery_mark_purchased_cd">Marquer comme acheté</string>
     <string name="grocery_delete">Supprimer</string>
     <string name="grocery_delete_purchased_title">Supprimer les achetés</string>

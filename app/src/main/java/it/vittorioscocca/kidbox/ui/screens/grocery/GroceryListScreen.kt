@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -57,6 +59,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -114,6 +119,7 @@ fun GroceryListScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var editingItem by remember { mutableStateOf<KBGroceryItemEntity?>(null) }
     var showDeletePurchasedAlert by remember { mutableStateOf(false) }
+    var collapsedCategories by remember { mutableStateOf(emptySet<String>()) }
     var showSaveTripSheet by remember { mutableStateOf(false) }
     var showTripsHistory by remember { mutableStateOf(false) }
     var editingTrip by remember { mutableStateOf<KBShoppingTripEntity?>(null) }
@@ -285,19 +291,54 @@ fun GroceryListScreen(
                     }
 
                     state.groupedVisible.forEach { (category, itemsInCategory) ->
+                        val isCollapsed = category in collapsedCategories
                         item(key = "header_$category") {
+                            val stateText = stringResource(
+                                if (isCollapsed) R.string.grocery_category_collapsed else R.string.grocery_category_expanded,
+                            )
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(top = 10.dp, bottom = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(
-                                    text = groceryCategoryLabel(category),
-                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                    color = kb.title,
-                                )
-                                Spacer(Modifier.weight(1f))
+                                // Titolo + chevron sono il bersaglio del tocco; «Elimina tutti»
+                                // resta un pulsante a parte. Si azzera a ogni apertura: una
+                                // categoria chiusa per sbaglio non deve far sembrare la lista vuota.
+                                Row(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable {
+                                            collapsedCategories = if (isCollapsed) {
+                                                collapsedCategories - category
+                                            } else {
+                                                collapsedCategories + category
+                                            }
+                                        }
+                                        .semantics { stateDescription = stateText },
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = groceryCategoryLabel(category),
+                                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                        color = kb.title,
+                                    )
+                                    if (isCollapsed) {
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            text = itemsInCategory.size.toString(),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = kb.subtitle,
+                                        )
+                                    }
+                                    Spacer(Modifier.weight(1f))
+                                    Icon(
+                                        imageVector = Icons.Filled.KeyboardArrowDown,
+                                        contentDescription = null,
+                                        tint = kb.title,
+                                        modifier = Modifier.rotate(if (isCollapsed) -90f else 0f),
+                                    )
+                                }
                                 if (state.filter == GroceryFilter.PURCHASED) {
                                     TextButton(onClick = { showDeletePurchasedAlert = true }) {
                                         Text(stringResource(R.string.grocery_delete_all), color = GroceryRed)
@@ -305,6 +346,7 @@ fun GroceryListScreen(
                                 }
                             }
                         }
+                        if (isCollapsed) return@forEach
                         item(key = "group_$category") {
                             GroceryGroupCard(
                                 items = itemsInCategory,

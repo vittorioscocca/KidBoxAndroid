@@ -99,6 +99,8 @@
     <string name="grocery_empty_list">Empty list</string>
     <string name="grocery_purchased_count">Bought (%1$d)</string>
     <string name="grocery_delete_all">Delete all</string>
+    <string name="grocery_category_collapsed">Collapsed</string>
+    <string name="grocery_category_expanded">Expanded</string>
     <string name="grocery_mark_purchased_cd">Mark as bought</string>
     <string name="grocery_delete">Delete</string>
     <string name="grocery_delete_purchased_title">Delete bought items</string>
