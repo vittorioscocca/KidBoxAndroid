@@ -67,6 +67,7 @@
 
     <string name="todo_list_hidden_message">Questa lista contiene solo attività personali di altri membri.</string>
     <string name="todo_no_items">Nessun elemento</string>
+    <string name="todo_no_list">Senza lista</string>
     <string name="todo_reminder_scheduled">Promemoria programmato per %1$s</string>
     <string name="todo_reminder_active_cd">Promemoria attivo</string>
     <string name="todo_urgent_label">Urgente</string>

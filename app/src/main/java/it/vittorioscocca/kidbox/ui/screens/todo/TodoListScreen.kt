@@ -130,6 +130,16 @@ fun TodoListScreen(
             }
         }
     }
+    // «Tutti» raggruppato per lista, come iOS (e Promemoria di Apple): ordine di
+    // creazione delle liste, i to-do senza lista (o di una lista non visibile) in
+    // coda sotto «Senza lista». Nelle altre viste resta l'elenco piatto.
+    val rows = remember(shownTodos, state.listsOrdered, state.smartKind) {
+        if (state.smartKind == TodoSmartKind.ALL) {
+            buildGroupedTodoRows(shownTodos, state.listsOrdered)
+        } else {
+            shownTodos.map { TodoListRow.Item(it) }
+        }
+    }
     // Tiene vivo l'ascolto di to-do ed eventi per «chi è libero».
     viewModel.availabilitySources.collectAsStateWithLifecycle()
 
@@ -154,12 +164,12 @@ fun TodoListScreen(
     // partire il flash a distanza di minuti. Equivale al `consumeIfMatches`
     // di iOS.
     var alreadyFlashedTodoId by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(state.highlightTodoId, state.filteredTodos) {
+    LaunchedEffect(state.highlightTodoId, state.filteredTodos, rows) {
         val target = state.highlightTodoId ?: return@LaunchedEffect
         if (alreadyFlashedTodoId == target) return@LaunchedEffect
         // La lista può non contenerlo ancora: la sincronizzazione arriva dopo la
         // push. Si riprova a ogni aggiornamento di `filteredTodos`.
-        val index = state.filteredTodos.indexOfFirst { it.id == target }
+        val index = rows.indexOfFirst { it is TodoListRow.Item && it.todo.id == target }
         if (index < 0) return@LaunchedEffect
         alreadyFlashedTodoId = target
         todoListState.animateScrollToItem(index)
@@ -428,7 +438,27 @@ fun TodoListScreen(
                             }
                         }
                     } else {
-                        items(shownTodos, key = { it.id }) { todo ->
+                        items(
+                            rows,
+                            key = { row ->
+                                when (row) {
+                                    is TodoListRow.Header -> "header-${row.listId}"
+                                    is TodoListRow.Item -> row.todo.id
+                                }
+                            },
+                            contentType = { it::class },
+                        ) { row ->
+                            if (row is TodoListRow.Header) {
+                                Text(
+                                    text = row.name ?: stringResource(R.string.todo_no_list),
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = kb.title,
+                                    modifier = Modifier.padding(top = 10.dp),
+                                )
+                                return@items
+                            }
+                            val todo = (row as TodoListRow.Item).todo
                             TodoRow(
                                 todo = todo,
                                 assigneeName = state.members.firstOrNull { it.uid == todo.assignedTo }?.displayName
@@ -999,3 +1029,29 @@ private fun HeaderCircleButton(
 
 /** Quanto resta acceso il flash prima di dissolversi (iOS: 1,5 s). */
 private const val HIGHLIGHT_HOLD_MS = 1500L
+
+
+/** Riga della lista: intestazione di gruppo (solo in «Tutti») o to-do. */
+private sealed interface TodoListRow {
+    data class Header(val listId: String, val name: String?) : TodoListRow
+    data class Item(val todo: KBTodoItemEntity) : TodoListRow
+}
+
+private fun buildGroupedTodoRows(
+    todos: List<KBTodoItemEntity>,
+    lists: List<Pair<String, String>>,
+): List<TodoListRow> {
+    val byList = todos.groupBy { it.listId.orEmpty() }.toMutableMap()
+    val rows = mutableListOf<TodoListRow>()
+    for ((id, name) in lists) {
+        val items = byList.remove(id) ?: continue
+        rows += TodoListRow.Header(id, name)
+        items.forEach { rows += TodoListRow.Item(it) }
+    }
+    val orphans = byList.values.flatten().sortedByDescending { it.updatedAtEpochMillis }
+    if (orphans.isNotEmpty()) {
+        rows += TodoListRow.Header("", null)
+        orphans.forEach { rows += TodoListRow.Item(it) }
+    }
+    return rows
+}

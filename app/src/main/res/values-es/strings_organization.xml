@@ -67,6 +67,7 @@
 
     <string name="todo_list_hidden_message">Esta lista solo tiene tareas personales de otros miembros.</string>
     <string name="todo_no_items">Sin elementos</string>
+    <string name="todo_no_list">Sin lista</string>
     <string name="todo_reminder_scheduled">Recordatorio programado para %1$s</string>
     <string name="todo_reminder_active_cd">Recordatorio activo</string>
     <string name="todo_urgent_label">Urgente</string>

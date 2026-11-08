@@ -39,6 +39,8 @@ data class TodoListUiState(
     val members: List<TodoMemberUi> = emptyList(),
     val highlightTodoId: String? = null,
     val smartKind: TodoSmartKind? = null,
+    /** Liste della famiglia (id, nome) nell'ordine di creazione: servono a «Tutti» per raggruppare. */
+    val listsOrdered: List<Pair<String, String>> = emptyList(),
     /** Lista con solo To-Do di altri utenti (non visibili a me). */
     val listAccessDenied: Boolean = false,
     val isLoading: Boolean = true,
@@ -142,6 +144,9 @@ class TodoListViewModel @Inject constructor(
             members = memberItems,
             highlightTodoId = highlightTodoIdArg,
             smartKind = kind,
+            listsOrdered = lists.filter { !it.isDeleted }
+                .sortedBy { it.createdAtEpochMillis }
+                .map { it.id to it.name },
             listAccessDenied = listAccessDenied,
             isLoading = false,
             errorMessage = err,

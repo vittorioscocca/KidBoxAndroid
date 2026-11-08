@@ -67,6 +67,7 @@
 
     <string name="todo_list_hidden_message">Cette liste ne contient que des tâches personnelles d\'autres membres.</string>
     <string name="todo_no_items">Aucun élément</string>
+    <string name="todo_no_list">Sans liste</string>
     <string name="todo_reminder_scheduled">Rappel programmé pour le %1$s</string>
     <string name="todo_reminder_active_cd">Rappel actif</string>
     <string name="todo_urgent_label">Urgent</string>
