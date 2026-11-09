@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import it.vittorioscocca.kidbox.ui.components.KeyVaultGate
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import kotlinx.coroutines.delay
@@ -350,6 +351,10 @@ fun AppNavGraph(
             firstContent = type,
         )
     }
+
+    // Cassaforte v2: compare solo con config/keyVault acceso per l'utente.
+    val vaultFamilies by familySwitcherVm.families.collectAsStateWithLifecycle()
+    KeyVaultGate(familyIds = vaultFamilies.map { it.id })
 
     // Annuncio dalla console admin: non è una destinazione, quindi vive sopra il
     // NavHost e non tocca il back stack.

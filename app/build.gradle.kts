@@ -160,6 +160,9 @@ dependencies {
     implementation(libs.androidx.credentials.play.services)
     implementation(libs.googleid)
     implementation("com.google.android.gms:play-services-auth:21.2.0")
+    // Cassaforte v2: la chiave personale sopravvive a reinstallazione e telefono
+    // nuovo, solo se Block Store la cifra end-to-end (piano, Fase 2).
+    implementation("com.google.android.gms:play-services-auth-blockstore:16.4.0")
     implementation("com.android.billingclient:billing-ktx:8.0.0")
     implementation(libs.facebook.login)
     implementation("com.google.zxing:core:3.5.3")

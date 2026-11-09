@@ -1,6 +1,9 @@
 package it.vittorioscocca.kidbox.data.crypto
 
 import android.content.SharedPreferences
+import com.google.android.gms.auth.blockstore.Blockstore
+import com.google.android.gms.auth.blockstore.RetrieveBytesRequest
+import com.google.android.gms.auth.blockstore.StoreBytesData
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
@@ -45,10 +48,84 @@ object FamilyKeyVault {
         return runCatching { FamilyKeyVaultCrypto.unb64(s) }.getOrNull()?.takeIf { it.size == 32 }
     }
 
-    /** Solo EncryptedPrefs: la RK non finisce mai nelle prefs in chiaro. */
-    private fun saveRk(uid: String, rk: ByteArray) {
+    /**
+     * EncryptedPrefs (mai le prefs in chiaro) e, se cifrata end-to-end, anche
+     * Block Store: così la RK torna da sola dopo una reinstallazione o su un
+     * telefono nuovo con lo stesso account Google.
+     */
+    private suspend fun saveRk(uid: String, rk: ByteArray) {
         val p = prefs() ?: error("EncryptedPrefs non disponibili")
         p.edit().putString(rkPref(uid), FamilyKeyVaultCrypto.b64(rk)).commit()
+        saveToBlockStore(uid, rk)
+    }
+
+    // ── Block Store (decisione del 09/11/2026: solo con E2E confermata) ──
+
+    private fun blockStoreKey(uid: String) = "kidbox_vault_rk_$uid"
+
+    private suspend fun saveToBlockStore(uid: String, rk: ByteArray) {
+        val ctx = KidBoxApplicationHolder.applicationContext ?: return
+        try {
+            val client = Blockstore.getClient(ctx)
+            // Senza blocco schermo Google potrebbe aprire la RK: non si salva, resta il codice.
+            if (!client.isEndToEndEncryptionAvailable.await()) {
+                KBLog.crypto.info("Block Store senza E2E: RK non salvata lì", TAG)
+                return
+            }
+            client.storeBytes(
+                StoreBytesData.Builder()
+                    .setKey(blockStoreKey(uid))
+                    .setBytes(rk)
+                    .setShouldBackupToCloud(true)
+                    .build()
+            ).await()
+            KBLog.crypto.info("RK salvata su Block Store (E2E)", TAG)
+        } catch (e: Exception) {
+            KBLog.crypto.info("Block Store non disponibile: ${e.message}", TAG)
+        }
+    }
+
+    /**
+     * Rimette in locale la RK da Block Store, se c'è e se il suo `rkId` coincide
+     * con quello della cassaforte dell'utente (una RK vecchia o di un altro
+     * account non si adotta). `true` = RK ora presente.
+     */
+    suspend fun restoreFromBlockStore(uid: String): Boolean {
+        if (loadRk(uid) != null) return true
+        val ctx = KidBoxApplicationHolder.applicationContext ?: return false
+        return try {
+            val key = blockStoreKey(uid)
+            val res = Blockstore.getClient(ctx).retrieveBytes(
+                RetrieveBytesRequest.Builder().setKeys(listOf(key)).build()
+            ).await()
+            val rk = res.blockstoreDataMap[key]?.bytes?.takeIf { it.size == 32 } ?: return false
+            val ids = db.collection("users").document(uid).collection("keyVault")
+                .get(Source.SERVER).await().documents.mapNotNull { it.getString("rkId") }.toSet()
+            if (FamilyKeyVaultCrypto.rkId(rk) !in ids) {
+                KBLog.crypto.info("Block Store: RK non della cassaforte attuale, ignorata", TAG)
+                return false
+            }
+            val p = prefs() ?: return false
+            p.edit().putString(rkPref(uid), FamilyKeyVaultCrypto.b64(rk)).commit()
+            KBLog.crypto.info("RK ripresa da Block Store", TAG)
+            true
+        } catch (e: Exception) {
+            KBLog.crypto.info("Block Store: lettura non riuscita: ${e.message}", TAG)
+            false
+        }
+    }
+
+    /** Quanti slot ha la cassaforte (0 = da creare). */
+    suspend fun slotCount(uid: String): Int =
+        db.collection("users").document(uid).collection("keyVault").get(Source.SERVER).await().size()
+
+    /** Copia v2 verificata per ogni famiglia di cui questo telefono ha la chiave. */
+    suspend fun syncFamilyKeysV2(context: android.content.Context, uid: String, familyIds: List<String>) {
+        for (fid in familyIds.toSet()) {
+            if (fid.isBlank()) continue
+            val key = FamilyKeyStore.loadFamilyKey(context, fid, uid) ?: continue
+            writeAndVerifyV2(uid, fid, key)
+        }
     }
 
     fun forgetRk(uid: String) {

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cassaforte della chiave di famiglia v2 (KeyVaultPrompt). Stesse chiavi in values/-en/-fr/-es; testi uguali al web (keyVault in translations.js). -->
+<resources>
+    <string name="kv_protect_title">Protege la clave de tu familia</string>
+    <string name="kv_when_needed">Normalmente no lo necesitarás: si aún tienes un dispositivo o un familiar con KidBox, vuelves a entrar desde ahí.</string>
+    <string name="kv_create_cta">Crear el código de recuperación</string>
+    <string name="kv_later">Más tarde</string>
+    <string name="kv_code_title">Tu código de recuperación</string>
+    <string name="kv_code_lead">Guárdalo ahora: solo lo verás esta vez. Vale para todas tus familias y en todos tus dispositivos.</string>
+    <string name="kv_copy">Copiar</string>
+    <string name="kv_copied">Copiado</string>
+    <string name="kv_code_warning">Si pierdes este código y todos tus dispositivos, y ningún familiar tiene la app, los datos cifrados no se pueden recuperar.</string>
+    <string name="kv_code_where">Imprímelo o guárdalo en el gestor de contraseñas del móvil. No lo guardes en las Contraseñas de KidBox: se abren con la misma clave que este código sirve para recuperar.</string>
+    <string name="kv_saved">He guardado el código</string>
+    <string name="kv_confirm_title">Confirma el código</string>
+    <string name="kv_confirm_lead">Escribe los caracteres del código en las posiciones indicadas.</string>
+    <string name="kv_confirm_wrong">No coincide: revisa el código que has guardado.</string>
+    <string name="kv_confirm_cta">Confirmar</string>
+    <string name="kv_creating">Creando…</string>
+    <string name="kv_back">Atrás</string>
+    <string name="kv_exists_now">Tu caja fuerte se acaba de crear en otro dispositivo: ábrela con ese código.</string>
+    <string name="kv_open_title">Abre la caja fuerte de la familia</string>
+    <string name="kv_open_cta">Abrir</string>
+    <string name="kv_opening">Abriendo…</string>
+    <string name="kv_wrong_code">Código no válido: comprueba que lo has escrito entero y sin errores.</string>
+    <string name="kv_lost_code">¿Has perdido el código? Si aún tienes un dispositivo o un familiar con KidBox, vuelves a entrar desde ahí.</string>
+    <string name="kv_done_title">Listo</string>
+    <string name="kv_done_body">La clave de tu familia está protegida. Ni siquiera KidBox puede abrirla.</string>
+    <string name="kv_done_cta">Continuar</string>
+    <string name="kv_error">Algo no ha funcionado. Inténtalo de nuevo.</string>
+    <string name="kv_file_header">KidBox — código de recuperación de la clave de familia</string>
+    <string name="kv_code_label">Código de recuperación</string>
+    <string name="kv_protect_body">Los documentos, contraseñas y fotos de KidBox están cifrados con una clave que solo tiene tu familia. Para recuperarla en un móvil nuevo o en el ordenador, guarda un código de recuperación. Ni siquiera KidBox puede abrirla.</string>
+    <string name="kv_open_lead">En este dispositivo solo hace falta una vez: escribe el código de recuperación que guardaste.</string>
+    <string name="kv_share">Guardar o imprimir</string>
+    <string name="kv_confirm_pos">N.º %1$d</string>
+</resources>
