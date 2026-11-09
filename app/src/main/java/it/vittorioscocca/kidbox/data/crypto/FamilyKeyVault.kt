@@ -150,6 +150,35 @@ object FamilyKeyVault {
         }
     }
 
+    data class Slot(val id: String, val type: String, val label: String?, val createdAt: java.util.Date?, val updatedAt: java.util.Date?)
+
+    /** Gli slot della cassaforte, dal server (codice e passkey). */
+    suspend fun listSlots(uid: String): List<Slot> =
+        db.collection("users").document(uid).collection("keyVault").get(Source.SERVER).await().documents.map {
+            Slot(it.id, it.getString("type").orEmpty(), it.getString("label"),
+                it.getTimestamp("createdAt")?.toDate(), it.getTimestamp("updatedAt")?.toDate())
+        }
+
+    /**
+     * Nuovo codice di recupero al posto del vecchio, con la RK di questo telefono:
+     * stesso documento e stesso `rkId`, il vecchio codice smette di valere.
+     */
+    suspend fun replaceRecoveryCode(uid: String, recoveryCode: String) {
+        val rk = loadRk(uid) ?: throw VaultMissingException()
+        val (salt, s) = FamilyKeyVaultCrypto.sealRecoverySlot(uid, recoveryCode, rk)
+        val ref = db.collection("users").document(uid).collection("keyVault").document("recoveryCode")
+        val old = ref.get(Source.SERVER).await()
+        val oldId = old.getString("rkId")
+        if (oldId != null && oldId != FamilyKeyVaultCrypto.rkId(rk)) throw FamilyKeyVaultCrypto.WrongSecretException()
+        ref.set(mapOf(
+            "type" to "recoveryCode", "version" to FamilyKeyVaultCrypto.VERSION,
+            "rkId" to FamilyKeyVaultCrypto.rkId(rk), "salt" to salt,
+            "nonce" to s.nonce, "cipher" to s.cipher, "tag" to s.tag,
+            "createdAt" to (old.getTimestamp("createdAt") ?: FieldValue.serverTimestamp()),
+            "updatedAt" to FieldValue.serverTimestamp(),
+        )).await()
+    }
+
     /** Quanti slot ha la cassaforte (0 = da creare). */
     suspend fun slotCount(uid: String): Int =
         db.collection("users").document(uid).collection("keyVault").get(Source.SERVER).await().size()

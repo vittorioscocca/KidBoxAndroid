@@ -38,4 +38,19 @@
     <string name="kv_backup_body">Activez la sauvegarde Google sur ce téléphone : si vous réinstallez KidBox ou changez de téléphone, la clé de votre famille revient toute seule, chiffrée avec le verrouillage de l\'écran, si bien que même Google ne peut pas la lire. Sans elle, il vous faudra le code de récupération.</string>
     <string name="kv_backup_cta">Ouvrir la sauvegarde Google</string>
     <string name="kv_backup_later">Pas maintenant</string>
+    <string name="security_title">Sécurité</string>
+    <string name="security_row_sub">Clé de la famille et nouveaux appareils</string>
+    <string name="security_checking">Vérification…</string>
+    <string name="security_status_failed">Impossible de lire l\'état. Vérifiez la connexion.</string>
+    <string name="security_status_none">Clé pas encore protégée</string>
+    <string name="security_status_ok">Clé protégée sur cet appareil</string>
+    <string name="security_status_locked">Coffre à ouvrir sur cet appareil</string>
+    <string name="security_explain">Les documents, mots de passe et photos sont chiffrés avec une clé que seule votre famille possède. Ici, vous choisissez comment la retrouver sur un nouvel appareil. Même KidBox ne peut pas l\'ouvrir.</string>
+    <string name="security_methods">Moyens d\'ouvrir le coffre</string>
+    <string name="security_passkey">Clé d\'accès</string>
+    <string name="security_open_here">Ouvrir le coffre sur cet appareil</string>
+    <string name="security_regenerate">Générer un nouveau code de récupération</string>
+    <string name="security_regenerate_hint">Si vous avez perdu le code mais avez encore cet appareil, créez-en un nouveau : l\'ancien ne fonctionnera plus.</string>
+    <string name="kv_regenerated">L\'ancien code ne fonctionne plus : utilisez désormais le nouveau.</string>
+    <string name="kv_cancel">Annuler</string>
 </resources>

@@ -81,6 +81,8 @@ fun KeyVaultPrompt(
     allowLater: Boolean,
     onDone: () -> Unit,
     onLater: () -> Unit,
+    /** Da Impostazioni › Sicurezza: nuovo codice al posto del vecchio (serve la RK qui). */
+    regenerate: Boolean = false,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -97,6 +99,7 @@ fun KeyVaultPrompt(
     val confirmChars = remember { mutableStateListOf("", "", "", "") }
 
     LaunchedEffect(uid) {
+        if (regenerate) { step = KvStep.CODE; return@LaunchedEffect }
         step = try {
             if (withContext(Dispatchers.IO) { FamilyKeyVault.slotCount(uid) } > 0) KvStep.OPEN else KvStep.INTRO
         } catch (e: Exception) {
@@ -112,6 +115,12 @@ fun KeyVaultPrompt(
         scope.launch {
             busy = true; error = null
             try {
+                if (regenerate) {
+                    withContext(Dispatchers.IO) { FamilyKeyVault.replaceRecoveryCode(uid, code) }
+                    notice = R.string.kv_regenerated
+                    step = KvStep.DONE
+                    return@launch
+                }
                 withContext(Dispatchers.IO) {
                     FamilyKeyVault.createVault(uid, code)
                     FamilyKeyVault.syncFamilyKeysV2(context, uid, familyIds)
@@ -289,7 +298,9 @@ fun KeyVaultPrompt(
                     }
                 }
                 if (allowLater && step != KvStep.DONE && step != KvStep.LOADING) {
-                    TextButton(onClick = onLater, enabled = !busy) { Text(stringResource(R.string.kv_later)) }
+                    TextButton(onClick = onLater, enabled = !busy) {
+                        Text(stringResource(if (regenerate) R.string.kv_cancel else R.string.kv_later))
+                    }
                 }
             }
         }

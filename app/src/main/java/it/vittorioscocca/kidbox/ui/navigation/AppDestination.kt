@@ -12,6 +12,7 @@ sealed class AppDestination(val route: String) {
     data object Profile : AppDestination("profile")
     data object Settings : AppDestination("settings")
     data object AutoFillSettings : AppDestination("autofill_settings")
+    data object SecuritySettings : AppDestination("security_settings")
     data object AiSettings : AppDestination("ai_settings")
     data object Plans : AppDestination("plans")
     data object StorageUsage : AppDestination("storage_usage")

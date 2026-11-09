@@ -92,6 +92,7 @@ import it.vittorioscocca.kidbox.ui.screens.settings.PrivacySettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.SettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.support.SupportChatScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.AutoFillSettingsScreen
+import it.vittorioscocca.kidbox.ui.screens.settings.SecuritySettingsScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.StorageUsageScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.ThemeScreen
 import it.vittorioscocca.kidbox.ui.screens.settings.WidgetSettingsScreen
@@ -610,6 +611,7 @@ fun AppNavGraph(
                 onNewsSettings = { navController.navigate(AppDestination.NewsSettings.route) },
                 onStorageUsage = { navController.navigate(AppDestination.StorageUsage.route) },
                 onAutoFillSettings = { navController.navigate(AppDestination.AutoFillSettings.route) },
+                onSecuritySettings = { navController.navigate(AppDestination.SecuritySettings.route) },
                 onPrivacySettings = { navController.navigate(AppDestination.PrivacySettings.route) },
                 onSupportChat = {
                     navController.navigate(AppDestination.SupportChat.route) {
@@ -629,6 +631,12 @@ fun AppNavGraph(
             PrivacySettingsScreen(onBack = { navController.popBackStack() })
         }
 
+        composable(AppDestination.SecuritySettings.route) {
+            SecuritySettingsScreen(
+                familyIds = vaultFamilies.map { it.id },
+                onBack = { navController.popBackStack() },
+            )
+        }
         composable(AppDestination.AutoFillSettings.route) {
             AutoFillSettingsScreen(onBack = { navController.popBackStack() })
         }

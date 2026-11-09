@@ -38,4 +38,19 @@
     <string name="kv_backup_body">Turn on Google Backup on this phone: if you reinstall KidBox or switch phones, your family\'s key comes back on its own, encrypted with your screen lock so not even Google can read it. Without it, you\'ll need your recovery code.</string>
     <string name="kv_backup_cta">Open Google backup</string>
     <string name="kv_backup_later">Not now</string>
+    <string name="security_title">Security</string>
+    <string name="security_row_sub">Family key and new devices</string>
+    <string name="security_checking">Checking…</string>
+    <string name="security_status_failed">Can\'t read the status. Check your connection.</string>
+    <string name="security_status_none">Key not protected yet</string>
+    <string name="security_status_ok">Key protected on this device</string>
+    <string name="security_status_locked">Vault not yet opened on this device</string>
+    <string name="security_explain">Documents, passwords and photos are encrypted with a key only your family has. Here you choose how to get it back on a new device. Not even KidBox can open it.</string>
+    <string name="security_methods">Ways to open the vault</string>
+    <string name="security_passkey">Passkey</string>
+    <string name="security_open_here">Open the vault on this device</string>
+    <string name="security_regenerate">Generate a new recovery code</string>
+    <string name="security_regenerate_hint">If you\'ve lost your code but still have this device, create a new one: the old one stops working.</string>
+    <string name="kv_regenerated">The previous code no longer works: from now on use the new one.</string>
+    <string name="kv_cancel">Cancel</string>
 </resources>

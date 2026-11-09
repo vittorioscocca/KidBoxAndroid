@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SupportAgent
@@ -46,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -93,6 +95,7 @@ fun SettingsScreen(
     onNewsSettings: () -> Unit,
     onStorageUsage: () -> Unit,
     onAutoFillSettings: () -> Unit,
+    onSecuritySettings: () -> Unit,
     onPrivacySettings: () -> Unit,
     onSupportChat: () -> Unit,
     viewModel: ThemeViewModel = hiltViewModel(),
@@ -100,6 +103,14 @@ fun SettingsScreen(
 ) {
     val uriHandler = LocalUriHandler.current
     BackHandler { onBack() }
+    // «Sicurezza» compare con la cassaforte v2 accesa per l'utente (config/keyVault).
+    var showSecurity by remember { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: return@LaunchedEffect
+        showSecurity = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            it.vittorioscocca.kidbox.data.crypto.FamilyKeyVault.flags(uid).active
+        }
+    }
     val theme by viewModel.theme.collectAsStateWithLifecycle()
     val showDashboard by widgetsViewModel.showDashboard.collectAsStateWithLifecycle()
     val showWeather by widgetsViewModel.showWeather.collectAsStateWithLifecycle()
@@ -196,6 +207,13 @@ fun SettingsScreen(
             showChevron = true,
             onClick = onAutoFillSettings,
         ),
+        if (showSecurity) SettingRowItem(
+            title = stringResource(R.string.security_title),
+            subtitle = stringResource(R.string.security_row_sub),
+            icon = Icons.Filled.Lock,
+            showChevron = true,
+            onClick = onSecuritySettings,
+        ) else null,
         SettingRowItem(
             title = stringResource(R.string.settings_row_storage),
             icon = Icons.Filled.Storage,

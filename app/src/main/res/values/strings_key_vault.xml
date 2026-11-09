@@ -38,4 +38,19 @@
     <string name="kv_backup_body">Attiva il Backup di Google su questo telefono: se reinstalli KidBox o cambi telefono, la chiave della tua famiglia torna da sola, cifrata con il blocco schermo, così nemmeno Google può leggerla. Senza, ti servirà il codice di recupero.</string>
     <string name="kv_backup_cta">Apri il backup di Google</string>
     <string name="kv_backup_later">Non ora</string>
+    <string name="security_title">Sicurezza</string>
+    <string name="security_row_sub">Chiave della famiglia e nuovi dispositivi</string>
+    <string name="security_checking">Controllo…</string>
+    <string name="security_status_failed">Non riesco a leggere lo stato. Controlla la connessione.</string>
+    <string name="security_status_none">Chiave non ancora protetta</string>
+    <string name="security_status_ok">Chiave protetta su questo dispositivo</string>
+    <string name="security_status_locked">Cassaforte da aprire su questo dispositivo</string>
+    <string name="security_explain">Documenti, password e foto sono cifrati con una chiave che ha solo la tua famiglia. Qui scegli come ritrovarla su un nuovo dispositivo. Nemmeno KidBox può aprirla.</string>
+    <string name="security_methods">Modi per aprire la cassaforte</string>
+    <string name="security_passkey">Passkey</string>
+    <string name="security_open_here">Apri la cassaforte su questo dispositivo</string>
+    <string name="security_regenerate">Rigenera codice di recupero</string>
+    <string name="security_regenerate_hint">Se hai perso il codice ma hai ancora questo dispositivo, creane uno nuovo: quello vecchio smette di valere.</string>
+    <string name="kv_regenerated">Il codice precedente non vale più: d\'ora in poi usa quello nuovo.</string>
+    <string name="kv_cancel">Annulla</string>
 </resources>
