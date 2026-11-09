@@ -34,4 +34,8 @@
     <string name="kv_open_lead">Su questo dispositivo serve una volta sola: scrivi il codice di recupero che hai salvato.</string>
     <string name="kv_share">Salva o stampa</string>
     <string name="kv_confirm_pos">N. %1$d</string>
+    <string name="kv_backup_title">Salva la chiave nel backup di Google</string>
+    <string name="kv_backup_body">Attiva il Backup di Google su questo telefono: se reinstalli KidBox o cambi telefono, la chiave della tua famiglia torna da sola, cifrata con il blocco schermo, così nemmeno Google può leggerla. Senza, ti servirà il codice di recupero.</string>
+    <string name="kv_backup_cta">Apri il backup di Google</string>
+    <string name="kv_backup_later">Non ora</string>
 </resources>

@@ -63,26 +63,61 @@ object FamilyKeyVault {
 
     private fun blockStoreKey(uid: String) = "kidbox_vault_rk_$uid"
 
-    private suspend fun saveToBlockStore(uid: String, rk: ByteArray) {
-        val ctx = KidBoxApplicationHolder.applicationContext ?: return
-        try {
-            val client = Blockstore.getClient(ctx)
-            // Senza blocco schermo Google potrebbe aprire la RK: non si salva, resta il codice.
-            if (!client.isEndToEndEncryptionAvailable.await()) {
-                KBLog.crypto.info("Block Store senza E2E: RK non salvata lì", TAG)
-                return
-            }
-            client.storeBytes(
+    private fun bsSavedPref(uid: String) = "bs_saved_$uid"
+    private fun bsHintPref(uid: String) = "bs_hint_$uid"
+
+    /** `true`/`false` = Block Store cifra end-to-end o no; `null` = Block Store non raggiungibile. */
+    suspend fun blockStoreE2E(): Boolean? {
+        val ctx = KidBoxApplicationHolder.applicationContext ?: return null
+        return try {
+            Blockstore.getClient(ctx).isEndToEndEncryptionAvailable.await()
+        } catch (e: Exception) {
+            KBLog.crypto.info("Block Store non disponibile: ${e.message}", TAG)
+            null
+        }
+    }
+
+    /** Salva la RK su Block Store se cifrato end-to-end. Restituisce lo stato E2E. */
+    private suspend fun saveToBlockStore(uid: String, rk: ByteArray): Boolean? {
+        val ctx = KidBoxApplicationHolder.applicationContext ?: return null
+        val e2e = blockStoreE2E() ?: return null
+        // Senza E2E Google potrebbe aprire la RK: non si salva, resta il codice.
+        if (!e2e) {
+            KBLog.crypto.info("Block Store senza E2E: RK non salvata lì", TAG)
+            return false
+        }
+        return try {
+            Blockstore.getClient(ctx).storeBytes(
                 StoreBytesData.Builder()
                     .setKey(blockStoreKey(uid))
                     .setBytes(rk)
                     .setShouldBackupToCloud(true)
                     .build()
             ).await()
+            runCatching { prefs()?.edit()?.putBoolean(bsSavedPref(uid), true)?.apply() }
             KBLog.crypto.info("RK salvata su Block Store (E2E)", TAG)
+            true
         } catch (e: Exception) {
-            KBLog.crypto.info("Block Store non disponibile: ${e.message}", TAG)
+            KBLog.crypto.info("Block Store: scrittura non riuscita: ${e.message}", TAG)
+            null
         }
+    }
+
+    /**
+     * All'avvio, con la RK già in locale: se Block Store è diventato E2E (l'utente
+     * ha acceso il backup di Google dopo) la RK ci va adesso. Una volta sola.
+     * Restituisce lo stato E2E (`null` = non raggiungibile).
+     */
+    suspend fun ensureRkInBlockStore(uid: String): Boolean? {
+        val rk = loadRk(uid) ?: return null
+        if (prefs()?.getBoolean(bsSavedPref(uid), false) == true) return true
+        return saveToBlockStore(uid, rk)
+    }
+
+    /** L'invito ad accendere il backup di Google si mostra una volta per utente e telefono. */
+    fun backupHintShown(uid: String): Boolean = prefs()?.getBoolean(bsHintPref(uid), false) ?: true
+    fun markBackupHintShown(uid: String) {
+        runCatching { prefs()?.edit()?.putBoolean(bsHintPref(uid), true)?.apply() }
     }
 
     /**

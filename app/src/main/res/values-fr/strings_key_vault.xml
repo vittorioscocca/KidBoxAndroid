@@ -34,4 +34,8 @@
     <string name="kv_open_lead">Sur cet appareil, il suffit de le faire une fois : saisissez le code de récupération que vous avez enregistré.</string>
     <string name="kv_share">Enregistrer ou imprimer</string>
     <string name="kv_confirm_pos">N° %1$d</string>
+    <string name="kv_backup_title">Enregistrez la clé dans la sauvegarde Google</string>
+    <string name="kv_backup_body">Activez la sauvegarde Google sur ce téléphone : si vous réinstallez KidBox ou changez de téléphone, la clé de votre famille revient toute seule, chiffrée avec le verrouillage de l\'écran, si bien que même Google ne peut pas la lire. Sans elle, il vous faudra le code de récupération.</string>
+    <string name="kv_backup_cta">Ouvrir la sauvegarde Google</string>
+    <string name="kv_backup_later">Pas maintenant</string>
 </resources>

@@ -90,6 +90,7 @@ fun KeyVaultPrompt(
     var notice by remember { mutableStateOf<Int?>(null) }
     var typedCode by remember { mutableStateOf("") }
     var copied by remember { mutableStateOf(false) }
+    var backupOff by remember { mutableStateOf(false) }
     val code = remember { FamilyKeyVaultCrypto.generateRecoveryCode() }
     val canonical = remember(code) { FamilyKeyVaultCrypto.normalizeRecoveryCode(code) }
     val positions = remember { (0 until 24).shuffled().take(4).sorted() }
@@ -114,7 +115,9 @@ fun KeyVaultPrompt(
                 withContext(Dispatchers.IO) {
                     FamilyKeyVault.createVault(uid, code)
                     FamilyKeyVault.syncFamilyKeysV2(context, uid, familyIds)
+                    backupOff = FamilyKeyVault.blockStoreE2E() == false
                 }
+                if (backupOff) FamilyKeyVault.markBackupHintShown(uid)
                 step = KvStep.DONE
             } catch (e: FamilyKeyVault.VaultExistsException) {
                 notice = R.string.kv_exists_now
@@ -133,7 +136,9 @@ fun KeyVaultPrompt(
                 withContext(Dispatchers.IO) {
                     FamilyKeyVault.openWithRecoveryCode(uid, typedCode)
                     FamilyKeyVault.syncFamilyKeysV2(context, uid, familyIds)
+                    backupOff = FamilyKeyVault.blockStoreE2E() == false
                 }
+                if (backupOff) FamilyKeyVault.markBackupHintShown(uid)
                 notice = null
                 step = KvStep.DONE
             } catch (e: FamilyKeyVaultCrypto.WrongSecretException) {
@@ -279,6 +284,7 @@ fun KeyVaultPrompt(
                         KvTitle(R.string.kv_done_title)
                         notice?.let { KvNotice(it) }
                         KvLead(R.string.kv_done_body)
+                        if (backupOff) BackupHint(context)
                         KvPrimary(R.string.kv_done_cta) { onDone() }
                     }
                 }
@@ -331,6 +337,37 @@ fun KeyVaultPrompt(
     Button(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth()) { Text(stringResource(res)) }
 }
 
+/** Riquadro «accendi il backup di Google» con il link all'impostazione. */
+@Composable private fun BackupHint(context: Context) = Surface(
+    shape = RoundedCornerShape(14.dp),
+    color = MaterialTheme.colorScheme.secondaryContainer,
+    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    modifier = Modifier.fillMaxWidth(),
+) {
+    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.kv_backup_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.kv_backup_body), style = MaterialTheme.typography.bodySmall)
+        OutlinedButton(onClick = { openGoogleBackupSettings(context) }, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.kv_backup_cta))
+        }
+    }
+}
+
+/**
+ * La pagina «Backup» di Google (servizi Play). Se il telefono non la espone,
+ * le Impostazioni generali.
+ */
+fun openGoogleBackupSettings(context: Context) {
+    val flags = Intent.FLAG_ACTIVITY_NEW_TASK
+    try {
+        context.startActivity(Intent("com.google.android.gms.backup.ACTION_BACKUP_SETTINGS").addFlags(flags))
+    } catch (e: android.content.ActivityNotFoundException) {
+        runCatching { context.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(flags)) }
+    } catch (e: SecurityException) {
+        runCatching { context.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(flags)) }
+    }
+}
+
 /** Negli appunti marcato sensibile: niente anteprima nella barra degli appunti (Android 13+). */
 private fun copySensitive(context: Context, text: String) {
     val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
@@ -359,14 +396,25 @@ private fun shareText(context: Context, text: String) {
 fun KeyVaultGate(familyIds: List<String>) {
     val context = LocalContext.current
     var shown by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
+    var backupHintFor by remember { mutableStateOf<String?>(null) }
     val key = familyIds.sorted().joinToString(",")
 
     LaunchedEffect(key) {
         if (shown != null || familyIds.isEmpty()) return@LaunchedEffect
         val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-        if (uid.isBlank() || FamilyKeyVault.loadRk(uid) != null) return@LaunchedEffect
+        if (uid.isBlank()) return@LaunchedEffect
         val flags = withContext(Dispatchers.IO) { FamilyKeyVault.flags(uid) }
         if (!flags.active) return@LaunchedEffect
+        if (FamilyKeyVault.loadRk(uid) != null) {
+            // RK già qui: va su Block Store appena diventa E2E; se non lo è, una
+            // volta sola si invita ad accendere il backup di Google.
+            val e2e = withContext(Dispatchers.IO) { FamilyKeyVault.ensureRkInBlockStore(uid) }
+            if (e2e == false && !FamilyKeyVault.backupHintShown(uid)) {
+                delay(3000)
+                backupHintFor = uid
+            }
+            return@LaunchedEffect
+        }
         if (withContext(Dispatchers.IO) { FamilyKeyVault.restoreFromBlockStore(uid) }) {
             withContext(Dispatchers.IO) { FamilyKeyVault.syncFamilyKeysV2(context, uid, familyIds) }
             return@LaunchedEffect
@@ -384,6 +432,22 @@ fun KeyVaultGate(familyIds: List<String>) {
             allowLater = !enforce,
             onDone = { shown = null },
             onLater = { KeyVaultLater.uids.add(uid); shown = null },
+        )
+    }
+
+    backupHintFor?.let { uid ->
+        val close = { FamilyKeyVault.markBackupHintShown(uid); backupHintFor = null }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = close,
+            icon = { Icon(Icons.Filled.Lock, contentDescription = null) },
+            title = { Text(stringResource(R.string.kv_backup_title), textAlign = TextAlign.Center) },
+            text = { Text(stringResource(R.string.kv_backup_body)) },
+            confirmButton = {
+                TextButton(onClick = { openGoogleBackupSettings(context); close() }) {
+                    Text(stringResource(R.string.kv_backup_cta))
+                }
+            },
+            dismissButton = { TextButton(onClick = close) { Text(stringResource(R.string.kv_backup_later)) } },
         )
     }
 }
