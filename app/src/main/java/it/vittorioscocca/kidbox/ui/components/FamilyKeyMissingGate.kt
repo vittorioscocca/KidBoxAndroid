@@ -16,6 +16,7 @@ import androidx.compose.ui.res.stringResource
 import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.crypto.FamilyKeyEscrow
+import it.vittorioscocca.kidbox.data.crypto.FamilyKeyVault
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -58,7 +59,7 @@ fun FamilyKeyMissingGate(familyId: String) {
     }
 
     if (visible) {
-        FamilyKeyMissingDialog(onDismiss = { visible = false })
+        FamilyKeyMissingDialog(familyId = familyId, onDismiss = { visible = false })
     }
 }
 
@@ -70,20 +71,58 @@ fun FamilyKeyMissingGate(familyId: String) {
  * schermata.
  */
 @Composable
-fun FamilyKeyMissingDialog(onDismiss: () -> Unit) {
+fun FamilyKeyMissingDialog(familyId: String, onDismiss: () -> Unit) {
+    val user = FirebaseAuth.getInstance().currentUser
+    val uid = user?.uid.orEmpty()
+    // Cassaforte v2 accesa per questo utente: allora si offre anche il QR per
+    // farsi mandare la chiave (piano v2, sezione 3.2).
+    var canReceive by remember { mutableStateOf(false) }
+    var receiving by remember { mutableStateOf(false) }
+    LaunchedEffect(uid) {
+        if (uid.isNotBlank()) canReceive = FamilyKeyVault.flags(uid).active
+    }
+
+    if (receiving) {
+        KeyVaultPrompt(
+            uid = uid,
+            email = user?.email,
+            familyIds = listOf(familyId).filter { it.isNotBlank() },
+            allowLater = true,
+            onDone = onDismiss,
+            onLater = onDismiss,
+            receive = true,
+        )
+        return
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.family_key_missing_title)) },
         text = {
             Text(
-                stringResource(R.string.family_key_missing_message),
+                stringResource(
+                    if (canReceive) R.string.family_key_missing_message_qr else R.string.family_key_missing_message,
+                ),
                 style = MaterialTheme.typography.bodyMedium,
             )
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.settings_common_close))
+            if (canReceive) {
+                TextButton(onClick = { receiving = true }) {
+                    Text(stringResource(R.string.handoff_receive))
+                }
+            } else {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.settings_common_close))
+                }
             }
         },
+        dismissButton = if (canReceive) {
+            {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.settings_common_close))
+                }
+            }
+        } else null,
     )
 }

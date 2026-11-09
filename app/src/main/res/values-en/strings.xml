@@ -75,6 +75,7 @@
     <string name="auth_error_session_expired">Session no longer valid. Sign out and sign in again.</string>
     <string name="family_key_missing_title">Family key missing</string>
     <string name="family_key_missing_message">This device doesn\'t have the key that protects your shared content, so documents, wallet, photos and chat attachments can\'t be opened.\n\nTo recover it, ask whoever created the family to invite you again and scan the QR code they generate.</string>
+    <string name="family_key_missing_message_qr">This device is missing the key that protects shared content, so documents, wallet, photos and chat attachments can\'t be opened.\n\nTo get it back, tap “Receive the key with a QR code” and scan the code with another of your devices or a family member\'s phone (Settings › Security › “Scan a QR code”).</string>
     <string name="family_key_missing_short">Family key missing: ask whoever created the family to invite you again and scan their QR code.</string>
     <string name="meal_plan_title">Meal Plan</string>
     <string name="meal_plan_card_subtitle">AI-tailored diet</string>

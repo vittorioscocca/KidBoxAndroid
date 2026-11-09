@@ -249,7 +249,7 @@ fun FamilyPhotosScreen(
         }
     }
     if (keyMissingFromError) {
-        FamilyKeyMissingDialog(onDismiss = { keyMissingFromError = false })
+        FamilyKeyMissingDialog(familyId = state.familyId, onDismiss = { keyMissingFromError = false })
     }
     LaunchedEffect(state.filteredPhotos, viewerPhotoId) {
         val selectedId = viewerPhotoId ?: return@LaunchedEffect

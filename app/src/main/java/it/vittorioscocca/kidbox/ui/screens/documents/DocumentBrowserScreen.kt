@@ -240,7 +240,7 @@ fun DocumentBrowserScreen(
         }
     }
     if (keyMissingFromError) {
-        FamilyKeyMissingDialog(onDismiss = { keyMissingFromError = false })
+        FamilyKeyMissingDialog(familyId = familyId, onDismiss = { keyMissingFromError = false })
     }
 
     val cameraLauncher = rememberLauncherForActivityResult(
