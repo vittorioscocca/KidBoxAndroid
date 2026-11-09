@@ -287,7 +287,7 @@ class SectionCrypto @Inject constructor(
         ref: DocumentReference,
         data: Map<String, Any?>,
     ): Map<String, Any?> {
-        if (!KBFeatureFlags.sectionsEncryptionEnabled.value) return data
+        if (!KBFeatureFlags.sectionsEncryptionEnabled(familyId)) return data
         if (!SectionFields.touchesSealedFields(collection, data)) return data
         if (collection == SectionFields.CALENDAR_EVENTS && isCalendarExported(familyId)) {
             // Calendario esportato: in chiaro. Una scrittura completa riapre anche
@@ -358,7 +358,7 @@ class SectionCrypto @Inject constructor(
         raw: Map<String, Any?>,
         resolved: Map<String, Any?>,
     ) {
-        if (!KBFeatureFlags.sectionsEncryptionEnabled.value) return
+        if (!KBFeatureFlags.sectionsEncryptionEnabled(familyId)) return
         if (collection == SectionFields.CALENDAR_EVENTS) {
             when (calendarExported[familyId]) {
                 // Non ancora noto (il listener della famiglia non ha risposto): niente.

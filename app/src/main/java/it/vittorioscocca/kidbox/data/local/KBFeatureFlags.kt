@@ -85,8 +85,30 @@ object KBFeatureFlags {
     private val _sectionsEncryptionEnabled = MutableStateFlow(SECTIONS_ENCRYPTION_FALLBACK)
     val sectionsEncryptionEnabled: StateFlow<Boolean> = _sectionsEncryptionEnabled.asStateFlow()
 
+    /**
+     * Prova su una sola famiglia a interruttore spento, solo nelle build debug:
+     * il file di preferenze
+     * `kb_debug_overrides` con la stringa `sections_encryption_family` = familyId
+     * (scritto con `run-as`, `internal/cifratura-sezioni.md`, «Come provarla»).
+     */
+    private const val DEBUG_PREFS_FILE = "kb_debug_overrides"
+    private const val KEY_DEBUG_SECTIONS_FAMILY = "sections_encryption_family"
+    @Volatile private var debugSectionsFamily: String? = null
+
+    /** Cifratura delle sezioni per questa famiglia: interruttore remoto o prova di debug. */
+    fun sectionsEncryptionEnabled(familyId: String): Boolean =
+        _sectionsEncryptionEnabled.value ||
+            (BuildConfig.DEBUG && !debugSectionsFamily.isNullOrEmpty() && debugSectionsFamily == familyId)
+
     /** Da `KidBoxApplication.onCreate()`: allinea lo stato alla cache locale. */
     fun init(context: Context) {
+        if (BuildConfig.DEBUG) {
+            debugSectionsFamily = context.getSharedPreferences(DEBUG_PREFS_FILE, Context.MODE_PRIVATE)
+                .getString(KEY_DEBUG_SECTIONS_FAMILY, null)
+            if (!debugSectionsFamily.isNullOrEmpty()) {
+                KBLog.data.info("FeatureFlags: cifratura sezioni di prova per $debugSectionsFamily", TAG)
+            }
+        }
         _facebookLoginEnabled.value =
             prefs(context).getBoolean(KEY_FACEBOOK_LOGIN, FACEBOOK_LOGIN_FALLBACK)
         _textEncryptionEnabled.value =
