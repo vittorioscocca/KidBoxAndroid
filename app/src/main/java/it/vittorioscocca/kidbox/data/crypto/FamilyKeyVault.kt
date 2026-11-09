@@ -179,6 +179,48 @@ object FamilyKeyVault {
         )).await()
     }
 
+    // ── passkey (stessi slot del web: VaultPasskey fa la cerimonia) ─────
+
+    /** Gli id delle passkey registrate (base64url), per `allowCredentials`. */
+    suspend fun passkeyCredentialIds(uid: String): List<String> =
+        db.collection("users").document(uid).collection("keyVault").get(Source.SERVER).await().documents
+            .filter { it.getString("type") == "passkey" }
+            .mapNotNull { it.getString("credentialId") }
+
+    /** Aggiunge lo slot della passkey appena creata, con la RK di questo telefono. */
+    suspend fun addPasskeySlot(uid: String, credentialId: String, prf: ByteArray, label: String?) {
+        val rk = loadRk(uid) ?: throw VaultMissingException()
+        val rawId = FamilyKeyVaultCrypto.unb64Url(credentialId)
+        val (salt, s) = FamilyKeyVaultCrypto.sealSlot(uid, "passkey", prf, rk)
+        val rec = mutableMapOf<String, Any>(
+            "type" to "passkey", "version" to FamilyKeyVaultCrypto.VERSION,
+            "rkId" to FamilyKeyVaultCrypto.rkId(rk), "salt" to salt,
+            "nonce" to s.nonce, "cipher" to s.cipher, "tag" to s.tag,
+            "credentialId" to FamilyKeyVaultCrypto.b64Url(rawId),
+            "createdAt" to FieldValue.serverTimestamp(),
+        )
+        label?.takeIf { it.isNotBlank() }?.let { rec["label"] = it.take(80) }
+        db.collection("users").document(uid).collection("keyVault")
+            .document(FamilyKeyVaultCrypto.passkeySlotId(rawId)).set(rec).await()
+    }
+
+    /** Apre la cassaforte con l'uscita PRF della passkey usata e salva la RK. */
+    suspend fun openWithPasskey(uid: String, credentialId: String, prf: ByteArray) {
+        val rawId = FamilyKeyVaultCrypto.unb64Url(credentialId)
+        val d = db.collection("users").document(uid).collection("keyVault")
+            .document(FamilyKeyVaultCrypto.passkeySlotId(rawId)).get(Source.SERVER).await().data
+            ?: throw FamilyKeyVaultCrypto.WrongSecretException()
+        val sealed = FamilyKeyVaultCrypto.Sealed(
+            d["cipher"] as? String ?: throw VaultMissingException(),
+            d["nonce"] as? String ?: throw VaultMissingException(),
+            d["tag"] as? String ?: throw VaultMissingException(),
+        )
+        val rk = FamilyKeyVaultCrypto.openSlot(
+            uid, "passkey", prf, d["salt"] as? String ?: throw VaultMissingException(), sealed, d["rkId"] as? String,
+        )
+        saveRk(uid, rk)
+    }
+
     /** Quanti slot ha la cassaforte (0 = da creare). */
     suspend fun slotCount(uid: String): Int =
         db.collection("users").document(uid).collection("keyVault").get(Source.SERVER).await().size()

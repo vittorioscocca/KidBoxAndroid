@@ -53,4 +53,13 @@
     <string name="security_regenerate_hint">If you\'ve lost your code but still have this device, create a new one: the old one stops working.</string>
     <string name="kv_regenerated">The previous code no longer works: from now on use the new one.</string>
     <string name="kv_cancel">Cancel</string>
+    <string name="kv_open_passkey">Use passkey</string>
+    <string name="kv_passkey_title">Open it with your fingerprint or screen lock too?</string>
+    <string name="kv_passkey_body">Create a passkey: on another device with the same Google account, unlocking will be enough, no code to type. Your code stays valid.</string>
+    <string name="kv_passkey_cta">Create a passkey</string>
+    <string name="kv_passkey_skip">Not now</string>
+    <string name="kv_passkey_added">Passkey added.</string>
+    <string name="kv_passkey_unsupported">This phone can\'t use a passkey for the vault: your recovery code remains your key.</string>
+    <string name="kv_passkey_not_usable">This passkey doesn\'t work here. Use your recovery code.</string>
+    <string name="security_add_passkey">Add a passkey</string>
 </resources>

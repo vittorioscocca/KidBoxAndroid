@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -55,6 +56,7 @@ import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.crypto.FamilyKeyVault
 import it.vittorioscocca.kidbox.data.crypto.FamilyKeyVaultCrypto
+import it.vittorioscocca.kidbox.data.crypto.VaultPasskey
 import it.vittorioscocca.kidbox.util.KBLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -63,15 +65,16 @@ import kotlinx.coroutines.withContext
 
 private const val TAG = "KeyVaultPrompt"
 
-private enum class KvStep { LOADING, INTRO, CODE, CONFIRM, OPEN, DONE }
+private enum class KvStep { LOADING, INTRO, CODE, CONFIRM, OPEN, PASSKEY, DONE }
 
 /**
  * «Proteggi la chiave della tua famiglia» (piano v2, Fase 2). Gemello di
  * `KeyVaultPrompt.jsx` (web) e `KeyVaultPromptView.swift` (iOS).
  *
  * Cassaforte assente → la crea col codice di recupero; presente → la apre col
- * codice. Dopo: copia v2 verificata per ogni famiglia. La v1 non si tocca.
- * Passkey e QR arrivano dopo.
+ * codice o con una passkey. Dopo: copia v2 verificata per ogni famiglia e,
+ * se il telefono può, l'offerta di una passkey (slot uguale a quello del web).
+ * La v1 non si tocca.
  */
 @Composable
 fun KeyVaultPrompt(
@@ -83,6 +86,8 @@ fun KeyVaultPrompt(
     onLater: () -> Unit,
     /** Da Impostazioni › Sicurezza: nuovo codice al posto del vecchio (serve la RK qui). */
     regenerate: Boolean = false,
+    /** Da Impostazioni › Sicurezza: solo «aggiungi una passkey» (serve la RK qui). */
+    addPasskey: Boolean = false,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -97,10 +102,16 @@ fun KeyVaultPrompt(
     val canonical = remember(code) { FamilyKeyVaultCrypto.normalizeRecoveryCode(code) }
     val positions = remember { (0 until 24).shuffled().take(4).sorted() }
     val confirmChars = remember { mutableStateListOf("", "", "", "") }
+    var passkeyIds by remember { mutableStateOf<List<String>>(emptyList()) }
+    val canPasskey = remember { VaultPasskey.maybeSupported() }
+    val afterUnlock = { if (canPasskey && !regenerate) KvStep.PASSKEY else KvStep.DONE }
 
     LaunchedEffect(uid) {
         if (regenerate) { step = KvStep.CODE; return@LaunchedEffect }
+        if (addPasskey) { step = KvStep.PASSKEY; return@LaunchedEffect }
         step = try {
+            passkeyIds = runCatching { withContext(Dispatchers.IO) { FamilyKeyVault.passkeyCredentialIds(uid) } }
+                .getOrDefault(emptyList())
             if (withContext(Dispatchers.IO) { FamilyKeyVault.slotCount(uid) } > 0) KvStep.OPEN else KvStep.INTRO
         } catch (e: Exception) {
             error = R.string.kv_error
@@ -127,7 +138,7 @@ fun KeyVaultPrompt(
                     backupOff = FamilyKeyVault.blockStoreE2E() == false
                 }
                 if (backupOff) FamilyKeyVault.markBackupHintShown(uid)
-                step = KvStep.DONE
+                step = afterUnlock()
             } catch (e: FamilyKeyVault.VaultExistsException) {
                 notice = R.string.kv_exists_now
                 step = KvStep.OPEN
@@ -149,11 +160,61 @@ fun KeyVaultPrompt(
                 }
                 if (backupOff) FamilyKeyVault.markBackupHintShown(uid)
                 notice = null
-                step = KvStep.DONE
+                step = afterUnlock()
             } catch (e: FamilyKeyVaultCrypto.WrongSecretException) {
                 error = R.string.kv_wrong_code
             } catch (e: Exception) {
                 KBLog.crypto.error("apertura cassaforte fallita: ${e.message}", TAG)
+                error = R.string.kv_error
+            } finally { busy = false }
+        }
+    }
+
+    fun openWithPasskey() {
+        scope.launch {
+            busy = true; error = null
+            try {
+                val r = VaultPasskey.assert(context, passkeyIds)
+                withContext(Dispatchers.IO) {
+                    FamilyKeyVault.openWithPasskey(uid, r.credentialId, r.prf)
+                    FamilyKeyVault.syncFamilyKeysV2(context, uid, familyIds)
+                    backupOff = FamilyKeyVault.blockStoreE2E() == false
+                }
+                if (backupOff) FamilyKeyVault.markBackupHintShown(uid)
+                notice = null
+                step = KvStep.DONE
+            } catch (e: VaultPasskey.CancelledException) {
+                // annullata dall'utente: si resta qui
+            } catch (e: FamilyKeyVaultCrypto.WrongSecretException) {
+                error = R.string.kv_passkey_not_usable
+            } catch (e: VaultPasskey.UnsupportedException) {
+                error = R.string.kv_passkey_not_usable
+            } catch (e: Exception) {
+                KBLog.crypto.error("apertura con passkey fallita: ${e.javaClass.simpleName} ${e.message}", TAG)
+                error = R.string.kv_passkey_not_usable
+            } finally { busy = false }
+        }
+    }
+
+    fun createPasskey() {
+        scope.launch {
+            busy = true; error = null
+            try {
+                val user = FirebaseAuth.getInstance().currentUser
+                val name = email?.takeIf { it.isNotBlank() } ?: uid
+                val r = VaultPasskey.create(context, uid, name, user?.displayName?.takeIf { it.isNotBlank() } ?: name)
+                val label = "Android · ${Build.MANUFACTURER.replaceFirstChar { it.uppercase() }} ${Build.MODEL}"
+                withContext(Dispatchers.IO) { FamilyKeyVault.addPasskeySlot(uid, r.credentialId, r.prf, label) }
+                notice = R.string.kv_passkey_added
+                step = KvStep.DONE
+            } catch (e: VaultPasskey.CancelledException) {
+                // annullata: si resta qui
+            } catch (e: VaultPasskey.UnsupportedException) {
+                KBLog.crypto.error("passkey senza PRF: ${e.message}", TAG)
+                notice = R.string.kv_passkey_unsupported
+                step = KvStep.DONE
+            } catch (e: Exception) {
+                KBLog.crypto.error("creazione passkey fallita: ${e.javaClass.simpleName} ${e.message}", TAG)
                 error = R.string.kv_error
             } finally { busy = false }
         }
@@ -268,6 +329,9 @@ fun KeyVaultPrompt(
                         KvTitle(R.string.kv_open_title)
                         notice?.let { KvNotice(it) }
                         KvLead(R.string.kv_open_lead)
+                        if (canPasskey && passkeyIds.isNotEmpty()) {
+                            KvPrimary(R.string.kv_open_passkey, enabled = !busy) { openWithPasskey() }
+                        }
                         OutlinedTextField(
                             value = typedCode,
                             onValueChange = { typedCode = it },
@@ -288,6 +352,21 @@ fun KeyVaultPrompt(
                         KvSmall(R.string.kv_lost_code)
                     }
 
+                    KvStep.PASSKEY -> {
+                        Icon(
+                            Icons.Filled.Fingerprint, contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 4.dp).height(44.dp).width(44.dp),
+                        )
+                        KvTitle(R.string.kv_passkey_title)
+                        KvLead(R.string.kv_passkey_body)
+                        KvError(error)
+                        KvPrimary(R.string.kv_passkey_cta, enabled = !busy) { createPasskey() }
+                        TextButton(onClick = { if (addPasskey) onLater() else step = KvStep.DONE }, enabled = !busy) {
+                            Text(stringResource(if (addPasskey) R.string.kv_cancel else R.string.kv_passkey_skip))
+                        }
+                    }
+
                     KvStep.DONE -> {
                         KvIcon(done = true)
                         KvTitle(R.string.kv_done_title)
@@ -297,9 +376,9 @@ fun KeyVaultPrompt(
                         KvPrimary(R.string.kv_done_cta) { onDone() }
                     }
                 }
-                if (allowLater && step != KvStep.DONE && step != KvStep.LOADING) {
+                if (allowLater && step != KvStep.DONE && step != KvStep.LOADING && step != KvStep.PASSKEY) {
                     TextButton(onClick = onLater, enabled = !busy) {
-                        Text(stringResource(if (regenerate) R.string.kv_cancel else R.string.kv_later))
+                        Text(stringResource(if (regenerate || addPasskey) R.string.kv_cancel else R.string.kv_later))
                     }
                 }
             }

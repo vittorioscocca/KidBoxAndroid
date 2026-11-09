@@ -53,4 +53,13 @@
     <string name="security_regenerate_hint">Se hai perso il codice ma hai ancora questo dispositivo, creane uno nuovo: quello vecchio smette di valere.</string>
     <string name="kv_regenerated">Il codice precedente non vale più: d\'ora in poi usa quello nuovo.</string>
     <string name="kv_cancel">Annulla</string>
+    <string name="kv_open_passkey">Usa la passkey</string>
+    <string name="kv_passkey_title">Vuoi aprirla anche con l\'impronta o lo sblocco del telefono?</string>
+    <string name="kv_passkey_body">Crea una passkey: su un altro dispositivo con lo stesso account Google basterà lo sblocco, senza scrivere il codice. Il codice resta valido.</string>
+    <string name="kv_passkey_cta">Crea una passkey</string>
+    <string name="kv_passkey_skip">Non ora</string>
+    <string name="kv_passkey_added">Passkey aggiunta.</string>
+    <string name="kv_passkey_unsupported">Questo telefono non permette di usare una passkey per la cassaforte: il codice di recupero resta la tua chiave.</string>
+    <string name="kv_passkey_not_usable">Questa passkey non funziona qui. Usa il codice di recupero.</string>
+    <string name="security_add_passkey">Aggiungi una passkey</string>
 </resources>

@@ -53,4 +53,13 @@
     <string name="security_regenerate_hint">Si vous avez perdu le code mais avez encore cet appareil, créez-en un nouveau : l\'ancien ne fonctionnera plus.</string>
     <string name="kv_regenerated">L\'ancien code ne fonctionne plus : utilisez désormais le nouveau.</string>
     <string name="kv_cancel">Annuler</string>
+    <string name="kv_open_passkey">Utiliser la clé d\'accès</string>
+    <string name="kv_passkey_title">L\'ouvrir aussi avec l\'empreinte ou le verrouillage du téléphone ?</string>
+    <string name="kv_passkey_body">Créez une clé d\'accès : sur un autre appareil avec le même compte Google, le déverrouillage suffira, sans saisir le code. Le code reste valable.</string>
+    <string name="kv_passkey_cta">Créer une clé d\'accès</string>
+    <string name="kv_passkey_skip">Pas maintenant</string>
+    <string name="kv_passkey_added">Clé d\'accès ajoutée.</string>
+    <string name="kv_passkey_unsupported">Ce téléphone ne permet pas d\'utiliser une clé d\'accès pour le coffre : le code de récupération reste votre clé.</string>
+    <string name="kv_passkey_not_usable">Cette clé d\'accès ne fonctionne pas ici. Utilisez le code de récupération.</string>
+    <string name="security_add_passkey">Ajouter une clé d\'accès</string>
 </resources>

@@ -64,7 +64,7 @@ fun SecuritySettingsScreen(familyIds: List<String>, onBack: () -> Unit) {
     var loaded by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     var reloadTick by remember { mutableIntStateOf(0) }
-    var dialog by remember { mutableStateOf<Boolean?>(null) } // false = apri/crea, true = rigenera
+    var dialog by remember { mutableStateOf<String?>(null) } // "open" | "regenerate" | "passkey"
 
     LaunchedEffect(uid, reloadTick) {
         if (uid.isBlank()) return@LaunchedEffect
@@ -136,12 +136,17 @@ fun SecuritySettingsScreen(familyIds: List<String>, onBack: () -> Unit) {
 
             if (loaded && !failed) {
                 if (slots.isEmpty() || !hasRk) {
-                    Button(onClick = { dialog = false }, modifier = Modifier.fillMaxWidth()) {
+                    Button(onClick = { dialog = "open" }, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(if (slots.isEmpty()) R.string.kv_create_cta else R.string.security_open_here))
                     }
                 }
+                if (hasRk && slots.isNotEmpty() && it.vittorioscocca.kidbox.data.crypto.VaultPasskey.maybeSupported()) {
+                    OutlinedButton(onClick = { dialog = "passkey" }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.security_add_passkey))
+                    }
+                }
                 if (hasRk && recovery != null) {
-                    OutlinedButton(onClick = { dialog = true }, modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(onClick = { dialog = "regenerate" }, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.security_regenerate))
                     }
                     Text(
@@ -153,7 +158,7 @@ fun SecuritySettingsScreen(familyIds: List<String>, onBack: () -> Unit) {
         }
     }
 
-    dialog?.let { regen ->
+    dialog?.let { mode ->
         KeyVaultPrompt(
             uid = uid,
             email = FirebaseAuth.getInstance().currentUser?.email,
@@ -161,7 +166,8 @@ fun SecuritySettingsScreen(familyIds: List<String>, onBack: () -> Unit) {
             allowLater = true,
             onDone = { dialog = null; reloadTick++ },
             onLater = { dialog = null },
-            regenerate = regen,
+            regenerate = mode == "regenerate",
+            addPasskey = mode == "passkey",
         )
     }
 }

@@ -139,6 +139,27 @@ object FamilyKeyVaultCrypto {
         return b64(salt) to seal(rk, key, AAD_SLOT_PREFIX + uid)
     }
 
+    /** Chiude la RK in uno slot qualunque (passkey: `ikm` = uscita PRF). */
+    fun sealSlot(uid: String, type: String, ikm: ByteArray, rk: ByteArray): Pair<String, Sealed> {
+        val salt = ByteArray(16).also { random.nextBytes(it) }
+        return b64(salt) to seal(rk, slotKey(type, ikm, salt), AAD_SLOT_PREFIX + uid)
+    }
+
+    /** Apre uno slot qualunque: la RK, o [WrongSecretException]. */
+    fun openSlot(uid: String, type: String, ikm: ByteArray, salt: String, sealed: Sealed, expectedRkId: String?): ByteArray {
+        val rk = runCatching { open(sealed, slotKey(type, ikm, unb64(salt)), AAD_SLOT_PREFIX + uid) }
+            .getOrNull() ?: throw WrongSecretException()
+        if (rk.size != 32) throw WrongSecretException()
+        if (expectedRkId != null && rkId(rk) != expectedRkId) throw WrongSecretException()
+        return rk
+    }
+
+    /** Id dello slot di una passkey, uguale al web: `passkey_` + b64url(sha256(rawId)[0..16]). */
+    fun passkeySlotId(rawId: ByteArray): String =
+        "passkey_" + b64Url(java.security.MessageDigest.getInstance("SHA-256").digest(rawId).copyOfRange(0, 16))
+
+    fun unb64Url(s: String): ByteArray = Base64.getUrlDecoder().decode(s.trimEnd('='))
+
     fun sealFamilyKeyV2(uid: String, familyId: String, familyKey: ByteArray, rk: ByteArray): Sealed =
         seal(familyKey, familyWrapKey(rk), "$AAD_FAMILY_PREFIX$uid:$familyId")
 
