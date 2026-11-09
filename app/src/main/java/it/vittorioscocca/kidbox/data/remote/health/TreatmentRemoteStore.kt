@@ -109,7 +109,7 @@ class TreatmentRemoteStore @Inject constructor(
         } else {
             payload["petId"] = FieldValue.delete()
         }
-        ref.set(sectionCrypto.prepareWrite(COLLECTION, dto.familyId, payload), SetOptions.merge()).await()
+        ref.set(sectionCrypto.prepareWrite(COLLECTION, dto.familyId, ref, payload), SetOptions.merge()).await()
     }
 
     suspend fun softDelete(familyId: String, treatmentId: String, updatedBy: String) {

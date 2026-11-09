@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.ui.screens.health
 
+import it.vittorioscocca.kidbox.data.crypto.SectionCrypto
 import it.vittorioscocca.kidbox.util.KBLog
 
 import androidx.lifecycle.ViewModel
@@ -42,6 +43,7 @@ class HealthSubjectSelectorViewModel @Inject constructor(
     private val childDao: KBChildDao,
     private val memberDao: KBFamilyMemberDao,
     private val familyDao: KBFamilyDao,
+    private val sectionCrypto: SectionCrypto,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HealthSubjectSelectorState())
@@ -105,9 +107,12 @@ class HealthSubjectSelectorViewModel @Inject constructor(
                 ((millis % 1000) * 1_000_000).toInt(),
             )
         }
-        firestore.collection("families").document(familyId)
+        // Un nome vuoto (figlio sigillato e chiave mancante) non si riscrive: in
+        // chiaro vincerebbe sul nome cifrato. Nome cifrato in `secure` se acceso.
+        if (e.name.isBlank()) data.remove("name")
+        val ref = firestore.collection("families").document(familyId)
             .collection("children").document(e.id)
-            .set(data, SetOptions.merge())
+        ref.set(sectionCrypto.prepareWrite("children", familyId, ref, data), SetOptions.merge())
             .await()
     }
 

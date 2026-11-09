@@ -106,12 +106,13 @@ class ExpenseRemoteStore @Inject constructor(
 
     suspend fun upsertExpense(entity: KBExpenseEntity) {
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
-        db.collection("families")
+        val docRef = db.collection("families")
             .document(entity.familyId)
             .collection("expenses")
             .document(entity.id)
+        docRef
             .set(
-                sectionCrypto.prepareWrite(COLLECTION, entity.familyId, mapOf(
+                sectionCrypto.prepareWrite(COLLECTION, entity.familyId, docRef, mapOf(
                     "id" to entity.id,
                     "familyId" to entity.familyId,
                     "title" to entity.title,

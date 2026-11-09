@@ -173,8 +173,8 @@ class VehicleRemoteStore @Inject constructor(
         data["notes"] = entity.notes
         data["photoURL"] = entity.photoURL
         if (isNew) data["createdBy"] = entity.createdBy.ifEmpty { uid }
-        ref(entity.familyId, entity.id)
-            .set(sectionCrypto.prepareWrite(COLLECTION, entity.familyId, data), SetOptions.merge())
+        val docRef = ref(entity.familyId, entity.id)
+        docRef.set(sectionCrypto.prepareWrite(COLLECTION, entity.familyId, docRef, data), SetOptions.merge())
             .await()
     }
 

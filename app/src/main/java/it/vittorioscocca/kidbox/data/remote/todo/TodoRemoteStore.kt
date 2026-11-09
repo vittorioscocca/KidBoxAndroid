@@ -10,6 +10,8 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.SetOptions
+import it.vittorioscocca.kidbox.data.crypto.SectionCrypto
+import it.vittorioscocca.kidbox.data.crypto.SectionFields
 import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoItemEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoListEntity
@@ -73,6 +75,7 @@ sealed interface TodoItemRemoteChange {
 @Singleton
 class TodoRemoteStore @Inject constructor(
     private val auth: FirebaseAuth,
+    private val sectionCrypto: SectionCrypto,
 ) {
     private val db get() = FirebaseFirestore.getInstance()
 
@@ -107,10 +110,14 @@ class TodoRemoteStore @Inject constructor(
                         // reali, e il listener non chiamava mai onChange. Le rimozioni
                         // restano sul delta, che per quelle risulta affidabile.
                         val upserts = snap.documents.mapNotNull { doc ->
-                            val d = doc.data ?: return@mapNotNull null
+                            val raw = doc.data ?: return@mapNotNull null
+                            // Nome cifrato in `secure` (cifratura delle sezioni).
+                            val d = sectionCrypto.readAndReencrypt(LISTS, familyId, doc.reference, raw)
                             val name = (d["name"] as? String)?.trim().orEmpty()
                             val cid = (d["childId"] as? String)?.trim().orEmpty()
-                            if (name.isEmpty()) {
+                            // Nome vuoto ma `secure` presente (chiave mancante): la lista si
+                            // tiene, altrimenti la FK di Room scarterebbe i suoi to-do.
+                            if (name.isEmpty() && !SectionFields.isSealed(raw)) {
                                 null
                             } else {
                                 TodoListRemoteChange.Upsert(
@@ -165,10 +172,13 @@ class TodoRemoteStore @Inject constructor(
                         // document_change — in quel caso il delta è vuoto pur avendo la
                         // query risultati reali. Le rimozioni restano sul delta.
                         val upserts = snap.documents.mapNotNull { doc ->
-                            val d = doc.data ?: return@mapNotNull null
+                            val raw = doc.data ?: return@mapNotNull null
+                            // Titolo e note cifrati in `secure` (cifratura delle sezioni).
+                            val d = sectionCrypto.readAndReencrypt(TODOS, familyId, doc.reference, raw)
                             val title = (d["title"] as? String)?.trim().orEmpty()
                             val cid = (d["childId"] as? String)?.trim().orEmpty()
-                            if (title.isEmpty()) {
+                            // Titolo vuoto ma `secure` presente (chiave mancante): si tiene.
+                            if (title.isEmpty() && !SectionFields.isSealed(raw)) {
                                 null
                             } else {
                                 TodoItemRemoteChange.Upsert(
@@ -227,10 +237,11 @@ class TodoRemoteStore @Inject constructor(
     suspend fun fetchList(familyId: String, listId: String): TodoListRemoteDto? {
         val doc = db.collection("families").document(familyId)
             .collection("todoLists").document(listId).get().await()
-        val d = doc.data ?: return null
-        if (d["isDeleted"] as? Boolean == true) return null
+        val raw = doc.data ?: return null
+        if (raw["isDeleted"] as? Boolean == true) return null
+        val d = sectionCrypto.readAndReencrypt(LISTS, familyId, doc.reference, raw)
         val name = (d["name"] as? String)?.trim().orEmpty()
-        if (name.isEmpty()) return null
+        if (name.isEmpty() && !SectionFields.isSealed(raw)) return null
         return TodoListRemoteDto(
             id = doc.id,
             familyId = familyId,
@@ -246,9 +257,9 @@ class TodoRemoteStore @Inject constructor(
 
     suspend fun upsertList(list: KBTodoListEntity) {
         val uid = auth.currentUser?.uid ?: error("Not authenticated")
-        db.collection("families").document(list.familyId).collection("todoLists").document(list.id)
-            .set(
-                mapOf(
+        val ref = db.collection("families").document(list.familyId).collection("todoLists").document(list.id)
+        ref.set(
+                sectionCrypto.prepareWrite(LISTS, list.familyId, ref, mapOf(
                     "childId" to list.childId,
                     "name" to list.name,
                     "isDeleted" to false,
@@ -261,7 +272,7 @@ class TodoRemoteStore @Inject constructor(
                         } else emptyList<String>(),
                     "updatedBy" to uid,
                     "updatedAt" to FieldValue.serverTimestamp(),
-                ),
+                )),
                 SetOptions.merge(),
             ).await()
     }
@@ -300,8 +311,8 @@ class TodoRemoteStore @Inject constructor(
         if (!todo.createdBy.isNullOrBlank()) payload["createdBy"] = todo.createdBy
         payload["visibilityScope"] = todo.visibilityScope
         payload["visibilityMemberIds"] = decodeStringList(todo.visibilityMemberIdsJson)
-        db.collection("families").document(todo.familyId).collection("todos").document(todo.id)
-            .set(payload, SetOptions.merge())
+        val ref = db.collection("families").document(todo.familyId).collection("todos").document(todo.id)
+        ref.set(sectionCrypto.prepareWrite(TODOS, todo.familyId, ref, payload), SetOptions.merge())
             .await()
     }
 
@@ -316,5 +327,10 @@ class TodoRemoteStore @Inject constructor(
                 ),
                 SetOptions.merge(),
             ).await()
+    }
+
+    private companion object {
+        const val TODOS = "todos"
+        const val LISTS = "todoLists"
     }
 }

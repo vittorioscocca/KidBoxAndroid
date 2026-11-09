@@ -124,4 +124,134 @@ class SectionFieldsTest {
         assertFalse(json.has("garageName"))
         assertFalse(SectionFields.hasPlain("vehicleEvents", payload))
     }
+
+    // ── Secondo giro ────────────────────────────────────────────────────────
+
+    @Test
+    fun campiStellaSiCancellanoGliAltriVannoVuoti() {
+        val data = mapOf<String, Any?>(
+            "reason" to "Febbre",
+            "asNeededDrugsJson" to "[\"Tachipirina\"]",
+            "travelDetailsData" to "eyJhIjoxfQ==",
+        )
+        val out = SectionFields.seal("medicalVisits", data, encrypt)!!
+        assertEquals("", out["reason"])
+        assertEquals("", out["doctorName"])
+        assertSame(SectionFields.Deleted, out["asNeededDrugsJson"])
+        assertSame(SectionFields.Deleted, out["travelDetailsData"])
+        assertSame(SectionFields.Deleted, out["prescribedExamsJson"])
+        val json = JSONObject(decrypt(out["secure"] as String)!!)
+        assertEquals("[\"Tachipirina\"]", json.getString("asNeededDrugsJson"))
+        assertEquals("eyJhIjoxfQ==", json.getString("travelDetailsData"))
+    }
+
+    @Test
+    fun ricifraturaCancellaICampiStella() {
+        val raw = mapOf<String, Any?>("reason" to "Controllo", "prescribedExamsJson" to "[]")
+        val resolved = SectionFields.resolve("medicalVisits", raw, decrypt)
+        val payload = SectionFields.reencryptPayload("medicalVisits", resolved, encrypt, deleteValue = "DEL")!!
+        assertEquals("", payload["reason"])
+        assertEquals("DEL", payload["prescribedExamsJson"])
+        assertEquals("DEL", payload["travelDetailsJson"])
+        assertEquals("[]", JSONObject(decrypt(payload["secure"] as String)!!).getString("prescribedExamsJson"))
+    }
+
+    @Test
+    fun campoStellaAssenteValeVuotoInLettura() {
+        val data = mapOf<String, Any?>(
+            "reason" to "",
+            "secure" to sealed("reason" to "Tosse", "travelDetailsJson" to "{\"dest\":\"Lisbona\"}"),
+        )
+        val out = SectionFields.resolve("medicalVisits", data, decrypt)
+        assertEquals("Tosse", out["reason"])
+        assertEquals("{\"dest\":\"Lisbona\"}", out["travelDetailsJson"])
+    }
+
+    @Test
+    fun scritturaParzialePrendeIMancantiDalDocumento() {
+        // Android non scrive i dettagli di viaggio: arrivano dal documento esistente.
+        val payload = mapOf<String, Any?>("reason" to "Nuovo motivo", "notes" to null, "cost" to 50.0)
+        val existing = mapOf<String, Any?>(
+            "reason" to "Vecchio motivo",
+            "notes" to "nota vecchia",
+            "travelDetailsJson" to "{\"x\":1}",
+            "doctorName" to "",
+        )
+        val merged = SectionFields.mergeMissing("medicalVisits", payload, existing)
+        assertEquals("Nuovo motivo", merged["reason"])
+        // Portato dalla scrittura (anche nullo: svuotato dall'utente) → non si riprende.
+        assertNull(merged["notes"])
+        assertEquals("{\"x\":1}", merged["travelDetailsJson"])
+        assertFalse("doctorName" in merged)
+        assertEquals(50.0, merged["cost"])
+        val json = JSONObject(decrypt(SectionFields.seal("medicalVisits", merged, encrypt)!!["secure"] as String)!!)
+        assertEquals("Nuovo motivo", json.getString("reason"))
+        assertEquals("{\"x\":1}", json.getString("travelDetailsJson"))
+        assertFalse(json.has("notes"))
+    }
+
+    @Test
+    fun vacciniTengonoNomeMedicoELuogo() {
+        val payload = mapOf<String, Any?>("commercialName" to "Hexyon", "notes" to "ok")
+        val existing = mapOf<String, Any?>("name" to "Esavalente", "doctorName" to "Rossi", "location" to "ASL")
+        val merged = SectionFields.mergeMissing("vaccines", payload, existing)
+        val out = SectionFields.seal("vaccines", merged, encrypt)!!
+        assertEquals("", out["name"])
+        assertEquals("", out["location"])
+        val back = SectionFields.resolve("vaccines", out, decrypt)
+        assertEquals("Esavalente", back["name"])
+        assertEquals("Rossi", back["doctorName"])
+        assertEquals("ASL", back["location"])
+        assertEquals("Hexyon", back["commercialName"])
+    }
+
+    @Test
+    fun scritturaCompletaNonHaMancanti() {
+        val payload = mapOf<String, Any?>("title" to "Pane", "notes" to null)
+        assertTrue(SectionFields.missingFields("todos", payload).isEmpty())
+        assertSame(payload, SectionFields.mergeMissing("todos", payload, mapOf("notes" to "x")))
+        assertEquals(listOf("notes"), SectionFields.missingFields("todos", mapOf("title" to "Pane")))
+    }
+
+    @Test
+    fun scritturaSenzaCampiDellaTabellaNonSiSigilla() {
+        assertFalse(SectionFields.touchesSealedFields("children", mapOf("birthDate" to 1L, "weightKg" to 12.0)))
+        assertTrue(SectionFields.touchesSealedFields("children", mapOf("name" to null)))
+    }
+
+    @Test
+    fun secureIllegibileNonSiSovrascrive() {
+        val raw = mapOf<String, Any?>("name" to "", "secure" to "altra-chiave")
+        val resolved = SectionFields.resolve("children", raw, decrypt)
+        assertTrue(SectionFields.isUnreadable("children", raw, resolved))
+        val ok = mapOf<String, Any?>("name" to "", "secure" to sealed("name" to "Marco"))
+        assertFalse(SectionFields.isUnreadable("children", ok, SectionFields.resolve("children", ok, decrypt)))
+    }
+
+    @Test
+    fun tabellaEstesa() {
+        assertEquals(listOf("name"), SectionFields.fieldsOf("children"))
+        assertEquals(listOf("title", "notes"), SectionFields.fieldsOf("todos"))
+        assertEquals(listOf("name"), SectionFields.fieldsOf("todoLists"))
+        assertEquals(listOf("title", "notes", "location"), SectionFields.fieldsOf("calendarEvents"))
+        assertTrue(SectionFields.fieldsOf("vaccines").containsAll(listOf("name", "doctorName", "location")))
+        assertEquals(12, SectionFields.fieldsOf("medicalVisits").size)
+    }
+
+    @Test
+    fun riaperturaCalendarioRimetteIlChiaroECancellaSecure() {
+        val raw = mapOf<String, Any?>(
+            "title" to "",
+            "notes" to "",
+            "location" to "",
+            "secure" to sealed("title" to "Recita", "location" to "Teatro"),
+            "secureV" to 1,
+        )
+        val resolved = SectionFields.resolve("calendarEvents", raw, decrypt)
+        val payload = SectionFields.reopenPayload("calendarEvents", resolved, deleteValue = "DEL")
+        assertEquals(
+            mapOf("title" to "Recita", "location" to "Teatro", "secure" to "DEL", "secureV" to "DEL"),
+            payload,
+        )
+    }
 }

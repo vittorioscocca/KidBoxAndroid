@@ -10,6 +10,8 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.SetOptions
+import it.vittorioscocca.kidbox.data.crypto.SectionCrypto
+import it.vittorioscocca.kidbox.data.crypto.SectionFields
 import it.vittorioscocca.kidbox.data.local.entity.KBCalendarEventEntity
 import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
 import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
@@ -50,6 +52,7 @@ sealed interface CalendarEventRemoteChange {
 @Singleton
 class CalendarRemoteStore @Inject constructor(
     private val auth: FirebaseAuth,
+    private val sectionCrypto: SectionCrypto,
 ) {
     private val db: FirebaseFirestore
         get() = FirebaseFirestore.getInstance()
@@ -74,9 +77,13 @@ class CalendarRemoteStore @Inject constructor(
                         // query ha risultati reali, e in Room non arrivava più nulla. Le rimozioni
                         // restano sul delta, dove sono affidabili.
                         val upserts = snap.documents.mapNotNull { doc ->
-                            val d = doc.data ?: return@mapNotNull null
+                            val raw = doc.data ?: return@mapNotNull null
+                            // Titolo, note e luogo cifrati in `secure` (cifratura delle
+                            // sezioni); a calendario esportato il documento si riapre.
+                            val d = sectionCrypto.readAndReencrypt(COLLECTION, familyId, doc.reference, raw)
                             val title = (d["title"] as? String)?.trim().orEmpty()
-                            if (title.isBlank()) {
+                            // Titolo vuoto ma `secure` presente (chiave mancante): si tiene.
+                            if (title.isBlank() && !SectionFields.isSealed(raw)) {
                                 null
                             } else {
                                 val dto = CalendarEventRemoteDto(
@@ -145,11 +152,11 @@ class CalendarRemoteStore @Inject constructor(
         payload["endDate"] = timestampFromMillis(event.endDateEpochMillis)
         payload["createdAt"] = timestampFromMillis(event.createdAtEpochMillis)
 
-        db.collection("families")
+        val ref = db.collection("families")
             .document(event.familyId)
             .collection("calendarEvents")
             .document(event.id)
-            .set(payload, SetOptions.merge())
+        ref.set(sectionCrypto.prepareWrite(COLLECTION, event.familyId, ref, payload), SetOptions.merge())
             .await()
     }
 
@@ -180,5 +187,8 @@ class CalendarRemoteStore @Inject constructor(
         is List<*> -> raw.mapNotNull { it as? String }.distinct()
         else -> emptyList()
     }
-}
 
+    private companion object {
+        const val COLLECTION = SectionFields.CALENDAR_EVENTS
+    }
+}

@@ -178,7 +178,7 @@ class MedicalVisitRemoteStore @Inject constructor(
             "updatedAt" to Timestamp.now(),
             "updatedBy" to dto.updatedBy,
         )
-        ref.set(sectionCrypto.prepareWrite(COLLECTION, dto.familyId, payload), SetOptions.merge()).await()
+        ref.set(sectionCrypto.prepareWrite(COLLECTION, dto.familyId, ref, payload), SetOptions.merge()).await()
     }
 
     private companion object {

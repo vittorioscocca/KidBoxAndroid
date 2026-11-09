@@ -77,6 +77,21 @@ class KidBoxFirebaseMessagingService : FirebaseMessagingService() {
         // quindi `remoteMessage.notification` è sempre null — titolo/corpo viaggiano
         // dentro `data`. Il fallback a `remoteMessage.notification` resta solo per le
         // poche push non ancora convertite (es. broadcast/nudge).
+        //
+        // Push con il testo cifrato (calendario, to-do, promemoria dei to-do,
+        // richieste, spese: cifratura delle sezioni): arrivano solo dati, quindi
+        // passano sempre da qui anche ad app chiusa, e la notifica la costruisce
+        // `showNotification` come per gli altri tipi (stesso canale, stesso
+        // intent di deep link coi campi di `data`). Se il blob si decifra e
+        // tutti i segnaposto hanno un valore si mostra il testo vero; altrimenti
+        // `title`/`body`, che il server manda già generici.
+        val securePush = SecurePushText.resolve(remoteMessage.data) { blob, familyId ->
+            chatCrypto.decryptStringFromBase64(blob, familyId)
+        }
+        if (securePush != null) {
+            showNotification(securePush.first, securePush.second, remoteMessage.data, type)
+            return
+        }
         val rawTitle = remoteMessage.data["title"] ?: remoteMessage.notification?.title
         val title = when {
             type == "chat_mention" && senderName.isNotBlank() -> "$senderName ti ha menzionato"

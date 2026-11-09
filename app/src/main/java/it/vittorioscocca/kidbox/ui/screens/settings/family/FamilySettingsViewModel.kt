@@ -1,6 +1,8 @@
 package it.vittorioscocca.kidbox.ui.screens.settings.family
 
 import it.vittorioscocca.kidbox.util.KBLog
+import it.vittorioscocca.kidbox.data.crypto.SectionCrypto
+import it.vittorioscocca.kidbox.data.crypto.SectionFields
 
 import android.content.Context
 import androidx.lifecycle.ViewModel
@@ -93,6 +95,7 @@ class FamilySettingsViewModel @Inject constructor(
     private val userProfileRepository: UserProfileRepository,
     private val creationRepository: FamilyFirestoreCreationRepository,
     private val familySessionPreferences: FamilySessionPreferences,
+    private val sectionCrypto: SectionCrypto,
 ) : ViewModel() {
     companion object {
         private const val TAG = "FamilySettingsVM"
@@ -393,12 +396,16 @@ class FamilySettingsViewModel @Inject constructor(
             val childDocs = db.collection("families")
                 .document(familyId).collection("children").get().await().documents
             childDocs.forEach { doc ->
-                val d = doc.data.orEmpty()
-                if (d["isDeleted"] as? Boolean != true) {
+                val raw = doc.data.orEmpty()
+                if (raw["isDeleted"] as? Boolean != true) {
+                    // Nome cifrato in `secure` (cifratura delle sezioni); sigillato e
+                    // illeggibile resta vuoto, non «Figlio» (si riscriverebbe in chiaro).
+                    val d = sectionCrypto.readAndReencrypt("children", familyId, doc.reference, raw)
                     childDao.upsert(KBChildEntity(
                         id = doc.id,
                         familyId = familyId,
-                        name = (d["name"] as? String)?.takeIf { it.isNotBlank() } ?: "Figlio",
+                        name = (d["name"] as? String)?.takeIf { it.isNotBlank() }
+                            ?: if (SectionFields.isSealed(raw)) "" else "Figlio",
                         birthDateEpochMillis = (d["birthDate"] as? com.google.firebase.Timestamp)
                             ?.toDate()?.time,
                         weightKg = null,
@@ -707,10 +714,11 @@ class FamilySettingsViewModel @Inject constructor(
                 )
             }
             childDao.upsert(entity)
-            fs.collection("families").document(family.id)
+            val childRef = fs.collection("families").document(family.id)
                 .collection("children").document(input.id)
+            childRef
                 .set(
-                    mapOf(
+                    sectionCrypto.prepareWrite("children", family.id, childRef, mapOf(
                         "id" to entity.id,
                         "familyId" to family.id,
                         "name" to entity.name,
@@ -722,7 +730,7 @@ class FamilySettingsViewModel @Inject constructor(
                         "updatedBy" to uid,
                         "updatedAt" to FieldValue.serverTimestamp(),
                         "isDeleted" to false,
-                    ),
+                    )),
                     com.google.firebase.firestore.SetOptions.merge(),
                 ).await()
         }
@@ -843,10 +851,11 @@ class FamilySettingsViewModel @Inject constructor(
                 updatedAtEpochMillis = now,
             )
             childDao.upsert(child)
-            db.collection("families").document(family.id)
+            val childRef = db.collection("families").document(family.id)
                 .collection("children").document(id)
+            childRef
                 .set(
-                    mapOf(
+                    sectionCrypto.prepareWrite("children", family.id, childRef, mapOf(
                         "id" to child.id,
                         "familyId" to family.id,
                         "name" to child.name,
@@ -858,7 +867,7 @@ class FamilySettingsViewModel @Inject constructor(
                         "updatedBy" to uid,
                         "updatedAt" to FieldValue.serverTimestamp(),
                         "isDeleted" to false,
-                    ),
+                    )),
                     com.google.firebase.firestore.SetOptions.merge()
                 ).await()
         }
@@ -891,10 +900,11 @@ class FamilySettingsViewModel @Inject constructor(
                     updatedAtEpochMillis = now,
                 )
                 childDao.upsert(updated)
-                db.collection("families").document(family.id)
+                val childRef = db.collection("families").document(family.id)
                     .collection("children").document(childId)
+                childRef
                     .set(
-                        mapOf(
+                        sectionCrypto.prepareWrite("children", family.id, childRef, mapOf(
                             "id" to updated.id,
                             "familyId" to family.id,
                             "name" to updated.name,
@@ -903,7 +913,7 @@ class FamilySettingsViewModel @Inject constructor(
                             },
                             "updatedBy" to uid,
                             "updatedAt" to FieldValue.serverTimestamp(),
-                        ),
+                        )),
                         com.google.firebase.firestore.SetOptions.merge()
                     ).await()
                 KBLog.ui.info("saveChild completed familyId=${family.id} childId=$childId", TAG)

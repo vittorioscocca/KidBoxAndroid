@@ -15,6 +15,8 @@ import com.google.firebase.firestore.Source
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.vittorioscocca.kidbox.data.crypto.FamilyKeyEscrow
 import it.vittorioscocca.kidbox.data.crypto.FamilyKeyStore
+import it.vittorioscocca.kidbox.data.crypto.SectionCrypto
+import it.vittorioscocca.kidbox.data.crypto.SectionFields
 import it.vittorioscocca.kidbox.data.local.FamilySessionPreferences
 import it.vittorioscocca.kidbox.data.local.db.KidBoxDatabase
 import it.vittorioscocca.kidbox.data.local.dao.KBChildDao
@@ -47,6 +49,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val TAG = "FamilySyncCenter"
+private const val CHILDREN = "children"
+
+/**
+ * Nome di ripiego per un figlio senza nome leggibile. Se il documento è
+ * sigillato (`secure` che non si apre: chiave mancante) resta vuoto invece di
+ * «Figlio»: un «Figlio» in Room finirebbe riscritto in chiaro da un salvataggio
+ * e, vincendo sul cifrato, cancellerebbe il nome vero per tutti.
+ */
+internal fun childNameFallback(raw: Map<String, Any?>): String =
+    if (SectionFields.isSealed(raw)) "" else "Figlio"
 
 
 @Singleton
@@ -58,6 +70,7 @@ class FamilySyncCenter @Inject constructor(
     private val database: KidBoxDatabase,
     private val sessionPrefs: FamilySessionPreferences,
     private val tripRepository: TripRepository,
+    private val sectionCrypto: SectionCrypto,
     @ApplicationContext private val appContext: Context,
 ) {
     /** Sempre [FirebaseFirestore.getInstance] — mai un `val` fisso (dopo terminate il singleton si rinnova). */
@@ -401,6 +414,9 @@ class FamilySyncCenter @Inject constructor(
                         familyFirstDone = true; checkAllFirstDone(); return@addSnapshotListener
                     }
                     val data = snap.data.orEmpty()
+                    // Calendario esportato col link iCal: gli eventi restano in chiaro
+                    // (cifratura delle sezioni, punto 4).
+                    sectionCrypto.setCalendarExported(familyId, data["calendarExported"] as? Boolean == true)
                     scope.launch {
                         val now = System.currentTimeMillis()
                         val local = familyDao.getById(familyId)
@@ -821,7 +837,11 @@ class FamilySyncCenter @Inject constructor(
                                 continue
                             }
 
-                            val remoteName = (d["name"] as? String)?.takeIf { it.isNotBlank() } ?: ""
+                            // Nome cifrato in `secure` (cifratura delle sezioni). Dopo il
+                            // controllo REMOVED: un documento rimosso non si ricifra.
+                            val resolved = sectionCrypto.readAndReencrypt(CHILDREN, familyId, doc.reference, d)
+                            val remoteName = (resolved["name"] as? String)?.takeIf { it.isNotBlank() } ?: ""
+                            val nameFallback = childNameFallback(d)
                             val remoteBirthDate = (d["birthDate"] as? com.google.firebase.Timestamp)
                                 ?.toDate()?.time
                             val remoteUpdatedAt = (d["updatedAt"] as? com.google.firebase.Timestamp)
@@ -858,7 +878,7 @@ class FamilySyncCenter @Inject constructor(
                             val entity = KBChildEntity(
                                 id = doc.id,
                                 familyId = familyId,
-                                name = remoteName.ifBlank { local?.name ?: "Figlio" },
+                                name = remoteName.ifBlank { local?.name?.takeIf { it.isNotBlank() } ?: nameFallback },
                                 birthDateEpochMillis = remoteBirthDate ?: local?.birthDateEpochMillis,
                                 weightKg = firestoreChildWeightKg(d) ?: local?.weightKg,
                                 heightCm = firestoreChildHeightCm(d) ?: local?.heightCm,
@@ -1089,7 +1109,9 @@ class FamilySyncCenter @Inject constructor(
                     childDao.deleteById(doc.id)
                     continue
                 }
-                val remoteName = (d["name"] as? String)?.takeIf { it.isNotBlank() } ?: ""
+                // Nome cifrato in `secure` (cifratura delle sezioni).
+                val resolved = sectionCrypto.readAndReencrypt(CHILDREN, familyId, doc.reference, d)
+                val remoteName = (resolved["name"] as? String)?.takeIf { it.isNotBlank() } ?: ""
                 val remoteBirthDate = (d["birthDate"] as? com.google.firebase.Timestamp)
                     ?.toDate()?.time
                 val remoteUpdatedAt = (d["updatedAt"] as? com.google.firebase.Timestamp)
@@ -1111,7 +1133,7 @@ class FamilySyncCenter @Inject constructor(
                         KBChildEntity(
                             id = doc.id,
                             familyId = familyId,
-                            name = remoteName.ifBlank { local?.name ?: "Figlio" },
+                            name = remoteName.ifBlank { local?.name?.takeIf { it.isNotBlank() } ?: childNameFallback(d) },
                             birthDateEpochMillis = remoteBirthDate ?: local?.birthDateEpochMillis,
                             weightKg = firestoreChildWeightKg(d) ?: local?.weightKg,
                             heightCm = firestoreChildHeightCm(d) ?: local?.heightCm,

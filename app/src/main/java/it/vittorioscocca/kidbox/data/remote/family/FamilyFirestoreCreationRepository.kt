@@ -1,5 +1,6 @@
 package it.vittorioscocca.kidbox.data.remote.family
 
+import it.vittorioscocca.kidbox.data.crypto.SectionCrypto
 import it.vittorioscocca.kidbox.util.KBLog
 
 import android.content.Context
@@ -36,6 +37,7 @@ class FamilyFirestoreCreationRepository @Inject constructor(
     private val auth: FirebaseAuth,
     private val familyDao: KBFamilyDao,
     private val childDao: KBChildDao,
+    private val sectionCrypto: SectionCrypto,
     @ApplicationContext private val appContext: Context,
 ) {
 
@@ -133,7 +135,11 @@ class FamilyFirestoreCreationRepository @Inject constructor(
                     ((child.birthDateMillis % 1000) * 1_000_000).toInt(),
                 )
             }
-            familyRef.collection("children").document(child.id).set(childData).await()
+            // Nome cifrato in `secure` se la cifratura delle sezioni è accesa e la
+            // chiave c'è già (di solito alla creazione non c'è ancora: resta in chiaro
+            // e lo ricifra il primo client che legge).
+            val childRef = familyRef.collection("children").document(child.id)
+            childRef.set(sectionCrypto.prepareWrite("children", familyId, childRef, childData)).await()
             childDao.upsert(
                 KBChildEntity(
                     id = child.id,

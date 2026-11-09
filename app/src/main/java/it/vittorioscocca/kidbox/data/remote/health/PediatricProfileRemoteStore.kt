@@ -104,7 +104,7 @@ class PediatricProfileRemoteStore @Inject constructor(
             "updatedBy" to dto.updatedBy,
             "updatedAt" to Timestamp.now(),
         )
-        ref.set(sectionCrypto.prepareWrite(COLLECTION, dto.familyId, payload), SetOptions.merge()).await()
+        ref.set(sectionCrypto.prepareWrite(COLLECTION, dto.familyId, ref, payload), SetOptions.merge()).await()
     }
 
     private companion object {
