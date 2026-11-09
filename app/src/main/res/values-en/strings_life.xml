@@ -365,4 +365,6 @@
     <string name="vehicles_no_date">—</string>
     <string name="form_section_deadlines">Deadlines</string>
     <string name="form_section_service">Service</string>
+    <string name="todo_list_who_can_see">Who can see this list’s to-dos</string>
+    <string name="todo_list_visibility_hint">To-dos created in this list will have this visibility, which you can change for each one.</string>
 </resources>

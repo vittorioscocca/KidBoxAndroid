@@ -365,4 +365,6 @@
     <string name="vehicles_no_date">—</string>
     <string name="form_section_deadlines">Vencimientos</string>
     <string name="form_section_service">Revisión</string>
+    <string name="todo_list_who_can_see">Quién puede ver las tareas de esta lista</string>
+    <string name="todo_list_visibility_hint">Las tareas creadas en esta lista tendrán esta visibilidad, que puedes cambiar en cada una.</string>
 </resources>

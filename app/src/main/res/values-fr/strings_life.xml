@@ -365,4 +365,6 @@
     <string name="vehicles_no_date">—</string>
     <string name="form_section_deadlines">Échéances</string>
     <string name="form_section_service">Révision</string>
+    <string name="todo_list_who_can_see">Qui peut voir les tâches de cette liste</string>
+    <string name="todo_list_visibility_hint">Les tâches créées dans cette liste auront cette visibilité, modifiable pour chacune.</string>
 </resources>

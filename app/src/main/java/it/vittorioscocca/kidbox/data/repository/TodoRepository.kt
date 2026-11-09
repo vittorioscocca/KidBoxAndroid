@@ -172,7 +172,13 @@ class TodoRepository @Inject constructor(
         scope.launch { realtimeMutex.withLock { stopRealtimeLocked() } }
     }
 
-    suspend fun addList(familyId: String, childId: String, name: String): String {
+    suspend fun addList(
+        familyId: String,
+        childId: String,
+        name: String,
+        visibilityScope: String = KBVisibilityScope.FAMILY,
+        visibilityMemberIds: List<String> = emptyList(),
+    ): String {
         KBLog.sync.info("addList START familyId=$familyId childId=$childId", tag = "todo")
         if (childId.isBlank()) ensureNoChildPlaceholder()
         val now = System.currentTimeMillis()
@@ -186,6 +192,10 @@ class TodoRepository @Inject constructor(
             updatedAtEpochMillis = now,
             isDeleted = false,
             createdBy = auth.currentUser?.uid?.trim()?.takeIf { it.isNotEmpty() },
+            defaultVisibilityScope = KBVisibilityScope.normalized(visibilityScope),
+            defaultVisibilityMemberIdsJson = encodeStringList(
+                if (KBVisibilityScope.normalized(visibilityScope) == KBVisibilityScope.MEMBERS) visibilityMemberIds else emptyList(),
+            ),
         )
         try {
             listDao.upsert(local)
@@ -203,10 +213,20 @@ class TodoRepository @Inject constructor(
         return id
     }
 
-    suspend fun updateListName(listId: String, name: String) {
+    suspend fun updateList(
+        listId: String,
+        name: String,
+        visibilityScope: String,
+        visibilityMemberIds: List<String>,
+    ) {
         val existing = listDao.getById(listId) ?: return
+        val scope = KBVisibilityScope.normalized(visibilityScope)
         val local = existing.copy(
             name = name,
+            defaultVisibilityScope = scope,
+            defaultVisibilityMemberIdsJson = encodeStringList(
+                if (scope == KBVisibilityScope.MEMBERS) visibilityMemberIds else emptyList(),
+            ),
             updatedAtEpochMillis = System.currentTimeMillis(),
         )
         listDao.upsert(local)
@@ -236,7 +256,8 @@ class TodoRepository @Inject constructor(
         assignedTo: String?,
         priorityRaw: Int?,
         reminderEnabled: Boolean,
-        visibilityScope: String = KBVisibilityScope.FAMILY,
+        /** null = la visibilità di default della lista (famiglia se non ne ha). */
+        visibilityScope: String? = null,
         visibilityMemberIds: List<String> = emptyList(),
         /** Id già deciso: il to-do «Pagare: …» degli avvisi ha un id legato alla scadenza. */
         id: String = java.util.UUID.randomUUID().toString(),
@@ -246,9 +267,13 @@ class TodoRepository @Inject constructor(
         val uid = auth.currentUser?.uid ?: "local"
         val now = System.currentTimeMillis()
         val isFirstUse = itemDao.countByFamilyId(familyId) == 0
-        val normalizedScope = KBVisibilityScope.normalized(visibilityScope)
+        val listDefault = if (visibilityScope == null) listDao.getById(listId) else null
+        val normalizedScope = KBVisibilityScope.normalized(visibilityScope ?: listDefault?.defaultVisibilityScope)
+        val effectiveMemberIds = if (visibilityScope == null) {
+            decodeStringList(listDefault?.defaultVisibilityMemberIdsJson.orEmpty())
+        } else visibilityMemberIds
         val memberIdsJson = encodeStringList(
-            if (normalizedScope == KBVisibilityScope.MEMBERS) visibilityMemberIds else emptyList(),
+            if (normalizedScope == KBVisibilityScope.MEMBERS) effectiveMemberIds else emptyList(),
         )
         val todo = KBTodoItemEntity(
             id = id,
@@ -493,6 +518,8 @@ class TodoRepository @Inject constructor(
                                 updatedAtEpochMillis = dto.updatedAtEpochMillis ?: now,
                                 isDeleted = false,
                                 createdBy = dto.createdBy ?: local?.createdBy,
+                                defaultVisibilityScope = dto.defaultVisibilityScope,
+                                defaultVisibilityMemberIdsJson = dto.defaultVisibilityMemberIds?.let(::encodeStringList),
                             ),
                         )
                         KBLog.sync.debug("applyListInbound SAVED id=${dto.id}", tag = "todo")
@@ -724,6 +751,8 @@ class TodoRepository @Inject constructor(
                 updatedAtEpochMillis = remote.updatedAtEpochMillis ?: now,
                 isDeleted = false,
                 createdBy = remote.createdBy,
+                defaultVisibilityScope = remote.defaultVisibilityScope,
+                defaultVisibilityMemberIdsJson = remote.defaultVisibilityMemberIds?.let(::encodeStringList),
             ),
         )
         KBLog.sync.info("resolveReferencedListId lista recuperata listId=$id", tag = "todo")

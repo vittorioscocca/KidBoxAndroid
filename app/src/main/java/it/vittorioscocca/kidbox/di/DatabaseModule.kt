@@ -280,6 +280,14 @@ object DatabaseModule {
     // Chat: dimensioni di foto/video per dare alla bolla il formato verticale/orizzontale.
     /** Chi ha preso un to-do da fuori dall'app (richieste di famiglia). */
     /** Carte di pagamento del Wallet: tabella nuova, nessun dato da migrare. */
+    /** Visibilità di default delle liste to-do. */
+    private val MIGRATION_52_53 = object : Migration(52, 53) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `kb_todo_lists` ADD COLUMN `defaultVisibilityScope` TEXT")
+            db.execSQL("ALTER TABLE `kb_todo_lists` ADD COLUMN `defaultVisibilityMemberIdsJson` TEXT")
+        }
+    }
+
     private val MIGRATION_51_52 = object : Migration(51, 52) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(
@@ -1539,6 +1547,7 @@ object DatabaseModule {
         MIGRATION_49_50,
         MIGRATION_50_51,
         MIGRATION_51_52,
+        MIGRATION_52_53,
     )
         .fallbackToDestructiveMigration()
         .build()

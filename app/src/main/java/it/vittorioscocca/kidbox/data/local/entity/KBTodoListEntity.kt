@@ -37,4 +37,8 @@ data class KBTodoListEntity(
      * pubbliche, per non farle sparire a chi le usa già.
      */
     val createdBy: String? = null,
+    /** Visibilità di default dei to-do creati nella lista. null = famiglia. */
+    val defaultVisibilityScope: String? = null,
+    /** JSON dei membri, solo con scope `members`. */
+    val defaultVisibilityMemberIdsJson: String? = null,
 )

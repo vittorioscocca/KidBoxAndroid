@@ -245,6 +245,8 @@ fun TodoListScreen(
     if (showEditor) {
         TodoEditScreen(
             initial = editingTodo,
+            defaultVisScope = state.listDefaultVisibilityScope,
+            defaultVisMemberIds = state.listDefaultVisibilityMemberIds,
             members = state.members,
             currentUid = state.currentUid,
             // Si chiede solo da una lista vera: il to-do nascerà lì.
@@ -594,6 +596,8 @@ private data class TodoEditForm(
 @Composable
 private fun TodoEditScreen(
     initial: KBTodoItemEntity?,
+    defaultVisScope: String,
+    defaultVisMemberIds: List<String>,
     members: List<TodoMemberUi>,
     currentUid: String,
     canAsk: Boolean,
@@ -610,17 +614,23 @@ private fun TodoEditScreen(
     var reminderEnabled by remember(initial?.id) { mutableStateOf(initial?.reminderEnabled == true && initial.dueAtEpochMillis != null) }
     var showReminderConfirm by remember { mutableStateOf(false) }
     var urgent by remember(initial?.id) { mutableStateOf((initial?.priorityRaw ?: 0) == 1) }
-    var assignedTo by remember(initial?.id) { mutableStateOf(initial?.assignedTo) }
+    var assignedTo by remember(initial?.id) {
+        mutableStateOf(
+            initial?.assignedTo ?: if (initial == null && KBVisibilityScope.normalized(defaultVisScope) == KBVisibilityScope.ONLY_CREATOR) {
+                currentUid.takeIf { it.isNotBlank() }
+            } else null,
+        )
+    }
     var showAssigneePicker by remember { mutableStateOf(false) }
     var visScope by remember(initial?.id) {
         mutableStateOf(
-            if (initial == null) KBVisibilityScope.FAMILY else KBVisibilityScope.normalized(initial.visibilityScope),
+            if (initial == null) KBVisibilityScope.normalized(defaultVisScope) else KBVisibilityScope.normalized(initial.visibilityScope),
         )
     }
     var visMemberIds by remember(initial?.id) {
         mutableStateOf(
             if (initial == null) {
-                emptySet()
+                defaultVisMemberIds.toSet()
             } else {
                 decodeStringList(initial.visibilityMemberIdsJson).toSet()
             },

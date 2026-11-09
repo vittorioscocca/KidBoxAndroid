@@ -33,6 +33,10 @@ import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonOff
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
+import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerBottomSheet
+import it.vittorioscocca.kidbox.ui.screens.notes.VisibilityPickerMember
+import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -77,6 +81,9 @@ fun TodoHomeScreen(
     var showNewList by remember { mutableStateOf(false) }
     var listNameDraft by remember { mutableStateOf("") }
     var editingListId by remember { mutableStateOf<String?>(null) }
+    var listVisScope by remember { mutableStateOf(KBVisibilityScope.FAMILY) }
+    var listVisMemberIds by remember { mutableStateOf<List<String>>(emptyList()) }
+    var showListVisPicker by remember { mutableStateOf(false) }
     var longPressListId by remember { mutableStateOf<String?>(null) }
     var longPressListName by remember { mutableStateOf("") }
 
@@ -111,6 +118,8 @@ fun TodoHomeScreen(
                         onClick = {
                             editingListId = null
                             listNameDraft = ""
+                            listVisScope = KBVisibilityScope.FAMILY
+                            listVisMemberIds = emptyList()
                             showNewList = true
                         },
                     )
@@ -133,6 +142,8 @@ fun TodoHomeScreen(
                     TodoEmptyState {
                         editingListId = null
                         listNameDraft = ""
+                        listVisScope = KBVisibilityScope.FAMILY
+                        listVisMemberIds = emptyList()
                         showNewList = true
                     }
                 } else {
@@ -255,25 +266,58 @@ fun TodoHomeScreen(
             onDismissRequest = { showNewList = false },
             title = { Text(if (editingListId == null) stringResource(R.string.todo_new_list) else stringResource(R.string.todo_edit_list)) },
             text = {
-                TextField(
-                    value = listNameDraft,
-                    onValueChange = { listNameDraft = it },
-                    placeholder = { Text(stringResource(R.string.todo_list_name)) },
-                    singleLine = true,
-                )
+                Column {
+                    TextField(
+                        value = listNameDraft,
+                        onValueChange = { listNameDraft = it },
+                        placeholder = { Text(stringResource(R.string.todo_list_name)) },
+                        singleLine = true,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    TextButton(onClick = { showListVisPicker = true }) {
+                        Text(stringResource(KBVisibilityScope.chipLabelRes(listVisScope)))
+                    }
+                    Text(
+                        stringResource(R.string.todo_list_visibility_hint),
+                        fontSize = 12.sp,
+                        color = kb.title.copy(alpha = 0.6f),
+                    )
+                }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
                         val value = listNameDraft.trim()
                         if (value.isBlank()) return@TextButton
-                        if (editingListId == null) viewModel.createList(value) else viewModel.renameList(editingListId!!, value)
+                        if (editingListId == null) {
+                            viewModel.createList(value, listVisScope, listVisMemberIds)
+                        } else {
+                            viewModel.updateList(editingListId!!, value, listVisScope, listVisMemberIds)
+                        }
                         showNewList = false
                     },
                 ) { Text(stringResource(R.string.life_save)) }
             },
             dismissButton = {
                 TextButton(onClick = { showNewList = false }) { Text(stringResource(R.string.life_cancel)) }
+            },
+        )
+    }
+
+    if (showListVisPicker) {
+        VisibilityPickerBottomSheet(
+            currentUid = state.currentUid,
+            scopeSectionTitle = stringResource(R.string.todo_list_who_can_see),
+            membersExcludingSelf = state.members
+                .filter { it.uid != state.currentUid }
+                .map { VisibilityPickerMember(uid = it.uid, displayName = it.displayName) },
+            initialScope = listVisScope,
+            initialMemberIds = listVisMemberIds,
+            onDismiss = { showListVisPicker = false },
+            onConfirmed = { scope, ids ->
+                listVisScope = scope
+                listVisMemberIds = ids
+                showListVisPicker = false
             },
         )
     }
@@ -291,6 +335,9 @@ fun TodoHomeScreen(
                     onClick = {
                         editingListId = longPressListId
                         listNameDraft = longPressListName
+                        val editedList = state.lists.firstOrNull { it.id == longPressListId }
+                        listVisScope = KBVisibilityScope.normalized(editedList?.defaultVisibilityScope)
+                        listVisMemberIds = decodeStringList(editedList?.defaultVisibilityMemberIdsJson.orEmpty())
                         showNewList = true
                         longPressListId = null
                         longPressListName = ""

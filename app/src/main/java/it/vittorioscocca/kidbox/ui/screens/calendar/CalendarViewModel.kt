@@ -318,6 +318,8 @@ class CalendarViewModel @Inject constructor(
                             todosForChild = sources.todos.filterNot { it.isDeleted },
                             currentUid = uid,
                             listCreatedBy = list.createdBy,
+                            listDefaultScope = list.defaultVisibilityScope,
+                            listDefaultMemberIds = decodeStringList(list.defaultVisibilityMemberIdsJson.orEmpty()),
                         )
                     }
                     _uiState.value = withDisplayEvents(_uiState.value.copy(

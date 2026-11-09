@@ -102,6 +102,8 @@ class TodoHomeViewModel @Inject constructor(
                         todosForChild = todosInChild,
                         currentUid = uidForVis,
                         listCreatedBy = list.createdBy,
+                        listDefaultScope = list.defaultVisibilityScope,
+                        listDefaultMemberIds = decodeStringList(list.defaultVisibilityMemberIdsJson.orEmpty()),
                     )
                 }
                 val visibleTodos = todos.filter { todo ->
@@ -152,18 +154,18 @@ class TodoHomeViewModel @Inject constructor(
         viewModelScope.launch { badgeManager.resetRemote(state.familyId, CounterField.TODOS) }
     }
 
-    fun createList(name: String) {
+    fun createList(name: String, visibilityScope: String, visibilityMemberIds: List<String>) {
         val state = stateBacking.value
         if (state.familyId.isBlank()) return
         viewModelScope.launch {
-            runCatching { todoRepository.addList(state.familyId, state.childId, name.trim()) }
+            runCatching { todoRepository.addList(state.familyId, state.childId, name.trim(), visibilityScope, visibilityMemberIds) }
                 .onFailure { error.value = it.message ?: "Errore durante la creazione lista" }
         }
     }
 
-    fun renameList(listId: String, name: String) {
+    fun updateList(listId: String, name: String, visibilityScope: String, visibilityMemberIds: List<String>) {
         viewModelScope.launch {
-            runCatching { todoRepository.updateListName(listId, name.trim()) }
+            runCatching { todoRepository.updateList(listId, name.trim(), visibilityScope, visibilityMemberIds) }
                 .onFailure { error.value = it.message ?: "Errore durante il rename lista" }
         }
     }

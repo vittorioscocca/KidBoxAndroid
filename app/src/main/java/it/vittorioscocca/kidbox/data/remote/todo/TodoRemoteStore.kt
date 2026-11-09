@@ -15,6 +15,7 @@ import it.vittorioscocca.kidbox.data.local.entity.KBTodoItemEntity
 import it.vittorioscocca.kidbox.data.local.entity.KBTodoListEntity
 import javax.inject.Inject
 import javax.inject.Singleton
+import it.vittorioscocca.kidbox.domain.model.KBVisibilityScope
 import kotlinx.coroutines.tasks.await
 
 data class TodoListRemoteDto(
@@ -25,6 +26,8 @@ data class TodoListRemoteDto(
     val isDeleted: Boolean,
     val createdBy: String? = null,
     val updatedAtEpochMillis: Long?,
+    val defaultVisibilityScope: String? = null,
+    val defaultVisibilityMemberIds: List<String>? = null,
 )
 
 data class TodoItemRemoteDto(
@@ -119,6 +122,8 @@ class TodoRemoteStore @Inject constructor(
                                         isDeleted = d["isDeleted"] as? Boolean ?: false,
                                         createdBy = (d["createdBy"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
                                         updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
+                                        defaultVisibilityScope = d["defaultVisibilityScope"] as? String,
+                                        defaultVisibilityMemberIds = (d["defaultVisibilityMemberIds"] as? List<*>)?.mapNotNull { it as? String },
                                     ),
                                 )
                             }
@@ -234,6 +239,8 @@ class TodoRemoteStore @Inject constructor(
             isDeleted = false,
             createdBy = (d["createdBy"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
             updatedAtEpochMillis = (d["updatedAt"] as? Timestamp)?.toDate()?.time,
+            defaultVisibilityScope = d["defaultVisibilityScope"] as? String,
+            defaultVisibilityMemberIds = (d["defaultVisibilityMemberIds"] as? List<*>)?.mapNotNull { it as? String },
         )
     }
 
@@ -247,6 +254,11 @@ class TodoRemoteStore @Inject constructor(
                     "isDeleted" to false,
                     // Serve a decidere chi vede una lista ancora vuota.
                     "createdBy" to (list.createdBy ?: uid),
+                    "defaultVisibilityScope" to KBVisibilityScope.normalized(list.defaultVisibilityScope),
+                    "defaultVisibilityMemberIds" to
+                        if (KBVisibilityScope.normalized(list.defaultVisibilityScope) == KBVisibilityScope.MEMBERS) {
+                            decodeStringList(list.defaultVisibilityMemberIdsJson.orEmpty())
+                        } else emptyList<String>(),
                     "updatedBy" to uid,
                     "updatedAt" to FieldValue.serverTimestamp(),
                 ),

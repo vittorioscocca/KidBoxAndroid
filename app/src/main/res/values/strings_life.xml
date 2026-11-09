@@ -365,4 +365,6 @@
     <string name="vehicles_no_date">—</string>
     <string name="form_section_deadlines">Scadenze</string>
     <string name="form_section_service">Tagliando</string>
+    <string name="todo_list_who_can_see">Chi può vedere i to-do di questa lista</string>
+    <string name="todo_list_visibility_hint">I to-do creati in questa lista avranno questa visibilità, che puoi cambiare per ognuno.</string>
 </resources>

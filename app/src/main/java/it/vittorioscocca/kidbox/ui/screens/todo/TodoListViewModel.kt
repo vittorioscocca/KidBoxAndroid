@@ -43,6 +43,9 @@ data class TodoListUiState(
     val listsOrdered: List<Pair<String, String>> = emptyList(),
     /** Lista con solo To-Do di altri utenti (non visibili a me). */
     val listAccessDenied: Boolean = false,
+    /** Visibilità che prendono di default i to-do nuovi di questa lista. */
+    val listDefaultVisibilityScope: String = KBVisibilityScope.FAMILY,
+    val listDefaultVisibilityMemberIds: List<String> = emptyList(),
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
 )
@@ -114,6 +117,10 @@ class TodoListViewModel @Inject constructor(
                 todosForChild = todosForChild,
                 currentUid = uidForVis,
                 listCreatedBy = lists.firstOrNull { it.id == listId }?.createdBy,
+                listDefaultScope = lists.firstOrNull { it.id == listId }?.defaultVisibilityScope,
+                listDefaultMemberIds = decodeStringList(
+                    lists.firstOrNull { it.id == listId }?.defaultVisibilityMemberIdsJson.orEmpty(),
+                ),
             )
         val listScoped = if (kind == null) todosVisible.filter { it.listId == listId } else todosVisible
         val filtered = when (kind) {
@@ -138,6 +145,10 @@ class TodoListViewModel @Inject constructor(
             childId = childId,
             listId = listId,
             listName = listName,
+            listDefaultVisibilityScope = KBVisibilityScope.normalized(lists.firstOrNull { it.id == listId }?.defaultVisibilityScope),
+            listDefaultVisibilityMemberIds = decodeStringList(
+                lists.firstOrNull { it.id == listId }?.defaultVisibilityMemberIdsJson.orEmpty(),
+            ),
             currentUid = meUid,
             todos = listScoped,
             filteredTodos = filtered,

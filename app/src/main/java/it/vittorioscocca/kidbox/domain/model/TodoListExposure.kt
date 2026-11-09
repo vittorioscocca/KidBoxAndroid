@@ -25,10 +25,16 @@ object TodoListExposure {
         todosForChild: List<KBTodoItemEntity>,
         currentUid: String?,
         listCreatedBy: String? = null,
+        listDefaultScope: String? = null,
+        listDefaultMemberIds: List<String> = emptyList(),
     ): Boolean {
         val uid = currentUid?.takeIf { it.isNotBlank() } ?: return false
         val activeInList = todosForChild.filter { it.listId == listId && !it.isDeleted }
         if (activeInList.isEmpty()) {
+            // Lista vuota con visibilità «membri selezionati»: la vedono anche loro.
+            if (KBVisibilityScope.normalized(listDefaultScope) == KBVisibilityScope.MEMBERS &&
+                uid in listDefaultMemberIds
+            ) return true
             val owner = listCreatedBy?.takeIf { it.isNotBlank() } ?: return true
             return owner == uid
         }
