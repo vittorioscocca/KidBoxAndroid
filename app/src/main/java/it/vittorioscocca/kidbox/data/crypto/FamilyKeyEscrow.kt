@@ -5,6 +5,11 @@ import it.vittorioscocca.kidbox.util.KBLog
 import android.content.Context
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 private const val TAG = "FamilyKeyEscrow"
@@ -18,6 +23,7 @@ private const val ESCROW_VERSION = 1
 object FamilyKeyEscrow {
 
     private val db get() = FirebaseFirestore.getInstance()
+    private val v2Scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
      * Coppie `familyId|userId` per cui il backup è già stato rinfrescato in
@@ -97,16 +103,19 @@ object FamilyKeyEscrow {
         try {
             val escrowWrap = InviteCrypto.deriveEscrowWrapKey(userId, familyId)
             val wrapped = InviteCrypto.wrapFamilyKey(keyBytes, escrowWrap)
-            val data = mapOf(
+            val data = mutableMapOf<String, Any>(
                 "cipher" to InviteCrypto.toBase64(wrapped.cipher),
                 "nonce" to InviteCrypto.toBase64(wrapped.nonce),
                 "tag" to InviteCrypto.toBase64(wrapped.tag),
                 "updatedAt" to FieldValue.serverTimestamp(),
                 "version" to ESCROW_VERSION,
             )
+            // Copia v2 accanto alla v1, se la cassaforte è accesa e c'è la RK.
+            FamilyKeyVault.v2Field(userId, familyId, keyBytes)?.let { data["v2"] = it }
+            // merge: una v2 scritta da un altro dispositivo non va cancellata.
             db.collection("families").document(familyId)
                 .collection("memberKeyBackups").document(userId)
-                .set(data)
+                .set(data, SetOptions.merge())
                 .await()
             KBLog.crypto.info("backup OK familyId=$familyId userId=$userId", TAG)
         } catch (e: Exception) {
@@ -125,6 +134,13 @@ object FamilyKeyEscrow {
                 KBLog.crypto.info("recover: no backup doc familyId=$familyId", TAG)
                 return null
             }
+            // Ordine fisso (piano v2, 4 bis): prima la v2 con la RK di questo
+            // dispositivo, poi la v1. Nessuna scrittura distruttiva qui.
+            val v2 = d["v2"] as? Map<*, *>
+            FamilyKeyVault.openV2(userId, familyId, v2)?.let {
+                KBLog.crypto.info("recover OK (v2) familyId=$familyId", TAG)
+                return it
+            }
             val cipherB64 = d["cipher"] as? String
             val nonceB64 = d["nonce"] as? String
             val tagB64 = d["tag"] as? String
@@ -136,7 +152,11 @@ object FamilyKeyEscrow {
                 return null
             }
             val escrowWrap = InviteCrypto.deriveEscrowWrapKey(userId, familyId)
-            InviteCrypto.unwrapFamilyKey(cipher, nonce, tag, escrowWrap)
+            val key = InviteCrypto.unwrapFamilyKey(cipher, nonce, tag, escrowWrap)
+            // La v2 non si è aperta: si aggiunge se cassaforte accesa e RK
+            // presente, altrimenti non fa niente. Non blocca il recupero.
+            v2Scope.launch { FamilyKeyVault.writeAndVerifyV2(userId, familyId, key) }
+            key
         } catch (e: Exception) {
             KBLog.crypto.error("recover failed familyId=$familyId: ${e.message}", TAG, e)
             null
