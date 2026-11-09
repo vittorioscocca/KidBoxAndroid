@@ -4,6 +4,7 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
+import it.vittorioscocca.kidbox.data.crypto.SectionCrypto
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
@@ -33,7 +34,9 @@ data class RemotePediatricProfileDto(
  * Mirrors iOS `PediatricProfileRemoteStore`.
  */
 @Singleton
-class PediatricProfileRemoteStore @Inject constructor() {
+class PediatricProfileRemoteStore @Inject constructor(
+    private val sectionCrypto: SectionCrypto,
+) {
 
     private val db get() = FirebaseFirestore.getInstance()
 
@@ -51,7 +54,10 @@ class PediatricProfileRemoteStore @Inject constructor() {
                     onChange(null)
                     return@addSnapshotListener
                 }
-                val data = snap.data ?: return@addSnapshotListener
+                // Campi cifrati in `secure` (cifratura delle sezioni).
+                val data = sectionCrypto.readAndReencrypt(
+                    COLLECTION, familyId, snap.reference, snap.data ?: return@addSnapshotListener,
+                )
                 onChange(
                     RemotePediatricProfileDto(
                         id = snap.id,
@@ -98,6 +104,10 @@ class PediatricProfileRemoteStore @Inject constructor() {
             "updatedBy" to dto.updatedBy,
             "updatedAt" to Timestamp.now(),
         )
-        ref.set(payload, SetOptions.merge()).await()
+        ref.set(sectionCrypto.prepareWrite(COLLECTION, dto.familyId, payload), SetOptions.merge()).await()
+    }
+
+    private companion object {
+        const val COLLECTION = "pediatricProfiles"
     }
 }

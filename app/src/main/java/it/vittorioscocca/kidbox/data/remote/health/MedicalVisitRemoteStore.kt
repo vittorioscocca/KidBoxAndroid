@@ -4,6 +4,7 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
+import it.vittorioscocca.kidbox.data.crypto.SectionCrypto
 import javax.inject.Inject
 import javax.inject.Singleton
 import it.vittorioscocca.kidbox.data.local.mapper.decodeStringList
@@ -47,7 +48,9 @@ data class RemoteMedicalVisitDto(
  * Mirrors iOS `SyncCenter+Visits`.
  */
 @Singleton
-class MedicalVisitRemoteStore @Inject constructor() {
+class MedicalVisitRemoteStore @Inject constructor(
+    private val sectionCrypto: SectionCrypto,
+) {
 
     private val db get() = FirebaseFirestore.getInstance()
 
@@ -65,7 +68,10 @@ class MedicalVisitRemoteStore @Inject constructor() {
             .addSnapshotListener { snap, _ ->
                 if (snap == null) return@addSnapshotListener
                 val dtos = snap.documents.mapNotNull { doc ->
-                    val data = doc.data ?: return@mapNotNull null
+                    // Campi cifrati in `secure` (cifratura delle sezioni).
+                    val data = sectionCrypto.readAndReencrypt(
+                        COLLECTION, familyId, doc.reference, doc.data ?: return@mapNotNull null,
+                    )
                     val linkedTreatmentIdsJson = mergedStringListJsonField(
                         data = data,
                         jsonKey = "linkedTreatmentIdsJson",
@@ -172,7 +178,11 @@ class MedicalVisitRemoteStore @Inject constructor() {
             "updatedAt" to Timestamp.now(),
             "updatedBy" to dto.updatedBy,
         )
-        ref.set(payload, SetOptions.merge()).await()
+        ref.set(sectionCrypto.prepareWrite(COLLECTION, dto.familyId, payload), SetOptions.merge()).await()
+    }
+
+    private companion object {
+        const val COLLECTION = "medicalVisits"
     }
 }
 
@@ -180,7 +190,7 @@ class MedicalVisitRemoteStore @Inject constructor() {
  * Preferisce gli array nativi Firestore (scritti da iOS); altrimenti usa la stringa JSON (Android).
  */
 private fun mergedStringListJsonField(
-    data: Map<String, Any>,
+    data: Map<String, Any?>,
     jsonKey: String,
     arrayKey: String,
 ): String {

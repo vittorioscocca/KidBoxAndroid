@@ -72,12 +72,27 @@ object KBFeatureFlags {
     private val _textEncryptionEnabled = MutableStateFlow(TEXT_ENCRYPTION_FALLBACK)
     val textEncryptionEnabled: StateFlow<Boolean> = _textEncryptionEnabled.asStateFlow()
 
+    /**
+     * Sezioni cifrate con la chiave di famiglia (Garage, Animali, Spese, Salute:
+     * campo `secure`, specifica in `internal/cifratura-sezioni.md`). La lettura
+     * capisce sempre entrambi i formati; questo governa solo la scrittura e la
+     * ricifratura. Spento finché le build che leggono `secure` non sono diffuse.
+     */
+    private const val REMOTE_KEY_SECTIONS_ENCRYPTION = "sections_encryption_enabled"
+    private const val KEY_SECTIONS_ENCRYPTION = "kb_sectionsEncryptionEnabled"
+    private const val SECTIONS_ENCRYPTION_FALLBACK = false
+
+    private val _sectionsEncryptionEnabled = MutableStateFlow(SECTIONS_ENCRYPTION_FALLBACK)
+    val sectionsEncryptionEnabled: StateFlow<Boolean> = _sectionsEncryptionEnabled.asStateFlow()
+
     /** Da `KidBoxApplication.onCreate()`: allinea lo stato alla cache locale. */
     fun init(context: Context) {
         _facebookLoginEnabled.value =
             prefs(context).getBoolean(KEY_FACEBOOK_LOGIN, FACEBOOK_LOGIN_FALLBACK)
         _textEncryptionEnabled.value =
             prefs(context).getBoolean(KEY_TEXT_ENCRYPTION, TEXT_ENCRYPTION_FALLBACK)
+        _sectionsEncryptionEnabled.value =
+            prefs(context).getBoolean(KEY_SECTIONS_ENCRYPTION, SECTIONS_ENCRYPTION_FALLBACK)
     }
 
     /**
@@ -92,6 +107,7 @@ object KBFeatureFlags {
             mapOf(
                 REMOTE_KEY_FACEBOOK_LOGIN to FACEBOOK_LOGIN_FALLBACK,
                 REMOTE_KEY_TEXT_ENCRYPTION to TEXT_ENCRYPTION_FALLBACK,
+                REMOTE_KEY_SECTIONS_ENCRYPTION to SECTIONS_ENCRYPTION_FALLBACK,
             ),
         )
         config.setConfigSettingsAsync(
@@ -105,15 +121,25 @@ object KBFeatureFlags {
 
         runCatching {
             config.fetchAndActivate().await()
-            config.getBoolean(REMOTE_KEY_FACEBOOK_LOGIN) to config.getBoolean(REMOTE_KEY_TEXT_ENCRYPTION)
-        }.onSuccess { (enabled, encrypted) ->
+            Triple(
+                config.getBoolean(REMOTE_KEY_FACEBOOK_LOGIN),
+                config.getBoolean(REMOTE_KEY_TEXT_ENCRYPTION),
+                config.getBoolean(REMOTE_KEY_SECTIONS_ENCRYPTION),
+            )
+        }.onSuccess { (enabled, encrypted, sections) ->
             prefs(context).edit()
                 .putBoolean(KEY_FACEBOOK_LOGIN, enabled)
                 .putBoolean(KEY_TEXT_ENCRYPTION, encrypted)
+                .putBoolean(KEY_SECTIONS_ENCRYPTION, sections)
                 .apply()
             _facebookLoginEnabled.value = enabled
             _textEncryptionEnabled.value = encrypted
-            KBLog.data.info("FeatureFlags: $REMOTE_KEY_FACEBOOK_LOGIN=$enabled $REMOTE_KEY_TEXT_ENCRYPTION=$encrypted", TAG)
+            _sectionsEncryptionEnabled.value = sections
+            KBLog.data.info(
+                "FeatureFlags: $REMOTE_KEY_FACEBOOK_LOGIN=$enabled $REMOTE_KEY_TEXT_ENCRYPTION=$encrypted " +
+                    "$REMOTE_KEY_SECTIONS_ENCRYPTION=$sections",
+                TAG,
+            )
         }.onFailure {
             // Nessun fallback qui: senza risposta resta l'ultimo valore noto,
             // che è già la scelta giusta dell'ultima volta.

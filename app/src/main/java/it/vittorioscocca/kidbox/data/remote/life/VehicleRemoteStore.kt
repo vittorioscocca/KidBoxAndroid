@@ -9,6 +9,8 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import it.vittorioscocca.kidbox.data.local.entity.VehicleEntity
 import it.vittorioscocca.kidbox.data.vehicles.VehicleReminderOffsets
+import it.vittorioscocca.kidbox.data.crypto.SectionCrypto
+import it.vittorioscocca.kidbox.data.crypto.SectionFields
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
@@ -52,6 +54,7 @@ sealed interface VehicleRemoteChange {
 @Singleton
 class VehicleRemoteStore @Inject constructor(
     private val auth: FirebaseAuth,
+    private val sectionCrypto: SectionCrypto,
 ) {
     private val db get() = FirebaseFirestore.getInstance()
 
@@ -88,9 +91,13 @@ class VehicleRemoteStore @Inject constructor(
                     .map { it.document }
                     .ifEmpty { if (changed.isEmpty()) snap.documents else emptyList() }
                 val upserts = upsertDocs.mapNotNull { doc ->
-                    val d = doc.data ?: return@mapNotNull null
+                    // Campi cifrati in `secure` (cifratura delle sezioni).
+                    val d = sectionCrypto.readAndReencrypt(
+                        COLLECTION, familyId, doc.reference, doc.data ?: return@mapNotNull null,
+                    )
                     val name = (d["name"] as? String)?.trim().orEmpty()
-                    if (name.isEmpty()) return@mapNotNull null
+                    // Nome vuoto con `secure` che non si apre: si tiene, non si scarta.
+                    if (name.isEmpty() && !SectionFields.isSealed(d)) return@mapNotNull null
                     val year: Int? = when (val y = d["year"]) {
                         is Int -> y
                         is Number -> y.toInt()
@@ -166,7 +173,9 @@ class VehicleRemoteStore @Inject constructor(
         data["notes"] = entity.notes
         data["photoURL"] = entity.photoURL
         if (isNew) data["createdBy"] = entity.createdBy.ifEmpty { uid }
-        ref(entity.familyId, entity.id).set(data, SetOptions.merge()).await()
+        ref(entity.familyId, entity.id)
+            .set(sectionCrypto.prepareWrite(COLLECTION, entity.familyId, data), SetOptions.merge())
+            .await()
     }
 
     suspend fun softDelete(familyId: String, vehicleId: String) {
@@ -179,5 +188,9 @@ class VehicleRemoteStore @Inject constructor(
             ),
             SetOptions.merge(),
         ).await()
+    }
+
+    private companion object {
+        const val COLLECTION = "vehicles"
     }
 }

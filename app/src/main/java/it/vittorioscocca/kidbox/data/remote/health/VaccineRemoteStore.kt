@@ -7,6 +7,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import it.vittorioscocca.kidbox.data.local.mapper.KBVaccineType
+import it.vittorioscocca.kidbox.data.crypto.SectionCrypto
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
@@ -45,7 +46,9 @@ sealed class VaccineRemoteChange {
 }
 
 @Singleton
-class VaccineRemoteStore @Inject constructor() {
+class VaccineRemoteStore @Inject constructor(
+    private val sectionCrypto: SectionCrypto,
+) {
 
     private val db get() = FirebaseFirestore.getInstance()
 
@@ -117,7 +120,7 @@ class VaccineRemoteStore @Inject constructor() {
             payload["nextDoseDate"] = FieldValue.delete()
         }
 
-        ref.set(payload, SetOptions.merge()).await()
+        ref.set(sectionCrypto.prepareWrite(COLLECTION, dto.familyId, payload), SetOptions.merge()).await()
     }
 
     suspend fun softDelete(familyId: String, vaccineId: String, updatedBy: String) {
@@ -135,7 +138,8 @@ class VaccineRemoteStore @Inject constructor() {
     }
 
     fun decode(doc: DocumentSnapshot, familyId: String): RemoteVaccineDto? {
-        val data = doc.data ?: return null
+        // Campi cifrati in `secure` (cifratura delle sezioni).
+        val data = sectionCrypto.readAndReencrypt(COLLECTION, familyId, doc.reference, doc.data ?: return null)
         val childId = data["childId"] as? String ?: return null
         val vaccineTypeRaw = data["vaccineTypeRaw"] as? String ?: "altro"
         val commercialName = data["commercialName"] as? String
@@ -169,6 +173,10 @@ class VaccineRemoteStore @Inject constructor() {
             createdAtEpochMillis = (data["createdAt"] as? Timestamp)?.toDate()?.time ?: 0L,
             createdBy = data["createdBy"] as? String,
         )
+    }
+
+    private companion object {
+        const val COLLECTION = "vaccines"
     }
 }
 

@@ -8,6 +8,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import it.vittorioscocca.kidbox.data.local.entity.PetEntity
+import it.vittorioscocca.kidbox.data.crypto.SectionCrypto
+import it.vittorioscocca.kidbox.data.crypto.SectionFields
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
@@ -41,6 +43,7 @@ sealed interface PetRemoteChange {
 @Singleton
 class PetRemoteStore @Inject constructor(
     private val auth: FirebaseAuth,
+    private val sectionCrypto: SectionCrypto,
 ) {
     private val db get() = FirebaseFirestore.getInstance()
 
@@ -68,9 +71,13 @@ class PetRemoteStore @Inject constructor(
                 // query ha risultati reali, e in Room non arrivava più nulla. Le rimozioni
                 // restano sul delta, dove sono affidabili.
                 val upserts = snap.documents.mapNotNull { doc ->
-                    val d = doc.data ?: return@mapNotNull null
+                    // Campi cifrati in `secure` (cifratura delle sezioni).
+                    val d = sectionCrypto.readAndReencrypt(
+                        COLLECTION, familyId, doc.reference, doc.data ?: return@mapNotNull null,
+                    )
                     val name = (d["name"] as? String)?.trim().orEmpty()
-                    if (name.isEmpty()) return@mapNotNull null
+                    // Nome vuoto con `secure` che non si apre: si tiene, non si scarta.
+                    if (name.isEmpty() && !SectionFields.isSealed(d)) return@mapNotNull null
                     val species = (d["species"] as? String)?.trim().orEmpty()
                     if (species.isEmpty()) return@mapNotNull null
                     val dto = PetRemoteDto(
@@ -120,7 +127,9 @@ class PetRemoteStore @Inject constructor(
         if (isNew) {
             data["createdBy"] = entity.createdBy.ifEmpty { uid }
         }
-        ref(entity.familyId, entity.id).set(data, SetOptions.merge()).await()
+        ref(entity.familyId, entity.id)
+            .set(sectionCrypto.prepareWrite(COLLECTION, entity.familyId, data), SetOptions.merge())
+            .await()
     }
 
     suspend fun softDelete(familyId: String, petId: String) {
@@ -133,5 +142,9 @@ class PetRemoteStore @Inject constructor(
             ),
             SetOptions.merge(),
         ).await()
+    }
+
+    private companion object {
+        const val COLLECTION = "pets"
     }
 }

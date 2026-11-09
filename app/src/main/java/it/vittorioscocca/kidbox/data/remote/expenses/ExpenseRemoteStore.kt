@@ -11,6 +11,8 @@ import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.SetOptions
 import it.vittorioscocca.kidbox.data.local.entity.KBExpenseEntity
+import it.vittorioscocca.kidbox.data.crypto.SectionCrypto
+import it.vittorioscocca.kidbox.data.crypto.SectionFields
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
@@ -39,6 +41,7 @@ sealed interface ExpenseRemoteChange {
 @Singleton
 class ExpenseRemoteStore @Inject constructor(
     private val auth: FirebaseAuth,
+    private val sectionCrypto: SectionCrypto,
 ) {
     private val db: FirebaseFirestore
         get() = FirebaseFirestore.getInstance()
@@ -65,11 +68,15 @@ class ExpenseRemoteStore @Inject constructor(
                 // query ha risultati reali, e in Room non arrivava più nulla. Le rimozioni
                 // restano sul delta, dove sono affidabili.
                 val upserts = snap?.documents?.mapNotNull { doc ->
-                    val d = doc.data ?: return@mapNotNull null
+                    // Campi cifrati in `secure` (cifratura delle sezioni).
+                    val d = sectionCrypto.readAndReencrypt(
+                        COLLECTION, familyId, doc.reference, doc.data ?: return@mapNotNull null,
+                    )
                     val title = (d["title"] as? String)?.trim().orEmpty()
                     val amount = (d["amount"] as? Number)?.toDouble() ?: return@mapNotNull null
                     val dateEpochMillis = (d["date"] as? Timestamp)?.toDate()?.time ?: return@mapNotNull null
-                    if (title.isBlank()) return@mapNotNull null
+                    // Titolo vuoto con `secure` che non si apre: si tiene, non si scarta.
+                    if (title.isBlank() && !SectionFields.isSealed(d)) return@mapNotNull null
                     ExpenseRemoteChange.Upsert(
                         RemoteExpenseDto(
                             id = doc.id,
@@ -104,7 +111,7 @@ class ExpenseRemoteStore @Inject constructor(
             .collection("expenses")
             .document(entity.id)
             .set(
-                mapOf(
+                sectionCrypto.prepareWrite(COLLECTION, entity.familyId, mapOf(
                     "id" to entity.id,
                     "familyId" to entity.familyId,
                     "title" to entity.title,
@@ -118,7 +125,7 @@ class ExpenseRemoteStore @Inject constructor(
                     "updatedBy" to uid,
                     "updatedAt" to FieldValue.serverTimestamp(),
                     "createdAt" to timestampFromMillis(entity.createdAtEpochMillis),
-                ),
+                )),
                 SetOptions.merge(),
             )
             .await()
@@ -146,4 +153,8 @@ class ExpenseRemoteStore @Inject constructor(
 
     private fun timestampFromMillis(epochMillis: Long): Timestamp =
         Timestamp(epochMillis / 1000, ((epochMillis % 1000) * 1_000_000).toInt())
+
+    private companion object {
+        const val COLLECTION = "expenses"
+    }
 }

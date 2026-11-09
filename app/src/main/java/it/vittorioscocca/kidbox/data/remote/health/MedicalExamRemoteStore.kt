@@ -6,6 +6,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import it.vittorioscocca.kidbox.data.local.entity.KBMedicalExamEntity
+import it.vittorioscocca.kidbox.data.crypto.SectionCrypto
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
@@ -40,7 +41,9 @@ sealed class ExamRemoteChange {
 }
 
 @Singleton
-class MedicalExamRemoteStore @Inject constructor() {
+class MedicalExamRemoteStore @Inject constructor(
+    private val sectionCrypto: SectionCrypto,
+) {
 
     private val db get() = FirebaseFirestore.getInstance()
 
@@ -96,7 +99,7 @@ class MedicalExamRemoteStore @Inject constructor() {
             }),
             "createdBy" to dto.createdBy,
         )
-        ref.set(payload, SetOptions.merge()).await()
+        ref.set(sectionCrypto.prepareWrite(COLLECTION, dto.familyId, payload), SetOptions.merge()).await()
     }
 
     suspend fun softDelete(familyId: String, examId: String, updatedBy: String) {
@@ -114,7 +117,8 @@ class MedicalExamRemoteStore @Inject constructor() {
     }
 
     fun decode(doc: com.google.firebase.firestore.DocumentSnapshot, familyId: String): RemoteExamDto? {
-        val data = doc.data ?: return null
+        // Campi cifrati in `secure` (cifratura delle sezioni).
+        val data = sectionCrypto.readAndReencrypt(COLLECTION, familyId, doc.reference, doc.data ?: return null)
         val name = data["name"] as? String ?: return null
         val childId = data["childId"] as? String ?: return null
         return RemoteExamDto(
@@ -140,6 +144,10 @@ class MedicalExamRemoteStore @Inject constructor() {
             createdAtEpochMillis = (data["createdAt"] as? Timestamp)?.toDate()?.time ?: 0L,
             createdBy = data["createdBy"] as? String,
         )
+    }
+
+    private companion object {
+        const val COLLECTION = "medicalExams"
     }
 }
 
