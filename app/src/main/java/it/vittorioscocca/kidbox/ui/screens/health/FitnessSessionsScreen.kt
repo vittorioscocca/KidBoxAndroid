@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.DirectionsRun
@@ -25,7 +26,6 @@ import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Pool
 import androidx.compose.material.icons.filled.SelfImprovement
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -120,8 +120,8 @@ fun FitnessSessionsScreen(
             )
             Spacer(Modifier.weight(1f))
             KidBoxHeaderCircleButton(
-                icon = Icons.Default.Settings,
-                contentDescription = stringResource(R.string.fitness_settings_title),
+                icon = ImageVector.vectorResource(R.drawable.ic_running_shoe),
+                contentDescription = stringResource(R.string.fitness_shoes_title),
                 onClick = { showSettings = true },
             )
         }
