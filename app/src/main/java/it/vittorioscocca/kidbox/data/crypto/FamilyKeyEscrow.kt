@@ -97,6 +97,11 @@ object FamilyKeyEscrow {
         backupRawKey(keyBytes, familyId, userId)
     }
 
+    /** `families/{familyId}.keyV1Closed`: la famiglia ha chiuso la copia v1 (Fase 3 della cassaforte). */
+    suspend fun isV1Closed(familyId: String): Boolean = runCatching {
+        db.collection("families").document(familyId).get().await().getBoolean("keyV1Closed") == true
+    }.getOrDefault(false)
+
     suspend fun backupRawKey(keyBytes: ByteArray, familyId: String, userId: String) {
         if (familyId.isBlank() || userId.isBlank()) return
         require(keyBytes.size == 32) { "Family key must be 32 bytes" }
@@ -112,6 +117,18 @@ object FamilyKeyEscrow {
             )
             // Copia v2 accanto alla v1, se la cassaforte è accesa e c'è la RK.
             FamilyKeyVault.v2Field(userId, familyId, keyBytes)?.let { data["v2"] = it }
+            // Fase 3 per questa famiglia (`keyV1Closed`): le rules accettano solo
+            // la v2. Si scrive quella sola, o niente se qui manca la cassaforte.
+            if (isV1Closed(familyId)) {
+                val v2 = data["v2"] ?: run {
+                    KBLog.crypto.info("backup skipped: v1 closed, no v2 here familyId=$familyId", TAG)
+                    return
+                }
+                data.clear()
+                data["version"] = 2
+                data["v2"] = v2
+                data["updatedAt"] = FieldValue.serverTimestamp()
+            }
             // merge: una v2 scritta da un altro dispositivo non va cancellata.
             db.collection("families").document(familyId)
                 .collection("memberKeyBackups").document(userId)
