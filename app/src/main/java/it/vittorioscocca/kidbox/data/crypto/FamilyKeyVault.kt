@@ -221,6 +221,14 @@ object FamilyKeyVault {
         saveRk(uid, rk)
     }
 
+    /** La RK arrivata col QR da un altro dispositivo dello stesso utente: vale solo se è quella della cassaforte. */
+    suspend fun adoptHandedRk(uid: String, rk: ByteArray) {
+        val expected = db.collection("users").document(uid).collection("keyVault").get(Source.SERVER).await()
+            .documents.firstOrNull()?.getString("rkId") ?: throw VaultMissingException()
+        if (rk.size != 32 || FamilyKeyVaultCrypto.rkId(rk) != expected) throw FamilyKeyVaultCrypto.WrongSecretException()
+        saveRk(uid, rk)
+    }
+
     /** Quanti slot ha la cassaforte (0 = da creare). */
     suspend fun slotCount(uid: String): Int =
         db.collection("users").document(uid).collection("keyVault").get(Source.SERVER).await().size()

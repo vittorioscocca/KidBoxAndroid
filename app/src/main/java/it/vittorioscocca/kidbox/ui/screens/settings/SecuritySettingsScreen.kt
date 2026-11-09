@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -64,6 +65,7 @@ fun SecuritySettingsScreen(familyIds: List<String>, onBack: () -> Unit) {
     var loaded by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     var reloadTick by remember { mutableIntStateOf(0) }
+    var showScan by remember { mutableStateOf(false) }
     var dialog by remember { mutableStateOf<String?>(null) } // "open" | "regenerate" | "passkey"
 
     LaunchedEffect(uid, reloadTick) {
@@ -145,6 +147,15 @@ fun SecuritySettingsScreen(familyIds: List<String>, onBack: () -> Unit) {
                         Text(stringResource(R.string.security_add_passkey))
                     }
                 }
+                OutlinedButton(onClick = { showScan = true }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.QrCodeScanner, contentDescription = null)
+                    Spacer(Modifier.size(8.dp))
+                    Text(stringResource(R.string.handoff_scan))
+                }
+                Text(
+                    stringResource(R.string.handoff_scan_hint),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.kidBoxColors.subtitle,
+                )
                 if (hasRk && recovery != null) {
                     OutlinedButton(onClick = { dialog = "regenerate" }, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.security_regenerate))
@@ -157,6 +168,8 @@ fun SecuritySettingsScreen(familyIds: List<String>, onBack: () -> Unit) {
             }
         }
     }
+
+    if (showScan) KeyHandoffScanDialog(familyIds = familyIds, onClose = { showScan = false })
 
     dialog?.let { mode ->
         KeyVaultPrompt(

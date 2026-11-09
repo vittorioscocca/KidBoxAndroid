@@ -51,12 +51,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.window.DialogProperties
 import com.google.firebase.auth.FirebaseAuth
 import it.vittorioscocca.kidbox.R
 import it.vittorioscocca.kidbox.data.crypto.FamilyKeyVault
 import it.vittorioscocca.kidbox.data.crypto.FamilyKeyVaultCrypto
 import it.vittorioscocca.kidbox.data.crypto.VaultPasskey
+import it.vittorioscocca.kidbox.data.crypto.KeyHandoff
+import it.vittorioscocca.kidbox.ui.screens.onboarding.QRCodeGenerator
 import it.vittorioscocca.kidbox.util.KBLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -65,7 +68,7 @@ import kotlinx.coroutines.withContext
 
 private const val TAG = "KeyVaultPrompt"
 
-private enum class KvStep { LOADING, INTRO, CODE, CONFIRM, OPEN, PASSKEY, DONE }
+private enum class KvStep { LOADING, INTRO, CODE, CONFIRM, OPEN, PHONE, PASSKEY, DONE }
 
 /**
  * «Proteggi la chiave della tua famiglia» (piano v2, Fase 2). Gemello di
@@ -105,6 +108,9 @@ fun KeyVaultPrompt(
     var passkeyIds by remember { mutableStateOf<List<String>>(emptyList()) }
     val canPasskey = remember { VaultPasskey.maybeSupported() }
     val afterUnlock = { if (canPasskey && !regenerate) KvStep.PASSKEY else KvStep.DONE }
+    var room by remember { mutableStateOf<KeyHandoff.Room?>(null) }
+    var roomExpired by remember { mutableStateOf(false) }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { room?.close() } }
 
     LaunchedEffect(uid) {
         if (regenerate) { step = KvStep.CODE; return@LaunchedEffect }
@@ -166,6 +172,55 @@ fun KeyVaultPrompt(
             } catch (e: Exception) {
                 KBLog.crypto.error("apertura cassaforte fallita: ${e.message}", TAG)
                 error = R.string.kv_error
+            } finally { busy = false }
+        }
+    }
+
+    fun onHandoff(result: Result<KeyHandoff.Received>) {
+        scope.launch {
+            room = null
+            busy = true
+            try {
+                val r = result.getOrThrow()
+                withContext(Dispatchers.IO) { KeyHandoff.adopt(context, r, uid) }
+                if (r.kind == "rk") {
+                    withContext(Dispatchers.IO) {
+                        FamilyKeyVault.syncFamilyKeysV2(context, uid, familyIds)
+                        backupOff = FamilyKeyVault.blockStoreE2E() == false
+                    }
+                    if (backupOff) FamilyKeyVault.markBackupHintShown(uid)
+                    notice = null
+                    step = afterUnlock()
+                } else {
+                    notice = R.string.kv_phone_got_family
+                    step = KvStep.DONE
+                }
+            } catch (e: Exception) {
+                KBLog.crypto.error("KeyHandoff: consegna non aperta ${e.javaClass.simpleName} ${e.message}", TAG)
+                error = R.string.kv_phone_failed
+                roomExpired = true
+            } finally { busy = false }
+        }
+    }
+
+    fun startRoom() {
+        room?.close(); room = null
+        error = null; roomExpired = false
+        step = KvStep.PHONE
+        scope.launch {
+            busy = true
+            try {
+                val label = "Android · ${Build.MANUFACTURER.replaceFirstChar { it.uppercase() }} ${Build.MODEL}"
+                val r = withContext(Dispatchers.IO) { KeyHandoff.openRoom(uid, label) { res -> onHandoff(res) } }
+                room = r
+                scope.launch {
+                    delay(KeyHandoff.TTL_MS)
+                    if (room === r) { r.close(); room = null; roomExpired = true }
+                }
+            } catch (e: Exception) {
+                KBLog.crypto.error("KeyHandoff: stanza non creata ${e.message}", TAG)
+                error = R.string.kv_error
+                roomExpired = true
             } finally { busy = false }
         }
     }
@@ -349,7 +404,35 @@ fun KeyVaultPrompt(
                             if (busy) R.string.kv_opening else R.string.kv_open_cta,
                             enabled = !busy && FamilyKeyVaultCrypto.normalizeRecoveryCode(typedCode) != null,
                         ) { openWithCode() }
+                        TextButton(onClick = { startRoom() }, enabled = !busy) {
+                            Text(stringResource(R.string.kv_phone_cta))
+                        }
                         KvSmall(R.string.kv_lost_code)
+                    }
+
+                    KvStep.PHONE -> {
+                        KvTitle(R.string.kv_phone_title)
+                        KvLead(R.string.kv_phone_lead)
+                        val r = room
+                        if (r != null && !roomExpired) {
+                            val bmp = remember(r.qrText) { QRCodeGenerator.generateQRCodeBitmap(r.qrText, 600) }
+                            bmp?.let {
+                                Surface(shape = RoundedCornerShape(12.dp), color = androidx.compose.ui.graphics.Color.White) {
+                                    androidx.compose.foundation.Image(
+                                        bitmap = it.asImageBitmap(), contentDescription = null,
+                                        modifier = Modifier.padding(10.dp).width(240.dp).height(240.dp),
+                                    )
+                                }
+                            }
+                            KvSmall(R.string.kv_phone_waiting)
+                        } else if (!roomExpired) {
+                            CircularProgressIndicator(Modifier.padding(24.dp))
+                        }
+                        KvError(error)
+                        if (roomExpired) KvPrimary(R.string.kv_phone_new, enabled = !busy) { startRoom() }
+                        TextButton(onClick = { room?.close(); room = null; error = null; step = KvStep.OPEN }) {
+                            Text(stringResource(R.string.kv_back))
+                        }
                     }
 
                     KvStep.PASSKEY -> {
