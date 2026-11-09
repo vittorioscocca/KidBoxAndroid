@@ -74,6 +74,9 @@ private val cardFieldColors @Composable get() = TextFieldDefaults.colors(
     focusedIndicatorColor = Color.Transparent,
     unfocusedIndicatorColor = Color.Transparent,
     disabledIndicatorColor = Color.Transparent,
+    focusedTextColor = MaterialTheme.kidBoxColors.title,
+    unfocusedTextColor = MaterialTheme.kidBoxColors.title,
+    disabledTextColor = MaterialTheme.kidBoxColors.title,
 )
 
 /**
@@ -153,7 +156,7 @@ fun ReferenceDoctorFormScreen(
                 // ── Dati medico ──────────────────────────────────────────────────
                 FormSectionLabel(stringResource(R.string.health_doctor_data))
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    colors = CardDefaults.cardColors(containerColor = kb.card, contentColor = kb.title),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -198,7 +201,7 @@ fun ReferenceDoctorFormScreen(
                 // ── Orari di studio ──────────────────────────────────────────────
                 FormSectionLabel(stringResource(R.string.health_office_hours))
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    colors = CardDefaults.cardColors(containerColor = kb.card, contentColor = kb.title),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -294,7 +297,7 @@ private fun ToolbarPillButton(
         enabled = enabled,
         modifier = Modifier
             .clip(RoundedCornerShape(22.dp))
-            .background(Color.White),
+            .background(kb.card),
     ) {
         Text(
             text = text,
@@ -468,7 +471,7 @@ private fun OfficeHourTimePickerField(
                 Column(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
-                        .background(Color.White)
+                        .background(kb.card)
                         .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {

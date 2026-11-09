@@ -198,9 +198,12 @@ fun MedicalRecordScreen(
                         .fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        disabledContainerColor = Color.White,
+                        focusedContainerColor = kb.card,
+                        unfocusedContainerColor = kb.card,
+                        disabledContainerColor = kb.card,
+                        focusedTextColor = kb.title,
+                        unfocusedTextColor = kb.title,
+                        disabledTextColor = kb.title,
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent,
                         disabledIndicatorColor = Color.Transparent,
@@ -239,7 +242,7 @@ fun MedicalRecordScreen(
                 SimpleDateFormat("d MMMM yyyy", KBLocale.current()).format(java.util.Date(birthMillis))
             }
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = kb.card, contentColor = kb.title),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -304,9 +307,12 @@ fun MedicalRecordScreen(
                 shape = RoundedCornerShape(12.dp),
                 minLines = 2,
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    disabledContainerColor = Color.White,
+                    focusedContainerColor = kb.card,
+                    unfocusedContainerColor = kb.card,
+                    disabledContainerColor = kb.card,
+                    focusedTextColor = kb.title,
+                    unfocusedTextColor = kb.title,
+                    disabledTextColor = kb.title,
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
                     disabledIndicatorColor = Color.Transparent,
@@ -317,7 +323,7 @@ fun MedicalRecordScreen(
             // ── Medico / pediatra di riferimento ────────────────────────────────
             SectionLabel(primaryDoctorLabel)
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = kb.card, contentColor = kb.title),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -353,7 +359,7 @@ fun MedicalRecordScreen(
             // ── Contatti di emergenza ──────────────────────────────────────────
             SectionLabel(stringResource(R.string.health_emergency_contacts))
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = kb.card, contentColor = kb.title),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -417,9 +423,12 @@ fun MedicalRecordScreen(
                 shape = RoundedCornerShape(12.dp),
                 minLines = 3,
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    disabledContainerColor = Color.White,
+                    focusedContainerColor = kb.card,
+                    unfocusedContainerColor = kb.card,
+                    disabledContainerColor = kb.card,
+                    focusedTextColor = kb.title,
+                    unfocusedTextColor = kb.title,
+                    disabledTextColor = kb.title,
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
                     disabledIndicatorColor = Color.Transparent,
@@ -433,7 +442,7 @@ fun MedicalRecordScreen(
                 enabled = !state.isSaving,
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White,
+                    containerColor = kb.card,
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
