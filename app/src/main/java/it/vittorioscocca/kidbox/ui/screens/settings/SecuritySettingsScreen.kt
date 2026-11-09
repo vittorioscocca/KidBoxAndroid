@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
@@ -152,6 +153,11 @@ fun SecuritySettingsScreen(familyIds: List<String>, onBack: () -> Unit) {
                     Spacer(Modifier.size(8.dp))
                     Text(stringResource(R.string.handoff_scan))
                 }
+                OutlinedButton(onClick = { dialog = "receive" }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.QrCode, contentDescription = null)
+                    Spacer(Modifier.size(8.dp))
+                    Text(stringResource(R.string.handoff_receive))
+                }
                 Text(
                     stringResource(R.string.handoff_scan_hint),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.kidBoxColors.subtitle,
@@ -181,6 +187,7 @@ fun SecuritySettingsScreen(familyIds: List<String>, onBack: () -> Unit) {
             onLater = { dialog = null },
             regenerate = mode == "regenerate",
             addPasskey = mode == "passkey",
+            receive = mode == "receive",
         )
     }
 }

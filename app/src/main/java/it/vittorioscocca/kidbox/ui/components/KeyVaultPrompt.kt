@@ -91,6 +91,8 @@ fun KeyVaultPrompt(
     regenerate: Boolean = false,
     /** Da Impostazioni › Sicurezza: solo «aggiungi una passkey» (serve la RK qui). */
     addPasskey: Boolean = false,
+    /** Da Impostazioni › Sicurezza: subito il QR per ricevere la chiave da un altro dispositivo o da un familiare. */
+    receive: Boolean = false,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -115,6 +117,7 @@ fun KeyVaultPrompt(
     LaunchedEffect(uid) {
         if (regenerate) { step = KvStep.CODE; return@LaunchedEffect }
         if (addPasskey) { step = KvStep.PASSKEY; return@LaunchedEffect }
+        if (receive) return@LaunchedEffect // il QR parte qui sotto, dopo startRoom
         step = try {
             passkeyIds = runCatching { withContext(Dispatchers.IO) { FamilyKeyVault.passkeyCredentialIds(uid) } }
                 .getOrDefault(emptyList())
@@ -224,6 +227,8 @@ fun KeyVaultPrompt(
             } finally { busy = false }
         }
     }
+
+    LaunchedEffect(Unit) { if (receive) startRoom() }
 
     fun openWithPasskey() {
         scope.launch {
@@ -430,8 +435,11 @@ fun KeyVaultPrompt(
                         }
                         KvError(error)
                         if (roomExpired) KvPrimary(R.string.kv_phone_new, enabled = !busy) { startRoom() }
-                        TextButton(onClick = { room?.close(); room = null; error = null; step = KvStep.OPEN }) {
-                            Text(stringResource(R.string.kv_back))
+                        TextButton(onClick = {
+                            room?.close(); room = null; error = null
+                            if (receive) onLater() else step = KvStep.OPEN
+                        }) {
+                            Text(stringResource(if (receive) R.string.kv_cancel else R.string.kv_back))
                         }
                     }
 
@@ -459,7 +467,7 @@ fun KeyVaultPrompt(
                         KvPrimary(R.string.kv_done_cta) { onDone() }
                     }
                 }
-                if (allowLater && step != KvStep.DONE && step != KvStep.LOADING && step != KvStep.PASSKEY) {
+                if (allowLater && step != KvStep.DONE && step != KvStep.LOADING && step != KvStep.PASSKEY && step != KvStep.PHONE) {
                     TextButton(onClick = onLater, enabled = !busy) {
                         Text(stringResource(if (regenerate || addPasskey) R.string.kv_cancel else R.string.kv_later))
                     }

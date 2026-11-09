@@ -63,7 +63,7 @@
     <string name="kv_passkey_not_usable">Cette clé d\'accès ne fonctionne pas ici. Utilisez le code de récupération.</string>
     <string name="security_add_passkey">Ajouter une clé d\'accès</string>
     <string name="handoff_scan">Scanner un QR</string>
-    <string name="handoff_scan_hint">Pour donner la clé à l\'ordinateur (« Se connecter avec le téléphone »), à un nouvel appareil ou à un membre de la famille qui ne l\'a pas.</string>
+    <string name="handoff_scan_hint">« Scanner un QR » donne la clé à l\'ordinateur, à un nouvel appareil ou à un membre de la famille. « Recevoir la clé avec un QR » sert si elle manque ici : un QR s\'affiche, à scanner avec un autre de vos appareils ou le téléphone d\'un membre de la famille.</string>
     <string name="handoff_scan_lead">Scannez le QR affiché par l\'ordinateur, un autre de vos appareils ou le téléphone d\'un membre de la famille.</string>
     <string name="handoff_send_rk_title">Envoyer votre clé à « %1$s » ?</string>
     <string name="handoff_send_rk_body">Cet appareil pourra ouvrir les données chiffrées de toutes vos familles. Confirmez seulement si le QR est sur votre ordinateur ou l\'un de vos appareils.</string>
@@ -86,4 +86,5 @@
     <string name="kv_phone_new">Nouveau code</string>
     <string name="kv_phone_failed">La clé reçue ne s\'ouvre pas. Réessayez avec un nouveau code.</string>
     <string name="kv_phone_got_family">Clé de la famille reçue d\'un membre de la famille.</string>
+    <string name="handoff_receive">Recevoir la clé avec un QR</string>
 </resources>

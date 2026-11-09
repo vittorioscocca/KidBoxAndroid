@@ -63,7 +63,7 @@
     <string name="kv_passkey_not_usable">Esta llave de acceso no funciona aquí. Usa el código de recuperación.</string>
     <string name="security_add_passkey">Añadir una llave de acceso</string>
     <string name="handoff_scan">Escanear un QR</string>
-    <string name="handoff_scan_hint">Para dar la clave al ordenador («Entrar con el teléfono»), a un dispositivo nuevo tuyo o a un familiar que no la tenga.</string>
+    <string name="handoff_scan_hint">«Escanear un QR» da la clave al ordenador, a un dispositivo nuevo tuyo o a un familiar. «Recibir la clave con un QR» sirve si aquí falta: muestra un QR para escanear con otro dispositivo tuyo o con el teléfono de un familiar.</string>
     <string name="handoff_scan_lead">Escanea el QR que muestra el ordenador, otro dispositivo tuyo o el teléfono de un familiar.</string>
     <string name="handoff_send_rk_title">¿Enviar tu clave a «%1$s»?</string>
     <string name="handoff_send_rk_body">Ese dispositivo podrá abrir los datos cifrados de todas tus familias. Confirma solo si el QR está en tu ordenador o en uno de tus dispositivos.</string>
@@ -86,4 +86,5 @@
     <string name="kv_phone_new">Nuevo código</string>
     <string name="kv_phone_failed">La clave recibida no se abre. Inténtalo de nuevo con un código nuevo.</string>
     <string name="kv_phone_got_family">Clave de la familia recibida de un familiar.</string>
+    <string name="handoff_receive">Recibir la clave con un QR</string>
 </resources>

@@ -63,7 +63,7 @@
     <string name="kv_passkey_not_usable">This passkey doesn\'t work here. Use your recovery code.</string>
     <string name="security_add_passkey">Add a passkey</string>
     <string name="handoff_scan">Scan a QR code</string>
-    <string name="handoff_scan_hint">To give the key to your computer (“Sign in with your phone”), to a new device of yours, or to a family member who doesn\'t have it.</string>
+    <string name="handoff_scan_hint">“Scan a QR code” gives the key to your computer, a new device of yours or a family member. “Receive the key with a QR code” is for when it\'s missing here: it shows a QR code to scan with another device of yours or a family member\'s phone.</string>
     <string name="handoff_scan_lead">Scan the QR code shown by the computer, another device of yours, or a family member\'s phone.</string>
     <string name="handoff_send_rk_title">Send your key to “%1$s”?</string>
     <string name="handoff_send_rk_body">That device will be able to open the encrypted data of all your families. Confirm only if the QR code is on your computer or one of your devices.</string>
@@ -86,4 +86,5 @@
     <string name="kv_phone_new">New code</string>
     <string name="kv_phone_failed">The key that arrived can\'t be opened. Try again with a new code.</string>
     <string name="kv_phone_got_family">Family key received from a family member.</string>
+    <string name="handoff_receive">Receive the key with a QR code</string>
 </resources>
