@@ -66,12 +66,24 @@ class FitnessPlanStore @Inject constructor(
      * Storico che un piano nuovo si porterà dietro, letto senza consumarlo: serve a
      * raccontarlo all'AI prima della generazione. Parity con iOS `pendingHistory`.
      */
-    fun pendingHistory(childId: String, old: FitnessPlanDocument?): Pair<List<FitnessSession>, List<FitnessLoggedWorkout>> {
+    fun pendingHistory(childId: String, old: FitnessPlanDocument?): Triple<List<FitnessSession>, List<FitnessLoggedWorkout>, List<FitnessSession>> {
         val stored = archiveFile(childId).takeIf { it.exists() }
             ?.let { runCatching { FitnessPlanJson.decodeSessions(org.json.JSONArray(it.readText())) }.getOrNull() }
             .orEmpty()
-        return (old?.doneHistory.orEmpty() + stored).distinctBy { it.id } to
-            old?.loggedWorkouts.orEmpty().distinctBy { it.id }
+        // Sedute del piano che sta per sparire non fatte (saltate o passate senza
+        // registrazione): senza queste l'AI non vedrebbe i regressi.
+        val today = FitnessPlanDates.today()
+        val missed = old?.allSessions.orEmpty().filter {
+            !it.isRest && (
+                it.status == FitnessSessionStatus.SKIPPED ||
+                    ((it.status == FitnessSessionStatus.PLANNED || it.status == FitnessSessionStatus.MOVED) && it.dateEpochMillis < today)
+                )
+        }
+        return Triple(
+            (old?.doneHistory.orEmpty() + stored).distinctBy { it.id },
+            old?.loggedWorkouts.orEmpty().distinctBy { it.id },
+            missed,
+        )
     }
 
     fun clear(childId: String) {

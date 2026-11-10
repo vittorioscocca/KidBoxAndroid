@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Favorite
@@ -705,6 +706,8 @@ private fun DayCell(
     val statuses = (sessions.filterNot { it.isRest }.ifEmpty { sessions }).map { it.status }.toSet()
     val status = statuses.singleOrNull()
     val isMixed = statuses.size > 1
+    // Attività fuori programma: sono cose fatte davvero, il giorno ha un segno.
+    val hasLogged = plan.loggedWorkoutsOn(dayEpochMillis).isNotEmpty()
     val dayNumber = Calendar.getInstance().apply { timeInMillis = dayEpochMillis }
         .get(Calendar.DAY_OF_MONTH)
 
@@ -715,7 +718,7 @@ private fun DayCell(
             .background(
                 when {
                     isSelected -> FITNESS_TINT
-                    sessions.isEmpty() -> Color.Transparent
+                    sessions.isEmpty() && !hasLogged -> Color.Transparent
                     else -> kb.subtitle.copy(alpha = 0.08f)
                 },
             )
@@ -751,6 +754,13 @@ private fun DayCell(
                 statusIcon(status),
                 contentDescription = null,
                 tint = if (isSelected) Color.White else statusColor(status, kb.subtitle),
+                modifier = Modifier.size(14.dp),
+            )
+        } else if (hasLogged) {
+            Icon(
+                Icons.Default.FitnessCenter,
+                contentDescription = null,
+                tint = if (isSelected) Color.White else FITNESS_TINT,
                 modifier = Modifier.size(14.dp),
             )
         } else {

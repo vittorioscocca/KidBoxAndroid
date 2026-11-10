@@ -59,6 +59,7 @@ object FitnessPlanGenerator {
         previousPlan: FitnessPlanDocument? = null,
         historySessions: List<FitnessSession> = emptyList(),
         historyWorkouts: List<FitnessLoggedWorkout> = emptyList(),
+        historyMissed: List<FitnessSession> = emptyList(),
         startDateEpochMillis: Long = FitnessPlanPromptBuilder.planStartDate(),
     ): Payload {
         val healthContext = ClinicalRecordHealthContextBuilder.buildClinicalPrompt(
@@ -94,6 +95,7 @@ object FitnessPlanGenerator {
                 previousPlan = previousPlan,
                 historySessions = historySessions,
                 historyWorkouts = historyWorkouts,
+                historyMissed = historyMissed,
             ),
             profileSummary = profileSummary,
             healthContext = healthContext,

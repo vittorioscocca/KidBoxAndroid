@@ -113,6 +113,7 @@ object FitnessPlanPromptBuilder {
         previousPlan: FitnessPlanDocument? = null,
         historySessions: List<FitnessSession> = emptyList(),
         historyWorkouts: List<FitnessLoggedWorkout> = emptyList(),
+        historyMissed: List<FitnessSession> = emptyList(),
     ): String = buildString {
         if (previousPlan != null) {
             appendLine(
@@ -182,7 +183,7 @@ object FitnessPlanPromptBuilder {
             previousPlanLines(previousPlan).forEach { appendLine(it) }
         }
 
-        historyLines(historySessions, historyWorkouts).takeIf { it.isNotEmpty() }?.let { lines ->
+        historyLines(historySessions, historyWorkouts, historyMissed).takeIf { it.isNotEmpty() }?.let { lines ->
             appendLine()
             lines.forEach { appendLine(it) }
         }
@@ -305,11 +306,15 @@ object FitnessPlanPromptBuilder {
      * ultime 4 settimane una per una, le precedenti una riga a settimana, tetto di caratteri
      * che scarta prima il più vecchio. Parity con iOS `historyLines`.
      */
-    fun historyLines(sessions: List<FitnessSession>, workouts: List<FitnessLoggedWorkout>): List<String> {
+    fun historyLines(
+        sessions: List<FitnessSession>,
+        workouts: List<FitnessLoggedWorkout>,
+        missed: List<FitnessSession> = emptyList(),
+    ): List<String> {
         val today = FitnessPlanDates.today()
         val since = today - HISTORY_WEEKS * 7 * DAY_MS
         val detailedSince = today - HISTORY_DETAILED_WEEKS * 7 * DAY_MS
-        val entries = buildList {
+        val entries0 = buildList {
             sessions.filter { it.status == FitnessSessionStatus.DONE && it.dateEpochMillis >= since }.forEach {
                 add(
                     HistoryEntry(
@@ -335,6 +340,7 @@ object FitnessPlanPromptBuilder {
                 )
             }
         }.sortedBy { it.date }
+        val entries = entries0
         if (entries.isEmpty()) return emptyList()
 
         var detailed = entries.filter { it.date >= detailedSince }
@@ -374,6 +380,7 @@ object FitnessPlanPromptBuilder {
                 "Sono sedute e attività che la persona ha già svolto e rivede sul calendario: " +
                     "tienine conto per carico, recupero e varietà, senza ripeterle uguali.",
             )
+            addAll(trendLines(entries0.map { Triple(it.date, it.minutes, it.meters) }, missed.map { it.dateEpochMillis }))
             if (omitted) add("[… storico più vecchio omesso per brevità]")
             if (weeklyLines.isNotEmpty()) {
                 add("Settimane meno recenti (riassunto):")
@@ -383,6 +390,42 @@ object FitnessPlanPromptBuilder {
                 add("Ultime $HISTORY_DETAILED_WEEKS settimane, una per una:")
                 addAll(detailedLines)
             }
+        }
+    }
+
+    /**
+     * Tendenza delle ultime 4 settimane (ultime due contro le due prima), sedute non
+     * fatte e giorni di pausa, più le regole di progressione/regressione. Parity con iOS.
+     */
+    private fun trendLines(entries: List<Triple<Long, Int, Double>>, missed: List<Long>): List<String> {
+        val today = FitnessPlanDates.today()
+        fun daysAgo(date: Long) = ((today - FitnessPlanDates.startOfDay(date)) / DAY_MS).toInt()
+        data class Summary(val count: Int, val minutes: Int, val km: Double, val missed: Int)
+        fun summary(range: IntRange): Summary {
+            val hit = entries.filter { daysAgo(it.first) in range }
+            return Summary(hit.size, hit.sumOf { it.second }, hit.sumOf { it.third } / 1000, missed.count { daysAgo(it) in range })
+        }
+        fun describe(label: String, s: Summary) = buildString {
+            append("- $label: ${s.count} attività, ${s.minutes} min")
+            if (s.km >= 0.01) append(String.format(Locale.US, ", %.1f km", s.km))
+            append(", ${s.missed} sedute non fatte")
+        }
+        val recent = summary(0..13)
+        val before = summary(14..27)
+        return buildList {
+            add("TENDENZA (ultime 4 settimane):")
+            add(describe("2 settimane precedenti", before))
+            add(describe("ultime 2 settimane", recent))
+            if (before.minutes > 0) {
+                val delta = Math.round((recent.minutes - before.minutes).toDouble() / before.minutes * 100).toInt()
+                add("- variazione del volume (minuti): ${if (delta >= 0) "+" else ""}$delta%")
+            }
+            entries.maxOfOrNull { it.first }?.let { add("- giorni dall'ultima attività svolta: ${maxOf(0, daysAgo(it))}") }
+            add("REGOLE PER PROGRESSI E REGRESSI:")
+            add("- Volume stabile o in crescita e poche sedute non fatte: progressione moderata (circa +10% di volume o una seduta più impegnativa).")
+            add("- Volume in calo, molte sedute non fatte o pausa di oltre 14 giorni: non progredire, riparti dal livello recente (ripresa graduale, sedute più brevi o facili).")
+            add("- Parti dal livello realmente raggiunto (durate e distanze svolte), non da zero e non dal piano teorico.")
+            add("- Il campo \"summary\" si apre con 1-2 frasi sui progressi o regressi rispetto a prima, con i numeri, e spiega come il nuovo piano ne tiene conto.")
         }
     }
 

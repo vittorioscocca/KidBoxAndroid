@@ -218,6 +218,7 @@ class FitnessPlanViewModel @Inject constructor(
                         previousPlan = finishedPlan,
                         historySessions = history.first,
                         historyWorkouts = history.second,
+                        historyMissed = history.third,
                     )
                     FitnessPlanGenerator.generate(
                         aiRepository = aiRepository,
@@ -548,6 +549,7 @@ class FitnessPlanViewModel @Inject constructor(
                         previousPlan = cached?.takeIf { it.isFinished() },
                         historySessions = history.first,
                         historyWorkouts = history.second,
+                        historyMissed = history.third,
                     )
                     inputs to FitnessPlanGenerator.estimate(payload).messageUnits
                 }
