@@ -202,6 +202,7 @@ class FitnessPlanViewModel @Inject constructor(
             runCatching {
                 withContext(Dispatchers.IO) {
                     val inputs = loadInputs()
+                    val history = planStore.pendingHistory(childId, _uiState.value.plan)
                     val payload = FitnessPlanGenerator.buildPayload(
                         subjectName = subjectName,
                         birthDateEpochMillis = inputs.birthMillis,
@@ -215,6 +216,8 @@ class FitnessPlanViewModel @Inject constructor(
                         // pulsante del consuntivo o le impostazioni), il mese
                         // concluso diventa storia.
                         previousPlan = finishedPlan,
+                        historySessions = history.first,
+                        historyWorkouts = history.second,
                     )
                     FitnessPlanGenerator.generate(
                         aiRepository = aiRepository,
@@ -532,6 +535,7 @@ class FitnessPlanViewModel @Inject constructor(
             runCatching {
                 withContext(Dispatchers.IO) {
                     val inputs = loadInputs()
+                    val history = planStore.pendingHistory(childId, cached)
                     val payload = FitnessPlanGenerator.buildPayload(
                         subjectName = _uiState.value.subjectName.ifBlank { inputs.name },
                         birthDateEpochMillis = inputs.birthMillis,
@@ -542,6 +546,8 @@ class FitnessPlanViewModel @Inject constructor(
                         visits = inputs.visits,
                         exams = inputs.exams,
                         previousPlan = cached?.takeIf { it.isFinished() },
+                        historySessions = history.first,
+                        historyWorkouts = history.second,
                     )
                     inputs to FitnessPlanGenerator.estimate(payload).messageUnits
                 }

@@ -57,6 +57,8 @@ object FitnessPlanGenerator {
         visits: List<KBMedicalVisitEntity>,
         exams: List<KBMedicalExamEntity>,
         previousPlan: FitnessPlanDocument? = null,
+        historySessions: List<FitnessSession> = emptyList(),
+        historyWorkouts: List<FitnessLoggedWorkout> = emptyList(),
         startDateEpochMillis: Long = FitnessPlanPromptBuilder.planStartDate(),
     ): Payload {
         val healthContext = ClinicalRecordHealthContextBuilder.buildClinicalPrompt(
@@ -90,6 +92,8 @@ object FitnessPlanGenerator {
                 profileSummary = profileSummary,
                 healthContext = healthContext,
                 previousPlan = previousPlan,
+                historySessions = historySessions,
+                historyWorkouts = historyWorkouts,
             ),
             profileSummary = profileSummary,
             healthContext = healthContext,

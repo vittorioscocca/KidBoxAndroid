@@ -353,7 +353,7 @@ fun FitnessPlanScreen(
 @Composable
 private fun SessionsButton(plan: FitnessPlanDocument, onClick: () -> Unit) {
     val kb = MaterialTheme.kidBoxColors
-    val done = plan.allSessions.count { it.status == FitnessSessionStatus.DONE }
+    val done = plan.doneHistory.size
 
     Row(
         modifier = Modifier
@@ -596,7 +596,7 @@ private fun CalendarCard(
 private fun MonthHeader(state: FitnessPlanUiState, viewModel: FitnessPlanViewModel) {
     val kb = MaterialTheme.kidBoxColors
     val plan = state.plan ?: return
-    val firstMonth = FitnessPlanDates.startOfMonth(plan.startDateEpochMillis)
+    val firstMonth = FitnessPlanDates.startOfMonth(plan.earliestHistoryMillis)
     val lastMonth = FitnessPlanDates.startOfMonth(
         plan.allSessions.lastOrNull()?.dateEpochMillis ?: plan.startDateEpochMillis,
     )

@@ -62,6 +62,18 @@ class FitnessPlanStore @Inject constructor(
         return document.copy(archivedSessions = history, loggedWorkouts = workouts)
     }
 
+    /**
+     * Storico che un piano nuovo si porterà dietro, letto senza consumarlo: serve a
+     * raccontarlo all'AI prima della generazione. Parity con iOS `pendingHistory`.
+     */
+    fun pendingHistory(childId: String, old: FitnessPlanDocument?): Pair<List<FitnessSession>, List<FitnessLoggedWorkout>> {
+        val stored = archiveFile(childId).takeIf { it.exists() }
+            ?.let { runCatching { FitnessPlanJson.decodeSessions(org.json.JSONArray(it.readText())) }.getOrNull() }
+            .orEmpty()
+        return (old?.doneHistory.orEmpty() + stored).distinctBy { it.id } to
+            old?.loggedWorkouts.orEmpty().distinctBy { it.id }
+    }
+
     fun clear(childId: String) {
         file(childId).delete()
         prefs.edit()

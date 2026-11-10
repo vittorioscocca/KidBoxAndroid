@@ -111,6 +111,8 @@ object FitnessPlanPromptBuilder {
         profileSummary: List<String>,
         healthContext: String,
         previousPlan: FitnessPlanDocument? = null,
+        historySessions: List<FitnessSession> = emptyList(),
+        historyWorkouts: List<FitnessLoggedWorkout> = emptyList(),
     ): String = buildString {
         if (previousPlan != null) {
             appendLine(
@@ -178,6 +180,11 @@ object FitnessPlanPromptBuilder {
         if (previousPlan != null) {
             appendLine()
             previousPlanLines(previousPlan).forEach { appendLine(it) }
+        }
+
+        historyLines(historySessions, historyWorkouts).takeIf { it.isNotEmpty() }?.let { lines ->
+            appendLine()
+            lines.forEach { appendLine(it) }
         }
 
         appendLine()
@@ -277,6 +284,118 @@ object FitnessPlanPromptBuilder {
             "- Il campo \"summary\" si apre con 1-2 frasi di bilancio del mese concluso, con i numeri, " +
                 "e spiega come il nuovo mese ne tiene conto.",
         )
+    }
+
+    private const val HISTORY_WEEKS = 26
+    private const val HISTORY_DETAILED_WEEKS = 4
+    private const val HISTORY_MAX_DETAILED_LINES = 24
+    private const val HISTORY_MAX_CHARS = 2_500
+    private const val DAY_MS = 24L * 60 * 60 * 1000
+
+    private data class HistoryEntry(
+        val date: Long,
+        val title: String,
+        val minutes: Int,
+        val meters: Double,
+        val line: String,
+    )
+
+    /**
+     * Sedute svolte nei piani precedenti e attività registrate fuori programma, compattate:
+     * ultime 4 settimane una per una, le precedenti una riga a settimana, tetto di caratteri
+     * che scarta prima il più vecchio. Parity con iOS `historyLines`.
+     */
+    fun historyLines(sessions: List<FitnessSession>, workouts: List<FitnessLoggedWorkout>): List<String> {
+        val today = FitnessPlanDates.today()
+        val since = today - HISTORY_WEEKS * 7 * DAY_MS
+        val detailedSince = today - HISTORY_DETAILED_WEEKS * 7 * DAY_MS
+        val entries = buildList {
+            sessions.filter { it.status == FitnessSessionStatus.DONE && it.dateEpochMillis >= since }.forEach {
+                add(
+                    HistoryEntry(
+                        it.dateEpochMillis,
+                        it.actualActivityTitle ?: it.title,
+                        it.actualMinutes ?: it.durationMinutes,
+                        it.actualDistanceMeters ?: 0.0,
+                        "${formatDate(it.dateEpochMillis)}: ${sessionOutcomeLine(it)}",
+                    ),
+                )
+            }
+            workouts.filter { it.dateEpochMillis >= since }.forEach { w ->
+                val extra = buildString {
+                    w.durationMinutes?.let { append(", $it min") }
+                    w.distanceMeters?.takeIf { it >= 10 }
+                        ?.let { append(String.format(Locale.US, ", %.1f km", it / 1000)) }
+                }
+                add(
+                    HistoryEntry(
+                        w.dateEpochMillis, w.title, w.durationMinutes ?: 0, w.distanceMeters ?: 0.0,
+                        "${formatDate(w.dateEpochMillis)}: ${w.title} (fuori programma$extra)",
+                    ),
+                )
+            }
+        }.sortedBy { it.date }
+        if (entries.isEmpty()) return emptyList()
+
+        var detailed = entries.filter { it.date >= detailedSince }
+        var older = entries.filter { it.date < detailedSince }
+        if (detailed.size > HISTORY_MAX_DETAILED_LINES) {
+            older = older + detailed.take(detailed.size - HISTORY_MAX_DETAILED_LINES)
+            detailed = detailed.takeLast(HISTORY_MAX_DETAILED_LINES)
+        }
+
+        // Una riga per settimana (lunedì come inizio).
+        val weeklyLines = older
+            .groupBy { weekStart(it.date) }
+            .toSortedMap()
+            .map { (start, items) ->
+                val km = items.sumOf { it.meters } / 1000
+                val top = items.groupingBy { it.title }.eachCount().entries
+                    .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+                    .take(3).joinToString(", ") { "${it.key} ×${it.value}" }
+                buildString {
+                    append("- settimana dal ${formatDate(start)}: ${items.size} attività, ${items.sumOf { it.minutes }} min")
+                    if (km >= 0.01) append(String.format(Locale.US, ", %.1f km", km))
+                    append(" ($top)")
+                }
+            }.toMutableList()
+        val detailedLines = detailed.map { "- " + it.line }.toMutableList()
+
+        var omitted = false
+        fun size() = (weeklyLines + detailedLines).sumOf { it.length + 1 }
+        while (size() > HISTORY_MAX_CHARS && (weeklyLines.isNotEmpty() || detailedLines.isNotEmpty())) {
+            if (weeklyLines.isNotEmpty()) weeklyLines.removeAt(0) else detailedLines.removeAt(0)
+            omitted = true
+        }
+
+        return buildList {
+            add("--- STORICO ALLENAMENTI (piani precedenti e attività registrate, ultime $HISTORY_WEEKS settimane) ---")
+            add(
+                "Sono sedute e attività che la persona ha già svolto e rivede sul calendario: " +
+                    "tienine conto per carico, recupero e varietà, senza ripeterle uguali.",
+            )
+            if (omitted) add("[… storico più vecchio omesso per brevità]")
+            if (weeklyLines.isNotEmpty()) {
+                add("Settimane meno recenti (riassunto):")
+                addAll(weeklyLines)
+            }
+            if (detailedLines.isNotEmpty()) {
+                add("Ultime $HISTORY_DETAILED_WEEKS settimane, una per una:")
+                addAll(detailedLines)
+            }
+        }
+    }
+
+    private fun weekStart(epochMillis: Long): Long {
+        val cal = java.util.Calendar.getInstance().apply {
+            firstDayOfWeek = java.util.Calendar.MONDAY
+            timeInMillis = epochMillis
+            set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+            val back = (get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7
+            add(java.util.Calendar.DAY_OF_YEAR, -back)
+        }
+        return cal.timeInMillis
     }
 
     /** Una seduta dell'ultima settimana come la legge l'AI: prevista e svolta. */

@@ -422,8 +422,19 @@ data class FitnessPlanDocument(
     /** Sedute di una giornata specifica. */
     fun sessionsOn(dayEpochMillis: Long): List<FitnessSession> {
         val day = FitnessPlanDates.startOfDay(dayEpochMillis)
-        return allSessions.filter { FitnessPlanDates.startOfDay(it.dateEpochMillis) == day }
+        val current = allSessions.filter { FitnessPlanDates.startOfDay(it.dateEpochMillis) == day }
+        val currentIds = current.map { it.id }.toSet()
+        // Le sedute fatte dei piani precedenti restano sul calendario dopo la rigenerazione.
+        val archived = archivedSessions.filter {
+            FitnessPlanDates.startOfDay(it.dateEpochMillis) == day && it.id !in currentIds
+        }
+        return (archived + current).sortedBy { it.dateEpochMillis }
     }
+
+    /** Primo giorno con qualcosa da mostrare sul calendario (piano, storico o attività registrate). */
+    val earliestHistoryMillis: Long
+        get() = (archivedSessions.map { it.dateEpochMillis } +
+            loggedWorkouts.map { it.dateEpochMillis } + startDateEpochMillis).min()
 
     /** Settimana che contiene la data indicata (1-based), `null` se fuori piano. */
     fun weekIndexFor(dayEpochMillis: Long): Int? {
