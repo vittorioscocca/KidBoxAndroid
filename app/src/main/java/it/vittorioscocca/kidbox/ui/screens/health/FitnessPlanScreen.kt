@@ -707,7 +707,8 @@ private fun DayCell(
     val status = statuses.singleOrNull()
     val isMixed = statuses.size > 1
     // Attività fuori programma: sono cose fatte davvero, il giorno ha un segno.
-    val hasLogged = plan.loggedWorkoutsOn(dayEpochMillis).isNotEmpty()
+    val loggedFirst = plan.loggedWorkoutsOn(dayEpochMillis).firstOrNull()
+    val hasLogged = loggedFirst != null
     val dayNumber = Calendar.getInstance().apply { timeInMillis = dayEpochMillis }
         .get(Calendar.DAY_OF_MONTH)
 
@@ -742,29 +743,35 @@ private fun DayCell(
             },
         )
         Spacer(Modifier.height(2.dp))
-        if (isMixed) {
-            Icon(
-                Icons.Default.Contrast,
-                contentDescription = null,
-                tint = if (isSelected) Color.White else statusColor(FitnessSessionStatus.MOVED, kb.subtitle),
-                modifier = Modifier.size(14.dp),
-            )
-        } else if (status != null) {
-            Icon(
-                statusIcon(status),
-                contentDescription = null,
-                tint = if (isSelected) Color.White else statusColor(status, kb.subtitle),
-                modifier = Modifier.size(14.dp),
-            )
-        } else if (hasLogged) {
-            Icon(
-                Icons.Default.FitnessCenter,
-                contentDescription = null,
-                tint = if (isSelected) Color.White else FITNESS_TINT,
-                modifier = Modifier.size(14.dp),
-            )
-        } else {
-            Spacer(Modifier.height(14.dp))
+        Row(
+            modifier = Modifier.height(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (isMixed) {
+                Icon(
+                    Icons.Default.Contrast,
+                    contentDescription = null,
+                    tint = if (isSelected) Color.White else statusColor(FitnessSessionStatus.MOVED, kb.subtitle),
+                    modifier = Modifier.size(14.dp),
+                )
+            } else if (status != null) {
+                Icon(
+                    statusIcon(status),
+                    contentDescription = null,
+                    tint = if (isSelected) Color.White else statusColor(status, kb.subtitle),
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+            // Attività fuori programma: l'icona della disciplina, accanto allo stato.
+            loggedFirst?.let {
+                Icon(
+                    FitnessActivityIcons.forWorkout(it.title),
+                    contentDescription = null,
+                    tint = if (isSelected) Color.White else FITNESS_TINT,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
         }
     }
 }
