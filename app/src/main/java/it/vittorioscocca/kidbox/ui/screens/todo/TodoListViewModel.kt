@@ -41,6 +41,8 @@ data class TodoListUiState(
     val smartKind: TodoSmartKind? = null,
     /** Liste della famiglia (id, nome) nell'ordine di creazione: servono a «Tutti» per raggruppare. */
     val listsOrdered: List<Pair<String, String>> = emptyList(),
+    /** Liste in cui si può spostare un to-do: quelle create da me (o senza autore). */
+    val movableLists: List<Pair<String, String>> = emptyList(),
     /** Lista con solo To-Do di altri utenti (non visibili a me). */
     val listAccessDenied: Boolean = false,
     /** Visibilità che prendono di default i to-do nuovi di questa lista. */
@@ -158,6 +160,9 @@ class TodoListViewModel @Inject constructor(
             listsOrdered = lists.filter { !it.isDeleted }
                 .sortedBy { it.createdAtEpochMillis }
                 .map { it.id to it.name },
+            movableLists = lists.filter { !it.isDeleted && (it.createdBy.isNullOrBlank() || it.createdBy == meUid || it.id == listId) }
+                .sortedBy { it.createdAtEpochMillis }
+                .map { it.id to it.name },
             listAccessDenied = listAccessDenied,
             isLoading = false,
             errorMessage = err,
@@ -223,6 +228,7 @@ class TodoListViewModel @Inject constructor(
         reminderEnabled: Boolean,
         visibilityScope: String,
         visibilityMemberIds: List<String>,
+        listId: String? = null,
     ) {
         viewModelScope.launch {
             runCatching {
@@ -236,6 +242,30 @@ class TodoListViewModel @Inject constructor(
                     reminderEnabled = reminderEnabled,
                     visibilityScope = visibilityScope,
                     visibilityMemberIds = visibilityMemberIds,
+                    listId = listId,
+                )
+            }.onFailure { error.value = it.message ?: "Errore durante aggiornamento To-Do" }
+        }
+    }
+
+    /** Modifica in riga (il tocco): cambia titolo, note e urgenza, il resto resta com'è. */
+    fun updateTodoInline(todo: KBTodoItemEntity, title: String, notes: String?, urgent: Boolean) {
+        val newTitle = title.trim()
+        val newNotes = notes?.trim()?.takeIf { it.isNotEmpty() }
+        if (newTitle.isEmpty()) return
+        val newPriority = if (urgent) 1 else 0
+        if (newTitle == todo.title && newNotes == todo.notes && newPriority == (todo.priorityRaw ?: 0)) return
+        viewModelScope.launch {
+            runCatching {
+                todoRepository.updateTodo(
+                    todoId = todo.id,
+                    title = newTitle,
+                    notes = newNotes,
+                    dueAtEpochMillis = todo.dueAtEpochMillis,
+                    dueHasTime = todo.dueHasTime,
+                    assignedTo = todo.assignedTo,
+                    priorityRaw = newPriority,
+                    reminderEnabled = todo.reminderEnabled,
                 )
             }.onFailure { error.value = it.message ?: "Errore durante aggiornamento To-Do" }
         }

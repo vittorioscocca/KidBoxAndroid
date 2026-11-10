@@ -47,6 +47,12 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.FilterChip
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -116,6 +122,8 @@ fun TodoListScreen(
     var showEditor by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var editingTodo by remember { mutableStateOf<KBTodoItemEntity?>(null) }
+    // Il tocco su un to-do apre la modifica in riga; la «i» la scheda completa.
+    var inlineEditId by remember { mutableStateOf<String?>(null) }
     val requestSend by viewModel.requestSend.collectAsStateWithLifecycle()
     // Titolo, note e a chi è assegnato (membro o persona fuori dall'app).
     val shownTodos = remember(state.filteredTodos, state.members, searchQuery) {
@@ -245,6 +253,7 @@ fun TodoListScreen(
     if (showEditor) {
         TodoEditScreen(
             initial = editingTodo,
+            lists = state.movableLists,
             defaultVisScope = state.listDefaultVisibilityScope,
             defaultVisMemberIds = state.listDefaultVisibilityMemberIds,
             members = state.members,
@@ -295,6 +304,7 @@ fun TodoListScreen(
                             reminderEnabled = form.reminderEnabled,
                             visibilityScope = form.visibilityScope,
                             visibilityMemberIds = form.visibilityMemberIds,
+                            listId = form.listId,
                         )
                     }
                     if (form.reminderEnabled && form.dueAt != null) {
@@ -461,16 +471,30 @@ fun TodoListScreen(
                                 return@items
                             }
                             val todo = (row as TodoListRow.Item).todo
+                            if (todo.id == inlineEditId) {
+                                TodoInlineEditor(
+                                    todo = todo,
+                                    onCommit = { t, n, u -> viewModel.updateTodoInline(todo, t, n, u) },
+                                    onClose = { inlineEditId = null },
+                                    onInfo = { t, n, u ->
+                                        editingTodo = todo.copy(
+                                            title = t.trim().ifBlank { todo.title },
+                                            notes = n.trim().takeIf { it.isNotEmpty() },
+                                            priorityRaw = if (u) 1 else 0,
+                                        )
+                                        inlineEditId = null
+                                        showEditor = true
+                                    },
+                                )
+                                return@items
+                            }
                             TodoRow(
                                 todo = todo,
                                 assigneeName = state.members.firstOrNull { it.uid == todo.assignedTo }?.displayName
                                     ?: externalAssignee(todo)?.let { stringResource(R.string.todo_external_assignee, it) },
                                 highlighted = flashingTodoId == todo.id,
                                 onToggle = { viewModel.toggleDone(todo.id) },
-                                onEdit = {
-                                    editingTodo = todo
-                                    showEditor = true
-                                },
+                                onEdit = { inlineEditId = todo.id },
                                 onDelete = { viewModel.deleteTodo(todo.id) },
                             )
                         }
@@ -589,6 +613,8 @@ private data class TodoEditForm(
     val reminderEnabled: Boolean,
     val visibilityScope: String,
     val visibilityMemberIds: List<String>,
+    /** Lista di appartenenza scelta (solo in modifica). */
+    val listId: String? = null,
     /** «Chiedi a…»: se c'è, si crea una richiesta invece del to-do. */
     val askDraft: FamilyRequestRemoteStore.Draft? = null,
 )
@@ -596,6 +622,7 @@ private data class TodoEditForm(
 @Composable
 private fun TodoEditScreen(
     initial: KBTodoItemEntity?,
+    lists: List<Pair<String, String>>,
     defaultVisScope: String,
     defaultVisMemberIds: List<String>,
     members: List<TodoMemberUi>,
@@ -622,6 +649,8 @@ private fun TodoEditScreen(
         )
     }
     var showAssigneePicker by remember { mutableStateOf(false) }
+    var selectedListId by remember(initial?.id) { mutableStateOf(initial?.listId.orEmpty()) }
+    var showListPicker by remember { mutableStateOf(false) }
     var visScope by remember(initial?.id) {
         mutableStateOf(
             if (initial == null) KBVisibilityScope.normalized(defaultVisScope) else KBVisibilityScope.normalized(initial.visibilityScope),
@@ -720,6 +749,7 @@ private fun TodoEditScreen(
                             emptyList()
                         },
                         askDraft = askDraft.takeIf { canAskNow },
+                        listId = selectedListId.takeIf { initial != null && it.isNotBlank() },
                     ),
                 )
             }
@@ -742,6 +772,28 @@ private fun TodoEditScreen(
             shape = RoundedCornerShape(12.dp),
             minLines = 3,
         )
+
+        if (initial != null && lists.size > 1) {
+            Card(
+                modifier = Modifier.fillMaxWidth().clickable { showListPicker = true },
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = kb.rowBackground),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(stringResource(R.string.todo_list), fontSize = 13.sp, color = kb.subtitle)
+                    Text(
+                        lists.firstOrNull { it.first == selectedListId }?.second
+                            ?: stringResource(R.string.todo_no_list),
+                        fontSize = 15.sp,
+                        color = kb.title,
+                    )
+                }
+            }
+        }
 
         FormSectionHeader(stringResource(R.string.todo_visibility), Icons.Default.Lock, accent)
         Card(
@@ -935,6 +987,32 @@ private fun TodoEditScreen(
         )
     }
 
+    if (showListPicker) {
+        AlertDialog(
+            onDismissRequest = { showListPicker = false },
+            title = { Text(stringResource(R.string.todo_list)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    lists.forEach { (id, name) ->
+                        Text(
+                            text = name,
+                            fontWeight = if (id == selectedListId) FontWeight.Bold else FontWeight.Normal,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectedListId = id
+                                    showListPicker = false
+                                }
+                                .padding(vertical = 8.dp),
+                        )
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { showListPicker = false }) { Text(stringResource(R.string.photos_close)) } },
+        )
+    }
+
     if (showAssigneePicker) {
         AlertDialog(
             onDismissRequest = { showAssigneePicker = false },
@@ -1064,4 +1142,83 @@ private fun buildGroupedTodoRows(
         orphans.forEach { rows += TodoListRow.Item(it) }
     }
     return rows
+}
+
+
+/**
+ * Modifica in riga di un to-do esistente (il tocco): titolo, note e urgenza.
+ * Si salva chiudendo, aprendo la «i» (scheda completa) o toccando altrove.
+ */
+@Composable
+private fun TodoInlineEditor(
+    todo: KBTodoItemEntity,
+    onCommit: (String, String, Boolean) -> Unit,
+    onClose: () -> Unit,
+    onInfo: (String, String, Boolean) -> Unit,
+) {
+    val kb = MaterialTheme.kidBoxColors
+    var title by remember(todo.id) { mutableStateOf(todo.title) }
+    var notes by remember(todo.id) { mutableStateOf(todo.notes.orEmpty()) }
+    var urgent by remember(todo.id) { mutableStateOf((todo.priorityRaw ?: 0) == 1) }
+    val finished = remember(todo.id) { booleanArrayOf(false) }
+    val focus = remember { FocusRequester() }
+    val latest = androidx.compose.runtime.rememberUpdatedState(Triple(title, notes, urgent))
+    val commit = androidx.compose.runtime.rememberUpdatedState(onCommit)
+    fun finish() {
+        if (finished[0]) return
+        finished[0] = true
+        val (t, n, u) = latest.value
+        commit.value(t, n, u)
+    }
+    LaunchedEffect(todo.id) { runCatching { focus.requestFocus() } }
+    DisposableEffect(todo.id) { onDispose { finish() } }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = kb.card),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true,
+                    placeholder = { Text(stringResource(R.string.vehicles_title_field)) },
+                )
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    maxLines = 4,
+                    placeholder = { Text(stringResource(R.string.life_notes)) },
+                )
+                FilterChip(
+                    selected = urgent,
+                    onClick = { urgent = !urgent },
+                    label = { Text(stringResource(R.string.todo_urgent)) },
+                )
+            }
+            Column {
+                IconButton(onClick = { finish(); onClose() }) {
+                    Icon(Icons.Filled.Check, contentDescription = null, tint = kb.title)
+                }
+                IconButton(onClick = {
+                    finished[0] = true
+                    val (t, n, u) = latest.value
+                    onCommit(t, n, u)
+                    onInfo(t, n, u)
+                }) {
+                    Icon(Icons.Filled.Info, contentDescription = null, tint = kb.title)
+                }
+            }
+        }
+    }
 }

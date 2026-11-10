@@ -353,6 +353,8 @@ class TodoRepository @Inject constructor(
         /** Se null, mantiene scope e membri già salvati sul todo (evita regressioni nei flussi tipo promemoria). */
         visibilityScope: String? = null,
         visibilityMemberIds: List<String>? = null,
+        /** Se non null, sposta il to-do in quella lista. */
+        listId: String? = null,
     ) {
         val existing = itemDao.getById(todoId) ?: return
         // Si annulla sempre, non solo quando il promemoria viene spento:
@@ -382,6 +384,7 @@ class TodoRepository @Inject constructor(
             lastSyncError = null,
             visibilityScope = normalizedScope,
             visibilityMemberIdsJson = memberIdsJson,
+            listId = listId?.takeIf { it.isNotBlank() } ?: existing.listId,
         )
         val reminderId = if (local.reminderEnabled && dueAtEpochMillis != null) {
             reminderScheduler.schedule(
