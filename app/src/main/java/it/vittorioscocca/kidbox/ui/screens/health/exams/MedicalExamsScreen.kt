@@ -75,7 +75,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBExamStatus
 import it.vittorioscocca.kidbox.domain.model.KBMedicalExam
-import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListAddBottomButton
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListDualSelectionBottomBar
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListSearchField
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListTopToolbar
@@ -174,12 +173,6 @@ fun MedicalExamsScreen(
                         hasSelection = state.selectedIds.isNotEmpty(),
                         onToggleAll = { viewModel.selectOrDeselectAllFiltered() },
                         onDelete = { showDeleteConfirm = true },
-                    )
-                } else {
-                    HealthListAddBottomButton(
-                        tint = TEAL,
-                        label = stringResource(R.string.health_new_exam_cap),
-                        onClick = onAdd,
                     )
                 }
             }

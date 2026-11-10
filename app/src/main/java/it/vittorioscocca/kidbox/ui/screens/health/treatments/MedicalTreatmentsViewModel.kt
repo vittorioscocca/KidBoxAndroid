@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import it.vittorioscocca.kidbox.data.repository.DoseLogRepository
 import it.vittorioscocca.kidbox.data.repository.TreatmentRepository
 import it.vittorioscocca.kidbox.data.sync.TreatmentSyncCenter
+import it.vittorioscocca.kidbox.domain.model.KBDoseLog
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import it.vittorioscocca.kidbox.domain.model.plannedFiniteDosesTotal
 import it.vittorioscocca.kidbox.notifications.TreatmentNotificationManager
@@ -41,6 +42,10 @@ data class MedicalTreatmentsState(
     val isSelecting: Boolean = false,
     val selectedIds: Set<String> = emptySet(),
     val isEmptyDueToFilter: Boolean = false,
+    /** Tutte le cure del figlio (senza filtro periodo né ricerca), per la vista a giorno. */
+    val calendarTreatments: List<KBTreatment> = emptyList(),
+    /** Registri delle dosi vivi del figlio, per la vista a giorno. */
+    val doseLogs: List<KBDoseLog> = emptyList(),
 )
 
 @HiltViewModel
@@ -61,6 +66,7 @@ class MedicalTreatmentsViewModel @Inject constructor(
     // il Flow rimette solo quando cambia la tabella e non quando cambia un chip.
     private var latestTreatments: List<KBTreatment> = emptyList()
     private var latestTakenMap: Map<String, Int> = emptyMap()
+    private var latestDoseLogs: List<KBDoseLog> = emptyList()
 
     private val pullToRefresh = PullToRefreshController(viewModelScope)
     val isRefreshing: StateFlow<Boolean> = pullToRefresh.isRefreshing
@@ -87,11 +93,12 @@ class MedicalTreatmentsViewModel @Inject constructor(
                 .mapValues { (_, logs) ->
                     logs.distinctBy { it.dayNumber to it.slotIndex }.size
                 }
-            treatments to takenMap
+            Triple(treatments, takenMap, doseLogs.filter { !it.isDeleted })
         }
-            .onEach { (treatments, takenMap) ->
+            .onEach { (treatments, takenMap, liveLogs) ->
                 latestTreatments = treatments
                 latestTakenMap = takenMap
+                latestDoseLogs = liveLogs
                 rebuild()
             }
             .launchIn(viewModelScope)
@@ -158,7 +165,47 @@ class MedicalTreatmentsViewModel @Inject constructor(
             isSelecting = prev.isSelecting,
             selectedIds = prev.selectedIds.filter { id -> filtered.any { it.id == id } }.toSet(),
             isEmptyDueToFilter = emptyDueToFilter,
+            calendarTreatments = latestTreatments.filter { !it.isDeleted && it.petId.isBlank() },
+            doseLogs = latestDoseLogs,
         )
+    }
+
+    // ── Vista a giorno: stessa scrittura dei log della scheda cura ──
+
+    /** Il giorno terapeutico [dayNumber] cade dopo oggi? (non si registrano dosi nel futuro) */
+    private fun isFutureDay(t: KBTreatment, dayNumber: Int): Boolean {
+        val zone = ZoneId.systemDefault()
+        val start = java.time.Instant.ofEpochMilli(t.startDateEpochMillis).atZone(zone).toLocalDate()
+        return start.plusDays((dayNumber - 1).toLong()).isAfter(LocalDate.now(zone))
+    }
+
+    fun markDoseTaken(
+        t: KBTreatment,
+        dayNumber: Int,
+        slotIndex: Int,
+        scheduledTime: String,
+        takenAtEpochMillis: Long,
+    ) {
+        if (isFutureDay(t, dayNumber)) return
+        viewModelScope.launch {
+            doseLogRepository.markTaken(
+                t.id, familyId, childId, dayNumber, slotIndex, scheduledTime,
+                takenAtEpochMillis = takenAtEpochMillis,
+            )
+            notifManager.cancelSlot(t.id, dayNumber - 1, slotIndex)
+        }
+    }
+
+    fun markDoseSkipped(t: KBTreatment, dayNumber: Int, slotIndex: Int, scheduledTime: String) {
+        if (isFutureDay(t, dayNumber)) return
+        viewModelScope.launch {
+            doseLogRepository.markSkipped(t.id, familyId, childId, dayNumber, slotIndex, scheduledTime)
+            notifManager.cancelSlot(t.id, dayNumber - 1, slotIndex)
+        }
+    }
+
+    fun clearDoseLog(logId: String) {
+        viewModelScope.launch { doseLogRepository.clearLog(logId) }
     }
 
     private fun passesSearch(t: KBTreatment, query: String): Boolean {

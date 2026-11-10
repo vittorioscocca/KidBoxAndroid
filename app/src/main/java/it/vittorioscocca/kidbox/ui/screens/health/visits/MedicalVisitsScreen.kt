@@ -88,7 +88,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.data.local.mapper.KBVisitStatus
 import it.vittorioscocca.kidbox.domain.model.KBMedicalVisit
-import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListAddBottomButton
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListDualSelectionBottomBar
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListSearchField
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListTopToolbar
@@ -185,12 +184,6 @@ fun MedicalVisitsScreen(
                         hasSelection = state.selectedIds.isNotEmpty(),
                         onToggleAll = { viewModel.selectOrDeselectAllFiltered() },
                         onDelete = { showDeleteConfirm = true },
-                    )
-                } else {
-                    HealthListAddBottomButton(
-                        tint = VISIT_TINT,
-                        label = stringResource(R.string.health_visit_add_new),
-                        onClick = onAdd,
                     )
                 }
             }

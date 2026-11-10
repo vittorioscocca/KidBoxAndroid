@@ -72,7 +72,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.vittorioscocca.kidbox.domain.model.KBTreatment
 import it.vittorioscocca.kidbox.domain.model.frequencyDisplayLabel
 import it.vittorioscocca.kidbox.domain.model.plannedFiniteDosesTotal
-import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListAddBottomButton
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListSearchField
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListTopToolbar
 import it.vittorioscocca.kidbox.ui.theme.kidBoxColors
@@ -81,6 +80,10 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 import it.vittorioscocca.kidbox.util.KBLocale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.runtime.saveable.rememberSaveable
 import it.vittorioscocca.kidbox.R
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
@@ -106,6 +109,9 @@ fun MedicalTreatmentsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     var showFilterSheet by remember { mutableStateOf(false) }
+    // Lista | Calendario (vista a giorno con linea del tempo), come su iOS.
+    var calendarMode by rememberSaveable { mutableStateOf(false) }
+    val showCalendar = calendarMode && state.calendarTreatments.isNotEmpty()
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var datePickerForStart by remember { mutableStateOf(false) }
     var datePickerForEnd by remember { mutableStateOf(false) }
@@ -193,12 +199,6 @@ fun MedicalTreatmentsScreen(
                         onDuplicate = { viewModel.duplicateSelected() },
                         onDelete = { showDeleteConfirm = true },
                     )
-                } else {
-                    HealthListAddBottomButton(
-                        tint = PURPLE,
-                        label = stringResource(R.string.health_new_treatment_cap),
-                        onClick = onAdd,
-                    )
                 }
             }
         },
@@ -218,22 +218,38 @@ fun MedicalTreatmentsScreen(
                     if (state.isSelecting) viewModel.setSelecting(false) else viewModel.setSelecting(true)
                 },
                 onAddClick = onAdd,
+                showFilterAndSelect = !showCalendar,
             )
 
-            Text(
-                stringResource(R.string.health_treatments),
-                fontSize = 32.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = kb.title,
-                modifier = Modifier.padding(horizontal = 18.dp),
-            )
-            HealthListSearchField(
+            // Titolo con il selettore Lista | Calendario piccolo a fianco, come in Home.
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.health_treatments),
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = kb.title,
+                    modifier = Modifier.weight(1f),
+                )
+                if (state.calendarTreatments.isNotEmpty()) {
+                    TreatmentsViewModeToggle(
+                        calendarMode = calendarMode,
+                        onChange = {
+                            calendarMode = it
+                            if (it) viewModel.setSelecting(false)
+                        },
+                    )
+                }
+            }
+            if (!showCalendar) HealthListSearchField(
                 value = state.searchQuery,
                 onValueChange = { viewModel.setSearchQuery(it) },
                 placeholder = stringResource(R.string.health_treatment_search),
                 tint = PURPLE,
             )
-            if (state.timeFilter != TreatmentTimeFilter.ALL) {
+            if (!showCalendar && state.timeFilter != TreatmentTimeFilter.ALL) {
                 Spacer(Modifier.height(8.dp))
                 FilterActivePill(
                     label = filterLabel(context, state),
@@ -247,6 +263,15 @@ fun MedicalTreatmentsScreen(
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
+            } else if (showCalendar) {
+                TreatmentsDayCalendar(
+                    treatments = state.calendarTreatments,
+                    doseLogs = state.doseLogs,
+                    onOpenTreatment = onOpen,
+                    onMarkTaken = { t, day, slot, time, at -> viewModel.markDoseTaken(t, day, slot, time, at) },
+                    onMarkSkipped = { t, day, slot, time -> viewModel.markDoseSkipped(t, day, slot, time) },
+                    onUndo = { viewModel.clearDoseLog(it) },
+                )
             } else if (state.isEmptyDueToFilter) {
                 EmptyFilterState(onClear = { viewModel.clearTimeFilter() }, modifier = Modifier.fillMaxSize())
             } else {
@@ -314,6 +339,39 @@ fun MedicalTreatmentsScreen(
                 }
             }
         }
+    }
+}
+
+/** Capsula piccola a icone (lista / calendario), come il selettore della Home. */
+@Composable
+private fun TreatmentsViewModeToggle(calendarMode: Boolean, onChange: (Boolean) -> Unit) {
+    val kb = MaterialTheme.kidBoxColors
+    val listDesc = stringResource(R.string.treatments_view_list)
+    val calDesc = stringResource(R.string.treatments_view_calendar)
+    @Composable
+    fun Item(selected: Boolean, icon: androidx.compose.ui.graphics.vector.ImageVector, desc: String, onClick: () -> Unit) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(if (selected) PURPLE else Color.Transparent)
+                .clickable(onClick = onClick)
+                .semantics { contentDescription = desc },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = if (selected) Color.White else kb.subtitle, modifier = Modifier.size(18.dp))
+        }
+    }
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(kb.subtitle.copy(alpha = 0.14f))
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Item(!calendarMode, Icons.AutoMirrored.Filled.List, listDesc) { onChange(false) }
+        Item(calendarMode, Icons.Default.CalendarMonth, calDesc) { onChange(true) }
     }
 }
 

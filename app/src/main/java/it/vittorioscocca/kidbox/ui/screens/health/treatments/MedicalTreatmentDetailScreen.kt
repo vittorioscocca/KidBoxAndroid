@@ -883,7 +883,7 @@ private fun SlotCompactRow(
 }
 
 @Composable
-private fun ConfirmDoseSheet(
+internal fun ConfirmDoseSheet(
     drugName: String,
     dosageLabel: String,
     scheduleDayLabel: String,

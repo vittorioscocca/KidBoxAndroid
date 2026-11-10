@@ -68,7 +68,6 @@ import it.vittorioscocca.kidbox.data.local.mapper.KBVaccineStatus
 import it.vittorioscocca.kidbox.data.local.mapper.KBVaccineType
 import it.vittorioscocca.kidbox.data.local.mapper.computedStatus
 import it.vittorioscocca.kidbox.domain.model.KBVaccine
-import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListAddBottomButton
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListDualSelectionBottomBar
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListSearchField
 import it.vittorioscocca.kidbox.ui.screens.health.common.HealthListTopToolbar
@@ -156,12 +155,6 @@ fun MedicalVaccinesScreen(
                                     if (selectedIds.size == allFilteredIds.size) emptySet() else allFilteredIds
                             },
                             onDelete = { showDeleteConfirm = true },
-                        )
-                    } else {
-                        HealthListAddBottomButton(
-                            tint = SALMON,
-                            label = stringResource(R.string.health_add_vaccine),
-                            onClick = onAdd,
                         )
                     }
                 }

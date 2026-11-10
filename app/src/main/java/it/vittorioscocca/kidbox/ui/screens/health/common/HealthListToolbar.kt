@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +50,8 @@ fun HealthListTopToolbar(
     onFilterClick: () -> Unit,
     onToggleSelectClick: () -> Unit,
     onAddClick: (() -> Unit)?,
+    /** `false` nella vista a calendario delle cure: niente filtro per periodo né selezione. */
+    showFilterAndSelect: Boolean = true,
 ) {
     val kb = MaterialTheme.kidBoxColors
     Row(
@@ -65,7 +66,7 @@ fun HealthListTopToolbar(
             onClick = onBack,
         )
         Spacer(Modifier.weight(1f))
-        Surface(
+        if (showFilterAndSelect) Surface(
             shape = RoundedCornerShape(22.dp),
             color = kb.card,
             tonalElevation = 1.dp,
@@ -98,32 +99,6 @@ fun HealthListTopToolbar(
                 onClick = onAddClick,
             )
         }
-    }
-}
-
-/** Pulsante full-width in basso per «nuova voce» (stesso padding e tipografia ovunque). */
-@Composable
-fun HealthListAddBottomButton(
-    tint: Color,
-    label: String,
-    onClick: () -> Unit,
-) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        shape = RoundedCornerShape(14.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = tint),
-    ) {
-        Icon(
-            Icons.Default.Add,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(label, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
     }
 }
 

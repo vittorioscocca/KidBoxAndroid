@@ -622,4 +622,17 @@
         <item quantity="one">Delete %d treatment?</item>
         <item quantity="other">Delete %d treatments?</item>
     </plurals>
+
+    <!-- Cure: vista a giorno con linea del tempo -->
+    <string name="treatments_view_list">List</string>
+    <string name="treatments_view_calendar">Calendar</string>
+    <string name="treatments_day_prev">Previous day</string>
+    <string name="treatments_day_next">Next day</string>
+    <string name="treatments_day_doses_count">%1$d of %2$d doses</string>
+    <string name="treatments_day_not_logged">Not recorded</string>
+    <string name="treatments_day_empty">No dose scheduled for this day.</string>
+    <string name="treatments_day_today">Today</string>
+    <string name="treatments_day_yesterday">Yesterday</string>
+    <string name="treatments_day_tomorrow">Tomorrow</string>
+    <string name="treatments_day_taken_at">Taken: %1$s</string>
 </resources>
