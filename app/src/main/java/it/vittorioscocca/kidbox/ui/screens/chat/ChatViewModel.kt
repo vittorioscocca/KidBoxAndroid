@@ -121,6 +121,15 @@ class ChatViewModel @Inject constructor(
     private var activeSendCount: Int = 0
     /** Job che osserva i family member per la famiglia attiva (per il picker @menzioni). */
     private var mentionsJob: Job? = null
+    /**
+     * Job che osserva i messaggi della famiglia attiva. Va fermato al cambio di
+     * famiglia: senza, restavano due osservatori (uno per famiglia) sulla stessa
+     * lista, e bastava una scrittura locale nella famiglia di prima per far
+     * tornare a schermo la sua conversazione mentre si scriveva nell'altra.
+     */
+    private var messagesJob: Job? = null
+    /** Scaricamento dei media mancanti della famiglia attiva. */
+    private var hydrateJob: Job? = null
     /** Candidati confermati dall'utente nel composer, in attesa di essere inviati. */
     private val pendingMentions = mutableListOf<ChatMentionCandidate>()
 
@@ -206,13 +215,26 @@ class ChatViewModel @Inject constructor(
 
     private fun bindFamily(familyId: String) {
         oldestCursor = null
+        // Cambio di famiglia: niente della conversazione di prima resta a schermo
+        // (messaggi, risposta in corso, «sta scrivendo», menzioni in attesa).
+        val switching = _uiState.value.familyId != familyId
+        if (switching) pendingMentions.clear()
         _uiState.value = _uiState.value.copy(
             isLoading = true,
             familyId = familyId,
             hasMoreOlder = true,
             isLoadingOlder = false,
             errorText = null,
-        )
+        ).let { state ->
+            if (!switching) state
+            else state.copy(
+                messages = emptyList(),
+                replyContexts = emptyMap(),
+                replyingToId = null,
+                typingUsers = emptyList(),
+                mentionCandidates = emptyList(),
+            )
+        }
 
         viewModelScope.launch {
             badgeManager.clearLocal(CounterField.CHAT)
@@ -233,7 +255,8 @@ class ChatViewModel @Inject constructor(
         // Background hydration: download and cache media for messages that have a Firebase
         // Storage path but no local file yet. Errors are swallowed per-message inside the
         // repository so this never surfaces to the user.
-        viewModelScope.launch {
+        hydrateJob?.cancel()
+        hydrateJob = viewModelScope.launch {
             chatRepository.hydrateMissingMedia(familyId)
         }
 
@@ -271,7 +294,8 @@ class ChatViewModel @Inject constructor(
         }
 
         messageWindow.value = INITIAL_MESSAGE_WINDOW
-        viewModelScope.launch {
+        messagesJob?.cancel()
+        messagesJob = viewModelScope.launch {
             messageWindow
                 .flatMapLatest { limit -> chatRepository.observeMessages(familyId, limit) }
                 // Mapping KBChatMessage → UiChatMessage is CPU-only (JSON parsing, string ops)
@@ -867,6 +891,10 @@ class ChatViewModel @Inject constructor(
         isTypingSignalled = false
         mentionsJob?.cancel()
         mentionsJob = null
+        messagesJob?.cancel()
+        messagesJob = null
+        hydrateJob?.cancel()
+        hydrateJob = null
         typingRegistration?.remove()
         typingRegistration = null
         chatRepository.stopRealtime()
