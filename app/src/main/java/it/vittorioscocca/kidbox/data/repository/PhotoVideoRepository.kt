@@ -549,7 +549,16 @@ class PhotoVideoRepository @Inject constructor(
             if (local != null && remoteUpdatedAt >= local.updatedAtEpochMillis) photoDao.deleteById(dto.id)
             return
         }
-        if (local != null && remoteUpdatedAt < local.updatedAtEpochMillis) return
+        // Riparazione delle date: fino alla correzione del formato, le foto
+        // arrivate da iOS/web erano salvate con l'ora della sincronizzazione
+        // (takenAt e updatedAt = "adesso"), che è PIÙ recente dell'`updatedAt`
+        // vero del server: la regola "vince l'ultimo aggiornamento" qui sotto le
+        // scarterebbe per sempre. Se la data di scatto remota esiste ed è diversa
+        // da quella locale, il remoto è la verità e si applica comunque (le righe
+        // in attesa di upload sono già state escluse sopra).
+        val remoteTakenAt = dto.takenAtEpochMillis
+        val datesNeedRepair = local != null && remoteTakenAt > 0L && local.takenAtEpochMillis != remoteTakenAt
+        if (local != null && remoteUpdatedAt < local.updatedAtEpochMillis && !datesNeedRepair) return
         val now = System.currentTimeMillis()
         photoDao.upsert(
             KBFamilyPhotoEntity(
@@ -564,8 +573,11 @@ class PhotoVideoRepository @Inject constructor(
                 thumbnailBase64 = dto.thumbnailBase64 ?: local?.thumbnailBase64,
                 caption = dto.caption,
                 videoDurationSeconds = dto.videoDurationSeconds ?: local?.videoDurationSeconds,
-                takenAtEpochMillis = if (dto.takenAtEpochMillis > 0L) dto.takenAtEpochMillis else (local?.takenAtEpochMillis ?: now),
-                createdAtEpochMillis = local?.createdAtEpochMillis ?: dto.createdAtEpochMillis ?: now,
+                takenAtEpochMillis = if (remoteTakenAt > 0L) remoteTakenAt else (local?.takenAtEpochMillis ?: now),
+                createdAtEpochMillis = (if (datesNeedRepair) dto.createdAtEpochMillis else null)
+                    ?: local?.createdAtEpochMillis
+                    ?: dto.createdAtEpochMillis
+                    ?: now,
                 updatedAtEpochMillis = if (remoteUpdatedAt > 0L) remoteUpdatedAt else now,
                 createdBy = local?.createdBy ?: dto.createdBy.orEmpty(),
                 updatedBy = dto.updatedBy ?: local?.updatedBy.orEmpty(),

@@ -2,7 +2,9 @@ package it.vittorioscocca.kidbox.data.remote
 
 import it.vittorioscocca.kidbox.util.KBLog
 
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentChange
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
@@ -14,6 +16,30 @@ import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
 
 private const val TAG_PHOTO_SYNC = "KB_Photo_Sync"
+
+/**
+ * Una data di un documento foto/album, in millisecondi.
+ *
+ * iOS e web scrivono `takenAt`, `createdAt` e `updatedAt` come Firestore
+ * Timestamp; le vecchie build Android scrivevano solo `takenAtEpochMillis`,
+ * `createdAtEpochMillis` e `updatedAtEpochMillis` (numeri). Leggendo solo
+ * questi ultimi, ogni foto arrivata da iOS prendeva come data l'ora della
+ * sincronizzazione: nessuna foto spariva, ma Anni/Mesi/Giorni collassavano in
+ * un solo gruppo e l'ordine era arbitrario. Vince il Timestamp; il numero resta
+ * il ripiego (documenti di vecchie build Android, o scrittura locale ancora in
+ * attesa del server, dove `updatedAt` è `null`).
+ */
+internal fun epochMillisOf(
+    data: Map<String, Any?>,
+    timestampKey: String,
+    legacyKey: String,
+): Long? {
+    (data[timestampKey] as? Timestamp)?.let { return it.toDate().time }
+    return (data[legacyKey] as? Number)?.toLong()
+}
+
+private fun timestampOf(epochMillis: Long): Timestamp =
+    Timestamp(Math.floorDiv(epochMillis, 1000L), (Math.floorMod(epochMillis, 1000L) * 1_000_000L).toInt())
 
 data class RemoteFamilyPhotoDto(
     val id: String = "",
@@ -204,6 +230,7 @@ class PhotoVideoRemoteStore @Inject constructor() {
                 mapOf(
                     "isDeleted" to true,
                     "updatedAtEpochMillis" to updatedAtEpochMillis,
+                    "updatedAt" to FieldValue.serverTimestamp(),
                     "updatedBy" to updatedBy,
                 ),
                 SetOptions.merge(),
@@ -234,6 +261,7 @@ class PhotoVideoRemoteStore @Inject constructor() {
                 mapOf(
                     "isDeleted" to true,
                     "updatedAtEpochMillis" to updatedAtEpochMillis,
+                    "updatedAt" to FieldValue.serverTimestamp(),
                     "updatedBy" to updatedBy,
                 ),
                 SetOptions.merge(),
@@ -253,9 +281,9 @@ class PhotoVideoRemoteStore @Inject constructor() {
             thumbnailBase64 = data["thumbnailBase64"] as? String,
             caption = data["caption"] as? String,
             videoDurationSeconds = data.doubleValueOrNull("videoDurationSeconds"),
-            takenAtEpochMillis = data.longValue("takenAtEpochMillis"),
-            createdAtEpochMillis = data.longValueOrNull("createdAtEpochMillis"),
-            updatedAtEpochMillis = data.longValueOrNull("updatedAtEpochMillis"),
+            takenAtEpochMillis = epochMillisOf(data, "takenAt", "takenAtEpochMillis") ?: 0L,
+            createdAtEpochMillis = epochMillisOf(data, "createdAt", "createdAtEpochMillis"),
+            updatedAtEpochMillis = epochMillisOf(data, "updatedAt", "updatedAtEpochMillis"),
             createdBy = data["createdBy"] as? String,
             updatedBy = data["updatedBy"] as? String,
             albumIdsRaw = data["albumIdsRaw"] as? String ?: "",
@@ -270,8 +298,8 @@ class PhotoVideoRemoteStore @Inject constructor() {
             title = data["title"] as? String ?: "",
             coverPhotoId = data["coverPhotoId"] as? String,
             sortOrder = data.intValue("sortOrder"),
-            createdAtEpochMillis = data.longValueOrNull("createdAtEpochMillis"),
-            updatedAtEpochMillis = data.longValueOrNull("updatedAtEpochMillis"),
+            createdAtEpochMillis = epochMillisOf(data, "createdAt", "createdAtEpochMillis"),
+            updatedAtEpochMillis = epochMillisOf(data, "updatedAt", "updatedAtEpochMillis"),
             createdBy = data["createdBy"] as? String,
             updatedBy = data["updatedBy"] as? String,
             isDeleted = data["isDeleted"] as? Boolean ?: false,
@@ -295,6 +323,11 @@ class PhotoVideoRemoteStore @Inject constructor() {
         "updatedBy" to updatedBy,
         "albumIdsRaw" to albumIdsRaw,
         "isDeleted" to isDeleted,
+        // Il formato di iOS e web: Timestamp. I campi `...EpochMillis` sopra
+        // restano per le vecchie build Android, che leggono solo quelli.
+        "takenAt" to timestampOf(takenAtEpochMillis),
+        "createdAt" to timestampOf(createdAtEpochMillis),
+        "updatedAt" to FieldValue.serverTimestamp(),
     )
 
     private fun KBPhotoAlbumEntity.toRemoteMap(): Map<String, Any?> = mapOf(
@@ -307,6 +340,8 @@ class PhotoVideoRemoteStore @Inject constructor() {
         "createdBy" to createdBy,
         "updatedBy" to updatedBy,
         "isDeleted" to isDeleted,
+        "createdAt" to timestampOf(createdAtEpochMillis),
+        "updatedAt" to FieldValue.serverTimestamp(),
     )
 
     private fun Map<String, Any>.longValue(key: String): Long = when (val value = this[key]) {
